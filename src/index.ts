@@ -1,9 +1,10 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { builtinAgents } from "./agents"
-import { createTodoContinuationEnforcer } from "./hooks"
+import { createTodoContinuationEnforcer, createContextWindowMonitorHook } from "./hooks"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
+  const contextWindowMonitor = createContextWindowMonitorHook(ctx)
 
   return {
     config: async (config) => {
@@ -13,7 +14,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     },
 
-    event: todoContinuationEnforcer,
+    event: async (input) => {
+      await todoContinuationEnforcer(input)
+      await contextWindowMonitor.event(input)
+    },
+
+    "tool.execute.after": contextWindowMonitor["tool.execute.after"],
   }
 }
 
