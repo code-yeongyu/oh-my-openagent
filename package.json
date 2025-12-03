@@ -1,0 +1,52 @@
+{
+  "name": "oh-my-opencode",
+  "version": "0.1.0",
+  "description": "OpenCode plugin - custom agents (oracle, librarian) and enhanced features",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run clean && bun run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "oracle",
+    "librarian",
+    "agents",
+    "ai",
+    "llm"
+  ],
+  "author": "YeonGyu-Kim",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-yeongyu/oh-my-opencode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/code-yeongyu/oh-my-opencode/issues"
+  },
+  "homepage": "https://github.com/code-yeongyu/oh-my-opencode#readme",
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.0.7"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "bun": ">=1.0.0"
+  }
+}
