@@ -49,9 +49,31 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Debug environment
+        run: |
+          echo "=== Bun version ==="
+          bun --version
+          echo "=== Node version ==="
+          node --version
+          echo "=== Current directory ==="
+          pwd
+          echo "=== List src/ ==="
+          ls -la src/
+          echo "=== package.json scripts ==="
+          cat package.json | jq '.scripts'
 
       - name: Build
-        run: bun run build
+        run: |
+          echo "=== Running bun build ==="
+          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
+          echo "=== bun build exit code: $? ==="
+          echo "=== Running tsc ==="
+          tsc --emitDeclarationOnly
+          echo "=== Running build:schema ==="
+          bun run build:schema
       
       - name: Verify build output
         run: |
