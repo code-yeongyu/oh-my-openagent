@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { McpNameSchema } from "../mcp/types"
 
 const PermissionValue = z.enum(["ask", "allow", "deny"])
 
@@ -22,8 +23,6 @@ export const AgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
 ])
-
-export const McpNameSchema = z.enum(["websearch_exa", "context7"])
 
 export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
@@ -53,5 +52,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
-export type McpName = z.infer<typeof McpNameSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
+
+export { McpNameSchema, type McpName } from "../mcp/types"
