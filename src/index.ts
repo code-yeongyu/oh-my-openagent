@@ -3,6 +3,7 @@ import { builtinAgents } from "./agents"
 import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
+import { builtinMcps } from "./mcp"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
@@ -26,6 +27,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       config.tools = {
         ...config.tools,
         grep: false,
+      }
+      config.mcp = {
+        ...config.mcp,
+        ...builtinMcps,
       }
     },
 

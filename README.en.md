@@ -13,6 +13,7 @@ English | [한국어](README.ko.md)
       - [Built-in LSP Tools](#built-in-lsp-tools)
       - [Built-in AST-Grep Tools](#built-in-ast-grep-tools)
       - [Safe Grep](#safe-grep)
+      - [Built-in MCPs](#built-in-mcps)
     - [Other Features](#other-features)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
@@ -116,6 +117,10 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   - The default `grep` lacks safeguards. On a large codebase, a broad pattern can cause CPU overload and indefinite hanging.
   - `safe_grep` enforces strict limits.
   - **Note**: Default `grep` is disabled to prevent Agent confusion. `safe_grep` delivers full `grep` functionality with safety assurance.
+
+#### Built-in MCPs
+
+- **websearch_exa**: Exa AI web search. Performs real-time web searches and content scraping. Returns LLM-optimized context from relevant websites.
 
 ### Other Features
 
