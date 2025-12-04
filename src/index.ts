@@ -2,6 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { builtinAgents } from "./agents"
 import { createTodoContinuationEnforcer, createContextWindowMonitorHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
+import { builtinTools } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
@@ -14,6 +15,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   let currentSessionTitle: string | undefined
 
   return {
+    tool: builtinTools,
+
     config: async (config) => {
       config.agent = {
         ...config.agent,
