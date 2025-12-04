@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { builtinAgents } from "./agents"
+import { createBuiltinAgents, type AgentName, type AgentOverrides } from "./agents"
 import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
@@ -9,6 +9,8 @@ import * as path from "path"
 
 interface OhMyOpenCodeConfig {
   disabled_mcps?: McpName[]
+  disabled_agents?: AgentName[]
+  agents?: AgentOverrides
 }
 
 function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
@@ -48,9 +50,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     tool: builtinTools,
 
     config: async (config) => {
+      const agents = createBuiltinAgents(
+        pluginConfig.disabled_agents,
+        pluginConfig.agents
+      )
+
       config.agent = {
         ...config.agent,
-        ...builtinAgents,
+        ...agents,
       }
       config.tools = {
         ...config.tools,
@@ -176,3 +183,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 }
 
 export default OhMyOpenCodePlugin
+
+export type { AgentName, AgentOverrideConfig, AgentOverrides } from "./agents"
+export type { McpName } from "./mcp"

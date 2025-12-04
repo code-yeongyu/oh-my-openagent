@@ -5,6 +5,7 @@ English | [한국어](README.ko.md)
 - [Oh My OpenCode](#oh-my-opencode)
   - [Installation](#installation)
   - [Configuration](#configuration)
+    - [Disable specific MCPs](#disable-specific-mcps)
   - [TL;DR](#tldr)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
@@ -55,6 +56,36 @@ If you want to disable specific built-in MCPs, you can use the `disabled_mcps` o
 ```json
 {
   "disabled_mcps": ["context7", "websearch_exa"]
+}
+```
+
+### Disable specific Agents
+
+If you want to disable specific built-in agents, you can use the `disabled_agents` option.
+Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+
+```json
+{
+  "disabled_agents": ["oracle", "librarian"]
+}
+```
+
+### Override Agents
+
+You can override the configuration of built-in agents using the `agents` option.
+Overridable properties: `model`, `temperature`, `tools`, `permission`, `color`, `disable`, `mode`.
+
+```json
+{
+  "agents": {
+    "oracle": {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "temperature": 0.5
+    },
+    "frontend-ui-ux-engineer": {
+      "tools": ["playwright_browser_take_screenshot"]
+    }
+  }
 }
 ```
 
@@ -163,11 +194,8 @@ If this sounds arrogant and you have a superior solution, send a PR. You are wel
 
 As of now, I have no affiliation with any of the projects or models mentioned here. This plugin is purely based on personal experimentation and preference.
 
+I constructed 99% of this project using OpenCode. I focused on functional verification. This documentation has been personally reviewed and comprehensively rewritten, so you can rely on it with confidence.
 ## Warnings
 
 - If you are on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or lower, OpenCode has a bug that might break config.
   - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132, so use a newer version.
-
-- I constructed 99% of this project using OpenCode. I focused on functional verification. This documentation has been personally reviewed and comprehensively rewritten, so you can rely on it with confidence.
-
-

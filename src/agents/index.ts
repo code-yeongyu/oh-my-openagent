@@ -12,3 +12,6 @@ export const builtinAgents: Record<string, AgentConfig> = {
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
   "document-writer": documentWriterAgent,
 }
+
+export * from "./types"
+export { createBuiltinAgents } from "./utils"
