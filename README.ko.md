@@ -3,6 +3,7 @@
 ## 목차
 
 - [Oh My OpenCode](#oh-my-opencode)
+  - [설치](#설치)
   - [세 줄 요약](#세-줄-요약)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
@@ -30,6 +31,18 @@ Windows 만 사용하다가 처음으로 Linux 를 접하고 신나서 잔뜩 �
 OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 그런 프로젝트가 될겁니다.
 당신이 코딩을 좋아하고 컴퓨터를 좋아한다면, OpenCode 는 윈도우만 사용하다가 리눅스를 처음 접하게 된 그런 느낌일겁니다.
 그렇지 않은 당신도 약간의 시간을 투자해서 당신의 실력과 생산성을 몇배로 부스트하세요.
+
+## 설치
+
+`~/.config/opencode/opencode.json`에 추가:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode"
+  ]
+}
+```
 
 ## 세 줄 요약
 
@@ -135,6 +148,4 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 - [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) 혹은 이것보다 낮은 버전을 사용중이라면, OpenCode 의 버그로 인해 제대로 구성이 되지 않을 수 있습니다.
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
 
----
 
-현재 NPM 계정에 접근할 수 없습니다. 계정이 복구되는 대로 이 내용을 업데이트하겠습니다.

@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "OpenCode plugin - custom agents (oracle, librarian) and enhanced features",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly",
     "clean": "rm -rf dist",
     "prepublishOnly": "bun run clean && bun run build",
     "typecheck": "tsc --noEmit"

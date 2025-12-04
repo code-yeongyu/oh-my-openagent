@@ -3,6 +3,7 @@ English | [한국어](README.ko.md)
 ## Contents
 
 - [Oh My OpenCode](#oh-my-opencode)
+  - [Installation](#installation)
   - [TL;DR](#tldr)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
@@ -28,6 +29,18 @@ If you are a hacker, you will fucking falling in love with [OpenCode](https://gi
 You don't write code just for a paycheck? You write because you genuinely love it?
 
 To you, OpenCode will feel like the paradigm shift from Windows to Linux. Not you? It's still worth the investment. Give it 10 minutes. Your work and life will improve. I promise.
+
+## Installation
+
+Add to `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode"
+  ]
+}
+```
 
 ## TL;DR
 
@@ -135,6 +148,4 @@ As of now, I have no affiliation with any of the projects or models mentioned he
 
 - I constructed 99% of this project using OpenCode. I focused on functional verification. This documentation has been personally reviewed and comprehensively rewritten, so you can rely on it with confidence.
 
----
 
-I currently don't have access to my NPM account. I'll update this section as soon as I get it back.
