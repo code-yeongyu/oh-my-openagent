@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-const ANTHROPIC_CONTEXT_LIMIT = 1_000_000
-const CONTEXT_WARNING_THRESHOLD = 0.75
+const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
+const ANTHROPIC_ACTUAL_LIMIT = 200_000
+const CONTEXT_WARNING_THRESHOLD = 0.70
 
 const CONTEXT_REMINDER = `[SYSTEM REMINDER - 1M Context Window]
 
@@ -65,16 +66,17 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
         return sum + inputTokens + cacheReadTokens
       }, 0)
 
-      const usagePercentage = totalInputTokens / ANTHROPIC_CONTEXT_LIMIT
+      const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
 
-      if (usagePercentage < CONTEXT_WARNING_THRESHOLD) return
+      if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
       remindedSessions.add(sessionID)
 
-      const usedPct = (usagePercentage * 100).toFixed(1)
-      const remainingPct = ((1 - usagePercentage) * 100).toFixed(1)
+      const displayUsagePercentage = totalInputTokens / ANTHROPIC_DISPLAY_LIMIT
+      const usedPct = (displayUsagePercentage * 100).toFixed(1)
+      const remainingPct = ((1 - displayUsagePercentage) * 100).toFixed(1)
       const usedTokens = totalInputTokens.toLocaleString()
-      const limitTokens = ANTHROPIC_CONTEXT_LIMIT.toLocaleString()
+      const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
 
       output.output += `\n\n${CONTEXT_REMINDER}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
