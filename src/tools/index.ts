@@ -6,7 +6,19 @@ import {
   lsp_workspace_symbols,
   lsp_diagnostics,
   lsp_servers,
+  lsp_prepare_rename,
+  lsp_rename,
+  lsp_code_actions,
+  lsp_code_action_resolve,
 } from "./lsp"
+
+import {
+  ast_grep_search,
+  ast_grep_replace,
+  ast_grep_languages,
+  ast_grep_analyze,
+  ast_grep_transform,
+} from "./ast-grep"
 
 export const builtinTools = {
   lsp_hover,
@@ -16,4 +28,13 @@ export const builtinTools = {
   lsp_workspace_symbols,
   lsp_diagnostics,
   lsp_servers,
+  lsp_prepare_rename,
+  lsp_rename,
+  lsp_code_actions,
+  lsp_code_action_resolve,
+  ast_grep_search,
+  ast_grep_replace,
+  ast_grep_languages,
+  ast_grep_analyze,
+  ast_grep_transform,
 }
