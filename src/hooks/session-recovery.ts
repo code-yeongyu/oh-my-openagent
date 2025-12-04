@@ -1,7 +1,7 @@
 /**
  * Session Recovery - Message State Error Recovery
  *
- * Handles THREE specific scenarios:
+ * Handles FOUR specific scenarios:
  * 1. tool_use block exists without tool_result
  *    - Recovery: inject tool_result with "cancelled" content
  *
@@ -10,6 +10,9 @@
  *
  * 3. Thinking disabled but message contains thinking blocks
  *    - Recovery: strip thinking/redacted_thinking blocks
+ *
+ * 4. Empty content message (non-empty content required)
+ *    - Recovery: delete the empty message via revert
  */
 
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -17,7 +20,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-type RecoveryErrorType = "tool_result_missing" | "thinking_block_order" | "thinking_disabled_violation" | null
+type RecoveryErrorType = "tool_result_missing" | "thinking_block_order" | "thinking_disabled_violation" | "empty_content_message" | null
 
 interface MessageInfo {
   id?: string
@@ -73,6 +76,10 @@ function detectErrorType(error: unknown): RecoveryErrorType {
 
   if (message.includes("thinking is disabled") && message.includes("cannot contain")) {
     return "thinking_disabled_violation"
+  }
+
+  if (message.includes("non-empty content") || message.includes("must have non-empty content")) {
+    return "empty_content_message"
   }
 
   return null
@@ -204,6 +211,35 @@ async function recoverThinkingDisabledViolation(
   return false
 }
 
+async function recoverEmptyContentMessage(
+  client: Client,
+  sessionID: string,
+  failedAssistantMsg: MessageData,
+  directory: string
+): Promise<boolean> {
+  const messageID = failedAssistantMsg.info?.id
+  const parentMsgID = failedAssistantMsg.info?.parentID
+
+  if (!messageID) {
+    return false
+  }
+
+  // Revert to parent message (delete the empty message)
+  const revertTargetID = parentMsgID || messageID
+
+  try {
+    await client.session.revert({
+      path: { id: sessionID },
+      body: { messageID: revertTargetID },
+      query: { directory },
+    })
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function fallbackRevertStrategy(
   client: Client,
   sessionID: string,
@@ -308,11 +344,13 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        empty_content_message: "Empty Message Recovery",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        empty_content_message: "Deleting empty message...",
       }
       const toastTitle = toastTitles[errorType]
       const toastMessage = toastMessages[errorType]
@@ -336,6 +374,8 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory)
       } else if (errorType === "thinking_disabled_violation") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
+      } else if (errorType === "empty_content_message") {
+        success = await recoverEmptyContentMessage(ctx.client, sessionID, failedMsg, ctx.directory)
       }
 
       return success
