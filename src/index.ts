@@ -22,6 +22,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...config.agent,
         ...builtinAgents,
       }
+      config.tools = {
+        ...config.tools,
+        grep: false,
+      }
     },
 
     event: async (input) => {
@@ -99,10 +103,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, _output) => {
-      if (input.tool === "grep") {
-        throw new Error(`[BLOCKED] grep has no timeout and can freeze the system. It is permanently disabled. Use 'safe-grep' instead.`)
-      }
-
       if (input.sessionID === mainSessionID) {
         updateTerminalTitle({
           sessionId: input.sessionID,
