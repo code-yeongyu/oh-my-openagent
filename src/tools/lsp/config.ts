@@ -7,97 +7,131 @@ export interface ResolvedServer {
   id: string
   command: string[]
   extensions: string[]
+  priority: number
   env?: Record<string, string>
   initialization?: Record<string, unknown>
 }
 
-interface OpencodeJsonLspEntry {
+interface LspEntry {
   disabled?: boolean
   command?: string[]
   extensions?: string[]
+  priority?: number
   env?: Record<string, string>
   initialization?: Record<string, unknown>
 }
 
-interface OpencodeJson {
-  lsp?: Record<string, OpencodeJsonLspEntry>
+interface ConfigJson {
+  lsp?: Record<string, LspEntry>
 }
 
-let cachedOpencodeConfig: OpencodeJson | null = null
+type ConfigSource = "project" | "user" | "opencode"
 
-function loadOpencodeJson(): OpencodeJson {
-  if (cachedOpencodeConfig) return cachedOpencodeConfig
+interface ServerWithSource extends ResolvedServer {
+  source: ConfigSource
+}
 
-  const configPath = join(homedir(), ".config", "opencode", "opencode.json")
-  if (existsSync(configPath)) {
-    try {
-      const content = readFileSync(configPath, "utf-8")
-      cachedOpencodeConfig = JSON.parse(content) as OpencodeJson
-      return cachedOpencodeConfig
-    } catch {
-    }
+function loadJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as T
+  } catch {
+    return null
   }
-
-  cachedOpencodeConfig = {}
-  return cachedOpencodeConfig
 }
 
-function getDisabledServers(): Set<string> {
-  const config = loadOpencodeJson()
-  const disabled = new Set<string>()
+function getConfigPaths(): { project: string; user: string; opencode: string } {
+  const cwd = process.cwd()
+  return {
+    project: join(cwd, ".opencode", "oh-my-opencode.json"),
+    user: join(homedir(), ".config", "opencode", "oh-my-opencode.json"),
+    opencode: join(homedir(), ".config", "opencode", "opencode.json"),
+  }
+}
 
-  if (config.lsp) {
+function loadAllConfigs(): Map<ConfigSource, ConfigJson> {
+  const paths = getConfigPaths()
+  const configs = new Map<ConfigSource, ConfigJson>()
+
+  const project = loadJsonFile<ConfigJson>(paths.project)
+  if (project) configs.set("project", project)
+
+  const user = loadJsonFile<ConfigJson>(paths.user)
+  if (user) configs.set("user", user)
+
+  const opencode = loadJsonFile<ConfigJson>(paths.opencode)
+  if (opencode) configs.set("opencode", opencode)
+
+  return configs
+}
+
+function getMergedServers(): ServerWithSource[] {
+  const configs = loadAllConfigs()
+  const servers: ServerWithSource[] = []
+  const disabled = new Set<string>()
+  const seen = new Set<string>()
+
+  const sources: ConfigSource[] = ["project", "user", "opencode"]
+
+  for (const source of sources) {
+    const config = configs.get(source)
+    if (!config?.lsp) continue
+
     for (const [id, entry] of Object.entries(config.lsp)) {
       if (entry.disabled) {
         disabled.add(id)
+        continue
       }
-    }
-  }
 
-  return disabled
-}
-
-function getUserLspServers(): Map<string, ResolvedServer> {
-  const config = loadOpencodeJson()
-  const servers = new Map<string, ResolvedServer>()
-
-  if (config.lsp) {
-    for (const [id, entry] of Object.entries(config.lsp)) {
-      if (entry.disabled) continue
+      if (seen.has(id)) continue
       if (!entry.command || !entry.extensions) continue
 
-      servers.set(id, {
+      servers.push({
         id,
         command: entry.command,
         extensions: entry.extensions,
+        priority: entry.priority ?? 0,
         env: entry.env,
         initialization: entry.initialization,
+        source,
       })
-    }
-  }
-
-  return servers
-}
-
-export function findServerForExtension(ext: string): ResolvedServer | null {
-  const userServers = getUserLspServers()
-  const disabledServers = getDisabledServers()
-
-  for (const server of userServers.values()) {
-    if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
-      return server
+      seen.add(id)
     }
   }
 
   for (const [id, config] of Object.entries(BUILTIN_SERVERS)) {
-    if (disabledServers.has(id)) continue
-    if (userServers.has(id)) continue
+    if (disabled.has(id) || seen.has(id)) continue
 
-    if (config.extensions.includes(ext) && isServerInstalled(config.command)) {
+    servers.push({
+      id,
+      command: config.command,
+      extensions: config.extensions,
+      priority: -100,
+      source: "opencode",
+    })
+  }
+
+  return servers.sort((a, b) => {
+    if (a.source !== b.source) {
+      const order: Record<ConfigSource, number> = { project: 0, user: 1, opencode: 2 }
+      return order[a.source] - order[b.source]
+    }
+    return b.priority - a.priority
+  })
+}
+
+export function findServerForExtension(ext: string): ResolvedServer | null {
+  const servers = getMergedServers()
+
+  for (const server of servers) {
+    if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
       return {
-        id,
-        command: config.command,
-        extensions: config.extensions,
+        id: server.id,
+        command: server.command,
+        extensions: server.extensions,
+        priority: server.priority,
+        env: server.env,
+        initialization: server.initialization,
       }
     }
   }
@@ -125,23 +159,50 @@ export function isServerInstalled(command: string[]): boolean {
   return false
 }
 
-export function getAllServers(): Array<{ id: string; installed: boolean; extensions: string[]; disabled: boolean }> {
-  const result: Array<{ id: string; installed: boolean; extensions: string[]; disabled: boolean }> = []
-  const userServers = getUserLspServers()
-  const disabledServers = getDisabledServers()
+export function getAllServers(): Array<{
+  id: string
+  installed: boolean
+  extensions: string[]
+  disabled: boolean
+  source: string
+  priority: number
+}> {
+  const configs = loadAllConfigs()
+  const servers = getMergedServers()
+  const disabled = new Set<string>()
+
+  for (const config of configs.values()) {
+    if (!config.lsp) continue
+    for (const [id, entry] of Object.entries(config.lsp)) {
+      if (entry.disabled) disabled.add(id)
+    }
+  }
+
+  const result: Array<{
+    id: string
+    installed: boolean
+    extensions: string[]
+    disabled: boolean
+    source: string
+    priority: number
+  }> = []
+
   const seen = new Set<string>()
 
-  for (const server of userServers.values()) {
+  for (const server of servers) {
+    if (seen.has(server.id)) continue
     result.push({
       id: server.id,
       installed: isServerInstalled(server.command),
       extensions: server.extensions,
       disabled: false,
+      source: server.source,
+      priority: server.priority,
     })
     seen.add(server.id)
   }
 
-  for (const id of disabledServers) {
+  for (const id of disabled) {
     if (seen.has(id)) continue
     const builtin = BUILTIN_SERVERS[id]
     result.push({
@@ -149,20 +210,14 @@ export function getAllServers(): Array<{ id: string; installed: boolean; extensi
       installed: builtin ? isServerInstalled(builtin.command) : false,
       extensions: builtin?.extensions || [],
       disabled: true,
-    })
-    seen.add(id)
-  }
-
-  for (const [id, config] of Object.entries(BUILTIN_SERVERS)) {
-    if (seen.has(id)) continue
-
-    result.push({
-      id,
-      installed: isServerInstalled(config.command),
-      extensions: config.extensions,
-      disabled: false,
+      source: "disabled",
+      priority: 0,
     })
   }
 
   return result
+}
+
+export function getConfigPaths_(): { project: string; user: string; opencode: string } {
+  return getConfigPaths()
 }
