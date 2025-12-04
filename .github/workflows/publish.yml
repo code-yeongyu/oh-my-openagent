@@ -46,7 +46,7 @@ jobs:
         run: bun install
 
       - name: Publish
-        run: ./script/publish.ts
+        run: bun run script/publish.ts
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
