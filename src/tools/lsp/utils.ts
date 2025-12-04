@@ -53,6 +53,17 @@ export async function withLspClient<T>(filePath: string, fn: (client: LSPClient)
 
   try {
     return await fn(client)
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("timeout")) {
+      const isInitializing = lspManager.isServerInitializing(root, server.id)
+      if (isInitializing) {
+        throw new Error(
+          `LSP server is still initializing. Please retry in a few seconds. ` +
+            `Original error: ${e.message}`
+        )
+      }
+    }
+    throw e
   } finally {
     lspManager.releaseClient(root, server.id)
   }

@@ -8,6 +8,8 @@ interface ManagedClient {
   client: LSPClient
   lastUsedAt: number
   refCount: number
+  initPromise?: Promise<void>
+  isInitializing: boolean
 }
 
 class LSPServerManager {
@@ -53,6 +55,9 @@ class LSPServerManager {
 
     let managed = this.clients.get(key)
     if (managed) {
+      if (managed.initPromise) {
+        await managed.initPromise
+      }
       if (managed.client.isAlive()) {
         managed.refCount++
         managed.lastUsedAt = Date.now()
@@ -63,16 +68,54 @@ class LSPServerManager {
     }
 
     const client = new LSPClient(root, server)
-    await client.start()
-    await client.initialize()
+    const initPromise = (async () => {
+      await client.start()
+      await client.initialize()
+    })()
 
     this.clients.set(key, {
       client,
       lastUsedAt: Date.now(),
       refCount: 1,
+      initPromise,
+      isInitializing: true,
     })
 
+    await initPromise
+    const m = this.clients.get(key)
+    if (m) {
+      m.initPromise = undefined
+      m.isInitializing = false
+    }
+
     return client
+  }
+
+  warmupClient(root: string, server: ResolvedServer): void {
+    const key = this.getKey(root, server.id)
+    if (this.clients.has(key)) return
+
+    const client = new LSPClient(root, server)
+    const initPromise = (async () => {
+      await client.start()
+      await client.initialize()
+    })()
+
+    this.clients.set(key, {
+      client,
+      lastUsedAt: Date.now(),
+      refCount: 0,
+      initPromise,
+      isInitializing: true,
+    })
+
+    initPromise.then(() => {
+      const m = this.clients.get(key)
+      if (m) {
+        m.initPromise = undefined
+        m.isInitializing = false
+      }
+    })
   }
 
   releaseClient(root: string, serverId: string): void {
@@ -82,6 +125,12 @@ class LSPServerManager {
       managed.refCount--
       managed.lastUsedAt = Date.now()
     }
+  }
+
+  isServerInitializing(root: string, serverId: string): boolean {
+    const key = this.getKey(root, serverId)
+    const managed = this.clients.get(key)
+    return managed?.isInitializing ?? false
   }
 
   async stopAll(): Promise<void> {
@@ -278,7 +327,7 @@ export class LSPClient {
           const stderr = this.stderrBuffer.slice(-5).join("\n")
           reject(new Error(`LSP request timeout (method: ${method})` + (stderr ? `\nrecent stderr: ${stderr}` : "")))
         }
-      }, 30000)
+      }, 15000)
     })
   }
 

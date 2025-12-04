@@ -20,6 +20,8 @@ import {
   ast_grep_transform,
 } from "./ast-grep"
 
+import { safe_grep } from "./safe-grep"
+
 export const builtinTools = {
   lsp_hover,
   lsp_goto_definition,
@@ -37,4 +39,5 @@ export const builtinTools = {
   ast_grep_languages,
   ast_grep_analyze,
   ast_grep_transform,
+  safe_grep,
 }
