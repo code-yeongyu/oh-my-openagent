@@ -63,10 +63,11 @@ async function generateChangelog(previous: string): Promise<string> {
 
 async function buildAndPublish(): Promise<void> {
   console.log("\nPublishing to npm...")
+  // --ignore-scripts: workflow에서 이미 빌드 완료, prepublishOnly 재실행 방지
   if (process.env.CI) {
-    await $`npm publish --access public --provenance`
+    await $`npm publish --access public --provenance --ignore-scripts`
   } else {
-    await $`npm publish --access public`
+    await $`npm publish --access public --ignore-scripts`
   }
 }
 
