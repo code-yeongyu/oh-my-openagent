@@ -8,8 +8,27 @@ import {
   formatSymbolInfo,
   formatDiagnostic,
   filterDiagnosticsBySeverity,
+  formatPrepareRenameResult,
+  formatWorkspaceEdit,
+  formatCodeActions,
+  applyWorkspaceEdit,
+  formatApplyResult,
 } from "./utils"
-import type { HoverResult, Location, LocationLink, DocumentSymbol, SymbolInfo, Diagnostic } from "./types"
+import type {
+  HoverResult,
+  Location,
+  LocationLink,
+  DocumentSymbol,
+  SymbolInfo,
+  Diagnostic,
+  PrepareRenameResult,
+  PrepareRenameDefaultBehavior,
+  WorkspaceEdit,
+  CodeAction,
+  Command,
+} from "./types"
+
+
 
 export const lsp_hover = tool({
   description:
@@ -19,14 +38,16 @@ export const lsp_hover = tool({
     line: tool.schema.number().min(1).describe("Line number (1-based)"),
     character: tool.schema.number().min(0).describe("Character position (0-based)"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.hover(args.filePath, args.line, args.character)) as HoverResult | null
       })
-      return formatHoverResult(result)
+      const output = formatHoverResult(result)
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -39,7 +60,7 @@ export const lsp_goto_definition = tool({
     line: tool.schema.number().min(1).describe("Line number (1-based)"),
     character: tool.schema.number().min(0).describe("Character position (0-based)"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.definition(args.filePath, args.line, args.character)) as
@@ -49,14 +70,22 @@ export const lsp_goto_definition = tool({
           | null
       })
 
-      if (!result) return "No definition found"
+      if (!result) {
+        const output = "No definition found"
+        return output
+      }
 
       const locations = Array.isArray(result) ? result : [result]
-      if (locations.length === 0) return "No definition found"
+      if (locations.length === 0) {
+        const output = "No definition found"
+        return output
+      }
 
-      return locations.map(formatLocation).join("\n")
+      const output = locations.map(formatLocation).join("\n")
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -70,7 +99,7 @@ export const lsp_find_references = tool({
     character: tool.schema.number().min(0).describe("Character position (0-based)"),
     includeDeclaration: tool.schema.boolean().optional().describe("Include the declaration itself"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.references(args.filePath, args.line, args.character, args.includeDeclaration ?? true)) as
@@ -78,11 +107,16 @@ export const lsp_find_references = tool({
           | null
       })
 
-      if (!result || result.length === 0) return "No references found"
+      if (!result || result.length === 0) {
+        const output = "No references found"
+        return output
+      }
 
-      return result.map(formatLocation).join("\n")
+      const output = result.map(formatLocation).join("\n")
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -93,20 +127,27 @@ export const lsp_document_symbols = tool({
   args: {
     filePath: tool.schema.string().describe("The absolute path to the file"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.documentSymbols(args.filePath)) as DocumentSymbol[] | SymbolInfo[] | null
       })
 
-      if (!result || result.length === 0) return "No symbols found"
-
-      if ("range" in result[0]) {
-        return (result as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)).join("\n")
+      if (!result || result.length === 0) {
+        const output = "No symbols found"
+        return output
       }
-      return (result as SymbolInfo[]).map(formatSymbolInfo).join("\n")
+
+      let output: string
+      if ("range" in result[0]) {
+        output = (result as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)).join("\n")
+      } else {
+        output = (result as SymbolInfo[]).map(formatSymbolInfo).join("\n")
+      }
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -119,18 +160,23 @@ export const lsp_workspace_symbols = tool({
     query: tool.schema.string().describe("The symbol name to search for (supports fuzzy matching)"),
     limit: tool.schema.number().optional().describe("Maximum number of results to return"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.workspaceSymbols(args.query)) as SymbolInfo[] | null
       })
 
-      if (!result || result.length === 0) return "No symbols found"
+      if (!result || result.length === 0) {
+        const output = "No symbols found"
+        return output
+      }
 
       const limited = args.limit ? result.slice(0, args.limit) : result
-      return limited.map(formatSymbolInfo).join("\n")
+      const output = limited.map(formatSymbolInfo).join("\n")
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -145,7 +191,7 @@ export const lsp_diagnostics = tool({
       .optional()
       .describe("Filter by severity level"),
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.diagnostics(args.filePath)) as { items?: Diagnostic[] } | Diagnostic[] | null
@@ -162,11 +208,16 @@ export const lsp_diagnostics = tool({
 
       diagnostics = filterDiagnosticsBySeverity(diagnostics, args.severity)
 
-      if (diagnostics.length === 0) return "No diagnostics found"
+      if (diagnostics.length === 0) {
+        const output = "No diagnostics found"
+        return output
+      }
 
-      return diagnostics.map(formatDiagnostic).join("\n")
+      const output = diagnostics.map(formatDiagnostic).join("\n")
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })
@@ -174,7 +225,7 @@ export const lsp_diagnostics = tool({
 export const lsp_servers = tool({
   description: "List all available LSP servers and check if they are installed. Use this to see what language support is available.",
   args: {},
-  execute: async () => {
+  execute: async (_args, context) => {
     try {
       const servers = getAllServers()
       const lines = servers.map((s) => {
@@ -184,9 +235,150 @@ export const lsp_servers = tool({
         const status = s.installed ? "[installed]" : "[not installed]"
         return `${s.id} ${status} - ${s.extensions.join(", ")}`
       })
-      return lines.join("\n")
+      const output = lines.join("\n")
+      return output
     } catch (e) {
-      return `Error: ${e instanceof Error ? e.message : String(e)}`
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
+    }
+  },
+})
+
+export const lsp_prepare_rename = tool({
+  description:
+    "Check if a symbol at a specific position can be renamed. Use this BEFORE attempting to rename to validate the operation and get the current symbol name.",
+  args: {
+    filePath: tool.schema.string().describe("The absolute path to the file"),
+    line: tool.schema.number().min(1).describe("Line number (1-based)"),
+    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+  },
+  execute: async (args, context) => {
+    try {
+      const result = await withLspClient(args.filePath, async (client) => {
+        return (await client.prepareRename(args.filePath, args.line, args.character)) as
+          | PrepareRenameResult
+          | PrepareRenameDefaultBehavior
+          | null
+      })
+      const output = formatPrepareRenameResult(result)
+      return output
+    } catch (e) {
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
+    }
+  },
+})
+
+export const lsp_rename = tool({
+  description:
+    "Rename a symbol across the entire workspace. This APPLIES the rename to all files. Use lsp_prepare_rename first to check if rename is possible.",
+  args: {
+    filePath: tool.schema.string().describe("The absolute path to the file"),
+    line: tool.schema.number().min(1).describe("Line number (1-based)"),
+    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+    newName: tool.schema.string().describe("The new name for the symbol"),
+  },
+  execute: async (args, context) => {
+    try {
+      const edit = await withLspClient(args.filePath, async (client) => {
+        return (await client.rename(args.filePath, args.line, args.character, args.newName)) as WorkspaceEdit | null
+      })
+      const result = applyWorkspaceEdit(edit)
+      const output = formatApplyResult(result)
+      return output
+    } catch (e) {
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
+    }
+  },
+})
+
+export const lsp_code_actions = tool({
+  description:
+    "Get available code actions for a range in the file. Code actions include quick fixes, refactorings (extract, inline, rewrite), and source actions (organize imports, fix all). Use this to discover what automated changes the language server can perform.",
+  args: {
+    filePath: tool.schema.string().describe("The absolute path to the file"),
+    startLine: tool.schema.number().min(1).describe("Start line number (1-based)"),
+    startCharacter: tool.schema.number().min(0).describe("Start character position (0-based)"),
+    endLine: tool.schema.number().min(1).describe("End line number (1-based)"),
+    endCharacter: tool.schema.number().min(0).describe("End character position (0-based)"),
+    kind: tool.schema
+      .enum([
+        "quickfix",
+        "refactor",
+        "refactor.extract",
+        "refactor.inline",
+        "refactor.rewrite",
+        "source",
+        "source.organizeImports",
+        "source.fixAll",
+      ])
+      .optional()
+      .describe("Filter by code action kind"),
+  },
+  execute: async (args, context) => {
+    try {
+      const only = args.kind ? [args.kind] : undefined
+      const result = await withLspClient(args.filePath, async (client) => {
+        return (await client.codeAction(
+          args.filePath,
+          args.startLine,
+          args.startCharacter,
+          args.endLine,
+          args.endCharacter,
+          only
+        )) as (CodeAction | Command)[] | null
+      })
+      const output = formatCodeActions(result)
+      return output
+    } catch (e) {
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
+    }
+  },
+})
+
+export const lsp_code_action_resolve = tool({
+  description:
+    "Resolve and APPLY a code action. This resolves the full details and applies the changes to files. Use after getting a code action from lsp_code_actions.",
+  args: {
+    filePath: tool.schema
+      .string()
+      .describe("The absolute path to a file in the workspace (used to find the LSP server)"),
+    codeAction: tool.schema.string().describe("The code action JSON object as returned by lsp_code_actions (stringified)"),
+  },
+  execute: async (args, context) => {
+    try {
+      const codeAction = JSON.parse(args.codeAction) as CodeAction
+      const resolved = await withLspClient(args.filePath, async (client) => {
+        return (await client.codeActionResolve(codeAction)) as CodeAction | null
+      })
+
+      if (!resolved) {
+        const output = "Failed to resolve code action"
+        return output
+      }
+
+      const lines: string[] = []
+      lines.push(`Action: ${resolved.title}`)
+      if (resolved.kind) lines.push(`Kind: ${resolved.kind}`)
+
+      if (resolved.edit) {
+        const result = applyWorkspaceEdit(resolved.edit)
+        lines.push(formatApplyResult(result))
+      } else {
+        lines.push("No edit to apply")
+      }
+
+      if (resolved.command) {
+        lines.push(`Command: ${resolved.command.title} (${resolved.command.command}) - not executed`)
+      }
+
+      const output = lines.join("\n")
+      return output
+    } catch (e) {
+      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+      return output
     }
   },
 })

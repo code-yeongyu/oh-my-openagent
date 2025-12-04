@@ -1,9 +1,22 @@
 import { extname, resolve } from "path"
-import { existsSync } from "fs"
-import { LSPClient } from "./client"
+import { existsSync, readFileSync, writeFileSync } from "fs"
+import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
-import type { HoverResult, DocumentSymbol, SymbolInfo, Location, LocationLink, Diagnostic } from "./types"
+import type {
+  HoverResult,
+  DocumentSymbol,
+  SymbolInfo,
+  Location,
+  LocationLink,
+  Diagnostic,
+  PrepareRenameResult,
+  PrepareRenameDefaultBehavior,
+  WorkspaceEdit,
+  TextEdit,
+  CodeAction,
+  Command,
+} from "./types"
 
 export function findWorkspaceRoot(filePath: string): string {
   let dir = resolve(filePath)
@@ -36,15 +49,12 @@ export async function withLspClient<T>(filePath: string, fn: (client: LSPClient)
   }
 
   const root = findWorkspaceRoot(absPath)
-  const client = new LSPClient(root, server)
-
-  await client.start()
-  await client.initialize()
+  const client = await lspManager.getClient(root, server)
 
   try {
     return await fn(client)
   } finally {
-    await client.stop()
+    lspManager.releaseClient(root, server.id)
   }
 }
 
@@ -141,4 +151,244 @@ export function filterDiagnosticsBySeverity(
 
   const targetSeverity = severityMap[severityFilter]
   return diagnostics.filter((d) => d.severity === targetSeverity)
+}
+
+export function formatPrepareRenameResult(
+  result: PrepareRenameResult | PrepareRenameDefaultBehavior | null
+): string {
+  if (!result) return "Cannot rename at this position"
+
+  if ("defaultBehavior" in result) {
+    return result.defaultBehavior ? "Rename supported (using default behavior)" : "Cannot rename at this position"
+  }
+
+  const startLine = result.range.start.line + 1
+  const startChar = result.range.start.character
+  const endLine = result.range.end.line + 1
+  const endChar = result.range.end.character
+  const placeholder = result.placeholder ? ` (current: "${result.placeholder}")` : ""
+
+  return `Rename available at ${startLine}:${startChar}-${endLine}:${endChar}${placeholder}`
+}
+
+export function formatTextEdit(edit: TextEdit): string {
+  const startLine = edit.range.start.line + 1
+  const startChar = edit.range.start.character
+  const endLine = edit.range.end.line + 1
+  const endChar = edit.range.end.character
+
+  const rangeStr = `${startLine}:${startChar}-${endLine}:${endChar}`
+  const preview = edit.newText.length > 50 ? edit.newText.substring(0, 50) + "..." : edit.newText
+
+  return `  ${rangeStr}: "${preview}"`
+}
+
+export function formatWorkspaceEdit(edit: WorkspaceEdit | null): string {
+  if (!edit) return "No changes"
+
+  const lines: string[] = []
+
+  if (edit.changes) {
+    for (const [uri, edits] of Object.entries(edit.changes)) {
+      const filePath = uri.replace("file://", "")
+      lines.push(`File: ${filePath}`)
+      for (const textEdit of edits) {
+        lines.push(formatTextEdit(textEdit))
+      }
+    }
+  }
+
+  if (edit.documentChanges) {
+    for (const change of edit.documentChanges) {
+      if ("kind" in change) {
+        if (change.kind === "create") {
+          lines.push(`Create: ${change.uri}`)
+        } else if (change.kind === "rename") {
+          lines.push(`Rename: ${change.oldUri} -> ${change.newUri}`)
+        } else if (change.kind === "delete") {
+          lines.push(`Delete: ${change.uri}`)
+        }
+      } else {
+        const filePath = change.textDocument.uri.replace("file://", "")
+        lines.push(`File: ${filePath}`)
+        for (const textEdit of change.edits) {
+          lines.push(formatTextEdit(textEdit))
+        }
+      }
+    }
+  }
+
+  if (lines.length === 0) return "No changes"
+
+  return lines.join("\n")
+}
+
+export function formatCodeAction(action: CodeAction): string {
+  let result = `[${action.kind || "action"}] ${action.title}`
+
+  if (action.isPreferred) {
+    result += " ⭐"
+  }
+
+  if (action.disabled) {
+    result += ` (disabled: ${action.disabled.reason})`
+  }
+
+  return result
+}
+
+export function formatCodeActions(actions: (CodeAction | Command)[] | null): string {
+  if (!actions || actions.length === 0) return "No code actions available"
+
+  const lines: string[] = []
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i]
+
+    if ("command" in action && typeof action.command === "string" && !("kind" in action)) {
+      lines.push(`${i + 1}. [command] ${(action as Command).title}`)
+    } else {
+      lines.push(`${i + 1}. ${formatCodeAction(action as CodeAction)}`)
+    }
+  }
+
+  return lines.join("\n")
+}
+
+export interface ApplyResult {
+  success: boolean
+  filesModified: string[]
+  totalEdits: number
+  errors: string[]
+}
+
+function applyTextEditsToFile(filePath: string, edits: TextEdit[]): { success: boolean; editCount: number; error?: string } {
+  try {
+    let content = readFileSync(filePath, "utf-8")
+    const lines = content.split("\n")
+
+    const sortedEdits = [...edits].sort((a, b) => {
+      if (b.range.start.line !== a.range.start.line) {
+        return b.range.start.line - a.range.start.line
+      }
+      return b.range.start.character - a.range.start.character
+    })
+
+    for (const edit of sortedEdits) {
+      const startLine = edit.range.start.line
+      const startChar = edit.range.start.character
+      const endLine = edit.range.end.line
+      const endChar = edit.range.end.character
+
+      if (startLine === endLine) {
+        const line = lines[startLine] || ""
+        lines[startLine] = line.substring(0, startChar) + edit.newText + line.substring(endChar)
+      } else {
+        const firstLine = lines[startLine] || ""
+        const lastLine = lines[endLine] || ""
+        const newContent = firstLine.substring(0, startChar) + edit.newText + lastLine.substring(endChar)
+        lines.splice(startLine, endLine - startLine + 1, ...newContent.split("\n"))
+      }
+    }
+
+    writeFileSync(filePath, lines.join("\n"), "utf-8")
+    return { success: true, editCount: edits.length }
+  } catch (err) {
+    return { success: false, editCount: 0, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
+  if (!edit) {
+    return { success: false, filesModified: [], totalEdits: 0, errors: ["No edit provided"] }
+  }
+
+  const result: ApplyResult = { success: true, filesModified: [], totalEdits: 0, errors: [] }
+
+  if (edit.changes) {
+    for (const [uri, edits] of Object.entries(edit.changes)) {
+      const filePath = uri.replace("file://", "")
+      const applyResult = applyTextEditsToFile(filePath, edits)
+
+      if (applyResult.success) {
+        result.filesModified.push(filePath)
+        result.totalEdits += applyResult.editCount
+      } else {
+        result.success = false
+        result.errors.push(`${filePath}: ${applyResult.error}`)
+      }
+    }
+  }
+
+  if (edit.documentChanges) {
+    for (const change of edit.documentChanges) {
+      if ("kind" in change) {
+        if (change.kind === "create") {
+          try {
+            const filePath = change.uri.replace("file://", "")
+            writeFileSync(filePath, "", "utf-8")
+            result.filesModified.push(filePath)
+          } catch (err) {
+            result.success = false
+            result.errors.push(`Create ${change.uri}: ${err}`)
+          }
+        } else if (change.kind === "rename") {
+          try {
+            const oldPath = change.oldUri.replace("file://", "")
+            const newPath = change.newUri.replace("file://", "")
+            const content = readFileSync(oldPath, "utf-8")
+            writeFileSync(newPath, content, "utf-8")
+            require("fs").unlinkSync(oldPath)
+            result.filesModified.push(newPath)
+          } catch (err) {
+            result.success = false
+            result.errors.push(`Rename ${change.oldUri}: ${err}`)
+          }
+        } else if (change.kind === "delete") {
+          try {
+            const filePath = change.uri.replace("file://", "")
+            require("fs").unlinkSync(filePath)
+            result.filesModified.push(filePath)
+          } catch (err) {
+            result.success = false
+            result.errors.push(`Delete ${change.uri}: ${err}`)
+          }
+        }
+      } else {
+        const filePath = change.textDocument.uri.replace("file://", "")
+        const applyResult = applyTextEditsToFile(filePath, change.edits)
+
+        if (applyResult.success) {
+          result.filesModified.push(filePath)
+          result.totalEdits += applyResult.editCount
+        } else {
+          result.success = false
+          result.errors.push(`${filePath}: ${applyResult.error}`)
+        }
+      }
+    }
+  }
+
+  return result
+}
+
+export function formatApplyResult(result: ApplyResult): string {
+  const lines: string[] = []
+
+  if (result.success) {
+    lines.push(`Applied ${result.totalEdits} edit(s) to ${result.filesModified.length} file(s):`)
+    for (const file of result.filesModified) {
+      lines.push(`  - ${file}`)
+    }
+  } else {
+    lines.push("Failed to apply some changes:")
+    for (const err of result.errors) {
+      lines.push(`  Error: ${err}`)
+    }
+    if (result.filesModified.length > 0) {
+      lines.push(`Successfully modified: ${result.filesModified.join(", ")}`)
+    }
+  }
+
+  return lines.join("\n")
 }
