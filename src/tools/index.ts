@@ -15,9 +15,6 @@ import {
 import {
   ast_grep_search,
   ast_grep_replace,
-  ast_grep_languages,
-  ast_grep_analyze,
-  ast_grep_transform,
 } from "./ast-grep"
 
 import { safe_grep } from "./safe-grep"
@@ -36,8 +33,5 @@ export const builtinTools = {
   lsp_code_action_resolve,
   ast_grep_search,
   ast_grep_replace,
-  ast_grep_languages,
-  ast_grep_analyze,
-  ast_grep_transform,
   safe_grep,
 }
