@@ -4,6 +4,7 @@ English | [한국어](README.ko.md)
 
 - [Oh My OpenCode](#oh-my-opencode)
   - [Installation](#installation)
+  - [Configuration](#configuration)
   - [TL;DR](#tldr)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
@@ -40,6 +41,20 @@ Add to `~/.config/opencode/opencode.json`:
   "plugin": [
     "oh-my-opencode"
   ]
+}
+```
+
+## Configuration
+
+You can configure Oh My OpenCode by creating a `oh-my-opencode.json` (or `.oh-my-opencode.json`) file in your project root.
+
+### Disable specific MCPs
+
+If you want to disable specific built-in MCPs, you can use the `disabled_mcps` option.
+
+```json
+{
+  "disabled_mcps": ["context7", "websearch_exa"]
 }
 ```
 
@@ -120,7 +135,8 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 
 #### Built-in MCPs
 
-- **websearch_exa**: Exa AI web search. Performs real-time web searches and content scraping. Returns LLM-optimized context from relevant websites.
+- **websearch_exa**: Exa AI web search. Performs real-time web searches and can scrape content from specific URLs. Returns LLM-optimized context from relevant websites.
+- **context7**: Library documentation lookup. Fetches up-to-date documentation for any library to assist with accurate coding.
 
 ### Other Features
 

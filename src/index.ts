@@ -3,7 +3,33 @@ import { builtinAgents } from "./agents"
 import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
-import { builtinMcps } from "./mcp"
+import { createBuiltinMcps, type McpName } from "./mcp"
+import * as fs from "fs"
+import * as path from "path"
+
+interface OhMyOpenCodeConfig {
+  disabled_mcps?: McpName[]
+}
+
+function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
+  const configPaths = [
+    path.join(directory, "oh-my-opencode.json"),
+    path.join(directory, ".oh-my-opencode.json"),
+  ]
+
+  for (const configPath of configPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, "utf-8")
+        return JSON.parse(content) as OhMyOpenCodeConfig
+      }
+    } catch {
+      // Ignore parse errors, use defaults
+    }
+  }
+
+  return {}
+}
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
@@ -11,6 +37,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const sessionRecovery = createSessionRecoveryHook(ctx)
 
   updateTerminalTitle({ sessionId: "main" })
+
+  const pluginConfig = loadPluginConfig(ctx.directory)
 
   let mainSessionID: string | undefined
   let currentSessionID: string | undefined
@@ -30,7 +58,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
       config.mcp = {
         ...config.mcp,
-        ...builtinMcps,
+        ...createBuiltinMcps(pluginConfig.disabled_mcps),
       }
     },
 
