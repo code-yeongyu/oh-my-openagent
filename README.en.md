@@ -78,6 +78,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **Todo Continuation Enforcer**: Forces the agent to complete all tasks before exiting. Eliminates the common LLM issue of "giving up halfway".
 - **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
 - **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
+- **Session Recovery**: Automatically recovers from API errors by injecting missing tool results and correcting thinking block violations, ensuring session stability.
 
 ### Agents
 - **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.

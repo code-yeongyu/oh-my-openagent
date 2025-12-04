@@ -1,12 +1,13 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { builtinAgents } from "./agents"
-import { createTodoContinuationEnforcer, createContextWindowMonitorHook } from "./hooks"
+import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
   const contextWindowMonitor = createContextWindowMonitorHook(ctx)
+  const sessionRecovery = createSessionRecoveryHook(ctx)
 
   updateTerminalTitle({ sessionId: "main" })
 
@@ -79,6 +80,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (event.type === "session.error") {
         const sessionID = props?.sessionID as string | undefined
+        const error = props?.error
+
+        if (sessionRecovery.isRecoverableError(error)) {
+          const messageInfo = {
+            id: props?.messageID as string | undefined,
+            role: "assistant" as const,
+            sessionID,
+            error,
+          }
+          await sessionRecovery.handleSessionRecovery(messageInfo)
+        }
+
         if (sessionID && sessionID === mainSessionID) {
           updateTerminalTitle({
             sessionId: sessionID,
