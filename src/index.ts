@@ -1,17 +1,12 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { createBuiltinAgents, type AgentName, type AgentOverrides } from "./agents"
+import { createBuiltinAgents } from "./agents"
 import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
-import { createBuiltinMcps, type McpName } from "./mcp"
+import { createBuiltinMcps } from "./mcp"
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config"
 import * as fs from "fs"
 import * as path from "path"
-
-interface OhMyOpenCodeConfig {
-  disabled_mcps?: McpName[]
-  disabled_agents?: AgentName[]
-  agents?: AgentOverrides
-}
 
 function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
   const configPaths = [
@@ -23,7 +18,18 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
     try {
       if (fs.existsSync(configPath)) {
         const content = fs.readFileSync(configPath, "utf-8")
-        return JSON.parse(content) as OhMyOpenCodeConfig
+        const rawConfig = JSON.parse(content)
+        const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+
+        if (!result.success) {
+          console.error(`[oh-my-opencode] Config validation error in ${configPath}:`)
+          for (const issue of result.error.issues) {
+            console.error(`  - ${issue.path.join(".")}: ${issue.message}`)
+          }
+          return {}
+        }
+
+        return result.data
       }
     } catch {
       // Ignore parse errors, use defaults
@@ -184,5 +190,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
 export default OhMyOpenCodePlugin
 
-export type { AgentName, AgentOverrideConfig, AgentOverrides } from "./agents"
-export type { McpName } from "./mcp"
+export { OhMyOpenCodeConfigSchema } from "./config"
+export type {
+  OhMyOpenCodeConfig,
+  AgentName,
+  AgentOverrideConfig,
+  AgentOverrides,
+  McpName,
+} from "./config"
