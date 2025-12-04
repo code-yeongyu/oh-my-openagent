@@ -62,9 +62,6 @@ async function generateChangelog(previous: string): Promise<string> {
 }
 
 async function buildAndPublish(): Promise<void> {
-  console.log("Building...")
-  await $`bun run build`
-
   console.log("\nPublishing to npm...")
   if (process.env.CI) {
     await $`npm publish --access public --provenance`

@@ -43,7 +43,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --ignore-scripts
+
+      - name: Build
+        run: bun run build
 
       - name: Publish
         run: bun run script/publish.ts
