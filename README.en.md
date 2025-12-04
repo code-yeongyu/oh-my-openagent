@@ -49,6 +49,25 @@ Add to `~/.config/opencode/opencode.json`:
 
 You can configure Oh My OpenCode by creating a `oh-my-opencode.json` (or `.oh-my-opencode.json`) file in your project root.
 
+### JSON Schema Support
+
+For autocompletion and validation in VS Code (or other editors), add the `$schema` property to your configuration file.
+
+**Using Remote Schema (Recommended):**
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json",
+  "disabled_mcps": ["context7"]
+}
+```
+
+**Using Local Schema:**
+```json
+{
+  "$schema": "./node_modules/oh-my-opencode/dist/oh-my-opencode.schema.json"
+}
+```
+
 ### Disable specific MCPs
 
 If you want to disable specific built-in MCPs, you can use the `disabled_mcps` option.
@@ -56,36 +75,6 @@ If you want to disable specific built-in MCPs, you can use the `disabled_mcps` o
 ```json
 {
   "disabled_mcps": ["context7", "websearch_exa"]
-}
-```
-
-### Disable specific Agents
-
-If you want to disable specific built-in agents, you can use the `disabled_agents` option.
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
-
-```json
-{
-  "disabled_agents": ["oracle", "librarian"]
-}
-```
-
-### Override Agents
-
-You can override the configuration of built-in agents using the `agents` option.
-Overridable properties: `model`, `temperature`, `tools`, `permission`, `color`, `disable`, `mode`.
-
-```json
-{
-  "agents": {
-    "oracle": {
-      "model": "anthropic/claude-3-7-sonnet-20250219",
-      "temperature": 0.5
-    },
-    "frontend-ui-ux-engineer": {
-      "tools": ["playwright_browser_take_screenshot"]
-    }
-  }
 }
 ```
 
@@ -126,6 +115,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
 - **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
 - **Session Recovery**: Automatically recovers from API errors by injecting missing tool results and correcting thinking block violations, ensuring session stability.
+- **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
 
 ### Agents
 - **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
