@@ -94,8 +94,4 @@ export function createCommentCheckerHooks() {
   }
 }
 
-export * from "./types"
-export * from "./constants"
-export * from "./detector"
-export * from "./filters"
-export * from "./output"
+

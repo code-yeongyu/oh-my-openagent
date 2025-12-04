@@ -190,7 +190,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
 export default OhMyOpenCodePlugin
 
-export { OhMyOpenCodeConfigSchema } from "./config"
 export type {
   OhMyOpenCodeConfig,
   AgentName,
