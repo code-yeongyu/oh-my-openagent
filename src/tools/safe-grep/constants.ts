@@ -85,7 +85,7 @@ export const DEFAULT_MAX_FILESIZE = "10M"
 export const DEFAULT_MAX_COUNT = 500
 export const DEFAULT_MAX_COLUMNS = 1000
 export const DEFAULT_CONTEXT = 2
-export const DEFAULT_TIMEOUT_MS = 60_000
+export const DEFAULT_TIMEOUT_MS = 300_000
 export const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024
 
 export const RG_SAFETY_FLAGS = [
