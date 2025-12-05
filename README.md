@@ -207,18 +207,25 @@ Schema autocomplete is supported:
 
 ### Agents
 
-Override any agent's model, prompt, or permissions via `agents.{name}`. See [OpenCode Agents](https://opencode.ai/docs/agents).
+Override built-in agent settings:
 
 ```json
 {
   "agents": {
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+      "temperature": 0.5
+    },
+    "frontend-ui-ux-engineer": {
+      "disable": true
+    }
   }
 }
 ```
 
-Disable agents entirely:
+Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+
+Or disable agents via `disabled_agents`:
 
 ```json
 {
@@ -226,7 +233,7 @@ Disable agents entirely:
 }
 ```
 
-Available: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
 
 ### MCPs
 

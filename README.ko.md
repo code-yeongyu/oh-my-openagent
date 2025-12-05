@@ -208,18 +208,25 @@ Schema 자동 완성이 지원됩니다:
 
 ### Agents
 
-`agents.{name}`을 통해 에이전트의 모델, 프롬프트, 권한을 오버라이드할 수 있습니다. [OpenCode Agents](https://opencode.ai/docs/agents)를 참조하세요.
+내장 에이전트 설정을 오버라이드할 수 있습니다:
 
 ```json
 {
   "agents": {
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+      "temperature": 0.5
+    },
+    "frontend-ui-ux-engineer": {
+      "disable": true
+    }
   }
 }
 ```
 
-에이전트를 완전히 비활성화할 수도 있습니다:
+각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+
+또는 `disabled_agents`로 비활성화할 수 있습니다:
 
 ```json
 {
@@ -227,7 +234,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+사용 가능한 에이전트: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
 
 ### MCPs
 
