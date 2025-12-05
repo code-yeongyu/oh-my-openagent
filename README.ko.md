@@ -157,6 +157,8 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 
 #### 내장 LSP Tools
 
+당신이 에디터에서 사용하는 그 기능을 다른 에이전트들은 사용하지 못합니다. Oh My OpenCode 는 당신만의 그 도구를 LLM Agent 에게 쥐어줍니다. 리팩토링하고, 탐색하고, 분석하는 모든 작업을 OpenCode 의 설정값을 그대로 사용하여 지원합니다.
+
 [OpenCode 는 LSP 를 제공하지만](https://opencode.ai/docs/lsp/), 오로지 분석용으로만 제공합니다. 탐색과 리팩토링을 위한 도구는 OpenCode 와 동일한 스펙과 설정으로 Oh My OpenCode 가 제공합니다.
 
 - **lsp_hover**: 위치의 타입 정보, 문서, 시그니처 가져오기

@@ -152,6 +152,8 @@ Agent models, prompts, and permissions can be customized via `oh-my-opencode.jso
 
 #### Built-in LSP Tools
 
+The features you use in your editor—other agents cannot access them. Oh My OpenCode hands those very tools to your LLM Agent. Refactoring, navigation, and analysis are all supported using the same OpenCode configuration.
+
 [OpenCode provides LSP](https://opencode.ai/docs/lsp/), but only for analysis. Oh My OpenCode equips you with navigation and refactoring tools matching the same specification.
 
 - **lsp_hover**: Get type info, docs, signatures at position
