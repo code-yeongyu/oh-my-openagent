@@ -26,7 +26,6 @@ function getPlatformPackageName(): string | null {
     "linux-arm64": "@code-yeongyu/comment-checker-linux-arm64",
     "linux-x64": "@code-yeongyu/comment-checker-linux-x64",
     "win32-x64": "@code-yeongyu/comment-checker-windows-x64",
-    "win32-arm64": "@code-yeongyu/comment-checker-windows-arm64",
   }
 
   return platformMap[`${platform}-${arch}`] ?? null
