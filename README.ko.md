@@ -9,6 +9,7 @@
     - [특정 MCP 비활성화](#특정-mcp-비활성화)
     - [특정 Agent 비활성화](#특정-agent-비활성화)
     - [Agent 설정](#agent-설정)
+  - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
   - [세 줄 요약](#세-줄-요약)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
@@ -62,7 +63,7 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/ropnop/oh-my-opencode/main/schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
 }
 ```
 
@@ -70,7 +71,7 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
 
 ```json
 {
-  "$schema": "./node_modules/oh-my-opencode/dist/schema.json"
+  "$schema": "./node_modules/oh-my-opencode/dist/oh-my-opencode.schema.json"
 }
 ```
 
@@ -103,7 +104,7 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
 
 | 옵션 | 설명 |
 |------|------|
-| `model` | 사용할 모델 ID (예: `anthropic/claude-3-7-sonnet`) |
+| `model` | 사용할 모델 ID (예: `anthropic/claude-sonnet-4`) |
 | `temperature` | 창의성 조절 (0.0 ~ 2.0) |
 | `top_p` | 단어 선택 다양성 (0.0 ~ 1.0) |
 | `prompt` | 시스템 프롬프트 오버라이드 |
@@ -133,11 +134,11 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
 ```json
 {
   "agents": {
-    "oracle": { "model": "anthropic/claude-3-7-sonnet" },
+    "oracle": { "model": "anthropic/claude-sonnet-4" },
     "librarian": { "model": "anthropic/claude-haiku-4-5" },
     "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-3-7-sonnet" },
-    "document-writer": { "model": "anthropic/claude-3-7-sonnet" }
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4" },
+    "document-writer": { "model": "anthropic/claude-sonnet-4" }
   }
 }
 ```
@@ -167,6 +168,52 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
   }
 }
 ```
+
+## LLM Agent를 위한 안내
+
+당신이 사용자의 oh-my-opencode 설정을 돕는 LLM Agent라면, 다음 단계를 따르세요:
+
+### 1단계: OpenCode 설치 확인
+
+```bash
+if command -v opencode &> /dev/null; then
+    echo "OpenCode $(opencode --version) 설치됨"
+else
+    echo "OpenCode가 설치되어 있지 않습니다. 먼저 설치해주세요."
+    echo "참고: https://opencode.ai/docs/installation/"
+fi
+```
+
+OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs/installation/)를 안내하세요.
+
+### 2단계: oh-my-opencode 플러그인 설정
+
+```bash
+mkdir -p ~/.config/opencode
+
+if [ -f ~/.config/opencode/opencode.json ]; then
+    # 기존 설정 파일이 있는 경우: jq 또는 python으로 plugin 추가
+    if command -v jq &> /dev/null; then
+        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
+            ~/.config/opencode/opencode.json > /tmp/oc.json && \
+            mv /tmp/oc.json ~/.config/opencode/opencode.json
+    else
+        echo "~/.config/opencode/opencode.json의 plugin 배열에 \"oh-my-opencode\"를 추가하세요"
+    fi
+else
+    # 새 설정 파일 생성
+    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
+fi
+```
+
+### 3단계: 설정 확인
+
+```bash
+opencode --version  # 1.0.132 이상이어야 함
+cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있어야 함
+```
+
+> **참고**: 모델 인증이 필요하면, `opencode` 실행 후 `/connect` 명령어를 사용하거나, tmux를 통해 `opencode auth login`을 안내하세요.
 
 ## 세 줄 요약
 
@@ -276,5 +323,3 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 
 - [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) 혹은 이것보다 낮은 버전을 사용중이라면, OpenCode 의 버그로 인해 제대로 구성이 되지 않을 수 있습니다.
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
-
-
