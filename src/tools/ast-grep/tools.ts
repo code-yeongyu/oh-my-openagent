@@ -10,44 +10,25 @@ function showOutputToUser(context: unknown, output: string): void {
   ctx.metadata?.({ metadata: { output } })
 }
 
-/**
- * JS/TS languages that require complete function declaration patterns
- */
-const JS_TS_LANGUAGES = ["javascript", "typescript", "tsx"] as const
-
-/**
- * Validates AST pattern for common incomplete patterns that will fail silently.
- * Only validates JS/TS languages where function declarations require body.
- *
- * @throws Error with helpful message if pattern is incomplete
- */
-function validatePatternForCli(pattern: string, lang: CliLanguage): void {
-  if (!JS_TS_LANGUAGES.includes(lang as (typeof JS_TS_LANGUAGES)[number])) {
-    return
-  }
-
+function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
   const src = pattern.trim()
 
-  // Detect incomplete function declarations:
-  // - "function $NAME" (no params/body)
-  // - "export function $NAME" (no params/body)
-  // - "export async function $NAME" (no params/body)
-  // - "export default function $NAME" (no params/body)
-  // Pattern: ends with $METAVAR (uppercase, underscore, digits) without ( or {
-  const incompleteFunctionDecl =
-    /^(export\s+)?(default\s+)?(async\s+)?function\s+\$[A-Z_][A-Z0-9_]*\s*$/i.test(src)
-
-  if (incompleteFunctionDecl) {
-    throw new Error(
-      `Incomplete AST pattern for ${lang}: "${pattern}"\n\n` +
-        `ast-grep requires complete AST nodes. Function declarations must include parameters and body.\n\n` +
-        `Examples of correct patterns:\n` +
-        `  - "export async function $NAME($$$) { $$$ }" (matches export async functions)\n` +
-        `  - "function $NAME($$$) { $$$ }" (matches all function declarations)\n` +
-        `  - "async function $NAME($$$) { $$$ }" (matches async functions)\n\n` +
-        `Your pattern "${pattern}" is missing the parameter list and body.`
-    )
+  if (lang === "python") {
+    if (src.startsWith("class ") && src.endsWith(":")) {
+      return `💡 Hint: Python class patterns need body. Try "class $NAME" or include body with $$$BODY`
+    }
+    if ((src.startsWith("def ") || src.startsWith("async def ")) && src.endsWith(":")) {
+      return `💡 Hint: Python function patterns need body. Try "def $FUNC($$$):\\n    $$$BODY"`
+    }
   }
+
+  if (["javascript", "typescript", "tsx"].includes(lang)) {
+    if (/^(export\s+)?(async\s+)?function\s+\$[A-Z_]+\s*$/i.test(src)) {
+      return `💡 Hint: Function patterns need params and body. Try "function $NAME($$$) { $$$ }"`
+    }
+  }
+
+  return null
 }
 
 export const ast_grep_search = tool({
@@ -66,8 +47,6 @@ export const ast_grep_search = tool({
   },
   execute: async (args, context) => {
     try {
-      validatePatternForCli(args.pattern, args.lang as CliLanguage)
-
       const matches = await runSg({
         pattern: args.pattern,
         lang: args.lang as CliLanguage,
@@ -75,7 +54,16 @@ export const ast_grep_search = tool({
         globs: args.globs,
         context: args.context,
       })
-      const output = formatSearchResult(matches)
+
+      let output = formatSearchResult(matches)
+
+      if (matches.length === 0) {
+        const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
+        if (hint) {
+          output += `\n\n${hint}`
+        }
+      }
+
       showOutputToUser(context, output)
       return output
     } catch (e) {
