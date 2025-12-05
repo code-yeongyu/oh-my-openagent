@@ -59,11 +59,11 @@ if command -v opencode &> /dev/null; then
     echo "OpenCode $(opencode --version) is installed"
 else
     echo "OpenCode is not installed. Please install it first."
-    echo "See: https://opencode.ai/docs/installation/"
+    echo "See: https://opencode.ai/docs"
 fi
 ```
 
-If OpenCode is not installed, guide the user to [OpenCode Installation Guide](https://opencode.ai/docs/installation/).
+If OpenCode is not installed, guide the user to [OpenCode Installation Guide](https://opencode.ai/docs).
 
 ### Step 2: Configure oh-my-opencode Plugin
 

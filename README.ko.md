@@ -180,11 +180,11 @@ if command -v opencode &> /dev/null; then
     echo "OpenCode $(opencode --version) 설치됨"
 else
     echo "OpenCode가 설치되어 있지 않습니다. 먼저 설치해주세요."
-    echo "참고: https://opencode.ai/docs/installation/"
+    echo "참고: https://opencode.ai/docs"
 fi
 ```
 
-OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs/installation/)를 안내하세요.
+OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs)를 안내하세요.
 
 ### 2단계: oh-my-opencode 플러그인 설정
 
