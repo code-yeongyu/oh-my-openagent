@@ -136,6 +136,11 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
   - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
 - **Session Notification**: 에이전트가 작업을 마치면 OS 네이티브 알림을 보냅니다 (macOS, Linux, Windows).
+- **Session Recovery**: API 에러로부터 자동으로 복구하여 세션 안정성을 보장합니다. 네 가지 시나리오를 처리합니다:
+  - **Tool Result Missing**: `tool_use` 블록이 있지만 `tool_result`가 없을 때 (ESC 인터럽트) → "cancelled" tool result 주입
+  - **Thinking Block Order**: thinking 블록이 첫 번째여야 하는데 아닐 때 → 빈 thinking 블록 추가
+  - **Thinking Disabled Violation**: thinking 이 비활성화인데 thinking 블록이 있을 때 → thinking 블록 제거
+  - **Empty Content Message**: 메시지가 thinking/meta 블록만 있고 실제 내용이 없을 때 → 파일시스템을 통해 "(interrupted)" 텍스트 주입
 - **Comment Checker**: 코드 수정 후 불필요한 주석을 감지하여 보고합니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, AI가 남긴 흔적을 제거하여 코드를 깨끗하게 유지합니다.
 
 ### Agents

@@ -12,13 +12,20 @@
  *    - Recovery: strip thinking/redacted_thinking blocks
  *
  * 4. Empty content message (non-empty content required)
- *    - Recovery: delete the empty message via revert
+ *    - Recovery: inject text part directly via filesystem
  */
 
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { xdgData } from "xdg-basedir"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 
 type Client = ReturnType<typeof createOpencodeClient>
+
+const OPENCODE_STORAGE = join(xdgData ?? "", "opencode", "storage")
+const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
+const PART_STORAGE = join(OPENCODE_STORAGE, "part")
 
 type RecoveryErrorType = "tool_result_missing" | "thinking_block_order" | "thinking_disabled_violation" | "empty_content_message" | null
 
@@ -215,6 +222,140 @@ async function recoverThinkingDisabledViolation(
 }
 
 const THINKING_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"])
+const META_TYPES = new Set(["step-start", "step-finish"])
+
+interface StoredMessageMeta {
+  id: string
+  sessionID: string
+  role: string
+  parentID?: string
+}
+
+interface StoredPart {
+  id: string
+  sessionID: string
+  messageID: string
+  type: string
+  text?: string
+}
+
+function generatePartId(): string {
+  const timestamp = Date.now().toString(16)
+  const random = Math.random().toString(36).substring(2, 10)
+  return `prt_${timestamp}${random}`
+}
+
+function getMessageDir(sessionID: string): string {
+  const projectHash = readdirSync(MESSAGE_STORAGE).find((dir) => {
+    const sessionDir = join(MESSAGE_STORAGE, dir)
+    try {
+      return readdirSync(sessionDir).some((f) => f.includes(sessionID.replace("ses_", "")))
+    } catch {
+      return false
+    }
+  })
+
+  if (projectHash) {
+    return join(MESSAGE_STORAGE, projectHash, sessionID)
+  }
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) {
+      return sessionPath
+    }
+  }
+
+  return ""
+}
+
+function readMessagesFromStorage(sessionID: string): StoredMessageMeta[] {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir || !existsSync(messageDir)) return []
+
+  const messages: StoredMessageMeta[] = []
+  for (const file of readdirSync(messageDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const content = readFileSync(join(messageDir, file), "utf-8")
+      messages.push(JSON.parse(content))
+    } catch {
+      continue
+    }
+  }
+
+  return messages.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+function readPartsFromStorage(messageID: string): StoredPart[] {
+  const partDir = join(PART_STORAGE, messageID)
+  if (!existsSync(partDir)) return []
+
+  const parts: StoredPart[] = []
+  for (const file of readdirSync(partDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const content = readFileSync(join(partDir, file), "utf-8")
+      parts.push(JSON.parse(content))
+    } catch {
+      continue
+    }
+  }
+
+  return parts
+}
+
+function injectTextPartToStorage(sessionID: string, messageID: string, text: string): boolean {
+  const partDir = join(PART_STORAGE, messageID)
+
+  if (!existsSync(partDir)) {
+    mkdirSync(partDir, { recursive: true })
+  }
+
+  const partId = generatePartId()
+  const part: StoredPart = {
+    id: partId,
+    sessionID,
+    messageID,
+    type: "text",
+    text,
+  }
+
+  try {
+    writeFileSync(join(partDir, `${partId}.json`), JSON.stringify(part, null, 2))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function findEmptyContentMessageFromStorage(sessionID: string): string | null {
+  const messages = readMessagesFromStorage(sessionID)
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== "assistant") continue
+
+    const isLastMessage = i === messages.length - 1
+    if (isLastMessage) continue
+
+    const parts = readPartsFromStorage(msg.id)
+    const hasContent = parts.some((p) => {
+      if (THINKING_TYPES.has(p.type)) return false
+      if (META_TYPES.has(p.type)) return false
+      if (p.type === "text" && p.text?.trim()) return true
+      if (p.type === "tool_use") return true
+      if (p.type === "tool_result") return true
+      return false
+    })
+
+    if (!hasContent && parts.length > 0) {
+      return msg.id
+    }
+  }
+
+  return null
+}
 
 function hasNonEmptyOutput(msg: MessageData): boolean {
   const parts = msg.parts
@@ -246,65 +387,15 @@ function findEmptyContentMessage(msgs: MessageData[]): MessageData | null {
 }
 
 async function recoverEmptyContentMessage(
-  client: Client,
+  _client: Client,
   sessionID: string,
   failedAssistantMsg: MessageData,
-  directory: string
+  _directory: string
 ): Promise<boolean> {
-  try {
-    const messagesResp = await client.session.messages({
-      path: { id: sessionID },
-      query: { directory },
-    })
-    const msgs = (messagesResp as { data?: MessageData[] }).data
+  const emptyMessageID = findEmptyContentMessageFromStorage(sessionID) || failedAssistantMsg.info?.id
+  if (!emptyMessageID) return false
 
-    if (!msgs || msgs.length === 0) return false
-
-    const emptyMsg = findEmptyContentMessage(msgs) || failedAssistantMsg
-    const messageID = emptyMsg.info?.id
-    if (!messageID) return false
-
-    const existingParts = emptyMsg.parts || []
-    const hasOnlyThinkingOrMeta = existingParts.length > 0 && existingParts.every(
-      (p) => THINKING_TYPES.has(p.type) || p.type === "step-start" || p.type === "step-finish"
-    )
-
-    if (hasOnlyThinkingOrMeta) {
-      const strippedParts: MessagePart[] = [{ type: "text", text: "(interrupted)" }]
-
-      try {
-        // @ts-expect-error - Experimental API
-        await client.message?.update?.({
-          path: { id: messageID },
-          body: { parts: strippedParts },
-        })
-        return true
-      } catch {
-        // message.update not available
-      }
-
-      try {
-        // @ts-expect-error - Experimental API
-        await client.session.patch?.({
-          path: { id: sessionID },
-          body: { messageID, parts: strippedParts },
-        })
-        return true
-      } catch {
-        // session.patch not available
-      }
-    }
-
-    const revertTargetID = emptyMsg.info?.parentID || messageID
-    await client.session.revert({
-      path: { id: sessionID },
-      body: { messageID: revertTargetID },
-      query: { directory },
-    })
-    return true
-  } catch {
-    return false
-  }
+  return injectTextPartToStorage(sessionID, emptyMessageID, "(interrupted)")
 }
 
 async function fallbackRevertStrategy(

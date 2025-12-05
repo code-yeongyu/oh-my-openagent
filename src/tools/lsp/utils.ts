@@ -12,6 +12,7 @@ import type {
   Diagnostic,
   PrepareRenameResult,
   PrepareRenameDefaultBehavior,
+  Range,
   WorkspaceEdit,
   TextEdit,
   CodeAction,
@@ -165,21 +166,35 @@ export function filterDiagnosticsBySeverity(
 }
 
 export function formatPrepareRenameResult(
-  result: PrepareRenameResult | PrepareRenameDefaultBehavior | null
+  result: PrepareRenameResult | PrepareRenameDefaultBehavior | Range | null
 ): string {
   if (!result) return "Cannot rename at this position"
 
+  // Case 1: { defaultBehavior: boolean }
   if ("defaultBehavior" in result) {
     return result.defaultBehavior ? "Rename supported (using default behavior)" : "Cannot rename at this position"
   }
 
-  const startLine = result.range.start.line + 1
-  const startChar = result.range.start.character
-  const endLine = result.range.end.line + 1
-  const endChar = result.range.end.character
-  const placeholder = result.placeholder ? ` (current: "${result.placeholder}")` : ""
+  // Case 2: { range: Range, placeholder?: string }
+  if ("range" in result && result.range) {
+    const startLine = result.range.start.line + 1
+    const startChar = result.range.start.character
+    const endLine = result.range.end.line + 1
+    const endChar = result.range.end.character
+    const placeholder = result.placeholder ? ` (current: "${result.placeholder}")` : ""
+    return `Rename available at ${startLine}:${startChar}-${endLine}:${endChar}${placeholder}`
+  }
 
-  return `Rename available at ${startLine}:${startChar}-${endLine}:${endChar}${placeholder}`
+  // Case 3: Range directly (has start/end but no range property)
+  if ("start" in result && "end" in result) {
+    const startLine = result.start.line + 1
+    const startChar = result.start.character
+    const endLine = result.end.line + 1
+    const endChar = result.end.character
+    return `Rename available at ${startLine}:${startChar}-${endLine}:${endChar}`
+  }
+
+  return "Cannot rename at this position"
 }
 
 export function formatTextEdit(edit: TextEdit): string {

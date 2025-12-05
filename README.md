@@ -132,7 +132,11 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **Todo Continuation Enforcer**: Forces the agent to complete all tasks before exiting. Eliminates the common LLM issue of "giving up halfway".
 - **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
 - **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
-- **Session Recovery**: Automatically recovers from API errors by injecting missing tool results and correcting thinking block violations, ensuring session stability.
+- **Session Recovery**: Automatically recovers from API errors, ensuring session stability. Handles four scenarios:
+  - **Tool Result Missing**: When `tool_use` block exists without `tool_result` (ESC interrupt) → injects "cancelled" tool results
+  - **Thinking Block Order**: When thinking block must be first but isn't → prepends empty thinking block
+  - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
+  - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
 - **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
 
 ### Agents
