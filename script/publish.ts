@@ -78,13 +78,35 @@ async function gitTagAndRelease(newVersion: string, changelog: string): Promise<
   await $`git config user.email "github-actions[bot]@users.noreply.github.com"`
   await $`git config user.name "github-actions[bot]"`
   await $`git add package.json`
-  await $`git commit -m "release: v${newVersion}"`
-  await $`git tag v${newVersion}`
+
+  // Commit only if there are staged changes (idempotent)
+  const hasStagedChanges = await $`git diff --cached --quiet`.nothrow()
+  if (hasStagedChanges.exitCode !== 0) {
+    await $`git commit -m "release: v${newVersion}"`
+  } else {
+    console.log("No changes to commit (version already updated)")
+  }
+
+  // Tag only if it doesn't exist (idempotent)
+  const tagExists = await $`git rev-parse v${newVersion}`.nothrow()
+  if (tagExists.exitCode !== 0) {
+    await $`git tag v${newVersion}`
+  } else {
+    console.log(`Tag v${newVersion} already exists`)
+  }
+
+  // Push (idempotent - git push is already idempotent)
   await $`git push origin HEAD --tags`
 
+  // Create release only if it doesn't exist (idempotent)
   console.log("\nCreating GitHub release...")
   const releaseNotes = changelog || "No notable changes"
-  await $`gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}`
+  const releaseExists = await $`gh release view v${newVersion}`.nothrow()
+  if (releaseExists.exitCode !== 0) {
+    await $`gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}`
+  } else {
+    console.log(`Release v${newVersion} already exists`)
+  }
 }
 
 async function checkVersionExists(version: string): Promise<boolean> {

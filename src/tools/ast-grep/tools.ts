@@ -10,13 +10,55 @@ function showOutputToUser(context: unknown, output: string): void {
   ctx.metadata?.({ metadata: { output } })
 }
 
+/**
+ * JS/TS languages that require complete function declaration patterns
+ */
+const JS_TS_LANGUAGES = ["javascript", "typescript", "tsx"] as const
+
+/**
+ * Validates AST pattern for common incomplete patterns that will fail silently.
+ * Only validates JS/TS languages where function declarations require body.
+ *
+ * @throws Error with helpful message if pattern is incomplete
+ */
+function validatePatternForCli(pattern: string, lang: CliLanguage): void {
+  if (!JS_TS_LANGUAGES.includes(lang as (typeof JS_TS_LANGUAGES)[number])) {
+    return
+  }
+
+  const src = pattern.trim()
+
+  // Detect incomplete function declarations:
+  // - "function $NAME" (no params/body)
+  // - "export function $NAME" (no params/body)
+  // - "export async function $NAME" (no params/body)
+  // - "export default function $NAME" (no params/body)
+  // Pattern: ends with $METAVAR (uppercase, underscore, digits) without ( or {
+  const incompleteFunctionDecl =
+    /^(export\s+)?(default\s+)?(async\s+)?function\s+\$[A-Z_][A-Z0-9_]*\s*$/i.test(src)
+
+  if (incompleteFunctionDecl) {
+    throw new Error(
+      `Incomplete AST pattern for ${lang}: "${pattern}"\n\n` +
+        `ast-grep requires complete AST nodes. Function declarations must include parameters and body.\n\n` +
+        `Examples of correct patterns:\n` +
+        `  - "export async function $NAME($$$) { $$$ }" (matches export async functions)\n` +
+        `  - "function $NAME($$$) { $$$ }" (matches all function declarations)\n` +
+        `  - "async function $NAME($$$) { $$$ }" (matches async functions)\n\n` +
+        `Your pattern "${pattern}" is missing the parameter list and body.`
+    )
+  }
+}
+
 export const ast_grep_search = tool({
   description:
     "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
     "Use meta-variables: $VAR (single node), $$$ (multiple nodes). " +
+    "IMPORTANT: Patterns must be complete AST nodes (valid code). " +
+    "For functions, include params and body: 'export async function $NAME($$$) { $$$ }' not 'export async function $NAME'. " +
     "Examples: 'console.log($MSG)', 'def $FUNC($$$):', 'async function $NAME($$$)'",
   args: {
-    pattern: tool.schema.string().describe("AST pattern with meta-variables ($VAR, $$$)"),
+    pattern: tool.schema.string().describe("AST pattern with meta-variables ($VAR, $$$). Must be complete AST node."),
     lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
     paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search (default: ['.'])"),
     globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs (prefix ! to exclude)"),
@@ -24,6 +66,8 @@ export const ast_grep_search = tool({
   },
   execute: async (args, context) => {
     try {
+      validatePatternForCli(args.pattern, args.lang as CliLanguage)
+
       const matches = await runSg({
         pattern: args.pattern,
         lang: args.lang as CliLanguage,
