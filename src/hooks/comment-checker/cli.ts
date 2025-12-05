@@ -25,18 +25,26 @@ function getPlatformPackageName(): string | null {
     "darwin-x64": "@code-yeongyu/comment-checker-darwin-x64",
     "linux-arm64": "@code-yeongyu/comment-checker-linux-arm64",
     "linux-x64": "@code-yeongyu/comment-checker-linux-x64",
+    "win32-x64": "@code-yeongyu/comment-checker-windows-x64",
+    "win32-arm64": "@code-yeongyu/comment-checker-windows-arm64",
   }
 
   return platformMap[`${platform}-${arch}`] ?? null
 }
 
+function getBinaryName(): string {
+  return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+}
+
 function findCommentCheckerPath(): string | null {
+  const binaryName = getBinaryName()
+
   // 1. Try to find from @code-yeongyu/comment-checker package
   try {
     const require = createRequire(import.meta.url)
     const cliPkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
     const cliDir = dirname(cliPkgPath)
-    const binaryPath = join(cliDir, "bin", "comment-checker")
+    const binaryPath = join(cliDir, "bin", binaryName)
 
     if (existsSync(binaryPath)) {
       debugLog("found binary in main package:", binaryPath)
@@ -46,14 +54,14 @@ function findCommentCheckerPath(): string | null {
     debugLog("main package not installed")
   }
 
-  // 2. Try platform-specific package directly
+  // 2. Try platform-specific package directly (legacy, for backwards compatibility)
   const platformPkg = getPlatformPackageName()
   if (platformPkg) {
     try {
       const require = createRequire(import.meta.url)
       const pkgPath = require.resolve(`${platformPkg}/package.json`)
       const pkgDir = dirname(pkgPath)
-      const binaryPath = join(pkgDir, "bin", "comment-checker")
+      const binaryPath = join(pkgDir, "bin", binaryName)
 
       if (existsSync(binaryPath)) {
         debugLog("found binary in platform package:", binaryPath)
