@@ -84,9 +84,31 @@ bun run build
 bun run rebuild
 ```
 
+## DEPLOYMENT
+
+**배포는 GitHub Actions workflow_dispatch로만 진행**
+
+1. package.json 버전은 수정하지 않음 (워크플로우에서 자동 bump)
+2. 변경사항 커밋 & 푸시
+3. GitHub Actions에서 `publish` 워크플로우 수동 실행
+   - `bump`: major | minor | patch 선택
+   - `version`: (선택) 특정 버전 지정 가능
+
+```bash
+# 워크플로우 실행 (CLI)
+gh workflow run publish -f bump=patch
+
+# 워크플로우 상태 확인
+gh run list --workflow=publish
+```
+
+**주의사항**:
+- `bun publish` 직접 실행 금지 (OIDC provenance 문제)
+- 로컬에서 버전 bump 하지 말 것
+
 ## NOTES
 
 - **No tests**: Test framework not configured
-- **No CI/CD**: GitHub workflows not present
+- **CI/CD**: GitHub Actions publish workflow 사용
 - **Version requirement**: OpenCode >= 1.0.132 (earlier versions have config bugs)
 - **Multi-language docs**: README.md, README.en.md, README.ko.md
