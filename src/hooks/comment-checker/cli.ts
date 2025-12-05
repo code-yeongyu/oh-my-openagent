@@ -21,20 +21,20 @@ function getPlatformPackageName(): string | null {
   const arch = process.arch
 
   const platformMap: Record<string, string> = {
-    "darwin-arm64": "@anthropic-claude/comment-checker-darwin-arm64",
-    "darwin-x64": "@anthropic-claude/comment-checker-darwin-x64",
-    "linux-arm64": "@anthropic-claude/comment-checker-linux-arm64",
-    "linux-x64": "@anthropic-claude/comment-checker-linux-x64",
+    "darwin-arm64": "@code-yeongyu/comment-checker-darwin-arm64",
+    "darwin-x64": "@code-yeongyu/comment-checker-darwin-x64",
+    "linux-arm64": "@code-yeongyu/comment-checker-linux-arm64",
+    "linux-x64": "@code-yeongyu/comment-checker-linux-x64",
   }
 
   return platformMap[`${platform}-${arch}`] ?? null
 }
 
 function findCommentCheckerPath(): string | null {
-  // 1. Try to find from @anthropic-claude/comment-checker package
+  // 1. Try to find from @code-yeongyu/comment-checker package
   try {
     const require = createRequire(import.meta.url)
-    const cliPkgPath = require.resolve("@anthropic-claude/comment-checker/package.json")
+    const cliPkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
     const cliDir = dirname(cliPkgPath)
     const binaryPath = join(cliDir, "bin", "comment-checker")
 
