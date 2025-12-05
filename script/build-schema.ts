@@ -2,7 +2,7 @@
 import * as z from "zod"
 import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 
-const SCHEMA_OUTPUT_PATH = "dist/oh-my-opencode.schema.json"
+const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
 
 async function main() {
   console.log("Generating JSON Schema...")
@@ -14,7 +14,7 @@ async function main() {
 
   const finalSchema = {
     $schema: "http://json-schema.org/draft-07/schema#",
-    $id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json",
+    $id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
     title: "Oh My OpenCode Configuration",
     description: "Configuration schema for oh-my-opencode plugin",
     ...jsonSchema,
