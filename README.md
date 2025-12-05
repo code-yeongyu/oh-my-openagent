@@ -146,89 +146,9 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### Agent Configuration
 
-You can override the configuration of any built-in agent using the `agents` option. This allows you to change models, adjust creativity, modify permissions, or disable agents individually.
+You can override any built-in agent's model, prompt, permissions, and more using the `agents` option. Configuration uses autocomplete via schema.
 
-#### Configuration Options
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `model` | string | Override the default model (e.g., "anthropic/claude-sonnet-4") |
-| `temperature` | number (0-2) | Controls randomness (0 = deterministic, 2 = creative) |
-| `top_p` | number (0-1) | Nucleus sampling parameter |
-| `prompt` | string | Additional system prompt to append |
-| `tools` | object | Enable/disable specific tools (e.g., `{"websearch_exa": false}`) |
-| `disable` | boolean | Completely disable the agent |
-| `description` | string | Override agent description |
-| `mode` | "subagent" | "primary" | "all" | When agent is available |
-| `color` | string | Hex color code for terminal output (e.g., "#FF0000") |
-| `permission` | object | Permission settings for sensitive operations |
-
-#### Permission Options
-
-| Option | Values | Description |
-|--------|--------|-------------|
-| `edit` | "ask" | "allow" | "deny" | File modification permissions |
-| `bash` | "ask" | "allow" | "deny" | object | Shell command execution permissions |
-| `webfetch` | "ask" | "allow" | "deny" | Web access permissions |
-| `doom_loop` | "ask" | "allow" | "deny" | Infinite loop prevention |
-| `external_directory` | "ask" | "allow" | "deny" | Access outside project root |
-
-#### Examples
-
-**Using Only Anthropic Models**
-
-This configuration forces all agents to use Anthropic models, suitable for users with only Anthropic API access.
-
-```json
-{
-  "agents": {
-    "oracle": {
-      "model": "anthropic/claude-sonnet-4"
-    },
-    "librarian": {
-      "model": "anthropic/claude-haiku-4-5"
-    },
-    "explore": {
-      "model": "anthropic/claude-haiku-4-5"
-    },
-    "frontend-ui-ux-engineer": {
-      "model": "anthropic/claude-sonnet-4"
-    },
-    "document-writer": {
-      "model": "anthropic/claude-sonnet-4"
-    }
-  }
-}
-```
-
-**Custom Agent with Additional Prompt**
-
-Inject custom instructions into an agent's system prompt.
-
-```json
-{
-  "agents": {
-    "frontend-ui-ux-engineer": {
-      "prompt": "ALWAYS use Tailwind CSS. NEVER use inline styles. Prefer dark mode defaults.",
-      "temperature": 0.8
-    }
-  }
-}
-```
-
-**Disable Agents Individually**
-
-You can also disable agents using the `disable` property within the agent config.
-
-```json
-{
-  "agents": {
-    "explore": {
-      "disable": true
-    }
-  }
-}
-```
+For full configuration options and examples, see the [OpenCode Agents documentation](https://opencode.ai/docs/agents).
 
 ## Why OpenCode & Why Oh My OpenCode
 
@@ -265,19 +185,21 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
 - **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
 
-#### Model Configuration Override
+#### Configuration
 
-Agents follow the exact same model configuration spec as [OpenCode's model configuration](https://opencode.ai/docs/models/#configure-models). While not generally recommended, if you decide to use only Anthropic models, you could configure like this:
+Agents follow the same configuration spec as OpenCode:
+
+- **Change models**: Override any agent's model via `agents.{name}.model`. See [OpenCode Models](https://opencode.ai/docs/models/#configure-models).
+- **Disable MCPs**: Use `disabled_mcps` to turn off built-in MCPs. See [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers).
+- **Disable agents**: Use `disabled_agents` or `agents.{name}.disable`. See [OpenCode Agents](https://opencode.ai/docs/agents).
+
+While not generally recommended (this plugin is designed for multi-model orchestration), here's an example for Anthropic-only users:
 
 ```json
 {
   "agents": {
-    "explore": {
-      "model": "anthropic/claude-haiku-4-5"
-    },
-    "frontend-ui-ux-engineer": {
-      "model": "anthropic/claude-opus-4"
-    }
+    "explore": { "model": "anthropic/claude-haiku-4-5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
   }
 }
 ```

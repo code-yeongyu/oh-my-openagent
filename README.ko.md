@@ -96,76 +96,9 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 
 ### Agent 설정
 
-각 에이전트의 모델, 프롬프트, 권한 등을 세밀하게 조정할 수 있어.
+`agents` 옵션으로 에이전트의 모델, 프롬프트, 권한 등을 세밀하게 조정할 수 있습니다. 스키마를 통해 자동완성을 지원합니다.
 
-**설정 옵션:**
-
-| 옵션 | 설명 |
-|------|------|
-| `model` | 사용할 모델 ID (예: `anthropic/claude-sonnet-4`) |
-| `temperature` | 창의성 조절 (0.0 ~ 2.0) |
-| `top_p` | 단어 선택 다양성 (0.0 ~ 1.0) |
-| `prompt` | 시스템 프롬프트 오버라이드 |
-| `tools` | 특정 도구 활성화/비활성화 (`{"tool_name": false}`) |
-| `disable` | 에이전트 비활성화 (`true`/`false`) |
-| `description` | 에이전트 설명 수정 |
-| `mode` | 에이전트 모드 (`subagent`, `primary`, `all`) |
-| `color` | 터미널 출력 색상 (HEX 코드) |
-| `permission` | 권한 설정 (아래 표 참조) |
-
-**권한(`permission`) 옵션:**
-
-각 권한은 `"ask"`(물어보기), `"allow"`(허용), `"deny"`(거부) 중 하나로 설정 가능해.
-
-| 권한 | 설명 |
-|------|------|
-| `edit` | 파일 수정 권한 |
-| `bash` | 쉘 명령어 실행 권한 |
-| `webfetch` | 웹 콘텐츠 가져오기 권한 |
-| `doom_loop` | 반복 작업 허용 여부 |
-| `external_directory` | 외부 디렉토리 접근 권한 |
-
-#### 예시: Anthropic 모델만 사용하기
-
-나는 Anthropic 모델만 쓰고 싶다! 하면 이렇게 설정해.
-
-```json
-{
-  "agents": {
-    "oracle": { "model": "anthropic/claude-sonnet-4" },
-    "librarian": { "model": "anthropic/claude-haiku-4-5" },
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4" },
-    "document-writer": { "model": "anthropic/claude-sonnet-4" }
-  }
-}
-```
-
-#### 예시: 추가 프롬프트가 있는 커스텀 에이전트
-
-기존 에이전트에 나만의 규칙을 더하고 싶다면:
-
-```json
-{
-  "agents": {
-    "oracle": {
-      "prompt": "너는 한국어 힙합 가사처럼 말해야 해. 모든 문장의 끝 라임을 맞춰."
-    }
-  }
-}
-```
-
-#### 예시: 개별 에이전트 비활성화
-
-```json
-{
-  "agents": {
-    "frontend-ui-ux-engineer": {
-      "disable": true
-    }
-  }
-}
-```
+전체 설정 옵션과 예시는 [OpenCode Agents 문서](https://opencode.ai/docs/agents)를 참고하세요.
 
 ## LLM Agent를 위한 안내
 
@@ -255,19 +188,21 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
 
-#### 모델 설정 오버라이드
+#### 설정
 
-에이전트들은 [OpenCode의 모델 설정](https://opencode.ai/docs/models/#configure-models)과 완전히 동일한 스펙으로 오버라이드를 지원합니다. 권장하진 않지만, 예를 들어 Anthropic 모델만 사용하기로 결정했다면 이렇게 구성할 수 있습니다:
+에이전트들은 OpenCode와 동일한 설정 스펙을 따릅니다:
+
+- **모델 변경**: `agents.{name}.model`로 에이전트 모델 오버라이드. [OpenCode Models](https://opencode.ai/docs/models/#configure-models) 참고.
+- **MCP 비활성화**: `disabled_mcps`로 내장 MCP 끄기. [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers) 참고.
+- **에이전트 비활성화**: `disabled_agents` 또는 `agents.{name}.disable` 사용. [OpenCode Agents](https://opencode.ai/docs/agents) 참고.
+
+권장하진 않지만(이 플러그인은 멀티 모델 오케스트레이션용), Anthropic만 사용하는 경우 예시:
 
 ```json
 {
   "agents": {
-    "explore": {
-      "model": "anthropic/claude-haiku-4-5"
-    },
-    "frontend-ui-ux-engineer": {
-      "model": "anthropic/claude-opus-4"
-    }
+    "explore": { "model": "anthropic/claude-haiku-4-5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
   }
 }
 ```
