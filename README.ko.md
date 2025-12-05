@@ -193,7 +193,6 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 에이전트들은 OpenCode와 동일한 설정 스펙을 따릅니다:
 
 - **모델 변경**: `agents.{name}.model`로 에이전트 모델 오버라이드. [OpenCode Models](https://opencode.ai/docs/models/#configure-models) 참고.
-- **MCP 비활성화**: `disabled_mcps`로 내장 MCP 끄기. [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers) 참고.
 - **에이전트 비활성화**: `disabled_agents` 또는 `agents.{name}.disable` 사용. [OpenCode Agents](https://opencode.ai/docs/agents) 참고.
 
 권장하진 않지만(이 플러그인은 멀티 모델 오케스트레이션용), Anthropic만 사용하는 경우 예시:

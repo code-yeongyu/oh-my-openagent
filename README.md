@@ -190,7 +190,6 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 Agents follow the same configuration spec as OpenCode:
 
 - **Change models**: Override any agent's model via `agents.{name}.model`. See [OpenCode Models](https://opencode.ai/docs/models/#configure-models).
-- **Disable MCPs**: Use `disabled_mcps` to turn off built-in MCPs. See [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers).
 - **Disable agents**: Use `disabled_agents` or `agents.{name}.disable`. See [OpenCode Agents](https://opencode.ai/docs/agents).
 
 While not generally recommended (this plugin is designed for multi-model orchestration), here's an example for Anthropic-only users:
