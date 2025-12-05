@@ -5,10 +5,6 @@
 - [Oh My OpenCode](#oh-my-opencode)
   - [세 줄 요약](#세-줄-요약)
   - [설치](#설치)
-  - [설정](#설정)
-    - [특정 MCP 비활성화](#특정-mcp-비활성화)
-    - [특정 Agent 비활성화](#특정-agent-비활성화)
-    - [Agent 설정](#agent-설정)
   - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
   - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
@@ -20,6 +16,7 @@
       - [Safe Grep](#safe-grep)
       - [내장 MCPs](#내장-mcps)
     - [기타 편의 기능](#기타-편의-기능)
+  - [설정](#설정)
   - [작성자의 노트](#작성자의-노트)
   - [주의](#주의)
 
@@ -60,45 +57,6 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   ]
 }
 ```
-
-## 설정
-
-`oh-my-opencode.json` (또는 `.oh-my-opencode.json`) 파일을 프로젝트 루트에 생성해서 Oh My OpenCode를 입맛대로 설정할 수 있어.
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
-}
-```
-
-설정 파일은 스키마를 통해 자동완성을 지원합니다. 자세한 내용은 각 기능 섹션에서 설명합니다.
-
-### 특정 MCP 비활성화
-
-특정 MCP가 거슬린다면 끌 수 있어.
-
-```json
-{
-  "disabled_mcps": ["websearch_exa"]
-}
-```
-
-### 특정 Agent 비활성화
-
-특정 에이전트가 마음에 안 들거나, 토큰을 아끼고 싶다면 비활성화해.
-비활성화 가능한 목록: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
-
-```json
-{
-  "disabled_agents": ["frontend-ui-ux-engineer"]
-}
-```
-
-### Agent 설정
-
-`agents` 옵션으로 에이전트의 모델, 프롬프트, 권한 등을 세밀하게 조정할 수 있습니다. 스키마를 통해 자동완성을 지원합니다.
-
-전체 설정 옵션과 예시는 [OpenCode Agents 문서](https://opencode.ai/docs/agents)를 참고하세요.
 
 ## LLM Agent를 위한 안내
 
@@ -188,23 +146,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
 
-#### 설정
-
-에이전트들은 OpenCode와 동일한 설정 스펙을 따릅니다:
-
-- **모델 변경**: `agents.{name}.model`로 에이전트 모델 오버라이드. [OpenCode Models](https://opencode.ai/docs/models/#configure-models) 참고.
-- **에이전트 비활성화**: `disabled_agents` 또는 `agents.{name}.disable` 사용. [OpenCode Agents](https://opencode.ai/docs/agents) 참고.
-
-권장하진 않지만(이 플러그인은 멀티 모델 오케스트레이션용), Anthropic만 사용하는 경우 예시:
-
-```json
-{
-  "agents": {
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
-  }
-}
-```
+에이전트의 모델, 프롬프트, 권한은 `oh-my-opencode.json`에서 커스텀할 수 있습니다. 자세한 내용은 [설정](#설정)을 참고하세요.
 
 ### Tools
 
@@ -239,8 +181,88 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **websearch_exa**: Exa AI 웹 검색. 실시간 웹 검색과 콘텐츠 스크래핑을 수행합니다. 관련 웹사이트에서 LLM에 최적화된 컨텍스트를 반환합니다.
 - **context7**: 라이브러리 문서 조회. 정확한 코딩을 위해 최신 라이브러리 문서를 가져옵니다.
 
+필요 없다면 `oh-my-opencode.json`에서 비활성화할 수 있습니다:
+
+```json
+{
+  "disabled_mcps": ["websearch_exa"]
+}
+```
+
 ### 기타 편의 기능
 - **Terminal Title**: 세션 상태에 따라 터미널 타이틀을 자동 업데이트합니다 (유휴 ○, 처리중 ◐, 도구 ⚡, 에러 ✖). tmux를 지원합니다.
+
+## 설정
+
+설정 파일 위치 (우선순위 순):
+1. `.opencode/oh-my-opencode.json` (프로젝트)
+2. `~/.config/opencode/oh-my-opencode.json` (사용자)
+
+Schema 자동 완성이 지원됩니다:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
+}
+```
+
+### Agents
+
+`agents.{name}`을 통해 에이전트의 모델, 프롬프트, 권한을 오버라이드할 수 있습니다. [OpenCode Agents](https://opencode.ai/docs/agents)를 참조하세요.
+
+```json
+{
+  "agents": {
+    "explore": { "model": "anthropic/claude-haiku-4-5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
+  }
+}
+```
+
+에이전트를 완전히 비활성화할 수도 있습니다:
+
+```json
+{
+  "disabled_agents": ["oracle", "frontend-ui-ux-engineer"]
+}
+```
+
+사용 가능: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+
+### MCPs
+
+내장된 MCP를 비활성화합니다:
+
+```json
+{
+  "disabled_mcps": ["context7", "websearch_exa"]
+}
+```
+
+더 자세한 내용은 [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers)를 참조하세요.
+
+### LSP
+
+Oh My OpenCode의 LSP 도구는 오직 **리팩토링(이름 변경, 코드 액션)만을 위한 것**입니다. 분석용 LSP는 OpenCode 자체에서 처리합니다.
+
+`lsp` 옵션을 통해 LSP 서버를 설정합니다:
+
+```json
+{
+  "lsp": {
+    "typescript-language-server": {
+      "command": ["typescript-language-server", "--stdio"],
+      "extensions": [".ts", ".tsx"],
+      "priority": 10
+    },
+    "pylsp": {
+      "disabled": true
+    }
+  }
+}
+```
+
+각 서버는 다음을 지원합니다: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
 ## 작성자의 노트
 

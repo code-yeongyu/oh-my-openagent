@@ -6,10 +6,6 @@ English | [한국어](README.ko.md)
   - [TL;DR](#tldr)
   - [Installation](#installation)
   - [For LLM Agents](#for-llm-agents)
-  - [Configuration](#configuration)
-    - [Disable specific MCPs](#disable-specific-mcps)
-    - [Disable specific Agents](#disable-specific-agents)
-    - [Agent Configuration](#agent-configuration)
   - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
     - [Hooks](#hooks)
@@ -20,6 +16,7 @@ English | [한국어](README.ko.md)
       - [Safe Grep](#safe-grep)
       - [Built-in MCPs](#built-in-mcps)
     - [Other Features](#other-features)
+  - [Configuration](#configuration)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
 
@@ -110,46 +107,6 @@ cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugi
 
 </details>
 
-## Configuration
-
-You can configure Oh My OpenCode by creating a `oh-my-opencode.json` (or `.oh-my-opencode.json`) file in your project root.
-
-Configuration supports autocomplete via schema. Details are covered in each feature section below.
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
-}
-```
-
-### Disable specific MCPs
-
-If you want to disable specific built-in MCPs, you can use the `disabled_mcps` option.
-
-```json
-{
-  "disabled_mcps": ["context7", "websearch_exa"]
-}
-```
-
-### Disable specific Agents
-
-If you want to disable specific built-in agents, you can use the `disabled_agents` option.
-
-```json
-{
-  "disabled_agents": ["explore", "frontend-ui-ux-engineer"]
-}
-```
-
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
-
-### Agent Configuration
-
-You can override any built-in agent's model, prompt, permissions, and more using the `agents` option. Configuration uses autocomplete via schema.
-
-For full configuration options and examples, see the [OpenCode Agents documentation](https://opencode.ai/docs/agents).
-
 ## Why OpenCode & Why Oh My OpenCode
 
 OpenCode is limitlessly extensible and customizable. Zero screen flicker.
@@ -185,23 +142,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
 - **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
 
-#### Configuration
-
-Agents follow the same configuration spec as OpenCode:
-
-- **Change models**: Override any agent's model via `agents.{name}.model`. See [OpenCode Models](https://opencode.ai/docs/models/#configure-models).
-- **Disable agents**: Use `disabled_agents` or `agents.{name}.disable`. See [OpenCode Agents](https://opencode.ai/docs/agents).
-
-While not generally recommended (this plugin is designed for multi-model orchestration), here's an example for Anthropic-only users:
-
-```json
-{
-  "agents": {
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
-  }
-}
-```
+Agent models, prompts, and permissions can be customized via `oh-my-opencode.json`. See [Configuration](#configuration) for details.
 
 ### Tools
 
@@ -238,9 +179,89 @@ While not generally recommended (this plugin is designed for multi-model orchest
 - **websearch_exa**: Exa AI web search. Performs real-time web searches and can scrape content from specific URLs. Returns LLM-optimized context from relevant websites.
 - **context7**: Library documentation lookup. Fetches up-to-date documentation for any library to assist with accurate coding.
 
+Don't need these? Disable them via `oh-my-opencode.json`:
+
+```json
+{
+  "disabled_mcps": ["websearch_exa"]
+}
+```
+
 ### Other Features
 
 - **Terminal Title**: Auto-updates terminal title with session status (idle ○, processing ◐, tool ⚡, error ✖). Supports tmux.
+
+## Configuration
+
+Configuration file locations (in priority order):
+1. `.opencode/oh-my-opencode.json` (project)
+2. `~/.config/opencode/oh-my-opencode.json` (user)
+
+Schema autocomplete is supported:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
+}
+```
+
+### Agents
+
+Override any agent's model, prompt, or permissions via `agents.{name}`. See [OpenCode Agents](https://opencode.ai/docs/agents).
+
+```json
+{
+  "agents": {
+    "explore": { "model": "anthropic/claude-haiku-4-5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4" }
+  }
+}
+```
+
+Disable agents entirely:
+
+```json
+{
+  "disabled_agents": ["oracle", "frontend-ui-ux-engineer"]
+}
+```
+
+Available: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+
+### MCPs
+
+Disable built-in MCPs:
+
+```json
+{
+  "disabled_mcps": ["context7", "websearch_exa"]
+}
+```
+
+See [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers) for more.
+
+### LSP
+
+Oh My OpenCode's LSP tools are for **refactoring only** (rename, code actions). Analysis LSP is handled by OpenCode itself.
+
+Configure LSP servers via `lsp` option:
+
+```json
+{
+  "lsp": {
+    "typescript-language-server": {
+      "command": ["typescript-language-server", "--stdio"],
+      "extensions": [".ts", ".tsx"],
+      "priority": 10
+    },
+    "pylsp": {
+      "disabled": true
+    }
+  }
+}
+```
+
+Each server supports: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
 ## Author's Note
 
