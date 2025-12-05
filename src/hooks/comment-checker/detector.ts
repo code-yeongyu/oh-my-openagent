@@ -47,7 +47,11 @@ export async function detectComments(
 
   try {
     const Parser = (await import("web-tree-sitter")).default
-    await Parser.init()
+    
+    const treeSitterWasmPath = require.resolve("web-tree-sitter/tree-sitter.wasm")
+    await Parser.init({
+      locateFile: () => treeSitterWasmPath,
+    })
 
     const parser = new Parser()
 
