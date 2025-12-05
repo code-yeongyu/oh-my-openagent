@@ -3,15 +3,14 @@
 ## 목차
 
 - [Oh My OpenCode](#oh-my-opencode)
+  - [세 줄 요약](#세-줄-요약)
   - [설치](#설치)
   - [설정](#설정)
-    - [JSON 스키마 지원](#json-스키마-지원)
     - [특정 MCP 비활성화](#특정-mcp-비활성화)
     - [특정 Agent 비활성화](#특정-agent-비활성화)
     - [Agent 설정](#agent-설정)
   - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
-  - [세 줄 요약](#세-줄-요약)
-  - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
+  - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
     - [Hooks](#hooks)
     - [Agents](#agents)
@@ -39,6 +38,17 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 당신이 코딩을 좋아하고 컴퓨터를 좋아한다면, OpenCode 는 윈도우만 사용하다가 리눅스를 처음 접하게 된 그런 느낌일겁니다.
 그렇지 않은 당신도 약간의 시간을 투자해서 당신의 실력과 생산성을 몇배로 부스트하세요.
 
+## 세 줄 요약
+
+- **모델 설정이 필요합니다**
+  - 이 플러그인은 [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, Anthropic 의 모델을 사용합니다.
+    - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요. (Anthropic 플랜은 유료입니다)
+    - OpenAI 모델들을 사용하기 위해 이 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 추천합니다. (OpenAI 플랜은 유료입니다)
+    - Gemini, GPT 를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 추천합니다. (Gemini 는 구독하지 않아도 사용 할 수 있습니다)
+- **사실 밑의 내용은 읽지 않아도 됩니다. 그냥 설치하시면 됩니다. 모델 설정하고나면 추가로 공부하거나 알 필요가 없고, 설치하고 나면 그냥 더 좋아집니다.**
+- **이 문서도 그냥 Claude Code, OpenCode, Cursor에 붙여넣고, 설치하고, 사용자의 개입이 필요할 때 알려달라고 프롬프팅하세요. 그럼 그냥 깔립니다.**
+  - 당신이 LLM Agent 라면, 필요한 플러그인과 의존성을 설치하고, tmux 를 통해 opencode auth login 을 실행하여 사용자의 구성을 도와주세요.
+
 ## 설치
 
 `~/.config/opencode/opencode.json`에 추가:
@@ -55,25 +65,13 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 
 `oh-my-opencode.json` (또는 `.oh-my-opencode.json`) 파일을 프로젝트 루트에 생성해서 Oh My OpenCode를 입맛대로 설정할 수 있어.
 
-### JSON 스키마 지원
-
-VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
-
-**원격 스키마 사용:**
-
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
 }
 ```
 
-**로컬 스키마 사용 (개발 중일 때):**
-
-```json
-{
-  "$schema": "./node_modules/oh-my-opencode/dist/oh-my-opencode.schema.json"
-}
-```
+설정 파일은 스키마를 통해 자동완성을 지원합니다. 자세한 내용은 각 기능 섹션에서 설명합니다.
 
 ### 특정 MCP 비활성화
 
@@ -171,6 +169,9 @@ VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
 
 ## LLM Agent를 위한 안내
 
+<details>
+<summary>LLM Agent를 위한 안내 (클릭하여 펼치기)</summary>
+
 당신이 사용자의 oh-my-opencode 설정을 돕는 LLM Agent라면, 다음 단계를 따르세요:
 
 ### 1단계: OpenCode 설치 확인
@@ -215,16 +216,7 @@ cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있
 
 > **참고**: 모델 인증이 필요하면, `opencode` 실행 후 `/connect` 명령어를 사용하거나, tmux를 통해 `opencode auth login`을 안내하세요.
 
-## 세 줄 요약
-
-- **모델 설정이 필요합니다**
-  - 이 플러그인은 [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, Anthropic 의 모델을 사용합니다.
-    - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요. (Anthropic 플랜은 유료입니다)
-    - OpenAI 모델들을 사용하기 위해 이 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 추천합니다. (OpenAI 플랜은 유료입니다)
-    - Gemini, GPT 를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 추천합니다. (Gemini 는 구독하지 않아도 사용 할 수 있습니다)
-- **사실 밑의 내용은 읽지 않아도 됩니다. 그냥 설치하시면 됩니다. 모델 설정하고나면 추가로 공부하거나 알 필요가 없고, 설치하고 나면 그냥 더 좋아집니다.**
-- **이 문서도 그냥 Claude Code, OpenCode, Cursor에 붙여넣고, 설치하고, 사용자의 개입이 필요할 때 알려달라고 프롬프팅하세요. 그럼 그냥 깔립니다.**
-  - 당신이 LLM Agent 라면, 필요한 플러그인과 의존성을 설치하고, tmux 를 통해 opencode auth login 을 실행하여 사용자의 구성을 도와주세요.
+</details>
 
 ## Why OpenCode & Why Oh My OpenCode
 
@@ -263,6 +255,23 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
 
+#### 모델 설정 오버라이드
+
+에이전트들은 [OpenCode의 모델 설정](https://opencode.ai/docs/models/#configure-models)과 완전히 동일한 스펙으로 오버라이드를 지원합니다. 권장하진 않지만, 예를 들어 Anthropic 모델만 사용하기로 결정했다면 이렇게 구성할 수 있습니다:
+
+```json
+{
+  "agents": {
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+    "frontend-ui-ux-engineer": {
+      "model": "anthropic/claude-opus-4"
+    }
+  }
+}
+```
+
 ### Tools
 
 #### 내장 LSP Tools
@@ -294,6 +303,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 #### 내장 MCPs
 
 - **websearch_exa**: Exa AI 웹 검색. 실시간 웹 검색과 콘텐츠 스크래핑을 수행합니다. 관련 웹사이트에서 LLM에 최적화된 컨텍스트를 반환합니다.
+- **context7**: 라이브러리 문서 조회. 정확한 코딩을 위해 최신 라이브러리 문서를 가져옵니다.
 
 ### 기타 편의 기능
 - **Terminal Title**: 세션 상태에 따라 터미널 타이틀을 자동 업데이트합니다 (유휴 ○, 처리중 ◐, 도구 ⚡, 에러 ✖). tmux를 지원합니다.

@@ -3,14 +3,14 @@ English | [한국어](README.ko.md)
 ## Contents
 
 - [Oh My OpenCode](#oh-my-opencode)
+  - [TL;DR](#tldr)
   - [Installation](#installation)
   - [For LLM Agents](#for-llm-agents)
   - [Configuration](#configuration)
     - [Disable specific MCPs](#disable-specific-mcps)
     - [Disable specific Agents](#disable-specific-agents)
     - [Agent Configuration](#agent-configuration)
-  - [TL;DR](#tldr)
-  - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
+  - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
     - [Hooks](#hooks)
     - [Agents](#agents)
@@ -36,6 +36,17 @@ You don't write code just for a paycheck? You write because you genuinely love i
 
 To you, OpenCode will feel like the paradigm shift from Windows to Linux. Not you? It's still worth the investment. Give it 10 minutes. Your work and life will improve. I promise.
 
+## TL;DR
+
+- **Model Setup Required**
+  - This plugin utilizes models from [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, and Anthropic.
+    - For Anthropic models, use [OpenCode's built-in Claude Code Max Plan login](https://opencode.ai/docs/providers/#anthropic).
+    - For OpenAI models, I recommend the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
+    - For Gemini and GPT, use [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+- **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
+- **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It works seamlessly.**
+  - If you are an LLM Agent, install the required plugins and dependencies, then run `opencode auth login` via tmux to assist the user with configuration.
+
 ## Installation
 
 Add to `~/.config/opencode/opencode.json`:
@@ -49,6 +60,9 @@ Add to `~/.config/opencode/opencode.json`:
 ```
 
 ## For LLM Agents
+
+<details>
+<summary>For LLM Agents (Click to expand)</summary>
 
 If you are an LLM Agent helping a user set up oh-my-opencode, follow these steps:
 
@@ -94,26 +108,17 @@ cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugi
 
 > **Note**: If model authentication is needed, run `opencode` and use `/connect` command, or assist the user with `opencode auth login` via tmux.
 
+</details>
+
 ## Configuration
 
 You can configure Oh My OpenCode by creating a `oh-my-opencode.json` (or `.oh-my-opencode.json`) file in your project root.
 
-### JSON Schema Support
+Configuration supports autocomplete via schema. Details are covered in each feature section below.
 
-For autocompletion and validation in VS Code (or other editors), add the `$schema` property to your configuration file.
-
-**Using Remote Schema (Recommended):**
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json",
-  "disabled_mcps": ["context7"]
-}
-```
-
-**Using Local Schema:**
-```json
-{
-  "$schema": "./node_modules/oh-my-opencode/dist/oh-my-opencode.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
 }
 ```
 
@@ -154,7 +159,7 @@ You can override the configuration of any built-in agent using the `agents` opti
 | `tools` | object | Enable/disable specific tools (e.g., `{"websearch_exa": false}`) |
 | `disable` | boolean | Completely disable the agent |
 | `description` | string | Override agent description |
-| `mode` | "subagent" \| "primary" \| "all" | When agent is available |
+| `mode` | "subagent" | "primary" | "all" | When agent is available |
 | `color` | string | Hex color code for terminal output (e.g., "#FF0000") |
 | `permission` | object | Permission settings for sensitive operations |
 
@@ -162,11 +167,11 @@ You can override the configuration of any built-in agent using the `agents` opti
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `edit` | "ask" \| "allow" \| "deny" | File modification permissions |
-| `bash` | "ask" \| "allow" \| "deny" \| object | Shell command execution permissions |
-| `webfetch` | "ask" \| "allow" \| "deny" | Web access permissions |
-| `doom_loop` | "ask" \| "allow" \| "deny" | Infinite loop prevention |
-| `external_directory` | "ask" \| "allow" \| "deny" | Access outside project root |
+| `edit` | "ask" | "allow" | "deny" | File modification permissions |
+| `bash` | "ask" | "allow" | "deny" | object | Shell command execution permissions |
+| `webfetch` | "ask" | "allow" | "deny" | Web access permissions |
+| `doom_loop` | "ask" | "allow" | "deny" | Infinite loop prevention |
+| `external_directory` | "ask" | "allow" | "deny" | Access outside project root |
 
 #### Examples
 
@@ -225,17 +230,6 @@ You can also disable agents using the `disable` property within the agent config
 }
 ```
 
-## TL;DR
-
-- **Model Setup Required**
-  - This plugin utilizes models from [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, and Anthropic.
-    - For Anthropic models, use [OpenCode's built-in Claude Code Max Plan login](https://opencode.ai/docs/providers/#anthropic).
-    - For OpenAI models, I recommend the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
-    - For Gemini and GPT, use [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
-- **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
-- **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It works seamlessly.**
-  - If you are an LLM Agent, install the required plugins and dependencies, then run `opencode auth login` via tmux to assist the user with configuration.
-
 ## Why OpenCode & Why Oh My OpenCode
 
 OpenCode is limitlessly extensible and customizable. Zero screen flicker.
@@ -270,6 +264,23 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **explore** (`opencode/grok-code`): Fast exploration and pattern matching. Claude Code uses Haiku; we use Grok. It is currently free, blazing fast, and intelligent enough for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
 - **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
+
+#### Model Configuration Override
+
+Agents follow the exact same model configuration spec as [OpenCode's model configuration](https://opencode.ai/docs/models/#configure-models). While not generally recommended, if you decide to use only Anthropic models, you could configure like this:
+
+```json
+{
+  "agents": {
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+    "frontend-ui-ux-engineer": {
+      "model": "anthropic/claude-opus-4"
+    }
+  }
+}
+```
 
 ### Tools
 
