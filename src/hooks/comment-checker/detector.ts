@@ -59,8 +59,13 @@ async function initParserClass(): Promise<void> {
   parserInitPromise = (async () => {
     debugLog("importing web-tree-sitter...")
     parserClass = (await import("web-tree-sitter")).default
-    const treeSitterWasmPath = require.resolve("web-tree-sitter/tree-sitter.wasm")
+    
+    // Find wasm path relative to web-tree-sitter package at runtime
+    const webTreeSitterPath = import.meta.resolve("web-tree-sitter")
+    const packageDir = webTreeSitterPath.replace(/\/[^/]+$/, "").replace("file://", "")
+    const treeSitterWasmPath = `${packageDir}/tree-sitter.wasm`
     debugLog("wasm path:", treeSitterWasmPath)
+    
     await parserClass.init({
       locateFile: () => treeSitterWasmPath,
     })
