@@ -1,4 +1,5 @@
 import type { PendingCall, FileComments } from "./types"
+import { runCommentChecker, isCliAvailable, type HookInput } from "./cli"
 import { detectComments, isSupportedFile, warmupCommonLanguages } from "./detector"
 import { applyFilters } from "./filters"
 import { formatHookMessage } from "./output"
@@ -18,6 +19,10 @@ function debugLog(...args: unknown[]) {
 const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
+// Check if native CLI is available at startup
+const USE_CLI = isCliAvailable()
+debugLog("comment-checker mode:", USE_CLI ? "CLI (native)" : "WASM (fallback)")
+
 function cleanupOldPendingCalls(): void {
   const now = Date.now()
   for (const [callID, call] of pendingCalls) {
@@ -32,8 +37,10 @@ setInterval(cleanupOldPendingCalls, 10_000)
 export function createCommentCheckerHooks() {
   debugLog("createCommentCheckerHooks called")
   
-  // Background warmup - LSP style (non-blocking)
-  warmupCommonLanguages()
+  // Background warmup for WASM fallback - LSP style (non-blocking)
+  if (!USE_CLI) {
+    warmupCommonLanguages()
+  }
   
   return {
     "tool.execute.before": async (
@@ -50,6 +57,9 @@ export function createCommentCheckerHooks() {
 
       const filePath = (output.args.filePath ?? output.args.file_path ?? output.args.path) as string | undefined
       const content = output.args.content as string | undefined
+      const oldString = output.args.oldString ?? output.args.old_string as string | undefined
+      const newString = output.args.newString ?? output.args.new_string as string | undefined
+      const edits = output.args.edits as Array<{ old_string: string; new_string: string }> | undefined
 
       debugLog("extracted filePath:", filePath)
 
@@ -58,7 +68,7 @@ export function createCommentCheckerHooks() {
         return
       }
 
-      if (!isSupportedFile(filePath)) {
+      if (!USE_CLI && !isSupportedFile(filePath)) {
         debugLog("unsupported file:", filePath)
         return
       }
@@ -67,6 +77,9 @@ export function createCommentCheckerHooks() {
       pendingCalls.set(input.callID, {
         filePath,
         content,
+        oldString: oldString as string | undefined,
+        newString: newString as string | undefined,
+        edits,
         tool: toolLower as "write" | "edit" | "multiedit",
         sessionID: input.sessionID,
         timestamp: Date.now(),
@@ -89,7 +102,6 @@ export function createCommentCheckerHooks() {
       debugLog("processing pendingCall:", pendingCall)
 
       // Only skip if the output indicates a tool execution failure
-      // (not LSP warnings/errors or other incidental "error" strings)
       const outputLower = output.output.toLowerCase()
       const isToolFailure = 
         outputLower.includes("error:") || 
@@ -103,45 +115,92 @@ export function createCommentCheckerHooks() {
       }
 
       try {
-        let content: string
-
-        if (pendingCall.content) {
-          content = pendingCall.content
-          debugLog("using content from args")
+        if (USE_CLI) {
+          // Native CLI mode - much faster
+          await processWithCli(input, pendingCall, output)
         } else {
-          debugLog("reading file:", pendingCall.filePath)
-          const file = Bun.file(pendingCall.filePath)
-          content = await file.text()
-          debugLog("file content length:", content.length)
+          // WASM fallback mode
+          await processWithWasm(pendingCall, output)
         }
-
-        debugLog("calling detectComments...")
-        const rawComments = await detectComments(pendingCall.filePath, content)
-        debugLog("raw comments:", rawComments.length)
-        
-        const filteredComments = applyFilters(rawComments)
-        debugLog("filtered comments:", filteredComments.length)
-
-        if (filteredComments.length === 0) {
-          debugLog("no comments after filtering")
-          return
-        }
-
-        const fileComments: FileComments[] = [
-          {
-            filePath: pendingCall.filePath,
-            comments: filteredComments,
-          },
-        ]
-
-        const message = formatHookMessage(fileComments)
-        debugLog("appending message to output")
-        output.output += `\n\n${message}`
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
     },
   }
+}
+
+async function processWithCli(
+  input: { tool: string; sessionID: string; callID: string },
+  pendingCall: PendingCall,
+  output: { output: string }
+): Promise<void> {
+  debugLog("using CLI mode")
+  
+  const hookInput: HookInput = {
+    session_id: pendingCall.sessionID,
+    tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1), // "write" -> "Write"
+    transcript_path: "",
+    cwd: process.cwd(),
+    hook_event_name: "PostToolUse",
+    tool_input: {
+      file_path: pendingCall.filePath,
+      content: pendingCall.content,
+      old_string: pendingCall.oldString,
+      new_string: pendingCall.newString,
+      edits: pendingCall.edits,
+    },
+  }
+  
+  const result = await runCommentChecker(hookInput)
+  
+  if (result.hasComments && result.message) {
+    debugLog("CLI detected comments, appending message")
+    output.output += `\n\n${result.message}`
+  } else {
+    debugLog("CLI: no comments detected")
+  }
+}
+
+async function processWithWasm(
+  pendingCall: PendingCall,
+  output: { output: string }
+): Promise<void> {
+  debugLog("using WASM fallback mode")
+  
+  let content: string
+
+  if (pendingCall.content) {
+    content = pendingCall.content
+    debugLog("using content from args")
+  } else {
+    debugLog("reading file:", pendingCall.filePath)
+    const file = Bun.file(pendingCall.filePath)
+    content = await file.text()
+    debugLog("file content length:", content.length)
+  }
+
+  debugLog("calling detectComments...")
+  const rawComments = await detectComments(pendingCall.filePath, content)
+  debugLog("raw comments:", rawComments.length)
+  
+  const filteredComments = applyFilters(rawComments)
+  debugLog("filtered comments:", filteredComments.length)
+
+  if (filteredComments.length === 0) {
+    debugLog("no comments after filtering")
+    return
+  }
+
+  const fileComments: FileComments[] = [
+    {
+      filePath: pendingCall.filePath,
+      comments: filteredComments,
+    },
+  ]
+
+  const message = formatHookMessage(fileComments)
+  debugLog("appending message to output")
+  output.output += `\n\n${message}`
 }
 
 
