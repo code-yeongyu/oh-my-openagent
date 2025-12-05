@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { createBuiltinAgents } from "./agents"
-import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook } from "./hooks"
+import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook, createCommentCheckerHooks } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
 import { createBuiltinMcps } from "./mcp"
@@ -43,6 +43,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx)
   const contextWindowMonitor = createContextWindowMonitorHook(ctx)
   const sessionRecovery = createSessionRecoveryHook(ctx)
+  const commentChecker = createCommentCheckerHooks()
 
   updateTerminalTitle({ sessionId: "main" })
 
@@ -161,7 +162,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     },
 
-    "tool.execute.before": async (input, _output) => {
+    "tool.execute.before": async (input, output) => {
+      await commentChecker["tool.execute.before"](input, output)
+
       if (input.sessionID === mainSessionID) {
         updateTerminalTitle({
           sessionId: input.sessionID,
@@ -175,6 +178,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       await contextWindowMonitor["tool.execute.after"](input, output)
+      await commentChecker["tool.execute.after"](input, output)
 
       if (input.sessionID === mainSessionID) {
         updateTerminalTitle({
