@@ -1,4 +1,5 @@
 import { parse, Lang } from "@ast-grep/napi"
+import { NAPI_LANGUAGES } from "./constants"
 import type { NapiLanguage, AnalyzeResult, MetaVariable, Range } from "./types"
 
 const LANG_MAP: Record<NapiLanguage, Lang> = {
@@ -10,7 +11,16 @@ const LANG_MAP: Record<NapiLanguage, Lang> = {
 }
 
 export function parseCode(code: string, lang: NapiLanguage) {
-  return parse(LANG_MAP[lang], code)
+  const parseLang = LANG_MAP[lang]
+  if (!parseLang) {
+    const supportedLangs = NAPI_LANGUAGES.join(", ")
+    throw new Error(
+      `Unsupported language for NAPI: "${lang}"\n` +
+        `Supported languages: ${supportedLangs}\n\n` +
+        `Use ast_grep_search for other languages (25 supported via CLI).`
+    )
+  }
+  return parse(parseLang, code)
 }
 
 export function findPattern(root: ReturnType<typeof parseCode>, pattern: string) {

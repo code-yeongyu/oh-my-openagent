@@ -1,6 +1,7 @@
 import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
+import { getCachedBinaryPath } from "./downloader"
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
@@ -21,30 +22,30 @@ function getPlatformPackageName(): string | null {
   return platformMap[`${platform}-${arch}`] ?? null
 }
 
-function findSgCliPath(): string {
-  // 1. Try to find from @ast-grep/cli package (installed via npm)
+export function findSgCliPathSync(): string | null {
+  const binaryName = process.platform === "win32" ? "sg.exe" : "sg"
+
   try {
     const require = createRequire(import.meta.url)
     const cliPkgPath = require.resolve("@ast-grep/cli/package.json")
     const cliDir = dirname(cliPkgPath)
-    const sgPath = join(cliDir, process.platform === "win32" ? "sg.exe" : "sg")
+    const sgPath = join(cliDir, binaryName)
 
     if (existsSync(sgPath)) {
       return sgPath
     }
   } catch {
-    // @ast-grep/cli not installed, try platform-specific package
+    // @ast-grep/cli not installed
   }
 
-  // 2. Try platform-specific package directly
   const platformPkg = getPlatformPackageName()
   if (platformPkg) {
     try {
       const require = createRequire(import.meta.url)
       const pkgPath = require.resolve(`${platformPkg}/package.json`)
       const pkgDir = dirname(pkgPath)
-      const binaryName = process.platform === "win32" ? "ast-grep.exe" : "ast-grep"
-      const binaryPath = join(pkgDir, binaryName)
+      const astGrepName = process.platform === "win32" ? "ast-grep.exe" : "ast-grep"
+      const binaryPath = join(pkgDir, astGrepName)
 
       if (existsSync(binaryPath)) {
         return binaryPath
@@ -54,12 +55,44 @@ function findSgCliPath(): string {
     }
   }
 
-  // 3. Fallback to system PATH
+  if (process.platform === "darwin") {
+    const homebrewPaths = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"]
+    for (const path of homebrewPaths) {
+      if (existsSync(path)) {
+        return path
+      }
+    }
+  }
+
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath) {
+    return cachedPath
+  }
+
+  return null
+}
+
+let resolvedCliPath: string | null = null
+
+export function getSgCliPath(): string {
+  if (resolvedCliPath !== null) {
+    return resolvedCliPath
+  }
+
+  const syncPath = findSgCliPathSync()
+  if (syncPath) {
+    resolvedCliPath = syncPath
+    return syncPath
+  }
+
   return "sg"
 }
 
-// ast-grep CLI path (auto-detected from node_modules or system PATH)
-export const SG_CLI_PATH = findSgCliPath()
+export function setSgCliPath(path: string): void {
+  resolvedCliPath = path
+}
+
+export const SG_CLI_PATH = getSgCliPath()
 
 // CLI supported languages (25 total)
 export const CLI_LANGUAGES = [
@@ -120,4 +153,100 @@ export const LANG_EXTENSIONS: Record<string, string[]> = {
   typescript: [".ts", ".cts", ".mts"],
   tsx: [".tsx"],
   yaml: [".yml", ".yaml"],
+}
+
+export interface EnvironmentCheckResult {
+  cli: {
+    available: boolean
+    path: string
+    error?: string
+  }
+  napi: {
+    available: boolean
+    error?: string
+  }
+}
+
+/**
+ * Check if ast-grep CLI and NAPI are available.
+ * Call this at startup to provide early feedback about missing dependencies.
+ */
+export function checkEnvironment(): EnvironmentCheckResult {
+  const result: EnvironmentCheckResult = {
+    cli: {
+      available: false,
+      path: SG_CLI_PATH,
+    },
+    napi: {
+      available: false,
+    },
+  }
+
+  // Check CLI availability
+  if (existsSync(SG_CLI_PATH)) {
+    result.cli.available = true
+  } else if (SG_CLI_PATH === "sg") {
+    // Fallback path - try which/where to find in PATH
+    try {
+      const { spawnSync } = require("child_process")
+      const whichResult = spawnSync(process.platform === "win32" ? "where" : "which", ["sg"], {
+        encoding: "utf-8",
+        timeout: 5000,
+      })
+      result.cli.available = whichResult.status === 0 && !!whichResult.stdout?.trim()
+      if (!result.cli.available) {
+        result.cli.error = "sg binary not found in PATH"
+      }
+    } catch {
+      result.cli.error = "Failed to check sg availability"
+    }
+  } else {
+    result.cli.error = `Binary not found: ${SG_CLI_PATH}`
+  }
+
+  // Check NAPI availability
+  try {
+    require("@ast-grep/napi")
+    result.napi.available = true
+  } catch (e) {
+    result.napi.available = false
+    result.napi.error = `@ast-grep/napi not installed: ${e instanceof Error ? e.message : String(e)}`
+  }
+
+  return result
+}
+
+/**
+ * Format environment check result as user-friendly message.
+ */
+export function formatEnvironmentCheck(result: EnvironmentCheckResult): string {
+  const lines: string[] = ["ast-grep Environment Status:", ""]
+
+  // CLI status
+  if (result.cli.available) {
+    lines.push(`✓ CLI: Available (${result.cli.path})`)
+  } else {
+    lines.push(`✗ CLI: Not available`)
+    if (result.cli.error) {
+      lines.push(`  Error: ${result.cli.error}`)
+    }
+    lines.push(`  Install: bun add -D @ast-grep/cli`)
+  }
+
+  // NAPI status
+  if (result.napi.available) {
+    lines.push(`✓ NAPI: Available`)
+  } else {
+    lines.push(`✗ NAPI: Not available`)
+    if (result.napi.error) {
+      lines.push(`  Error: ${result.napi.error}`)
+    }
+    lines.push(`  Install: bun add -D @ast-grep/napi`)
+  }
+
+  lines.push("")
+  lines.push(`CLI supports ${CLI_LANGUAGES.length} languages`)
+  lines.push(`NAPI supports ${NAPI_LANGUAGES.length} languages: ${NAPI_LANGUAGES.join(", ")}`)
+
+  return lines.join("\n")
 }
