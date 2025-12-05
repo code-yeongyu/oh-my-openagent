@@ -4,6 +4,11 @@
 
 - [Oh My OpenCode](#oh-my-opencode)
   - [설치](#설치)
+  - [설정](#설정)
+    - [JSON 스키마 지원](#json-스키마-지원)
+    - [특정 MCP 비활성화](#특정-mcp-비활성화)
+    - [특정 Agent 비활성화](#특정-agent-비활성화)
+    - [Agent 설정](#agent-설정)
   - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
   - [세 줄 요약](#세-줄-요약)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
@@ -43,6 +48,124 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   "plugin": [
     "oh-my-opencode"
   ]
+}
+```
+
+## 설정
+
+`oh-my-opencode.json` (또는 `.oh-my-opencode.json`) 파일을 프로젝트 루트에 생성해서 Oh My OpenCode를 입맛대로 설정할 수 있어.
+
+### JSON 스키마 지원
+
+VS Code 같은 에디터에서 자동완성을 쓰려면 스키마를 추가해.
+
+**원격 스키마 사용:**
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/dist/oh-my-opencode.schema.json"
+}
+```
+
+**로컬 스키마 사용 (개발 중일 때):**
+
+```json
+{
+  "$schema": "./node_modules/oh-my-opencode/dist/oh-my-opencode.schema.json"
+}
+```
+
+### 특정 MCP 비활성화
+
+특정 MCP가 거슬린다면 끌 수 있어.
+
+```json
+{
+  "disabled_mcps": ["websearch_exa"]
+}
+```
+
+### 특정 Agent 비활성화
+
+특정 에이전트가 마음에 안 들거나, 토큰을 아끼고 싶다면 비활성화해.
+비활성화 가능한 목록: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+
+```json
+{
+  "disabled_agents": ["frontend-ui-ux-engineer"]
+}
+```
+
+### Agent 설정
+
+각 에이전트의 모델, 프롬프트, 권한 등을 세밀하게 조정할 수 있어.
+
+**설정 옵션:**
+
+| 옵션 | 설명 |
+|------|------|
+| `model` | 사용할 모델 ID (예: `anthropic/claude-sonnet-4`) |
+| `temperature` | 창의성 조절 (0.0 ~ 2.0) |
+| `top_p` | 단어 선택 다양성 (0.0 ~ 1.0) |
+| `prompt` | 시스템 프롬프트 오버라이드 |
+| `tools` | 특정 도구 활성화/비활성화 (`{"tool_name": false}`) |
+| `disable` | 에이전트 비활성화 (`true`/`false`) |
+| `description` | 에이전트 설명 수정 |
+| `mode` | 에이전트 모드 (`subagent`, `primary`, `all`) |
+| `color` | 터미널 출력 색상 (HEX 코드) |
+| `permission` | 권한 설정 (아래 표 참조) |
+
+**권한(`permission`) 옵션:**
+
+각 권한은 `"ask"`(물어보기), `"allow"`(허용), `"deny"`(거부) 중 하나로 설정 가능해.
+
+| 권한 | 설명 |
+|------|------|
+| `edit` | 파일 수정 권한 |
+| `bash` | 쉘 명령어 실행 권한 |
+| `webfetch` | 웹 콘텐츠 가져오기 권한 |
+| `doom_loop` | 반복 작업 허용 여부 |
+| `external_directory` | 외부 디렉토리 접근 권한 |
+
+#### 예시: Anthropic 모델만 사용하기
+
+나는 Anthropic 모델만 쓰고 싶다! 하면 이렇게 설정해.
+
+```json
+{
+  "agents": {
+    "oracle": { "model": "anthropic/claude-sonnet-4" },
+    "librarian": { "model": "anthropic/claude-haiku-4-5" },
+    "explore": { "model": "anthropic/claude-haiku-4-5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4" },
+    "document-writer": { "model": "anthropic/claude-sonnet-4" }
+  }
+}
+```
+
+#### 예시: 추가 프롬프트가 있는 커스텀 에이전트
+
+기존 에이전트에 나만의 규칙을 더하고 싶다면:
+
+```json
+{
+  "agents": {
+    "oracle": {
+      "prompt": "너는 한국어 힙합 가사처럼 말해야 해. 모든 문장의 끝 라임을 맞춰."
+    }
+  }
+}
+```
+
+#### 예시: 개별 에이전트 비활성화
+
+```json
+{
+  "agents": {
+    "frontend-ui-ux-engineer": {
+      "disable": true
+    }
+  }
 }
 ```
 
@@ -200,5 +323,3 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 
 - [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) 혹은 이것보다 낮은 버전을 사용중이라면, OpenCode 의 버그로 인해 제대로 구성이 되지 않을 수 있습니다.
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
-
-

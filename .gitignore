@@ -2,7 +2,8 @@
 node_modules/
 
 # Build output
-dist/
+dist/*
+!dist/oh-my-opencode.schema.json
 
 # IDE
 .idea/
