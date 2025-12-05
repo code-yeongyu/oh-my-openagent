@@ -15,10 +15,12 @@ function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
 
   if (lang === "python") {
     if (src.startsWith("class ") && src.endsWith(":")) {
-      return `💡 Hint: Python class patterns need body. Try "class $NAME" or include body with $$$BODY`
+      const withoutColon = src.slice(0, -1)
+      return `💡 Hint: Remove trailing colon. Try: "${withoutColon}"`
     }
     if ((src.startsWith("def ") || src.startsWith("async def ")) && src.endsWith(":")) {
-      return `💡 Hint: Python function patterns need body. Try "def $FUNC($$$):\\n    $$$BODY"`
+      const withoutColon = src.slice(0, -1)
+      return `💡 Hint: Remove trailing colon. Try: "${withoutColon}"`
     }
   }
 
