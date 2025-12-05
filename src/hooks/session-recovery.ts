@@ -70,7 +70,10 @@ function detectErrorType(error: unknown): RecoveryErrorType {
     return "tool_result_missing"
   }
 
-  if (message.includes("thinking") && message.includes("first block")) {
+  if (
+    message.includes("thinking") &&
+    (message.includes("first block") || message.includes("must start with") || message.includes("preceeding"))
+  ) {
     return "thinking_block_order"
   }
 

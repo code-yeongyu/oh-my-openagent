@@ -136,7 +136,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             sessionID,
             error,
           }
-          await sessionRecovery.handleSessionRecovery(messageInfo)
+          const recovered = await sessionRecovery.handleSessionRecovery(messageInfo)
+
+          if (recovered && sessionID && sessionID === mainSessionID) {
+            await ctx.client.session.prompt({
+              path: { id: sessionID },
+              body: { parts: [{ type: "text", text: "continue" }] },
+              query: { directory: ctx.directory },
+            }).catch(() => {})
+          }
         }
 
         if (sessionID && sessionID === mainSessionID) {
