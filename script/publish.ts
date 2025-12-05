@@ -87,10 +87,24 @@ async function gitTagAndRelease(newVersion: string, changelog: string): Promise<
   await $`gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}`
 }
 
+async function checkVersionExists(version: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/${PACKAGE_NAME}/${version}`)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function main() {
   const previous = await fetchPreviousVersion()
   const newVersion = versionOverride || (bump ? bumpVersion(previous, bump) : bumpVersion(previous, "patch"))
   console.log(`New version: ${newVersion}\n`)
+
+  if (await checkVersionExists(newVersion)) {
+    console.log(`Version ${newVersion} already exists on npm. Skipping publish.`)
+    process.exit(0)
+  }
 
   await updatePackageVersion(newVersion)
   const changelog = await generateChangelog(previous)
