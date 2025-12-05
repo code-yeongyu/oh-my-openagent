@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "OpenCode plugin - custom agents (oracle, librarian) and enhanced features",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,9 +44,8 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
+    "@code-yeongyu/comment-checker": "^0.4.1",
     "@opencode-ai/plugin": "^1.0.7",
-    "tree-sitter-wasms": "^0.1.12",
-    "web-tree-sitter": "^0.24.7",
     "zod": "^4.1.8"
   },
   "devDependencies": {
@@ -58,6 +57,7 @@
   },
   "trustedDependencies": [
     "@ast-grep/cli",
-    "@ast-grep/napi"
+    "@ast-grep/napi",
+    "@code-yeongyu/comment-checker"
   ]
 }

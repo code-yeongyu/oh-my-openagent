@@ -9,12 +9,6 @@ export interface CommentInfo {
   metadata?: Record<string, string>
 }
 
-export interface LanguageConfig {
-  extensions: string[]
-  commentQuery: string
-  docstringQuery?: string
-}
-
 export interface PendingCall {
   filePath: string
   content?: string

@@ -1,10 +1,8 @@
-import type { PendingCall, FileComments } from "./types"
-import { runCommentChecker, isCliAvailable, type HookInput } from "./cli"
-import { detectComments, isSupportedFile, warmupCommonLanguages } from "./detector"
-import { applyFilters } from "./filters"
-import { formatHookMessage } from "./output"
+import type { PendingCall } from "./types"
+import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
 
 import * as fs from "fs"
+import { existsSync } from "fs"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = "/tmp/comment-checker-debug.log"
@@ -19,9 +17,7 @@ function debugLog(...args: unknown[]) {
 const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
-// Check if native CLI is available at startup
-const USE_CLI = isCliAvailable()
-debugLog("comment-checker mode:", USE_CLI ? "CLI (native)" : "WASM (fallback)")
+let cliPathPromise: Promise<string | null> | null = null
 
 function cleanupOldPendingCalls(): void {
   const now = Date.now()
@@ -37,10 +33,14 @@ setInterval(cleanupOldPendingCalls, 10_000)
 export function createCommentCheckerHooks() {
   debugLog("createCommentCheckerHooks called")
   
-  // Background warmup for WASM fallback - LSP style (non-blocking)
-  if (!USE_CLI) {
-    warmupCommonLanguages()
-  }
+  // Start background CLI initialization (may trigger lazy download)
+  startBackgroundInit()
+  cliPathPromise = getCommentCheckerPath()
+  cliPathPromise.then(path => {
+    debugLog("CLI path resolved:", path || "disabled (no binary)")
+  }).catch(err => {
+    debugLog("CLI path resolution error:", err)
+  })
   
   return {
     "tool.execute.before": async (
@@ -65,11 +65,6 @@ export function createCommentCheckerHooks() {
 
       if (!filePath) {
         debugLog("no filePath found")
-        return
-      }
-
-      if (!USE_CLI && !isSupportedFile(filePath)) {
-        debugLog("unsupported file:", filePath)
         return
       }
 
@@ -115,13 +110,18 @@ export function createCommentCheckerHooks() {
       }
 
       try {
-        if (USE_CLI) {
-          // Native CLI mode - much faster
-          await processWithCli(input, pendingCall, output)
-        } else {
-          // WASM fallback mode
-          await processWithWasm(pendingCall, output)
+        // Wait for CLI path resolution
+        const cliPath = await cliPathPromise
+        
+        if (!cliPath || !existsSync(cliPath)) {
+          // CLI not available - silently skip comment checking
+          debugLog("CLI not available, skipping comment check")
+          return
         }
+        
+        // CLI mode only
+        debugLog("using CLI:", cliPath)
+        await processWithCli(input, pendingCall, output, cliPath)
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
@@ -132,13 +132,14 @@ export function createCommentCheckerHooks() {
 async function processWithCli(
   input: { tool: string; sessionID: string; callID: string },
   pendingCall: PendingCall,
-  output: { output: string }
+  output: { output: string },
+  cliPath: string
 ): Promise<void> {
-  debugLog("using CLI mode")
+  debugLog("using CLI mode with path:", cliPath)
   
   const hookInput: HookInput = {
     session_id: pendingCall.sessionID,
-    tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1), // "write" -> "Write"
+    tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1),
     transcript_path: "",
     cwd: process.cwd(),
     hook_event_name: "PostToolUse",
@@ -151,7 +152,7 @@ async function processWithCli(
     },
   }
   
-  const result = await runCommentChecker(hookInput)
+  const result = await runCommentChecker(hookInput, cliPath)
   
   if (result.hasComments && result.message) {
     debugLog("CLI detected comments, appending message")
@@ -160,47 +161,3 @@ async function processWithCli(
     debugLog("CLI: no comments detected")
   }
 }
-
-async function processWithWasm(
-  pendingCall: PendingCall,
-  output: { output: string }
-): Promise<void> {
-  debugLog("using WASM fallback mode")
-  
-  let content: string
-
-  if (pendingCall.content) {
-    content = pendingCall.content
-    debugLog("using content from args")
-  } else {
-    debugLog("reading file:", pendingCall.filePath)
-    const file = Bun.file(pendingCall.filePath)
-    content = await file.text()
-    debugLog("file content length:", content.length)
-  }
-
-  debugLog("calling detectComments...")
-  const rawComments = await detectComments(pendingCall.filePath, content)
-  debugLog("raw comments:", rawComments.length)
-  
-  const filteredComments = applyFilters(rawComments)
-  debugLog("filtered comments:", filteredComments.length)
-
-  if (filteredComments.length === 0) {
-    debugLog("no comments after filtering")
-    return
-  }
-
-  const fileComments: FileComments[] = [
-    {
-      filePath: pendingCall.filePath,
-      comments: filteredComments,
-    },
-  ]
-
-  const message = formatHookMessage(fileComments)
-  debugLog("appending message to output")
-  output.output += `\n\n${message}`
-}
-
-

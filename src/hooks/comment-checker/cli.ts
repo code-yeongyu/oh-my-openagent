@@ -3,6 +3,7 @@ import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
 import * as fs from "fs"
+import { getCachedBinaryPath, ensureCommentCheckerBinary } from "./downloader"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = "/tmp/comment-checker-debug.log"
@@ -35,7 +36,12 @@ function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
-function findCommentCheckerPath(): string | null {
+/**
+ * Synchronously find comment-checker binary path.
+ * Checks installed packages, homebrew, cache, and system PATH.
+ * Does NOT trigger download.
+ */
+function findCommentCheckerPathSync(): string | null {
   const binaryName = getBinaryName()
 
   // 1. Try to find from @code-yeongyu/comment-checker package
@@ -85,13 +91,87 @@ function findCommentCheckerPath(): string | null {
     }
   }
 
-  // 4. Try system PATH
-  const systemPath = "comment-checker"
-  debugLog("falling back to system PATH:", systemPath)
-  return systemPath
+  // 4. Try cached binary (lazy download location)
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath) {
+    debugLog("found binary in cache:", cachedPath)
+    return cachedPath
+  }
+
+  // 5. Try system PATH (as fallback)
+  debugLog("no binary found in known locations")
+  return null
 }
 
-export const COMMENT_CHECKER_CLI_PATH = findCommentCheckerPath()
+// Cached resolved path
+let resolvedCliPath: string | null = null
+let initPromise: Promise<string | null> | null = null
+
+/**
+ * Asynchronously get comment-checker binary path.
+ * Will trigger lazy download if binary not found.
+ */
+export async function getCommentCheckerPath(): Promise<string | null> {
+  // Return cached path if already resolved
+  if (resolvedCliPath !== null) {
+    return resolvedCliPath
+  }
+
+  // Return existing promise if initialization is in progress
+  if (initPromise) {
+    return initPromise
+  }
+
+  initPromise = (async () => {
+    // First try sync path resolution
+    const syncPath = findCommentCheckerPathSync()
+    if (syncPath && existsSync(syncPath)) {
+      resolvedCliPath = syncPath
+      debugLog("using sync-resolved path:", syncPath)
+      return syncPath
+    }
+
+    // Lazy download if not found
+    debugLog("triggering lazy download...")
+    const downloadedPath = await ensureCommentCheckerBinary()
+    if (downloadedPath) {
+      resolvedCliPath = downloadedPath
+      debugLog("using downloaded path:", downloadedPath)
+      return downloadedPath
+    }
+
+    debugLog("no binary available")
+    return null
+  })()
+
+  return initPromise
+}
+
+/**
+ * Synchronously get comment-checker path (no download).
+ * Returns cached path or searches known locations.
+ */
+export function getCommentCheckerPathSync(): string | null {
+  return resolvedCliPath ?? findCommentCheckerPathSync()
+}
+
+/**
+ * Start background initialization.
+ * Call this early to trigger download while other init happens.
+ */
+export function startBackgroundInit(): void {
+  if (!initPromise) {
+    initPromise = getCommentCheckerPath()
+    initPromise.then(path => {
+      debugLog("background init complete:", path || "no binary")
+    }).catch(err => {
+      debugLog("background init error:", err)
+    })
+  }
+}
+
+// Legacy export for backwards compatibility (sync, no download)
+export const COMMENT_CHECKER_CLI_PATH = findCommentCheckerPathSync()
 
 export interface HookInput {
   session_id: string
@@ -114,9 +194,21 @@ export interface CheckResult {
   message: string
 }
 
-export async function runCommentChecker(input: HookInput): Promise<CheckResult> {
-  if (!COMMENT_CHECKER_CLI_PATH) {
+/**
+ * Run comment-checker CLI with given input.
+ * @param input Hook input to check
+ * @param cliPath Optional explicit path to CLI binary
+ */
+export async function runCommentChecker(input: HookInput, cliPath?: string): Promise<CheckResult> {
+  const binaryPath = cliPath ?? resolvedCliPath ?? COMMENT_CHECKER_CLI_PATH
+  
+  if (!binaryPath) {
     debugLog("comment-checker binary not found")
+    return { hasComments: false, message: "" }
+  }
+
+  if (!existsSync(binaryPath)) {
+    debugLog("comment-checker binary does not exist:", binaryPath)
     return { hasComments: false, message: "" }
   }
 
@@ -124,7 +216,7 @@ export async function runCommentChecker(input: HookInput): Promise<CheckResult> 
   debugLog("running comment-checker with input:", jsonInput.substring(0, 200))
 
   try {
-    const proc = spawn([COMMENT_CHECKER_CLI_PATH], {
+    const proc = spawn([binaryPath], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
@@ -158,6 +250,18 @@ export async function runCommentChecker(input: HookInput): Promise<CheckResult> 
   }
 }
 
+/**
+ * Check if CLI is available (sync check, no download).
+ */
 export function isCliAvailable(): boolean {
-  return COMMENT_CHECKER_CLI_PATH !== null && existsSync(COMMENT_CHECKER_CLI_PATH)
+  const path = getCommentCheckerPathSync()
+  return path !== null && existsSync(path)
+}
+
+/**
+ * Check if CLI will be available (async, may trigger download).
+ */
+export async function ensureCliAvailable(): Promise<boolean> {
+  const path = await getCommentCheckerPath()
+  return path !== null && existsSync(path)
 }
