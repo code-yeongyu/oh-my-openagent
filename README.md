@@ -4,6 +4,7 @@ English | [한국어](README.ko.md)
 
 - [Oh My OpenCode](#oh-my-opencode)
   - [Installation](#installation)
+  - [For LLM Agents](#for-llm-agents)
   - [Configuration](#configuration)
     - [Disable specific MCPs](#disable-specific-mcps)
   - [TL;DR](#tldr)
@@ -44,6 +45,52 @@ Add to `~/.config/opencode/opencode.json`:
   ]
 }
 ```
+
+## For LLM Agents
+
+If you are an LLM Agent helping a user set up oh-my-opencode, follow these steps:
+
+### Step 1: Verify OpenCode Installation
+
+```bash
+if command -v opencode &> /dev/null; then
+    echo "OpenCode $(opencode --version) is installed"
+else
+    echo "OpenCode is not installed. Please install it first."
+    echo "See: https://opencode.ai/docs/installation/"
+fi
+```
+
+If OpenCode is not installed, guide the user to [OpenCode Installation Guide](https://opencode.ai/docs/installation/).
+
+### Step 2: Configure oh-my-opencode Plugin
+
+```bash
+mkdir -p ~/.config/opencode
+
+if [ -f ~/.config/opencode/opencode.json ]; then
+    # Existing config: add plugin using jq or python
+    if command -v jq &> /dev/null; then
+        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
+            ~/.config/opencode/opencode.json > /tmp/oc.json && \
+            mv /tmp/oc.json ~/.config/opencode/opencode.json
+    else
+        echo "Add \"oh-my-opencode\" to plugin array in ~/.config/opencode/opencode.json"
+    fi
+else
+    # New config
+    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
+fi
+```
+
+### Step 3: Verify Setup
+
+```bash
+opencode --version  # Should be >= 1.0.132
+cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
+```
+
+> **Note**: If model authentication is needed, run `opencode` and use `/connect` command, or assist the user with `opencode auth login` via tmux.
 
 ## Configuration
 

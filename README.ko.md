@@ -4,6 +4,7 @@
 
 - [Oh My OpenCode](#oh-my-opencode)
   - [설치](#설치)
+  - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
   - [세 줄 요약](#세-줄-요약)
   - [Why OpenCode \& Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
@@ -44,6 +45,52 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   ]
 }
 ```
+
+## LLM Agent를 위한 안내
+
+당신이 사용자의 oh-my-opencode 설정을 돕는 LLM Agent라면, 다음 단계를 따르세요:
+
+### 1단계: OpenCode 설치 확인
+
+```bash
+if command -v opencode &> /dev/null; then
+    echo "OpenCode $(opencode --version) 설치됨"
+else
+    echo "OpenCode가 설치되어 있지 않습니다. 먼저 설치해주세요."
+    echo "참고: https://opencode.ai/docs/installation/"
+fi
+```
+
+OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs/installation/)를 안내하세요.
+
+### 2단계: oh-my-opencode 플러그인 설정
+
+```bash
+mkdir -p ~/.config/opencode
+
+if [ -f ~/.config/opencode/opencode.json ]; then
+    # 기존 설정 파일이 있는 경우: jq 또는 python으로 plugin 추가
+    if command -v jq &> /dev/null; then
+        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
+            ~/.config/opencode/opencode.json > /tmp/oc.json && \
+            mv /tmp/oc.json ~/.config/opencode/opencode.json
+    else
+        echo "~/.config/opencode/opencode.json의 plugin 배열에 \"oh-my-opencode\"를 추가하세요"
+    fi
+else
+    # 새 설정 파일 생성
+    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
+fi
+```
+
+### 3단계: 설정 확인
+
+```bash
+opencode --version  # 1.0.132 이상이어야 함
+cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있어야 함
+```
+
+> **참고**: 모델 인증이 필요하면, `opencode` 실행 후 `/connect` 명령어를 사용하거나, tmux를 통해 `opencode auth login`을 안내하세요.
 
 ## 세 줄 요약
 
