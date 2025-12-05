@@ -22,8 +22,31 @@ function getPlatformPackageName(): string | null {
   return platformMap[`${platform}-${arch}`] ?? null
 }
 
+function isValidBinary(filePath: string): boolean {
+  try {
+    const stats = require("fs").statSync(filePath)
+    return stats.size > 10000
+  } catch {
+    return false
+  }
+}
+
 export function findSgCliPathSync(): string | null {
   const binaryName = process.platform === "win32" ? "sg.exe" : "sg"
+
+  if (process.platform === "darwin") {
+    const homebrewPaths = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"]
+    for (const path of homebrewPaths) {
+      if (existsSync(path) && isValidBinary(path)) {
+        return path
+      }
+    }
+  }
+
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath && isValidBinary(cachedPath)) {
+    return cachedPath
+  }
 
   try {
     const require = createRequire(import.meta.url)
@@ -31,7 +54,7 @@ export function findSgCliPathSync(): string | null {
     const cliDir = dirname(cliPkgPath)
     const sgPath = join(cliDir, binaryName)
 
-    if (existsSync(sgPath)) {
+    if (existsSync(sgPath) && isValidBinary(sgPath)) {
       return sgPath
     }
   } catch {
@@ -47,26 +70,12 @@ export function findSgCliPathSync(): string | null {
       const astGrepName = process.platform === "win32" ? "ast-grep.exe" : "ast-grep"
       const binaryPath = join(pkgDir, astGrepName)
 
-      if (existsSync(binaryPath)) {
+      if (existsSync(binaryPath) && isValidBinary(binaryPath)) {
         return binaryPath
       }
     } catch {
       // Platform-specific package not installed
     }
-  }
-
-  if (process.platform === "darwin") {
-    const homebrewPaths = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"]
-    for (const path of homebrewPaths) {
-      if (existsSync(path)) {
-        return path
-      }
-    }
-  }
-
-  const cachedPath = getCachedBinaryPath()
-  if (cachedPath) {
-    return cachedPath
   }
 
   return null
