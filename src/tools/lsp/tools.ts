@@ -1,6 +1,11 @@
 import { tool } from "@opencode-ai/plugin/tool"
 import { getAllServers } from "./config"
 import {
+  DEFAULT_MAX_REFERENCES,
+  DEFAULT_MAX_SYMBOLS,
+  DEFAULT_MAX_DIAGNOSTICS,
+} from "./constants"
+import {
   withLspClient,
   formatHoverResult,
   formatLocation,
@@ -112,7 +117,14 @@ export const lsp_find_references = tool({
         return output
       }
 
-      const output = result.map(formatLocation).join("\n")
+      const total = result.length
+      const truncated = total > DEFAULT_MAX_REFERENCES
+      const limited = truncated ? result.slice(0, DEFAULT_MAX_REFERENCES) : result
+      const lines = limited.map(formatLocation)
+      if (truncated) {
+        lines.unshift(`Found ${total} references (showing first ${DEFAULT_MAX_REFERENCES}):`)
+      }
+      const output = lines.join("\n")
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
@@ -138,13 +150,21 @@ export const lsp_document_symbols = tool({
         return output
       }
 
-      let output: string
-      if ("range" in result[0]) {
-        output = (result as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)).join("\n")
-      } else {
-        output = (result as SymbolInfo[]).map(formatSymbolInfo).join("\n")
+      const total = result.length
+      const truncated = total > DEFAULT_MAX_SYMBOLS
+      const limited = truncated ? result.slice(0, DEFAULT_MAX_SYMBOLS) : result
+
+      const lines: string[] = []
+      if (truncated) {
+        lines.push(`Found ${total} symbols (showing first ${DEFAULT_MAX_SYMBOLS}):`)
       }
-      return output
+
+      if ("range" in limited[0]) {
+        lines.push(...(limited as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)))
+      } else {
+        lines.push(...(limited as SymbolInfo[]).map(formatSymbolInfo))
+      }
+      return lines.join("\n")
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
       return output
@@ -171,8 +191,15 @@ export const lsp_workspace_symbols = tool({
         return output
       }
 
-      const limited = args.limit ? result.slice(0, args.limit) : result
-      const output = limited.map(formatSymbolInfo).join("\n")
+      const total = result.length
+      const limit = Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS)
+      const truncated = total > limit
+      const limited = result.slice(0, limit)
+      const lines = limited.map(formatSymbolInfo)
+      if (truncated) {
+        lines.unshift(`Found ${total} symbols (showing first ${limit}):`)
+      }
+      const output = lines.join("\n")
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
@@ -213,7 +240,14 @@ export const lsp_diagnostics = tool({
         return output
       }
 
-      const output = diagnostics.map(formatDiagnostic).join("\n")
+      const total = diagnostics.length
+      const truncated = total > DEFAULT_MAX_DIAGNOSTICS
+      const limited = truncated ? diagnostics.slice(0, DEFAULT_MAX_DIAGNOSTICS) : diagnostics
+      const lines = limited.map(formatDiagnostic)
+      if (truncated) {
+        lines.unshift(`Found ${total} diagnostics (showing first ${DEFAULT_MAX_DIAGNOSTICS}):`)
+      }
+      const output = lines.join("\n")
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`

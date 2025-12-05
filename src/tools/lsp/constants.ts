@@ -36,6 +36,10 @@ export const SEVERITY_MAP: Record<number, string> = {
   4: "hint",
 }
 
+export const DEFAULT_MAX_REFERENCES = 200
+export const DEFAULT_MAX_SYMBOLS = 200
+export const DEFAULT_MAX_DIAGNOSTICS = 200
+
 export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
   typescript: {
     command: ["typescript-language-server", "--stdio"],
