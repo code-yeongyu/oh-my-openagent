@@ -1,5 +1,5 @@
 import type { PendingCall, FileComments } from "./types"
-import { detectComments, isSupportedFile } from "./detector"
+import { detectComments, isSupportedFile, warmupCommonLanguages } from "./detector"
 import { applyFilters } from "./filters"
 import { formatHookMessage } from "./output"
 
@@ -31,6 +31,9 @@ setInterval(cleanupOldPendingCalls, 10_000)
 
 export function createCommentCheckerHooks() {
   debugLog("createCommentCheckerHooks called")
+  
+  // Background warmup - LSP style (non-blocking)
+  warmupCommonLanguages()
   
   return {
     "tool.execute.before": async (

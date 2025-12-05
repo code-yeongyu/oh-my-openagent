@@ -17,71 +17,168 @@ function debugLog(...args: unknown[]) {
 }
 
 // =============================================================================
-// Parser caching for performance
+// Parser Manager (LSP-style background initialization)
 // =============================================================================
+
+interface ManagedLanguage {
+  language: unknown
+  initPromise?: Promise<unknown>
+  isInitializing: boolean
+  lastUsedAt: number
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let parserClass: any = null
-let parserInitialized = false
-const languageCache = new Map<string, unknown>()
+let parserInitPromise: Promise<void> | null = null
+const languageCache = new Map<string, ManagedLanguage>()
 
-async function getParser() {
-  if (!parserClass) {
-    debugLog("importing web-tree-sitter (first time)...")
-    parserClass = (await import("web-tree-sitter")).default
+const LANGUAGE_NAME_MAP: Record<string, string> = {
+  golang: "go",
+  csharp: "c_sharp",
+  cpp: "cpp",
+}
+
+const COMMON_LANGUAGES = [
+  "python",
+  "typescript",
+  "javascript",
+  "tsx",
+  "go",
+  "rust",
+  "java",
+]
+
+async function initParserClass(): Promise<void> {
+  if (parserClass) return
+  
+  if (parserInitPromise) {
+    await parserInitPromise
+    return
   }
   
-  if (!parserInitialized) {
-    debugLog("initializing Parser (first time)...")
+  parserInitPromise = (async () => {
+    debugLog("importing web-tree-sitter...")
+    parserClass = (await import("web-tree-sitter")).default
     const treeSitterWasmPath = require.resolve("web-tree-sitter/tree-sitter.wasm")
     debugLog("wasm path:", treeSitterWasmPath)
     await parserClass.init({
       locateFile: () => treeSitterWasmPath,
     })
-    parserInitialized = true
-    debugLog("Parser initialized")
-  }
+    debugLog("Parser class initialized")
+  })()
   
+  await parserInitPromise
+}
+
+async function getParser() {
+  await initParserClass()
   return new parserClass()
 }
 
-async function getLanguage(langName: string) {
-  if (languageCache.has(langName)) {
+async function loadLanguageWasm(langName: string): Promise<unknown | null> {
+  const mappedLang = LANGUAGE_NAME_MAP[langName] || langName
+  
+  try {
+    const wasmModule = await import(`tree-sitter-wasms/out/tree-sitter-${langName}.wasm`)
+    return wasmModule.default
+  } catch {
+    if (mappedLang !== langName) {
+      try {
+        const wasmModule = await import(`tree-sitter-wasms/out/tree-sitter-${mappedLang}.wasm`)
+        return wasmModule.default
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+}
+
+async function getLanguage(langName: string): Promise<unknown | null> {
+  const cached = languageCache.get(langName)
+  
+  if (cached) {
+    if (cached.initPromise) {
+      await cached.initPromise
+    }
+    cached.lastUsedAt = Date.now()
     debugLog("using cached language:", langName)
-    return languageCache.get(langName)
+    return cached.language
   }
   
   debugLog("loading language wasm:", langName)
   
-  let wasmPath: string
-  try {
-    const wasmModule = await import(`tree-sitter-wasms/out/tree-sitter-${langName}.wasm`)
-    wasmPath = wasmModule.default
-  } catch {
-    const languageMap: Record<string, string> = {
-      golang: "go",
-      csharp: "c_sharp",
-      cpp: "cpp",
-    }
-    const mappedLang = languageMap[langName] || langName
-    try {
-      const wasmModule = await import(`tree-sitter-wasms/out/tree-sitter-${mappedLang}.wasm`)
-      wasmPath = wasmModule.default
-    } catch (err) {
-      debugLog("failed to load language wasm:", langName, err)
+  const initPromise = (async () => {
+    await initParserClass()
+    const wasmPath = await loadLanguageWasm(langName)
+    if (!wasmPath) {
+      debugLog("failed to load language wasm:", langName)
       return null
     }
+    return await parserClass!.Language.load(wasmPath)
+  })()
+  
+  languageCache.set(langName, {
+    language: null as unknown,
+    initPromise,
+    isInitializing: true,
+    lastUsedAt: Date.now(),
+  })
+  
+  const language = await initPromise
+  const managed = languageCache.get(langName)
+  if (managed) {
+    managed.language = language
+    managed.initPromise = undefined
+    managed.isInitializing = false
   }
   
-  if (!parserClass) {
-    await getParser() // ensure parserClass is initialized
-  }
-  
-  const language = await parserClass!.Language.load(wasmPath)
-  languageCache.set(langName, language)
   debugLog("language loaded and cached:", langName)
-  
   return language
+}
+
+function warmupLanguage(langName: string): void {
+  if (languageCache.has(langName)) return
+  
+  debugLog("warming up language (background):", langName)
+  
+  const initPromise = (async () => {
+    await initParserClass()
+    const wasmPath = await loadLanguageWasm(langName)
+    if (!wasmPath) return null
+    return await parserClass!.Language.load(wasmPath)
+  })()
+  
+  languageCache.set(langName, {
+    language: null as unknown,
+    initPromise,
+    isInitializing: true,
+    lastUsedAt: Date.now(),
+  })
+  
+  initPromise.then((language) => {
+    const managed = languageCache.get(langName)
+    if (managed) {
+      managed.language = language
+      managed.initPromise = undefined
+      managed.isInitializing = false
+      debugLog("warmup complete:", langName)
+    }
+  }).catch((err) => {
+    debugLog("warmup failed:", langName, err)
+    languageCache.delete(langName)
+  })
+}
+
+export function warmupCommonLanguages(): void {
+  debugLog("starting background warmup for common languages...")
+  initParserClass().then(() => {
+    for (const lang of COMMON_LANGUAGES) {
+      warmupLanguage(lang)
+    }
+  }).catch((err) => {
+    debugLog("warmup initialization failed:", err)
+  })
 }
 
 // =============================================================================
