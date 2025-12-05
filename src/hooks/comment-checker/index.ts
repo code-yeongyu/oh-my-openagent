@@ -28,7 +28,7 @@ export function createCommentCheckerHooks() {
         return
       }
 
-      const filePath = (output.args.filePath ?? output.args.file_path) as string | undefined
+      const filePath = (output.args.filePath ?? output.args.file_path ?? output.args.path) as string | undefined
       const content = output.args.content as string | undefined
 
       if (!filePath) {
