@@ -51,3 +51,11 @@ export interface TransformResult {
   transformed: string
   editCount: number
 }
+
+export interface SgResult {
+  matches: CliMatch[]
+  totalMatches: number
+  truncated: boolean
+  truncatedReason?: "max_matches" | "max_output_bytes" | "timeout"
+  error?: string
+}

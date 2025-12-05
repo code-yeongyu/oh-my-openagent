@@ -1,8 +1,15 @@
 import { spawn } from "bun"
 import { existsSync } from "fs"
-import { getSgCliPath, setSgCliPath, findSgCliPathSync } from "./constants"
+import {
+  getSgCliPath,
+  setSgCliPath,
+  findSgCliPathSync,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_MAX_OUTPUT_BYTES,
+  DEFAULT_MAX_MATCHES,
+} from "./constants"
 import { ensureAstGrepBinary } from "./downloader"
-import type { CliMatch, CliLanguage } from "./types"
+import type { CliMatch, CliLanguage, SgResult } from "./types"
 
 export interface RunOptions {
   pattern: string
@@ -54,26 +61,7 @@ export function startBackgroundInit(): void {
   }
 }
 
-interface SpawnResult {
-  stdout: string
-  stderr: string
-  exitCode: number
-}
-
-async function spawnSg(cliPath: string, args: string[]): Promise<SpawnResult> {
-  const proc = spawn([cliPath, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-
-  const stdout = await new Response(proc.stdout).text()
-  const stderr = await new Response(proc.stderr).text()
-  const exitCode = await proc.exited
-
-  return { stdout, stderr, exitCode }
-}
-
-export async function runSg(options: RunOptions): Promise<CliMatch[]> {
+export async function runSg(options: RunOptions): Promise<SgResult> {
   const args = ["run", "-p", options.pattern, "--lang", options.lang, "--json=compact"]
 
   if (options.rewrite) {
@@ -105,55 +93,129 @@ export async function runSg(options: RunOptions): Promise<CliMatch[]> {
     }
   }
 
-  let result: SpawnResult
+  const timeout = DEFAULT_TIMEOUT_MS
+
+  const proc = spawn([cliPath, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const id = setTimeout(() => {
+      proc.kill()
+      reject(new Error(`Search timeout after ${timeout}ms`))
+    }, timeout)
+    proc.exited.then(() => clearTimeout(id))
+  })
+
+  let stdout: string
+  let stderr: string
+  let exitCode: number
+
   try {
-    result = await spawnSg(cliPath, args)
+    stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
+    stderr = await new Response(proc.stderr).text()
+    exitCode = await proc.exited
   } catch (e) {
-    const error = e as NodeJS.ErrnoException
+    const error = e as Error
+    if (error.message?.includes("timeout")) {
+      return {
+        matches: [],
+        totalMatches: 0,
+        truncated: true,
+        truncatedReason: "timeout",
+        error: error.message,
+      }
+    }
+
+    const nodeError = e as NodeJS.ErrnoException
     if (
-      error.code === "ENOENT" ||
-      error.message?.includes("ENOENT") ||
-      error.message?.includes("not found")
+      nodeError.code === "ENOENT" ||
+      nodeError.message?.includes("ENOENT") ||
+      nodeError.message?.includes("not found")
     ) {
       const downloadedPath = await ensureAstGrepBinary()
       if (downloadedPath) {
         resolvedCliPath = downloadedPath
         setSgCliPath(downloadedPath)
-        result = await spawnSg(downloadedPath, args)
+        return runSg(options)
       } else {
-        throw new Error(
-          `ast-grep CLI binary not found.\n\n` +
+        return {
+          matches: [],
+          totalMatches: 0,
+          truncated: false,
+          error:
+            `ast-grep CLI binary not found.\n\n` +
             `Auto-download failed. Manual install options:\n` +
             `  bun add -D @ast-grep/cli\n` +
             `  cargo install ast-grep --locked\n` +
-            `  brew install ast-grep`
-        )
+            `  brew install ast-grep`,
+        }
       }
-    } else {
-      throw new Error(`Failed to spawn ast-grep: ${error.message}`)
+    }
+
+    return {
+      matches: [],
+      totalMatches: 0,
+      truncated: false,
+      error: `Failed to spawn ast-grep: ${error.message}`,
     }
   }
-
-  const { stdout, stderr, exitCode } = result
 
   if (exitCode !== 0 && stdout.trim() === "") {
     if (stderr.includes("No files found")) {
-      return []
+      return { matches: [], totalMatches: 0, truncated: false }
     }
     if (stderr.trim()) {
-      throw new Error(stderr.trim())
+      return { matches: [], totalMatches: 0, truncated: false, error: stderr.trim() }
     }
-    return []
+    return { matches: [], totalMatches: 0, truncated: false }
   }
 
   if (!stdout.trim()) {
-    return []
+    return { matches: [], totalMatches: 0, truncated: false }
   }
 
+  const outputTruncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
+  const outputToProcess = outputTruncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
+
+  let matches: CliMatch[] = []
   try {
-    return JSON.parse(stdout) as CliMatch[]
+    matches = JSON.parse(outputToProcess) as CliMatch[]
   } catch {
-    return []
+    if (outputTruncated) {
+      try {
+        const lastValidIndex = outputToProcess.lastIndexOf("}")
+        if (lastValidIndex > 0) {
+          const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
+          if (bracketIndex > 0) {
+            const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
+            matches = JSON.parse(truncatedJson) as CliMatch[]
+          }
+        }
+      } catch {
+        return {
+          matches: [],
+          totalMatches: 0,
+          truncated: true,
+          truncatedReason: "max_output_bytes",
+          error: "Output too large and could not be parsed",
+        }
+      }
+    } else {
+      return { matches: [], totalMatches: 0, truncated: false }
+    }
+  }
+
+  const totalMatches = matches.length
+  const matchesTruncated = totalMatches > DEFAULT_MAX_MATCHES
+  const finalMatches = matchesTruncated ? matches.slice(0, DEFAULT_MAX_MATCHES) : matches
+
+  return {
+    matches: finalMatches,
+    totalMatches,
+    truncated: outputTruncated || matchesTruncated,
+    truncatedReason: outputTruncated ? "max_output_bytes" : matchesTruncated ? "max_matches" : undefined,
   }
 }
 

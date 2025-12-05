@@ -135,6 +135,10 @@ export const CLI_LANGUAGES = [
 export const NAPI_LANGUAGES = ["html", "javascript", "tsx", "css", "typescript"] as const
 
 // Language to file extensions mapping
+export const DEFAULT_TIMEOUT_MS = 300_000
+export const DEFAULT_MAX_OUTPUT_BYTES = 1 * 1024 * 1024
+export const DEFAULT_MAX_MATCHES = 500
+
 export const LANG_EXTENSIONS: Record<string, string[]> = {
   bash: [".bash", ".sh", ".zsh", ".bats"],
   c: [".c", ".h"],

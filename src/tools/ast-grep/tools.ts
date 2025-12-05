@@ -49,7 +49,7 @@ export const ast_grep_search = tool({
   },
   execute: async (args, context) => {
     try {
-      const matches = await runSg({
+      const result = await runSg({
         pattern: args.pattern,
         lang: args.lang as CliLanguage,
         paths: args.paths,
@@ -57,9 +57,9 @@ export const ast_grep_search = tool({
         context: args.context,
       })
 
-      let output = formatSearchResult(matches)
+      let output = formatSearchResult(result)
 
-      if (matches.length === 0) {
+      if (result.matches.length === 0 && !result.error) {
         const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
         if (hint) {
           output += `\n\n${hint}`
@@ -91,7 +91,7 @@ export const ast_grep_replace = tool({
   },
   execute: async (args, context) => {
     try {
-      const matches = await runSg({
+      const result = await runSg({
         pattern: args.pattern,
         rewrite: args.rewrite,
         lang: args.lang as CliLanguage,
@@ -99,7 +99,7 @@ export const ast_grep_replace = tool({
         globs: args.globs,
         updateAll: args.dryRun === false,
       })
-      const output = formatReplaceResult(matches, args.dryRun !== false)
+      const output = formatReplaceResult(result, args.dryRun !== false)
       showOutputToUser(context, output)
       return output
     } catch (e) {
