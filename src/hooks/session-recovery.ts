@@ -211,29 +211,93 @@ async function recoverThinkingDisabledViolation(
   return false
 }
 
+const THINKING_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"])
+
+function hasNonEmptyOutput(msg: MessageData): boolean {
+  const parts = msg.parts
+  if (!parts || parts.length === 0) return false
+
+  return parts.some((p) => {
+    if (THINKING_TYPES.has(p.type)) return false
+    if (p.type === "step-start" || p.type === "step-finish") return false
+    if (p.type === "text" && p.text && p.text.trim()) return true
+    if (p.type === "tool_use" && p.id) return true
+    if (p.type === "tool_result") return true
+    return false
+  })
+}
+
+function findEmptyContentMessage(msgs: MessageData[]): MessageData | null {
+  for (let i = 0; i < msgs.length; i++) {
+    const msg = msgs[i]
+    const isLastMessage = i === msgs.length - 1
+    const isAssistant = msg.info?.role === "assistant"
+
+    if (isLastMessage && isAssistant) continue
+
+    if (!hasNonEmptyOutput(msg)) {
+      return msg
+    }
+  }
+  return null
+}
+
 async function recoverEmptyContentMessage(
   client: Client,
   sessionID: string,
   failedAssistantMsg: MessageData,
   directory: string
 ): Promise<boolean> {
-  const messageID = failedAssistantMsg.info?.id
-  const parentMsgID = failedAssistantMsg.info?.parentID
-
-  if (!messageID) {
-    return false
-  }
-
-  // Revert to parent message (delete the empty message)
-  const revertTargetID = parentMsgID || messageID
-
   try {
+    const messagesResp = await client.session.messages({
+      path: { id: sessionID },
+      query: { directory },
+    })
+    const msgs = (messagesResp as { data?: MessageData[] }).data
+
+    if (!msgs || msgs.length === 0) return false
+
+    const emptyMsg = findEmptyContentMessage(msgs) || failedAssistantMsg
+    const messageID = emptyMsg.info?.id
+    if (!messageID) return false
+
+    const existingParts = emptyMsg.parts || []
+    const hasOnlyThinkingOrMeta = existingParts.length > 0 && existingParts.every(
+      (p) => THINKING_TYPES.has(p.type) || p.type === "step-start" || p.type === "step-finish"
+    )
+
+    if (hasOnlyThinkingOrMeta) {
+      const strippedParts: MessagePart[] = [{ type: "text", text: "(interrupted)" }]
+
+      try {
+        // @ts-expect-error - Experimental API
+        await client.message?.update?.({
+          path: { id: messageID },
+          body: { parts: strippedParts },
+        })
+        return true
+      } catch {
+        // message.update not available
+      }
+
+      try {
+        // @ts-expect-error - Experimental API
+        await client.session.patch?.({
+          path: { id: sessionID },
+          body: { messageID, parts: strippedParts },
+        })
+        return true
+      } catch {
+        // session.patch not available
+      }
+    }
+
+    const revertTargetID = emptyMsg.info?.parentID || messageID
     await client.session.revert({
       path: { id: sessionID },
       body: { messageID: revertTargetID },
       query: { directory },
     })
-
     return true
   } catch {
     return false
