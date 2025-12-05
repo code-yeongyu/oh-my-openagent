@@ -1,81 +1,18 @@
-import { createRequire } from "module"
-import { dirname, join } from "path"
-import { existsSync } from "fs"
+import { existsSync, statSync } from "fs"
 import { getCachedBinaryPath } from "./downloader"
-
-type Platform = "darwin" | "linux" | "win32" | "unsupported"
-
-function getPlatformPackageName(): string | null {
-  const platform = process.platform as Platform
-  const arch = process.arch
-
-  const platformMap: Record<string, string> = {
-    "darwin-arm64": "@ast-grep/cli-darwin-arm64",
-    "darwin-x64": "@ast-grep/cli-darwin-x64",
-    "linux-arm64": "@ast-grep/cli-linux-arm64-gnu",
-    "linux-x64": "@ast-grep/cli-linux-x64-gnu",
-    "win32-x64": "@ast-grep/cli-win32-x64-msvc",
-    "win32-arm64": "@ast-grep/cli-win32-arm64-msvc",
-    "win32-ia32": "@ast-grep/cli-win32-ia32-msvc",
-  }
-
-  return platformMap[`${platform}-${arch}`] ?? null
-}
 
 function isValidBinary(filePath: string): boolean {
   try {
-    const stats = require("fs").statSync(filePath)
-    return stats.size > 10000
+    return statSync(filePath).size > 10000
   } catch {
     return false
   }
 }
 
 export function findSgCliPathSync(): string | null {
-  const binaryName = process.platform === "win32" ? "sg.exe" : "sg"
-
-  if (process.platform === "darwin") {
-    const homebrewPaths = ["/opt/homebrew/bin/sg", "/usr/local/bin/sg"]
-    for (const path of homebrewPaths) {
-      if (existsSync(path) && isValidBinary(path)) {
-        return path
-      }
-    }
-  }
-
   const cachedPath = getCachedBinaryPath()
   if (cachedPath && isValidBinary(cachedPath)) {
     return cachedPath
-  }
-
-  try {
-    const require = createRequire(import.meta.url)
-    const cliPkgPath = require.resolve("@ast-grep/cli/package.json")
-    const cliDir = dirname(cliPkgPath)
-    const sgPath = join(cliDir, binaryName)
-
-    if (existsSync(sgPath) && isValidBinary(sgPath)) {
-      return sgPath
-    }
-  } catch {
-    // @ast-grep/cli not installed
-  }
-
-  const platformPkg = getPlatformPackageName()
-  if (platformPkg) {
-    try {
-      const require = createRequire(import.meta.url)
-      const pkgPath = require.resolve(`${platformPkg}/package.json`)
-      const pkgDir = dirname(pkgPath)
-      const astGrepName = process.platform === "win32" ? "ast-grep.exe" : "ast-grep"
-      const binaryPath = join(pkgDir, astGrepName)
-
-      if (existsSync(binaryPath) && isValidBinary(binaryPath)) {
-        return binaryPath
-      }
-    } catch {
-      // Platform-specific package not installed
-    }
   }
 
   return null
