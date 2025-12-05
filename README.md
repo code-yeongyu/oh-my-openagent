@@ -146,6 +146,14 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
 - **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
 
+Each agent is automatically invoked by the main agent, but you can also explicitly request them:
+
+```
+@oracle Please think through the design of this part and suggest an architecture.
+@librarian Tell me how this is implemented — why does the behavior keep changing internally?
+@explore Tell me about the policy for this feature.
+```
+
 Agent models, prompts, and permissions can be customized via `oh-my-opencode.json`. See [Configuration](#configuration) for details.
 
 ### Tools
