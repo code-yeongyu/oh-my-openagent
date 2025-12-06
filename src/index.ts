@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { createBuiltinAgents } from "./agents"
-import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook, createCommentCheckerHooks } from "./hooks"
+import { createTodoContinuationEnforcer, createContextWindowMonitorHook, createSessionRecoveryHook, createCommentCheckerHooks, createGrepOutputTruncatorHook } from "./hooks"
 import { updateTerminalTitle } from "./features/terminal"
 import { builtinTools } from "./tools"
 import { createBuiltinMcps } from "./mcp"
@@ -44,6 +44,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const contextWindowMonitor = createContextWindowMonitorHook(ctx)
   const sessionRecovery = createSessionRecoveryHook(ctx)
   const commentChecker = createCommentCheckerHooks()
+  const grepOutputTruncator = createGrepOutputTruncatorHook(ctx)
 
   updateTerminalTitle({ sessionId: "main" })
 
@@ -185,6 +186,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
+      await grepOutputTruncator["tool.execute.after"](input, output)
       await contextWindowMonitor["tool.execute.after"](input, output)
       await commentChecker["tool.execute.after"](input, output)
 
