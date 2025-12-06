@@ -7,18 +7,13 @@ interface Todo {
   id: string
 }
 
-const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO ENFORCEMENT]
+const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
 
-Your todo list is NOT complete. There are still incomplete tasks remaining.
+Incomplete tasks remain in your todo list. Continue working on the next pending task.
 
-CRITICAL INSTRUCTION:
-- You MUST NOT stop working until ALL todos are marked as completed
-- Continue working on the next pending task immediately
-- Work honestly and diligently to finish every task
-- Do NOT ask for permission to continue - just proceed with the work
-- Mark each task as completed as soon as you finish it
-
-Resume your work NOW.`
+- Proceed without asking for permission
+- Mark each task complete when finished
+- Do not stop until all tasks are done`
 
 function detectInterrupt(error: unknown): boolean {
   if (!error) return false
@@ -113,7 +108,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
             parts: [
               {
                 type: "text",
-                text: `${CONTINUATION_PROMPT}\n\n[Status: ${incomplete.length}/${todos.length} tasks remaining]`,
+                text: `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - incomplete.length}/${todos.length} completed, ${incomplete.length} remaining]`,
               },
             ],
           },
