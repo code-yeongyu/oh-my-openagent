@@ -20,5 +20,3 @@ export function createBuiltinMcps(disabledMcps: McpName[] = []) {
 
   return mcps
 }
-
-export const builtinMcps = allBuiltinMcps
