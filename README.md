@@ -138,6 +138,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
   - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
 - **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
+- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, providing directory-level context to the agent. Inspired by Claude Code's CLAUDE.md feature.
 
 ### Agents
 - **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.

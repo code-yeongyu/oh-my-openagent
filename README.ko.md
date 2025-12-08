@@ -142,6 +142,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
   - **Thinking Disabled Violation**: thinking 이 비활성화인데 thinking 블록이 있을 때 → thinking 블록 제거
   - **Empty Content Message**: 메시지가 thinking/meta 블록만 있고 실제 내용이 없을 때 → 파일시스템을 통해 "(interrupted)" 텍스트 주입
 - **Comment Checker**: 코드 수정 후 불필요한 주석을 감지하여 보고합니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, AI가 남긴 흔적을 제거하여 코드를 깨끗하게 유지합니다.
+- **Directory AGENTS.md Injector**: 파일을 읽을 때 `AGENTS.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 디렉토리별 컨텍스트를 에이전트에게 제공합니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
 
 ### Agents
 
