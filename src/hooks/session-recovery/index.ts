@@ -51,8 +51,12 @@ interface MessagePart {
 function getErrorMessage(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error.toLowerCase()
-  const errorObj = error as { data?: { message?: string }; message?: string }
-  return (errorObj.data?.message || errorObj.message || "").toLowerCase()
+  const errorObj = error as {
+    data?: { message?: string }
+    message?: string
+    error?: { message?: string }
+  }
+  return (errorObj.data?.message || errorObj.error?.message || errorObj.message || "").toLowerCase()
 }
 
 function detectErrorType(error: unknown): RecoveryErrorType {
