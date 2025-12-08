@@ -14,7 +14,6 @@ import {
   formatDiagnostic,
   filterDiagnosticsBySeverity,
   formatPrepareRenameResult,
-  formatWorkspaceEdit,
   formatCodeActions,
   applyWorkspaceEdit,
   formatApplyResult,
