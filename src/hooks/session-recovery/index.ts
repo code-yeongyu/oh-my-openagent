@@ -1,6 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import { findFirstEmptyMessage, injectTextPart } from "./storage"
+import {
+  findEmptyMessages,
+  findMessagesWithOrphanThinking,
+  findMessagesWithThinkingBlocks,
+  injectTextPart,
+  prependThinkingPart,
+  stripThinkingParts,
+} from "./storage"
 import type { MessageData } from "./types"
 
 type Client = ReturnType<typeof createOpencodeClient>
@@ -109,76 +116,46 @@ async function recoverToolResultMissing(
 }
 
 async function recoverThinkingBlockOrder(
-  client: Client,
+  _client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData,
-  directory: string
+  _failedAssistantMsg: MessageData,
+  _directory: string
 ): Promise<boolean> {
-  const messageID = failedAssistantMsg.info?.id
-  if (!messageID) {
+  const orphanMessages = findMessagesWithOrphanThinking(sessionID)
+
+  if (orphanMessages.length === 0) {
     return false
   }
 
-  const existingParts = failedAssistantMsg.parts || []
-  const patchedParts: MessagePart[] = [{ type: "thinking", thinking: "" } as ThinkingPart, ...existingParts]
+  let anySuccess = false
+  for (const messageID of orphanMessages) {
+    if (prependThinkingPart(sessionID, messageID)) {
+      anySuccess = true
+    }
+  }
 
-  try {
-    // @ts-expect-error - Experimental API
-    await client.message?.update?.({
-      path: { id: messageID },
-      body: { parts: patchedParts },
-    })
-    return true
-  } catch {}
-
-  try {
-    // @ts-expect-error - Experimental API
-    await client.session.patch?.({
-      path: { id: sessionID },
-      body: { messageID, parts: patchedParts },
-    })
-    return true
-  } catch {}
-
-  return await fallbackRevertStrategy(client, sessionID, failedAssistantMsg, directory)
+  return anySuccess
 }
 
 async function recoverThinkingDisabledViolation(
-  client: Client,
+  _client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  _failedAssistantMsg: MessageData
 ): Promise<boolean> {
-  const messageID = failedAssistantMsg.info?.id
-  if (!messageID) {
+  const messagesWithThinking = findMessagesWithThinkingBlocks(sessionID)
+
+  if (messagesWithThinking.length === 0) {
     return false
   }
 
-  const existingParts = failedAssistantMsg.parts || []
-  const strippedParts = existingParts.filter((p) => p.type !== "thinking" && p.type !== "redacted_thinking")
-
-  if (strippedParts.length === 0) {
-    return false
+  let anySuccess = false
+  for (const messageID of messagesWithThinking) {
+    if (stripThinkingParts(messageID)) {
+      anySuccess = true
+    }
   }
 
-  try {
-    // @ts-expect-error - Experimental API
-    await client.message?.update?.({
-      path: { id: messageID },
-      body: { parts: strippedParts },
-    })
-    return true
-  } catch {}
-
-  try {
-    // @ts-expect-error - Experimental API
-    await client.session.patch?.({
-      path: { id: sessionID },
-      body: { messageID, parts: strippedParts },
-    })
-    return true
-  } catch {}
-
-  return false
+  return anySuccess
 }
 
 async function recoverEmptyContentMessage(
@@ -187,10 +164,22 @@ async function recoverEmptyContentMessage(
   failedAssistantMsg: MessageData,
   _directory: string
 ): Promise<boolean> {
-  const emptyMessageID = findFirstEmptyMessage(sessionID) || failedAssistantMsg.info?.id
-  if (!emptyMessageID) return false
+  const emptyMessageIDs = findEmptyMessages(sessionID)
 
-  return injectTextPart(sessionID, emptyMessageID, "(interrupted)")
+  if (emptyMessageIDs.length === 0) {
+    const fallbackID = failedAssistantMsg.info?.id
+    if (!fallbackID) return false
+    return injectTextPart(sessionID, fallbackID, "(interrupted)")
+  }
+
+  let anySuccess = false
+  for (const messageID of emptyMessageIDs) {
+    if (injectTextPart(sessionID, messageID, "(interrupted)")) {
+      anySuccess = true
+    }
+  }
+
+  return anySuccess
 }
 
 async function fallbackRevertStrategy(

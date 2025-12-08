@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE, THINKING_TYPES, META_TYPES } from "./constants"
 import type { StoredMessageMeta, StoredPart, StoredTextPart } from "./types"
@@ -135,4 +135,101 @@ export function findEmptyMessages(sessionID: string): string[] {
 export function findFirstEmptyMessage(sessionID: string): string | null {
   const emptyIds = findEmptyMessages(sessionID)
   return emptyIds.length > 0 ? emptyIds[0] : null
+}
+
+export function findMessagesWithThinkingBlocks(sessionID: string): string[] {
+  const messages = readMessages(sessionID)
+  const result: string[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== "assistant") continue
+
+    const isLastMessage = i === messages.length - 1
+    if (isLastMessage) continue
+
+    const parts = readParts(msg.id)
+    const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
+    if (hasThinking) {
+      result.push(msg.id)
+    }
+  }
+
+  return result
+}
+
+export function findMessagesWithOrphanThinking(sessionID: string): string[] {
+  const messages = readMessages(sessionID)
+  const result: string[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== "assistant") continue
+
+    const isLastMessage = i === messages.length - 1
+    if (isLastMessage) continue
+
+    const parts = readParts(msg.id)
+    if (parts.length === 0) continue
+
+    const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id))
+    const firstPart = sortedParts[0]
+
+    const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
+    const firstIsThinking = THINKING_TYPES.has(firstPart.type)
+
+    if (hasThinking && !firstIsThinking) {
+      result.push(msg.id)
+    }
+  }
+
+  return result
+}
+
+export function prependThinkingPart(sessionID: string, messageID: string): boolean {
+  const partDir = join(PART_STORAGE, messageID)
+
+  if (!existsSync(partDir)) {
+    mkdirSync(partDir, { recursive: true })
+  }
+
+  const partId = `prt_0000000000_thinking`
+  const part = {
+    id: partId,
+    sessionID,
+    messageID,
+    type: "thinking",
+    thinking: "",
+    synthetic: true,
+  }
+
+  try {
+    writeFileSync(join(partDir, `${partId}.json`), JSON.stringify(part, null, 2))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function stripThinkingParts(messageID: string): boolean {
+  const partDir = join(PART_STORAGE, messageID)
+  if (!existsSync(partDir)) return false
+
+  let anyRemoved = false
+  for (const file of readdirSync(partDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const filePath = join(partDir, file)
+      const content = readFileSync(filePath, "utf-8")
+      const part = JSON.parse(content) as StoredPart
+      if (THINKING_TYPES.has(part.type)) {
+        unlinkSync(filePath)
+        anyRemoved = true
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return anyRemoved
 }
