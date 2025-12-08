@@ -6,3 +6,4 @@ export { createCommentCheckerHooks } from "./comment-checker";
 export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
 export { createPulseMonitorHook } from "./pulse-monitor";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
+export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
