@@ -344,7 +344,7 @@ function findEmptyContentMessageFromStorage(sessionID: string): string | null {
       if (THINKING_TYPES.has(p.type)) return false
       if (META_TYPES.has(p.type)) return false
       if (p.type === "text" && p.text?.trim()) return true
-      if (p.type === "tool_use") return true
+      if (p.type === "tool_use" || p.type === "tool") return true
       if (p.type === "tool_result") return true
       return false
     })
@@ -365,7 +365,7 @@ function hasNonEmptyOutput(msg: MessageData): boolean {
     if (THINKING_TYPES.has(p.type)) return false
     if (p.type === "step-start" || p.type === "step-finish") return false
     if (p.type === "text" && p.text && p.text.trim()) return true
-    if (p.type === "tool_use" && p.id) return true
+    if ((p.type === "tool_use" || p.type === "tool") && p.id) return true
     if (p.type === "tool_result") return true
     return false
   })
