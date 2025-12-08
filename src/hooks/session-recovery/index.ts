@@ -1,33 +1,16 @@
-/**
- * Session Recovery - Message State Error Recovery
- *
- * Handles FOUR specific scenarios:
- * 1. tool_use block exists without tool_result
- *    - Recovery: inject tool_result with "cancelled" content
- *
- * 2. Thinking block order violation (first block must be thinking)
- *    - Recovery: prepend empty thinking block
- *
- * 3. Thinking disabled but message contains thinking blocks
- *    - Recovery: strip thinking/redacted_thinking blocks
- *
- * 4. Empty content message (non-empty content required)
- *    - Recovery: inject text part directly via filesystem
- */
-
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { xdgData } from "xdg-basedir"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import { findFirstEmptyMessage, injectTextPart } from "./storage"
+import type { MessageData } from "./types"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-const OPENCODE_STORAGE = join(xdgData ?? "", "opencode", "storage")
-const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
-const PART_STORAGE = join(OPENCODE_STORAGE, "part")
-
-type RecoveryErrorType = "tool_result_missing" | "thinking_block_order" | "thinking_disabled_violation" | "empty_content_message" | null
+type RecoveryErrorType =
+  | "tool_result_missing"
+  | "thinking_block_order"
+  | "thinking_disabled_violation"
+  | "empty_content_message"
+  | null
 
 interface MessageInfo {
   id?: string
@@ -56,11 +39,6 @@ interface MessagePart {
   thinking?: string
   name?: string
   input?: Record<string, unknown>
-}
-
-interface MessageData {
-  info?: MessageInfo
-  parts?: MessagePart[]
 }
 
 function getErrorMessage(error: unknown): string {
@@ -120,7 +98,7 @@ async function recoverToolResultMissing(
   try {
     await client.session.prompt({
       path: { id: sessionID },
-      // @ts-expect-error - SDK types may not include tool_result parts, but runtime accepts it
+      // @ts-expect-error - SDK types may not include tool_result parts
       body: { parts: toolResultParts },
     })
 
@@ -150,26 +128,17 @@ async function recoverThinkingBlockOrder(
       path: { id: messageID },
       body: { parts: patchedParts },
     })
-
     return true
-  } catch {
-    // message.update not available
-  }
+  } catch {}
 
   try {
     // @ts-expect-error - Experimental API
     await client.session.patch?.({
       path: { id: sessionID },
-      body: {
-        messageID,
-        parts: patchedParts,
-      },
+      body: { messageID, parts: patchedParts },
     })
-
     return true
-  } catch {
-    // session.patch not available
-  }
+  } catch {}
 
   return await fallbackRevertStrategy(client, sessionID, failedAssistantMsg, directory)
 }
@@ -197,193 +166,19 @@ async function recoverThinkingDisabledViolation(
       path: { id: messageID },
       body: { parts: strippedParts },
     })
-
     return true
-  } catch {
-    // message.update not available
-  }
+  } catch {}
 
   try {
     // @ts-expect-error - Experimental API
     await client.session.patch?.({
       path: { id: sessionID },
-      body: {
-        messageID,
-        parts: strippedParts,
-      },
+      body: { messageID, parts: strippedParts },
     })
-
     return true
-  } catch {
-    // session.patch not available
-  }
+  } catch {}
 
   return false
-}
-
-const THINKING_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"])
-const META_TYPES = new Set(["step-start", "step-finish"])
-
-interface StoredMessageMeta {
-  id: string
-  sessionID: string
-  role: string
-  parentID?: string
-}
-
-interface StoredPart {
-  id: string
-  sessionID: string
-  messageID: string
-  type: string
-  text?: string
-}
-
-function generatePartId(): string {
-  const timestamp = Date.now().toString(16)
-  const random = Math.random().toString(36).substring(2, 10)
-  return `prt_${timestamp}${random}`
-}
-
-function getMessageDir(sessionID: string): string {
-  const projectHash = readdirSync(MESSAGE_STORAGE).find((dir) => {
-    const sessionDir = join(MESSAGE_STORAGE, dir)
-    try {
-      return readdirSync(sessionDir).some((f) => f.includes(sessionID.replace("ses_", "")))
-    } catch {
-      return false
-    }
-  })
-
-  if (projectHash) {
-    return join(MESSAGE_STORAGE, projectHash, sessionID)
-  }
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) {
-      return sessionPath
-    }
-  }
-
-  return ""
-}
-
-function readMessagesFromStorage(sessionID: string): StoredMessageMeta[] {
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir || !existsSync(messageDir)) return []
-
-  const messages: StoredMessageMeta[] = []
-  for (const file of readdirSync(messageDir)) {
-    if (!file.endsWith(".json")) continue
-    try {
-      const content = readFileSync(join(messageDir, file), "utf-8")
-      messages.push(JSON.parse(content))
-    } catch {
-      continue
-    }
-  }
-
-  return messages.sort((a, b) => a.id.localeCompare(b.id))
-}
-
-function readPartsFromStorage(messageID: string): StoredPart[] {
-  const partDir = join(PART_STORAGE, messageID)
-  if (!existsSync(partDir)) return []
-
-  const parts: StoredPart[] = []
-  for (const file of readdirSync(partDir)) {
-    if (!file.endsWith(".json")) continue
-    try {
-      const content = readFileSync(join(partDir, file), "utf-8")
-      parts.push(JSON.parse(content))
-    } catch {
-      continue
-    }
-  }
-
-  return parts
-}
-
-function injectTextPartToStorage(sessionID: string, messageID: string, text: string): boolean {
-  const partDir = join(PART_STORAGE, messageID)
-
-  if (!existsSync(partDir)) {
-    mkdirSync(partDir, { recursive: true })
-  }
-
-  const partId = generatePartId()
-  const part: StoredPart = {
-    id: partId,
-    sessionID,
-    messageID,
-    type: "text",
-    text,
-  }
-
-  try {
-    writeFileSync(join(partDir, `${partId}.json`), JSON.stringify(part, null, 2))
-    return true
-  } catch {
-    return false
-  }
-}
-
-function findEmptyContentMessageFromStorage(sessionID: string): string | null {
-  const messages = readMessagesFromStorage(sessionID)
-
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
-    if (msg.role !== "assistant") continue
-
-    const isLastMessage = i === messages.length - 1
-    if (isLastMessage) continue
-
-    const parts = readPartsFromStorage(msg.id)
-    const hasContent = parts.some((p) => {
-      if (THINKING_TYPES.has(p.type)) return false
-      if (META_TYPES.has(p.type)) return false
-      if (p.type === "text" && p.text?.trim()) return true
-      if (p.type === "tool_use" || p.type === "tool") return true
-      if (p.type === "tool_result") return true
-      return false
-    })
-
-    if (!hasContent) {
-      return msg.id
-    }
-  }
-
-  return null
-}
-
-function hasNonEmptyOutput(msg: MessageData): boolean {
-  const parts = msg.parts
-  if (!parts || parts.length === 0) return false
-
-  return parts.some((p) => {
-    if (THINKING_TYPES.has(p.type)) return false
-    if (p.type === "step-start" || p.type === "step-finish") return false
-    if (p.type === "text" && p.text && p.text.trim()) return true
-    if ((p.type === "tool_use" || p.type === "tool") && p.id) return true
-    if (p.type === "tool_result") return true
-    return false
-  })
-}
-
-function findEmptyContentMessage(msgs: MessageData[]): MessageData | null {
-  for (let i = 0; i < msgs.length; i++) {
-    const msg = msgs[i]
-    const isLastMessage = i === msgs.length - 1
-    const isAssistant = msg.info?.role === "assistant"
-
-    if (isLastMessage && isAssistant) continue
-
-    if (!hasNonEmptyOutput(msg)) {
-      return msg
-    }
-  }
-  return null
 }
 
 async function recoverEmptyContentMessage(
@@ -392,10 +187,10 @@ async function recoverEmptyContentMessage(
   failedAssistantMsg: MessageData,
   _directory: string
 ): Promise<boolean> {
-  const emptyMessageID = findEmptyContentMessageFromStorage(sessionID) || failedAssistantMsg.info?.id
+  const emptyMessageID = findFirstEmptyMessage(sessionID) || failedAssistantMsg.info?.id
   if (!emptyMessageID) return false
 
-  return injectTextPartToStorage(sessionID, emptyMessageID, "(interrupted)")
+  return injectTextPart(sessionID, emptyMessageID, "(interrupted)")
 }
 
 async function fallbackRevertStrategy(
@@ -508,16 +303,14 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
-        empty_content_message: "Deleting empty message...",
+        empty_content_message: "Fixing empty message...",
       }
-      const toastTitle = toastTitles[errorType]
-      const toastMessage = toastMessages[errorType]
 
       await ctx.client.tui
         .showToast({
           body: {
-            title: toastTitle,
-            message: toastMessage,
+            title: toastTitles[errorType],
+            message: toastMessages[errorType],
             variant: "warning",
             duration: 3000,
           },

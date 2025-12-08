@@ -1,0 +1,138 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { MESSAGE_STORAGE, PART_STORAGE, THINKING_TYPES, META_TYPES } from "./constants"
+import type { StoredMessageMeta, StoredPart, StoredTextPart } from "./types"
+
+export function generatePartId(): string {
+  const timestamp = Date.now().toString(16)
+  const random = Math.random().toString(36).substring(2, 10)
+  return `prt_${timestamp}${random}`
+}
+
+export function getMessageDir(sessionID: string): string {
+  if (!existsSync(MESSAGE_STORAGE)) return ""
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) {
+    return directPath
+  }
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) {
+      return sessionPath
+    }
+  }
+
+  return ""
+}
+
+export function readMessages(sessionID: string): StoredMessageMeta[] {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir || !existsSync(messageDir)) return []
+
+  const messages: StoredMessageMeta[] = []
+  for (const file of readdirSync(messageDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const content = readFileSync(join(messageDir, file), "utf-8")
+      messages.push(JSON.parse(content))
+    } catch {
+      continue
+    }
+  }
+
+  return messages.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+export function readParts(messageID: string): StoredPart[] {
+  const partDir = join(PART_STORAGE, messageID)
+  if (!existsSync(partDir)) return []
+
+  const parts: StoredPart[] = []
+  for (const file of readdirSync(partDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const content = readFileSync(join(partDir, file), "utf-8")
+      parts.push(JSON.parse(content))
+    } catch {
+      continue
+    }
+  }
+
+  return parts
+}
+
+export function hasContent(part: StoredPart): boolean {
+  if (THINKING_TYPES.has(part.type)) return false
+  if (META_TYPES.has(part.type)) return false
+
+  if (part.type === "text") {
+    const textPart = part as StoredTextPart
+    return !!(textPart.text?.trim())
+  }
+
+  if (part.type === "tool" || part.type === "tool_use") {
+    return true
+  }
+
+  if (part.type === "tool_result") {
+    return true
+  }
+
+  return false
+}
+
+export function messageHasContent(messageID: string): boolean {
+  const parts = readParts(messageID)
+  return parts.some(hasContent)
+}
+
+export function injectTextPart(sessionID: string, messageID: string, text: string): boolean {
+  const partDir = join(PART_STORAGE, messageID)
+
+  if (!existsSync(partDir)) {
+    mkdirSync(partDir, { recursive: true })
+  }
+
+  const partId = generatePartId()
+  const part: StoredTextPart = {
+    id: partId,
+    sessionID,
+    messageID,
+    type: "text",
+    text,
+    synthetic: true,
+  }
+
+  try {
+    writeFileSync(join(partDir, `${partId}.json`), JSON.stringify(part, null, 2))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function findEmptyMessages(sessionID: string): string[] {
+  const messages = readMessages(sessionID)
+  const emptyIds: string[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== "assistant") continue
+
+    const isLastMessage = i === messages.length - 1
+    if (isLastMessage) continue
+
+    if (!messageHasContent(msg.id)) {
+      emptyIds.push(msg.id)
+    }
+  }
+
+  return emptyIds
+}
+
+export function findFirstEmptyMessage(sessionID: string): string | null {
+  const emptyIds = findEmptyMessages(sessionID)
+  return emptyIds.length > 0 ? emptyIds[0] : null
+}
