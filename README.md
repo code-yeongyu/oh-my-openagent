@@ -187,6 +187,12 @@ The features you use in your editor—other agents cannot access them. Oh My Ope
   - The default `grep` lacks safeguards. On a large codebase, a broad pattern can cause CPU overload and indefinite hanging.
   - This tool enforces strict limits and completely replaces the built-in `grep`.
 
+#### Glob
+
+- **glob**: File pattern matching with timeout protection (60s). Overrides OpenCode's built-in `glob` tool.
+  - The default `glob` lacks timeout. If ripgrep hangs, it waits indefinitely.
+  - This tool enforces timeouts and kills the process on expiration.
+
 #### Built-in MCPs
 
 - **websearch_exa**: Exa AI web search. Performs real-time web searches and can scrape content from specific URLs. Returns LLM-optimized context from relevant websites.

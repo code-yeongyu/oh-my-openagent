@@ -18,6 +18,7 @@ import {
 } from "./ast-grep"
 
 import { grep } from "./grep"
+import { glob } from "./glob"
 
 export const builtinTools = {
   lsp_hover,
@@ -34,4 +35,5 @@ export const builtinTools = {
   ast_grep_search,
   ast_grep_replace,
   grep,
+  glob,
 }
