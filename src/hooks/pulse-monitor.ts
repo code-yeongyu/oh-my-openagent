@@ -132,11 +132,10 @@ export function createPulseMonitorHook(ctx: PluginInput) {
         // Pause monitoring while tool runs locally (tools can take time)
         stopMonitoring()
     },
-    "tool.execute.after": async (input: { sessionID: string }) => {
-        // Resume monitoring after tool finishes
-        if (input.sessionID) {
-            startMonitoring(input.sessionID)
-        }
+    "tool.execute.after": async (_input: { sessionID: string }) => {
+        // Don't forcefully restart monitoring here to avoid false positives
+        // Monitoring will naturally resume when next session/message event arrives
+        // This prevents stalled detection on legitimately idle sessions
     }
   }
 }
