@@ -1,7 +1,8 @@
-export { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
-export { createContextWindowMonitorHook } from "./context-window-monitor"
-export { createSessionNotification } from "./session-notification"
-export { createSessionRecoveryHook } from "./session-recovery"
-export { createCommentCheckerHooks } from "./comment-checker"
-export { createGrepOutputTruncatorHook } from "./grep-output-truncator"
-export { createPulseMonitorHook } from "./pulse-monitor"
+export { createTodoContinuationEnforcer } from "./todo-continuation-enforcer";
+export { createContextWindowMonitorHook } from "./context-window-monitor";
+export { createSessionNotification } from "./session-notification";
+export { createSessionRecoveryHook } from "./session-recovery";
+export { createCommentCheckerHooks } from "./comment-checker";
+export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
+export { createPulseMonitorHook } from "./pulse-monitor";
+export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
