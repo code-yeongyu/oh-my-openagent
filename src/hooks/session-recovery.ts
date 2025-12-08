@@ -349,7 +349,7 @@ function findEmptyContentMessageFromStorage(sessionID: string): string | null {
       return false
     })
 
-    if (!hasContent && parts.length > 0) {
+    if (!hasContent) {
       return msg.id
     }
   }
