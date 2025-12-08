@@ -34,11 +34,6 @@ interface ToolUsePart {
   input: Record<string, unknown>
 }
 
-interface ThinkingPart {
-  type: "thinking"
-  thinking: string
-}
-
 interface MessagePart {
   type: string
   id?: string
@@ -186,62 +181,10 @@ async function recoverEmptyContentMessage(
   return anySuccess
 }
 
-async function fallbackRevertStrategy(
-  client: Client,
-  sessionID: string,
-  failedAssistantMsg: MessageData,
-  directory: string
-): Promise<boolean> {
-  const parentMsgID = failedAssistantMsg.info?.parentID
-
-  const messagesResp = await client.session.messages({
-    path: { id: sessionID },
-    query: { directory },
-  })
-  const msgs = (messagesResp as { data?: MessageData[] }).data
-  if (!msgs || msgs.length === 0) {
-    return false
-  }
-
-  let targetUserMsg: MessageData | null = null
-  if (parentMsgID) {
-    targetUserMsg = msgs.find((m) => m.info?.id === parentMsgID) ?? null
-  }
-  if (!targetUserMsg) {
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].info?.role === "user") {
-        targetUserMsg = msgs[i]
-        break
-      }
-    }
-  }
-
-  if (!targetUserMsg?.parts?.length) {
-    return false
-  }
-
-  await client.session.revert({
-    path: { id: sessionID },
-    body: { messageID: targetUserMsg.info?.id ?? "" },
-    query: { directory },
-  })
-
-  const textParts = targetUserMsg.parts
-    .filter((p) => p.type === "text" && p.text)
-    .map((p) => ({ type: "text" as const, text: p.text ?? "" }))
-
-  if (textParts.length === 0) {
-    return false
-  }
-
-  await client.session.prompt({
-    path: { id: sessionID },
-    body: { parts: textParts },
-    query: { directory },
-  })
-
-  return true
-}
+// NOTE: fallbackRevertStrategy was removed (2025-12-08)
+// Reason: Function was defined but never called - no error recovery paths used it.
+// All error types have dedicated recovery functions (recoverToolResultMissing,
+// recoverThinkingBlockOrder, recoverThinkingDisabledViolation, recoverEmptyContentMessage).
 
 export function createSessionRecoveryHook(ctx: PluginInput) {
   const processingErrors = new Set<string>()
