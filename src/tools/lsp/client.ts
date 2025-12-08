@@ -3,6 +3,7 @@ import { readFileSync } from "fs"
 import { extname, resolve } from "path"
 import type { ResolvedServer } from "./config"
 import { getLanguageId } from "./config"
+import type { Diagnostic } from "./types"
 
 interface ManagedClient {
   client: LSPClient
@@ -155,6 +156,7 @@ export class LSPClient {
   private openedFiles = new Set<string>()
   private stderrBuffer: string[] = []
   private processExited = false
+  private diagnosticsStore = new Map<string, Diagnostic[]>()
 
   constructor(
     private root: string,
@@ -290,7 +292,11 @@ export class LSPClient {
       try {
         const msg = JSON.parse(content)
 
-        if ("id" in msg && "method" in msg) {
+        if ("method" in msg && !("id" in msg)) {
+          if (msg.method === "textDocument/publishDiagnostics" && msg.params?.uri) {
+            this.diagnosticsStore.set(msg.params.uri, msg.params.diagnostics ?? [])
+          }
+        } else if ("id" in msg && "method" in msg) {
           this.handleServerRequest(msg.id, msg.method, msg.params)
         } else if ("id" in msg && this.pending.has(msg.id)) {
           const handler = this.pending.get(msg.id)!
@@ -347,9 +353,14 @@ export class LSPClient {
     this.proc.stdin.write(`Content-Length: ${Buffer.byteLength(msg)}\r\n\r\n${msg}`)
   }
 
-  private handleServerRequest(id: number | string, method: string, _params?: unknown): void {
+  private handleServerRequest(id: number | string, method: string, params?: unknown): void {
     if (method === "workspace/configuration") {
-      this.respond(id, [{}])
+      const items = (params as { items?: Array<{ section?: string }> })?.items ?? []
+      const result = items.map((item) => {
+        if (item.section === "json") return { validate: { enable: true } }
+        return {}
+      })
+      this.respond(id, result)
     } else if (method === "client/registerCapability") {
       this.respond(id, null)
     } else if (method === "window/workDoneProgress/create") {
@@ -412,7 +423,9 @@ export class LSPClient {
       ...this.server.initialization,
     })
     this.notify("initialized")
-    this.notify("workspace/didChangeConfiguration", { settings: {} })
+    this.notify("workspace/didChangeConfiguration", {
+      settings: { json: { validate: { enable: true } } },
+    })
     await new Promise((r) => setTimeout(r, 300))
   }
 
@@ -477,13 +490,23 @@ export class LSPClient {
     return this.send("workspace/symbol", { query })
   }
 
-  async diagnostics(filePath: string): Promise<unknown> {
+  async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
     const absPath = resolve(filePath)
+    const uri = `file://${absPath}`
     await this.openFile(absPath)
     await new Promise((r) => setTimeout(r, 500))
-    return this.send("textDocument/diagnostic", {
-      textDocument: { uri: `file://${absPath}` },
-    })
+
+    try {
+      const result = await this.send("textDocument/diagnostic", {
+        textDocument: { uri },
+      })
+      if (result && typeof result === "object" && "items" in result) {
+        return result as { items: Diagnostic[] }
+      }
+    } catch {
+    }
+
+    return { items: this.diagnosticsStore.get(uri) ?? [] }
   }
 
   async prepareRename(filePath: string, line: number, character: number): Promise<unknown> {
@@ -545,5 +568,6 @@ export class LSPClient {
     this.proc?.kill()
     this.proc = null
     this.processExited = true
+    this.diagnosticsStore.clear()
   }
 }
