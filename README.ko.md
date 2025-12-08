@@ -13,7 +13,7 @@
     - [Tools](#tools)
       - [내장 LSP Tools](#내장-lsp-tools)
       - [내장 AST-Grep Tools](#내장-ast-grep-tools)
-      - [Safe Grep](#safe-grep)
+      - [Grep](#grep)
       - [내장 MCPs](#내장-mcps)
     - [기타 편의 기능](#기타-편의-기능)
   - [설정](#설정)
@@ -185,11 +185,10 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **ast_grep_search**: AST 인식 코드 패턴 검색 (25개 언어)
 - **ast_grep_replace**: AST 인식 코드 교체
 
-#### Safe Grep
-- **safe_grep**: 안전 제한이 있는 콘텐츠 검색 (5분 타임아웃, 10MB 출력 제한).
+#### Grep
+- **grep**: 안전 제한이 있는 콘텐츠 검색 (5분 타임아웃, 10MB 출력 제한). OpenCode의 내장 `grep` 도구를 대체합니다.
   - 기본 grep 도구는 시간제한이 걸려있지 않습니다. 대형 코드베이스에서 광범위한 패턴을 검색하면 CPU가 폭발하고 무한히 멈출 수 있습니다.
-  - safe_grep 은 timeout 과 더 엄격한 출력 제한을 적용합니다.
-  - **주의**: 기본 grep 도구는 Agent 를 햇갈리게 하지 않기 위해 비활성화됩니다. 그러나 SafeGrep 은 Grep 이 제공하는 모든 기능을 제공합니다.
+  - 이 도구는 엄격한 제한을 적용하며, 내장 `grep`을 완전히 대체합니다.
 
 #### 내장 MCPs
 

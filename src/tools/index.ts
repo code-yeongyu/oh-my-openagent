@@ -17,7 +17,7 @@ import {
   ast_grep_replace,
 } from "./ast-grep"
 
-import { safe_grep } from "./safe-grep"
+import { grep } from "./grep"
 
 export const builtinTools = {
   lsp_hover,
@@ -33,5 +33,5 @@ export const builtinTools = {
   lsp_code_action_resolve,
   ast_grep_search,
   ast_grep_replace,
-  safe_grep,
+  grep,
 }

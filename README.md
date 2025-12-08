@@ -13,7 +13,7 @@ English | [한국어](README.ko.md)
     - [Tools](#tools)
       - [Built-in LSP Tools](#built-in-lsp-tools)
       - [Built-in AST-Grep Tools](#built-in-ast-grep-tools)
-      - [Safe Grep](#safe-grep)
+      - [Grep](#grep)
       - [Built-in MCPs](#built-in-mcps)
     - [Other Features](#other-features)
   - [Configuration](#configuration)
@@ -181,12 +181,11 @@ The features you use in your editor—other agents cannot access them. Oh My Ope
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 
-#### Safe Grep
+#### Grep
 
-- **safe_grep**: Content search with safety limits (5min timeout, 10MB output).
+- **grep**: Content search with safety limits (5min timeout, 10MB output). Overrides OpenCode's built-in `grep` tool.
   - The default `grep` lacks safeguards. On a large codebase, a broad pattern can cause CPU overload and indefinite hanging.
-  - `safe_grep` enforces strict limits.
-  - **Note**: Default `grep` is disabled to prevent Agent confusion. `safe_grep` delivers full `grep` functionality with safety assurance.
+  - This tool enforces strict limits and completely replaces the built-in `grep`.
 
 #### Built-in MCPs
 
