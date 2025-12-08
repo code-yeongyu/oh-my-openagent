@@ -8,6 +8,7 @@ import {
   createGrepOutputTruncatorHook,
   createPulseMonitorHook,
   createDirectoryAgentsInjectorHook,
+  createEmptyTaskResponseDetectorHook,
 } from "./hooks";
 import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools } from "./tools";
@@ -57,6 +58,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const commentChecker = createCommentCheckerHooks();
   const grepOutputTruncator = createGrepOutputTruncatorHook(ctx);
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+  const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -212,6 +214,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await contextWindowMonitor["tool.execute.after"](input, output);
       await commentChecker["tool.execute.after"](input, output);
       await directoryAgentsInjector["tool.execute.after"](input, output);
+      await emptyTaskResponseDetector["tool.execute.after"](input, output);
 
       if (input.sessionID === mainSessionID) {
         updateTerminalTitle({
