@@ -1,9 +1,8 @@
 import { tool } from "@opencode-ai/plugin/tool"
-import { CLI_LANGUAGES, NAPI_LANGUAGES, LANG_EXTENSIONS } from "./constants"
+import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
-import { analyzeCode, transformCode, getRootInfo } from "./napi"
-import { formatSearchResult, formatReplaceResult, formatAnalyzeResult, formatTransformResult } from "./utils"
-import type { CliLanguage, NapiLanguage } from "./types"
+import { formatSearchResult, formatReplaceResult } from "./utils"
+import type { CliLanguage } from "./types"
 
 function showOutputToUser(context: unknown, output: string): void {
   const ctx = context as { metadata?: (input: { metadata: { output: string } }) => void }
@@ -110,83 +109,4 @@ export const ast_grep_replace = tool({
   },
 })
 
-export const ast_grep_languages = tool({
-  description:
-    "List all supported languages for ast-grep tools with their file extensions. " +
-    "Use this to determine valid language options.",
-  args: {},
-  execute: async (_args, context) => {
-    const lines: string[] = [`Supported Languages (${CLI_LANGUAGES.length}):`]
-    for (const lang of CLI_LANGUAGES) {
-      const exts = LANG_EXTENSIONS[lang]?.join(", ") || ""
-      lines.push(`  ${lang}: ${exts}`)
-    }
-    lines.push("")
-    lines.push(`NAPI (in-memory) languages: ${NAPI_LANGUAGES.join(", ")}`)
-    const output = lines.join("\n")
-    showOutputToUser(context, output)
-    return output
-  },
-})
 
-export const ast_grep_analyze = tool({
-  description:
-    "Parse code and extract AST structure with pattern matching (in-memory). " +
-    "Extracts meta-variable bindings. Only for: html, javascript, tsx, css, typescript. " +
-    "Use for detailed code analysis without file I/O.",
-  args: {
-    code: tool.schema.string().describe("Source code to analyze"),
-    lang: tool.schema.enum(NAPI_LANGUAGES).describe("Language (html, javascript, tsx, css, typescript)"),
-    pattern: tool.schema.string().optional().describe("Pattern to find (omit for root structure)"),
-    extractMetaVars: tool.schema.boolean().optional().describe("Extract meta-variable bindings (default: true)"),
-  },
-  execute: async (args, context) => {
-    try {
-      if (!args.pattern) {
-        const info = getRootInfo(args.code, args.lang as NapiLanguage)
-        const output = `Root kind: ${info.kind}\nChildren: ${info.childCount}`
-        showOutputToUser(context, output)
-        return output
-      }
-
-      const results = analyzeCode(args.code, args.lang as NapiLanguage, args.pattern, args.extractMetaVars !== false)
-      const output = formatAnalyzeResult(results, args.extractMetaVars !== false)
-      showOutputToUser(context, output)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      showOutputToUser(context, output)
-      return output
-    }
-  },
-})
-
-export const ast_grep_transform = tool({
-  description:
-    "Transform code in-memory using AST-aware rewriting. " +
-    "Only for: html, javascript, tsx, css, typescript. " +
-    "Returns transformed code without writing to filesystem.",
-  args: {
-    code: tool.schema.string().describe("Source code to transform"),
-    lang: tool.schema.enum(NAPI_LANGUAGES).describe("Language"),
-    pattern: tool.schema.string().describe("Pattern to match"),
-    rewrite: tool.schema.string().describe("Replacement (can use $VAR from pattern)"),
-  },
-  execute: async (args, context) => {
-    try {
-      const { transformed, editCount } = transformCode(
-        args.code,
-        args.lang as NapiLanguage,
-        args.pattern,
-        args.rewrite
-      )
-      const output = formatTransformResult(args.code, transformed, editCount)
-      showOutputToUser(context, output)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      showOutputToUser(context, output)
-      return output
-    }
-  },
-})
