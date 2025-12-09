@@ -20,10 +20,22 @@ import {
   loadUserSkillsAsCommands,
   loadProjectSkillsAsCommands,
 } from "./features/claude-code-skill-loader";
+import {
+  loadUserAgents,
+  loadProjectAgents,
+} from "./features/claude-code-agent-loader";
+import { loadMcpConfigs } from "./features/claude-code-mcp-loader";
+import {
+  setCurrentSession,
+  setMainSession,
+  getMainSessionID,
+  getCurrentSessionTitle,
+} from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools } from "./tools";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { log } from "./shared/logger";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -41,12 +53,7 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
         const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
         if (!result.success) {
-          console.error(
-            `[oh-my-opencode] Config validation error in ${configPath}:`,
-          );
-          for (const issue of result.error.issues) {
-            console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
-          }
+          log(`Config validation error in ${configPath}:`, result.error.issues);
           return {};
         }
 
@@ -74,29 +81,32 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const pluginConfig = loadPluginConfig(ctx.directory);
 
-  let mainSessionID: string | undefined;
-  let currentSessionID: string | undefined;
-  let currentSessionTitle: string | undefined;
-
   return {
     tool: builtinTools,
 
     config: async (config) => {
-      const agents = createBuiltinAgents(
+      const builtinAgents = createBuiltinAgents(
         pluginConfig.disabled_agents,
         pluginConfig.agents,
       );
+      const userAgents = loadUserAgents();
+      const projectAgents = loadProjectAgents();
 
       config.agent = {
         ...config.agent,
-        ...agents,
+        ...builtinAgents,
+        ...userAgents,
+        ...projectAgents,
       };
       config.tools = {
         ...config.tools,
       };
+
+      const mcpResult = await loadMcpConfigs();
       config.mcp = {
         ...config.mcp,
         ...createBuiltinMcps(pluginConfig.disabled_mcps),
+        ...mcpResult.servers,
       };
 
       const userCommands = loadUserCommands();
@@ -132,14 +142,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           | { id?: string; title?: string; parentID?: string }
           | undefined;
         if (!sessionInfo?.parentID) {
-          mainSessionID = sessionInfo?.id;
-          currentSessionID = sessionInfo?.id;
-          currentSessionTitle = sessionInfo?.title;
+          setMainSession(sessionInfo?.id);
+          setCurrentSession(sessionInfo?.id, sessionInfo?.title);
           updateTerminalTitle({
-            sessionId: currentSessionID || "main",
+            sessionId: sessionInfo?.id || "main",
             status: "idle",
             directory: ctx.directory,
-            sessionTitle: currentSessionTitle,
+            sessionTitle: sessionInfo?.title,
           });
         }
       }
@@ -149,23 +158,21 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           | { id?: string; title?: string; parentID?: string }
           | undefined;
         if (!sessionInfo?.parentID) {
-          currentSessionID = sessionInfo?.id;
-          currentSessionTitle = sessionInfo?.title;
+          setCurrentSession(sessionInfo?.id, sessionInfo?.title);
           updateTerminalTitle({
-            sessionId: currentSessionID || "main",
+            sessionId: sessionInfo?.id || "main",
             status: "processing",
             directory: ctx.directory,
-            sessionTitle: currentSessionTitle,
+            sessionTitle: sessionInfo?.title,
           });
         }
       }
 
       if (event.type === "session.deleted") {
         const sessionInfo = props?.info as { id?: string } | undefined;
-        if (sessionInfo?.id === mainSessionID) {
-          mainSessionID = undefined;
-          currentSessionID = undefined;
-          currentSessionTitle = undefined;
+        if (sessionInfo?.id === getMainSessionID()) {
+          setMainSession(undefined);
+          setCurrentSession(undefined, undefined);
           updateTerminalTitle({
             sessionId: "main",
             status: "idle",
@@ -187,7 +194,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           const recovered =
             await sessionRecovery.handleSessionRecovery(messageInfo);
 
-          if (recovered && sessionID && sessionID === mainSessionID) {
+          if (recovered && sessionID && sessionID === getMainSessionID()) {
             await ctx.client.session
               .prompt({
                 path: { id: sessionID },
@@ -198,24 +205,24 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           }
         }
 
-        if (sessionID && sessionID === mainSessionID) {
+        if (sessionID && sessionID === getMainSessionID()) {
           updateTerminalTitle({
             sessionId: sessionID,
             status: "error",
             directory: ctx.directory,
-            sessionTitle: currentSessionTitle,
+            sessionTitle: getCurrentSessionTitle(),
           });
         }
       }
 
       if (event.type === "session.idle") {
         const sessionID = props?.sessionID as string | undefined;
-        if (sessionID && sessionID === mainSessionID) {
+        if (sessionID && sessionID === getMainSessionID()) {
           updateTerminalTitle({
             sessionId: sessionID,
             status: "idle",
             directory: ctx.directory,
-            sessionTitle: currentSessionTitle,
+            sessionTitle: getCurrentSessionTitle(),
           });
         }
       }
@@ -224,13 +231,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "tool.execute.before": async (input, output) => {
       await commentChecker["tool.execute.before"](input, output);
 
-      if (input.sessionID === mainSessionID) {
+      if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({
           sessionId: input.sessionID,
           status: "tool",
           currentTool: input.tool,
           directory: ctx.directory,
-          sessionTitle: currentSessionTitle,
+          sessionTitle: getCurrentSessionTitle(),
         });
       }
     },
@@ -242,12 +249,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryAgentsInjector["tool.execute.after"](input, output);
       await emptyTaskResponseDetector["tool.execute.after"](input, output);
 
-      if (input.sessionID === mainSessionID) {
+      if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({
           sessionId: input.sessionID,
           status: "idle",
           directory: ctx.directory,
-          sessionTitle: currentSessionTitle,
+          sessionTitle: getCurrentSessionTitle(),
         });
       }
     },

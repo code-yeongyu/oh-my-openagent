@@ -316,3 +316,47 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 16:32] - Task 7: Integrate new features into src/index.ts
+
+### DISCOVERED ISSUES
+- None - integration task with well-defined API from previous tasks
+
+### IMPLEMENTATION DECISIONS
+- Added imports for new modules:
+  - `loadUserAgents`, `loadProjectAgents` from `./features/claude-code-agent-loader`
+  - `loadMcpConfigs` from `./features/claude-code-mcp-loader`
+  - `setCurrentSession`, `setMainSession`, `getMainSessionID`, `getCurrentSessionTitle` from `./features/claude-code-session-state`
+  - `log` from `./shared/logger`
+- Removed local session variables (lines 77-79): `mainSessionID`, `currentSessionID`, `currentSessionTitle`
+- Replaced direct session assignments with setter functions:
+  - `mainSessionID = x` → `setMainSession(x)`
+  - `currentSessionID = x; currentSessionTitle = y` → `setCurrentSession(x, y)`
+- Replaced session variable reads with getter functions:
+  - `mainSessionID` comparisons → `getMainSessionID()`
+  - `currentSessionTitle` reads → `getCurrentSessionTitle()`
+- Added agent loading in config hook: `loadUserAgents()`, `loadProjectAgents()`
+- Added MCP loading in config hook: `await loadMcpConfigs()` (async)
+- Replaced `console.error` with `log()` for config validation errors
+- Renamed local variable `agents` to `builtinAgents` to distinguish from loaded agents
+
+### PROBLEMS FOR NEXT TASKS
+- Task 8 (README update) should document the new Agent Loader and MCP Loader features
+- Should explain the `claude-code-*` naming convention
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful build
+- Session tracking verified: all event handlers use getter/setter functions
+- Agent loading verified: config.agent merges builtin + user + project agents
+- MCP loading verified: config.mcp merges builtin MCPs + loaded MCP servers
+
+### LEARNINGS
+- `setCurrentSession(id, title)` sets both ID and title atomically
+- `loadMcpConfigs()` is async - must use `await` in config hook
+- MCP result has `.servers` property that returns the server configs
+- Order matters in spread: later values override earlier (projectAgents > userAgents > builtinAgents)
+
+소요 시간: ~4분
+
+---
+
