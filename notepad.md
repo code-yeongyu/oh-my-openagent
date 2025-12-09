@@ -225,3 +225,94 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 16:24] - Task 4: Add claude-code-agent-loader feature
+
+### DISCOVERED ISSUES
+- None - straightforward file copy task
+
+### IMPLEMENTATION DECISIONS
+- Copied 3 files from opencode-cc-plugin: `index.ts`, `loader.ts`, `types.ts`
+- Import path `../../shared/frontmatter` unchanged - already compatible with oh-my-opencode structure
+- No `log()` usage in source files - no logger integration needed
+
+### PROBLEMS FOR NEXT TASKS
+- None identified - agent-loader is self-contained
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Directory structure verified: `claude-code-agent-loader/` created with 3 files
+- Functions exported: `loadUserAgents()`, `loadProjectAgents()`
+
+### LEARNINGS
+- Source location: `~/local-workspaces/opencode-cc-plugin/src/features/agent-loader/`
+- Agent loader uses `parseFrontmatter` from shared module
+- Agent configs loaded from `~/.claude/agents/` (user) and `.claude/agents/` (project)
+- Scope is appended to description: `(user)` or `(project)`
+
+소요 시간: ~1분
+
+---
+
+## [2025-12-09 16:25] - Task 5: Add claude-code-mcp-loader feature
+
+### DISCOVERED ISSUES
+- None - straightforward file copy task
+
+### IMPLEMENTATION DECISIONS
+- Copied 5 files from opencode-cc-plugin: `index.ts`, `loader.ts`, `transformer.ts`, `env-expander.ts`, `types.ts`
+- Import path `../../shared/logger` unchanged - already compatible with oh-my-opencode structure
+- Kept `Bun.file()` usage - oh-my-opencode targets Bun runtime
+- Environment variable expansion supports `${VAR}` and `${VAR:-default}` syntax
+
+### PROBLEMS FOR NEXT TASKS
+- None identified - mcp-loader is self-contained
+- Does NOT conflict with src/mcp/ (builtin MCPs are separate)
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Directory structure verified: `claude-code-mcp-loader/` created with 5 files
+- Functions exported: `loadMcpConfigs()`, `formatLoadedServersForToast()`, `transformMcpServer()`, `expandEnvVars()`, `expandEnvVarsInObject()`
+
+### LEARNINGS
+- Source location: `~/local-workspaces/opencode-cc-plugin/src/features/mcp-loader/`
+- MCP configs loaded from:
+  - `~/.claude/.mcp.json` (user scope)
+  - `.mcp.json` (project scope)
+  - `.claude/.mcp.json` (local scope)
+- Later scope overrides earlier scope for same server name
+- Supports stdio, http, and sse server types
+
+소요 시간: ~1분
+
+---
+
+## [2025-12-09 16:24] - Task 6: Add claude-code-session-state feature
+
+### DISCOVERED ISSUES
+- None - straightforward file copy task
+
+### IMPLEMENTATION DECISIONS
+- Copied 4 files from opencode-cc-plugin: `types.ts`, `state.ts`, `detector.ts`, `index.ts`
+- No import path changes needed - files are completely self-contained
+- No external dependencies - types are defined locally
+
+### PROBLEMS FOR NEXT TASKS
+- Task 7 should import from `./features/claude-code-session-state` in src/index.ts
+- Task 7 should remove local session variables and use the module's getter/setters
+
+### VERIFICATION RESULTS
+- Directory created: `src/features/claude-code-session-state/` (4 files confirmed)
+- Exports available: sessionErrorState, sessionInterruptState, subagentSessions, sessionFirstMessageProcessed (Maps/Sets)
+- Exports available: currentSessionID, currentSessionTitle, mainSessionID (state vars)
+- Exports available: setCurrentSession(), setMainSession(), getCurrentSessionID(), getCurrentSessionTitle(), getMainSessionID() (getters/setters)
+- Exports available: detectInterrupt() function
+
+### LEARNINGS
+- Session state module is completely self-contained - no external dependencies
+- Uses barrel export pattern: index.ts re-exports everything from types, state, detector
+- Source directory: `~/local-workspaces/opencode-cc-plugin/src/features/session-state/`
+
+소요 시간: ~1분
+
+---
+
