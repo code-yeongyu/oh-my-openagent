@@ -795,3 +795,51 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 소요 시간: ~6분
 
 ---
+
+## [2025-12-09 18:16] - hook-message-injector 사용 패턴 크로스체크
+
+### DISCOVERED ISSUES
+- **CRITICAL**: UserPromptSubmit hooks가 oh-my-opencode에 완전히 누락됨
+- opencode-cc-plugin에서는 chat.message hook으로 UserPromptSubmit 처리
+- oh-my-opencode에는 chat.message hook이 구현되지 않음
+- user-prompt-submit.ts는 정의만 있고 실제 사용처 없음
+
+### IMPLEMENTATION DECISIONS
+- PostToolUse는 이미 올바르게 구현됨:
+  * opencode-cc-plugin: result.message를 tool output에 append
+  * oh-my-opencode: 동일한 방식 사용 (claude-code-hooks/index.ts:95-97)
+  * injectHookMessage() 불필요
+- UserPromptSubmit 구현 추가:
+  * chat.message hook handler 추가 (claude-code-hooks/index.ts)
+  * executeUserPromptSubmitHooks() 호출
+  * sessionFirstMessageProcessed Set으로 첫 메시지 skip (title generation)
+  * result.messages가 있으면 injectHookMessage() 호출
+  * src/index.ts에 hook 등록
+- Import 추가:
+  * executeUserPromptSubmitHooks, UserPromptSubmitContext, MessagePart from ./user-prompt-submit
+  * injectHookMessage from ../../features/hook-message-injector
+
+### PROBLEMS FOR NEXT TASKS
+- None - UserPromptSubmit 통합 완료
+
+### VERIFICATION RESULTS
+- Ran: `bunx tsc --noEmit` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful build
+- Files modified:
+  * src/hooks/claude-code-hooks/index.ts (chat.message handler 추가)
+  * src/index.ts (chat.message hook 등록)
+- Verified OpenCode Plugin API: chat.message hook 공식 지원 확인 (@opencode-ai/plugin/dist/index.d.ts:112-123)
+
+### LEARNINGS
+- OpenCode Plugin API에 chat.message hook 존재:
+  * input: sessionID, agent?, model?, messageID?
+  * output: message, parts[]
+- PostToolUse는 tool output에 직접 append (injectHookMessage 불필요)
+- UserPromptSubmit는 file system injection 사용 (injectHookMessage 필수)
+- opencode-cc-plugin 구조: src/plugin/chat-handler.ts → handleChatMessage()
+- oh-my-opencode 구조: src/hooks/claude-code-hooks/index.ts → createClaudeCodeHooksHook()
+- 첫 메시지 skip 로직: title generation을 위해 UserPromptSubmit hooks 실행 안 함
+
+소요 시간: ~8분
+
+---

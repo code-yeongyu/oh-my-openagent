@@ -86,6 +86,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   return {
     tool: builtinTools,
 
+    "chat.message": async (input, output) => {
+      await claudeCodeHooks["chat.message"]?.(input, output)
+    },
+
     config: async (config) => {
       const builtinAgents = createBuiltinAgents(
         pluginConfig.disabled_agents,
