@@ -224,19 +224,20 @@ Don't need these? Disable them via `oh-my-opencode.json`:
 ### Other Features
 
 - **Terminal Title**: Auto-updates terminal title with session status (idle ○, processing ◐, tool ⚡, error ✖). Supports tmux.
-- **Command Loader**: Loads markdown-based commands from multiple directories:
+- **Command Loader** (`src/features/claude-code-command-loader/`): Loads markdown-based commands from multiple directories:
   - User scope: `~/.claude/commands/`
   - Project scope: `./.claude/commands/`
   - OpenCode global: `~/.config/opencode/command/`
   - OpenCode project: `./.opencode/command/`
-- **Skill Loader**: Loads directory-based skills as executable commands:
+- **Skill Loader** (`src/features/claude-code-skill-loader/`): Loads directory-based skills as executable commands:
   - User scope: `~/.claude/skills/`
   - Project scope: `./.claude/skills/`
-- **Agent Loader**: Loads agent definitions from markdown files with YAML frontmatter:
+- **Agent Loader** (`src/features/claude-code-agent-loader/`): Loads agent definitions from markdown files with YAML frontmatter:
   - User scope: `~/.claude/agents/`
   - Project scope: `./.claude/agents/`
   - Format: `*.md` files with frontmatter (name, description, tools)
-- **MCP Loader**: Loads MCP server configurations from `.mcp.json` files:
+- **Session State** (`src/features/claude-code-session-state/`): Centralized session tracking module used by event hooks and terminal title updates.
+- **MCP Loader** (`src/features/claude-code-mcp-loader/`): Loads MCP server configurations from `.mcp.json` files:
   - User scope: `~/.claude/.mcp.json`
   - Project scope: `./.mcp.json`
   - Local scope: `./.claude/.mcp.json`
