@@ -9,6 +9,7 @@ import {
   createDirectoryAgentsInjectorHook,
   createEmptyTaskResponseDetectorHook,
   createThinkModeHook,
+  createClaudeCodeHooksHook,
 } from "./hooks";
 import {
   loadUserCommands,
@@ -76,6 +77,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
   const thinkMode = createThinkModeHook();
+  const claudeCodeHooks = createClaudeCodeHooksHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -129,6 +131,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     event: async (input) => {
+      await claudeCodeHooks.event(input);
       await todoContinuationEnforcer(input);
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);
@@ -229,6 +232,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      await claudeCodeHooks["tool.execute.before"](input, output);
       await commentChecker["tool.execute.before"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
@@ -243,6 +247,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
+      await claudeCodeHooks["tool.execute.after"](input, output);
       await grepOutputTruncator["tool.execute.after"](input, output);
       await contextWindowMonitor["tool.execute.after"](input, output);
       await commentChecker["tool.execute.after"](input, output);

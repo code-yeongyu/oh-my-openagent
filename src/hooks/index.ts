@@ -8,3 +8,4 @@ export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicAutoCompactHook } from "./anthropic-auto-compact";
 export { createThinkModeHook } from "./think-mode";
+export { createClaudeCodeHooksHook } from "./claude-code-hooks";

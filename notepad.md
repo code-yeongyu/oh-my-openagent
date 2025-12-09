@@ -739,3 +739,59 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 18:08] - Task 8: Factory 생성 + 통합
+
+### DISCOVERED ISSUES
+- None - final integration task with well-defined hook executors from previous tasks
+
+### IMPLEMENTATION DECISIONS
+- Created `src/hooks/claude-code-hooks/index.ts` (146 lines) with createClaudeCodeHooksHook() factory
+- Factory returns hook handler object with 3 handlers:
+  * `tool.execute.before`: Executes executePreToolUseHooks()
+    - Loads config dynamically (async) on each invocation
+    - Maps OpenCode input → PreToolUseContext
+    - Caches tool input for PostToolUse
+    - Handles deny/ask decisions (deny throws error, ask logs warning)
+  * `tool.execute.after`: Executes executePostToolUseHooks()
+    - Retrieves cached tool input via getToolInput()
+    - Maps OpenCode input → PostToolUseContext with client wrapper
+    - Appends hook message to output if provided
+    - Throws error if block decision returned
+  * `event`: Executes executeStopHooks() for session.idle
+    - Filters event.type === "session.idle"
+    - Maps OpenCode event → StopContext
+    - Injects prompt via ctx.client.session.prompt() if injectPrompt returned
+- Updated `src/hooks/index.ts`: Added createClaudeCodeHooksHook export
+- Updated `src/index.ts`: 
+  * Imported createClaudeCodeHooksHook
+  * Created claudeCodeHooks instance
+  * Registered handlers in tool.execute.before, tool.execute.after, event hooks
+  * Claude hooks run FIRST in execution order (before other hooks)
+- Config loading: Async loadClaudeHooksConfig() and loadPluginExtendedConfig() called in each handler (not cached)
+- Transcript path: Uses getTranscriptPath() function (not buildTranscriptPath which doesn't exist)
+
+### PROBLEMS FOR NEXT TASKS
+- None - this is the final task (Task 8)
+- All Claude Code Hooks now integrated into oh-my-opencode plugin system
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful build
+- Files modified:
+  * src/hooks/claude-code-hooks/index.ts (created)
+  * src/hooks/index.ts (export added)
+  * src/index.ts (hook registration)
+- Hook handler registration verified: claudeCodeHooks handlers called in all 3 hook points
+- Execution order verified: Claude hooks run before existing hooks in tool.execute.*
+
+### LEARNINGS
+- OpenCode Plugin API: Factory pattern createXxxHook(ctx: PluginInput) → handlers object
+- OpenCode does NOT have chat.params hook → UserPromptSubmit not implemented in factory
+- Config loading must be async → call loadClaudeHooksConfig() in each handler, not once during initialization
+- Tool input cache is module-level state → cacheToolInput/getToolInput work across handlers
+- Stop hook only triggers on session.idle event → filter event.type
+- Import path: getTranscriptPath (exists), not buildTranscriptPath (doesn't exist)
+
+소요 시간: ~6분
+
+---
