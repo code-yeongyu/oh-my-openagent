@@ -153,6 +153,10 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
   │       └── Button.tsx     # 이 파일을 읽으면 위 3개 AGENTS.md 모두 주입
   ```
   `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
+- **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
+- **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
+- **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
+- **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
 
 ### Agents
 
@@ -221,7 +225,16 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 ```
 
 ### 기타 편의 기능
+
 - **Terminal Title**: 세션 상태에 따라 터미널 타이틀을 자동 업데이트합니다 (유휴 ○, 처리중 ◐, 도구 ⚡, 에러 ✖). tmux를 지원합니다.
+- **Command Loader**: 다음 디렉토리들에서 마크다운 기반의 커스텀 명령어들을 로드합니다:
+  - User scope: `~/.claude/commands/`
+  - Project scope: `./.claude/commands/`
+  - OpenCode global: `~/.config/opencode/command/`
+  - OpenCode project: `./.opencode/command/`
+- **Skill Loader**: 다음 디렉토리들에서 디렉토리 기반의 스킬들을 실행 가능한 명령어로 로드합니다:
+  - User scope: `~/.claude/skills/`
+  - Project scope: `./.claude/skills/`
 
 ## 설정
 

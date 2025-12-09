@@ -149,6 +149,10 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
   ```
   When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
+- **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
+- **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
+- **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
+- **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
 
 ### Agents
 - **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
@@ -220,6 +224,14 @@ Don't need these? Disable them via `oh-my-opencode.json`:
 ### Other Features
 
 - **Terminal Title**: Auto-updates terminal title with session status (idle ○, processing ◐, tool ⚡, error ✖). Supports tmux.
+- **Command Loader**: Loads markdown-based commands from multiple directories:
+  - User scope: `~/.claude/commands/`
+  - Project scope: `./.claude/commands/`
+  - OpenCode global: `~/.config/opencode/command/`
+  - OpenCode project: `./.opencode/command/`
+- **Skill Loader**: Loads directory-based skills as executable commands:
+  - User scope: `~/.claude/skills/`
+  - Project scope: `./.claude/skills/`
 
 ## Configuration
 
