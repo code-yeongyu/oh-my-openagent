@@ -642,3 +642,100 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 17:58] - Task 6: user-prompt-submit.ts + stop.ts 포팅
+
+### DISCOVERED ISSUES
+- None - straightforward file copy with import path adjustments
+
+### IMPLEMENTATION DECISIONS
+- Copied user-prompt-submit.ts (118 lines) from opencode-cc-plugin → oh-my-opencode
+- Copied stop.ts (119 lines) from opencode-cc-plugin → oh-my-opencode
+- Import path adjustments (both files):
+  * `../types` → `./types`
+  * `../../shared` → `../../shared` (unchanged)
+  * `../../config` → `./plugin-config`
+  * `../../config-loader` → `./config-loader`
+  * `../todo` → `./todo` (stop.ts only)
+- Preserved recursion prevention logic in user-prompt-submit.ts:
+  * Tags: `<user-prompt-submit-hook>` (open/close)
+  * Check if prompt already contains tags → return early
+  * Wrap hook stdout with tags to prevent infinite recursion
+- Preserved inject_prompt support:
+  * user-prompt-submit: messages array collection for injection
+  * stop: injectPrompt field in result (from output.inject_prompt or output.reason)
+- Preserved stopHookActiveState management in stop.ts:
+  * Module-level Map<string, boolean> for per-session state
+  * setStopHookActive(), getStopHookActive() exported
+  * State persists across hook invocations
+- Preserved exit code handling:
+  * stop.ts: exitCode === 2 → block with reason
+  * user-prompt-submit.ts: exitCode !== 0 → check JSON for decision: "block"
+
+### PROBLEMS FOR NEXT TASKS
+- Task 7 (hook-message-injector) will use the message injection pattern
+- Task 8 (Factory + Integration) will wire these hooks to OpenCode lifecycle events
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful
+- Files created:
+  * `src/hooks/claude-code-hooks/user-prompt-submit.ts` (115 lines)
+  * `src/hooks/claude-code-hooks/stop.ts` (119 lines)
+- Functions available:
+  * executeUserPromptSubmitHooks() with UserPromptSubmitContext → UserPromptSubmitResult
+  * executeStopHooks() with StopContext → StopResult
+  * setStopHookActive(), getStopHookActive()
+- Recursion prevention verified: lines 47-52 check for tag presence
+- inject_prompt field verified: stop.ts line 102 sets injectPrompt from output
+
+### LEARNINGS
+- user-prompt-submit uses tag wrapping pattern to prevent infinite hook loops
+- stop hook can inject prompts into session via injectPrompt result field
+- stopHookActiveState Map persists across hook invocations (module-level state)
+- getTodoPath() from ./todo provides todo file path for Stop hook context
+- Source files:
+  * `/Users/yeongyu/local-workspaces/opencode-cc-plugin/src/claude-compat/hooks/user-prompt-submit.ts` (118 lines)
+  * `/Users/yeongyu/local-workspaces/opencode-cc-plugin/src/claude-compat/hooks/stop.ts` (119 lines)
+
+소요 시간: ~3분
+
+---
+
+## [2025-12-09 17:58] - Task 7: hook-message-injector 포팅
+
+### DISCOVERED ISSUES
+- None - straightforward file copy task
+
+### IMPLEMENTATION DECISIONS
+- Created `src/features/hook-message-injector/` directory
+- Copied 4 files from opencode-cc-plugin → oh-my-opencode:
+  * constants.ts (9 lines): XDG-based path definitions (MESSAGE_STORAGE, PART_STORAGE)
+  * types.ts (46 lines): MessageMeta, OriginalMessageContext, TextPart interfaces
+  * injector.ts (142 lines): injectHookMessage() implementation with message/part storage
+  * index.ts (3 lines): Barrel export
+- No import path changes needed - module is self-contained
+- Preserved XDG_DATA_HOME environment variable support
+- Preserved message fallback logic: finds nearest message with agent/model/tools if not provided
+
+### PROBLEMS FOR NEXT TASKS
+- Task 8 (Factory + Integration) will import injectHookMessage from this module
+- Hook executors (user-prompt-submit, stop) can use injectHookMessage to store hook messages
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Files created: src/features/hook-message-injector/ (4 files)
+- Functions exported: injectHookMessage()
+- Types exported: MessageMeta, OriginalMessageContext, TextPart
+- Constants exported: MESSAGE_STORAGE, PART_STORAGE (XDG-based paths)
+
+### LEARNINGS
+- Message injector uses XDG_DATA_HOME for storage (~/.local/share/opencode/storage/)
+- Message storage structure: sessionID → messageID.json (meta) + partID.json (content)
+- Fallback logic: searches recent messages for agent/model/tools if originalMessage is incomplete
+- Part-based storage allows incremental message building
+- Source: `/Users/yeongyu/local-workspaces/opencode-cc-plugin/src/features/hook-message-injector/`
+
+소요 시간: ~2분
+
+---
+
