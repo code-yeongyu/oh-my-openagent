@@ -396,3 +396,38 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 17:24] - Task 0: Shared Utilities 포팅
+
+### DISCOVERED ISSUES
+- command-executor.ts already existed but had minor whitespace differences (indentation inconsistency)
+- pattern-matcher.ts and hook-disabled.ts import from `../claude-compat/types` which doesn't exist yet in oh-my-opencode
+- Types will be created in Task 1 at `src/hooks/claude-code-hooks/types.ts`
+
+### IMPLEMENTATION DECISIONS
+- Created snake-case.ts and tool-name.ts (no dependencies) - exact copy from source
+- Created temporary stub types at `src/hooks/claude-code-hooks/types.ts` with minimal definitions needed for shared utilities
+- Created pattern-matcher.ts with adjusted import: `../claude-compat/types` → `../hooks/claude-code-hooks/types`
+- Created hook-disabled.ts with adjusted import to point to stub types
+- Added all new utilities to `src/shared/index.ts` using barrel export pattern
+- Stub types include: HookCommand, HookMatcher, ClaudeHooksConfig, ClaudeHookEvent, PluginConfig
+
+### PROBLEMS FOR NEXT TASKS
+- Task 1 will replace stub types with full implementation from opencode-cc-plugin
+- Stub types in `src/hooks/claude-code-hooks/types.ts` are marked with comments indicating they're temporary
+- The real PluginConfig will likely be different - current stub only supports `disabledHooks` field
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- All 5 functions exported: executeHookCommand, objectToSnakeCase, transformToolName, findMatchingHooks, isHookDisabled
+- Import paths verified: pattern-matcher.ts and hook-disabled.ts successfully import from stub types
+
+### LEARNINGS
+- Import paths must be adjusted when porting between different project structures
+- opencode-cc-plugin structure: `src/claude-compat/` → oh-my-opencode structure: `src/hooks/claude-code-hooks/`
+- Stub types strategy allows Task 0 to complete and typecheck to pass before Task 1 implements full types
+- command-executor.ts in oh-my-opencode had indentation inconsistency (not 100% identical to source)
+
+소요 시간: ~5분
+
+---
+
