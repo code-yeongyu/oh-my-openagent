@@ -466,3 +466,75 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 17:39] - Task 3: tool-input-cache.ts 포팅
+
+### DISCOVERED ISSUES
+- None - straightforward file copy task
+
+### IMPLEMENTATION DECISIONS
+- Copied tool-input-cache.ts (48 lines) from opencode-cc-plugin → oh-my-opencode
+- Preserved cache structure:
+  * Key format: `${sessionId}:${toolName}:${invocationId}`
+  * TTL: 60000ms (1 minute) as CACHE_TTL constant
+  * Periodic cleanup: setInterval every CACHE_TTL (60000ms)
+- Preserved original comments from source file (lines 12, 39)
+- Functions: cacheToolInput(), getToolInput()
+- Cache behavior: getToolInput() deletes entry immediately after retrieval (single-use cache)
+
+### PROBLEMS FOR NEXT TASKS
+- Task 4 (pre-tool-use.ts) will call cacheToolInput() to store tool inputs
+- Task 5 (post-tool-use.ts) will call getToolInput() to retrieve cached inputs for transcript building
+- No import path changes needed - this file has no external dependencies
+
+### VERIFICATION RESULTS
+- File created: `src/hooks/claude-code-hooks/tool-input-cache.ts` (48 lines)
+- Functions exported: cacheToolInput(), getToolInput()
+- TTL verified: CACHE_TTL = 60000 (1 minute)
+- Cleanup interval verified: setInterval(cleanup, CACHE_TTL)
+
+### LEARNINGS
+- Tool input cache is a temporary storage for PreToolUse → PostToolUse communication
+- Single-use pattern: getToolInput() deletes entry after first retrieval (line 33)
+- TTL check happens after deletion, so expired entries still return null
+- setInterval runs in background for periodic cleanup of abandoned entries
+- Source location: `~/local-workspaces/opencode-cc-plugin/src/claude-compat/hooks/tool-input-cache.ts`
+
+소요 시간: ~2분
+
+---
+
+## [2025-12-09 17:39] - Task 2: config.ts + transcript.ts + todo.ts 포팅
+
+### DISCOVERED ISSUES
+- transcript.ts had unused imports (ClaudeCodeMessage, ClaudeCodeContent) - same as source file
+- LSP warned about unused types - removed from import to clean up
+
+### IMPLEMENTATION DECISIONS
+- Copied config.ts (101 lines) - no import path changes needed (only uses `./types` and Node.js builtins)
+- Copied transcript.ts (256 lines) - changed import path:
+  * Line 10: `../shared/tool-name` → `../../shared/tool-name` (opencode-cc-plugin depth 1, oh-my-opencode depth 2)
+- Copied todo.ts (78 lines) - no import path changes needed (only uses `./types` and Node.js builtins)
+- Removed unused imports from transcript.ts: ClaudeCodeMessage, ClaudeCodeContent (not used in function bodies)
+- Preserved ALL original comments from source files - these are pre-existing comments
+
+### PROBLEMS FOR NEXT TASKS
+- Task 3 will import cacheToolInput/getToolInput for cache functionality
+- Task 4 will import loadClaudeHooksConfig, buildTranscriptFromSession
+- Task 5 will import transcript building functions for PostToolUse hook
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Files created: config.ts (101 lines), transcript.ts (256 lines), todo.ts (78 lines)
+- Functions available: loadClaudeHooksConfig(), buildTranscriptFromSession(), appendTranscriptEntry(), loadTodoFile(), saveTodoFile()
+- Import paths verified: transcript.ts successfully imports transformToolName from ../../shared
+
+### LEARNINGS
+- Import path depth difference: opencode-cc-plugin `src/claude-compat/` (1 level up) → oh-my-opencode `src/hooks/claude-code-hooks/` (2 levels up)
+- transcript.ts unused imports were present in original source - cleaning them is optional but improves code hygiene
+- config.ts uses Bun.file() for async file reading - compatible with oh-my-opencode's Bun runtime
+- Bun.file().text() automatically handles encoding
+
+소요 시간: ~3분
+
+---
+
