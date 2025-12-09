@@ -8,7 +8,18 @@ import {
   createGrepOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
   createEmptyTaskResponseDetectorHook,
+  createThinkModeHook,
 } from "./hooks";
+import {
+  loadUserCommands,
+  loadProjectCommands,
+  loadOpencodeGlobalCommands,
+  loadOpencodeProjectCommands,
+} from "./features/command-loader";
+import {
+  loadUserSkillsAsCommands,
+  loadProjectSkillsAsCommands,
+} from "./features/skill-loader";
 import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools } from "./tools";
 import { createBuiltinMcps } from "./mcp";
@@ -57,6 +68,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const grepOutputTruncator = createGrepOutputTruncatorHook(ctx);
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
+  const thinkMode = createThinkModeHook();
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -86,12 +98,31 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...config.mcp,
         ...createBuiltinMcps(pluginConfig.disabled_mcps),
       };
+
+      const userCommands = loadUserCommands();
+      const opencodeGlobalCommands = loadOpencodeGlobalCommands();
+      const systemCommands = config.command ?? {};
+      const projectCommands = loadProjectCommands();
+      const opencodeProjectCommands = loadOpencodeProjectCommands();
+      const userSkills = loadUserSkillsAsCommands();
+      const projectSkills = loadProjectSkillsAsCommands();
+
+      config.command = {
+        ...userCommands,
+        ...userSkills,
+        ...opencodeGlobalCommands,
+        ...systemCommands,
+        ...projectCommands,
+        ...projectSkills,
+        ...opencodeProjectCommands,
+      };
     },
 
     event: async (input) => {
       await todoContinuationEnforcer(input);
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);
+      await thinkMode.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
