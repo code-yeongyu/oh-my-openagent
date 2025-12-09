@@ -15,36 +15,13 @@ function debugLog(...args: unknown[]) {
   }
 }
 
-type Platform = "darwin" | "linux" | "win32" | "unsupported"
-
-function getPlatformPackageName(): string | null {
-  const platform = process.platform as Platform
-  const arch = process.arch
-
-  const platformMap: Record<string, string> = {
-    "darwin-arm64": "@code-yeongyu/comment-checker-darwin-arm64",
-    "darwin-x64": "@code-yeongyu/comment-checker-darwin-x64",
-    "linux-arm64": "@code-yeongyu/comment-checker-linux-arm64",
-    "linux-x64": "@code-yeongyu/comment-checker-linux-x64",
-    "win32-x64": "@code-yeongyu/comment-checker-windows-x64",
-  }
-
-  return platformMap[`${platform}-${arch}`] ?? null
-}
-
 function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
-/**
- * Synchronously find comment-checker binary path.
- * Checks installed packages, homebrew, cache, and system PATH.
- * Does NOT trigger download.
- */
 function findCommentCheckerPathSync(): string | null {
   const binaryName = getBinaryName()
 
-  // 1. Try to find from @code-yeongyu/comment-checker package
   try {
     const require = createRequire(import.meta.url)
     const cliPkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
@@ -59,46 +36,12 @@ function findCommentCheckerPathSync(): string | null {
     debugLog("main package not installed")
   }
 
-  // 2. Try platform-specific package directly (legacy, for backwards compatibility)
-  const platformPkg = getPlatformPackageName()
-  if (platformPkg) {
-    try {
-      const require = createRequire(import.meta.url)
-      const pkgPath = require.resolve(`${platformPkg}/package.json`)
-      const pkgDir = dirname(pkgPath)
-      const binaryPath = join(pkgDir, "bin", binaryName)
-
-      if (existsSync(binaryPath)) {
-        debugLog("found binary in platform package:", binaryPath)
-        return binaryPath
-      }
-    } catch {
-      debugLog("platform package not installed:", platformPkg)
-    }
-  }
-
-  // 3. Try homebrew installation (macOS)
-  if (process.platform === "darwin") {
-    const homebrewPaths = [
-      "/opt/homebrew/bin/comment-checker",
-      "/usr/local/bin/comment-checker",
-    ]
-    for (const path of homebrewPaths) {
-      if (existsSync(path)) {
-        debugLog("found binary via homebrew:", path)
-        return path
-      }
-    }
-  }
-
-  // 4. Try cached binary (lazy download location)
   const cachedPath = getCachedBinaryPath()
   if (cachedPath) {
     debugLog("found binary in cache:", cachedPath)
     return cachedPath
   }
 
-  // 5. Try system PATH (as fallback)
   debugLog("no binary found in known locations")
   return null
 }

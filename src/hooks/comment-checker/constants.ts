@@ -72,6 +72,10 @@ PRIORITY-BASED ACTION GUIDELINES:
 \t-> Make the code itself clearer so it can be understood without comments/docstrings.
 \t-> For verbose docstrings: refactor code to be self-documenting instead of adding lengthy explanations.
 
+CODE SMELL WARNING: Using comments as visual separators (e.g., "// =========", "# ---", "// *** Section ***")
+is a code smell. If you need separators, your file is too long or poorly organized.
+Refactor into smaller modules or use proper code organization instead of comment-based section dividers.
+
 MANDATORY REQUIREMENT: You must acknowledge this hook message and take one of the above actions.
 Review in the above priority order and take the corresponding action EVERY TIME this appears.
 
