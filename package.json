@@ -44,7 +44,7 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
-    "@code-yeongyu/comment-checker": "^0.4.4",
+    "@code-yeongyu/comment-checker": "^0.5.0",
     "@opencode-ai/plugin": "^1.0.7",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
