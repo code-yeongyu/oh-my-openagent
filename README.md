@@ -15,6 +15,7 @@ English | [한국어](README.ko.md)
       - [Built-in AST-Grep Tools](#built-in-ast-grep-tools)
       - [Grep](#grep)
       - [Built-in MCPs](#built-in-mcps)
+    - [Claude Code Compatibility](#claude-code-compatibility)
     - [Other Features](#other-features)
   - [Configuration](#configuration)
   - [Author's Note](#authors-note)
@@ -221,29 +222,72 @@ Don't need these? Disable them via `oh-my-opencode.json`:
 }
 ```
 
+### Claude Code Compatibility
+
+Oh My OpenCode provides seamless Claude Code configuration compatibility. If you've been using Claude Code, your existing setup works out of the box.
+
+#### Hooks Integration
+
+Execute custom scripts via Claude Code's `settings.json` hook system. Oh My OpenCode reads and executes hooks defined in:
+
+- `~/.claude/settings.json` (user)
+- `./.claude/settings.json` (project)
+- `./.claude/settings.local.json` (local, git-ignored)
+
+Supported hook events:
+- **PreToolUse**: Runs before tool execution. Can block or modify tool input.
+- **PostToolUse**: Runs after tool execution. Can add warnings or context.
+- **UserPromptSubmit**: Runs when user submits a prompt. Can block or inject messages.
+- **Stop**: Runs when session goes idle. Can inject follow-up prompts.
+
+Example `settings.json`:
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "eslint --fix $FILE" }]
+      }
+    ]
+  }
+}
+```
+
+#### Configuration Loaders
+
+**Command Loader**: Loads markdown-based slash commands from 4 directories:
+- `~/.claude/commands/` (user)
+- `./.claude/commands/` (project)
+- `~/.config/opencode/command/` (opencode global)
+- `./.opencode/command/` (opencode project)
+
+**Skill Loader**: Loads directory-based skills with `SKILL.md`:
+- `~/.claude/skills/` (user)
+- `./.claude/skills/` (project)
+
+**Agent Loader**: Loads custom agent definitions from markdown files:
+- `~/.claude/agents/*.md` (user)
+- `./.claude/agents/*.md` (project)
+
+**MCP Loader**: Loads MCP server configurations from `.mcp.json` files:
+- `~/.claude/.mcp.json` (user)
+- `./.mcp.json` (project)
+- `./.claude/.mcp.json` (local)
+- Supports environment variable expansion (`${VAR}` syntax)
+
+#### Data Storage
+
+**Todo Management**: Session todos are stored in Claude Code compatible format at `~/.claude/todos/`.
+
+**Transcript**: Session activity is logged to `~/.claude/transcripts/` in JSONL format, enabling replay and analysis.
+
+> **Note on `claude-code-*` naming**: Features under `src/features/claude-code-*/` are migrated from Claude Code's configuration system. This naming convention clearly identifies which features originated from Claude Code.
+
 ### Other Features
 
 - **Terminal Title**: Auto-updates terminal title with session status (idle ○, processing ◐, tool ⚡, error ✖). Supports tmux.
-- **Command Loader** (`src/features/claude-code-command-loader/`): Loads markdown-based commands from multiple directories:
-  - User scope: `~/.claude/commands/`
-  - Project scope: `./.claude/commands/`
-  - OpenCode global: `~/.config/opencode/command/`
-  - OpenCode project: `./.opencode/command/`
-- **Skill Loader** (`src/features/claude-code-skill-loader/`): Loads directory-based skills as executable commands:
-  - User scope: `~/.claude/skills/`
-  - Project scope: `./.claude/skills/`
-- **Agent Loader** (`src/features/claude-code-agent-loader/`): Loads agent definitions from markdown files with YAML frontmatter:
-  - User scope: `~/.claude/agents/`
-  - Project scope: `./.claude/agents/`
-  - Format: `*.md` files with frontmatter (name, description, tools)
-- **Session State** (`src/features/claude-code-session-state/`): Centralized session tracking module used by event hooks and terminal title updates.
-- **MCP Loader** (`src/features/claude-code-mcp-loader/`): Loads MCP server configurations from `.mcp.json` files:
-  - User scope: `~/.claude/.mcp.json`
-  - Project scope: `./.mcp.json`
-  - Local scope: `./.claude/.mcp.json`
-  - Supports environment variable expansion (`${VAR}` syntax)
-
-> **Note on `claude-code-*` naming**: Features under `src/features/claude-code-*/` are migrated from Claude Code's configuration system. This naming convention clearly identifies which features originated from Claude Code, such as `claude-code-command-loader`, `claude-code-skill-loader`, `claude-code-agent-loader`, and `claude-code-mcp-loader`.
+- **Session State**: Centralized session tracking module used by event hooks and terminal title updates.
 
 ## Configuration
 

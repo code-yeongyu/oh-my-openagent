@@ -15,6 +15,7 @@
       - [내장 AST-Grep Tools](#내장-ast-grep-tools)
       - [Grep](#grep)
       - [내장 MCPs](#내장-mcps)
+    - [Claude Code 호환성](#claude-code-호환성)
     - [기타 편의 기능](#기타-편의-기능)
   - [설정](#설정)
   - [작성자의 노트](#작성자의-노트)
@@ -224,17 +225,72 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 }
 ```
 
+### Claude Code 호환성
+
+Oh My OpenCode는 Claude Code 설정과 완벽하게 호환됩니다. Claude Code를 사용하셨다면, 기존 설정을 그대로 사용할 수 있습니다.
+
+#### Hooks 통합
+
+Claude Code의 `settings.json` 훅 시스템을 통해 커스텀 스크립트를 실행합니다. Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
+
+- `~/.claude/settings.json` (사용자)
+- `./.claude/settings.json` (프로젝트)
+- `./.claude/settings.local.json` (로컬, git-ignored)
+
+지원되는 훅 이벤트:
+- **PreToolUse**: 도구 실행 전에 실행. 차단하거나 도구 입력을 수정할 수 있습니다.
+- **PostToolUse**: 도구 실행 후에 실행. 경고나 컨텍스트를 추가할 수 있습니다.
+- **UserPromptSubmit**: 사용자가 프롬프트를 제출할 때 실행. 차단하거나 메시지를 주입할 수 있습니다.
+- **Stop**: 세션이 유휴 상태가 될 때 실행. 후속 프롬프트를 주입할 수 있습니다.
+
+`settings.json` 예시:
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "eslint --fix $FILE" }]
+      }
+    ]
+  }
+}
+```
+
+#### 설정 로더
+
+**Command Loader**: 4개 디렉토리에서 마크다운 기반 슬래시 명령어를 로드합니다:
+- `~/.claude/commands/` (사용자)
+- `./.claude/commands/` (프로젝트)
+- `~/.config/opencode/command/` (opencode 전역)
+- `./.opencode/command/` (opencode 프로젝트)
+
+**Skill Loader**: `SKILL.md`가 있는 디렉토리 기반 스킬을 로드합니다:
+- `~/.claude/skills/` (사용자)
+- `./.claude/skills/` (프로젝트)
+
+**Agent Loader**: 마크다운 파일에서 커스텀 에이전트 정의를 로드합니다:
+- `~/.claude/agents/*.md` (사용자)
+- `./.claude/agents/*.md` (프로젝트)
+
+**MCP Loader**: `.mcp.json` 파일에서 MCP 서버 설정을 로드합니다:
+- `~/.claude/.mcp.json` (사용자)
+- `./.mcp.json` (프로젝트)
+- `./.claude/.mcp.json` (로컬)
+- 환경변수 확장 지원 (`${VAR}` 문법)
+
+#### 데이터 저장소
+
+**Todo 관리**: 세션 todo가 `~/.claude/todos/`에 Claude Code 호환 형식으로 저장됩니다.
+
+**Transcript**: 세션 활동이 `~/.claude/transcripts/`에 JSONL 형식으로 기록되어 재생 및 분석이 가능합니다.
+
+> **`claude-code-*` 네이밍에 대해**: `src/features/claude-code-*/` 아래의 기능들은 Claude Code의 설정 시스템에서 마이그레이션되었습니다. 이 네이밍 규칙은 어떤 기능이 Claude Code에서 유래했는지 명확히 식별합니다.
+
 ### 기타 편의 기능
 
 - **Terminal Title**: 세션 상태에 따라 터미널 타이틀을 자동 업데이트합니다 (유휴 ○, 처리중 ◐, 도구 ⚡, 에러 ✖). tmux를 지원합니다.
-- **Command Loader**: 다음 디렉토리들에서 마크다운 기반의 커스텀 명령어들을 로드합니다:
-  - User scope: `~/.claude/commands/`
-  - Project scope: `./.claude/commands/`
-  - OpenCode global: `~/.config/opencode/command/`
-  - OpenCode project: `./.opencode/command/`
-- **Skill Loader**: 다음 디렉토리들에서 디렉토리 기반의 스킬들을 실행 가능한 명령어로 로드합니다:
-  - User scope: `~/.claude/skills/`
-  - Project scope: `./.claude/skills/`
+- **Session State**: 이벤트 훅과 터미널 타이틀 업데이트에 사용되는 중앙집중식 세션 추적 모듈입니다.
 
 ## 설정
 
