@@ -20,13 +20,16 @@ import {
   type StopContext,
 } from "./stop"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
-import { getTranscriptPath } from "./transcript"
-import { log } from "../../shared"
+import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
+import type { PluginConfig } from "./types"
+import { log, isHookDisabled } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
 
-export function createClaudeCodeHooksHook(ctx: PluginInput) {
-  const sessionFirstMessageProcessed = new Set<string>()
+const sessionFirstMessageProcessed = new Set<string>()
+const sessionErrorState = new Map<string, { hasError: boolean; errorMessage?: string }>()
+const sessionInterruptState = new Map<string, { interrupted: boolean }>()
 
+export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig = {}) {
   return {
     "chat.message": async (
       input: {
@@ -40,34 +43,48 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
+      const interruptState = sessionInterruptState.get(input.sessionID)
+      if (interruptState?.interrupted) {
+        log("chat.message hook skipped - session interrupted", { sessionID: input.sessionID })
+        return
+      }
+
+      const claudeConfig = await loadClaudeHooksConfig()
+      const extendedConfig = await loadPluginExtendedConfig()
+
+      const textParts = output.parts.filter((p) => p.type === "text" && p.text)
+      const prompt = textParts.map((p) => p.text ?? "").join("\n")
+
+      recordUserMessage(input.sessionID, prompt)
+
+      const messageParts: MessagePart[] = textParts.map((p) => ({
+        type: p.type as "text",
+        text: p.text,
+      }))
+
+      const interruptStateBeforeHooks = sessionInterruptState.get(input.sessionID)
+      if (interruptStateBeforeHooks?.interrupted) {
+        log("chat.message hooks skipped - interrupted during preparation", { sessionID: input.sessionID })
+        return
+      }
+
+      let parentSessionId: string | undefined
       try {
-        const claudeConfig = await loadClaudeHooksConfig()
-        const extendedConfig = await loadPluginExtendedConfig()
+        const sessionInfo = await ctx.client.session.get({
+          path: { id: input.sessionID },
+        })
+        parentSessionId = sessionInfo.data?.parentID
+      } catch {}
 
-        const textParts = output.parts.filter((p) => p.type === "text" && p.text)
-        const prompt = textParts.map((p) => p.text ?? "").join("\n")
+      const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
+      sessionFirstMessageProcessed.add(input.sessionID)
 
-        const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
-        sessionFirstMessageProcessed.add(input.sessionID)
+      if (isFirstMessage) {
+        log("Skipping UserPromptSubmit hooks on first message for title generation", { sessionID: input.sessionID })
+        return
+      }
 
-        if (isFirstMessage) {
-          log("[Claude Hooks] Skipping UserPromptSubmit on first message for title generation")
-          return
-        }
-
-        let parentSessionId: string | undefined
-        try {
-          const sessionInfo = await ctx.client.session.get({
-            path: { id: input.sessionID },
-          })
-          parentSessionId = sessionInfo.data?.parentID
-        } catch {}
-
-        const messageParts: MessagePart[] = textParts.map((p) => ({
-          type: p.type as "text",
-          text: p.text,
-        }))
-
+      if (!isHookDisabled(config, "UserPromptSubmit")) {
         const userPromptCtx: UserPromptSubmitContext = {
           sessionId: input.sessionID,
           parentSessionId,
@@ -86,6 +103,12 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
           throw new Error(result.reason ?? "Hook blocked the prompt")
         }
 
+        const interruptStateAfterHooks = sessionInterruptState.get(input.sessionID)
+        if (interruptStateAfterHooks?.interrupted) {
+          log("chat.message injection skipped - interrupted during hooks", { sessionID: input.sessionID })
+          return
+        }
+
         if (result.messages.length > 0) {
           const hookContent = result.messages.join("\n\n")
           const message = output.message as {
@@ -102,16 +125,10 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
             tools: message.tools,
           })
 
-          log(
-            success
-              ? "[Claude Hooks] Hook message injected via file system"
-              : "[Claude Hooks] File injection failed",
-            { sessionID: input.sessionID }
-          )
+          log(success ? "Hook message injected via file system" : "File injection failed", {
+            sessionID: input.sessionID,
+          })
         }
-      } catch (error) {
-        log("[Claude Hooks] chat.message error:", error)
-        throw error
       }
     },
 
@@ -119,37 +136,41 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> }
     ): Promise<void> => {
-      try {
-        const claudeConfig = await loadClaudeHooksConfig()
-        const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig()
+      const extendedConfig = await loadPluginExtendedConfig()
 
+      recordToolUse(input.sessionID, input.tool, output.args as Record<string, unknown>)
+
+      cacheToolInput(input.sessionID, input.tool, input.callID, output.args as Record<string, unknown>)
+
+      if (!isHookDisabled(config, "PreToolUse")) {
         const preCtx: PreToolUseContext = {
           sessionId: input.sessionID,
           toolName: input.tool,
-          toolInput: output.args,
+          toolInput: output.args as Record<string, unknown>,
           cwd: ctx.directory,
-          transcriptPath: getTranscriptPath(input.sessionID),
           toolUseId: input.callID,
         }
-
-        cacheToolInput(input.sessionID, input.tool, input.callID, output.args)
 
         const result = await executePreToolUseHooks(preCtx, claudeConfig, extendedConfig)
 
         if (result.decision === "deny") {
-          throw new Error(result.reason || "Tool execution denied by PreToolUse hook")
-        }
-
-        if (result.decision === "ask") {
-          log(`[Claude Hooks] PreToolUse hook returned "ask" decision, but OpenCode doesn't support interactive prompts. Allowing by default.`)
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "PreToolUse Hook Executed",
+                message: `✗ ${result.toolName ?? input.tool} ${result.hookName ?? "hook"}: BLOCKED ${result.elapsedMs ?? 0}ms\n${result.inputLines ?? ""}`,
+                variant: "error",
+                duration: 4000,
+              },
+            })
+            .catch(() => {})
+          throw new Error(result.reason ?? "Hook blocked the operation")
         }
 
         if (result.modifiedInput) {
-          output.args = result.modifiedInput
+          Object.assign(output.args as Record<string, unknown>, result.modifiedInput)
         }
-      } catch (error) {
-        log(`[Claude Hooks] PreToolUse error:`, error)
-        throw error
       }
     },
 
@@ -157,12 +178,14 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: unknown }
     ): Promise<void> => {
-      try {
-        const claudeConfig = await loadClaudeHooksConfig()
-        const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig()
+      const extendedConfig = await loadPluginExtendedConfig()
 
-        const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
+      const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
+      recordToolResult(input.sessionID, input.tool, cachedInput, (output.metadata as Record<string, unknown>) || {})
+
+      if (!isHookDisabled(config, "PostToolUse")) {
         const postClient: PostToolUseClient = {
           session: {
             messages: (opts) => ctx.client.session.messages(opts),
@@ -174,65 +197,139 @@ export function createClaudeCodeHooksHook(ctx: PluginInput) {
           toolName: input.tool,
           toolInput: cachedInput,
           toolOutput: {
-            title: output.title,
+            title: input.tool,
             output: output.output,
-            metadata: output.metadata,
+            metadata: output.metadata as Record<string, unknown>,
           },
           cwd: ctx.directory,
           transcriptPath: getTranscriptPath(input.sessionID),
           toolUseId: input.callID,
           client: postClient,
+          permissionMode: "bypassPermissions",
         }
 
         const result = await executePostToolUseHooks(postCtx, claudeConfig, extendedConfig)
 
-        if (result.message) {
-          output.output += `\n\n${result.message}`
+        if (result.block) {
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "PostToolUse Hook Warning",
+                message: result.reason ?? "Hook returned warning",
+                variant: "warning",
+                duration: 4000,
+              },
+            })
+            .catch(() => {})
         }
 
-        if (result.block) {
-          throw new Error(result.reason || "Tool execution blocked by PostToolUse hook")
+        if (result.warnings && result.warnings.length > 0) {
+          output.output = `${output.output}\n\n${result.warnings.join("\n")}`
         }
-      } catch (error) {
-        log(`[Claude Hooks] PostToolUse error:`, error)
+
+        if (result.message) {
+          output.output = `${output.output}\n\n${result.message}`
+        }
+
+        if (result.hookName) {
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "PostToolUse Hook Executed",
+                message: `▶ ${result.toolName ?? input.tool} ${result.hookName}: ${result.elapsedMs ?? 0}ms`,
+                variant: "success",
+                duration: 2000,
+              },
+            })
+            .catch(() => {})
+        }
       }
     },
 
     event: async (input: { event: { type: string; properties?: unknown } }) => {
       const { event } = input
 
+      if (event.type === "session.error") {
+        const props = event.properties as Record<string, unknown> | undefined
+        const sessionID = props?.sessionID as string | undefined
+        if (sessionID) {
+          sessionErrorState.set(sessionID, {
+            hasError: true,
+            errorMessage: String(props?.error ?? "Unknown error"),
+          })
+        }
+        return
+      }
+
+      if (event.type === "session.deleted") {
+        const props = event.properties as Record<string, unknown> | undefined
+        const sessionInfo = props?.info as { id?: string } | undefined
+        if (sessionInfo?.id) {
+          sessionErrorState.delete(sessionInfo.id)
+          sessionInterruptState.delete(sessionInfo.id)
+          sessionFirstMessageProcessed.delete(sessionInfo.id)
+        }
+        return
+      }
+
       if (event.type === "session.idle") {
+        const props = event.properties as Record<string, unknown> | undefined
+        const sessionID = props?.sessionID as string | undefined
+
+        if (!sessionID) return
+
+        const claudeConfig = await loadClaudeHooksConfig()
+        const extendedConfig = await loadPluginExtendedConfig()
+
+        const errorStateBefore = sessionErrorState.get(sessionID)
+        const endedWithErrorBefore = errorStateBefore?.hasError === true
+        const interruptStateBefore = sessionInterruptState.get(sessionID)
+        const interruptedBefore = interruptStateBefore?.interrupted === true
+
+        let parentSessionId: string | undefined
         try {
-          const claudeConfig = await loadClaudeHooksConfig()
-          const extendedConfig = await loadPluginExtendedConfig()
+          const sessionInfo = await ctx.client.session.get({
+            path: { id: sessionID },
+          })
+          parentSessionId = sessionInfo.data?.parentID
+        } catch {}
 
-          const props = event.properties as Record<string, unknown> | undefined
-          const sessionID = props?.sessionID as string | undefined
-
-          if (!sessionID) return
-
+        if (!isHookDisabled(config, "Stop")) {
           const stopCtx: StopContext = {
             sessionId: sessionID,
+            parentSessionId,
             cwd: ctx.directory,
-            transcriptPath: getTranscriptPath(sessionID),
           }
 
-          const result = await executeStopHooks(stopCtx, claudeConfig, extendedConfig)
+          const stopResult = await executeStopHooks(stopCtx, claudeConfig, extendedConfig)
 
-          if (result.injectPrompt) {
-            await ctx.client.session.prompt({
-              path: { id: sessionID },
-              body: {
-                parts: [{ type: "text", text: result.injectPrompt }],
-              },
-              query: { directory: ctx.directory },
-            }).catch((err) => {
-              log(`[Claude Hooks] Failed to inject prompt from Stop hook:`, err)
-            })
+          const errorStateAfter = sessionErrorState.get(sessionID)
+          const endedWithErrorAfter = errorStateAfter?.hasError === true
+          const interruptStateAfter = sessionInterruptState.get(sessionID)
+          const interruptedAfter = interruptStateAfter?.interrupted === true
+
+          const shouldBypass = endedWithErrorBefore || endedWithErrorAfter || interruptedBefore || interruptedAfter
+
+          if (shouldBypass && stopResult.block) {
+            const interrupted = interruptedBefore || interruptedAfter
+            const endedWithError = endedWithErrorBefore || endedWithErrorAfter
+            log("Stop hook block ignored", { sessionID, block: stopResult.block, interrupted, endedWithError })
+          } else if (stopResult.block && stopResult.injectPrompt) {
+            log("Stop hook returned block with inject_prompt", { sessionID })
+            ctx.client.session
+              .prompt({
+                path: { id: sessionID },
+                body: { parts: [{ type: "text", text: stopResult.injectPrompt }] },
+                query: { directory: ctx.directory },
+              })
+              .catch((err: unknown) => log("Failed to inject prompt from Stop hook", err))
+          } else if (stopResult.block) {
+            log("Stop hook returned block", { sessionID, reason: stopResult.reason })
           }
-        } catch (error) {
-          log(`[Claude Hooks] Stop hook error:`, error)
         }
+
+        sessionErrorState.delete(sessionID)
+        sessionInterruptState.delete(sessionID)
       }
     },
   }

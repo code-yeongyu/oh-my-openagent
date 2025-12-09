@@ -69,6 +69,8 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
 }
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  const pluginConfig = loadPluginConfig(ctx.directory);
+
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx);
   const contextWindowMonitor = createContextWindowMonitorHook(ctx);
   const sessionRecovery = createSessionRecoveryHook(ctx);
@@ -77,11 +79,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
   const thinkMode = createThinkModeHook();
-  const claudeCodeHooks = createClaudeCodeHooksHook(ctx);
+  const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {});
 
   updateTerminalTitle({ sessionId: "main" });
-
-  const pluginConfig = loadPluginConfig(ctx.directory);
 
   return {
     tool: builtinTools,
@@ -99,10 +99,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const projectAgents = loadProjectAgents();
 
       config.agent = {
-        ...config.agent,
         ...builtinAgents,
         ...userAgents,
         ...projectAgents,
+        ...config.agent,
       };
       config.tools = {
         ...config.tools,
