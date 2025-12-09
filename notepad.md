@@ -141,3 +141,87 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 16:13] - Task 1: Add file-based logger to shared module
+
+### DISCOVERED ISSUES
+- None - straightforward file copy and modification task
+
+### IMPLEMENTATION DECISIONS
+- Copied logger.ts from opencode-cc-plugin source
+- Changed log file path from `opencode-cc-plugin.log` to `oh-my-opencode.log`
+- Added barrel export from `src/shared/index.ts`
+- Kept original comment for module description
+
+### PROBLEMS FOR NEXT TASKS
+- None identified - logger is now available for use in all new loaders
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Log file path verified: `/tmp/oh-my-opencode.log`
+- Exports verified: `log()` and `getLogFilePath()` now accessible via `src/shared`
+
+### LEARNINGS
+- Source file location: `~/local-workspaces/opencode-cc-plugin/src/shared/logger.ts`
+- Logger uses `fs.appendFileSync` for synchronous file writing
+- Empty catch block intentionally swallows errors to prevent logging from breaking main operations
+
+소요 시간: ~1분
+
+---
+
+## [2025-12-09 16:14] - Task 3: Rename skill-loader to claude-code-skill-loader
+
+### DISCOVERED ISSUES
+- None - straightforward directory rename task
+
+### IMPLEMENTATION DECISIONS
+- Used `mv` command to rename `src/features/skill-loader/` → `src/features/claude-code-skill-loader/`
+- Updated import path in `src/index.ts` (lines 19-22)
+- Did NOT modify internal imports (`../command-loader/types`) since command-loader still exists (Task 2 runs in parallel)
+
+### PROBLEMS FOR NEXT TASKS
+- If Task 2 renames command-loader to claude-code-command-loader, the internal imports in claude-code-skill-loader will need to be updated as part of Task 2's scope
+- The skill-loader's loader.ts:6 and types.ts:1 import from `../command-loader/types`
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, succeeded
+- Directory structure verified: `skill-loader/` deleted, `claude-code-skill-loader/` exists
+
+### LEARNINGS
+- This project uses `mv` for directory rename (acceptable per ANTI-PATTERNS - file creation is forbidden, not rename)
+- Command: `bun run typecheck` for type check, `bun run build` for build
+- skill-loader internal imports use relative paths (`../command-loader/types`) which remain valid after rename
+
+소요 시간: ~2분
+
+---
+
+## [2025-12-09 16:16] - Task 2: Rename command-loader to claude-code-command-loader
+
+### DISCOVERED ISSUES
+- skill-loader (now claude-code-skill-loader) was importing `CommandDefinition` from `../command-loader/types`
+- After renaming command-loader, these references also needed updating
+
+### IMPLEMENTATION DECISIONS
+- Used `mv` command: `src/features/command-loader/` → `src/features/claude-code-command-loader/`
+- Updated import path in `src/index.ts` (lines 13-18)
+- Also updated `claude-code-skill-loader/loader.ts:6` and `types.ts:1` to reference new path
+
+### PROBLEMS FOR NEXT TASKS
+- None identified - all dependent imports updated
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Directory structure verified: `command-loader/` deleted, `claude-code-command-loader/` exists
+- All imports updated: src/index.ts, claude-code-skill-loader/loader.ts, claude-code-skill-loader/types.ts
+
+### LEARNINGS
+- skill-loader depends on command-loader's `CommandDefinition` type via relative import
+- When renaming shared modules, must update ALL dependent modules' imports
+- Task 2 and Task 3 have an implicit dependency through the type import
+
+소요 시간: ~2분
+
+---
+

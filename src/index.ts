@@ -15,11 +15,11 @@ import {
   loadProjectCommands,
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
-} from "./features/command-loader";
+} from "./features/claude-code-command-loader";
 import {
   loadUserSkillsAsCommands,
   loadProjectSkillsAsCommands,
-} from "./features/skill-loader";
+} from "./features/claude-code-skill-loader";
 import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools } from "./tools";
 import { createBuiltinMcps } from "./mcp";

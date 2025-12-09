@@ -3,7 +3,7 @@ import { homedir } from "os"
 import { join, resolve } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
-import type { CommandDefinition } from "../command-loader/types"
+import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkillAsCommand } from "./types"
 
 function loadSkillsFromDir(skillsDir: string, scope: SkillScope): LoadedSkillAsCommand[] {

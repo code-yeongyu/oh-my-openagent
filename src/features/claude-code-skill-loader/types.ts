@@ -1,4 +1,4 @@
-import type { CommandDefinition } from "../command-loader/types"
+import type { CommandDefinition } from "../claude-code-command-loader/types"
 
 export type SkillScope = "user" | "project"
 
