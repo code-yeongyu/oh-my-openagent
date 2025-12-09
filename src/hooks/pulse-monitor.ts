@@ -132,8 +132,13 @@ export function createPulseMonitorHook(ctx: PluginInput) {
         // Pause monitoring while tool runs locally (tools can take time)
         stopMonitoring()
     },
-    "tool.execute.after": async (_input: { sessionID: string }) => {
-        // Don't forcefully restart monitoring here to avoid false positives
+    "tool.execute.after": async (input: { sessionID: string }) => {
+        // Reset heartbeat after tool execution to prevent false positives
+        // Tools can take arbitrary time, so we need a fresh baseline
+        if (input.sessionID && currentSessionID === input.sessionID) {
+            lastHeartbeat = Date.now()
+        }
+        // Don't forcefully restart monitoring here
         // Monitoring will naturally resume when next session/message event arrives
         // This prevents stalled detection on legitimately idle sessions
     }
