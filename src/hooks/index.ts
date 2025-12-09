@@ -7,3 +7,4 @@ export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicAutoCompactHook } from "./anthropic-auto-compact";
+export { createThinkModeHook } from "./think-mode";
