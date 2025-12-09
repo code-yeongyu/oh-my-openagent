@@ -19,6 +19,8 @@ import {
 
 import { grep } from "./grep"
 import { glob } from "./glob"
+import { slashcommand } from "./slashcommand"
+import { skill } from "./skill"
 
 export const builtinTools = {
   lsp_hover,
@@ -36,4 +38,6 @@ export const builtinTools = {
   ast_grep_replace,
   grep,
   glob,
+  slashcommand,
+  skill,
 }
