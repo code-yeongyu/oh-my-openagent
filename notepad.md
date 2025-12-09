@@ -538,3 +538,107 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 17:48] - Task 4: pre-tool-use.ts 포팅 (+ plugin-config.ts, config-loader.ts)
+
+### DISCOVERED ISSUES
+- pre-tool-use.ts depends on DEFAULT_CONFIG and isHookCommandDisabled which weren't created yet
+- Plan document listed plugin-config.ts and config-loader.ts as separate task (Section 4), but not mentioned in Task 4 instructions
+- These dependency files needed to be created before pre-tool-use.ts could compile
+
+### IMPLEMENTATION DECISIONS
+- Created plugin-config.ts (9 lines) with DEFAULT_CONFIG containing forceZsh and zshPath settings
+  * Minimal version - only fields used by pre-tool-use.ts (not full opencode-cc-plugin config)
+  * forceZsh: true, zshPath: "/bin/zsh"
+- Created config-loader.ts (105 lines) - full copy from opencode-cc-plugin
+  * Changed import: `../claude-compat/types` → `./types`
+  * Changed import: `../shared/logger` → `../../shared/logger`
+  * Functions: loadPluginExtendedConfig(), isHookCommandDisabled()
+  * Supports regex patterns for disabling specific hook commands
+- Created pre-tool-use.ts (172 lines) - full copy with adjusted imports:
+  * `../types` → `./types`
+  * `../../shared` → `../../shared` (unchanged)
+  * `../../config` → `./plugin-config` (NEW file)
+  * `../../config-loader` → `./config-loader` (NEW file)
+- Preserved ALL exit code logic:
+  * exitCode === 2 → decision = "deny"
+  * exitCode === 1 → decision = "ask"
+  * exitCode === 0 → parse JSON for decision
+- Preserved ALL deprecated field support:
+  * decision: "approve" → "allow"
+  * decision: "block" → "deny"
+- Original comments from source preserved (backward compat, spec references)
+
+### PROBLEMS FOR NEXT TASKS
+- Task 5 (post-tool-use.ts) can now import executePreToolUseHooks if needed
+- plugin-config.ts and config-loader.ts are now available for all subsequent hook implementations
+- isHookCommandDisabled pattern can be reused in PostToolUse, UserPromptSubmit, Stop hooks
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful
+- Committed: 530c4d6 "feat(hooks): add PreToolUse hook executor"
+  * 4 files: tool-input-cache.ts (Task 3), plugin-config.ts, config-loader.ts, pre-tool-use.ts (Task 4)
+  * 333 insertions total
+- Functions available: executePreToolUseHooks(), isHookCommandDisabled(), loadPluginExtendedConfig()
+- Exit code mapping verified: lines 96-116 check exitCode === 2/1/0
+- Deprecated field mapping verified: lines 132-141 check decision === "approve"/"block"
+
+### LEARNINGS
+- Pre-tool-use.ts depends on plugin configuration that wasn't part of oh-my-opencode's original structure
+- plugin-config.ts only needs subset of opencode-cc-plugin's config.ts (forceZsh, zshPath for executeHookCommand)
+- config-loader.ts provides hook command filtering via regex patterns (disabledHooks config)
+- executeHookCommand from shared/ accepts ExecuteHookOptions{ forceZsh, zshPath } parameter
+- Task 3 + Task 4 grouped in single commit per plan requirement
+- Source: `/Users/yeongyu/local-workspaces/opencode-cc-plugin/src/claude-compat/hooks/pre-tool-use.ts` (173 lines)
+
+소요 시간: ~5분
+
+---
+
+## [2025-12-09 17:52] - Task 5: post-tool-use.ts 포팅
+
+### DISCOVERED ISSUES
+- None - straightforward file copy with import path adjustments
+
+### IMPLEMENTATION DECISIONS
+- Copied post-tool-use.ts (200 lines) from opencode-cc-plugin → oh-my-opencode
+- Import path adjustments:
+  * `../types` → `./types`
+  * `../../shared` → `../../shared` (unchanged)
+  * `../../config` → `./plugin-config`
+  * `../transcript` → `./transcript`
+  * `../../config-loader` → `./config-loader`
+- Preserved ALL transcript logic:
+  * buildTranscriptFromSession() call with client.session.messages() API
+  * Temp file creation in try block
+  * deleteTempTranscript() cleanup in finally block
+- Preserved ALL exit code handling:
+  * exitCode === 2 → warning (continue)
+  * exitCode === 0 → parse JSON for decision: "block"
+  * Non-zero, non-2 → parse JSON for decision: "block"
+- Preserved ALL output fields: block, reason, message, warnings, elapsedMs, additionalContext, continue, stopReason, suppressOutput, systemMessage
+- Original comments from source preserved (PORT FROM DISABLED, cleanup explanation)
+
+### PROBLEMS FOR NEXT TASKS
+- Task 6 (user-prompt-submit.ts, stop.ts) can use similar pattern for hook execution
+- plugin-config.ts, config-loader.ts, transcript.ts dependencies already in place
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Ran: `bun run build` → exit 0, successful
+- File created: `src/hooks/claude-code-hooks/post-tool-use.ts` (200 lines)
+- Functions available: executePostToolUseHooks()
+- Transcript integration verified: buildTranscriptFromSession() imported from ./transcript
+- Cleanup mechanism verified: deleteTempTranscript() in finally block (line 196)
+
+### LEARNINGS
+- PostToolUse differs from PreToolUse: no permission decision (allow/deny/ask), only block/continue
+- PostToolUse provides hook results via message/warnings/additionalContext (observability, not control)
+- Exit code 2 in PostToolUse = warning (not block), collected in warnings array
+- Transcript temp file pattern: create in try, cleanup in finally (prevents disk accumulation)
+- Source: `/Users/yeongyu/local-workspaces/opencode-cc-plugin/src/claude-compat/hooks/post-tool-use.ts` (200 lines)
+
+소요 시간: ~5분
+
+---
+
