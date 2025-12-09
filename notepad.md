@@ -431,3 +431,38 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 17:34] - Task 1: types.ts 포팅
+
+### DISCOVERED ISSUES
+- Stub types.ts had `PluginConfig` interface needed by hook-disabled.ts (from Task 0)
+- Full types.ts from opencode-cc-plugin did NOT have `PluginConfig`
+- Typecheck initially failed: Module has no exported member 'PluginConfig'
+
+### IMPLEMENTATION DECISIONS
+- Copied full types.ts (181 lines) from opencode-cc-plugin → oh-my-opencode
+- Preserved ALL types: ClaudeHooksConfig, HookMatcher, PreToolUseInput/Output, PostToolUseInput/Output
+- Preserved deprecated decision fields: `decision?: "allow" | "deny" | "approve" | "block" | "ask"`
+- Added `PluginConfig` interface at end (oh-my-opencode specific type needed by hook-disabled.ts)
+- Kept line 150 comment (`// "pending" | "in_progress" | "completed"`) - existing source comment
+
+### PROBLEMS FOR NEXT TASKS
+- PluginConfig is now available for all subsequent tasks
+- Full type definitions ready for Task 2, 3, 4+ to use
+
+### VERIFICATION RESULTS
+- Ran: `bun run typecheck` → exit 0, no errors
+- Verified: ClaudeHooksConfig, HookMatcher, HookCommand types exist
+- Verified: PreToolUseInput/Output, PostToolUseInput/Output types exist
+- Verified: deprecated decision field (approve/block) included in PreToolUseOutput
+- Verified: PluginConfig export added (fixes hook-disabled.ts import)
+
+### LEARNINGS
+- opencode-cc-plugin types.ts: 181 lines, no PluginConfig
+- oh-my-opencode requires PluginConfig for hook disabling functionality
+- Stub-to-full replacement pattern works: stub allows Task 0 typecheck, Task 1 replaces with full implementation
+- Must preserve project-specific types (PluginConfig) when porting from different codebases
+
+소요 시간: ~2분
+
+---
+
