@@ -138,7 +138,17 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
   - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
 - **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
-- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, providing directory-level context to the agent. Inspired by Claude Code's CLAUDE.md feature.
+- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, collecting **all** `AGENTS.md` files along the path hierarchy. This enables nested, directory-specific instructions:
+  ```
+  project/
+  ├── AGENTS.md              # Project-wide context
+  ├── src/
+  │   ├── AGENTS.md          # src-specific context
+  │   └── components/
+  │       ├── AGENTS.md      # Component-specific context
+  │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
+  ```
+  When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
 
 ### Agents
 - **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
