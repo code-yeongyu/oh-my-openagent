@@ -360,3 +360,39 @@ All tasks execution STARTED: Thu Dec 4 16:52:57 KST 2025
 
 ---
 
+## [2025-12-09 16:35] - Task 8: Update README.md documentation
+
+### DISCOVERED ISSUES
+- None - documentation update task
+
+### IMPLEMENTATION DECISIONS
+- Added Agent Loader feature documentation under "Other Features" section (line 235-238)
+  - User scope: `~/.claude/agents/`
+  - Project scope: `./.claude/agents/`
+  - Format: `*.md` files with YAML frontmatter
+- Added MCP Loader feature documentation (line 239-243)
+  - User scope: `~/.claude/.mcp.json`
+  - Project scope: `./.mcp.json`
+  - Local scope: `./.claude/.mcp.json`
+  - Environment variable expansion (`${VAR}` syntax)
+- Added `claude-code-*` naming convention explanation as a blockquote note (line 245)
+  - Explains features migrated from Claude Code
+  - Lists examples: claude-code-command-loader, skill-loader, agent-loader, mcp-loader
+
+### PROBLEMS FOR NEXT TASKS
+- None - this is the final task
+
+### VERIFICATION RESULTS
+- README.md updated with new documentation
+- Style matches existing documentation (bullet points, code blocks for paths)
+- No sections removed or modified (only additions)
+
+### LEARNINGS
+- README.md "Other Features" section is at line 224
+- Existing features: Terminal Title, Command Loader, Skill Loader
+- Documentation style: bold feature name, bullet points for scopes/details
+
+소요 시간: ~1분
+
+---
+

@@ -232,6 +232,17 @@ Don't need these? Disable them via `oh-my-opencode.json`:
 - **Skill Loader**: Loads directory-based skills as executable commands:
   - User scope: `~/.claude/skills/`
   - Project scope: `./.claude/skills/`
+- **Agent Loader**: Loads agent definitions from markdown files with YAML frontmatter:
+  - User scope: `~/.claude/agents/`
+  - Project scope: `./.claude/agents/`
+  - Format: `*.md` files with frontmatter (name, description, tools)
+- **MCP Loader**: Loads MCP server configurations from `.mcp.json` files:
+  - User scope: `~/.claude/.mcp.json`
+  - Project scope: `./.mcp.json`
+  - Local scope: `./.claude/.mcp.json`
+  - Supports environment variable expansion (`${VAR}` syntax)
+
+> **Note on `claude-code-*` naming**: Features under `src/features/claude-code-*/` are migrated from Claude Code's configuration system. This naming convention clearly identifies which features originated from Claude Code, such as `claude-code-command-loader`, `claude-code-skill-loader`, `claude-code-agent-loader`, and `claude-code-mcp-loader`.
 
 ## Configuration
 
