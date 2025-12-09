@@ -44,13 +44,14 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
-    "@code-yeongyu/comment-checker": "^0.4.1",
+    "@code-yeongyu/comment-checker": "^0.4.4",
     "@opencode-ai/plugin": "^1.0.7",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
   },
   "devDependencies": {
     "bun-types": "latest",
+    "oh-my-opencode": "^0.1.30",
     "typescript": "^5.7.3"
   },
   "peerDependencies": {

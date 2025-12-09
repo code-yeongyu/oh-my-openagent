@@ -7,13 +7,14 @@
       "dependencies": {
         "@ast-grep/cli": "^0.40.0",
         "@ast-grep/napi": "^0.40.0",
-        "@code-yeongyu/comment-checker": "^0.4.1",
+        "@code-yeongyu/comment-checker": "^0.4.4",
         "@opencode-ai/plugin": "^1.0.7",
         "xdg-basedir": "^5.1.0",
         "zod": "^4.1.8",
       },
       "devDependencies": {
         "bun-types": "latest",
+        "oh-my-opencode": "^0.1.30",
         "typescript": "^5.7.3",
       },
       "peerDependencies": {
@@ -63,7 +64,7 @@
 
     "@ast-grep/napi-win32-x64-msvc": ["@ast-grep/napi-win32-x64-msvc@0.40.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Hk2IwfPqMFGZt5SRxsoWmGLxBXxprow4LRp1eG6V8EEiJCNHxZ9ZiEaIc5bNvMDBjHVSnqZAXT22dROhrcSKQg=="],
 
-    "@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.4.1", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-E7p1V8CsRj9hMbwENd9BfxZGWYu+lKS5tXGuNNcNtkRMhWvwM/ononysKpLB7LXdxfSYAn0j7heJydyzEmm+lg=="],
+    "@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.4.4", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-vsbdLMQYJJNDV/baTDnNqqg/MZwA+9nz7TE6Mybj8zjZVTCn4ZivH4hAdD5p4fLxhGZEJ5x1UDmXA6pAGA7lHA=="],
 
     "@opencode-ai/plugin": ["@opencode-ai/plugin@1.0.128", "", { "dependencies": { "@opencode-ai/sdk": "1.0.128", "zod": "4.1.8" } }, "sha512-M5vjz3I6KeoBSNduWmT5iHXRtTLCqICM5ocs+WrB3uxVorslcO3HVwcLzrERh/ntpxJ/1xhnHQaeG6Mg+P744A=="],
 
@@ -99,6 +100,8 @@
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
+    "oh-my-opencode": ["oh-my-opencode@0.1.30", "", { "dependencies": { "@ast-grep/cli": "^0.40.0", "@ast-grep/napi": "^0.40.0", "@code-yeongyu/comment-checker": "^0.4.1", "@opencode-ai/plugin": "^1.0.7", "xdg-basedir": "^5.1.0", "zod": "^4.1.8" }, "peerDependencies": { "bun": ">=1.0.0" } }, "sha512-pXGGgL/7Jcz3yuGJJTI72BKern2egwfRz2LQZTBq+jl+pNCybOvGvXtFmR+WGlF8O3ZjL1wIHypBbIVuHOBzxg=="],
+
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
@@ -106,5 +109,7 @@
     "xdg-basedir": ["xdg-basedir@5.1.0", "", {}, "sha512-GCPAHLvrIH13+c0SuacwvRYj2SxJXQ4kaVTT5xgL3kPrz56XxkF21IGhjSE1+W0aw7gpBWRGXLCPnPby6lSpmQ=="],
 
     "zod": ["zod@4.1.8", "", {}, "sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ=="],
+
+    "oh-my-opencode/@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.4.1", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-E7p1V8CsRj9hMbwENd9BfxZGWYu+lKS5tXGuNNcNtkRMhWvwM/ononysKpLB7LXdxfSYAn0j7heJydyzEmm+lg=="],
   }
 }
