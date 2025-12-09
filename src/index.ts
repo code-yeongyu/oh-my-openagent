@@ -6,7 +6,6 @@ import {
   createSessionRecoveryHook,
   createCommentCheckerHooks,
   createGrepOutputTruncatorHook,
-  createPulseMonitorHook,
   createDirectoryAgentsInjectorHook,
   createEmptyTaskResponseDetectorHook,
 } from "./hooks";
@@ -54,7 +53,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx);
   const contextWindowMonitor = createContextWindowMonitorHook(ctx);
   const sessionRecovery = createSessionRecoveryHook(ctx);
-  const pulseMonitor = createPulseMonitorHook(ctx);
   const commentChecker = createCommentCheckerHooks();
   const grepOutputTruncator = createGrepOutputTruncatorHook(ctx);
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
@@ -93,7 +91,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     event: async (input) => {
       await todoContinuationEnforcer(input);
       await contextWindowMonitor.event(input);
-      await pulseMonitor.event(input);
       await directoryAgentsInjector.event(input);
 
       const { event } = input;
@@ -194,7 +191,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
-      await pulseMonitor["tool.execute.before"]();
       await commentChecker["tool.execute.before"](input, output);
 
       if (input.sessionID === mainSessionID) {
@@ -209,7 +205,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
-      await pulseMonitor["tool.execute.after"](input);
       await grepOutputTruncator["tool.execute.after"](input, output);
       await contextWindowMonitor["tool.execute.after"](input, output);
       await commentChecker["tool.execute.after"](input, output);
