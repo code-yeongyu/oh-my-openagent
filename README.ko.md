@@ -106,7 +106,19 @@ opencode --version  # 1.0.132 이상이어야 함
 cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있어야 함
 ```
 
-> **참고**: 모델 인증이 필요하면, `opencode` 실행 후 `/connect` 명령어를 사용하거나, tmux를 통해 `opencode auth login`을 안내하세요.
+### 4단계: 인증정보 설정
+
+plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 다음의 내용을 진행주세요.
+
+1. tmux 를 사용하여 셸 열기
+2. opencode auth login > Provider Anthropic > Login method Claude Pro/Max > 사용자에게 oauth 화면에서 인증하라고 안내
+3. 사용자에게 권장하는 셋업은 macOS 일 경우 VibeProxy, 아닐 경우 CLIProxyAPI 라고 안내
+
+### ⚠️ 주의
+
+**사용자가 명시적으로 요청하지 않는 한, `oh-my-opencode.json` 설정 파일을 생성하거나 수정하지 마세요.**
+
+플러그인은 설정 파일 없이도 기본값으로 완벽하게 동작합니다. 설정 파일은 사용자가 커스터마이징을 원할 때만 필요합니다.
 
 </details>
 

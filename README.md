@@ -28,11 +28,12 @@ Oh My OpenCode
 oMoMoMoMoMo···
 
 If you work in tech, you likely appreciated [Claude Code](https://www.claude.com/product/claude-code).
-If you are a hacker, you will fucking falling in love with [OpenCode](https://github.com/sst/opencode).
+If you are a hacker, you will fucking fall in love with [OpenCode](https://github.com/sst/opencode).
 
-You don't write code just for a paycheck? You write because you genuinely love it?
-
-To you, OpenCode will feel like the paradigm shift from Windows to Linux. Not you? It's still worth the investment. Give it 10 minutes. Your work and life will improve. I promise.
+Do you remember the first time you switched from Windows to Linux? The excitement of configuring everything just the way you wanted?
+In an era where that romance feels lost, OpenCode will be that project for you.
+If you love coding and computers, OpenCode will feel exactly like that moment you first touched Linux after years of Windows.
+Even if you don't, invest a little time. Boost your skills and productivity by multipliers.
 
 ## TL;DR
 
@@ -42,7 +43,7 @@ To you, OpenCode will feel like the paradigm shift from Windows to Linux. Not yo
     - For OpenAI models, I recommend the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
     - For Gemini and GPT, use [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 - **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
-- **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It works seamlessly.**
+- **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It just installs.**
   - If you are an LLM Agent, install the required plugins and dependencies, then run `opencode auth login` via tmux to assist the user with configuration.
 
 ## Installation
@@ -104,7 +105,19 @@ opencode --version  # Should be >= 1.0.132
 cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
 ```
 
-> **Note**: If model authentication is needed, run `opencode` and use `/connect` command, or assist the user with `opencode auth login` via tmux.
+### Step 4: Configure Authentication
+
+Once `oh-my-opencode` is added to the plugin list, use `tmux` to proceed with the following:
+
+1. Open a shell using `tmux`.
+2. Run `opencode auth login` > Select Provider `Anthropic` > Select Login method `Claude Pro/Max` > Instruct the user to authenticate via the OAuth screen.
+3. Recommend the setup: [VibeProxy](https://github.com/automazeio/vibeproxy) for macOS users, or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) for others.
+
+### ⚠️ Warning
+
+**Do NOT create or modify the `oh-my-opencode.json` configuration file unless the user explicitly requests it.**
+
+The plugin works perfectly with default settings without any configuration file. The configuration file is only needed when the user wants customization.
 
 </details>
 
@@ -115,7 +128,7 @@ OpenCode is limitlessly extensible and customizable. Zero screen flicker.
 You can mix and orchestrate models to your exact specifications.
 It is feature-rich. It is elegant. It handles the terminal without hesitation. It is high-performance.
 
-But here is the catch: the learning curve is steep. There is a lot to master.
+But here is the catch: the learning curve is steep. There is a lot to master. And your time is expensive.
 
 Inspired by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/en/overview), I have implemented their features here—often with superior execution.
 Because this is OpenCode.
@@ -389,7 +402,7 @@ If this sounds arrogant and you have a superior solution, send a PR. You are wel
 
 As of now, I have no affiliation with any of the projects or models mentioned here. This plugin is purely based on personal experimentation and preference.
 
-I constructed 99% of this project using OpenCode. I focused on functional verification. This documentation has been personally reviewed and comprehensively rewritten, so you can rely on it with confidence.
+I constructed 99% of this project using OpenCode. I focused on functional verification, and honestly, I don't know how to write proper TypeScript. **But I personally reviewed and comprehensively rewritten this documentation, so you can rely on it with confidence.**
 ## Warnings
 
 - If you are on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or lower, OpenCode has a bug that might break config.
