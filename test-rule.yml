@@ -1,6 +1,0 @@
-id: test-rule
-message: Test rule
-severity: info
-language: JavaScript
-rule:
-  pattern: console
