@@ -7,6 +7,8 @@ interface Todo {
   id: string
 }
 
+type SessionStatus = "idle" | "aborted" | "continuation-sent"
+
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
@@ -14,6 +16,8 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 - Proceed without asking for permission
 - Mark each task complete when finished
 - Do not stop until all tasks are done`
+
+const CONTINUATION_DELAY_MS = 500
 
 function detectInterrupt(error: unknown): boolean {
   if (!error) return false
@@ -33,43 +37,36 @@ function detectInterrupt(error: unknown): boolean {
 }
 
 export function createTodoContinuationEnforcer(ctx: PluginInput) {
-  const remindedSessions = new Set<string>()
-  const interruptedSessions = new Set<string>()
-  const errorSessions = new Set<string>()
+  const sessionStates = new Map<string, SessionStatus>()
+  const pendingContinuations = new Map<string, Timer>()
 
-  return async ({ event }: { event: { type: string; properties?: unknown } }) => {
-    const props = event.properties as Record<string, unknown> | undefined
+  const cleanupSession = (sessionID: string) => {
+    const timer = pendingContinuations.get(sessionID)
+    if (timer) clearTimeout(timer)
+    pendingContinuations.delete(sessionID)
+    sessionStates.delete(sessionID)
+  }
 
-    if (event.type === "session.error") {
-      const sessionID = props?.sessionID as string | undefined
-      if (sessionID) {
-        errorSessions.add(sessionID)
-        if (detectInterrupt(props?.error)) {
-          interruptedSessions.add(sessionID)
-        }
-      }
-      return
+  const cancelPendingContinuation = (sessionID: string) => {
+    const timer = pendingContinuations.get(sessionID)
+    if (timer) {
+      clearTimeout(timer)
+      pendingContinuations.delete(sessionID)
     }
+    sessionStates.set(sessionID, "aborted")
+  }
 
-    if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
-      if (!sessionID) return
+  const scheduleContinuation = (sessionID: string) => {
+    const prev = pendingContinuations.get(sessionID)
+    if (prev) clearTimeout(prev)
 
-      // Wait for potential session.error events to be processed first
-      await new Promise(resolve => setTimeout(resolve, 150))
+    sessionStates.set(sessionID, "idle")
 
-      const shouldBypass = interruptedSessions.has(sessionID) || errorSessions.has(sessionID)
-      
-      interruptedSessions.delete(sessionID)
-      errorSessions.delete(sessionID)
+    const timer = setTimeout(async () => {
+      pendingContinuations.delete(sessionID)
 
-      if (shouldBypass) {
-        return
-      }
-
-      if (remindedSessions.has(sessionID)) {
-        return
-      }
+      const state = sessionStates.get(sessionID)
+      if (state !== "idle") return
 
       let todos: Todo[] = []
       try {
@@ -93,13 +90,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
         return
       }
 
-      remindedSessions.add(sessionID)
-
-      // Re-check if abort occurred during the delay
-      if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID)) {
-        remindedSessions.delete(sessionID)
-        return
-      }
+      sessionStates.set(sessionID, "continuation-sent")
 
       try {
         await ctx.client.session.prompt({
@@ -115,24 +106,46 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
           query: { directory: ctx.directory },
         })
       } catch {
-        remindedSessions.delete(sessionID)
+        sessionStates.delete(sessionID)
       }
+    }, CONTINUATION_DELAY_MS)
+
+    pendingContinuations.set(sessionID, timer)
+  }
+
+  return async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    const props = event.properties as Record<string, unknown> | undefined
+
+    if (event.type === "session.error") {
+      const sessionID = props?.sessionID as string | undefined
+      if (sessionID && detectInterrupt(props?.error)) {
+        cancelPendingContinuation(sessionID)
+      }
+      return
+    }
+
+    if (event.type === "session.idle") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
+
+      const state = sessionStates.get(sessionID)
+      if (state === "continuation-sent") return
+
+      scheduleContinuation(sessionID)
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       if (sessionID && info?.role === "user") {
-        remindedSessions.delete(sessionID)
+        sessionStates.delete(sessionID)
       }
     }
 
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
-        remindedSessions.delete(sessionInfo.id)
-        interruptedSessions.delete(sessionInfo.id)
-        errorSessions.delete(sessionInfo.id)
+        cleanupSession(sessionInfo.id)
       }
     }
   }
