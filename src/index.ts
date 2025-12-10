@@ -10,6 +10,7 @@ import {
   createEmptyTaskResponseDetectorHook,
   createThinkModeHook,
   createClaudeCodeHooksHook,
+  createAnthropicAutoCompactHook,
 } from "./hooks";
 import {
   loadUserCommands,
@@ -80,6 +81,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
   const thinkMode = createThinkModeHook();
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {});
+  const anthropicAutoCompact = createAnthropicAutoCompactHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -140,6 +142,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);
       await thinkMode.event(input);
+      await anthropicAutoCompact.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
