@@ -336,7 +336,7 @@ Override built-in agent settings:
 
 Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
-Or disable agents via `disabled_agents`:
+Or you can disable them using `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -348,7 +348,9 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### MCPs
 
-Disable built-in MCPs:
+By default, Context7 and Exa MCP are supported.
+
+If you don't want these, you can disable them using `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -356,13 +358,13 @@ Disable built-in MCPs:
 }
 ```
 
-See [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers) for more.
-
 ### LSP
 
-Oh My OpenCode's LSP tools are for **refactoring only** (rename, code actions). Analysis LSP is handled by OpenCode itself.
+OpenCode provides LSP tools for analysis.
+Oh My OpenCode provides LSP tools for refactoring (rename, code actions).
+It supports all LSP configurations and custom settings supported by OpenCode (those configured in opencode.json), and you can also configure additional settings specifically for Oh My OpenCode as shown below.
 
-Configure LSP servers via `lsp` option:
+You can configure additional LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
