@@ -112,7 +112,7 @@ plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 다음의 �
 
 1. tmux 를 사용하여 셸 열기
 2. opencode auth login > Provider Anthropic > Login method Claude Pro/Max > 사용자에게 oauth 화면에서 인증하라고 안내
-3. 사용자에게 권장하는 셋업은 macOS 일 경우 VibeProxy, 아닐 경우 CLIProxyAPI 라고 안내
+3. 사용자에게 macOS 일 경우 VibeProxy, 아닐 경우 CLIProxyAPI 를 사용하여 OpenAI / Google 인증을 완료하라고 안내
 
 ### ⚠️ 주의
 
@@ -338,7 +338,7 @@ Schema 자동 완성이 지원됩니다:
 
 각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
-또는 `disabled_agents`로 비활성화할 수 있습니다:
+또는 ~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `disabled_agents` 를 사용하여 비활성화할 수 있습니다:
 
 ```json
 {
@@ -350,7 +350,9 @@ Schema 자동 완성이 지원됩니다:
 
 ### MCPs
 
-내장된 MCP를 비활성화합니다:
+기본적으로 Context7, Exa MCP 를 지원합니다.
+
+이것이 마음에 들지 않는다면, ~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `disabled_mcps` 를 사용하여 비활성화할 수 있습니다:
 
 ```json
 {
@@ -358,13 +360,13 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-더 자세한 내용은 [OpenCode MCP Servers](https://opencode.ai/docs/mcp-servers)를 참조하세요.
-
 ### LSP
 
-Oh My OpenCode의 LSP 도구는 오직 **리팩토링(이름 변경, 코드 액션)만을 위한 것**입니다. 분석용 LSP는 OpenCode 자체에서 처리합니다.
+OpenCode 는 분석을 위해 LSP 도구를 제공합니다.
+Oh My OpenCode 에서는 LSP 의 리팩토링(이름 변경, 코드 액션) 도구를 제공합니다.
+OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.json 에 설정 된 것) 을 그대로 지원하고, Oh My OpenCode 만을 위한 추가적인 설정도 아래와 같이 설정 할 수 있습니다.
 
-`lsp` 옵션을 통해 LSP 서버를 설정합니다:
+~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `lsp` 옵션을 통해 LSP 서버를 추가로 설정 할 수 있습니다:
 
 ```json
 {
