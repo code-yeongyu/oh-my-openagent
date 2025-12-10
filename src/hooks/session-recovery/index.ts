@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import {
   findEmptyMessages,
+  findEmptyMessageByIndex,
   findMessagesWithOrphanThinking,
   findMessagesWithThinkingBlocks,
   injectTextPart,
@@ -52,6 +53,12 @@ function getErrorMessage(error: unknown): string {
     error?: { message?: string }
   }
   return (errorObj.data?.message || errorObj.error?.message || errorObj.message || "").toLowerCase()
+}
+
+function extractMessageIndex(error: unknown): number | null {
+  const message = getErrorMessage(error)
+  const match = message.match(/messages\.(\d+)/)
+  return match ? parseInt(match[1], 10) : null
 }
 
 function detectErrorType(error: unknown): RecoveryErrorType {
@@ -161,16 +168,26 @@ async function recoverEmptyContentMessage(
   _client: Client,
   sessionID: string,
   failedAssistantMsg: MessageData,
-  _directory: string
+  _directory: string,
+  error: unknown
 ): Promise<boolean> {
-  const emptyMessageIDs = findEmptyMessages(sessionID)
+  const targetIndex = extractMessageIndex(error)
+  const failedID = failedAssistantMsg.info?.id
 
-  if (emptyMessageIDs.length === 0) {
-    const fallbackID = failedAssistantMsg.info?.id
-    if (!fallbackID) return false
-    return injectTextPart(sessionID, fallbackID, "(interrupted)")
+  if (targetIndex !== null) {
+    const targetMessageID = findEmptyMessageByIndex(sessionID, targetIndex)
+    if (targetMessageID) {
+      return injectTextPart(sessionID, targetMessageID, "(interrupted)")
+    }
   }
 
+  if (failedID) {
+    if (injectTextPart(sessionID, failedID, "(interrupted)")) {
+      return true
+    }
+  }
+
+  const emptyMessageIDs = findEmptyMessages(sessionID)
   let anySuccess = false
   for (const messageID of emptyMessageIDs) {
     if (injectTextPart(sessionID, messageID, "(interrupted)")) {
@@ -262,15 +279,16 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
       } else if (errorType === "thinking_disabled_violation") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
       } else if (errorType === "empty_content_message") {
-        success = await recoverEmptyContentMessage(ctx.client, sessionID, failedMsg, ctx.directory)
+        success = await recoverEmptyContentMessage(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
       }
 
-      return success
-    } catch {
-      return false
-    } finally {
-      processingErrors.delete(assistantMsgID)
-    }
+    return success
+  } catch (err) {
+    console.error("[session-recovery] Recovery failed:", err)
+    return false
+  } finally {
+    processingErrors.delete(assistantMsgID)
+  }
   }
 
   return {

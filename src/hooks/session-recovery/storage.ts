@@ -42,7 +42,12 @@ export function readMessages(sessionID: string): StoredMessageMeta[] {
     }
   }
 
-  return messages.sort((a, b) => a.id.localeCompare(b.id))
+  return messages.sort((a, b) => {
+    const aTime = a.time?.created ?? 0
+    const bTime = b.time?.created ?? 0
+    if (aTime !== bTime) return aTime - bTime
+    return a.id.localeCompare(b.id)
+  })
 }
 
 export function readParts(messageID: string): StoredPart[] {
@@ -117,12 +122,8 @@ export function findEmptyMessages(sessionID: string): string[] {
   const messages = readMessages(sessionID)
   const emptyIds: string[] = []
 
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
+  for (const msg of messages) {
     if (msg.role !== "assistant") continue
-
-    const isLastMessage = i === messages.length - 1
-    if (isLastMessage) continue
 
     if (!messageHasContent(msg.id)) {
       emptyIds.push(msg.id)
@@ -130,6 +131,18 @@ export function findEmptyMessages(sessionID: string): string[] {
   }
 
   return emptyIds
+}
+
+export function findEmptyMessageByIndex(sessionID: string, targetIndex: number): string | null {
+  const messages = readMessages(sessionID)
+  
+  if (targetIndex < 0 || targetIndex >= messages.length) return null
+
+  const targetMsg = messages[targetIndex]
+  if (targetMsg.role !== "assistant") return null
+  if (messageHasContent(targetMsg.id)) return null
+
+  return targetMsg.id
 }
 
 export function findFirstEmptyMessage(sessionID: string): string | null {
