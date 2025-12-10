@@ -7,16 +7,8 @@ const CONTEXT_WARNING_THRESHOLD = 0.70
 const CONTEXT_REMINDER = `[SYSTEM REMINDER - 1M Context Window]
 
 You are using Anthropic Claude with 1M context window.
-Current usage has exceeded 75%.
-
-RECOMMENDATIONS:
-- Consider compacting the session if available
-- Break complex tasks into smaller, focused sessions
-- Be concise in your responses
-- Avoid redundant file reads
-
-You have access to 1M tokens - use them wisely. Do NOT rush or skip tasks.
-Complete your work thoroughly despite the context usage warning.`
+You have plenty of context remaining - do NOT rush or skip tasks.
+Complete your work thoroughly and methodically.`
 
 interface AssistantMessageInfo {
   role: "assistant"
