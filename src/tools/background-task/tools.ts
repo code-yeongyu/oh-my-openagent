@@ -27,7 +27,6 @@ export function createBackgroundTask(manager: BackgroundManager) {
       description: tool.schema.string().describe("Short task description (shown in status)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       agent: tool.schema.string().describe("Agent type to use (any agent allowed)"),
-      session_id: tool.schema.string().describe("Parent session ID (auto-detected if omitted)").optional(),
     },
     async execute(args: BackgroundTaskArgs, toolContext) {
       try {
@@ -35,8 +34,8 @@ export function createBackgroundTask(manager: BackgroundManager) {
           description: args.description,
           prompt: args.prompt,
           agent: args.agent,
-          parentSessionID: args.session_id ?? toolContext.sessionID,
-          parentMessageID: toolContext.messageID ?? "unknown",
+          parentSessionID: toolContext.sessionID,
+          parentMessageID: toolContext.messageID,
         })
 
         return `✅ Background task launched successfully!
