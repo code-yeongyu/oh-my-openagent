@@ -265,31 +265,28 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
   }
 
   private async pollRunningTasks(): Promise<void> {
+    const statusResult = await this.client.session.status()
+    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
 
       try {
-        const infoResult = await this.client.session.get({
-          path: { id: task.sessionID },
-        })
-
-        if (infoResult.error) {
-          const errorStr = String(infoResult.error)
-          if (errorStr.includes("404") || errorStr.includes("not found")) {
-            task.status = "error"
-            task.error = "Session not found"
-            task.completedAt = new Date()
-          }
+        const sessionStatus = allStatuses[task.sessionID]
+        
+        if (!sessionStatus) {
+          task.status = "error"
+          task.error = "Session not found"
+          task.completedAt = new Date()
           continue
         }
 
-        const sessionInfo = infoResult.data as { status?: string }
-
-        if (sessionInfo.status === "idle") {
+        if (sessionStatus.type === "idle") {
           task.status = "completed"
           task.completedAt = new Date()
           this.markForNotification(task)
           this.notifyParentSession(task)
+          log("[background-agent] Task completed, notifying parent:", task.id)
           continue
         }
 
