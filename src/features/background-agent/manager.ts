@@ -28,12 +28,14 @@ export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
   private client: OpencodeClient
+  private directory: string
   private pollingInterval?: Timer
 
-  constructor(client: OpencodeClient) {
+  constructor(ctx: PluginInput) {
     this.tasks = new Map()
     this.notifications = new Map()
-    this.client = client
+    this.client = ctx.client
+    this.directory = ctx.directory
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -214,19 +216,43 @@ export class BackgroundManager {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
     const toolCalls = task.progress?.toolCalls ?? 0
     
-    const message = `Background task "${task.description}" completed in ${duration} with ${toolCalls} tool calls. Use background_result tool with taskId="${task.id}" to get the full result.`
+    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} with ${toolCalls} tool calls. Use background_result tool with taskId="${task.id}" to retrieve the result.`
 
-    log("[background-agent] Sending message to parent session:", task.parentSessionID)
+    log("[background-agent] Sending async message to parent:", task.parentSessionID)
     
-    this.client.session.prompt({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tuiClient = this.client as any
+    if (tuiClient.tui?.showToast) {
+      tuiClient.tui.showToast({
+        body: {
+          title: "Background Task Completed",
+          message: `Task "${task.description}" finished.`,
+          variant: "success",
+          duration: 5000,
+        },
+      }).catch(() => {})
+    }
+
+    this.client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
         parts: [{ type: "text", text: message }],
       },
     }).then((result) => {
-      log("[background-agent] Message sent, response:", result.data ? "success" : result.error)
+      log("[background-agent] promptAsync result:", { error: result.error, response: result.response?.status })
+      
+      setTimeout(() => {
+        if (tuiClient.tui?.submitPrompt) {
+          log("[background-agent] Triggering submitPrompt to force TUI update")
+          tuiClient.tui.submitPrompt({
+            query: { directory: this.directory }
+          }).catch((err: unknown) => {
+            log("[background-agent] submitPrompt failed:", String(err))
+          })
+        }
+      }, 100)
     }).catch((error) => {
-      log("[background-agent] Failed to send message:", error)
+      log("[background-agent] promptAsync exception:", String(error))
     })
   }
 
