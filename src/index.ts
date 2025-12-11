@@ -7,6 +7,7 @@ import {
   createCommentCheckerHooks,
   createGrepOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
+  createDirectoryReadmeInjectorHook,
   createEmptyTaskResponseDetectorHook,
   createThinkModeHook,
   createClaudeCodeHooksHook,
@@ -78,6 +79,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const commentChecker = createCommentCheckerHooks();
   const grepOutputTruncator = createGrepOutputTruncatorHook(ctx);
   const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+  const directoryReadmeInjector = createDirectoryReadmeInjectorHook(ctx);
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
   const thinkMode = createThinkModeHook();
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {});
@@ -141,6 +143,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await todoContinuationEnforcer(input);
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);
+      await directoryReadmeInjector.event(input);
       await thinkMode.event(input);
       await anthropicAutoCompact.event(input);
 
@@ -259,6 +262,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await contextWindowMonitor["tool.execute.after"](input, output);
       await commentChecker["tool.execute.after"](input, output);
       await directoryAgentsInjector["tool.execute.after"](input, output);
+      await directoryReadmeInjector["tool.execute.after"](input, output);
       await emptyTaskResponseDetector["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {

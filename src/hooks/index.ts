@@ -5,6 +5,7 @@ export { createSessionRecoveryHook } from "./session-recovery";
 export { createCommentCheckerHooks } from "./comment-checker";
 export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
+export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicAutoCompactHook } from "./anthropic-auto-compact";
 export { createThinkModeHook } from "./think-mode";

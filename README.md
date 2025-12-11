@@ -163,6 +163,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
   ```
   When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
+- **Directory README.md Injector**: Automatically injects `README.md` contents when reading files. Works identically to the AGENTS.md Injector, searching upward from the file's directory to project root. Provides project documentation context to the LLM agent. Each directory's README is injected only once per session.
 - **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
 - **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
 - **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
