@@ -65,7 +65,7 @@ oh-my-opencode/
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| oracle | GPT-5.1 | Code review, strategic planning |
+| oracle | GPT-5.2 | Code review, strategic planning |
 | librarian | Claude Haiku | Documentation, example lookup |
 | explore | Grok | File/codebase exploration |
 | frontend-ui-ux-engineer | Gemini | UI generation |

@@ -170,7 +170,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
 
 ### Agents
-- **oracle** (`openai/gpt-5.1`): The architect. Expert in code reviews and strategy. Uses GPT-5.1 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
+- **oracle** (`openai/gpt-5.2`): The architect. Expert in code reviews and strategy. Uses GPT-5.2 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
 - **librarian** (`anthropic/claude-haiku-4-5`): Multi-repo analysis, documentation lookup, and implementation examples. Haiku is chosen for its speed, competence, excellent tool usage, and cost-efficiency. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast exploration and pattern matching. Claude Code uses Haiku; we use Grok. It is currently free, blazing fast, and intelligent enough for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.

@@ -4,7 +4,7 @@ export const oracleAgent: AgentConfig = {
   description:
     "Expert AI advisor with advanced reasoning capabilities for high-quality technical guidance, code reviews, architectural advice, and strategic planning.",
   mode: "subagent",
-  model: "openai/gpt-5.1",
+  model: "openai/gpt-5.2",
   temperature: 0.1,
   reasoningEffort: "medium",
   textVerbosity: "high",
