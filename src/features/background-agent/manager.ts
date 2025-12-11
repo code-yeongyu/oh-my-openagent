@@ -1,0 +1,281 @@
+import type { PluginInput } from "@opencode-ai/plugin"
+import type {
+  BackgroundTask,
+  BackgroundTaskStatus,
+  LaunchInput,
+} from "./types"
+
+type OpencodeClient = PluginInput["client"]
+
+interface SessionInfo {
+  id?: string
+  parentID?: string
+  status?: string
+}
+
+interface MessagePartInfo {
+  sessionID?: string
+  type?: string
+  tool?: string
+}
+
+interface EventProperties {
+  info?: SessionInfo
+  sessionID?: string
+  [key: string]: unknown
+}
+
+interface Event {
+  type: string
+  properties?: EventProperties
+}
+
+export class BackgroundManager {
+  private tasks: Map<string, BackgroundTask>
+  private notifications: Map<string, BackgroundTask[]>
+  private client: OpencodeClient
+  private storePath: string
+  private persistTimer?: Timer
+
+  constructor(client: OpencodeClient, storePath: string) {
+    this.tasks = new Map()
+    this.notifications = new Map()
+    this.client = client
+    this.storePath = storePath
+  }
+
+  async launch(input: LaunchInput): Promise<BackgroundTask> {
+    const createResult = await this.client.session.create({
+      body: {
+        parentID: input.parentSessionID,
+        title: `Background: ${input.description}`,
+      },
+    })
+
+    if (createResult.error) {
+      throw new Error(`Failed to create background session: ${createResult.error}`)
+    }
+
+    const sessionID = createResult.data.id
+
+    const task: BackgroundTask = {
+      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+      sessionID,
+      parentSessionID: input.parentSessionID,
+      parentMessageID: input.parentMessageID,
+      description: input.description,
+      agent: input.agent,
+      status: "running",
+      startedAt: new Date(),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+      },
+    }
+
+    this.tasks.set(task.id, task)
+    this.persist()
+
+    this.client.session.promptAsync({
+      path: { id: sessionID },
+      body: {
+        agent: input.agent,
+        parts: [{ type: "text", text: input.prompt }],
+      },
+    }).catch((error) => {
+      const existingTask = this.findBySession(sessionID)
+      if (existingTask) {
+        existingTask.status = "error"
+        existingTask.error = String(error)
+        existingTask.completedAt = new Date()
+        this.persist()
+      }
+    })
+
+    return task
+  }
+
+  getTask(id: string): BackgroundTask | undefined {
+    return this.tasks.get(id)
+  }
+
+  getTasksByParentSession(sessionID: string): BackgroundTask[] {
+    const result: BackgroundTask[] = []
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionID === sessionID) {
+        result.push(task)
+      }
+    }
+    return result
+  }
+
+  findBySession(sessionID: string): BackgroundTask | undefined {
+    for (const task of this.tasks.values()) {
+      if (task.sessionID === sessionID) {
+        return task
+      }
+    }
+    return undefined
+  }
+
+  handleEvent(event: Event): void {
+    const props = event.properties
+
+    if (event.type === "message.part.updated") {
+      const partInfo = props as unknown as MessagePartInfo
+      const sessionID = partInfo?.sessionID
+      if (!sessionID) return
+
+      const task = this.findBySession(sessionID)
+      if (!task) return
+
+      if (partInfo?.type === "tool" || partInfo?.tool) {
+        if (!task.progress) {
+          task.progress = {
+            toolCalls: 0,
+            lastUpdate: new Date(),
+          }
+        }
+        task.progress.toolCalls += 1
+        task.progress.lastTool = partInfo.tool
+        task.progress.lastUpdate = new Date()
+        this.persist()
+      }
+    }
+
+    if (event.type === "session.updated") {
+      const info = props?.info as SessionInfo | undefined
+      const sessionID = info?.id
+      const status = info?.status
+
+      if (!sessionID) return
+
+      const task = this.findBySession(sessionID)
+      if (!task) return
+
+      if (status === "idle" && task.status === "running") {
+        task.status = "completed"
+        task.completedAt = new Date()
+        this.markForNotification(task)
+        this.persist()
+      }
+    }
+
+    if (event.type === "session.deleted") {
+      const info = props?.info as SessionInfo | undefined
+      const sessionID = info?.id
+
+      if (!sessionID) return
+
+      const task = this.findBySession(sessionID)
+      if (!task) return
+
+      if (task.status === "running") {
+        task.status = "cancelled"
+        task.completedAt = new Date()
+        task.error = "Session deleted (cascade delete from parent)"
+      }
+
+      this.tasks.delete(task.id)
+      this.persist()
+
+      this.clearNotificationsForTask(task.id)
+    }
+  }
+
+  markForNotification(task: BackgroundTask): void {
+    const queue = this.notifications.get(task.parentSessionID) ?? []
+    queue.push(task)
+    this.notifications.set(task.parentSessionID, queue)
+  }
+
+  getPendingNotifications(sessionID: string): BackgroundTask[] {
+    return this.notifications.get(sessionID) ?? []
+  }
+
+  clearNotifications(sessionID: string): void {
+    this.notifications.delete(sessionID)
+  }
+
+  private clearNotificationsForTask(taskId: string): void {
+    for (const [sessionID, tasks] of this.notifications.entries()) {
+      const filtered = tasks.filter((t) => t.id !== taskId)
+      if (filtered.length === 0) {
+        this.notifications.delete(sessionID)
+      } else {
+        this.notifications.set(sessionID, filtered)
+      }
+    }
+  }
+
+  async persist(): Promise<void> {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+    }
+
+    this.persistTimer = setTimeout(async () => {
+      try {
+        const data = Array.from(this.tasks.values())
+        const serialized = data.map((task) => ({
+          ...task,
+          startedAt: task.startedAt.toISOString(),
+          completedAt: task.completedAt?.toISOString(),
+          progress: task.progress
+            ? {
+                ...task.progress,
+                lastUpdate: task.progress.lastUpdate.toISOString(),
+              }
+            : undefined,
+        }))
+        await Bun.write(this.storePath, JSON.stringify(serialized, null, 2))
+      } catch {
+        void 0
+      }
+    }, 500)
+  }
+
+  async restore(): Promise<void> {
+    try {
+      const file = Bun.file(this.storePath)
+      const exists = await file.exists()
+      if (!exists) return
+
+      const content = await file.text()
+      const data = JSON.parse(content) as Array<{
+        id: string
+        sessionID: string
+        parentSessionID: string
+        parentMessageID: string
+        description: string
+        agent: string
+        status: BackgroundTaskStatus
+        startedAt: string
+        completedAt?: string
+        result?: string
+        error?: string
+        progress?: {
+          toolCalls: number
+          lastTool?: string
+          lastUpdate: string
+        }
+      }>
+
+      for (const item of data) {
+        const task: BackgroundTask = {
+          ...item,
+          startedAt: new Date(item.startedAt),
+          completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
+          progress: item.progress
+            ? {
+                ...item.progress,
+                lastUpdate: new Date(item.progress.lastUpdate),
+              }
+            : undefined,
+        }
+        this.tasks.set(task.id, task)
+      }
+    } catch {
+      void 0
+    }
+  }
+}
