@@ -154,12 +154,8 @@ export function findMessagesWithThinkingBlocks(sessionID: string): string[] {
   const messages = readMessages(sessionID)
   const result: string[] = []
 
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
+  for (const msg of messages) {
     if (msg.role !== "assistant") continue
-
-    const isLastMessage = i === messages.length - 1
-    if (isLastMessage) continue
 
     const parts = readParts(msg.id)
     const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
@@ -179,8 +175,8 @@ export function findMessagesWithOrphanThinking(sessionID: string): string[] {
     const msg = messages[i]
     if (msg.role !== "assistant") continue
 
-    const isLastMessage = i === messages.length - 1
-    if (isLastMessage) continue
+    // NOTE: Removed isLastMessage skip - recovery needs to fix last message too
+    // when "thinking must start with" errors occur on final assistant message
 
     const parts = readParts(msg.id)
     if (parts.length === 0) continue
@@ -188,10 +184,11 @@ export function findMessagesWithOrphanThinking(sessionID: string): string[] {
     const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id))
     const firstPart = sortedParts[0]
 
-    const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
     const firstIsThinking = THINKING_TYPES.has(firstPart.type)
 
-    if (hasThinking && !firstIsThinking) {
+    // NOTE: Changed condition - if first part is not thinking, it's orphan
+    // regardless of whether thinking blocks exist elsewhere in the message
+    if (!firstIsThinking) {
       result.push(msg.id)
     }
   }
@@ -245,4 +242,26 @@ export function stripThinkingParts(messageID: string): boolean {
   }
 
   return anyRemoved
+}
+
+export function findMessageByIndexNeedingThinking(sessionID: string, targetIndex: number): string | null {
+  const messages = readMessages(sessionID)
+
+  if (targetIndex < 0 || targetIndex >= messages.length) return null
+
+  const targetMsg = messages[targetIndex]
+  if (targetMsg.role !== "assistant") return null
+
+  const parts = readParts(targetMsg.id)
+  if (parts.length === 0) return null
+
+  const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id))
+  const firstPart = sortedParts[0]
+  const firstIsThinking = THINKING_TYPES.has(firstPart.type)
+
+  if (!firstIsThinking) {
+    return targetMsg.id
+  }
+
+  return null
 }

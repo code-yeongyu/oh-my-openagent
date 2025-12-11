@@ -3,6 +3,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import {
   findEmptyMessages,
   findEmptyMessageByIndex,
+  findMessageByIndexNeedingThinking,
   findMessagesWithOrphanThinking,
   findMessagesWithThinkingBlocks,
   injectTextPart,
@@ -70,7 +71,10 @@ function detectErrorType(error: unknown): RecoveryErrorType {
 
   if (
     message.includes("thinking") &&
-    (message.includes("first block") || message.includes("must start with") || message.includes("preceeding"))
+    (message.includes("first block") ||
+      message.includes("must start with") ||
+      message.includes("preceeding") ||
+      (message.includes("expected") && message.includes("found")))
   ) {
     return "thinking_block_order"
   }
@@ -125,8 +129,17 @@ async function recoverThinkingBlockOrder(
   _client: Client,
   sessionID: string,
   _failedAssistantMsg: MessageData,
-  _directory: string
+  _directory: string,
+  error: unknown
 ): Promise<boolean> {
+  const targetIndex = extractMessageIndex(error)
+  if (targetIndex !== null) {
+    const targetMessageID = findMessageByIndexNeedingThinking(sessionID, targetIndex)
+    if (targetMessageID) {
+      return prependThinkingPart(sessionID, targetMessageID)
+    }
+  }
+
   const orphanMessages = findMessagesWithOrphanThinking(sessionID)
 
   if (orphanMessages.length === 0) {
@@ -275,7 +288,7 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
       if (errorType === "tool_result_missing") {
         success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
       } else if (errorType === "thinking_block_order") {
-        success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory)
+        success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
       } else if (errorType === "thinking_disabled_violation") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
       } else if (errorType === "empty_content_message") {
