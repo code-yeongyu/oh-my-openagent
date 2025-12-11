@@ -7,12 +7,6 @@ import { log } from "../../shared/logger"
 
 type OpencodeClient = PluginInput["client"]
 
-interface SessionInfo {
-  id?: string
-  parentID?: string
-  status?: string
-}
-
 interface MessagePartInfo {
   sessionID?: string
   type?: string
@@ -20,8 +14,8 @@ interface MessagePartInfo {
 }
 
 interface EventProperties {
-  info?: SessionInfo
   sessionID?: string
+  info?: { id?: string }
   [key: string]: unknown
 }
 
@@ -73,6 +67,8 @@ export class BackgroundManager {
 
     this.tasks.set(task.id, task)
     this.startPolling()
+
+    log("[background-agent] Launching task:", { taskId: task.id, sessionID })
 
     this.client.session.promptAsync({
       path: { id: sessionID },
@@ -141,24 +137,22 @@ export class BackgroundManager {
       }
     }
 
-    if (event.type === "session.updated") {
-      const info = props?.info as SessionInfo | undefined
-      if (!info || typeof info.id !== "string") return
-      const sessionID = info.id
-      const status = info?.status
+    if (event.type === "session.idle") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
 
       const task = this.findBySession(sessionID)
-      if (!task) return
+      if (!task || task.status !== "running") return
 
-      if (status === "idle" && task.status === "running") {
-        task.status = "completed"
-        task.completedAt = new Date()
-        this.markForNotification(task)
-      }
+      task.status = "completed"
+      task.completedAt = new Date()
+      this.markForNotification(task)
+      this.notifyParentSession(task)
+      log("[background-agent] Task completed via session.idle event:", task.id)
     }
 
     if (event.type === "session.deleted") {
-      const info = props?.info as SessionInfo | undefined
+      const info = props?.info
       if (!info || typeof info.id !== "string") return
       const sessionID = info.id
 
@@ -168,7 +162,7 @@ export class BackgroundManager {
       if (task.status === "running") {
         task.status = "cancelled"
         task.completedAt = new Date()
-        task.error = "Session deleted (cascade delete from parent)"
+        task.error = "Session deleted"
       }
 
       this.tasks.delete(task.id)
@@ -275,9 +269,7 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
         const sessionStatus = allStatuses[task.sessionID]
         
         if (!sessionStatus) {
-          task.status = "error"
-          task.error = "Session not found"
-          task.completedAt = new Date()
+          log("[background-agent] Session not found in status:", task.sessionID)
           continue
         }
 
@@ -286,7 +278,7 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
           task.completedAt = new Date()
           this.markForNotification(task)
           this.notifyParentSession(task)
-          log("[background-agent] Task completed, notifying parent:", task.id)
+          log("[background-agent] Task completed via polling:", task.id)
           continue
         }
 
@@ -323,8 +315,8 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
           task.progress.lastTool = lastTool
           task.progress.lastUpdate = new Date()
         }
-      } catch {
-        void 0
+      } catch (error) {
+        log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }
     }
 
