@@ -22,6 +22,8 @@ import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 import { skill } from "./skill"
 
+export { createOmoTask } from "./omo-task"
+
 export const builtinTools = {
   lsp_hover,
   lsp_goto_definition,

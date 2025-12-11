@@ -36,7 +36,7 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools } from "./tools";
+import { builtinTools, createOmoTask } from "./tools";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import { log } from "./shared/logger";
@@ -162,8 +162,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   updateTerminalTitle({ sessionId: "main" });
 
+  const omoTask = createOmoTask(ctx);
+
   return {
-    tool: builtinTools,
+    tool: {
+      ...builtinTools,
+      omo_task: omoTask,
+    },
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output)
@@ -187,6 +192,19 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       config.tools = {
         ...config.tools,
       };
+
+      if (config.agent.explore) {
+        config.agent.explore.tools = {
+          ...config.agent.explore.tools,
+          omo_task: false,
+        };
+      }
+      if (config.agent.librarian) {
+        config.agent.librarian.tools = {
+          ...config.agent.librarian.tools,
+          omo_task: false,
+        };
+      }
 
       const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
         ? await loadMcpConfigs()
