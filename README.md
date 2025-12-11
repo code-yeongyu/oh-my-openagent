@@ -164,6 +164,20 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
   ```
   When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
 - **Directory README.md Injector**: Automatically injects `README.md` contents when reading files. Works identically to the AGENTS.md Injector, searching upward from the file's directory to project root. Provides project documentation context to the LLM agent. Each directory's README is injected only once per session.
+- **Rules Injector**: Automatically injects rules from `.claude/rules/` directory when reading files.
+  - Searches upward from the file's directory to project root, plus `~/.claude/rules/` (user).
+  - Supports `.md` and `.mdc` files.
+  - Frontmatter-based matching with `globs` field (glob patterns).
+  - `alwaysApply: true` option for rules that should always apply.
+  - Example rule file structure:
+    ```markdown
+    ---
+    globs: ["*.ts", "src/**/*.js"]
+    description: "TypeScript/JavaScript coding rules"
+    ---
+    - Use PascalCase for interface names
+    - Use camelCase for function names
+    ```
 - **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
 - **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
 - **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.

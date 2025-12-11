@@ -167,6 +167,20 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
   ```
   `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
 - **Directory README.md Injector**: 파일을 읽을 때 `README.md` 내용을 자동으로 주입합니다. AGENTS.md Injector와 동일하게 동작하며, 파일 디렉토리부터 프로젝트 루트까지 탐색합니다. LLM 에이전트에게 프로젝트 문서 컨텍스트를 제공합니다. 각 디렉토리의 README는 세션당 한 번만 주입됩니다.
+- **Rules Injector**: 파일을 읽을 때 `.claude/rules/` 디렉토리의 규칙을 자동으로 주입합니다.
+  - 파일 디렉토리부터 프로젝트 루트까지 상향 탐색하며, `~/.claude/rules/` (사용자) 경로도 포함합니다.
+  - `.md` 및 `.mdc` 파일을 지원합니다.
+  - Frontmatter의 `globs` 필드(glob 패턴)를 기반으로 매칭합니다.
+  - 항상 적용되어야 하는 규칙을 위한 `alwaysApply: true` 옵션을 지원합니다.
+  - 규칙 파일 구조 예시:
+    ```markdown
+    ---
+    globs: ["*.ts", "src/**/*.js"]
+    description: "TypeScript/JavaScript coding rules"
+    ---
+    - Use PascalCase for interface names
+    - Use camelCase for function names
+    ```
 - **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
 - **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
 - **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
