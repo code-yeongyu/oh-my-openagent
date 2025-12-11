@@ -237,7 +237,7 @@ export class BackgroundManager {
 
 Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
 
-    this.client.session.prompt({
+    this.client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
         parts: [{ type: "text", text: message }],
@@ -278,10 +278,13 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
         })
 
         if (infoResult.error) {
-          task.status = "error"
-          task.error = "Session not found"
-          task.completedAt = new Date()
-          this.persist()
+          const errorStr = String(infoResult.error)
+          if (errorStr.includes("404") || errorStr.includes("not found")) {
+            task.status = "error"
+            task.error = "Session not found"
+            task.completedAt = new Date()
+            this.persist()
+          }
           continue
         }
 
@@ -322,11 +325,12 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
             }
           }
 
-          if (task.progress) {
-            task.progress.toolCalls = toolCalls
-            task.progress.lastTool = lastTool
-            task.progress.lastUpdate = new Date()
+          if (!task.progress) {
+            task.progress = { toolCalls: 0, lastUpdate: new Date() }
           }
+          task.progress.toolCalls = toolCalls
+          task.progress.lastTool = lastTool
+          task.progress.lastUpdate = new Date()
         }
       } catch {
         void 0
