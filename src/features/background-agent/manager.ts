@@ -214,26 +214,19 @@ export class BackgroundManager {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
     const toolCalls = task.progress?.toolCalls ?? 0
     
-    const message = `✅ **Background task completed!**
+    const toastMessage = `Background task completed: ${task.description} (${duration}, ${toolCalls} tools). Use background_result with taskId="${task.id}"`
 
-**Task ID:** ${task.id}
-**Description:** ${task.description}
-**Duration:** ${duration}
-**Tool calls:** ${toolCalls}
-
-Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
-
-    log("[background-agent] Notifying parent session:", task.parentSessionID)
+    log("[background-agent] Notifying via toast:", task.id)
     
-    this.client.session.promptAsync({
-      path: { id: task.parentSessionID },
+    this.client.tui.showToast({
       body: {
-        parts: [{ type: "text", text: message }],
+        message: toastMessage,
+        variant: "success",
       },
     }).then(() => {
-      log("[background-agent] Parent session notified successfully")
+      log("[background-agent] Toast notification sent successfully")
     }).catch((error) => {
-      log("[background-agent] Failed to notify parent session:", error)
+      log("[background-agent] Failed to send toast:", error)
     })
   }
 
