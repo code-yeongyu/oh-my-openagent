@@ -122,6 +122,7 @@ export class BackgroundManager {
     const props = event.properties
 
     if (event.type === "message.part.updated") {
+      if (!props || typeof props !== "object" || !("sessionID" in props)) return
       const partInfo = props as unknown as MessagePartInfo
       const sessionID = partInfo?.sessionID
       if (!sessionID) return
@@ -145,10 +146,9 @@ export class BackgroundManager {
 
     if (event.type === "session.updated") {
       const info = props?.info as SessionInfo | undefined
-      const sessionID = info?.id
+      if (!info || typeof info.id !== "string") return
+      const sessionID = info.id
       const status = info?.status
-
-      if (!sessionID) return
 
       const task = this.findBySession(sessionID)
       if (!task) return
@@ -163,9 +163,8 @@ export class BackgroundManager {
 
     if (event.type === "session.deleted") {
       const info = props?.info as SessionInfo | undefined
-      const sessionID = info?.id
-
-      if (!sessionID) return
+      if (!info || typeof info.id !== "string") return
+      const sessionID = info.id
 
       const task = this.findBySession(sessionID)
       if (!task) return
@@ -208,29 +207,27 @@ export class BackgroundManager {
     }
   }
 
-  async persist(): Promise<void> {
+  persist(): void {
     if (this.persistTimer) {
       clearTimeout(this.persistTimer)
     }
 
-    this.persistTimer = setTimeout(async () => {
-      try {
-        const data = Array.from(this.tasks.values())
-        const serialized = data.map((task) => ({
-          ...task,
-          startedAt: task.startedAt.toISOString(),
-          completedAt: task.completedAt?.toISOString(),
-          progress: task.progress
-            ? {
-                ...task.progress,
-                lastUpdate: task.progress.lastUpdate.toISOString(),
-              }
-            : undefined,
-        }))
-        await Bun.write(this.storePath, JSON.stringify(serialized, null, 2))
-      } catch {
+    this.persistTimer = setTimeout(() => {
+      const data = Array.from(this.tasks.values())
+      const serialized = data.map((task) => ({
+        ...task,
+        startedAt: task.startedAt.toISOString(),
+        completedAt: task.completedAt?.toISOString(),
+        progress: task.progress
+          ? {
+              ...task.progress,
+              lastUpdate: task.progress.lastUpdate.toISOString(),
+            }
+          : undefined,
+      }))
+      Bun.write(this.storePath, JSON.stringify(serialized, null, 2)).catch(() => {
         void 0
-      }
+      })
     }, 500)
   }
 

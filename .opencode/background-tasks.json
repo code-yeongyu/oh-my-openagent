@@ -1,0 +1,13 @@
+[
+  {
+    "id": "bg_wzsdt60b",
+    "sessionID": "ses_4f3e89f0dffeooeXNVx5QCifse",
+    "parentSessionID": "ses_4f3e8d141ffeyfJ1taVVOdQTzx",
+    "parentMessageID": "msg_b0c172ee1001w2B52VSZrP08PJ",
+    "description": "Explore opencode in codebase",
+    "agent": "explore",
+    "status": "completed",
+    "startedAt": 1765434417395,
+    "completedAt": 1765434456778
+  }
+]

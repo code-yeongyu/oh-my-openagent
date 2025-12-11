@@ -1,5 +1,4 @@
 export type BackgroundTaskStatus =
-  | "pending"
   | "running"
   | "completed"
   | "error"

@@ -207,7 +207,7 @@ Only running tasks can be cancelled.`
         task.status = "cancelled"
         task.completedAt = new Date()
 
-        await manager.persist()
+        manager.persist()
 
         return `✅ Task cancelled successfully
 
