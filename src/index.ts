@@ -43,6 +43,20 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
+/**
+ * Returns the user-level config directory based on the OS.
+ * - Linux/macOS: XDG_CONFIG_HOME or ~/.config
+ * - Windows: %APPDATA%
+ */
+function getUserConfigDir(): string {
+  if (process.platform === "win32") {
+    return process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+  }
+
+  // Linux, macOS, and other Unix-like systems: respect XDG_CONFIG_HOME
+  return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+}
+
 function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
@@ -64,53 +78,61 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
   return null;
 }
 
-function mergeConfigs(base: OhMyOpenCodeConfig, override: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+function mergeConfigs(
+  base: OhMyOpenCodeConfig,
+  override: OhMyOpenCodeConfig
+): OhMyOpenCodeConfig {
   return {
     ...base,
     ...override,
-    agents: override.agents !== undefined
-      ? { ...(base.agents ?? {}), ...override.agents }
-      : base.agents,
+    agents:
+      override.agents !== undefined
+        ? { ...(base.agents ?? {}), ...override.agents }
+        : base.agents,
     disabled_agents: [
-      ...new Set([...(base.disabled_agents ?? []), ...(override.disabled_agents ?? [])])
+      ...new Set([
+        ...(base.disabled_agents ?? []),
+        ...(override.disabled_agents ?? []),
+      ]),
     ],
     disabled_mcps: [
-      ...new Set([...(base.disabled_mcps ?? []), ...(override.disabled_mcps ?? [])])
+      ...new Set([
+        ...(base.disabled_mcps ?? []),
+        ...(override.disabled_mcps ?? []),
+      ]),
     ],
   };
 }
 
 function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
-  // User-level config paths
-  const userConfigPaths = [
-    path.join(os.homedir(), ".config", "opencode", "oh-my-opencode.json"),
-  ];
+  // User-level config path (OS-specific)
+  const userConfigPath = path.join(
+    getUserConfigDir(),
+    "opencode",
+    "oh-my-opencode.json"
+  );
 
-  // Project-level config paths (higher precedence)
-  const projectConfigPaths = [
-    path.join(directory, ".opencode", "oh-my-opencode.json"),
-  ];
+  // Project-level config path
+  const projectConfigPath = path.join(
+    directory,
+    ".opencode",
+    "oh-my-opencode.json"
+  );
 
-  // Load user config first
-  let config: OhMyOpenCodeConfig = {};
-  for (const configPath of userConfigPaths) {
-    const userConfig = loadConfigFromPath(configPath);
-    if (userConfig) {
-      config = userConfig;
-      break;
-    }
-  }
+  // Load user config first (base)
+  let config: OhMyOpenCodeConfig = loadConfigFromPath(userConfigPath) ?? {};
 
   // Override with project config
-  for (const configPath of projectConfigPaths) {
-    const projectConfig = loadConfigFromPath(configPath);
-    if (projectConfig) {
-      config = mergeConfigs(config, projectConfig);
-      break;
-    }
+  const projectConfig = loadConfigFromPath(projectConfigPath);
+  if (projectConfig) {
+    config = mergeConfigs(config, projectConfig);
   }
 
-  log("Final merged config", { agents: config.agents, disabled_agents: config.disabled_agents, disabled_mcps: config.disabled_mcps });
+  log("Final merged config", {
+    agents: config.agents,
+    disabled_agents: config.disabled_agents,
+    disabled_mcps: config.disabled_mcps,
+  });
   return config;
 }
 
