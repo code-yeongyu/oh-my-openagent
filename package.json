@@ -46,10 +46,12 @@
     "@ast-grep/napi": "^0.40.0",
     "@code-yeongyu/comment-checker": "^0.5.0",
     "@opencode-ai/plugin": "^1.0.7",
+    "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
     "oh-my-opencode": "^0.1.30",
     "typescript": "^5.7.3"

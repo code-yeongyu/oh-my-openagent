@@ -12,6 +12,7 @@ import {
   createThinkModeHook,
   createClaudeCodeHooksHook,
   createAnthropicAutoCompactHook,
+  createRulesInjectorHook,
 } from "./hooks";
 import {
   loadUserCommands,
@@ -157,6 +158,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
   const anthropicAutoCompact = createAnthropicAutoCompactHook(ctx);
+  const rulesInjector = createRulesInjectorHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -220,6 +222,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);
       await directoryReadmeInjector.event(input);
+      await rulesInjector.event(input);
       await thinkMode.event(input);
       await anthropicAutoCompact.event(input);
 
@@ -339,6 +342,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await commentChecker["tool.execute.after"](input, output);
       await directoryAgentsInjector["tool.execute.after"](input, output);
       await directoryReadmeInjector["tool.execute.after"](input, output);
+      await rulesInjector["tool.execute.after"](input, output);
       await emptyTaskResponseDetector["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {

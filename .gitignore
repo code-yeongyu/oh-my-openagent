@@ -25,3 +25,5 @@ yarn.lock
 # Environment
 .env
 .env.local
+test-injection/
+notepad.md
