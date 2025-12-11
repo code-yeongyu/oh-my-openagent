@@ -207,8 +207,6 @@ Only running tasks can be cancelled.`
         task.status = "cancelled"
         task.completedAt = new Date()
 
-        manager.persist()
-
         return `✅ Task cancelled successfully
 
 Task ID: ${task.id}

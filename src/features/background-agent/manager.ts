@@ -1,9 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type {
   BackgroundTask,
-  BackgroundTaskStatus,
   LaunchInput,
 } from "./types"
+import { log } from "../../shared/logger"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -34,15 +34,12 @@ export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
   private client: OpencodeClient
-  private storePath: string
-  private persistTimer?: Timer
   private pollingInterval?: Timer
 
-  constructor(client: OpencodeClient, storePath: string) {
+  constructor(client: OpencodeClient) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.client = client
-    this.storePath = storePath
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -75,7 +72,6 @@ export class BackgroundManager {
     }
 
     this.tasks.set(task.id, task)
-    this.persist()
     this.startPolling()
 
     this.client.session.promptAsync({
@@ -85,12 +81,12 @@ export class BackgroundManager {
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
+      log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
         existingTask.error = String(error)
         existingTask.completedAt = new Date()
-        this.persist()
       }
     })
 
@@ -142,7 +138,6 @@ export class BackgroundManager {
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
         task.progress.lastUpdate = new Date()
-        this.persist()
       }
     }
 
@@ -159,7 +154,6 @@ export class BackgroundManager {
         task.status = "completed"
         task.completedAt = new Date()
         this.markForNotification(task)
-        this.persist()
       }
     }
 
@@ -178,8 +172,6 @@ export class BackgroundManager {
       }
 
       this.tasks.delete(task.id)
-      this.persist()
-
       this.clearNotificationsForTask(task.id)
     }
   }
@@ -237,13 +229,17 @@ export class BackgroundManager {
 
 Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
 
+    log("[background-agent] Notifying parent session:", task.parentSessionID)
+    
     this.client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
         parts: [{ type: "text", text: message }],
       },
-    }).catch(() => {
-      void 0
+    }).then(() => {
+      log("[background-agent] Parent session notified successfully")
+    }).catch((error) => {
+      log("[background-agent] Failed to notify parent session:", error)
     })
   }
 
@@ -283,7 +279,6 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
             task.status = "error"
             task.error = "Session not found"
             task.completedAt = new Date()
-            this.persist()
           }
           continue
         }
@@ -294,7 +289,6 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
           task.status = "completed"
           task.completedAt = new Date()
           this.markForNotification(task)
-          this.persist()
           this.notifyParentSession(task)
           continue
         }
@@ -339,79 +333,6 @@ Use \`background_result\` tool with taskId="${task.id}" to retrieve the full res
 
     if (!this.hasRunningTasks()) {
       this.stopPolling()
-    }
-  }
-
-  persist(): void {
-    if (this.persistTimer) {
-      clearTimeout(this.persistTimer)
-    }
-
-    this.persistTimer = setTimeout(() => {
-      const data = Array.from(this.tasks.values())
-      const serialized = data.map((task) => ({
-        ...task,
-        startedAt: task.startedAt.toISOString(),
-        completedAt: task.completedAt?.toISOString(),
-        progress: task.progress
-          ? {
-              ...task.progress,
-              lastUpdate: task.progress.lastUpdate.toISOString(),
-            }
-          : undefined,
-      }))
-      Bun.write(this.storePath, JSON.stringify(serialized, null, 2)).catch(() => {
-        void 0
-      })
-    }, 500)
-  }
-
-  async restore(): Promise<void> {
-    try {
-      const file = Bun.file(this.storePath)
-      const exists = await file.exists()
-      if (!exists) return
-
-      const content = await file.text()
-      const data = JSON.parse(content) as Array<{
-        id: string
-        sessionID: string
-        parentSessionID: string
-        parentMessageID: string
-        description: string
-        agent: string
-        status: BackgroundTaskStatus
-        startedAt: string
-        completedAt?: string
-        result?: string
-        error?: string
-        progress?: {
-          toolCalls: number
-          lastTool?: string
-          lastUpdate: string
-        }
-      }>
-
-      for (const item of data) {
-        const task: BackgroundTask = {
-          ...item,
-          startedAt: new Date(item.startedAt),
-          completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
-          progress: item.progress
-            ? {
-                ...item.progress,
-                lastUpdate: new Date(item.progress.lastUpdate),
-              }
-            : undefined,
-        }
-        this.tasks.set(task.id, task)
-      }
-
-      if (this.hasRunningTasks()) {
-        this.startPolling()
-      }
-    } catch {
-      void 0
     }
   }
 }

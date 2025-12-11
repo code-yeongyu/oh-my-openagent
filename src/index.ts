@@ -164,11 +164,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   updateTerminalTitle({ sessionId: "main" });
 
-  const backgroundManager = new BackgroundManager(
-    ctx.client,
-    path.join(ctx.directory, ".opencode", "background-tasks.json")
-  );
-  await backgroundManager.restore();
+  const backgroundManager = new BackgroundManager(ctx.client);
 
   const backgroundNotificationHook = createBackgroundNotificationHook(backgroundManager);
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
