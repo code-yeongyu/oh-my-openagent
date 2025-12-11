@@ -224,6 +224,43 @@ export class BackgroundManager {
     }
   }
 
+  private notifyParentSession(task: BackgroundTask): void {
+    const duration = this.formatDuration(task.startedAt, task.completedAt)
+    const toolCalls = task.progress?.toolCalls ?? 0
+    
+    const message = `✅ **Background task completed!**
+
+**Task ID:** ${task.id}
+**Description:** ${task.description}
+**Duration:** ${duration}
+**Tool calls:** ${toolCalls}
+
+Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
+
+    this.client.session.prompt({
+      path: { id: task.parentSessionID },
+      body: {
+        parts: [{ type: "text", text: message }],
+      },
+    }).catch(() => {
+      void 0
+    })
+  }
+
+  private formatDuration(start: Date, end?: Date): string {
+    const duration = (end ?? new Date()).getTime() - start.getTime()
+    const seconds = Math.floor(duration / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`
+    }
+    return `${seconds}s`
+  }
+
   private hasRunningTasks(): boolean {
     for (const task of this.tasks.values()) {
       if (task.status === "running") return true
@@ -255,6 +292,7 @@ export class BackgroundManager {
           task.completedAt = new Date()
           this.markForNotification(task)
           this.persist()
+          this.notifyParentSession(task)
           continue
         }
 
