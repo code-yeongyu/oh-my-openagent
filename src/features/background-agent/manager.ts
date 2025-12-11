@@ -36,6 +36,7 @@ export class BackgroundManager {
   private client: OpencodeClient
   private storePath: string
   private persistTimer?: Timer
+  private pollingInterval?: Timer
 
   constructor(client: OpencodeClient, storePath: string) {
     this.tasks = new Map()
@@ -75,6 +76,7 @@ export class BackgroundManager {
 
     this.tasks.set(task.id, task)
     this.persist()
+    this.startPolling()
 
     this.client.session.promptAsync({
       path: { id: sessionID },
@@ -207,6 +209,97 @@ export class BackgroundManager {
     }
   }
 
+  private startPolling(): void {
+    if (this.pollingInterval) return
+
+    this.pollingInterval = setInterval(() => {
+      this.pollRunningTasks()
+    }, 2000)
+  }
+
+  private stopPolling(): void {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = undefined
+    }
+  }
+
+  private hasRunningTasks(): boolean {
+    for (const task of this.tasks.values()) {
+      if (task.status === "running") return true
+    }
+    return false
+  }
+
+  private async pollRunningTasks(): Promise<void> {
+    for (const task of this.tasks.values()) {
+      if (task.status !== "running") continue
+
+      try {
+        const infoResult = await this.client.session.get({
+          path: { id: task.sessionID },
+        })
+
+        if (infoResult.error) {
+          task.status = "error"
+          task.error = "Session not found"
+          task.completedAt = new Date()
+          this.persist()
+          continue
+        }
+
+        const sessionInfo = infoResult.data as { status?: string }
+
+        if (sessionInfo.status === "idle") {
+          task.status = "completed"
+          task.completedAt = new Date()
+          this.markForNotification(task)
+          this.persist()
+          continue
+        }
+
+        const messagesResult = await this.client.session.messages({
+          path: { id: task.sessionID },
+        })
+
+        if (!messagesResult.error && messagesResult.data) {
+          const messages = messagesResult.data as Array<{
+            info?: { role?: string }
+            parts?: Array<{ type?: string; tool?: string; name?: string }>
+          }>
+          const assistantMsgs = messages.filter(
+            (m) => m.info?.role === "assistant"
+          )
+
+          let toolCalls = 0
+          let lastTool: string | undefined
+
+          for (const msg of assistantMsgs) {
+            const parts = msg.parts ?? []
+            for (const part of parts) {
+              if (part.type === "tool_use" || part.tool) {
+                toolCalls++
+                lastTool = part.tool || part.name || "unknown"
+              }
+            }
+          }
+
+          if (task.progress) {
+            task.progress.toolCalls = toolCalls
+            task.progress.lastTool = lastTool
+            task.progress.lastUpdate = new Date()
+          }
+        }
+      } catch {
+        void 0
+      }
+    }
+
+    if (!this.hasRunningTasks()) {
+      this.stopPolling()
+    }
+  }
+
   persist(): void {
     if (this.persistTimer) {
       clearTimeout(this.persistTimer)
@@ -270,6 +363,10 @@ export class BackgroundManager {
             : undefined,
         }
         this.tasks.set(task.id, task)
+      }
+
+      if (this.hasRunningTasks()) {
+        this.startPolling()
       }
     } catch {
       void 0
