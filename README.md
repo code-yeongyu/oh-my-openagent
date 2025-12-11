@@ -200,6 +200,12 @@ Each agent is automatically invoked by the main agent, but you can also explicit
 
 Agent models, prompts, and permissions can be customized via `oh-my-opencode.json`. See [Configuration](#configuration) for details.
 
+#### Subagent Orchestration (omo_task)
+
+The `omo_task` tool allows agents (like `oracle`, `frontend-ui-ux-engineer`) to spawn `explore` or `librarian` as subagents to delegate specific tasks. This enables powerful workflows where an agent can "ask" another specialized agent to gather information before proceeding.
+
+> **Note**: To prevent infinite recursion, `explore` and `librarian` agents cannot use the `omo_task` tool themselves.
+
 ### Tools
 
 #### Built-in LSP Tools
