@@ -21,6 +21,15 @@ function getProjectConfigPath(): string {
   return join(process.cwd(), ".opencode", "opencode-cc-plugin.json")
 }
 
+const DEFAULT_DISABLED_HOOKS: DisabledHooksConfig = {
+  PostToolUse: [
+    "inject_rules\\.py$",
+    "inject_readme\\.py$",
+    "inject_knowledge\\.py$",
+    "remind.*rules.*\\.py$",
+  ],
+}
+
 async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | null> {
   if (!existsSync(path)) {
     return null
@@ -43,10 +52,10 @@ function mergeDisabledHooks(
   if (!base) return override
 
   return {
-    Stop: override.Stop ?? base.Stop,
-    PreToolUse: override.PreToolUse ?? base.PreToolUse,
-    PostToolUse: override.PostToolUse ?? base.PostToolUse,
-    UserPromptSubmit: override.UserPromptSubmit ?? base.UserPromptSubmit,
+    Stop: [...(base.Stop ?? []), ...(override.Stop ?? [])],
+    PreToolUse: [...(base.PreToolUse ?? []), ...(override.PreToolUse ?? [])],
+    PostToolUse: [...(base.PostToolUse ?? []), ...(override.PostToolUse ?? [])],
+    UserPromptSubmit: [...(base.UserPromptSubmit ?? []), ...(override.UserPromptSubmit ?? [])],
   }
 }
 
@@ -56,8 +65,11 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
 
   const merged: PluginExtendedConfig = {
     disabledHooks: mergeDisabledHooks(
-      userConfig?.disabledHooks,
-      projectConfig?.disabledHooks
+      DEFAULT_DISABLED_HOOKS,
+      mergeDisabledHooks(
+        userConfig?.disabledHooks,
+        projectConfig?.disabledHooks
+      )
     ),
   }
 
