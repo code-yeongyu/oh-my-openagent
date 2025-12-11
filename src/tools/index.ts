@@ -22,7 +22,28 @@ import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 import { skill } from "./skill"
 
+import {
+  createBackgroundTask,
+  createBackgroundStatus,
+  createBackgroundResult,
+  createBackgroundCancel,
+} from "./background-task"
+
+import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../features/background-agent"
+
+type OpencodeClient = PluginInput["client"]
+
 export { createOmoTask } from "./omo-task"
+
+export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
+  return {
+    background_task: createBackgroundTask(manager),
+    background_status: createBackgroundStatus(manager),
+    background_result: createBackgroundResult(manager, client),
+    background_cancel: createBackgroundCancel(manager, client),
+  }
+}
 
 export const builtinTools = {
   lsp_hover,

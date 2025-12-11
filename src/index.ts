@@ -13,6 +13,7 @@ import {
   createClaudeCodeHooksHook,
   createAnthropicAutoCompactHook,
   createRulesInjectorHook,
+  createBackgroundNotificationHook,
 } from "./hooks";
 import {
   loadUserCommands,
@@ -36,7 +37,8 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createOmoTask } from "./tools";
+import { builtinTools, createOmoTask, createBackgroundTools } from "./tools";
+import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import { log } from "./shared/logger";
@@ -162,16 +164,27 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   updateTerminalTitle({ sessionId: "main" });
 
+  const backgroundManager = new BackgroundManager(
+    ctx.client,
+    path.join(ctx.directory, ".opencode", "background-tasks.json")
+  );
+  await backgroundManager.restore();
+
+  const backgroundNotificationHook = createBackgroundNotificationHook(backgroundManager);
+  const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
+
   const omoTask = createOmoTask(ctx);
 
   return {
     tool: {
       ...builtinTools,
+      ...backgroundTools,
       omo_task: omoTask,
     },
 
     "chat.message": async (input, output) => {
-      await claudeCodeHooks["chat.message"]?.(input, output)
+      await claudeCodeHooks["chat.message"]?.(input, output);
+      await backgroundNotificationHook["chat.message"](input, output);
     },
 
     config: async (config) => {
@@ -197,12 +210,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         config.agent.explore.tools = {
           ...config.agent.explore.tools,
           omo_task: false,
+          background_task: false,
         };
       }
       if (config.agent.librarian) {
         config.agent.librarian.tools = {
           ...config.agent.librarian.tools,
           omo_task: false,
+          background_task: false,
         };
       }
 
@@ -236,6 +251,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     event: async (input) => {
       await claudeCodeHooks.event(input);
+      await backgroundNotificationHook.event(input);
       await todoContinuationEnforcer(input);
       await contextWindowMonitor.event(input);
       await directoryAgentsInjector.event(input);

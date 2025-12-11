@@ -15,7 +15,7 @@ interface ChatMessageInput {
 }
 
 interface ChatMessageOutput {
-  parts: Array<{ type: string; text: string }>
+  parts: Array<{ type: string; text?: string; [key: string]: unknown }>
   [key: string]: unknown
 }
 
