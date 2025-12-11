@@ -4,6 +4,7 @@ import type {
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
+import { getMainSessionID } from "../claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -215,45 +216,94 @@ export class BackgroundManager {
   private notifyParentSession(task: BackgroundTask): void {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
     const toolCalls = task.progress?.toolCalls ?? 0
-    
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} with ${toolCalls} tool calls. Use background_result tool with taskId="${task.id}" to retrieve the result.`
 
-    log("[background-agent] Sending async message to parent:", task.parentSessionID)
-    
+    log("[background-agent] notifyParentSession called for task:", task.id)
+
+    // 1. Toast 알림 (즉각적 피드백 - 항상 실행)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tuiClient = this.client as any
     if (tuiClient.tui?.showToast) {
       tuiClient.tui.showToast({
         body: {
           title: "Background Task Completed",
-          message: `Task "${task.description}" finished.`,
+          message: `Task "${task.description}" finished in ${duration}.`,
           variant: "success",
           duration: 5000,
         },
       }).catch(() => {})
     }
 
-    this.client.session.promptAsync({
-      path: { id: task.parentSessionID },
-      body: {
-        parts: [{ type: "text", text: message }],
-      },
-    }).then((result) => {
-      log("[background-agent] promptAsync result:", { error: result.error, response: result.response?.status })
-      
+    // 2. Main session 확인
+    const mainSessionID = getMainSessionID()
+    const isMainSession = task.parentSessionID === mainSessionID
+
+    if (!isMainSession) {
+      log("[background-agent] Parent is not main session, relying on pending queue")
+      return
+    }
+
+    // 3. Session status 확인 + 200ms debounce 후 prompt() 호출
+    this.schedulePromptToParent(task, duration, toolCalls)
+  }
+
+  private schedulePromptToParent(task: BackgroundTask, duration: string, toolCalls: number): void {
+    this.client.session.status().then((statusResult) => {
+      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+      const parentStatus = allStatuses[task.parentSessionID]
+
+      if (!parentStatus || parentStatus.type !== "idle") {
+        log("[background-agent] Parent session is busy, relying on pending queue")
+        return
+      }
+
+      // 4. 200ms debounce 후 prompt() 호출
       setTimeout(() => {
-        if (tuiClient.tui?.submitPrompt) {
-          log("[background-agent] Triggering submitPrompt to force TUI update")
-          tuiClient.tui.submitPrompt({
-            query: { directory: this.directory }
-          }).catch((err: unknown) => {
-            log("[background-agent] submitPrompt failed:", String(err))
-          })
-        }
-      }, 100)
+        this.sendPromptToParent(task, duration, toolCalls)
+      }, 200)
     }).catch((error) => {
-      log("[background-agent] promptAsync exception:", String(error))
+      log("[background-agent] Failed to check session status:", String(error))
     })
+  }
+
+  private sendPromptToParent(task: BackgroundTask, duration: string, toolCalls: number): void {
+    // Re-check status after delay (race condition 방지)
+    this.client.session.status().then((recheck) => {
+      const recheckStatuses = (recheck.data ?? {}) as Record<string, { type: string }>
+      const recheckStatus = recheckStatuses[task.parentSessionID]
+
+      if (!recheckStatus || recheckStatus.type !== "idle") {
+        log("[background-agent] Parent session no longer idle after delay, skipping prompt")
+        return
+      }
+
+      const message = this.buildNotificationMessage(task, duration, toolCalls)
+
+      this.client.session.prompt({
+        path: { id: task.parentSessionID },
+        body: {
+          parts: [{ type: "text", text: message }],
+        },
+        query: { directory: this.directory },
+      }).then(() => {
+        this.clearNotificationsForTask(task.id)
+        log("[background-agent] Successfully sent prompt to parent session")
+      }).catch((error) => {
+        // 실패해도 pending queue가 있으므로 다음 user 입력 시 전달됨
+        log("[background-agent] Failed to send prompt, relying on pending queue:", String(error))
+      })
+    }).catch((error) => {
+      log("[background-agent] Failed to recheck session status:", String(error))
+    })
+  }
+
+  private buildNotificationMessage(task: BackgroundTask, duration: string, toolCalls: number): string {
+    return `[BACKGROUND TASK COMPLETED]
+
+Task "${task.description}" has finished.
+Duration: ${duration}
+Tool calls: ${toolCalls}
+
+Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
   }
 
   private formatDuration(start: Date, end?: Date): string {
