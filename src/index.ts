@@ -41,33 +41,77 @@ import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import { log } from "./shared/logger";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
+
+function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
+  try {
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, "utf-8");
+      const rawConfig = JSON.parse(content);
+      const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+      if (!result.success) {
+        log(`Config validation error in ${configPath}:`, result.error.issues);
+        return null;
+      }
+
+      log(`Config loaded from ${configPath}`, { agents: result.data.agents });
+      return result.data;
+    }
+  } catch (err) {
+    log(`Error loading config from ${configPath}:`, err);
+  }
+  return null;
+}
+
+function mergeConfigs(base: OhMyOpenCodeConfig, override: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  return {
+    ...base,
+    ...override,
+    agents: override.agents !== undefined
+      ? { ...(base.agents ?? {}), ...override.agents }
+      : base.agents,
+    disabled_agents: [
+      ...new Set([...(base.disabled_agents ?? []), ...(override.disabled_agents ?? [])])
+    ],
+    disabled_mcps: [
+      ...new Set([...(base.disabled_mcps ?? []), ...(override.disabled_mcps ?? [])])
+    ],
+  };
+}
 
 function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
-  const configPaths = [
-    path.join(directory, "oh-my-opencode.json"),
-    path.join(directory, ".oh-my-opencode.json"),
+  // User-level config paths
+  const userConfigPaths = [
+    path.join(os.homedir(), ".config", "opencode", "oh-my-opencode.json"),
   ];
 
-  for (const configPath of configPaths) {
-    try {
-      if (fs.existsSync(configPath)) {
-        const content = fs.readFileSync(configPath, "utf-8");
-        const rawConfig = JSON.parse(content);
-        const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+  // Project-level config paths (higher precedence)
+  const projectConfigPaths = [
+    path.join(directory, ".opencode", "oh-my-opencode.json"),
+  ];
 
-        if (!result.success) {
-          log(`Config validation error in ${configPath}:`, result.error.issues);
-          return {};
-        }
-
-        return result.data;
-      }
-    } catch {
-      // Ignore parse errors, use defaults
+  // Load user config first
+  let config: OhMyOpenCodeConfig = {};
+  for (const configPath of userConfigPaths) {
+    const userConfig = loadConfigFromPath(configPath);
+    if (userConfig) {
+      config = userConfig;
+      break;
     }
   }
 
-  return {};
+  // Override with project config
+  for (const configPath of projectConfigPaths) {
+    const projectConfig = loadConfigFromPath(configPath);
+    if (projectConfig) {
+      config = mergeConfigs(config, projectConfig);
+      break;
+    }
+  }
+
+  log("Final merged config", { agents: config.agents, disabled_agents: config.disabled_agents, disabled_mcps: config.disabled_mcps });
+  return config;
 }
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
