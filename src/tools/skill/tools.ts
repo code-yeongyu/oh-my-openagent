@@ -2,8 +2,23 @@ import { tool } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, statSync, readlinkSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join, resolve, basename } from "path"
+import { z } from "zod/v4"
 import { parseFrontmatter, resolveCommandsInText } from "../../shared"
-import type { SkillScope, SkillMetadata, SkillInfo, LoadedSkill } from "./types"
+import { SkillFrontmatterSchema } from "./types"
+import type { SkillScope, SkillMetadata, SkillInfo, LoadedSkill, SkillFrontmatter } from "./types"
+
+function parseSkillFrontmatter(data: Record<string, unknown>): SkillFrontmatter {
+  return {
+    name: typeof data.name === "string" ? data.name : "",
+    description: typeof data.description === "string" ? data.description : "",
+    license: typeof data.license === "string" ? data.license : undefined,
+    "allowed-tools": Array.isArray(data["allowed-tools"]) ? data["allowed-tools"] : undefined,
+    metadata:
+      typeof data.metadata === "object" && data.metadata !== null
+        ? (data.metadata as Record<string, string>)
+        : undefined,
+  }
+}
 
 function discoverSkillsFromDir(
   skillsDir: string,
@@ -93,10 +108,14 @@ async function parseSkillMd(skillPath: string): Promise<SkillInfo | null> {
     content = await resolveCommandsInText(content)
     const { data, body } = parseFrontmatter(content)
 
+    const frontmatter = parseSkillFrontmatter(data)
+
     const metadata: SkillMetadata = {
-      name: data.name || basename(skillPath),
-      description: data.description || "",
-      license: data.license,
+      name: frontmatter.name || basename(skillPath),
+      description: frontmatter.description,
+      license: frontmatter.license,
+      allowedTools: frontmatter["allowed-tools"],
+      metadata: frontmatter.metadata,
     }
 
     const referencesDir = join(resolvedPath, "references")
@@ -118,6 +137,7 @@ async function parseSkillMd(skillPath: string): Promise<SkillInfo | null> {
     return {
       name: metadata.name,
       path: resolvedPath,
+      basePath: resolvedPath,
       metadata,
       content: body,
       references,
@@ -202,6 +222,7 @@ async function loadSkillWithReferences(
         content = await resolveCommandsInText(content)
         referencesLoaded.push({ path: ref, content })
       } catch {
+        // Skip unreadable references
       }
     }
   }
@@ -209,6 +230,7 @@ async function loadSkillWithReferences(
   return {
     name: skill.name,
     metadata: skill.metadata,
+    basePath: skill.basePath,
     body: skill.content,
     referencesLoaded,
   }
@@ -234,31 +256,24 @@ function formatLoadedSkills(loadedSkills: LoadedSkill[]): string {
     return "No skills loaded."
   }
 
-  const sections: string[] = ["# Loaded Skills\n"]
+  const skill = loadedSkills[0]
+  const sections: string[] = []
 
-  for (const skill of loadedSkills) {
-    sections.push(`## ${skill.metadata.name}\n`)
-    sections.push(`**Description**: ${skill.metadata.description || "(no description)"}\n`)
-    sections.push("### Skill Instructions\n")
-    sections.push(skill.body.trim())
+  sections.push(`Base directory for this skill: ${skill.basePath}/`)
+  sections.push("")
+  sections.push(skill.body.trim())
 
-    if (skill.referencesLoaded.length > 0) {
-      sections.push("\n### Loaded References\n")
-      for (const ref of skill.referencesLoaded) {
-        sections.push(`#### ${ref.path}\n`)
-        sections.push("```")
-        sections.push(ref.content.trim())
-        sections.push("```\n")
-      }
+  if (skill.referencesLoaded.length > 0) {
+    sections.push("\n---\n### Loaded References\n")
+    for (const ref of skill.referencesLoaded) {
+      sections.push(`#### ${ref.path}\n`)
+      sections.push("```")
+      sections.push(ref.content.trim())
+      sections.push("```\n")
     }
-
-    sections.push("\n---\n")
   }
 
-  const skillNames = loadedSkills.map((s) => s.metadata.name).join(", ")
-  sections.push(`**Skills loaded**: ${skillNames}`)
-  sections.push(`**Total**: ${loadedSkills.length} skill(s)`)
-  sections.push("\nPlease confirm these skills match your needs before proceeding.")
+  sections.push(`\n---\n**Launched skill**: ${skill.metadata.name}`)
 
   return sections.join("\n")
 }
@@ -266,25 +281,7 @@ function formatLoadedSkills(loadedSkills: LoadedSkill[]): string {
 export const skill = tool({
   description: `Execute a skill within the main conversation.
 
-When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
-
-How to use skills:
-- Invoke skills using this tool with the skill name only (no arguments)
-- When you invoke a skill, the skill's prompt will expand and provide detailed instructions on how to complete the task
-
-Important:
-- Only use skills listed in Available Skills below
-- Do not invoke a skill that is already running
-
-Skills are loaded from:
-- ~/.claude/skills/ (user scope - global skills)
-- ./.claude/skills/ (project scope - project-specific skills)
-
-Each skill contains:
-- SKILL.md: Main instructions with YAML frontmatter (name, description)
-- references/: Documentation files loaded into context as needed
-- scripts/: Executable code for deterministic operations
-- assets/: Files used in output (templates, icons, etc.)
+When you invoke a skill, the skill's prompt will expand and provide detailed instructions on how to complete the task.
 
 Available Skills:
 ${skillListForDescription}`,
