@@ -8,7 +8,7 @@
 
 ## 현재 진행 중인 작업
 
-**Task 1. Create Antigravity auth types** - ✅ 완료됨
+**Task 6. Implement project context** - ✅ 완료됨
 
 ---
 
@@ -527,7 +527,7 @@ Phase 4 (Plugin Assembly)
 
 ### Phase 2: OAuth Core
 
-- [ ] **4. Implement OAuth flow**
+- [x] **4. Implement OAuth flow**
 
   **What to do**:
   - Create `src/auth/antigravity/oauth.ts`
@@ -554,17 +554,17 @@ Phase 4 (Plugin Assembly)
   - cliproxyapi line: `exchangeAntigravityCode` function
 
   **Acceptance Criteria**:
-  - [ ] PKCE verifier/challenge generated correctly
-  - [ ] Auth URL includes all required parameters
-  - [ ] Token exchange returns access_token and refresh_token
-  - [ ] User info fetch returns email
+  - [x] PKCE verifier/challenge generated correctly
+  - [x] Auth URL includes all required parameters
+  - [x] Token exchange returns access_token and refresh_token
+  - [x] User info fetch returns email
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 6)
 
 ---
 
-- [ ] **5. Implement token management**
+- [x] **5. Implement token management**
 
   **What to do**:
   - Create `src/auth/antigravity/token.ts`
@@ -584,16 +584,16 @@ Phase 4 (Plugin Assembly)
   - `~/tools/cliproxyapi/sdk/auth/antigravity.go` - token refresh logic
 
   **Acceptance Criteria**:
-  - [ ] Token expiration check includes 60s buffer
-  - [ ] Refresh token exchange works with Google endpoint
-  - [ ] Token parsing handles `|` separated format
+  - [x] Token expiration check includes 60s buffer
+  - [x] Refresh token exchange works with Google endpoint
+  - [x] Token parsing handles `|` separated format
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 6)
 
 ---
 
-- [ ] **6. Implement project context**
+- [x] **6. Implement project context**
 
   **What to do**:
   - Create `src/auth/antigravity/project.ts`
@@ -616,9 +616,9 @@ Phase 4 (Plugin Assembly)
   - Response field: `cloudaicompanionProject`
 
   **Acceptance Criteria**:
-  - [ ] loadCodeAssist API called with correct headers
-  - [ ] Project ID extracted from response
-  - [ ] Fallback to default project ID works
+  - [x] loadCodeAssist API called with correct headers
+  - [x] Project ID extracted from response
+  - [x] Fallback to default project ID works
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: YES
