@@ -8,13 +8,14 @@
   - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
   - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [기능](#기능)
-    - [Hooks](#hooks)
     - [Agents](#agents)
     - [Tools](#tools)
       - [내장 LSP Tools](#내장-lsp-tools)
       - [내장 AST-Grep Tools](#내장-ast-grep-tools)
       - [Grep](#grep)
       - [내장 MCPs](#내장-mcps)
+      - [Background Task](#background-task)
+    - [Hooks](#hooks)
     - [Claude Code 호환성](#claude-code-호환성)
     - [기타 편의 기능](#기타-편의-기능)
   - [설정](#설정)
@@ -199,49 +200,6 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 
 ## 기능
 
-### Hooks
-
-- **Todo Continuation Enforcer**: 에이전트가 멈추기 전 모든 TODO 항목을 완료하도록 강제합니다. LLM의 고질적인 "중도 포기" 문제를 방지합니다.
-- **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
-  - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
-- **Session Notification**: 에이전트가 작업을 마치면 OS 네이티브 알림을 보냅니다 (macOS, Linux, Windows).
-- **Session Recovery**: API 에러로부터 자동으로 복구하여 세션 안정성을 보장합니다. 네 가지 시나리오를 처리합니다:
-  - **Tool Result Missing**: `tool_use` 블록이 있지만 `tool_result`가 없을 때 (ESC 인터럽트) → "cancelled" tool result 주입
-  - **Thinking Block Order**: thinking 블록이 첫 번째여야 하는데 아닐 때 → 빈 thinking 블록 추가
-  - **Thinking Disabled Violation**: thinking 이 비활성화인데 thinking 블록이 있을 때 → thinking 블록 제거
-  - **Empty Content Message**: 메시지가 thinking/meta 블록만 있고 실제 내용이 없을 때 → 파일시스템을 통해 "(interrupted)" 텍스트 주입
-- **Comment Checker**: 코드 수정 후 불필요한 주석을 감지하여 보고합니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, AI가 남긴 흔적을 제거하여 코드를 깨끗하게 유지합니다.
-- **Directory AGENTS.md Injector**: 파일을 읽을 때 `AGENTS.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 경로 상의 **모든** `AGENTS.md` 파일을 수집합니다. 중첩된 디렉토리별 지침을 지원합니다:
-  ```
-  project/
-  ├── AGENTS.md              # 프로젝트 전체 컨텍스트
-  ├── src/
-  │   ├── AGENTS.md          # src 전용 컨텍스트
-  │   └── components/
-  │       ├── AGENTS.md      # 컴포넌트 전용 컨텍스트
-  │       └── Button.tsx     # 이 파일을 읽으면 위 3개 AGENTS.md 모두 주입
-  ```
-  `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
-- **Directory README.md Injector**: 파일을 읽을 때 `README.md` 내용을 자동으로 주입합니다. AGENTS.md Injector와 동일하게 동작하며, 파일 디렉토리부터 프로젝트 루트까지 탐색합니다. LLM 에이전트에게 프로젝트 문서 컨텍스트를 제공합니다. 각 디렉토리의 README는 세션당 한 번만 주입됩니다.
-- **Rules Injector**: 파일을 읽을 때 `.claude/rules/` 디렉토리의 규칙을 자동으로 주입합니다.
-  - 파일 디렉토리부터 프로젝트 루트까지 상향 탐색하며, `~/.claude/rules/` (사용자) 경로도 포함합니다.
-  - `.md` 및 `.mdc` 파일을 지원합니다.
-  - Frontmatter의 `globs` 필드(glob 패턴)를 기반으로 매칭합니다.
-  - 항상 적용되어야 하는 규칙을 위한 `alwaysApply: true` 옵션을 지원합니다.
-  - 규칙 파일 구조 예시:
-    ```markdown
-    ---
-    globs: ["*.ts", "src/**/*.js"]
-    description: "TypeScript/JavaScript coding rules"
-    ---
-    - Use PascalCase for interface names
-    - Use camelCase for function names
-    ```
-- **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
-- **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
-- **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
-- **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
-
 ### Agents
 
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
@@ -313,6 +271,71 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
   "disabled_mcps": ["websearch_exa"]
 }
 ```
+
+#### Background Task
+
+장시간 실행되는 작업이나 복잡한 분석을 메인 세션을 차단하지 않고 백그라운드에서 실행합니다. 작업이 완료되면 시스템이 자동으로 알림을 보냅니다.
+
+- **background_task**: 백그라운드 에이전트 작업을 시작합니다. 설명, 프롬프트, 에이전트 타입을 지정하면 즉시 task ID를 반환합니다.
+- **background_output**: 작업 진행 상황 확인(`block=false`) 또는 결과 대기(`block=true`). 최대 10분까지 커스텀 타임아웃을 지원합니다.
+- **background_cancel**: task ID로 실행 중인 백그라운드 작업을 취소합니다.
+
+주요 기능:
+- **비동기 실행**: 복잡한 분석이나 연구 작업을 백그라운드에서 처리하면서 다른 작업 계속 가능
+- **자동 알림**: 백그라운드 작업 완료 시 메인 세션에 자동 알림
+- **상태 추적**: 도구 호출 횟수, 마지막 사용 도구 등 실시간 진행 상황 모니터링
+- **세션 격리**: 각 작업은 독립된 세션에서 실행
+
+사용 예시:
+```
+1. 시작: background_task → task_id="bg_abc123" 반환
+2. 다른 작업 계속 진행
+3. 시스템 알림: "Task bg_abc123 completed"
+4. 결과 조회: background_output(task_id="bg_abc123") → 전체 결과 획득
+```
+
+### Hooks
+
+- **Todo Continuation Enforcer**: 에이전트가 멈추기 전 모든 TODO 항목을 완료하도록 강제합니다. LLM의 고질적인 "중도 포기" 문제를 방지합니다.
+- **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
+  - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
+- **Session Notification**: 에이전트가 작업을 마치면 OS 네이티브 알림을 보냅니다 (macOS, Linux, Windows).
+- **Session Recovery**: API 에러로부터 자동으로 복구하여 세션 안정성을 보장합니다. 네 가지 시나리오를 처리합니다:
+  - **Tool Result Missing**: `tool_use` 블록이 있지만 `tool_result`가 없을 때 (ESC 인터럽트) → "cancelled" tool result 주입
+  - **Thinking Block Order**: thinking 블록이 첫 번째여야 하는데 아닐 때 → 빈 thinking 블록 추가
+  - **Thinking Disabled Violation**: thinking 이 비활성화인데 thinking 블록이 있을 때 → thinking 블록 제거
+  - **Empty Content Message**: 메시지가 thinking/meta 블록만 있고 실제 내용이 없을 때 → 파일시스템을 통해 "(interrupted)" 텍스트 주입
+- **Comment Checker**: 코드 수정 후 불필요한 주석을 감지하여 보고합니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, AI가 남긴 흔적을 제거하여 코드를 깨끗하게 유지합니다.
+- **Directory AGENTS.md Injector**: 파일을 읽을 때 `AGENTS.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 경로 상의 **모든** `AGENTS.md` 파일을 수집합니다. 중첩된 디렉토리별 지침을 지원합니다:
+  ```
+  project/
+  ├── AGENTS.md              # 프로젝트 전체 컨텍스트
+  ├── src/
+  │   ├── AGENTS.md          # src 전용 컨텍스트
+  │   └── components/
+  │       ├── AGENTS.md      # 컴포넌트 전용 컨텍스트
+  │       └── Button.tsx     # 이 파일을 읽으면 위 3개 AGENTS.md 모두 주입
+  ```
+  `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
+- **Directory README.md Injector**: 파일을 읽을 때 `README.md` 내용을 자동으로 주입합니다. AGENTS.md Injector와 동일하게 동작하며, 파일 디렉토리부터 프로젝트 루트까지 탐색합니다. LLM 에이전트에게 프로젝트 문서 컨텍스트를 제공합니다. 각 디렉토리의 README는 세션당 한 번만 주입됩니다.
+- **Rules Injector**: 파일을 읽을 때 `.claude/rules/` 디렉토리의 규칙을 자동으로 주입합니다.
+  - 파일 디렉토리부터 프로젝트 루트까지 상향 탐색하며, `~/.claude/rules/` (사용자) 경로도 포함합니다.
+  - `.md` 및 `.mdc` 파일을 지원합니다.
+  - Frontmatter의 `globs` 필드(glob 패턴)를 기반으로 매칭합니다.
+  - 항상 적용되어야 하는 규칙을 위한 `alwaysApply: true` 옵션을 지원합니다.
+  - 규칙 파일 구조 예시:
+    ```markdown
+    ---
+    globs: ["*.ts", "src/**/*.js"]
+    description: "TypeScript/JavaScript coding rules"
+    ---
+    - Use PascalCase for interface names
+    - Use camelCase for function names
+    ```
+- **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
+- **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
+- **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
+- **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
 
 ### Claude Code 호환성
 

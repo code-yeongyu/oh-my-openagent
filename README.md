@@ -8,13 +8,14 @@ English | [한국어](README.ko.md)
   - [For LLM Agents](#for-llm-agents)
   - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
   - [Features](#features)
-    - [Hooks](#hooks)
     - [Agents](#agents)
     - [Tools](#tools)
       - [Built-in LSP Tools](#built-in-lsp-tools)
       - [Built-in AST-Grep Tools](#built-in-ast-grep-tools)
       - [Grep](#grep)
       - [Built-in MCPs](#built-in-mcps)
+      - [Background Task](#background-task)
+    - [Hooks](#hooks)
     - [Claude Code Compatibility](#claude-code-compatibility)
     - [Other Features](#other-features)
   - [Configuration](#configuration)
@@ -197,48 +198,6 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 
 ## Features
 
-### Hooks
-
-- **Todo Continuation Enforcer**: Forces the agent to complete all tasks before exiting. Eliminates the common LLM issue of "giving up halfway".
-- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
-- **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
-- **Session Recovery**: Automatically recovers from API errors, ensuring session stability. Handles four scenarios:
-  - **Tool Result Missing**: When `tool_use` block exists without `tool_result` (ESC interrupt) → injects "cancelled" tool results
-  - **Thinking Block Order**: When thinking block must be first but isn't → prepends empty thinking block
-  - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
-  - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
-- **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
-- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, collecting **all** `AGENTS.md` files along the path hierarchy. This enables nested, directory-specific instructions:
-  ```
-  project/
-  ├── AGENTS.md              # Project-wide context
-  ├── src/
-  │   ├── AGENTS.md          # src-specific context
-  │   └── components/
-  │       ├── AGENTS.md      # Component-specific context
-  │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
-  ```
-  When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
-- **Directory README.md Injector**: Automatically injects `README.md` contents when reading files. Works identically to the AGENTS.md Injector, searching upward from the file's directory to project root. Provides project documentation context to the LLM agent. Each directory's README is injected only once per session.
-- **Rules Injector**: Automatically injects rules from `.claude/rules/` directory when reading files.
-  - Searches upward from the file's directory to project root, plus `~/.claude/rules/` (user).
-  - Supports `.md` and `.mdc` files.
-  - Frontmatter-based matching with `globs` field (glob patterns).
-  - `alwaysApply: true` option for rules that should always apply.
-  - Example rule file structure:
-    ```markdown
-    ---
-    globs: ["*.ts", "src/**/*.js"]
-    description: "TypeScript/JavaScript coding rules"
-    ---
-    - Use PascalCase for interface names
-    - Use camelCase for function names
-    ```
-- **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
-- **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
-- **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
-- **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
-
 ### Agents
 - **oracle** (`openai/gpt-5.2`): The architect. Expert in code reviews and strategy. Uses GPT-5.2 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
 - **librarian** (`anthropic/claude-haiku-4-5`): Multi-repo analysis, documentation lookup, and implementation examples. Haiku is chosen for its speed, competence, excellent tool usage, and cost-efficiency. Inspired by AmpCode.
@@ -311,6 +270,70 @@ Don't need these? Disable them via `oh-my-opencode.json`:
   "disabled_mcps": ["websearch_exa"]
 }
 ```
+
+#### Background Task
+
+Run long-running or complex tasks in the background without blocking your main session. The system automatically notifies you when tasks complete.
+
+- **background_task**: Launch a background agent task. Specify description, prompt, and agent type. Returns immediately with a task ID.
+- **background_output**: Check task progress (`block=false`) or wait for results (`block=true`). Supports custom timeout up to 10 minutes.
+- **background_cancel**: Cancel a running background task by task ID.
+
+Key capabilities:
+- **Async Execution**: Offload complex analysis or research while you continue working
+- **Auto Notification**: System notifies the main session when background tasks complete
+- **Status Tracking**: Real-time progress with tool call counts and last tool used
+- **Session Isolation**: Each task runs in an independent session
+
+Example workflow:
+```
+1. Launch: background_task → returns task_id="bg_abc123"
+2. Continue working on other tasks
+3. System notification: "Task bg_abc123 completed"
+4. Retrieve: background_output(task_id="bg_abc123") → get full results
+```
+
+### Hooks
+
+- **Todo Continuation Enforcer**: Forces the agent to complete all tasks before exiting. Eliminates the common LLM issue of "giving up halfway".
+- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
+- **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
+- **Session Recovery**: Automatically recovers from API errors, ensuring session stability. Handles four scenarios:
+  - **Tool Result Missing**: When `tool_use` block exists without `tool_result` (ESC interrupt) → injects "cancelled" tool results
+  - **Thinking Block Order**: When thinking block must be first but isn't → prepends empty thinking block
+  - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
+  - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
+- **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
+- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, collecting **all** `AGENTS.md` files along the path hierarchy. This enables nested, directory-specific instructions:
+  ```
+  project/
+  ├── AGENTS.md              # Project-wide context
+  ├── src/
+  │   ├── AGENTS.md          # src-specific context
+  │   └── components/
+  │       ├── AGENTS.md      # Component-specific context
+  │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
+  ```
+  When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
+- **Directory README.md Injector**: Automatically injects `README.md` contents when reading files. Works identically to the AGENTS.md Injector, searching upward from the file's directory to project root. Provides project documentation context to the LLM agent. Each directory's README is injected only once per session.
+- **Rules Injector**: Automatically injects rules from `.claude/rules/` directory when reading files.
+  - Searches upward from the file's directory to project root, plus `~/.claude/rules/` (user).
+  - Supports `.md` and `.mdc` files.
+  - Frontmatter-based matching with `globs` field (glob patterns).
+  - `alwaysApply: true` option for rules that should always apply.
+  - Example rule file structure:
+    ```markdown
+    ---
+    globs: ["*.ts", "src/**/*.js"]
+    description: "TypeScript/JavaScript coding rules"
+    ---
+    - Use PascalCase for interface names
+    - Use camelCase for function names
+    ```
+- **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
+- **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
+- **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
+- **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
 
 ### Claude Code Compatibility
 
