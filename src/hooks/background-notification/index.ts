@@ -40,7 +40,7 @@ function formatNotifications(tasks: BackgroundTask[]): string {
   }
 
   if (tasks.length > 1) {
-    let message = `✅ **Background Tasks Complete (${tasks.length})**\n\n`
+    let message = `**Background Tasks Complete (${tasks.length})**\n\n`
 
     for (const task of tasks) {
       const duration = formatDuration(task.startedAt, task.completedAt)
@@ -50,7 +50,7 @@ function formatNotifications(tasks: BackgroundTask[]): string {
       message += `  Duration: ${duration} | Tool calls: ${toolCalls}\n\n`
     }
 
-    message += `Use \`background_result\` tool to retrieve results.`
+    message += `Use \`background_output\` tool to retrieve results.`
 
     return message
   }
@@ -59,14 +59,14 @@ function formatNotifications(tasks: BackgroundTask[]): string {
   const duration = formatDuration(task.startedAt, task.completedAt)
   const toolCalls = task.progress?.toolCalls ?? 0
 
-  return `✅ **Background Task Complete**
+  return `**Background Task Complete**
 
 **Task ID:** ${task.id}
 **Description:** ${task.description}
 **Duration:** ${duration}
 **Tool calls:** ${toolCalls}
 
-The background task has finished. Use \`background_result\` tool with task ID \`${task.id}\` to retrieve the full result.`
+Use \`background_output\` tool with task_id="${task.id}" to retrieve the full result.`
 }
 
 export function createBackgroundNotificationHook(manager: BackgroundManager) {

@@ -11,37 +11,24 @@ Arguments:
 - description: Short task description (shown in status)
 - prompt: Full detailed prompt for the agent
 - agent: Agent type to use (any agent allowed)
-- session_id: Optional parent session ID (auto-detected if omitted)
 
-Returns immediately with task ID and session info. Use \`background_status\` to check progress.`
+Returns immediately with task ID and session info. Use \`background_output\` to check progress or retrieve results.`
 
-export const BACKGROUND_STATUS_DESCRIPTION = `Check the status of background tasks.
-
-If taskId is provided, returns status for that specific task.
-If taskId is omitted, returns status for all tasks in the current session.
-
-Status includes:
-- Task description
-- Current status (pending/running/completed/error/cancelled)
-- Duration
-- Number of tool calls made
-- Last tool used
+export const BACKGROUND_OUTPUT_DESCRIPTION = `Get output from a background task.
 
 Arguments:
-- taskId: Optional task ID. If omitted, lists all tasks for current session.`
+- task_id: Required task ID to get output from
+- block: If true (default), wait for task completion. If false, return current status immediately.
+- timeout: Max wait time in ms when blocking (default: 60000, max: 600000)
 
-export const BACKGROUND_RESULT_DESCRIPTION = `Retrieve the result of a completed background task.
+Returns:
+- When blocking: Waits for completion, then returns full result
+- When not blocking: Returns current status and progress
 
-Only works for tasks with status "completed". For running tasks, use \`background_status\` to check progress.
-
-Returns the full assistant output from the background session, including:
-- Task description
-- Duration
-- Complete response content
-- Session ID for reference
-
-Arguments:
-- taskId: Required task ID to retrieve result for.`
+Use this to:
+- Check task progress (block=false)
+- Wait for and retrieve task result (block=true)
+- Set custom timeout for long tasks`
 
 export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel a running background task.
 

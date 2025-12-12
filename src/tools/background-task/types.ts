@@ -4,12 +4,10 @@ export interface BackgroundTaskArgs {
   agent: string
 }
 
-export interface BackgroundStatusArgs {
-  taskId?: string
-}
-
-export interface BackgroundResultArgs {
-  taskId: string
+export interface BackgroundOutputArgs {
+  task_id: string
+  block?: boolean
+  timeout?: number
 }
 
 export interface BackgroundCancelArgs {

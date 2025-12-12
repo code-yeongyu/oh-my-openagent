@@ -24,8 +24,7 @@ import { skill } from "./skill"
 
 import {
   createBackgroundTask,
-  createBackgroundStatus,
-  createBackgroundResult,
+  createBackgroundOutput,
   createBackgroundCancel,
 } from "./background-task"
 
@@ -39,8 +38,7 @@ export { createOmoTask } from "./omo-task"
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {
     background_task: createBackgroundTask(manager),
-    background_status: createBackgroundStatus(manager),
-    background_result: createBackgroundResult(manager, client),
+    background_output: createBackgroundOutput(manager, client),
     background_cancel: createBackgroundCancel(manager, client),
   }
 }

@@ -1,7 +1,6 @@
 export {
   createBackgroundTask,
-  createBackgroundStatus,
-  createBackgroundResult,
+  createBackgroundOutput,
   createBackgroundCancel,
 } from "./tools"
 

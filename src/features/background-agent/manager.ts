@@ -232,7 +232,7 @@ export class BackgroundManager {
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} (${toolCalls} tool calls). Use background_result with taskId="${task.id}" to get results.`
+    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} (${toolCalls} tool calls). Use background_output with task_id="${task.id}" to get results.`
 
     const mainSessionID = getMainSessionID()
     if (!mainSessionID) {
