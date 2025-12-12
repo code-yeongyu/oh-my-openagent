@@ -4,6 +4,7 @@ import type {
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
+import { getMainSessionID } from "../claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -233,21 +234,27 @@ export class BackgroundManager {
 
     const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} (${toolCalls} tool calls). Use background_result with taskId="${task.id}" to get results.`
 
-    log("[background-agent] Sending notification via TUI appendPrompt + submitPrompt")
+    const mainSessionID = getMainSessionID()
+    if (!mainSessionID) {
+      log("[background-agent] No main session ID available, relying on pending queue")
+      return
+    }
+
+    log("[background-agent] Sending notification to main session:", mainSessionID)
 
     setTimeout(async () => {
       try {
-        await tuiClient.tui.appendPrompt({
-          body: { text: message },
-          query: { directory: this.directory },
-        })
-        await tuiClient.tui.submitPrompt({
+        await this.client.session.prompt({
+          path: { id: mainSessionID },
+          body: {
+            parts: [{ type: "text", text: message }],
+          },
           query: { directory: this.directory },
         })
         this.clearNotificationsForTask(task.id)
-        log("[background-agent] Successfully sent via TUI API")
+        log("[background-agent] Successfully sent to main session")
       } catch (error) {
-        log("[background-agent] TUI API failed:", String(error))
+        log("[background-agent] session.prompt failed:", String(error))
       }
     }, 200)
   }
