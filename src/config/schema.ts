@@ -40,7 +40,15 @@ export const AgentOverrideConfigSchema = z.object({
   permission: AgentPermissionSchema.optional(),
 })
 
-export const AgentOverridesSchema = z.record(AgentNameSchema, AgentOverrideConfigSchema)
+export const AgentOverridesSchema = z
+  .object({
+    oracle: AgentOverrideConfigSchema.optional(),
+    librarian: AgentOverrideConfigSchema.optional(),
+    explore: AgentOverrideConfigSchema.optional(),
+    "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
+    "document-writer": AgentOverrideConfigSchema.optional(),
+  })
+  .partial()
 
 export const ClaudeCodeConfigSchema = z.object({
   mcp: z.boolean().optional(),
