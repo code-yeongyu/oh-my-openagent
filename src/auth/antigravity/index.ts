@@ -1,5 +1,3 @@
-// Antigravity auth module barrel export
-
 export * from "./types"
 export * from "./constants"
 export * from "./oauth"
@@ -9,5 +7,6 @@ export * from "./request"
 export * from "./response"
 export * from "./tools"
 export * from "./thinking"
+export * from "./thought-signature-store"
 export * from "./fetch"
 export * from "./plugin"

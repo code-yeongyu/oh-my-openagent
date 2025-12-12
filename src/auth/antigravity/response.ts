@@ -466,6 +466,61 @@ export function isStreamingResponse(response: Response): boolean {
 }
 
 /**
+ * Extract thought signature from SSE payload text
+ *
+ * Looks for thoughtSignature in SSE events:
+ * data: { "response": { "candidates": [{ "content": { "parts": [{ "thoughtSignature": "..." }] } }] } }
+ *
+ * Returns the last found signature (most recent in the stream).
+ *
+ * @param payload - SSE payload text
+ * @returns Last thought signature if found
+ */
+export function extractSignatureFromSsePayload(payload: string): string | undefined {
+  const lines = payload.split("\n")
+  let lastSignature: string | undefined
+
+  for (const line of lines) {
+    if (!line.startsWith("data:")) {
+      continue
+    }
+
+    const json = line.slice(5).trim()
+    if (!json || json === "[DONE]") {
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(json) as Record<string, unknown>
+
+      // Check in response wrapper (Antigravity format)
+      const response = (parsed.response || parsed) as Record<string, unknown>
+      const candidates = response.candidates as Array<Record<string, unknown>> | undefined
+
+      if (candidates && Array.isArray(candidates)) {
+        for (const candidate of candidates) {
+          const content = candidate.content as Record<string, unknown> | undefined
+          const parts = content?.parts as Array<Record<string, unknown>> | undefined
+
+          if (parts && Array.isArray(parts)) {
+            for (const part of parts) {
+              const sig = (part.thoughtSignature || part.thought_signature) as string | undefined
+              if (sig && typeof sig === "string") {
+                lastSignature = sig
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue to next line if parsing fails
+    }
+  }
+
+  return lastSignature
+}
+
+/**
  * Extract usage from SSE payload text
  *
  * Looks for usageMetadata in SSE events:

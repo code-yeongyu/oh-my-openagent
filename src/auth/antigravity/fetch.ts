@@ -21,9 +21,19 @@ import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "./constants"
 import { fetchProjectContext, clearProjectContextCache } from "./project"
 import { isTokenExpired, refreshAccessToken, parseStoredToken, formatTokenForStorage } from "./token"
 import { transformRequest } from "./request"
-import { transformResponse, transformStreamingResponse, isStreamingResponse } from "./response"
+import {
+  transformResponse,
+  transformStreamingResponse,
+  isStreamingResponse,
+  extractSignatureFromSsePayload,
+} from "./response"
 import { normalizeToolsForGemini, type OpenAITool } from "./tools"
 import { extractThinkingBlocks, shouldIncludeThinking, transformResponseThinking } from "./thinking"
+import {
+  getThoughtSignature,
+  setThoughtSignature,
+  getOrCreateSessionId,
+} from "./thought-signature-store"
 import type { AntigravityTokens } from "./types"
 
 /**
@@ -65,14 +75,22 @@ function isRetryableError(status: number): boolean {
   return false
 }
 
-async function attemptFetch(
-  endpoint: string,
-  url: string,
-  init: RequestInit,
-  accessToken: string,
-  projectId: string,
+interface AttemptFetchOptions {
+  endpoint: string
+  url: string
+  init: RequestInit
+  accessToken: string
+  projectId: string
+  sessionId: string
   modelName?: string
+  thoughtSignature?: string
+}
+
+async function attemptFetch(
+  options: AttemptFetchOptions
 ): Promise<Response | null | "pass-through"> {
+  const { endpoint, url, init, accessToken, projectId, sessionId, modelName, thoughtSignature } =
+    options
   debugLog(`Trying endpoint: ${endpoint}`)
 
   try {
@@ -99,14 +117,16 @@ async function attemptFetch(
       }
     }
 
-    const transformed = transformRequest(
+    const transformed = transformRequest({
       url,
-      parsedBody,
+      body: parsedBody,
       accessToken,
       projectId,
+      sessionId,
       modelName,
-      endpoint
-    )
+      endpointOverride: endpoint,
+      thoughtSignature,
+    })
 
     const response = await fetch(transformed.url, {
       method: init.method || "POST",
@@ -129,16 +149,56 @@ async function attemptFetch(
   }
 }
 
-/**
- * Transform response with thinking extraction if applicable
- */
+interface GeminiResponsePart {
+  thoughtSignature?: string
+  thought_signature?: string
+  functionCall?: Record<string, unknown>
+  text?: string
+  [key: string]: unknown
+}
+
+interface GeminiResponseCandidate {
+  content?: {
+    parts?: GeminiResponsePart[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+interface GeminiResponseBody {
+  candidates?: GeminiResponseCandidate[]
+  [key: string]: unknown
+}
+
+function extractSignatureFromResponse(parsed: GeminiResponseBody): string | undefined {
+  if (!parsed.candidates || !Array.isArray(parsed.candidates)) {
+    return undefined
+  }
+
+  for (const candidate of parsed.candidates) {
+    const parts = candidate.content?.parts
+    if (!parts || !Array.isArray(parts)) {
+      continue
+    }
+
+    for (const part of parts) {
+      const sig = part.thoughtSignature || part.thought_signature
+      if (sig && typeof sig === "string") {
+        return sig
+      }
+    }
+  }
+
+  return undefined
+}
+
 async function transformResponseWithThinking(
   response: Response,
-  modelName: string
+  modelName: string,
+  fetchInstanceId: string
 ): Promise<Response> {
   const streaming = isStreamingResponse(response)
 
-  // Transform response based on streaming mode
   let result
   if (streaming) {
     result = await transformStreamingResponse(response)
@@ -146,26 +206,37 @@ async function transformResponseWithThinking(
     result = await transformResponse(response)
   }
 
-  // Apply thinking extraction for high-thinking models
-  if (!streaming && shouldIncludeThinking(modelName)) {
-    try {
-      const text = await result.response.clone().text()
-      const parsed = JSON.parse(text) as Record<string, unknown>
+  try {
+    const text = await result.response.clone().text()
 
-      // Extract and transform thinking blocks
-      const thinkingResult = extractThinkingBlocks(parsed)
-      if (thinkingResult.hasThinking) {
-        const transformed = transformResponseThinking(parsed)
-        return new Response(JSON.stringify(transformed), {
-          status: result.response.status,
-          statusText: result.response.statusText,
-          headers: result.response.headers,
-        })
+    if (streaming) {
+      const signature = extractSignatureFromSsePayload(text)
+      if (signature) {
+        setThoughtSignature(fetchInstanceId, signature)
+        debugLog(`[STREAMING] Stored thought signature for instance ${fetchInstanceId}`)
       }
-    } catch {
-      // If thinking extraction fails, return original transformed response
+    } else {
+      const parsed = JSON.parse(text) as GeminiResponseBody
+
+      const signature = extractSignatureFromResponse(parsed)
+      if (signature) {
+        setThoughtSignature(fetchInstanceId, signature)
+        debugLog(`Stored thought signature for instance ${fetchInstanceId}`)
+      }
+
+      if (shouldIncludeThinking(modelName)) {
+        const thinkingResult = extractThinkingBlocks(parsed)
+        if (thinkingResult.hasThinking) {
+          const transformed = transformResponseThinking(parsed)
+          return new Response(JSON.stringify(transformed), {
+            status: result.response.status,
+            statusText: result.response.statusText,
+            headers: result.response.headers,
+          })
+        }
+      }
     }
-  }
+  } catch {}
 
   return result.response
 }
@@ -207,9 +278,9 @@ export function createAntigravityFetch(
   clientId?: string,
   clientSecret?: string
 ): (url: string, init?: RequestInit) => Promise<Response> {
-  // Cache for current token state
   let cachedTokens: AntigravityTokens | null = null
   let cachedProjectId: string | null = null
+  const fetchInstanceId = crypto.randomUUID()
 
   return async (url: string, init: RequestInit = {}): Promise<Response> => {
     debugLog(`Intercepting request to: ${url}`)
@@ -304,18 +375,23 @@ export function createAntigravityFetch(
     }
 
     const maxEndpoints = Math.min(ANTIGRAVITY_ENDPOINT_FALLBACKS.length, 3)
+    const sessionId = getOrCreateSessionId(fetchInstanceId)
+    const thoughtSignature = getThoughtSignature(fetchInstanceId)
+    debugLog(`[TSIG][GET] sessionId=${sessionId}, signature=${thoughtSignature ? thoughtSignature.substring(0, 20) + "..." : "none"}`)
 
     for (let i = 0; i < maxEndpoints; i++) {
       const endpoint = ANTIGRAVITY_ENDPOINT_FALLBACKS[i]
 
-      const response = await attemptFetch(
+      const response = await attemptFetch({
         endpoint,
         url,
         init,
-        cachedTokens.access_token,
+        accessToken: cachedTokens.access_token,
         projectId,
-        modelName
-      )
+        sessionId,
+        modelName,
+        thoughtSignature,
+      })
 
       if (response === "pass-through") {
         debugLog("Non-string body detected, passing through with auth headers")
@@ -328,7 +404,12 @@ export function createAntigravityFetch(
 
       if (response) {
         debugLog(`Success with endpoint: ${endpoint}`)
-        return transformResponseWithThinking(response, modelName || "")
+        const transformedResponse = await transformResponseWithThinking(
+          response,
+          modelName || "",
+          fetchInstanceId
+        )
+        return transformedResponse
       }
     }
 

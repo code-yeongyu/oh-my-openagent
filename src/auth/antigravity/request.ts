@@ -132,15 +132,11 @@ function generateRequestId(): string {
   return `agent-${crypto.randomUUID()}`
 }
 
-function generateSessionId(): string {
-  const n = Math.floor(Math.random() * 9_000_000_000_000_000_000)
-  return `-${n}`
-}
-
 export function wrapRequestBody(
   body: Record<string, unknown>,
   projectId: string,
-  modelName: string
+  modelName: string,
+  sessionId: string
 ): AntigravityRequestBody {
   const requestPayload = { ...body }
   delete requestPayload.model
@@ -152,9 +148,67 @@ export function wrapRequestBody(
     requestId: generateRequestId(),
     request: {
       ...requestPayload,
-      sessionId: generateSessionId(),
+      sessionId,
     },
   }
+}
+
+interface ContentPart {
+  functionCall?: Record<string, unknown>
+  thoughtSignature?: string
+  [key: string]: unknown
+}
+
+interface ContentBlock {
+  role?: string
+  parts?: ContentPart[]
+  [key: string]: unknown
+}
+
+function debugLog(message: string): void {
+  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+    console.log(`[antigravity-request] ${message}`)
+  }
+}
+
+export function injectThoughtSignatureIntoFunctionCalls(
+  body: Record<string, unknown>,
+  signature: string | undefined
+): Record<string, unknown> {
+  debugLog(`[TSIG][INJECT] signature=${signature ? signature.substring(0, 20) + "..." : "none"}`)
+
+  if (!signature) {
+    return body
+  }
+
+  const contents = body.contents as ContentBlock[] | undefined
+  if (!contents || !Array.isArray(contents)) {
+    debugLog(`[TSIG][INJECT] no contents array found`)
+    return body
+  }
+
+  let injectedCount = 0
+  const modifiedContents = contents.map((content) => {
+    if (!content.parts || !Array.isArray(content.parts)) {
+      return content
+    }
+
+    const modifiedParts = content.parts.map((part) => {
+      if (part.functionCall && !part.thoughtSignature) {
+        injectedCount++
+        return {
+          ...part,
+          thoughtSignature: signature,
+        }
+      }
+      return part
+    })
+
+    return { ...content, parts: modifiedParts }
+  })
+
+  debugLog(`[TSIG][INJECT] injected signature into ${injectedCount} functionCall(s)`)
+  return { ...body, contents: modifiedContents }
 }
 
 /**
@@ -183,48 +237,45 @@ export function isStreamingRequest(
   return false
 }
 
-/**
- * Transform an OpenAI-format request to Antigravity format.
- * This is the main transformation function used by the fetch interceptor.
- *
- * @param url - Original request URL
- * @param body - Original request body (OpenAI format)
- * @param accessToken - OAuth access token for Authorization
- * @param projectId - GCP project ID for wrapper
- * @param modelName - Model name to use (overrides body.model if provided)
- * @param endpointOverride - Optional endpoint override (uses first fallback if not provided)
- * @returns Transformed request with URL, headers, body, and streaming flag
- */
-export function transformRequest(
-  url: string,
-  body: Record<string, unknown>,
-  accessToken: string,
-  projectId: string,
-  modelName?: string,
+export interface TransformRequestOptions {
+  url: string
+  body: Record<string, unknown>
+  accessToken: string
+  projectId: string
+  sessionId: string
+  modelName?: string
   endpointOverride?: string
-): TransformedRequest {
-  // Determine model name (parameter override > body > URL)
+  thoughtSignature?: string
+}
+
+export function transformRequest(options: TransformRequestOptions): TransformedRequest {
+  const {
+    url,
+    body,
+    accessToken,
+    projectId,
+    sessionId,
+    modelName,
+    endpointOverride,
+    thoughtSignature,
+  } = options
+
   const effectiveModel =
     modelName || extractModelFromBody(body) || extractModelFromUrl(url) || "gemini-3-pro-preview"
 
-  // Determine if streaming
   const streaming = isStreamingRequest(url, body)
-
-  // Determine action (default to appropriate generate action)
   const action = streaming ? "streamGenerateContent" : "generateContent"
 
-  // Build URL
   const endpoint = endpointOverride || getDefaultEndpoint()
   const transformedUrl = buildAntigravityUrl(endpoint, action, streaming)
 
-  // Build headers
   const headers = buildRequestHeaders(accessToken)
   if (streaming) {
     headers["Accept"] = "text/event-stream"
   }
 
-  // Wrap body in Antigravity format
-  const wrappedBody = wrapRequestBody(body, projectId, effectiveModel)
+  const bodyWithSignature = injectThoughtSignatureIntoFunctionCalls(body, thoughtSignature)
+  const wrappedBody = wrapRequestBody(bodyWithSignature, projectId, effectiveModel, sessionId)
 
   return {
     url: transformedUrl,
