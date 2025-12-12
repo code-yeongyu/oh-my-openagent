@@ -231,29 +231,24 @@ export class BackgroundManager {
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED]
+    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} (${toolCalls} tool calls). Use background_result with taskId="${task.id}" to get results.`
 
-Task "${task.description}" has finished.
-Duration: ${duration}
-Tool calls: ${toolCalls}
+    log("[background-agent] Sending notification via TUI appendPrompt + submitPrompt")
 
-Use \`background_result\` tool with taskId="${task.id}" to retrieve the full result.`
-
-    log("[background-agent] Scheduling prompt to parent session:", task.parentSessionID)
-
-    setTimeout(() => {
-      this.client.session.prompt({
-        path: { id: task.parentSessionID },
-        body: {
-          parts: [{ type: "text", text: message }],
-        },
-        query: { directory: this.directory },
-      }).then(() => {
+    setTimeout(async () => {
+      try {
+        await tuiClient.tui.appendPrompt({
+          body: { text: message },
+          query: { directory: this.directory },
+        })
+        await tuiClient.tui.submitPrompt({
+          query: { directory: this.directory },
+        })
         this.clearNotificationsForTask(task.id)
-        log("[background-agent] Successfully sent prompt to parent session")
-      }).catch((error) => {
-        log("[background-agent] Failed to send prompt:", String(error))
-      })
+        log("[background-agent] Successfully sent via TUI API")
+      } catch (error) {
+        log("[background-agent] TUI API failed:", String(error))
+      }
     }, 200)
   }
 
