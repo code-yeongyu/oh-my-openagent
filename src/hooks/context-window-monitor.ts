@@ -52,11 +52,10 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
       if (lastAssistant.providerID !== "anthropic") return
 
-      const totalInputTokens = assistantMessages.reduce((sum, m) => {
-        const inputTokens = m.tokens?.input ?? 0
-        const cacheReadTokens = m.tokens?.cache?.read ?? 0
-        return sum + inputTokens + cacheReadTokens
-      }, 0)
+      // Use only the last assistant message's input tokens
+      // This reflects the ACTUAL current context window usage (post-compaction)
+      const lastTokens = lastAssistant.tokens
+      const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
       const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
 

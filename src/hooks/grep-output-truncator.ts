@@ -98,11 +98,11 @@ export function createGrepOutputTruncatorHook(ctx: PluginInput) {
 
       if (assistantMessages.length === 0) return
 
-      const totalInputTokens = assistantMessages.reduce((sum, m) => {
-        const inputTokens = m.tokens?.input ?? 0
-        const cacheReadTokens = m.tokens?.cache?.read ?? 0
-        return sum + inputTokens + cacheReadTokens
-      }, 0)
+      // Use only the last assistant message's input tokens
+      // This reflects the ACTUAL current context window usage (post-compaction)
+      const lastAssistant = assistantMessages[assistantMessages.length - 1]
+      const lastTokens = lastAssistant.tokens
+      const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
       const remainingTokens = ANTHROPIC_ACTUAL_LIMIT - totalInputTokens
 
