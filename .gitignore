@@ -27,3 +27,4 @@ yarn.lock
 .env.local
 test-injection/
 notepad.md
+oauth-success.html

@@ -180,7 +180,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
-      await backgroundNotificationHook["chat.message"](input, output);
     },
 
     config: async (config) => {
