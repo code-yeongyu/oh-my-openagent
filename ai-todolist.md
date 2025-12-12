@@ -8,7 +8,7 @@
 
 ## 현재 진행 중인 작업
 
-**Task 6. Implement project context** - ✅ 완료됨
+**Task 11. Implement fetch interceptor** - ✅ 완료됨
 
 ---
 
@@ -634,7 +634,7 @@ Phase 4 (Plugin Assembly)
 
 ### Phase 3: Request/Response Transformation
 
-- [ ] **7. Implement request transformer**
+- [x] **7. Implement request transformer** ✅ COMPLETED
 
   **What to do**:
   - Create `src/auth/antigravity/request.ts`
@@ -654,16 +654,16 @@ Phase 4 (Plugin Assembly)
   - Reference: numman-ali/opencode-openai-codex-auth `lib/request/request-transformer.ts`
 
   **Acceptance Criteria**:
-  - [ ] Model name extracted from URL path
-  - [ ] Request wrapped correctly for Antigravity API
-  - [ ] Headers include Authorization, User-Agent, X-Goog-Api-Client
+  - [x] Model name extracted from URL path
+  - [x] Request wrapped correctly for Antigravity API
+  - [x] Headers include Authorization, User-Agent, X-Goog-Api-Client
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 9)
 
 ---
 
-- [ ] **8. Implement response handler**
+- [x] **8. Implement response handler** ✅ COMPLETED
 
   **What to do**:
   - Create `src/auth/antigravity/response.ts`
@@ -683,16 +683,16 @@ Phase 4 (Plugin Assembly)
   - Reference: numman-ali/opencode-openai-codex-auth `lib/request/response-handler.ts`
 
   **Acceptance Criteria**:
-  - [ ] Non-streaming responses transformed correctly
-  - [ ] SSE streaming preserved and transformed
-  - [ ] Error responses include useful details
+  - [x] Non-streaming responses transformed correctly
+  - [x] SSE streaming preserved and transformed
+  - [x] Error responses include useful details
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 9)
 
 ---
 
-- [ ] **9. Implement tool normalization (Gemini only)**
+- [x] **9. Implement tool normalization (Gemini only)** ✅ COMPLETED
 
   **What to do**:
   - Create `src/auth/antigravity/tools.ts`
@@ -724,16 +724,16 @@ Phase 4 (Plugin Assembly)
   ```
 
   **Acceptance Criteria**:
-  - [ ] OpenAI-style tools converted to Gemini functionDeclarations
-  - [ ] Tool call results mapped back correctly
-  - [ ] Warning logged for unsupported tool types
+  - [x] OpenAI-style tools converted to Gemini functionDeclarations
+  - [x] Tool call results mapped back correctly
+  - [x] Warning logged for unsupported tool types
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 11)
 
 ---
 
-- [ ] **10. Implement thinking block handler (Gemini only)**
+- [x] **10. Implement thinking block handler (Gemini only)** ✅ COMPLETED
 
   **What to do**:
   - Create `src/auth/antigravity/thinking.ts`
@@ -761,15 +761,15 @@ Phase 4 (Plugin Assembly)
   - Model variants with `-high` suffix have thinking enabled
 
   **Acceptance Criteria**:
-  - [ ] Thinking blocks extracted from Gemini responses
-  - [ ] Model variant detection works (`-high`)
+  - [x] Thinking blocks extracted from Gemini responses
+  - [x] Model variant detection works (`-high`)
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 11)
 
 ---
 
-- [ ] **11. Implement fetch interceptor**
+- [x] **11. Implement fetch interceptor** ✅ COMPLETED
 
   **What to do**:
   - Create `src/auth/antigravity/fetch.ts`
@@ -798,12 +798,12 @@ Phase 4 (Plugin Assembly)
   ```
 
   **Acceptance Criteria**:
-  - [ ] Token refresh triggered when needed
-  - [ ] URL rewritten to Antigravity endpoint
-  - [ ] Request transformation applied (including tools)
-  - [ ] Response transformation applied (including thinking)
-  - [ ] Endpoint fallback works (daily → autopush → prod)
-  - [ ] Debug logging shows endpoint attempts when ANTIGRAVITY_DEBUG=1
+  - [x] Token refresh triggered when needed
+  - [x] URL rewritten to Antigravity endpoint
+  - [x] Request transformation applied (including tools)
+  - [x] Response transformation applied (including thinking)
+  - [x] Endpoint fallback works (daily → autopush → prod)
+  - [x] Debug logging shows endpoint attempts when ANTIGRAVITY_DEBUG=1
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: YES
@@ -812,7 +812,7 @@ Phase 4 (Plugin Assembly)
   - **Message**: `feat(antigravity-auth): add request/response transformation with tools and thinking`
   - **Files to stage**: `src/auth/antigravity/request.ts`, `src/auth/antigravity/response.ts`, `src/auth/antigravity/tools.ts`, `src/auth/antigravity/thinking.ts`, `src/auth/antigravity/fetch.ts`
   - **Pre-commit verification**:
-    - [ ] `bun run typecheck` → No errors
+    - [x] `bun run typecheck` → No errors
   - **Rollback trigger**: Transformation errors
 
 ---
