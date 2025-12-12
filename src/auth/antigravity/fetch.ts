@@ -318,8 +318,12 @@ export function createAntigravityFetch(
       )
 
       if (response === "pass-through") {
-        debugLog("Non-string body detected, passing through to original fetch")
-        return fetch(url, init)
+        debugLog("Non-string body detected, passing through with auth headers")
+        const headersWithAuth = {
+          ...init.headers,
+          Authorization: `Bearer ${cachedTokens.access_token}`,
+        }
+        return fetch(url, { ...init, headers: headersWithAuth })
       }
 
       if (response) {
