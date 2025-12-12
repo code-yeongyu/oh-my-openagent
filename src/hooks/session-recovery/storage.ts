@@ -122,13 +122,7 @@ export function findEmptyMessages(sessionID: string): string[] {
   const messages = readMessages(sessionID)
   const emptyIds: string[] = []
 
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
-    
-    // API rule: only the final assistant message may have empty content
-    const isLastMessage = i === messages.length - 1
-    if (isLastMessage && msg.role === "assistant") continue
-
+  for (const msg of messages) {
     if (!messageHasContent(msg.id)) {
       emptyIds.push(msg.id)
     }
@@ -140,18 +134,25 @@ export function findEmptyMessages(sessionID: string): string[] {
 export function findEmptyMessageByIndex(sessionID: string, targetIndex: number): string | null {
   const messages = readMessages(sessionID)
   
-  if (targetIndex < 0 || targetIndex >= messages.length) return null
-
-  const targetMsg = messages[targetIndex]
+  // Try multiple indices to handle system message offset
+  // API includes system message at index 0, storage may not
+  const indicesToTry = [targetIndex, targetIndex - 1]
   
-  // API rule: only the final assistant message may have empty content
-  // All other messages (user AND assistant) must have non-empty content
-  const isLastMessage = targetIndex === messages.length - 1
-  if (isLastMessage && targetMsg.role === "assistant") return null
-  
-  if (messageHasContent(targetMsg.id)) return null
+  for (const idx of indicesToTry) {
+    if (idx < 0 || idx >= messages.length) continue
 
-  return targetMsg.id
+    const targetMsg = messages[idx]
+    
+    // NOTE: Do NOT skip last assistant message here
+    // If API returned an error, this message is NOT the final assistant message
+    // (the API only allows empty content for the ACTUAL final assistant message)
+    
+    if (!messageHasContent(targetMsg.id)) {
+      return targetMsg.id
+    }
+  }
+
+  return null
 }
 
 export function findFirstEmptyMessage(sessionID: string): string | null {
