@@ -122,8 +122,12 @@ export function findEmptyMessages(sessionID: string): string[] {
   const messages = readMessages(sessionID)
   const emptyIds: string[] = []
 
-  for (const msg of messages) {
-    if (msg.role !== "assistant") continue
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    
+    // API rule: only the final assistant message may have empty content
+    const isLastMessage = i === messages.length - 1
+    if (isLastMessage && msg.role === "assistant") continue
 
     if (!messageHasContent(msg.id)) {
       emptyIds.push(msg.id)
@@ -139,7 +143,12 @@ export function findEmptyMessageByIndex(sessionID: string, targetIndex: number):
   if (targetIndex < 0 || targetIndex >= messages.length) return null
 
   const targetMsg = messages[targetIndex]
-  if (targetMsg.role !== "assistant") return null
+  
+  // API rule: only the final assistant message may have empty content
+  // All other messages (user AND assistant) must have non-empty content
+  const isLastMessage = targetIndex === messages.length - 1
+  if (isLastMessage && targetMsg.role === "assistant") return null
+  
   if (messageHasContent(targetMsg.id)) return null
 
   return targetMsg.id
