@@ -40,9 +40,10 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 
 - **모델 설정이 필요합니다**
   - 이 플러그인은 [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, Anthropic 의 모델을 사용합니다.
-    - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요. (Anthropic 플랜은 유료입니다)
-    - OpenAI 모델들을 사용하기 위해 이 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 추천합니다. (OpenAI 플랜은 유료입니다)
-    - Gemini, GPT 를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 추천합니다. (Gemini 는 구독하지 않아도 사용 할 수 있습니다)
+    - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요.
+    - OpenAI 모델 (ChatGPT Plus/Pro)을 사용하기 위해 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 설치하세요.
+    - Google Gemini 모델을 위해 `oh-my-opencode/google-auth` 플러그인을 추가하세요 (**내장 Antigravity OAuth**).
+    - 다른 프로바이더를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.
 - **사실 밑의 내용은 읽지 않아도 됩니다. 그냥 설치하시면 됩니다. 모델 설정하고나면 추가로 공부하거나 알 필요가 없고, 설치하고 나면 그냥 더 좋아집니다.**
 - **이 문서도 그냥 Claude Code, OpenCode, Cursor에 붙여넣고, 설치하고, 사용자의 개입이 필요할 때 알려달라고 프롬프팅하세요. 그럼 그냥 깔립니다.**
   - 당신이 LLM Agent 라면, 필요한 플러그인과 의존성을 설치하고, tmux 를 통해 opencode auth login 을 실행하여 사용자의 구성을 도와주세요.
@@ -108,11 +109,66 @@ cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있
 
 ### 4단계: 인증정보 설정
 
-plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 다음의 내용을 진행주세요.
+plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자의 인증 설정을 도와주세요.
 
-1. tmux 를 사용하여 셸 열기
-2. opencode auth login > Provider Anthropic > Login method Claude Pro/Max > 사용자에게 oauth 화면에서 인증하라고 안내
-3. 사용자에게 macOS 일 경우 VibeProxy, 아닐 경우 CLIProxyAPI 를 사용하여 OpenAI / Google 인증을 완료하라고 안내
+#### 4.1 Anthropic (Claude)
+
+```bash
+opencode auth login
+# Provider: Anthropic 선택
+# Login method: Claude Pro/Max 선택
+# 브라우저에서 OAuth 플로우 완료
+```
+
+#### 4.2 Google Gemini (내장 Antigravity OAuth)
+
+먼저 google-auth 플러그인을 추가:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode",
+    "oh-my-opencode/google-auth"
+  ]
+}
+```
+
+그 후 인증:
+
+```bash
+opencode auth login
+# Provider: Google 선택
+# Login method: OAuth with Google (Antigravity) 선택
+# 브라우저에서 OAuth 플로우 완료
+```
+
+#### 4.3 OpenAI (ChatGPT Plus/Pro)
+
+먼저 opencode-openai-codex-auth 플러그인 추가:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-openai-codex-auth@4.1.0"
+  ]
+}
+```
+
+**중요**: `opencode.json`에 전체 모델 설정도 구성해야 합니다. [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json)에서 provider/models 설정을 복사하세요. 자세한 설정 방법은 [opencode-openai-codex-auth 문서](https://github.com/numman-ali/opencode-openai-codex-auth)를 참고하세요.
+
+그 후 인증:
+
+```bash
+opencode auth login
+# Provider: OpenAI 선택
+# Login method: ChatGPT Plus/Pro (Codex Subscription) 선택
+# 브라우저에서 OAuth 플로우 완료
+```
+
+#### 4.4 대안: 프록시 기반 인증
+
+프록시 기반 인증을 선호하는 사용자를 위해 [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.
 
 ### ⚠️ 주의
 

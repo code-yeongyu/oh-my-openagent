@@ -40,8 +40,9 @@ Even if you don't, invest a little time. Boost your skills and productivity by m
 - **Model Setup Required**
   - This plugin utilizes models from [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, and Anthropic.
     - For Anthropic models, use [OpenCode's built-in Claude Code Max Plan login](https://opencode.ai/docs/providers/#anthropic).
-    - For OpenAI models, I recommend the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
-    - For Gemini and GPT, use [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+    - For OpenAI models (ChatGPT Plus/Pro), install the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
+    - For Google Gemini models, add `oh-my-opencode/google-auth` plugin for **built-in Antigravity OAuth**.
+    - For other providers, [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
 - **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
 - **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It just installs.**
   - If you are an LLM Agent, install the required plugins and dependencies, then run `opencode auth login` via tmux to assist the user with configuration.
@@ -107,11 +108,66 @@ cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugi
 
 ### Step 4: Configure Authentication
 
-Once `oh-my-opencode` is added to the plugin list, use `tmux` to proceed with the following:
+Once `oh-my-opencode` is added to the plugin list, use `tmux` to assist the user with authentication setup.
 
-1. Open a shell using `tmux`.
-2. Run `opencode auth login` > Select Provider `Anthropic` > Select Login method `Claude Pro/Max` > Instruct the user to authenticate via the OAuth screen.
-3. Recommend the setup: [VibeProxy](https://github.com/automazeio/vibeproxy) for macOS users, or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) for others.
+#### 4.1 Anthropic (Claude)
+
+```bash
+opencode auth login
+# Select Provider: Anthropic
+# Select Login method: Claude Pro/Max
+# Complete OAuth flow in browser
+```
+
+#### 4.2 Google Gemini (Built-in Antigravity OAuth)
+
+First, add the google-auth plugin:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode",
+    "oh-my-opencode/google-auth"
+  ]
+}
+```
+
+Then authenticate:
+
+```bash
+opencode auth login
+# Select Provider: Google
+# Select Login method: OAuth with Google (Antigravity)
+# Complete OAuth flow in browser
+```
+
+#### 4.3 OpenAI (ChatGPT Plus/Pro)
+
+First, add the opencode-openai-codex-auth plugin:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-openai-codex-auth@4.1.0"
+  ]
+}
+```
+
+**Important**: You must also configure the full model settings in your `opencode.json`. Copy the provider/models configuration from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json). See the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth) for detailed setup instructions.
+
+Then authenticate:
+
+```bash
+opencode auth login
+# Select Provider: OpenAI
+# Select Login method: ChatGPT Plus/Pro (Codex Subscription)
+# Complete OAuth flow in browser
+```
+
+#### 4.4 Alternative: Proxy-based Authentication
+
+For users who prefer proxy-based authentication, [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
 
 ### ⚠️ Warning
 
