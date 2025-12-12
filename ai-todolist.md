@@ -1,19 +1,328 @@
-# Background Agent Implementation Work Plan
+# Antigravity Auth Plugin Implementation Plan
 
-**Date**: 2025-12-11
-**Branch**: `feature/background-agent`
-**Based on**: `local-ignore/background-agent-analysis.md`
+**Date**: 2025-12-12
+**Branch**: `feature/antigravity-auth`
+**Status**: REVISION 1 - Addressing reviewer feedback
+
+---
+
+## 현재 진행 중인 작업
+
+**Task 1. Create Antigravity auth types** - ✅ 완료됨
+
+---
+
+## Revision History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2025-12-12 | Initial plan |
+| 1.1 | 2025-12-12 | Added tool normalization tasks, clarified provider ID, fixed export structure, added model mapping |
 
 ---
 
 ## User's Original Request
 
-`local-ignore/` 안의 마크다운 문서(background-agent-analysis.md)를 작업계획서로 작성. 모든 내용을 지금 상황에 맞게 구현.
+> ~/tools/cliproxyapi ultrasearch, and make a plan for "antigravity" auth from there to be implemented as openai codex auth implemented on here; use https://github.com/numman-ali/opencode-openai-codex-auth https://github.com/NoeFabris/opencode-antigravity-auth as a reference and also write it on the plan file. see how those auth providing plugin can be done by exploring of ~/local-workspaces/opencode and write me a full plan workable --review
 
-**Q&A**:
-- Q1. 기존 `omo_task`와의 관계? → A: `background_task` 별도 추가 (공존)
-- Q2. MVP 스코프? → A: 전부 구현 (분석서에 있는 모든 것)
-- Q3. Agent 제한? → A: Task와 동일하게 모든 agent 허용, Background 기능 지원하는 확장된 형태
+---
+
+## References (CRITICAL)
+
+### External Repositories
+
+| Repository | Purpose | Key Files |
+|------------|---------|-----------|
+| [numman-ali/opencode-openai-codex-auth](https://github.com/numman-ali/opencode-openai-codex-auth) | Reference for OpenCode auth plugin structure | `index.ts` (root), `lib/request/fetch-helpers.ts`, `lib/auth/oauth.ts` |
+| [NoeFabris/opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) | Reference for Antigravity-specific implementation | `src/plugin.ts`, `src/antigravity/oauth.ts`, `src/plugin/request.ts` |
+
+### Local Codebase
+
+| Location | Purpose |
+|----------|---------|
+| `~/tools/cliproxyapi/sdk/auth/antigravity.go` | Original Go implementation to port |
+| `~/tools/cliproxyapi/internal/cmd/antigravity_login.go` | CLI login flow reference |
+| `~/local-workspaces/opencode/packages/plugin/src/index.ts` | AuthHook interface definition |
+| `~/local-workspaces/opencode/packages/opencode/src/provider/auth.ts` | Auth provider registration |
+
+---
+
+## Context Gathered
+
+### 1. cliproxyapi Antigravity Auth (Go Implementation)
+
+**AntigravityAuthenticator Key Methods:**
+```go
+func (AntigravityAuthenticator) Provider() string { return "antigravity" }
+func (AntigravityAuthenticator) Login() // OAuth flow with PKCE
+```
+
+**OAuth Configuration:**
+- Client ID: `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`
+- Client Secret: `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`
+- Redirect URI: `http://localhost:51121/oauth-callback`
+- Scopes: `cloud-platform`, `userinfo.email`, `userinfo.profile`, `cclog`, `experimentsandconfigs`
+
+**Auth Flow:**
+1. Generate PKCE verifier/challenge
+2. Build OAuth URL with state containing verifier
+3. Open browser for Google OAuth
+4. Receive callback with code
+5. Exchange code for tokens
+6. Fetch user info (email)
+7. Fetch project ID via loadCodeAssist API
+8. Store tokens with project context
+
+**Token Storage Format:**
+```json
+{
+  "type": "antigravity",
+  "access_token": "...",
+  "refresh_token": "...",
+  "expires_in": 3600,
+  "timestamp": 1640995200000,
+  "email": "user@example.com",
+  "project_id": "my-gcp-project"
+}
+```
+
+### 2. OpenCode Auth Plugin Interface
+
+**AuthHook Interface** (from `packages/plugin/src/index.ts`):
+```typescript
+export type AuthHook = {
+  provider: string
+  loader?: (auth: () => Promise<Auth>, provider: Provider) => Promise<Record<string, any>>
+  methods: Array<{
+    type: "oauth" | "api"
+    label: string
+    prompts?: Array<{ type: "text" | "select", key: string, message: string }>
+    authorize?(inputs?: Record<string, string>): Promise<AuthOuathResult>
+  }>
+}
+
+export type AuthOuathResult = { url: string; instructions: string } & (
+  | { method: "auto"; callback(): Promise<{ type: "success" | "failed", ... }> }
+  | { method: "code"; callback(code: string): Promise<{ type: "success" | "failed", ... }> }
+)
+```
+
+### 3. opencode-openai-codex-auth Pattern
+
+**Plugin Structure:**
+```
+opencode-openai-codex-auth/
+├── index.ts                    # Main export
+├── src/plugin.ts               # createCodexAuthPlugin()
+├── lib/
+│   ├── auth/oauth.ts           # OAuth flow
+│   ├── request/
+│   │   ├── fetch-helpers.ts    # Custom fetch interceptor
+│   │   ├── request-transformer.ts
+│   │   └── response-handler.ts
+│   └── prompts/codex.ts        # Model-specific prompts
+```
+
+**Key Pattern:**
+- `createPlugin()` returns `{ hooks: { auth: AuthHook } }`
+- `loader()` returns `{ fetch: customFetch }` for request interception
+- Token refresh handled in custom fetch
+
+### 4. opencode-antigravity-auth Pattern
+
+**Unique Features:**
+- Endpoint fallback: `daily → autopush → prod`
+- Project context via `loadCodeAssist` API
+- Tool normalization for Claude/Gemini
+- Thinking block support
+- Token storage: `refreshToken|projectId|managedProjectId`
+
+**Endpoint Fallbacks:**
+```typescript
+ANTIGRAVITY_ENDPOINT_FALLBACKS = [
+  "https://daily-cloudcode-pa.sandbox.googleapis.com",      // dev
+  "https://autopush-cloudcode-pa.sandbox.googleapis.com",   // staging
+  "https://cloudcode-pa.googleapis.com"                     // prod
+]
+```
+
+---
+
+## Assumptions Made (User Did Not Respond)
+
+| Question | Assumed Answer | Rationale |
+|----------|---------------|-----------|
+| Package structure | B) Internal implementation | More control, easier to customize |
+| Existing auth relation | A) Add alongside (coexist) | Non-breaking change |
+| Feature scope | A) Full features | Match reference implementations |
+| Endpoint fallback | A) All environments | Maximum compatibility |
+| Client credentials | A) Hardcoded | Match cliproxyapi and references |
+| Tool normalization | A) Include | Full feature parity |
+| Definition of Done | C) Full conversation working | Complete verification |
+
+**User can override these assumptions by responding to the clarifying questions.**
+
+---
+
+## Critical Design Decisions (CORRECTED)
+
+### Provider ID Decision
+
+**Provider ID MUST be `"google"`**.
+
+Rationale:
+- Antigravity is just an auth mechanism for Google models
+- Provider in OpenCode = the model provider (Google)
+- User selects `google` provider, then chooses Antigravity as auth method
+
+**UX in OpenCode:**
+```
+opencode auth login
+> Select provider: google
+> Select auth method:
+  - API Key
+  - OAuth with Google (Antigravity)  <-- NEW
+```
+
+### Export Structure (SIMPLE - No Migration)
+
+**Keep it simple like openai-codex-auth:**
+```
+src/
+├── auth.ts  # export { GoogleAntigravityAuthPlugin as default } from "./auth/antigravity"
+```
+
+That's it. No complex migration. Just works.
+
+### Model Mapping
+
+**Supported Models (Google/Gemini ONLY):**
+| OpenCode Model ID | Antigravity Model | Notes |
+|-------------------|-------------------|-------|
+| `google/gemini-3-pro-preview` | `gemini-3-pro-preview` | Default |
+| `google/gemini-3-pro-high` | `gemini-3-pro-high` | High thinking |
+| `google/gemini-2.5-pro` | `gemini-2.5-pro` | Standard |
+
+**NO Claude models** - Antigravity is for Google models only.
+
+### Token Storage in OpenCode
+
+**Storage Mechanism:**
+- Uses OpenCode's built-in `Auth.set(providerID, data)` and `Auth.get(providerID)`
+- `providerID` = `"google"` (matches `AuthHook.provider`)
+- `loader` callback receives `auth()` function to retrieve stored tokens
+
+**Token Format Stored:**
+```json
+{
+  "type": "oauth",
+  "access": "ya29.xxx...",
+  "refresh": "1//xxx...|projectId|managedProjectId",
+  "expires": 1702400000000
+}
+```
+
+### Client Credentials (Via OpenCode Provider Options)
+
+**Client credentials configured via `opencode.json` provider options.**
+
+**NO prompts.** Just works with defaults, optionally configurable:
+
+```json
+// opencode.json (OPTIONAL - only if user wants custom credentials)
+{
+  "provider": {
+    "google": {
+      "options": {
+        "clientId": "your-custom-client-id",
+        "clientSecret": "your-custom-client-secret"
+      }
+    }
+  }
+}
+```
+
+**Implementation:**
+```typescript
+// In loader function - reads from provider.options
+loader: async (auth, provider) => {
+  const clientId = provider.options?.clientId || DEFAULT_CLIENT_ID
+  const clientSecret = provider.options?.clientSecret || DEFAULT_CLIENT_SECRET
+  // Use these for fetch interceptor
+  return { fetch: createAntigravityFetch(auth, clientId, clientSecret, ...) }
+}
+
+// In authorize function - also reads from provider context
+methods: [{
+  type: "oauth",
+  label: "OAuth with Google (Antigravity)",
+  // NO prompts - just authorize directly
+  authorize: async () => {
+    // clientId/clientSecret passed from loader context or use defaults
+    // Start OAuth flow
+  }
+}]
+```
+
+**User Experience:**
+```
+opencode auth login
+> Select provider: google
+> Select auth method: OAuth with Google (Antigravity)
+# Browser opens immediately - no prompts for credentials
+# Uses defaults or whatever is in opencode.json options
+```
+
+**Defaults (from cliproxyapi):**
+- `DEFAULT_CLIENT_ID`: `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`
+- `DEFAULT_CLIENT_SECRET`: `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`
+
+### Relationship with openai-codex-auth
+
+**This plugin REPLACES openai-codex-auth in this repo.**
+
+- `src/auth.ts` will export GoogleAntigravityAuthPlugin as default
+- If users need OpenAI Codex auth, they should use `opencode-openai-codex-auth` directly as a separate plugin
+- This is NOT a "coexistence" scenario - it's a "replacement" for this repo's auth
+
+**Rationale:**
+- oh-my-opencode focuses on Google/Gemini via Antigravity
+- OpenAI users already have a well-maintained separate plugin
+- Keeps this codebase focused and simple
+
+### Token Format Responsibility
+
+**refresh token format: `refreshToken|projectId|managedProjectId`**
+
+**Where it's created:** `token.ts` → `formatTokenForStorage()`
+```typescript
+function formatTokenForStorage(
+  refreshToken: string, 
+  projectId: string, 
+  managedProjectId?: string
+): string {
+  return `${refreshToken}|${projectId}|${managedProjectId || ""}`
+}
+```
+
+**Where it's parsed:** `token.ts` → `parseStoredToken()`
+```typescript
+function parseStoredToken(stored: string): {
+  refreshToken: string
+  projectId: string
+  managedProjectId?: string
+} {
+  const [refreshToken, projectId, managedProjectId] = stored.split("|")
+  return { refreshToken, projectId, managedProjectId: managedProjectId || undefined }
+}
+```
+
+**Flow:**
+1. OAuth callback receives `refresh_token` from Google
+2. `project.ts` fetches `projectId` via loadCodeAssist API
+3. `token.ts` combines them into `refresh|projectId|managedProjectId`
+4. Combined string stored via `Auth.set(providerID, { refresh: combinedString, ... })`
+5. On reload, `token.ts` parses back to individual components
 
 ---
 
@@ -21,612 +330,618 @@
 
 | Deliverable | Location | Description |
 |-------------|----------|-------------|
-| BackgroundManager 클래스 | `src/features/background-agent/manager.ts` | Task state management, SDK client integration, event handling, persistence |
-| BackgroundTask types | `src/features/background-agent/types.ts` | TypeScript interfaces for background task |
-| Storage utilities | `src/features/background-agent/storage.ts` | Persistence layer with debounced writes |
-| Feature barrel export | `src/features/background-agent/index.ts` | Module exports |
-| 4 background tools | `src/tools/background-task/tools.ts` | background_task, background_status, background_result, background_cancel |
-| Tool types | `src/tools/background-task/types.ts` | Tool argument interfaces |
-| Tool constants | `src/tools/background-task/constants.ts` | Tool descriptions, allowed agents |
-| Tool barrel export | `src/tools/background-task/index.ts` | Tool exports |
-| Background notification hook | `src/hooks/background-notification/index.ts` | chat.message hook for completion notification |
-| Notification types | `src/hooks/background-notification/types.ts` | Hook types |
-| Main integration | `src/index.ts` | Integrate tools and hooks into plugin |
-| Tools index update | `src/tools/index.ts` | Export background tools |
-| Hooks index update | `src/hooks/index.ts` | Export background notification hook |
+| Google Antigravity auth plugin | `src/auth/antigravity/plugin.ts` | Main createGoogleAntigravityAuthPlugin() |
+| OAuth flow | `src/auth/antigravity/oauth.ts` | PKCE OAuth with configurable credentials |
+| Token management | `src/auth/antigravity/token.ts` | Token refresh, storage format |
+| Request transformer | `src/auth/antigravity/request.ts` | OpenAI → Gemini/Antigravity format |
+| Response handler | `src/auth/antigravity/response.ts` | Gemini/Antigravity → OpenAI format |
+| Tool normalization | `src/auth/antigravity/tools.ts` | OpenAI tools ↔ Gemini functionDeclarations |
+| Thinking block handler | `src/auth/antigravity/thinking.ts` | Extract/format Gemini thinking blocks |
+| Fetch interceptor | `src/auth/antigravity/fetch.ts` | Request interception with endpoint fallback |
+| Project context | `src/auth/antigravity/project.ts` | loadCodeAssist API integration |
+| Constants | `src/auth/antigravity/constants.ts` | Default OAuth config, endpoints, headers |
+| Types | `src/auth/antigravity/types.ts` | TypeScript interfaces |
+| Barrel export | `src/auth/antigravity/index.ts` | Module exports |
+| Auth entry | `src/auth.ts` | Simple default export |
 
 ---
 
 ## Definition of Done
 
-- [ ] `bun run typecheck` passes with no errors
+- [x] `bun run typecheck` passes with no errors
 - [ ] `bun run build` succeeds
-- [ ] `background_task` tool launches async agent and returns immediately
-- [ ] `background_status` tool shows task status (pending/running/completed/error/cancelled)
-- [ ] `background_result` tool retrieves completed task output
-- [ ] `background_cancel` tool cancels running task
-- [ ] State persists to `.opencode/background-tasks.json`
-- [ ] Completion notification injected via `chat.message` hook
-- [ ] Event listener tracks task progress (tool calls count)
-- [ ] Parent session close triggers cascade cleanup
-- [ ] No new dependencies added (use existing zod, @opencode-ai/plugin)
+- [ ] `opencode auth login` shows "google" provider with "OAuth with Google (Antigravity)" method
+- [ ] NO prompts - OAuth starts immediately (credentials from options or defaults)
+- [ ] OAuth flow completes and stores tokens
+- [ ] Token auto-refresh works before expiration
+- [ ] `loadCodeAssist` API returns project ID
+- [ ] Endpoint fallback works (tries prod if daily fails)
+- [ ] API request transformation works (OpenAI → Gemini format)
+- [ ] API response transformation works (Gemini → OpenAI format)
+- [ ] Can have full conversation with Gemini model via Antigravity
+- [ ] Custom credentials work when configured in `opencode.json` provider options
 
 ---
 
 ## Must Have
 
-- All 4 tools: `background_task`, `background_status`, `background_result`, `background_cancel`
-- BackgroundManager with:
-  - Task state machine: pending → running → completed/error/cancelled
-  - SDK client integration via `promptAsync()`
-  - Event handling for progress tracking
-  - Notification queue for completed tasks
-- Persistence layer:
-  - `.opencode/background-tasks.json` storage
-  - Debounced writes (500ms)
-  - Restore on plugin init
-- Notification system:
-  - `chat.message` hook injection
-  - Formatted completion messages
-  - Clear notifications after delivery
-- Progress tracking:
-  - Tool calls count
-  - Last tool name
-  - Last update timestamp
+- **OAuth with PKCE**: Google OAuth 2.0 with Proof Key for Code Exchange
+- **Token Management**: Access token refresh before expiration (60s buffer)
+- **Project Context**: loadCodeAssist API for automatic project discovery
+- **Request Transformation**: Convert OpenAI-format requests to Gemini/Antigravity format
+- **Response Transformation**: Convert Gemini/Antigravity responses to OpenAI format
+- **Endpoint Fallback**: Try multiple endpoints if primary fails
+- **REPLACES openai-codex-auth**: This repo becomes Google/Antigravity focused (OpenAI users use separate plugin)
 
 ---
 
 ## Must NOT Have
 
-- No modification to existing `omo_task` code
-- No new npm dependencies
-- No test files (test framework not configured)
-- No changes to `oh-my-opencode.json` schema
-- No over-engineered retry/backoff logic
-- No complex state machine beyond 5 states
-- No excessive logging
-
----
-
-## References
-
-### MUST READ Before Starting
-
-| File | What to understand | Key patterns |
-|------|-------------------|--------------|
-| `src/tools/omo-task/tools.ts` | Existing task tool pattern | `createOmoTask` factory, SDK client usage, session creation |
-| `src/tools/omo-task/types.ts` | Type definition pattern | Interface naming, optional props |
-| `src/tools/omo-task/constants.ts` | Constants pattern | ALLOWED_AGENTS, description template |
-| `src/tools/index.ts` | Tool export pattern | Barrel exports, `builtinTools` object |
-| `src/hooks/session-notification.ts` | Event handling pattern | Event types, session tracking |
-| `src/index.ts:100-103` | chat.message hook integration | How hooks merge |
-| `src/index.ts:162-264` | Event hook integration | Event type handling, session state |
-| `src/features/claude-code-session-state/` | Session state pattern | State storage, getters/setters |
-| `local-ignore/background-agent-analysis.md` | Full specification | All implementation details |
-
-### Reference Files (Per-task)
-
-| File | Search term | Purpose |
-|------|-------------|---------|
-| `src/tools/omo-task/tools.ts:62` | `client.session.prompt` | Change to `promptAsync` for background |
-| `src/tools/omo-task/tools.ts:43-56` | `client.session.create` | Session creation with parentID |
-| `src/hooks/session-notification.ts:153-199` | `event.type` | Event handling patterns |
-| `src/index.ts:100-103` | `chat.message` | Hook integration point |
+- **No modification to existing auth.ts** beyond adding export
+- **No new npm dependencies** (use existing @openauthjs/openauth for PKCE)
+- **No test files** (test framework not configured)
+- **No over-abstraction** (no "AuthProvider" base class)
+- **No separate npm package** (internal implementation only)
+- **No changes to opencode.json schema**
+- **No breaking changes to existing functionality**
 
 ---
 
 ## Task Flow Diagram
 
 ```
-Phase 1 (Core Infrastructure)
-├── Task 1: Create types ─────────────────────┐
-├── Task 2: Create BackgroundManager ─────────┤ Sequential (2 depends on 1)
-└── Task 3: Create storage utilities ─────────┘ Parallel with 2
+Phase 1 (Foundation)
+├── Task 1: Create types ──────────────────────┐
+├── Task 2: Create constants ──────────────────┤ Parallel
+└── Task 3: Create module structure ───────────┘
 
-Phase 2 (Tools)
-├── Task 4: Create tool types & constants ────┐
-├── Task 5: Implement background_task ────────┤ Sequential (5 depends on 4, 2)
-├── Task 6: Implement background_status ──────┤ Sequential (6 depends on 5)
-├── Task 7: Implement background_result ──────┤ Parallel with 6
-└── Task 8: Implement background_cancel ──────┘ Parallel with 6, 7
+Phase 2 (OAuth Core)
+├── Task 4: Implement OAuth flow ──────────────┐
+├── Task 5: Implement token management ────────┤ Sequential (5 depends on 4)
+└── Task 6: Implement project context ─────────┘ Sequential (6 depends on 5)
 
-Phase 3 (Notification)
-├── Task 9: Create notification hook ─────────┐
-└── Task 10: Hook integration in manager ─────┘ Sequential (10 depends on 9)
+Phase 3 (Request/Response Transformation)
+├── Task 7: Implement request transformer ─────┐
+├── Task 8: Implement response handler ────────┤ Parallel
+├── Task 9: Implement tool normalization ──────┤ Parallel (after 7, 8 design known)
+├── Task 10: Implement thinking block handler ─┤ Parallel with 9
+└── Task 11: Implement fetch interceptor ──────┘ Sequential (depends on 7-10)
 
-Phase 4 (Integration)
-├── Task 11: Update tools/index.ts ───────────┐
-├── Task 12: Update hooks/index.ts ───────────┤ Parallel (all 3)
-├── Task 13: Update main index.ts ────────────┘
-└── Task 14: Final verification ──────────────  Sequential (depends on 11-13)
+Phase 4 (Plugin Assembly)
+├── Task 12: Create main plugin ───────────────┐
+├── Task 13: Migrate auth exports ─────────────┤ Sequential
+└── Task 14: Final verification ───────────────┘ Sequential
 ```
+Phase 1 (Foundation)
+├── Task 1: Create types ──────────────────────┐
+├── Task 2: Create constants ──────────────────┤ Parallel
+└── Task 3: Create barrel export structure ────┘
 
----
+Phase 2 (OAuth Core)
+├── Task 4: Implement OAuth flow ──────────────┐
+├── Task 5: Implement token management ────────┤ Sequential (5 depends on 4)
+└── Task 6: Implement project context ─────────┘ Sequential (6 depends on 5)
 
-## 현재 진행 중인 작업
+Phase 3 (Request/Response)
+├── Task 7: Implement request transformer ─────┐
+├── Task 8: Implement response handler ────────┤ Parallel
+└── Task 9: Implement fetch interceptor ───────┘ Sequential (9 depends on 7, 8)
 
-- ✅ **Task 11: Update tools/index.ts** - 완료
-- ✅ **Task 12: Update hooks/index.ts** - 완료
-- ✅ **Task 13: Update main index.ts** - 완료
-- ✅ **Task 14: Final verification and cleanup** - 완료
-
-🎉 **모든 14개 태스크 완료!** Background Agent 기능 구현 완료!
+Phase 4 (Plugin Assembly)
+├── Task 10: Create main plugin ───────────────┐
+├── Task 11: Update auth exports ──────────────┤ Sequential
+└── Task 12: Final verification ───────────────┘ Sequential
+```
 
 ---
 
 ## Tasks
 
-### Phase 1: Core Infrastructure
+### Phase 1: Foundation
 
-- [x] **1. Create background-agent types**
+- [x] **1. Create Antigravity auth types**
 
   **What to do**:
-  - Create `src/features/background-agent/types.ts`
-  - Define `BackgroundTask` interface with all fields from analysis doc
-  - Define `BackgroundTaskStatus` type union
-  - Define `LaunchInput` interface for manager.launch()
-  - Define `TaskProgress` interface
+  - Create `src/auth/antigravity/types.ts`
+  - Define `AntigravityTokens` interface (access_token, refresh_token, expires_in, timestamp, email, project_id)
+  - Define `AntigravityProjectContext` interface
+  - Define `AntigravityRequestBody` interface
+  - Define `AntigravityResponse` interface
 
   **Must NOT do**:
-  - Do NOT add fields not in analysis document
-  - Do NOT use `class` for data types (use `interface`)
+  - Do NOT create abstract base classes
+  - Do NOT add fields not in cliproxyapi implementation
 
-  **Parallelizable**: NO (foundation for all other tasks)
+  **Parallelizable**: YES (with Task 2, 3)
 
   **MUST READ first**:
-  - `src/tools/omo-task/types.ts` - type definition pattern
-  - `local-ignore/background-agent-analysis.md:308-325` - BackgroundTask interface spec
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go` - token structure
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin/types.ts`
 
   **Acceptance Criteria**:
-  - [ ] `BackgroundTask` interface has: id, sessionID, parentSessionID, parentMessageID, description, agent, status, startedAt, completedAt?, result?, error?, progress?
-  - [ ] `BackgroundTaskStatus` = "pending" | "running" | "completed" | "error" | "cancelled"
-  - [ ] File exports all types
-  - [ ] `bun run typecheck` passes
+  - [x] All interfaces match cliproxyapi token format
+  - [x] Types exported from file
+  - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 3)
 
 ---
 
-- [x] **2. Create BackgroundManager class**
+- [x] **2. Create constants**
 
   **What to do**:
-  - Create `src/features/background-agent/manager.ts`
-  - Implement `BackgroundManager` class with:
-    - `tasks: Map<string, BackgroundTask>`
-    - `notifications: Map<string, BackgroundTask[]>` (pending notifications per session)
-    - `client: OpencodeClient` (from ctx)
-    - `storePath: string`
-  - Implement methods:
-    - `launch(input: LaunchInput): Promise<BackgroundTask>` - create session, store task, call promptAsync
-    - `getTask(id: string): BackgroundTask | undefined`
-    - `getTasksByParentSession(sessionID: string): BackgroundTask[]`
-    - `findBySession(sessionID: string): BackgroundTask | undefined`
-    - `handleEvent(event: Event): void` - track progress, detect completion
-    - `markForNotification(task: BackgroundTask): void`
-    - `getPendingNotifications(sessionID: string): BackgroundTask[]`
-    - `clearNotifications(sessionID: string): void`
-    - `persist(): Promise<void>` - debounced write
-    - `restore(): Promise<void>` - load from disk
+  - Create `src/auth/antigravity/constants.ts`
+  - Define `ANTIGRAVITY_CLIENT_ID`, `ANTIGRAVITY_CLIENT_SECRET`
+  - Define `ANTIGRAVITY_REDIRECT_URI` = `http://localhost:51121/oauth-callback`
+  - Define `ANTIGRAVITY_SCOPES` array
+  - Define `ANTIGRAVITY_ENDPOINT_FALLBACKS` array
+  - Define `ANTIGRAVITY_HEADERS` object
+  - Define `ANTIGRAVITY_DEFAULT_PROJECT_ID`
 
   **Must NOT do**:
-  - Do NOT implement retry logic
-  - Do NOT add constructor parameters beyond client and storePath
-  - Do NOT call persist() synchronously (always debounce)
+  - Do NOT put credentials in environment variables
+  - Do NOT modify values from cliproxyapi
 
-  **Parallelizable**: NO (depends on Task 1)
+  **Parallelizable**: YES (with Task 1, 3)
 
   **MUST READ first**:
-  - `src/tools/omo-task/tools.ts:41-72` - SDK client session.create and prompt patterns
-  - `local-ignore/background-agent-analysis.md:327-416` - BackgroundManager spec
-  - `local-ignore/background-agent-analysis.md:759-823` - Session lifecycle & cleanup
-
-  **References**:
-  - `src/tools/omo-task/tools.ts:62` - change `prompt()` to `promptAsync()` for non-blocking
-  - `src/hooks/session-notification.ts:109-120` - notification queue pattern
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go` - OAuth credentials
+  - Reference: NoeFabris/opencode-antigravity-auth `src/constants.ts`
 
   **Acceptance Criteria**:
-  - [ ] `launch()` creates child session with parentID, calls promptAsync, returns task with status "running"
-  - [ ] `handleEvent()` updates task.progress on `message.part.updated`
-  - [ ] `handleEvent()` marks task completed on `session.updated` with status "idle"
-  - [ ] `handleEvent()` handles `session.deleted` for cleanup
-  - [ ] Debounced persist (500ms delay)
-  - [ ] `bun run typecheck` passes
+  - [ ] All OAuth constants match cliproxyapi
+  - [ ] Endpoint fallbacks in correct order (daily, autopush, prod)
+  - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 3)
 
 ---
 
-- [x] **3. Create storage utilities**
+- [x] **3. Create module structure** ✅ COMPLETED
 
   **What to do**:
-  - Create `src/features/background-agent/storage.ts`
-  - Implement persistence helpers:
-    - `saveToFile(path: string, tasks: BackgroundTask[]): Promise<void>`
-    - `loadFromFile(path: string): Promise<BackgroundTask[]>`
-  - Handle file not exists gracefully (return empty array)
-  - Create `src/features/background-agent/index.ts` barrel export
+  - Create `src/auth/antigravity/index.ts` barrel export
+  - Create empty placeholder files for remaining modules
+  - Ensure directory structure matches plan
 
   **Must NOT do**:
-  - Do NOT use synchronous file operations
-  - Do NOT throw on missing file
+  - Do NOT implement actual logic yet
 
-  **Parallelizable**: YES (with Task 2, but Task 2 depends on Task 1)
-
-  **MUST READ first**:
-  - `src/features/claude-code-session-state/state.ts` - existing state storage pattern
+  **Parallelizable**: YES (with Task 1, 2)
 
   **Acceptance Criteria**:
-  - [ ] `saveToFile` writes JSON with 2-space indent
-  - [ ] `loadFromFile` returns `[]` if file doesn't exist
-  - [ ] `index.ts` exports BackgroundManager and all types
-  - [ ] `bun run typecheck` passes
+  - [x] Directory `src/auth/antigravity/` exists
+  - [x] `index.ts` exports types and constants
+  - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: YES
 
   **Commit Specification**:
-  - **Message**: `feat(background-agent): add BackgroundManager with persistence layer`
-  - **Files to stage**: `src/features/background-agent/`
+  - **Message**: `feat(antigravity-auth): add types and constants foundation`
+  - **Files to stage**: `src/auth/antigravity/`
   - **Pre-commit verification**:
     - [ ] `bun run typecheck` → No errors
-  - **Rollback trigger**: Type errors in BackgroundManager
+  - **Rollback trigger**: Type errors in imports
 
 ---
 
-### Phase 2: Tools Implementation
+### Phase 2: OAuth Core
 
-- [x] **4. Create background-task tool types and constants**
-
-  **What to do**:
-  - Create `src/tools/background-task/types.ts`:
-    - `BackgroundTaskArgs` interface (description, prompt, agent, session_id?)
-    - `BackgroundStatusArgs` interface (taskId?)
-    - `BackgroundResultArgs` interface (taskId)
-    - `BackgroundCancelArgs` interface (taskId)
-  - Create `src/tools/background-task/constants.ts`:
-    - `BACKGROUND_TASK_DESCRIPTION` - tool description from analysis doc
-    - `BACKGROUND_STATUS_DESCRIPTION`
-    - `BACKGROUND_RESULT_DESCRIPTION`
-    - `BACKGROUND_CANCEL_DESCRIPTION`
-
-  **Must NOT do**:
-  - Do NOT restrict agents like omo_task does (allow all agents)
-  - Do NOT copy ALLOWED_AGENTS pattern
-
-  **Parallelizable**: NO (required by Task 5-8)
-
-  **MUST READ first**:
-  - `src/tools/omo-task/types.ts` - type pattern
-  - `src/tools/omo-task/constants.ts` - constants pattern
-  - `local-ignore/background-agent-analysis.md:651-740` - tool specs
-
-  **Acceptance Criteria**:
-  - [ ] All 4 Args interfaces defined
-  - [ ] All 4 description constants match analysis doc
-  - [ ] No agent restriction (unlike omo_task)
-  - [ ] `bun run typecheck` passes
-
-  **Commit Checkpoint**: NO (groups with Task 8)
-
----
-
-- [x] **5. Implement background_task tool** ✅ 완료
+- [ ] **4. Implement OAuth flow**
 
   **What to do**:
-  - Create `src/tools/background-task/tools.ts`
-  - Implement `createBackgroundTask(manager: BackgroundManager)` factory
-  - Tool should:
-    - Accept description, prompt, agent args
-    - Call `manager.launch()` to start background task
-    - Return formatted success message with task ID, session ID, status
-    - Handle errors gracefully
+  - Create `src/auth/antigravity/oauth.ts`
+  - Implement `generatePKCE()` using @openauthjs/openauth
+  - Implement `buildAuthURL(projectId: string)` 
+  - Implement `exchangeCode(code: string, verifier: string)`
+  - Implement `fetchUserInfo(accessToken: string)`
+  - Start local callback server on port 51121
 
   **Must NOT do**:
-  - Do NOT block/await for task completion
-  - Do NOT restrict agent types
-  - Do NOT access SDK client directly (use manager)
+  - Do NOT use custom PKCE implementation (use @openauthjs/openauth)
+  - Do NOT change OAuth scopes from cliproxyapi
 
-  **Parallelizable**: NO (depends on Task 2, 4)
+  **Parallelizable**: NO (foundation for Phase 2)
 
   **MUST READ first**:
-  - `src/tools/omo-task/tools.ts:6-111` - tool factory pattern
-  - `local-ignore/background-agent-analysis.md:427-458` - background_task spec
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go:buildAntigravityAuthURL`
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go:exchangeAntigravityCode`
+  - Reference: NoeFabris/opencode-antigravity-auth `src/antigravity/oauth.ts`
+  - Reference: numman-ali/opencode-openai-codex-auth `lib/auth/oauth.ts`
 
   **References**:
-  - `src/tools/omo-task/tools.ts:12-21` - tool() function usage with schema
+  - cliproxyapi line: `buildAntigravityAuthURL` function
+  - cliproxyapi line: `exchangeAntigravityCode` function
 
   **Acceptance Criteria**:
-  - [x] Returns immediately after launch (non-blocking)
-  - [x] Output includes task ID, session ID, description, agent, status
-  - [x] Output instructs user to use `background_status` for progress
+  - [ ] PKCE verifier/challenge generated correctly
+  - [ ] Auth URL includes all required parameters
+  - [ ] Token exchange returns access_token and refresh_token
+  - [ ] User info fetch returns email
   - [x] `bun run typecheck` passes
 
-  **Commit Checkpoint**: NO (groups with Task 8)
+  **Commit Checkpoint**: NO (groups with Task 6)
 
 ---
 
-- [x] **6. Implement background_status tool**
+- [ ] **5. Implement token management**
 
   **What to do**:
-  - Add `background_status` to `src/tools/background-task/tools.ts`
-  - Implement `createBackgroundStatus(manager: BackgroundManager)` factory
-  - Tool should:
-    - Accept optional taskId arg
-    - If taskId: return single task status
-    - If no taskId: return all tasks for current parent session
-    - Format output with: description, status, duration, tool calls, last tool
+  - Create `src/auth/antigravity/token.ts`
+  - Implement `isTokenExpired(tokens: AntigravityTokens)` with 60s buffer
+  - Implement `refreshAccessToken(refreshToken: string)`
+  - Implement `parseStoredToken(stored: string)` for `refreshToken|projectId|managedProjectId` format
+  - Implement `formatTokenForStorage(tokens, projectId, managedProjectId)`
 
   **Must NOT do**:
-  - Do NOT return tasks from other parent sessions when taskId is omitted
+  - Do NOT implement retry logic for refresh
+  - Do NOT cache tokens in memory (use OpenCode's storage)
+
+  **Parallelizable**: NO (depends on Task 4)
+
+  **MUST READ first**:
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin/token.ts`
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go` - token refresh logic
+
+  **Acceptance Criteria**:
+  - [ ] Token expiration check includes 60s buffer
+  - [ ] Refresh token exchange works with Google endpoint
+  - [ ] Token parsing handles `|` separated format
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: NO (groups with Task 6)
+
+---
+
+- [ ] **6. Implement project context**
+
+  **What to do**:
+  - Create `src/auth/antigravity/project.ts`
+  - Implement `fetchProjectContext(accessToken: string)` calling loadCodeAssist API
+  - Extract `cloudaicompanionProject` from response
+  - Implement fallback to `ANTIGRAVITY_DEFAULT_PROJECT_ID` if API fails
+  - Cache project context per refresh token
+
+  **Must NOT do**:
+  - Do NOT fail if loadCodeAssist returns empty (use default)
 
   **Parallelizable**: NO (depends on Task 5)
 
   **MUST READ first**:
-  - `local-ignore/background-agent-analysis.md:462-508` - background_status spec
-
-  **Acceptance Criteria**:
-  - [ ] Shows task status with duration (formatted human-readable)
-  - [ ] Shows tool calls count and last tool name
-  - [ ] Returns "No background tasks found" if empty
-  - [ ] `bun run typecheck` passes
-
-  **Commit Checkpoint**: NO (groups with Task 8)
-
----
-
-- [x] **7. Implement background_result tool**
-
-  **What to do**:
-  - Add `background_result` to `src/tools/background-task/tools.ts`
-  - Implement `createBackgroundResult(manager: BackgroundManager, client: OpencodeClient)` factory
-  - Tool should:
-    - Accept taskId arg (required)
-    - Validate task exists and is completed
-    - Fetch messages from child session via SDK
-    - Extract last assistant message content
-    - Return formatted result with duration
-
-  **Must NOT do**:
-  - Do NOT return result if task status != "completed"
-  - Do NOT store full result in BackgroundTask (fetch on demand)
-
-  **Parallelizable**: YES (with Task 6)
-
-  **MUST READ first**:
-  - `src/tools/omo-task/tools.ts:76-101` - message fetching pattern
-  - `local-ignore/background-agent-analysis.md:498-529` - background_result spec
-
-  **Acceptance Criteria**:
-  - [ ] Returns error if task not found
-  - [ ] Returns "Wait for completion" if task not completed
-  - [ ] Fetches and returns assistant output from child session
-  - [ ] Includes duration and session ID in output
-  - [ ] `bun run typecheck` passes
-
-  **Commit Checkpoint**: NO (groups with Task 8)
-
----
-
-- [x] **8. Implement background_cancel tool** ✅ 완료
-
-  **What to do**:
-  - Add `background_cancel` to `src/tools/background-task/tools.ts`
-  - Implement `createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient)` factory
-  - Tool should:
-    - Accept taskId arg (required)
-    - Validate task exists and is running
-    - Call `client.session.abort()` on child session
-    - Update task status to "cancelled"
-    - Persist state
-  - Create `src/tools/background-task/index.ts` barrel export
-
-  **Must NOT do**:
-  - Do NOT cancel if task status != "running"
-
-  **Parallelizable**: YES (with Task 6, 7)
-
-  **MUST READ first**:
-  - `local-ignore/background-agent-analysis.md:531-559` - background_cancel spec
-
-  **Acceptance Criteria**:
-  - [x] Returns error if task not found
-  - [x] Returns error if task not running
-  - [x] Calls session.abort() on child session
-  - [x] Updates task status and completedAt
-  - [x] Persists state change
-  - [x] `index.ts` exports all 4 tool factories
-  - [x] `bun run typecheck` passes
-
-  **Commit Checkpoint**: YES
-
-  **Commit Specification**:
-  - **Message**: `feat(background-task): add 4 background task tools`
-  - **Files to stage**: `src/tools/background-task/`
-  - **Pre-commit verification**:
-    - [ ] `bun run typecheck` → No errors
-  - **Rollback trigger**: Tool execution failures
-
----
-
-### Phase 3: Notification System
-
-- [x] **9. Create background notification hook** ✅ 완료
-
-  **What to do**:
-  - Create `src/hooks/background-notification/types.ts` with hook types
-  - Create `src/hooks/background-notification/index.ts`
-  - Implement `createBackgroundNotificationHook(manager: BackgroundManager)` factory
-  - Return object with:
-    - `event`: Forward events to manager.handleEvent()
-    - `chat.message`: Inject completion notifications
-
-  **Must NOT do**:
-  - Do NOT process events not relevant to background tasks
-  - Do NOT inject notifications for tasks from other sessions
-
-  **Parallelizable**: NO (depends on Task 2)
-
-  **MUST READ first**:
-  - `src/hooks/session-notification.ts:153-199` - event handling pattern
-  - `src/index.ts:100-103` - chat.message hook pattern
-  - `local-ignore/background-agent-analysis.md:567-604` - hook spec
+  - `~/tools/cliproxyapi/sdk/auth/antigravity.go:fetchAntigravityProjectID`
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin/project.ts`
 
   **References**:
-  - `local-ignore/background-agent-analysis.md:586-598` - notification format
+  - API endpoint: `https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`
+  - Response field: `cloudaicompanionProject`
 
   **Acceptance Criteria**:
-  - [x] `event` handler forwards to manager.handleEvent()
-  - [x] `chat.message` checks pending notifications for input.sessionID
-  - [x] Injects formatted notification message into output.parts
-  - [x] Clears notifications after injection
-  - [x] `bun run typecheck` passes
-
-  **Commit Checkpoint**: NO (groups with Task 10)
-
----
-
-- [x] **10. Integrate notification formatting** ✅ 완료
-
-  **What to do**:
-  - Add notification message formatting function
-  - Format includes:
-    - Task description and ID
-    - Duration (human-readable)
-    - Tool calls count
-    - Instructions to use `background_result`
-  - Use markdown format for clear presentation
-
-  **Must NOT do**:
-  - Do NOT use XML tags (use markdown)
-  - Do NOT include full result in notification (just summary)
-
-  **Parallelizable**: NO (depends on Task 9)
-
-  **MUST READ first**:
-  - `local-ignore/background-agent-analysis.md:586-598` - notification format spec
-
-  **Acceptance Criteria**:
-  - [x] Notification includes all required info
-  - [x] Readable markdown format
-  - [x] Includes instruction to retrieve full result
+  - [ ] loadCodeAssist API called with correct headers
+  - [ ] Project ID extracted from response
+  - [ ] Fallback to default project ID works
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: YES
 
   **Commit Specification**:
-  - **Message**: `feat(background-notification): add completion notification hook`
-  - **Files to stage**: `src/hooks/background-notification/`
+  - **Message**: `feat(antigravity-auth): add OAuth flow and token management`
+  - **Files to stage**: `src/auth/antigravity/oauth.ts`, `src/auth/antigravity/token.ts`, `src/auth/antigravity/project.ts`
   - **Pre-commit verification**:
     - [ ] `bun run typecheck` → No errors
-  - **Rollback trigger**: Hook integration failures
+  - **Rollback trigger**: OAuth flow failures
 
 ---
 
-### Phase 4: Integration
+### Phase 3: Request/Response Transformation
 
-- [x] **11. Update tools/index.ts** ✅ 완료
+- [ ] **7. Implement request transformer**
 
   **What to do**:
-  - Import background tool factories from `./background-task`
-  - Export `createBackgroundTools` composite factory
-  - Do NOT add to `builtinTools` (tools need manager instance)
+  - Create `src/auth/antigravity/request.ts`
+  - Implement `transformRequest(body: OpenAIRequest)` → AntigravityRequest
+  - Handle model name extraction from path
+  - Wrap request body in `{ project, model, request }` format
+  - Add Antigravity-specific headers
 
   **Must NOT do**:
-  - Do NOT add individual tools to builtinTools (they need runtime init)
+  - Do NOT modify the original request object (create new)
+  - Do NOT implement tool normalization in this task
 
-  **Parallelizable**: YES (with Task 12, 13)
+  **Parallelizable**: YES (with Task 8)
 
   **MUST READ first**:
-  - `src/tools/index.ts` - current export pattern
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin/request.ts`
+  - Reference: numman-ali/opencode-openai-codex-auth `lib/request/request-transformer.ts`
 
   **Acceptance Criteria**:
-  - [x] `createBackgroundTools` exported
-  - [x] Takes manager and client as params, returns tool object
+  - [ ] Model name extracted from URL path
+  - [ ] Request wrapped correctly for Antigravity API
+  - [ ] Headers include Authorization, User-Agent, X-Goog-Api-Client
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: NO (groups with Task 9)
+
+---
+
+- [ ] **8. Implement response handler**
+
+  **What to do**:
+  - Create `src/auth/antigravity/response.ts`
+  - Implement `transformResponse(response: Response)` for non-streaming
+  - Implement `transformStreamingResponse(response: Response)` for SSE
+  - Handle error responses with retry-after extraction
+  - Extract usage metadata from x-antigravity-* headers
+
+  **Must NOT do**:
+  - Do NOT block on streaming responses
+  - Do NOT lose error details in transformation
+
+  **Parallelizable**: YES (with Task 7)
+
+  **MUST READ first**:
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin/request.ts` response handling
+  - Reference: numman-ali/opencode-openai-codex-auth `lib/request/response-handler.ts`
+
+  **Acceptance Criteria**:
+  - [ ] Non-streaming responses transformed correctly
+  - [ ] SSE streaming preserved and transformed
+  - [ ] Error responses include useful details
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: NO (groups with Task 9)
+
+---
+
+- [ ] **9. Implement tool normalization (Gemini only)**
+
+  **What to do**:
+  - Create `src/auth/antigravity/tools.ts`
+  - Implement `normalizeToolsForGemini(tools: OpenAITool[])` 
+    - Convert OpenAI function calling format to Gemini format
+    - Handle `function` type tools with name, description, parameters
+  - Implement `normalizeToolResultsFromGemini(results: GeminiToolResult[])`
+    - Convert Gemini tool call results back to OpenAI format
+
+  **Must NOT do**:
+  - Do NOT handle Claude models (Antigravity is Google/Gemini only)
+  - Do NOT drop unknown tool types silently (log warning)
+  - Do NOT modify tool behavior, only format
+
+  **Parallelizable**: YES (with Task 10, after 7-8 design understood)
+
+  **MUST READ first**:
+  - Reference: NoeFabris/opencode-antigravity-auth tool handling in `src/plugin/request.ts`
+  - OpenAI function calling format docs
+  - Gemini tool format docs
+
+  **Tool Format Mapping:**
+  ```
+  OpenAI format:
+  { "type": "function", "function": { "name": "x", "parameters": {...} } }
+  
+  Gemini format:
+  { "functionDeclarations": [{ "name": "x", "parameters": {...} }] }
+  ```
+
+  **Acceptance Criteria**:
+  - [ ] OpenAI-style tools converted to Gemini functionDeclarations
+  - [ ] Tool call results mapped back correctly
+  - [ ] Warning logged for unsupported tool types
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: NO (groups with Task 11)
+
+---
+
+- [ ] **10. Implement thinking block handler (Gemini only)**
+
+  **What to do**:
+  - Create `src/auth/antigravity/thinking.ts`
+  - Implement `extractThinkingBlocks(response: GeminiResponse)`
+    - Identify `thinkingContent` or reasoning segments in Gemini response
+    - Separate thinking content from main response
+  - Implement `shouldIncludeThinking(model: string)` 
+    - Return true for `-high` model variants (e.g., `gemini-3-pro-high`)
+  - Implement `formatThinkingForOpenAI(thinking: ThinkingBlock[])`
+    - Convert Gemini thinking to OpenAI-compatible format
+
+  **Must NOT do**:
+  - Do NOT handle Claude models (Antigravity is Google/Gemini only)
+  - Do NOT lose thinking content without explicit decision
+  - Do NOT block on thinking extraction
+
+  **Parallelizable**: YES (with Task 9)
+
+  **MUST READ first**:
+  - Reference: NoeFabris/opencode-antigravity-auth thinking block handling
+  - Gemini thinking mode response format
+
+  **Thinking Block Detection (Gemini only):**
+  - Look for `thinkingContent` field in Gemini response
+  - Model variants with `-high` suffix have thinking enabled
+
+  **Acceptance Criteria**:
+  - [ ] Thinking blocks extracted from Gemini responses
+  - [ ] Model variant detection works (`-high`)
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: NO (groups with Task 11)
+
+---
+
+- [ ] **11. Implement fetch interceptor**
+
+  **What to do**:
+  - Create `src/auth/antigravity/fetch.ts`
+  - Implement `createAntigravityFetch(getAuth, client, providerId)` factory
+  - Check token expiration before each request → auto refresh
+  - Rewrite URL for Antigravity endpoints
+  - Apply request transformation (including tool normalization)
+  - Apply response transformation (including thinking extraction)
+  - Implement endpoint fallback (try next endpoint on failure)
+
+  **Must NOT do**:
+  - Do NOT retry indefinitely (max 3 endpoints)
+  - Do NOT modify global fetch
+
+  **Parallelizable**: NO (depends on Task 7-10)
+
+  **MUST READ first**:
+  - Reference: numman-ali/opencode-openai-codex-auth `lib/request/fetch-helpers.ts`
+  - Reference: NoeFabris/opencode-antigravity-auth fetch implementation
+
+  **Endpoint Fallback Verification Procedure:**
+  ```bash
+  # To test fallback, temporarily modify ANTIGRAVITY_ENDPOINT_FALLBACKS order
+  # or set environment variable ANTIGRAVITY_DEBUG=1 to see endpoint attempts
+  # Expected: If daily fails (4xx/5xx/timeout), tries autopush, then prod
+  ```
+
+  **Acceptance Criteria**:
+  - [ ] Token refresh triggered when needed
+  - [ ] URL rewritten to Antigravity endpoint
+  - [ ] Request transformation applied (including tools)
+  - [ ] Response transformation applied (including thinking)
+  - [ ] Endpoint fallback works (daily → autopush → prod)
+  - [ ] Debug logging shows endpoint attempts when ANTIGRAVITY_DEBUG=1
+  - [x] `bun run typecheck` passes
+
+  **Commit Checkpoint**: YES
+
+  **Commit Specification**:
+  - **Message**: `feat(antigravity-auth): add request/response transformation with tools and thinking`
+  - **Files to stage**: `src/auth/antigravity/request.ts`, `src/auth/antigravity/response.ts`, `src/auth/antigravity/tools.ts`, `src/auth/antigravity/thinking.ts`, `src/auth/antigravity/fetch.ts`
+  - **Pre-commit verification**:
+    - [ ] `bun run typecheck` → No errors
+  - **Rollback trigger**: Transformation errors
+
+---
+
+### Phase 4: Plugin Assembly
+
+- [ ] **12. Create main plugin**
+
+  **What to do**:
+  - Create `src/auth/antigravity/plugin.ts`
+  - Implement `createGoogleAntigravityAuthPlugin()` factory
+  - Return `{ hooks: { auth: AuthHook } }` structure
+  - AuthHook includes:
+    - `provider`: `"google"`
+    - `loader`: Reads `provider.options` for credentials, returns `{ fetch }`
+    - `methods`: OAuth method (NO prompts)
+
+  **Must NOT do**:
+  - Do NOT use prompts for credentials
+  - Do NOT hardcode credentials in authorize() - read from options or use defaults
+
+  **Parallelizable**: NO (depends on Phase 3)
+
+  **MUST READ first**:
+  - Reference: NoeFabris/opencode-antigravity-auth `src/plugin.ts`
+  - Reference: numman-ali/opencode-openai-codex-auth `index.ts` (root entry point)
+  - `~/local-workspaces/opencode/packages/plugin/src/index.ts` - AuthHook interface
+
+  **Plugin Structure:**
+  ```typescript
+  {
+    provider: "google",
+    loader: async (auth, provider) => {
+      // Read credentials from provider.options (opencode.json)
+      const clientId = provider.options?.clientId || DEFAULT_CLIENT_ID
+      const clientSecret = provider.options?.clientSecret || DEFAULT_CLIENT_SECRET
+      return { 
+        fetch: createAntigravityFetch(auth, clientId, clientSecret, ...) 
+      }
+    },
+    methods: [{
+      type: "oauth",
+      label: "OAuth with Google (Antigravity)",
+      // NO prompts - authorize directly
+      authorize: async () => {
+        // OAuth flow starts immediately
+        // Credentials come from loader context or defaults
+      }
+    }]
+  }
+  ```
+
+  **Acceptance Criteria**:
+  - [ ] Plugin returns correct structure for OpenCode
+  - [ ] `provider` is `"google"`
+  - [ ] NO prompts in methods
+  - [ ] `loader` reads credentials from `provider.options`
+  - [ ] Falls back to DEFAULT_CLIENT_ID/SECRET if not configured
   - [x] `bun run typecheck` passes
 
   **Commit Checkpoint**: NO (groups with Task 13)
 
 ---
 
-- [x] **12. Update hooks/index.ts** ✅ 완료
+- [ ] **13. Update auth.ts export (SIMPLE)**
 
   **What to do**:
-  - Add export for `createBackgroundNotificationHook`
+  - Update `src/auth.ts` to export the new Google Antigravity plugin:
+    ```typescript
+    export { createGoogleAntigravityAuthPlugin as default } from "./auth/antigravity"
+    ```
+  - Create `src/auth/antigravity/index.ts` barrel export
+
+  **That's it. Keep it simple.**
 
   **Must NOT do**:
-  - Do NOT modify existing exports
+  - Do NOT create complex migration structure
+  - Do NOT keep OpenAI auth (this is a separate plugin now)
+  - Do NOT over-engineer
 
-  **Parallelizable**: YES (with Task 11, 13)
+  **Parallelizable**: NO (depends on Task 12)
 
   **MUST READ first**:
-  - `src/hooks/index.ts` - current export pattern
+  - Current `src/auth.ts` for existing pattern
+
+  **Final Structure:**
+  ```
+  src/
+  ├── auth.ts                           # export default from "./auth/antigravity"
+  └── auth/
+      └── antigravity/
+          ├── index.ts                  # barrel export
+          ├── plugin.ts                 # createGoogleAntigravityAuthPlugin
+          ├── oauth.ts
+          ├── token.ts
+          ├── project.ts
+          ├── request.ts
+          ├── response.ts
+          ├── tools.ts
+          ├── thinking.ts
+          ├── fetch.ts
+          ├── types.ts
+          └── constants.ts
+  ```
 
   **Acceptance Criteria**:
-  - [x] Export added
+  - [ ] `src/auth.ts` exports GoogleAntigravityAuthPlugin as default
+  - [ ] All antigravity modules exported from barrel
   - [x] `bun run typecheck` passes
-
-  **Commit Checkpoint**: NO (groups with Task 13)
-
----
-
-- [x] **13. Update main index.ts** ✅ 완료
-
-  **What to do**:
-  - Import BackgroundManager from features
-  - Import createBackgroundTools from tools
-  - Import createBackgroundNotificationHook from hooks
-  - Initialize manager with ctx.client and store path
-  - Call manager.restore() on init
-  - Add background tools to tool object
-  - Integrate notification hook into:
-    - `event`: Call hook event handler
-    - `chat.message`: Call hook chat.message handler
-  - Disable background_task for explore/librarian agents (like omo_task)
-
-  **Must NOT do**:
-  - Do NOT break existing hook integrations
-  - Do NOT remove any existing functionality
-
-  **Parallelizable**: NO (depends on Task 11, 12)
-
-  **MUST READ first**:
-  - `src/index.ts` - full file for integration patterns
-
-  **References**:
-  - `src/index.ts:92` - omoTask creation pattern
-  - `src/index.ts:100-103` - chat.message integration
-  - `src/index.ts:162-264` - event integration
-  - `src/index.ts:122-134` - agent tool restriction pattern
-
-  **Acceptance Criteria**:
-  - [ ] BackgroundManager initialized on plugin load
-  - [ ] State restored from disk
-  - [ ] All 4 background tools registered
-  - [ ] Notification hook integrated into event and chat.message
-  - [ ] explore/librarian agents have background_task disabled
-  - [ ] `bun run typecheck` passes
-  - [ ] `bun run build` succeeds
 
   **Commit Checkpoint**: YES
 
   **Commit Specification**:
-  - **Message**: `feat(background-agent): integrate into main plugin`
-  - **Files to stage**: `src/tools/index.ts`, `src/hooks/index.ts`, `src/index.ts`
+  - **Message**: `feat(google-antigravity-auth): create auth plugin for Google models`
+  - **Files to stage**: `src/auth.ts`, `src/auth/antigravity/`
   - **Pre-commit verification**:
     - [ ] `bun run typecheck` → No errors
     - [ ] `bun run build` → Success
-  - **Rollback trigger**: Plugin fails to load
+  - **Rollback trigger**: Export errors
 
 ---
 
-- [x] **14. Final verification and cleanup**
+- [ ] **14. Final verification and documentation**
 
   **What to do**:
-  - Run full typecheck
-  - Run full build
-  - Verify all files are properly formatted
-  - Check for any debug/console.log statements
-  - Ensure no TODO comments left
-  - Test tool descriptions are clear
+  - Run full typecheck and build
+  - Verify no console.log or debug statements (except when ANTIGRAVITY_DEBUG=1)
+  - Update AGENTS.md with new auth location
+  - Test complete flow manually
 
   **Must NOT do**:
   - Do NOT add test files
@@ -634,22 +949,49 @@ Phase 4 (Integration)
 
   **Parallelizable**: NO (final task)
 
+  **Manual Verification Procedure:**
+  ```bash
+  # 1. Build and verify
+  bun run typecheck && bun run build
+  
+  # 2. Test auth login shows option
+  opencode auth login
+  # Expected: See "google" provider with "OAuth with Google (Antigravity)" method
+  
+  # 3. Complete OAuth flow (NO prompts - browser opens immediately)
+  # Select google → OAuth with Google (Antigravity)
+  # Browser opens → Complete Google login
+  # Expected: "Successfully authenticated with google"
+  
+  # 4. Test conversation (after auth)
+  opencode chat --provider google --model gemini-3-pro-preview
+  # Send: "Hello, what is 2+2?"
+  # Expected: Non-empty response without errors
+  
+  # 5. (Optional) Test custom credentials via opencode.json
+  # Add provider.google.options.clientId/clientSecret
+  # Re-run auth login - should use custom credentials
+  ```
+
   **Acceptance Criteria**:
   - [ ] `bun run typecheck` → No errors
   - [ ] `bun run build` → Success
-  - [ ] No console.log in production code
-  - [ ] No TODO comments
-  - [ ] All exports working
+  - [ ] `opencode auth login` shows "google" provider with Antigravity method
+  - [ ] NO prompts - browser opens immediately after selecting method
+  - [ ] OAuth flow completes and stores tokens
+  - [ ] `opencode chat --provider google` receives Gemini response
+  - [ ] Custom credentials from opencode.json options work if configured
+  - [ ] No debug console.log in production (only with ANTIGRAVITY_DEBUG=1)
 
   **Commit Checkpoint**: YES
 
   **Commit Specification**:
-  - **Message**: `chore(background-agent): final cleanup and verification`
-  - **Files to stage**: Any cleanup changes
+  - **Message**: `feat(google-antigravity-auth): complete implementation and verification`
+  - **Files to stage**: Any remaining changes, AGENTS.md
   - **Pre-commit verification**:
     - [ ] `bun run typecheck` → No errors
     - [ ] `bun run build` → Success
-  - **Rollback trigger**: N/A (cleanup only)
+  - **Rollback trigger**: N/A
 
 ---
 
@@ -657,27 +999,39 @@ Phase 4 (Integration)
 
 | After Task | Commit Message | Pre-commit Commands | Rollback Condition |
 |------------|----------------|---------------------|-------------------|
-| Task 3 | `feat(background-agent): add BackgroundManager with persistence layer` | `bun run typecheck` | Type errors |
-| Task 8 | `feat(background-task): add 4 background task tools` | `bun run typecheck` | Tool failures |
-| Task 10 | `feat(background-notification): add completion notification hook` | `bun run typecheck` | Hook failures |
-| Task 13 | `feat(background-agent): integrate into main plugin` | `bun run typecheck`, `bun run build` | Plugin load failure |
-| Task 14 | `chore(background-agent): final cleanup and verification` | `bun run typecheck`, `bun run build` | N/A |
+| Task 3 | `feat(google-antigravity-auth): add types and constants foundation` | `bun run typecheck` | Type errors |
+| Task 6 | `feat(google-antigravity-auth): add OAuth flow and token management` | `bun run typecheck` | OAuth failures |
+| Task 11 | `feat(google-antigravity-auth): add request/response transformation for Gemini` | `bun run typecheck` | Transform errors |
+| Task 13 | `feat(google-antigravity-auth): create auth plugin for Google models` | `bun run typecheck`, `bun run build` | Export errors |
+| Task 14 | `feat(google-antigravity-auth): complete implementation and verification` | `bun run typecheck`, `bun run build` | N/A |
 
 ---
 
 ## Estimated Effort
 
-- **Phase 1 (Core)**: 1-2 hours
-- **Phase 2 (Tools)**: 2-3 hours
-- **Phase 3 (Notification)**: 1 hour
-- **Phase 4 (Integration)**: 1 hour
-- **Total**: ~6 hours
+- **Phase 1 (Foundation)**: 30 minutes
+- **Phase 2 (OAuth Core)**: 2 hours
+- **Phase 3 (Request/Response + Tools + Thinking)**: 3 hours
+- **Phase 4 (Plugin Assembly)**: 1.5 hours
+- **Total**: ~7 hours
+
+---
+
+## Risk Assessment
+
+| Risk | Mitigation |
+|------|------------|
+| OAuth flow differences from Go | Follow cliproxyapi and opencode-antigravity-auth closely |
+| Token format incompatibility | Test with actual Google OAuth tokens |
+| Endpoint fallback complexity | Start with prod-only, add fallback incrementally |
+| Response transformation edge cases | Log and handle unknown response formats gracefully |
+| Repo focus change | Clear communication: this repo now provides Google/Antigravity auth only |
 
 ---
 
 ## Notes
 
-- `promptAsync()` API is key - documented in analysis as existing in OpenCode SDK
-- Session parent-child relationship handles automatic cleanup (cascade delete)
-- Event filtering is critical for performance - only process relevant events
-- Debounced persistence prevents excessive disk I/O
+- @openauthjs/openauth already used by opencode-openai-codex-auth for PKCE
+- Token storage format `refreshToken|projectId|managedProjectId` enables multi-account support
+- Endpoint fallback ensures service availability during Google outages
+- loadCodeAssist API returns managed project for enterprise users
