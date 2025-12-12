@@ -87,16 +87,51 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
     return `Error fetching messages: ${messagesResult.error}`
   }
 
-  const messages = messagesResult.data
+  // Handle both SDK response structures: direct array or wrapped in .data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
+    info?: { role?: string }
+    parts?: Array<{ type?: string; text?: string }>
+  }>
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Session ID: ${task.sessionID}
+
+---
+
+(No messages found)`
+  }
+
   const assistantMessages = messages.filter(
-    (m: any) => m.info?.role === "assistant"
+    (m) => m.info?.role === "assistant"
   )
+
+  if (assistantMessages.length === 0) {
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Session ID: ${task.sessionID}
+
+---
+
+(No assistant response found)`
+  }
 
   const lastMessage = assistantMessages[assistantMessages.length - 1]
   const textParts = lastMessage?.parts?.filter(
-    (p: any) => p.type === "text"
+    (p) => p.type === "text"
   ) ?? []
-  const textContent = textParts.map((p: any) => p.text).join("\n")
+  const textContent = textParts
+    .map((p) => p.text ?? "")
+    .filter((text) => text.length > 0)
+    .join("\n")
 
   const duration = formatDuration(task.startedAt, task.completedAt)
 
@@ -109,7 +144,7 @@ Session ID: ${task.sessionID}
 
 ---
 
-${textContent || "(No output)"}`
+${textContent || "(No text output)"}`
 }
 
 export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient) {
