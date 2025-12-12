@@ -244,7 +244,7 @@ export class BackgroundManager {
 
     setTimeout(async () => {
       try {
-        await this.client.session.prompt({
+        await this.client.session.promptAsync({
           path: { id: mainSessionID },
           body: {
             parts: [{ type: "text", text: message }],
@@ -252,9 +252,9 @@ export class BackgroundManager {
           query: { directory: this.directory },
         })
         this.clearNotificationsForTask(task.id)
-        log("[background-agent] Successfully sent to main session")
+        log("[background-agent] Successfully sent promptAsync to main session")
       } catch (error) {
-        log("[background-agent] session.prompt failed:", String(error))
+        log("[background-agent] promptAsync failed:", String(error))
       }
     }, 200)
   }
