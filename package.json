@@ -50,7 +50,8 @@
     "@ast-grep/napi": "^0.40.0",
     "@code-yeongyu/comment-checker": "^0.5.0",
     "@opencode-ai/plugin": "^1.0.150",
-
+    "@openauthjs/openauth": "^0.4.3",
+    "hono": "^4.10.4",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"

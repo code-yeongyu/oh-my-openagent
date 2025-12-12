@@ -8,8 +8,9 @@
         "@ast-grep/cli": "^0.40.0",
         "@ast-grep/napi": "^0.40.0",
         "@code-yeongyu/comment-checker": "^0.5.0",
+        "@openauthjs/openauth": "^0.4.3",
         "@opencode-ai/plugin": "^1.0.150",
-        "opencode-openai-codex-auth": "^4.1.0",
+        "hono": "^4.10.4",
         "picomatch": "^4.0.2",
         "xdg-basedir": "^5.1.0",
         "zod": "^4.1.8",
@@ -128,8 +129,6 @@
     "jose": ["jose@5.9.6", "", {}, "sha512-AMlnetc9+CV9asI19zHmrgS/WYsWUwCn2R7RzlbJWD7F9eWYUTGyBmU9o6PxngtLGOiDGPRu+Uc4fhKzbpteZQ=="],
 
     "oh-my-opencode": ["oh-my-opencode@0.1.30", "", { "dependencies": { "@ast-grep/cli": "^0.40.0", "@ast-grep/napi": "^0.40.0", "@code-yeongyu/comment-checker": "^0.4.1", "@opencode-ai/plugin": "^1.0.7", "xdg-basedir": "^5.1.0", "zod": "^4.1.8" }, "peerDependencies": { "bun": ">=1.0.0" } }, "sha512-pXGGgL/7Jcz3yuGJJTI72BKern2egwfRz2LQZTBq+jl+pNCybOvGvXtFmR+WGlF8O3ZjL1wIHypBbIVuHOBzxg=="],
-
-    "opencode-openai-codex-auth": ["opencode-openai-codex-auth@4.1.0", "", { "dependencies": { "@openauthjs/openauth": "^0.4.3", "hono": "^4.10.4" }, "peerDependencies": { "@opencode-ai/plugin": "^1.0.150" } }, "sha512-oTJTS6dJt6qokDDUedEvqcWcGl6byGDq4ZbfOHWQQaqiGdbmqoRf3zoQJELuhA3ceibkXv19zljeHbPH9m7FpA=="],
 
     "picomatch": ["picomatch@4.0.3", "", {}, "sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q=="],
 
