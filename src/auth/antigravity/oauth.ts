@@ -117,16 +117,10 @@ export function decodeState(encoded: string): OAuthState {
   }
 }
 
-/**
- * Build the OAuth authorization URL with PKCE.
- *
- * @param projectId - Optional GCP project ID to include in state
- * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
- * @returns Authorization result with URL and verifier
- */
 export async function buildAuthURL(
   projectId?: string,
-  clientId: string = ANTIGRAVITY_CLIENT_ID
+  clientId: string = ANTIGRAVITY_CLIENT_ID,
+  port: number = ANTIGRAVITY_CALLBACK_PORT
 ): Promise<AuthorizationResult> {
   const pkce = await generatePKCEPair()
 
@@ -135,9 +129,11 @@ export async function buildAuthURL(
     projectId,
   }
 
+  const redirectUri = `http://localhost:${port}/oauth-callback`
+
   const url = new URL(GOOGLE_AUTH_URL)
   url.searchParams.set("client_id", clientId)
-  url.searchParams.set("redirect_uri", ANTIGRAVITY_REDIRECT_URI)
+  url.searchParams.set("redirect_uri", redirectUri)
   url.searchParams.set("response_type", "code")
   url.searchParams.set("scope", ANTIGRAVITY_SCOPES.join(" "))
   url.searchParams.set("state", encodeState(state))
@@ -165,14 +161,16 @@ export async function exchangeCode(
   code: string,
   verifier: string,
   clientId: string = ANTIGRAVITY_CLIENT_ID,
-  clientSecret: string = ANTIGRAVITY_CLIENT_SECRET
+  clientSecret: string = ANTIGRAVITY_CLIENT_SECRET,
+  port: number = ANTIGRAVITY_CALLBACK_PORT
 ): Promise<AntigravityTokenExchangeResult> {
+  const redirectUri = `http://localhost:${port}/oauth-callback`
   const params = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
     code,
     grant_type: "authorization_code",
-    redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+    redirect_uri: redirectUri,
     code_verifier: verifier,
   })
 
@@ -236,97 +234,88 @@ export async function fetchUserInfo(
   }
 }
 
-/**
- * Start a local HTTP server to receive OAuth callback.
- *
- * @param timeoutMs - Timeout in milliseconds (default: 5 minutes)
- * @returns Promise that resolves with callback result
- */
-export function startCallbackServer(
-  timeoutMs: number = 5 * 60 * 1000
-): Promise<CallbackResult> {
-  return new Promise((resolve, reject) => {
-    let server: ReturnType<typeof Bun.serve> | null = null
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-    const cleanup = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
-      if (server) {
-        server.stop()
-        server = null
-      }
-    }
-
-    // Set timeout
-    timeoutId = setTimeout(() => {
-      cleanup()
-      reject(new Error("OAuth callback timeout"))
-    }, timeoutMs)
-
-    try {
-      server = Bun.serve({
-        port: ANTIGRAVITY_CALLBACK_PORT,
-        fetch(request: Request): Response {
-          const url = new URL(request.url)
-
-          if (url.pathname === "/oauth-callback") {
-            const code = url.searchParams.get("code") || ""
-            const state = url.searchParams.get("state") || ""
-            const error = url.searchParams.get("error") || undefined
-
-            // Respond to browser
-            let responseBody: string
-            if (code && !error) {
-              responseBody =
-                "<html><body><h1>Login successful</h1><p>You can close this window.</p></body></html>"
-            } else {
-              responseBody =
-                "<html><body><h1>Login failed</h1><p>Please check the CLI output.</p></body></html>"
-            }
-
-            // Schedule cleanup and resolve
-            setTimeout(() => {
-              cleanup()
-              resolve({ code, state, error })
-            }, 100)
-
-            return new Response(responseBody, {
-              status: 200,
-              headers: { "Content-Type": "text/html" },
-            })
-          }
-
-          return new Response("Not Found", { status: 404 })
-        },
-      })
-    } catch (err) {
-      cleanup()
-      reject(
-        new Error(
-          `Failed to start callback server: ${err instanceof Error ? err.message : String(err)}`
-        )
-      )
-    }
-  })
+export interface CallbackServerHandle {
+  port: number
+  waitForCallback: () => Promise<CallbackResult>
+  close: () => void
 }
 
-/**
- * Perform complete OAuth flow:
- * 1. Start callback server
- * 2. Build auth URL
- * 3. Wait for callback
- * 4. Exchange code for tokens
- * 5. Fetch user info
- *
- * @param projectId - Optional GCP project ID
- * @param openBrowser - Function to open URL in browser
- * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
- * @param clientSecret - Optional custom client secret (defaults to ANTIGRAVITY_CLIENT_SECRET)
- * @returns Object with tokens and user info
- */
+export function startCallbackServer(
+  timeoutMs: number = 5 * 60 * 1000
+): CallbackServerHandle {
+  let server: ReturnType<typeof Bun.serve> | null = null
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  let resolveCallback: ((result: CallbackResult) => void) | null = null
+  let rejectCallback: ((error: Error) => void) | null = null
+
+  const cleanup = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+    if (server) {
+      server.stop()
+      server = null
+    }
+  }
+
+  server = Bun.serve({
+    port: 0,
+    fetch(request: Request): Response {
+      const url = new URL(request.url)
+
+      if (url.pathname === "/oauth-callback") {
+        const code = url.searchParams.get("code") || ""
+        const state = url.searchParams.get("state") || ""
+        const error = url.searchParams.get("error") || undefined
+
+        let responseBody: string
+        if (code && !error) {
+          responseBody =
+            "<html><body><h1>Login successful</h1><p>You can close this window.</p></body></html>"
+        } else {
+          responseBody =
+            "<html><body><h1>Login failed</h1><p>Please check the CLI output.</p></body></html>"
+        }
+
+        setTimeout(() => {
+          cleanup()
+          if (resolveCallback) {
+            resolveCallback({ code, state, error })
+          }
+        }, 100)
+
+        return new Response(responseBody, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        })
+      }
+
+      return new Response("Not Found", { status: 404 })
+    },
+  })
+
+  const actualPort = server.port as number
+
+  const waitForCallback = (): Promise<CallbackResult> => {
+    return new Promise((resolve, reject) => {
+      resolveCallback = resolve
+      rejectCallback = reject
+
+      timeoutId = setTimeout(() => {
+        cleanup()
+        reject(new Error("OAuth callback timeout"))
+      }, timeoutMs)
+    })
+  }
+
+  return {
+    port: actualPort,
+    waitForCallback,
+    close: cleanup,
+  }
+}
+
 export async function performOAuthFlow(
   projectId?: string,
   openBrowser?: (url: string) => Promise<void>,
@@ -337,43 +326,36 @@ export async function performOAuthFlow(
   userInfo: AntigravityUserInfo
   verifier: string
 }> {
-  // Build auth URL first to get the verifier
-  const auth = await buildAuthURL(projectId, clientId)
+  const serverHandle = startCallbackServer()
 
-  // Start callback server
-  const callbackPromise = startCallbackServer()
+  try {
+    const auth = await buildAuthURL(projectId, clientId, serverHandle.port)
 
-  // Open browser (caller provides implementation)
-  if (openBrowser) {
-    await openBrowser(auth.url)
-  }
+    if (openBrowser) {
+      await openBrowser(auth.url)
+    }
 
-  // Wait for callback
-  const callback = await callbackPromise
+    const callback = await serverHandle.waitForCallback()
 
-  if (callback.error) {
-    throw new Error(`OAuth error: ${callback.error}`)
-  }
+    if (callback.error) {
+      throw new Error(`OAuth error: ${callback.error}`)
+    }
 
-  if (!callback.code) {
-    throw new Error("No authorization code received")
-  }
+    if (!callback.code) {
+      throw new Error("No authorization code received")
+    }
 
-  // Verify state and extract verifier
-  const state = decodeState(callback.state)
-  if (state.verifier !== auth.verifier) {
-    throw new Error("PKCE verifier mismatch - possible CSRF attack")
-  }
+    const state = decodeState(callback.state)
+    if (state.verifier !== auth.verifier) {
+      throw new Error("PKCE verifier mismatch - possible CSRF attack")
+    }
 
-  // Exchange code for tokens
-  const tokens = await exchangeCode(callback.code, auth.verifier, clientId, clientSecret)
+    const tokens = await exchangeCode(callback.code, auth.verifier, clientId, clientSecret, serverHandle.port)
+    const userInfo = await fetchUserInfo(tokens.access_token)
 
-  // Fetch user info
-  const userInfo = await fetchUserInfo(tokens.access_token)
-
-  return {
-    tokens,
-    userInfo,
-    verifier: auth.verifier,
+    return { tokens, userInfo, verifier: auth.verifier }
+  } catch (err) {
+    serverHandle.close()
+    throw err
   }
 }

@@ -99,11 +99,23 @@ export async function createGoogleAntigravityAuthPlugin({
       auth: () => Promise<Auth>,
       provider: Provider
     ): Promise<Record<string, unknown>> => {
-      // Check if current auth is OAuth type
       const currentAuth = await auth()
+      
+      if (process.env.ANTIGRAVITY_DEBUG === "1") {
+        console.log("[antigravity-plugin] loader called")
+        console.log("[antigravity-plugin] auth type:", currentAuth?.type)
+        console.log("[antigravity-plugin] auth keys:", Object.keys(currentAuth || {}))
+      }
+      
       if (!isOAuthAuth(currentAuth)) {
-        // Not OAuth auth, return empty (fallback to default fetch)
+        if (process.env.ANTIGRAVITY_DEBUG === "1") {
+          console.log("[antigravity-plugin] NOT OAuth auth, returning empty")
+        }
         return {}
+      }
+      
+      if (process.env.ANTIGRAVITY_DEBUG === "1") {
+        console.log("[antigravity-plugin] OAuth auth detected, creating custom fetch")
       }
 
       cachedClientId =
@@ -167,6 +179,7 @@ export async function createGoogleAntigravityAuthPlugin({
 
       return {
         fetch: antigravityFetch,
+        apiKey: "antigravity-oauth",
       }
     },
 
@@ -188,10 +201,8 @@ export async function createGoogleAntigravityAuthPlugin({
          * @returns Authorization result with URL and callback
          */
         authorize: async (): Promise<AuthOuathResult> => {
-          const { url, verifier } = await buildAuthURL(undefined, cachedClientId)
-
-          // Start local callback server to receive OAuth callback
-          const callbackPromise = startCallbackServer()
+          const serverHandle = startCallbackServer()
+          const { url, verifier } = await buildAuthURL(undefined, cachedClientId, serverHandle.port)
 
           return {
             url,
@@ -199,35 +210,24 @@ export async function createGoogleAntigravityAuthPlugin({
               "Complete the sign-in in your browser. We'll automatically detect when you're done.",
             method: "auto",
 
-            /**
-             * Callback function invoked when OAuth redirect is received.
-             * Exchanges code for tokens and fetches project context.
-             */
             callback: async () => {
               try {
-                // Wait for OAuth callback
-                const result = await callbackPromise
+                const result = await serverHandle.waitForCallback()
 
-                // Check for errors
                 if (result.error) {
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
-                    console.error(
-                      `[antigravity-plugin] OAuth error: ${result.error}`
-                    )
+                    console.error(`[antigravity-plugin] OAuth error: ${result.error}`)
                   }
                   return { type: "failed" as const }
                 }
 
                 if (!result.code) {
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
-                    console.error(
-                      "[antigravity-plugin] No authorization code received"
-                    )
+                    console.error("[antigravity-plugin] No authorization code received")
                   }
                   return { type: "failed" as const }
                 }
 
-                // Verify state and extract original verifier
                 const state = decodeState(result.state)
                 if (state.verifier !== verifier) {
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
@@ -236,27 +236,19 @@ export async function createGoogleAntigravityAuthPlugin({
                   return { type: "failed" as const }
                 }
 
-                const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret)
+                const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret, serverHandle.port)
 
-                // Fetch user info (optional, for logging)
                 try {
                   const userInfo = await fetchUserInfo(tokens.access_token)
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
-                    console.log(
-                      `[antigravity-plugin] Authenticated as: ${userInfo.email}`
-                    )
+                    console.log(`[antigravity-plugin] Authenticated as: ${userInfo.email}`)
                   }
                 } catch {
-                  // User info is optional, continue without it
+                  // User info is optional
                 }
 
-                // Fetch project context for Antigravity API
-                const projectContext = await fetchProjectContext(
-                  tokens.access_token
-                )
+                const projectContext = await fetchProjectContext(tokens.access_token)
 
-                // Format refresh token with project info for storage
-                // Format: refreshToken|projectId|managedProjectId
                 const formattedRefresh = formatTokenForStorage(
                   tokens.refresh_token,
                   projectContext.cloudaicompanionProject || "",
@@ -270,6 +262,7 @@ export async function createGoogleAntigravityAuthPlugin({
                   expires: Date.now() + tokens.expires_in * 1000,
                 }
               } catch (error) {
+                serverHandle.close()
                 if (process.env.ANTIGRAVITY_DEBUG === "1") {
                   console.error(
                     `[antigravity-plugin] OAuth flow failed: ${

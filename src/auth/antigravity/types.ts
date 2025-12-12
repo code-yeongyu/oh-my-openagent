@@ -73,6 +73,10 @@ export interface AntigravityRequestBody {
   project: string
   /** Model identifier (e.g., "gemini-3-pro-preview") */
   model: string
+  /** User agent identifier */
+  userAgent: string
+  /** Unique request ID */
+  requestId: string
   /** The actual request payload */
   request: Record<string, unknown>
 }

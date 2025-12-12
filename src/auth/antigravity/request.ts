@@ -128,30 +128,32 @@ export function getDefaultEndpoint(): string {
   return ANTIGRAVITY_ENDPOINT_FALLBACKS[0]
 }
 
-/**
- * Wrap a request body in Antigravity format.
- * Creates a new object without modifying the original.
- *
- * @param body - Original request payload
- * @param projectId - GCP project ID
- * @param modelName - Model identifier
- * @returns Wrapped request body in Antigravity format
- */
+function generateRequestId(): string {
+  return `agent-${crypto.randomUUID()}`
+}
+
+function generateSessionId(): string {
+  const n = Math.floor(Math.random() * 9_000_000_000_000_000_000)
+  return `-${n}`
+}
+
 export function wrapRequestBody(
   body: Record<string, unknown>,
   projectId: string,
   modelName: string
 ): AntigravityRequestBody {
-  // Clone the body to avoid mutation
   const requestPayload = { ...body }
-
-  // Remove model from inner request (it's in wrapper)
   delete requestPayload.model
 
   return {
     project: projectId,
     model: modelName,
-    request: requestPayload,
+    userAgent: "antigravity",
+    requestId: generateRequestId(),
+    request: {
+      ...requestPayload,
+      sessionId: generateSessionId(),
+    },
   }
 }
 
