@@ -34,6 +34,7 @@ oh-my-opencode/
 | Modify LSP behavior | `src/tools/lsp/` | client.ts for connection logic |
 | AST-Grep patterns | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi |
 | Terminal features | `src/features/terminal/` | title.ts |
+| Google Antigravity auth | `src/auth/antigravity/` | OAuth plugin for Google models |
 
 ## CONVENTIONS
 

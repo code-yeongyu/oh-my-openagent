@@ -1,1 +1,1 @@
-export { OpenAIAuthPlugin as default } from "opencode-openai-codex-auth";
+export { createGoogleAntigravityAuthPlugin as default } from "./auth/antigravity"
