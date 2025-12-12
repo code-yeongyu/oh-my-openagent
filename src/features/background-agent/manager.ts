@@ -81,6 +81,7 @@ export class BackgroundManager {
           background_task: false,
           background_output: false,
           background_cancel: false,
+          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -248,7 +249,7 @@ export class BackgroundManager {
 
     setTimeout(async () => {
       try {
-        await this.client.session.promptAsync({
+        await this.client.session.prompt({
           path: { id: mainSessionID },
           body: {
             parts: [{ type: "text", text: message }],
@@ -256,9 +257,9 @@ export class BackgroundManager {
           query: { directory: this.directory },
         })
         this.clearNotificationsForTask(task.id)
-        log("[background-agent] Successfully sent promptAsync to main session")
+        log("[background-agent] Successfully sent prompt to main session")
       } catch (error) {
-        log("[background-agent] promptAsync failed:", String(error))
+        log("[background-agent] prompt failed:", String(error))
       }
     }, 200)
   }

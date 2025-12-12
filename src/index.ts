@@ -37,7 +37,7 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createOmoTask, createBackgroundTools } from "./tools";
+import { builtinTools, createCallOmoAgent, createBackgroundTools } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
@@ -169,13 +169,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = createBackgroundNotificationHook(backgroundManager);
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const omoTask = createOmoTask(ctx);
+  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
 
   return {
     tool: {
       ...builtinTools,
       ...backgroundTools,
-      omo_task: omoTask,
+      call_omo_agent: callOmoAgent,
     },
 
     "chat.message": async (input, output) => {
@@ -205,13 +205,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (config.agent.explore) {
         config.agent.explore.tools = {
           ...config.agent.explore.tools,
-          omo_task: false,
+          call_omo_agent: false,
         };
       }
       if (config.agent.librarian) {
         config.agent.librarian.tools = {
           ...config.agent.librarian.tools,
-          omo_task: false,
+          call_omo_agent: false,
         };
       }
 

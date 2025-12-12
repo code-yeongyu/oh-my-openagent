@@ -13,10 +13,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./codex-auth": {
+      "types": "./dist/codex-auth.d.ts",
+      "import": "./dist/codex-auth.js"
+    },
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun run build:schema",
+    "build": "bun build src/index.ts src/codex-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun run build:schema",
     "build:schema": "bun run script/build-schema.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "bun run clean && bun run build",
@@ -45,7 +49,8 @@
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
     "@code-yeongyu/comment-checker": "^0.5.0",
-    "@opencode-ai/plugin": "^1.0.7",
+    "@opencode-ai/plugin": "^1.0.150",
+    "opencode-openai-codex-auth": "^4.1.0",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"

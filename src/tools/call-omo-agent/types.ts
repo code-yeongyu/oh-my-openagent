@@ -2,14 +2,15 @@ import type { ALLOWED_AGENTS } from "./constants"
 
 export type AllowedAgentType = (typeof ALLOWED_AGENTS)[number]
 
-export interface OmoTaskArgs {
+export interface CallOmoAgentArgs {
   description: string
   prompt: string
   subagent_type: string
+  run_in_background: boolean
   session_id?: string
 }
 
-export interface OmoTaskResult {
+export interface CallOmoAgentSyncResult {
   title: string
   metadata: {
     summary?: Array<{

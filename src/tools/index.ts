@@ -33,7 +33,7 @@ import type { BackgroundManager } from "../features/background-agent"
 
 type OpencodeClient = PluginInput["client"]
 
-export { createOmoTask } from "./omo-task"
+export { createCallOmoAgent } from "./call-omo-agent"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {

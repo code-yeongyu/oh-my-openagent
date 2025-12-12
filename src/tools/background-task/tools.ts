@@ -196,13 +196,11 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
 Only running tasks can be cancelled.`
         }
 
-        const abortResult = await client.session.abort({
+        // Fire-and-forget: abort 요청을 보내고 await 하지 않음
+        // await 하면 메인 세션까지 abort 되는 문제 발생
+        client.session.abort({
           path: { id: task.sessionID },
-        })
-
-        if (abortResult.error) {
-          return `❌ Failed to abort session: ${(abortResult.error as any).message || String(abortResult.error)}`
-        }
+        }).catch(() => {})
 
         task.status = "cancelled"
         task.completedAt = new Date()

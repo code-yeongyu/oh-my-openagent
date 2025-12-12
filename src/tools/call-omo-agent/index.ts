@@ -1,3 +1,3 @@
 export * from "./types"
 export * from "./constants"
-export { createOmoTask } from "./tools"
+export { createCallOmoAgent } from "./tools"
