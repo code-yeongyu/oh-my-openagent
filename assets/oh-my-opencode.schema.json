@@ -154,6 +154,32 @@
           }
         }
       }
+    },
+    "claude_code": {
+      "type": "object",
+      "description": "Toggle Claude Code compatibility features on/off. All default to true (enabled).",
+      "properties": {
+        "mcp": {
+          "type": "boolean",
+          "description": "Load MCP servers from ~/.claude/.mcp.json, ./.mcp.json, ./.claude/.mcp.json"
+        },
+        "commands": {
+          "type": "boolean",
+          "description": "Load commands from ~/.claude/commands/*.md, ./.claude/commands/*.md"
+        },
+        "skills": {
+          "type": "boolean",
+          "description": "Load skills from ~/.claude/skills/*/SKILL.md, ./.claude/skills/*/SKILL.md"
+        },
+        "agents": {
+          "type": "boolean",
+          "description": "Load agents from ~/.claude/agents/*.md, ./.claude/agents/*.md"
+        },
+        "hooks": {
+          "type": "boolean",
+          "description": "Execute hooks from ~/.claude/settings.json, ./.claude/settings.json, ./.claude/settings.local.json"
+        }
+      }
     }
   }
 }

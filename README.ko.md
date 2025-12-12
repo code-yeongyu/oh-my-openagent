@@ -242,6 +242,32 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 
 Oh My OpenCode는 Claude Code 설정과 완벽하게 호환됩니다. Claude Code를 사용하셨다면, 기존 설정을 그대로 사용할 수 있습니다.
 
+#### 호환성 토글
+
+특정 Claude Code 호환 기능을 비활성화하려면 `claude_code` 설정 객체를 사용하세요:
+
+```json
+{
+  "claude_code": {
+    "mcp": false,
+    "commands": false,
+    "skills": false,
+    "agents": false,
+    "hooks": false
+  }
+}
+```
+
+| 토글 | `false`일 때 로딩 비활성화 경로 | 영향 받지 않음 |
+|------|-------------------------------|---------------|
+| `mcp` | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json` | 내장 MCP (context7, websearch_exa) |
+| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md` | `~/.config/opencode/command/`, `./.opencode/command/` |
+| `skills` | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md` | - |
+| `agents` | `~/.claude/agents/*.md`, `./.claude/agents/*.md` | 내장 에이전트 (oracle, librarian 등) |
+| `hooks` | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | - |
+
+모든 토글은 기본값이 `true` (활성화)입니다. 완전한 Claude Code 호환성을 원하면 `claude_code` 객체를 생략하세요.
+
 #### Hooks 통합
 
 Claude Code의 `settings.json` 훅 시스템을 통해 커스텀 스크립트를 실행합니다. Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:

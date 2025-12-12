@@ -101,6 +101,10 @@ function mergeConfigs(
         ...(override.disabled_mcps ?? []),
       ]),
     ],
+    claude_code:
+      override.claude_code !== undefined || base.claude_code !== undefined
+        ? { ...(base.claude_code ?? {}), ...(override.claude_code ?? {}) }
+        : undefined,
   };
 }
 
@@ -132,6 +136,7 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
     agents: config.agents,
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
+    claude_code: config.claude_code,
   });
   return config;
 }
@@ -148,7 +153,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const directoryReadmeInjector = createDirectoryReadmeInjectorHook(ctx);
   const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
   const thinkMode = createThinkModeHook();
-  const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {});
+  const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
+    disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+  });
   const anthropicAutoCompact = createAnthropicAutoCompactHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
@@ -165,8 +172,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         pluginConfig.disabled_agents,
         pluginConfig.agents,
       );
-      const userAgents = loadUserAgents();
-      const projectAgents = loadProjectAgents();
+
+      const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
+      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
 
       config.agent = {
         ...builtinAgents,
@@ -178,20 +186,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...config.tools,
       };
 
-      const mcpResult = await loadMcpConfigs();
+      const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
+        ? await loadMcpConfigs()
+        : { servers: {} };
       config.mcp = {
         ...config.mcp,
         ...createBuiltinMcps(pluginConfig.disabled_mcps),
         ...mcpResult.servers,
       };
 
-      const userCommands = loadUserCommands();
+      const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
       const opencodeGlobalCommands = loadOpencodeGlobalCommands();
       const systemCommands = config.command ?? {};
-      const projectCommands = loadProjectCommands();
+      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
       const opencodeProjectCommands = loadOpencodeProjectCommands();
-      const userSkills = loadUserSkillsAsCommands();
-      const projectSkills = loadProjectSkillsAsCommands();
+      const userSkills = (pluginConfig.claude_code?.skills ?? true) ? loadUserSkillsAsCommands() : {};
+      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands() : {};
 
       config.command = {
         ...userCommands,

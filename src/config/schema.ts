@@ -42,11 +42,20 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AgentOverridesSchema = z.record(AgentNameSchema, AgentOverrideConfigSchema)
 
+export const ClaudeCodeConfigSchema = z.object({
+  mcp: z.boolean().optional(),
+  commands: z.boolean().optional(),
+  skills: z.boolean().optional(),
+  agents: z.boolean().optional(),
+  hooks: z.boolean().optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
   disabled_agents: z.array(AgentNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
+  claude_code: ClaudeCodeConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>

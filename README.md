@@ -240,6 +240,32 @@ Don't need these? Disable them via `oh-my-opencode.json`:
 
 Oh My OpenCode provides seamless Claude Code configuration compatibility. If you've been using Claude Code, your existing setup works out of the box.
 
+#### Compatibility Toggles
+
+If you want to disable specific Claude Code compatibility features, use the `claude_code` configuration object:
+
+```json
+{
+  "claude_code": {
+    "mcp": false,
+    "commands": false,
+    "skills": false,
+    "agents": false,
+    "hooks": false
+  }
+}
+```
+
+| Toggle | When `false`, disables loading from... | NOT affected |
+|--------|----------------------------------------|--------------|
+| `mcp` | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json` | Built-in MCPs (context7, websearch_exa) |
+| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md` | `~/.config/opencode/command/`, `./.opencode/command/` |
+| `skills` | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md` | - |
+| `agents` | `~/.claude/agents/*.md`, `./.claude/agents/*.md` | Built-in agents (oracle, librarian, etc.) |
+| `hooks` | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | - |
+
+All toggles default to `true` (enabled). Omit the entire `claude_code` object for full Claude Code compatibility.
+
 #### Hooks Integration
 
 Execute custom scripts via Claude Code's `settings.json` hook system. Oh My OpenCode reads and executes hooks defined in:
