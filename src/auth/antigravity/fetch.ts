@@ -63,16 +63,24 @@ function debugLog(message: string): void {
   }
 }
 
-/**
- * Check if an error is a retryable network/server error
- */
 function isRetryableError(status: number): boolean {
-  // 4xx client errors (except 429 rate limit) are not retryable
-  // 5xx server errors are retryable
-  // Network errors (status 0) are retryable
-  if (status === 0) return true // Network error
-  if (status === 429) return true // Rate limit
-  if (status >= 500 && status < 600) return true // Server errors
+  if (status === 0) return true
+  if (status === 429) return true
+  if (status >= 500 && status < 600) return true
+  return false
+}
+
+async function isRetryableResponse(response: Response): Promise<boolean> {
+  if (isRetryableError(response.status)) return true
+  if (response.status === 403) {
+    try {
+      const text = await response.clone().text()
+      if (text.includes("SUBSCRIPTION_REQUIRED") || text.includes("Gemini Code Assist license")) {
+        debugLog(`[RETRY] 403 SUBSCRIPTION_REQUIRED detected, will retry with next endpoint`)
+        return true
+      }
+    } catch {}
+  }
   return false
 }
 
@@ -145,6 +153,8 @@ async function attemptFetch(
       thoughtSignature,
     })
 
+    debugLog(`[REQ] streaming=${transformed.streaming}, url=${transformed.url}`)
+
     const response = await fetch(transformed.url, {
       method: init.method || "POST",
       headers: transformed.headers,
@@ -152,7 +162,11 @@ async function attemptFetch(
       signal: init.signal,
     })
 
-    if (!response.ok && isRetryableError(response.status)) {
+    debugLog(
+      `[RESP] status=${response.status} content-type=${response.headers.get("content-type") ?? ""} url=${response.url}`
+    )
+
+    if (!response.ok && (await isRetryableResponse(response))) {
       debugLog(`Endpoint failed: ${endpoint} (status: ${response.status}), trying next`)
       return null
     }
@@ -223,41 +237,36 @@ async function transformResponseWithThinking(
     result = await transformResponse(response)
   }
 
+  if (streaming) {
+    return result.response
+  }
+
   try {
     const text = await result.response.clone().text()
     debugLog(`[TSIG][RESP] Response text length: ${text.length}`)
 
-    if (streaming) {
-      const signature = extractSignatureFromSsePayload(text)
-      debugLog(`[TSIG][RESP] SSE signature extracted: ${signature ? "yes" : "no"}`)
-      if (signature) {
-        setThoughtSignature(fetchInstanceId, signature)
-        debugLog(`[TSIG][STORE] Stored signature for ${fetchInstanceId}: ${signature.substring(0, 30)}...`)
-      }
+    const parsed = JSON.parse(text) as GeminiResponseBody
+    debugLog(`[TSIG][RESP] Parsed keys: ${Object.keys(parsed).join(", ")}`)
+    debugLog(`[TSIG][RESP] Has candidates: ${!!parsed.candidates}, count: ${parsed.candidates?.length ?? 0}`)
+
+    const signature = extractSignatureFromResponse(parsed)
+    debugLog(`[TSIG][RESP] Signature extracted: ${signature ? signature.substring(0, 30) + "..." : "NONE"}`)
+    if (signature) {
+      setThoughtSignature(fetchInstanceId, signature)
+      debugLog(`[TSIG][STORE] Stored signature for ${fetchInstanceId}`)
     } else {
-      const parsed = JSON.parse(text) as GeminiResponseBody
-      debugLog(`[TSIG][RESP] Parsed keys: ${Object.keys(parsed).join(", ")}`)
-      debugLog(`[TSIG][RESP] Has candidates: ${!!parsed.candidates}, count: ${parsed.candidates?.length ?? 0}`)
+      debugLog(`[TSIG][WARN] No signature found in response!`)
+    }
 
-      const signature = extractSignatureFromResponse(parsed)
-      debugLog(`[TSIG][RESP] Signature extracted: ${signature ? signature.substring(0, 30) + "..." : "NONE"}`)
-      if (signature) {
-        setThoughtSignature(fetchInstanceId, signature)
-        debugLog(`[TSIG][STORE] Stored signature for ${fetchInstanceId}`)
-      } else {
-        debugLog(`[TSIG][WARN] No signature found in response!`)
-      }
-
-      if (shouldIncludeThinking(modelName)) {
-        const thinkingResult = extractThinkingBlocks(parsed)
-        if (thinkingResult.hasThinking) {
-          const transformed = transformResponseThinking(parsed)
-          return new Response(JSON.stringify(transformed), {
-            status: result.response.status,
-            statusText: result.response.statusText,
-            headers: result.response.headers,
-          })
-        }
+    if (shouldIncludeThinking(modelName)) {
+      const thinkingResult = extractThinkingBlocks(parsed)
+      if (thinkingResult.hasThinking) {
+        const transformed = transformResponseThinking(parsed)
+        return new Response(JSON.stringify(transformed), {
+          status: result.response.status,
+          statusText: result.response.statusText,
+          headers: result.response.headers,
+        })
       }
     }
   } catch {}

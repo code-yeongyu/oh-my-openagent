@@ -339,31 +339,39 @@ export function transformStreamingPayload(payload: string): string {
     .join("\n")
 }
 
+function createSseTransformStream(): TransformStream<Uint8Array, Uint8Array> {
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  let buffer = ""
+
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += decoder.decode(chunk, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      for (const line of lines) {
+        const transformed = transformSseLine(line)
+        controller.enqueue(encoder.encode(transformed + "\n"))
+      }
+    },
+    flush(controller) {
+      if (buffer) {
+        const transformed = transformSseLine(buffer)
+        controller.enqueue(encoder.encode(transformed))
+      }
+    },
+  })
+}
+
 /**
  * Transforms a streaming SSE response from Antigravity to OpenAI format.
  *
- * **⚠️ CURRENT IMPLEMENTATION: BUFFERING**
- * This implementation reads the entire stream into memory before transforming.
- * While functional, it does not preserve true streaming characteristics:
- * - Blocks until entire response is received
- * - Consumes memory proportional to response size
- * - Increases Time-To-First-Byte (TTFB)
- *
- * **TODO: Future Enhancement**
- * Implement true streaming using ReadableStream transformation:
- * - Parse SSE chunks incrementally
- * - Transform and yield chunks as they arrive
- * - Reduce memory footprint and TTFB
- *
- * For streaming responses (current buffered approach):
- * - Unwraps the `response` field from each SSE event
- * - Returns transformed SSE text as new Response
- * - Extracts usage metadata from headers
- *
- * Note: Does NOT handle thinking block extraction (Task 10)
+ * Uses TransformStream to process SSE chunks incrementally as they arrive.
+ * Each line is transformed immediately and yielded to the client.
  *
  * @param response - The SSE response from Antigravity API
- * @returns TransformResult with transformed response and metadata
+ * @returns TransformResult with transformed streaming response
  */
 export async function transformStreamingResponse(response: Response): Promise<TransformResult> {
   const headers = new Headers(response.headers)
@@ -402,7 +410,8 @@ export async function transformStreamingResponse(response: Response): Promise<Tr
 
   // Check content type
   const contentType = response.headers.get("content-type") ?? ""
-  const isEventStream = contentType.includes("text/event-stream")
+  const isEventStream =
+    contentType.includes("text/event-stream") || response.url.includes("alt=sse")
 
   if (!isEventStream) {
     // Not SSE, delegate to non-streaming transform
@@ -434,23 +443,24 @@ export async function transformStreamingResponse(response: Response): Promise<Tr
     }
   }
 
-  // Handle SSE stream
-  // NOTE: Current implementation buffers entire stream - see JSDoc for details
-  try {
-    const text = await response.text()
-    const transformed = transformStreamingPayload(text)
-
-    return {
-      response: new Response(transformed, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      }),
-      usage,
-    }
-  } catch {
-    // If reading fails, return original response
+  if (!response.body) {
     return { response, usage }
+  }
+
+  headers.delete("content-length")
+  headers.delete("content-encoding")
+  headers.set("content-type", "text/event-stream; charset=utf-8")
+
+  const transformStream = createSseTransformStream()
+  const transformedBody = response.body.pipeThrough(transformStream)
+
+  return {
+    response: new Response(transformedBody, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    }),
+    usage,
   }
 }
 
@@ -462,7 +472,7 @@ export async function transformStreamingResponse(response: Response): Promise<Tr
  */
 export function isStreamingResponse(response: Response): boolean {
   const contentType = response.headers.get("content-type") ?? ""
-  return contentType.includes("text/event-stream")
+  return contentType.includes("text/event-stream") || response.url.includes("alt=sse")
 }
 
 /**
