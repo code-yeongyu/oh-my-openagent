@@ -14,6 +14,7 @@ import {
   createAnthropicAutoCompactHook,
   createRulesInjectorHook,
   createBackgroundNotificationHook,
+  createAutoUpdateCheckerHook,
 } from "./hooks";
 import {
   loadUserCommands,
@@ -161,6 +162,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
   const anthropicAutoCompact = createAnthropicAutoCompactHook(ctx);
   const rulesInjector = createRulesInjectorHook(ctx);
+  const autoUpdateChecker = createAutoUpdateCheckerHook(ctx);
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -243,6 +245,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     event: async (input) => {
+      await autoUpdateChecker.event(input);
       await claudeCodeHooks.event(input);
       await backgroundNotificationHook.event(input);
       await todoContinuationEnforcer(input);
