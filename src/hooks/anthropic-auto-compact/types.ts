@@ -7,7 +7,20 @@ export interface ParsedTokenLimitError {
   modelID?: string
 }
 
+export interface RetryState {
+  attempt: number
+  lastAttemptTime: number
+}
+
 export interface AutoCompactState {
   pendingCompact: Set<string>
   errorDataBySession: Map<string, ParsedTokenLimitError>
+  retryStateBySession: Map<string, RetryState>
 }
+
+export const RETRY_CONFIG = {
+  maxAttempts: 5,
+  initialDelayMs: 2000,
+  backoffFactor: 2,
+  maxDelayMs: 30000,
+} as const

@@ -7,6 +7,7 @@ function createAutoCompactState(): AutoCompactState {
   return {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
+    retryStateBySession: new Map(),
   }
 }
 
@@ -21,6 +22,7 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
       if (sessionInfo?.id) {
         autoCompactState.pendingCompact.delete(sessionInfo.id)
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
+        autoCompactState.retryStateBySession.delete(sessionInfo.id)
       }
       return
     }
