@@ -8,6 +8,7 @@ import {
   ANTIGRAVITY_HEADERS,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_API_VERSION,
+  SKIP_THOUGHT_SIGNATURE_VALIDATOR,
 } from "./constants"
 import type { AntigravityRequestBody } from "./types"
 
@@ -175,18 +176,18 @@ export function injectThoughtSignatureIntoFunctionCalls(
   body: Record<string, unknown>,
   signature: string | undefined
 ): Record<string, unknown> {
-  debugLog(`[TSIG][INJECT] signature=${signature ? signature.substring(0, 20) + "..." : "none"}`)
-
-  if (!signature) {
-    return body
-  }
+  // Always use skip validator as fallback (CLIProxyAPI approach)
+  const effectiveSignature = signature || SKIP_THOUGHT_SIGNATURE_VALIDATOR
+  debugLog(`[TSIG][INJECT] signature=${effectiveSignature.substring(0, 30)}... (${signature ? "provided" : "default"})`)
+  debugLog(`[TSIG][INJECT] body keys: ${Object.keys(body).join(", ")}`)
 
   const contents = body.contents as ContentBlock[] | undefined
   if (!contents || !Array.isArray(contents)) {
-    debugLog(`[TSIG][INJECT] no contents array found`)
+    debugLog(`[TSIG][INJECT] No contents array! Has messages: ${!!body.messages}`)
     return body
   }
 
+  debugLog(`[TSIG][INJECT] Found ${contents.length} content blocks`)
   let injectedCount = 0
   const modifiedContents = contents.map((content) => {
     if (!content.parts || !Array.isArray(content.parts)) {
@@ -198,7 +199,7 @@ export function injectThoughtSignatureIntoFunctionCalls(
         injectedCount++
         return {
           ...part,
-          thoughtSignature: signature,
+          thoughtSignature: effectiveSignature,
         }
       }
       return part

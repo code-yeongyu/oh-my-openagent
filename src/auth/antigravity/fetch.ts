@@ -17,10 +17,11 @@
  * Debug logging available via ANTIGRAVITY_DEBUG=1 environment variable.
  */
 
-import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "./constants"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_DEFAULT_PROJECT_ID } from "./constants"
 import { fetchProjectContext, clearProjectContextCache } from "./project"
 import { isTokenExpired, refreshAccessToken, parseStoredToken, formatTokenForStorage } from "./token"
 import { transformRequest } from "./request"
+import { convertRequestBody, hasOpenAIMessages } from "./message-converter"
 import {
   transformResponse,
   transformStreamingResponse,
@@ -110,11 +111,27 @@ async function attemptFetch(
       }
     }
 
+    debugLog(`[BODY] Keys: ${Object.keys(parsedBody).join(", ")}`)
+    debugLog(`[BODY] Has contents: ${!!parsedBody.contents}, Has messages: ${!!parsedBody.messages}`)
+    if (parsedBody.contents) {
+      const contents = parsedBody.contents as Array<Record<string, unknown>>
+      debugLog(`[BODY] contents length: ${contents.length}`)
+      contents.forEach((c, i) => {
+        debugLog(`[BODY] contents[${i}].role: ${c.role}, parts: ${JSON.stringify(c.parts).substring(0, 200)}`)
+      })
+    }
+
     if (parsedBody.tools && Array.isArray(parsedBody.tools)) {
       const normalizedTools = normalizeToolsForGemini(parsedBody.tools as OpenAITool[])
       if (normalizedTools) {
         parsedBody.tools = normalizedTools
       }
+    }
+
+    if (hasOpenAIMessages(parsedBody)) {
+      debugLog(`[CONVERT] Converting OpenAI messages to Gemini contents`)
+      parsedBody = convertRequestBody(parsedBody, thoughtSignature)
+      debugLog(`[CONVERT] After conversion - Has contents: ${!!parsedBody.contents}`)
     }
 
     const transformed = transformRequest({
@@ -208,20 +225,27 @@ async function transformResponseWithThinking(
 
   try {
     const text = await result.response.clone().text()
+    debugLog(`[TSIG][RESP] Response text length: ${text.length}`)
 
     if (streaming) {
       const signature = extractSignatureFromSsePayload(text)
+      debugLog(`[TSIG][RESP] SSE signature extracted: ${signature ? "yes" : "no"}`)
       if (signature) {
         setThoughtSignature(fetchInstanceId, signature)
-        debugLog(`[STREAMING] Stored thought signature for instance ${fetchInstanceId}`)
+        debugLog(`[TSIG][STORE] Stored signature for ${fetchInstanceId}: ${signature.substring(0, 30)}...`)
       }
     } else {
       const parsed = JSON.parse(text) as GeminiResponseBody
+      debugLog(`[TSIG][RESP] Parsed keys: ${Object.keys(parsed).join(", ")}`)
+      debugLog(`[TSIG][RESP] Has candidates: ${!!parsed.candidates}, count: ${parsed.candidates?.length ?? 0}`)
 
       const signature = extractSignatureFromResponse(parsed)
+      debugLog(`[TSIG][RESP] Signature extracted: ${signature ? signature.substring(0, 30) + "..." : "NONE"}`)
       if (signature) {
         setThoughtSignature(fetchInstanceId, signature)
-        debugLog(`Stored thought signature for instance ${fetchInstanceId}`)
+        debugLog(`[TSIG][STORE] Stored signature for ${fetchInstanceId}`)
+      } else {
+        debugLog(`[TSIG][WARN] No signature found in response!`)
       }
 
       if (shouldIncludeThinking(modelName)) {
@@ -349,14 +373,15 @@ export function createAntigravityFetch(
       }
     }
 
-    // Get project context
+    // Fetch project ID via loadCodeAssist (CLIProxyAPI approach)
     if (!cachedProjectId) {
       const projectContext = await fetchProjectContext(cachedTokens.access_token)
       cachedProjectId = projectContext.cloudaicompanionProject || ""
+      debugLog(`[PROJECT] Fetched project ID: "${cachedProjectId}"`)
     }
 
-    // Use project ID from refresh token if available, otherwise use fetched context
-    const projectId = refreshParts.projectId || cachedProjectId
+    const projectId = cachedProjectId
+    debugLog(`[PROJECT] Using project ID: "${projectId}"`)
 
     // Extract model name from request body
     let modelName: string | undefined

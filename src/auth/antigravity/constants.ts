@@ -57,7 +57,10 @@ export const ANTIGRAVITY_HEADERS = {
 } as const
 
 // Default Project ID (fallback when loadCodeAssist API fails)
-export const ANTIGRAVITY_DEFAULT_PROJECT_ID = ""
+// From opencode-antigravity-auth reference implementation
+export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc"
+
+
 
 // Google OAuth endpoints
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -66,3 +69,6 @@ export const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinf
 
 // Token refresh buffer (refresh 60 seconds before expiry)
 export const ANTIGRAVITY_TOKEN_REFRESH_BUFFER_MS = 60_000
+
+// Default thought signature to skip validation (CLIProxyAPI approach)
+export const SKIP_THOUGHT_SIGNATURE_VALIDATOR = "skip_thought_signature_validator"

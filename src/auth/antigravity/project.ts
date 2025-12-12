@@ -116,7 +116,6 @@ async function callLoadCodeAssistAPI(
 /**
  * Fetch project context from Google's loadCodeAssist API.
  * Extracts the cloudaicompanionProject from the response.
- * Falls back to ANTIGRAVITY_DEFAULT_PROJECT_ID if API fails or returns empty.
  *
  * @param accessToken - Valid OAuth access token
  * @returns Project context with cloudaicompanionProject ID
@@ -124,26 +123,20 @@ async function callLoadCodeAssistAPI(
 export async function fetchProjectContext(
   accessToken: string
 ): Promise<AntigravityProjectContext> {
-  // Check cache first
   const cached = projectContextCache.get(accessToken)
   if (cached) {
     return cached
   }
 
-  // Call the API
   const response = await callLoadCodeAssistAPI(accessToken)
-
-  // Extract project ID from response
   const projectId = response
     ? extractProjectId(response.cloudaicompanionProject)
     : undefined
 
-  // Build result with fallback
   const result: AntigravityProjectContext = {
-    cloudaicompanionProject: projectId || ANTIGRAVITY_DEFAULT_PROJECT_ID,
+    cloudaicompanionProject: projectId || "",
   }
 
-  // Cache the result
   if (projectId) {
     projectContextCache.set(accessToken, result)
   }

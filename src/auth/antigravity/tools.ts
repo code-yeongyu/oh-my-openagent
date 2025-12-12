@@ -96,34 +96,31 @@ export function normalizeToolsForGemini(
   const functionDeclarations: GeminiFunctionDeclaration[] = []
 
   for (const tool of tools) {
-    // Handle function type tools
-    if (tool.type === "function" && tool.function) {
+    if (!tool || typeof tool !== "object") {
+      continue
+    }
+
+    const toolType = tool.type ?? "function"
+    if (toolType === "function" && tool.function) {
       const declaration: GeminiFunctionDeclaration = {
         name: tool.function.name,
       }
 
-      // Include description if present
       if (tool.function.description) {
         declaration.description = tool.function.description
       }
 
-      // Include parameters if present, default to empty object schema
       if (tool.function.parameters) {
         declaration.parameters = tool.function.parameters
       } else {
-        // Gemini requires parameters field, use empty object as default
         declaration.parameters = { type: "object", properties: {} }
       }
 
       functionDeclarations.push(declaration)
-    } else {
-      // Log warning for unsupported tool types (debug only)
-      if (process.env.ANTIGRAVITY_DEBUG === "1") {
-        console.warn(
-          `[antigravity-tools] Unsupported tool type: "${tool.type}". ` +
-            `Only "function" type tools are supported for Gemini. Tool will be skipped.`
-        )
-      }
+    } else if (toolType !== "function" && process.env.ANTIGRAVITY_DEBUG === "1") {
+      console.warn(
+        `[antigravity-tools] Unsupported tool type: "${toolType}". Tool will be skipped.`
+      )
     }
   }
 
