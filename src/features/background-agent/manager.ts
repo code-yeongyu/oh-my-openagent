@@ -77,6 +77,11 @@ export class BackgroundManager {
       path: { id: sessionID },
       body: {
         agent: input.agent,
+        tools: {
+          background_task: false,
+          background_output: false,
+          background_cancel: false,
+        },
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
@@ -215,7 +220,6 @@ export class BackgroundManager {
 
   private notifyParentSession(task: BackgroundTask): void {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
-    const toolCalls = task.progress?.toolCalls ?? 0
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
@@ -232,7 +236,7 @@ export class BackgroundManager {
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration} (${toolCalls} tool calls). Use background_output with task_id="${task.id}" to get results.`
+    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
 
     const mainSessionID = getMainSessionID()
     if (!mainSessionID) {

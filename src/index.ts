@@ -206,14 +206,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         config.agent.explore.tools = {
           ...config.agent.explore.tools,
           omo_task: false,
-          background_task: false,
         };
       }
       if (config.agent.librarian) {
         config.agent.librarian.tools = {
           ...config.agent.librarian.tools,
           omo_task: false,
-          background_task: false,
         };
       }
 
