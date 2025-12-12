@@ -8,6 +8,12 @@
  * - Applies response transformation (including thinking extraction)
  * - Implements endpoint fallback (daily → autopush → prod)
  *
+ * **Body Type Assumption:**
+ * This interceptor assumes `init.body` is a JSON string (OpenAI format).
+ * Non-string bodies (ReadableStream, Blob, FormData, URLSearchParams, etc.)
+ * are passed through unchanged to the original fetch to avoid breaking
+ * other requests that may not be OpenAI-format API calls.
+ *
  * Debug logging available via ANTIGRAVITY_DEBUG=1 environment variable.
  */
 
@@ -59,9 +65,6 @@ function isRetryableError(status: number): boolean {
   return false
 }
 
-/**
- * Attempt fetch with a single endpoint
- */
 async function attemptFetch(
   endpoint: string,
   url: string,
@@ -69,43 +72,42 @@ async function attemptFetch(
   accessToken: string,
   projectId: string,
   modelName?: string
-): Promise<Response | null> {
+): Promise<Response | null | "pass-through"> {
   debugLog(`Trying endpoint: ${endpoint}`)
 
   try {
-    // Parse request body if present
-    let body: Record<string, unknown> = {}
-    if (init.body) {
+    const rawBody = init.body
+
+    if (rawBody !== undefined && typeof rawBody !== "string") {
+      debugLog(`Non-string body detected (${typeof rawBody}), signaling pass-through`)
+      return "pass-through"
+    }
+
+    let parsedBody: Record<string, unknown> = {}
+    if (rawBody) {
       try {
-        body =
-          typeof init.body === "string"
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : (init.body as unknown as Record<string, unknown>)
+        parsedBody = JSON.parse(rawBody) as Record<string, unknown>
       } catch {
-        // If body parsing fails, use empty object
-        body = {}
+        parsedBody = {}
       }
     }
 
-    // Apply tool normalization if tools present
-    if (body.tools && Array.isArray(body.tools)) {
-      const normalizedTools = normalizeToolsForGemini(body.tools as OpenAITool[])
+    if (parsedBody.tools && Array.isArray(parsedBody.tools)) {
+      const normalizedTools = normalizeToolsForGemini(parsedBody.tools as OpenAITool[])
       if (normalizedTools) {
-        body.tools = normalizedTools
+        parsedBody.tools = normalizedTools
       }
     }
 
-    // Transform request
     const transformed = transformRequest(
       url,
-      body,
+      parsedBody,
       accessToken,
       projectId,
       modelName,
       endpoint
     )
 
-    // Make the request
     const response = await fetch(transformed.url, {
       method: init.method || "POST",
       headers: transformed.headers,
@@ -113,7 +115,6 @@ async function attemptFetch(
       signal: init.signal,
     })
 
-    // Check for retryable errors
     if (!response.ok && isRetryableError(response.status)) {
       debugLog(`Endpoint failed: ${endpoint} (status: ${response.status}), trying next`)
       return null
@@ -121,7 +122,6 @@ async function attemptFetch(
 
     return response
   } catch (error) {
-    // Network error - try next endpoint
     debugLog(
       `Endpoint failed: ${endpoint} (${error instanceof Error ? error.message : "Unknown error"}), trying next`
     )
@@ -179,6 +179,8 @@ async function transformResponseWithThinking(
  * @param getAuth - Async function to retrieve current auth state
  * @param client - Auth client for saving updated tokens
  * @param providerId - Provider identifier (e.g., "google")
+ * @param clientId - Optional custom client ID for token refresh (defaults to ANTIGRAVITY_CLIENT_ID)
+ * @param clientSecret - Optional custom client secret for token refresh (defaults to ANTIGRAVITY_CLIENT_SECRET)
  * @returns Custom fetch function compatible with standard fetch signature
  *
  * @example
@@ -186,7 +188,9 @@ async function transformResponseWithThinking(
  * const customFetch = createAntigravityFetch(
  *   () => auth(),
  *   client,
- *   "google"
+ *   "google",
+ *   "custom-client-id",
+ *   "custom-client-secret"
  * )
  *
  * // Use like standard fetch
@@ -199,7 +203,9 @@ async function transformResponseWithThinking(
 export function createAntigravityFetch(
   getAuth: () => Promise<Auth>,
   client: AuthClient,
-  providerId: string
+  providerId: string,
+  clientId?: string,
+  clientSecret?: string
 ): (url: string, init?: RequestInit) => Promise<Response> {
   // Cache for current token state
   let cachedTokens: AntigravityTokens | null = null
@@ -237,7 +243,7 @@ export function createAntigravityFetch(
       debugLog("Token expired, refreshing...")
 
       try {
-        const newTokens = await refreshAccessToken(refreshParts.refreshToken)
+        const newTokens = await refreshAccessToken(refreshParts.refreshToken, clientId, clientSecret)
 
         // Update cached tokens
         cachedTokens = {
@@ -297,7 +303,6 @@ export function createAntigravityFetch(
       }
     }
 
-    // Try each endpoint in fallback order
     const maxEndpoints = Math.min(ANTIGRAVITY_ENDPOINT_FALLBACKS.length, 3)
 
     for (let i = 0; i < maxEndpoints; i++) {
@@ -312,10 +317,13 @@ export function createAntigravityFetch(
         modelName
       )
 
+      if (response === "pass-through") {
+        debugLog("Non-string body detected, passing through to original fetch")
+        return fetch(url, init)
+      }
+
       if (response) {
         debugLog(`Success with endpoint: ${endpoint}`)
-
-        // Transform response (with thinking extraction if applicable)
         return transformResponseWithThinking(response, modelName || "")
       }
     }

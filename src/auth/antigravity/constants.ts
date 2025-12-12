@@ -1,6 +1,20 @@
 /**
  * Antigravity OAuth configuration constants.
  * Values sourced from cliproxyapi/sdk/auth/antigravity.go
+ *
+ * ## Logging Policy
+ *
+ * All console logging in antigravity modules follows a consistent policy:
+ *
+ * - **Debug logs**: Guard with `if (process.env.ANTIGRAVITY_DEBUG === "1")`
+ *   - Includes: info messages, warnings, non-fatal errors
+ *   - Enable debugging: `ANTIGRAVITY_DEBUG=1 opencode`
+ *
+ * - **Fatal errors**: None currently. All errors are handled by returning
+ *   appropriate error responses to OpenCode's auth system.
+ *
+ * This policy ensures production silence while enabling verbose debugging
+ * when needed for troubleshooting OAuth flows.
  */
 
 // OAuth 2.0 Client Credentials

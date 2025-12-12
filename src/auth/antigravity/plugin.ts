@@ -74,6 +74,12 @@ function isOAuthAuth(
 export async function createGoogleAntigravityAuthPlugin({
   client,
 }: PluginInput): Promise<{ auth: AuthHook }> {
+  // Cache for custom credentials from provider.options
+  // These are populated by loader() and used by authorize()
+  // Falls back to defaults if loader hasn't been called yet
+  let cachedClientId: string = ANTIGRAVITY_CLIENT_ID
+  let cachedClientSecret: string = ANTIGRAVITY_CLIENT_SECRET
+
   const authHook: AuthHook = {
     /**
      * Provider identifier - must be "google" as Antigravity is
@@ -100,18 +106,16 @@ export async function createGoogleAntigravityAuthPlugin({
         return {}
       }
 
-      // Read credentials from provider.options (opencode.json)
-      // Fall back to default credentials if not configured
-      const clientId =
+      cachedClientId =
         (provider.options?.clientId as string) || ANTIGRAVITY_CLIENT_ID
-      const clientSecret =
+      cachedClientSecret =
         (provider.options?.clientSecret as string) || ANTIGRAVITY_CLIENT_SECRET
 
       // Log if using custom credentials (for debugging)
       if (
         process.env.ANTIGRAVITY_DEBUG === "1" &&
-        (clientId !== ANTIGRAVITY_CLIENT_ID ||
-          clientSecret !== ANTIGRAVITY_CLIENT_SECRET)
+        (cachedClientId !== ANTIGRAVITY_CLIENT_ID ||
+          cachedClientSecret !== ANTIGRAVITY_CLIENT_SECRET)
       ) {
         console.log(
           "[antigravity-plugin] Using custom credentials from provider.options"
@@ -153,13 +157,12 @@ export async function createGoogleAntigravityAuthPlugin({
         return {}
       }
 
-      // Create the Antigravity fetch interceptor
-      // Note: The fetch interceptor uses constants for token refresh internally
-      // Custom credentials in provider.options are for future extensibility
       const antigravityFetch = createAntigravityFetch(
         getAuth,
         authClient,
-        GOOGLE_PROVIDER_ID
+        GOOGLE_PROVIDER_ID,
+        cachedClientId,
+        cachedClientSecret
       )
 
       return {
@@ -185,8 +188,7 @@ export async function createGoogleAntigravityAuthPlugin({
          * @returns Authorization result with URL and callback
          */
         authorize: async (): Promise<AuthOuathResult> => {
-          // Build OAuth URL with PKCE
-          const { url, verifier } = await buildAuthURL()
+          const { url, verifier } = await buildAuthURL(undefined, cachedClientId)
 
           // Start local callback server to receive OAuth callback
           const callbackPromise = startCallbackServer()
@@ -208,28 +210,33 @@ export async function createGoogleAntigravityAuthPlugin({
 
                 // Check for errors
                 if (result.error) {
-                  console.error(
-                    `[antigravity-plugin] OAuth error: ${result.error}`
-                  )
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.error(
+                      `[antigravity-plugin] OAuth error: ${result.error}`
+                    )
+                  }
                   return { type: "failed" as const }
                 }
 
                 if (!result.code) {
-                  console.error(
-                    "[antigravity-plugin] No authorization code received"
-                  )
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.error(
+                      "[antigravity-plugin] No authorization code received"
+                    )
+                  }
                   return { type: "failed" as const }
                 }
 
                 // Verify state and extract original verifier
                 const state = decodeState(result.state)
                 if (state.verifier !== verifier) {
-                  console.error("[antigravity-plugin] PKCE verifier mismatch")
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.error("[antigravity-plugin] PKCE verifier mismatch")
+                  }
                   return { type: "failed" as const }
                 }
 
-                // Exchange authorization code for tokens
-                const tokens = await exchangeCode(result.code, verifier)
+                const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret)
 
                 // Fetch user info (optional, for logging)
                 try {
@@ -263,11 +270,13 @@ export async function createGoogleAntigravityAuthPlugin({
                   expires: Date.now() + tokens.expires_in * 1000,
                 }
               } catch (error) {
-                console.error(
-                  `[antigravity-plugin] OAuth flow failed: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                  }`
-                )
+                if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                  console.error(
+                    `[antigravity-plugin] OAuth flow failed: ${
+                      error instanceof Error ? error.message : "Unknown error"
+                    }`
+                  )
+                }
                 return { type: "failed" as const }
               }
             },

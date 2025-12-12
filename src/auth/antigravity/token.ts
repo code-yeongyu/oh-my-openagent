@@ -36,16 +36,20 @@ export function isTokenExpired(tokens: AntigravityTokens): boolean {
  * Exchanges the refresh token for a new access token via Google's OAuth endpoint.
  *
  * @param refreshToken - The refresh token to use
+ * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
+ * @param clientSecret - Optional custom client secret (defaults to ANTIGRAVITY_CLIENT_SECRET)
  * @returns Token exchange result with new access token, or throws on error
  */
 export async function refreshAccessToken(
-  refreshToken: string
+  refreshToken: string,
+  clientId: string = ANTIGRAVITY_CLIENT_ID,
+  clientSecret: string = ANTIGRAVITY_CLIENT_SECRET
 ): Promise<AntigravityTokenExchangeResult> {
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    client_secret: ANTIGRAVITY_CLIENT_SECRET,
+    client_id: clientId,
+    client_secret: clientSecret,
   })
 
   const response = await fetch(GOOGLE_TOKEN_URL, {

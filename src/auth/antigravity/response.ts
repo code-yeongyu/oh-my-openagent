@@ -4,7 +4,7 @@
  *
  * Key responsibilities:
  * - Non-streaming response transformation
- * - SSE streaming response transformation (preserving stream)
+ * - SSE streaming response transformation (buffered - see transformStreamingResponse)
  * - Error response handling with retry-after extraction
  * - Usage metadata extraction from x-antigravity-* headers
  */
@@ -340,19 +340,29 @@ export function transformStreamingPayload(payload: string): string {
 }
 
 /**
- * Transform a streaming SSE response
+ * Transforms a streaming SSE response from Antigravity to OpenAI format.
  *
- * For streaming responses:
- * - Preserves the SSE format for downstream consumers
+ * **⚠️ CURRENT IMPLEMENTATION: BUFFERING**
+ * This implementation reads the entire stream into memory before transforming.
+ * While functional, it does not preserve true streaming characteristics:
+ * - Blocks until entire response is received
+ * - Consumes memory proportional to response size
+ * - Increases Time-To-First-Byte (TTFB)
+ *
+ * **TODO: Future Enhancement**
+ * Implement true streaming using ReadableStream transformation:
+ * - Parse SSE chunks incrementally
+ * - Transform and yield chunks as they arrive
+ * - Reduce memory footprint and TTFB
+ *
+ * For streaming responses (current buffered approach):
  * - Unwraps the `response` field from each SSE event
+ * - Returns transformed SSE text as new Response
  * - Extracts usage metadata from headers
- *
- * Note: This reads the entire stream and returns a new Response.
- * The stream is preserved as SSE text, not blocked.
  *
  * Note: Does NOT handle thinking block extraction (Task 10)
  *
- * @param response - Fetch Response object with SSE body
+ * @param response - The SSE response from Antigravity API
  * @returns TransformResult with transformed response and metadata
  */
 export async function transformStreamingResponse(response: Response): Promise<TransformResult> {
@@ -425,6 +435,7 @@ export async function transformStreamingResponse(response: Response): Promise<Tr
   }
 
   // Handle SSE stream
+  // NOTE: Current implementation buffers entire stream - see JSDoc for details
   try {
     const text = await response.text()
     const transformed = transformStreamingPayload(text)

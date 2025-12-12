@@ -121,10 +121,12 @@ export function decodeState(encoded: string): OAuthState {
  * Build the OAuth authorization URL with PKCE.
  *
  * @param projectId - Optional GCP project ID to include in state
+ * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
  * @returns Authorization result with URL and verifier
  */
 export async function buildAuthURL(
-  projectId?: string
+  projectId?: string,
+  clientId: string = ANTIGRAVITY_CLIENT_ID
 ): Promise<AuthorizationResult> {
   const pkce = await generatePKCEPair()
 
@@ -134,7 +136,7 @@ export async function buildAuthURL(
   }
 
   const url = new URL(GOOGLE_AUTH_URL)
-  url.searchParams.set("client_id", ANTIGRAVITY_CLIENT_ID)
+  url.searchParams.set("client_id", clientId)
   url.searchParams.set("redirect_uri", ANTIGRAVITY_REDIRECT_URI)
   url.searchParams.set("response_type", "code")
   url.searchParams.set("scope", ANTIGRAVITY_SCOPES.join(" "))
@@ -155,15 +157,19 @@ export async function buildAuthURL(
  *
  * @param code - Authorization code from OAuth callback
  * @param verifier - PKCE verifier from initial auth request
+ * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
+ * @param clientSecret - Optional custom client secret (defaults to ANTIGRAVITY_CLIENT_SECRET)
  * @returns Token exchange result with access and refresh tokens
  */
 export async function exchangeCode(
   code: string,
-  verifier: string
+  verifier: string,
+  clientId: string = ANTIGRAVITY_CLIENT_ID,
+  clientSecret: string = ANTIGRAVITY_CLIENT_SECRET
 ): Promise<AntigravityTokenExchangeResult> {
   const params = new URLSearchParams({
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    client_secret: ANTIGRAVITY_CLIENT_SECRET,
+    client_id: clientId,
+    client_secret: clientSecret,
     code,
     grant_type: "authorization_code",
     redirect_uri: ANTIGRAVITY_REDIRECT_URI,
@@ -317,18 +323,22 @@ export function startCallbackServer(
  *
  * @param projectId - Optional GCP project ID
  * @param openBrowser - Function to open URL in browser
+ * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
+ * @param clientSecret - Optional custom client secret (defaults to ANTIGRAVITY_CLIENT_SECRET)
  * @returns Object with tokens and user info
  */
 export async function performOAuthFlow(
   projectId?: string,
-  openBrowser?: (url: string) => Promise<void>
+  openBrowser?: (url: string) => Promise<void>,
+  clientId: string = ANTIGRAVITY_CLIENT_ID,
+  clientSecret: string = ANTIGRAVITY_CLIENT_SECRET
 ): Promise<{
   tokens: AntigravityTokenExchangeResult
   userInfo: AntigravityUserInfo
   verifier: string
 }> {
   // Build auth URL first to get the verifier
-  const auth = await buildAuthURL(projectId)
+  const auth = await buildAuthURL(projectId, clientId)
 
   // Start callback server
   const callbackPromise = startCallbackServer()
@@ -356,7 +366,7 @@ export async function performOAuthFlow(
   }
 
   // Exchange code for tokens
-  const tokens = await exchangeCode(callback.code, auth.verifier)
+  const tokens = await exchangeCode(callback.code, auth.verifier, clientId, clientSecret)
 
   // Fetch user info
   const userInfo = await fetchUserInfo(tokens.access_token)

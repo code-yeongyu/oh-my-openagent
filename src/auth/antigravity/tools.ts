@@ -117,11 +117,13 @@ export function normalizeToolsForGemini(
 
       functionDeclarations.push(declaration)
     } else {
-      // Log warning for unsupported tool types
-      console.warn(
-        `[antigravity-tools] Unsupported tool type: "${tool.type}". ` +
-          `Only "function" type tools are supported for Gemini. Tool will be skipped.`
-      )
+      // Log warning for unsupported tool types (debug only)
+      if (process.env.ANTIGRAVITY_DEBUG === "1") {
+        console.warn(
+          `[antigravity-tools] Unsupported tool type: "${tool.type}". ` +
+            `Only "function" type tools are supported for Gemini. Tool will be skipped.`
+        )
+      }
     }
   }
 
