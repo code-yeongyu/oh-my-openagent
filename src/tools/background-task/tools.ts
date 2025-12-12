@@ -46,9 +46,10 @@ Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
-Use \`background_output\` tool with task_id="${task.id}" to check progress or retrieve results.
-- block=false: Check status without waiting
-- block=true (default): Wait for completion and get result`
+The system will notify you when the task completes.
+Use \`background_output\` tool with task_id="${task.id}" to check progress:
+- block=false (default): Check status immediately - returns full status info
+- block=true: Wait for completion (rarely needed since system notifies)`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return `❌ Failed to launch background task: ${message}`
@@ -152,7 +153,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
       task_id: tool.schema.string().describe("Task ID to get output from"),
-      block: tool.schema.boolean().optional().describe("Wait for completion (default: true)"),
+      block: tool.schema.boolean().optional().describe("Wait for completion (default: false). System notifies when done, so blocking is rarely needed."),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
     },
     async execute(args: BackgroundOutputArgs) {
@@ -162,7 +163,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
           return `Task not found: ${args.task_id}`
         }
 
-        const shouldBlock = args.block !== false
+        const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
 
         // Non-blocking: return status immediately

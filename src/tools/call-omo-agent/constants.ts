@@ -11,7 +11,8 @@ When using this tool, you must specify a subagent_type parameter to select which
 
 **IMPORTANT: run_in_background parameter is REQUIRED**
 - \`run_in_background=true\`: Task runs asynchronously in background. Returns immediately with task_id.
-  Use \`background_output\` tool with the returned task_id to check progress or retrieve results.
+  The system will notify you when the task completes.
+  Use \`background_output\` tool with task_id to check progress (block=false returns full status info).
 - \`run_in_background=false\`: Task runs synchronously. Waits for completion and returns full result.
 
 Usage notes:
