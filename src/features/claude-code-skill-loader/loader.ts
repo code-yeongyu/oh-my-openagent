@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, readlinkSync } from "fs"
+import { existsSync, readdirSync, readFileSync, lstatSync, readlinkSync } from "fs"
 import { homedir } from "os"
 import { join, resolve } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
@@ -22,8 +22,12 @@ function loadSkillsFromDir(skillsDir: string, scope: SkillScope): LoadedSkillAsC
     if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
 
     let resolvedPath = skillPath
-    if (statSync(skillPath, { throwIfNoEntry: false })?.isSymbolicLink()) {
-      resolvedPath = resolve(skillPath, "..", readlinkSync(skillPath))
+    try {
+      if (lstatSync(skillPath, { throwIfNoEntry: false })?.isSymbolicLink()) {
+        resolvedPath = resolve(skillPath, "..", readlinkSync(skillPath))
+      }
+    } catch {
+      continue
     }
 
     const skillMdPath = join(resolvedPath, "SKILL.md")

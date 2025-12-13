@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import { existsSync, readdirSync, statSync, readlinkSync, readFileSync } from "fs"
+import { existsSync, readdirSync, lstatSync, readlinkSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join, resolve, basename } from "path"
 import { z } from "zod/v4"
@@ -39,7 +39,7 @@ function discoverSkillsFromDir(
     if (entry.isDirectory() || entry.isSymbolicLink()) {
       let resolvedPath = skillPath
       try {
-        const stats = statSync(skillPath, { throwIfNoEntry: false })
+        const stats = lstatSync(skillPath, { throwIfNoEntry: false })
         if (stats?.isSymbolicLink()) {
           resolvedPath = resolve(skillPath, "..", readlinkSync(skillPath))
         }
@@ -85,7 +85,7 @@ const skillListForDescription = availableSkills
 
 function resolveSymlink(skillPath: string): string {
   try {
-    const stats = statSync(skillPath, { throwIfNoEntry: false })
+    const stats = lstatSync(skillPath, { throwIfNoEntry: false })
     if (stats?.isSymbolicLink()) {
       return resolve(skillPath, "..", readlinkSync(skillPath))
     }
