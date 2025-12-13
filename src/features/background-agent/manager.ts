@@ -4,7 +4,6 @@ import type {
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
-import { getMainSessionID } from "../claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -240,25 +239,19 @@ export class BackgroundManager {
 
     const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
 
-    const mainSessionID = getMainSessionID()
-    if (!mainSessionID) {
-      log("[background-agent] No main session ID available, relying on pending queue")
-      return
-    }
-
-    log("[background-agent] Sending notification to main session:", mainSessionID)
+    log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
 
     setTimeout(async () => {
       try {
         await this.client.session.prompt({
-          path: { id: mainSessionID },
+          path: { id: task.parentSessionID },
           body: {
             parts: [{ type: "text", text: message }],
           },
           query: { directory: this.directory },
         })
         this.clearNotificationsForTask(task.id)
-        log("[background-agent] Successfully sent prompt to main session")
+        log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
       } catch (error) {
         log("[background-agent] prompt failed:", String(error))
       }
