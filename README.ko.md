@@ -602,3 +602,5 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 - [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) 혹은 이것보다 낮은 버전을 사용중이라면, OpenCode 의 버그로 인해 제대로 구성이 되지 않을 수 있습니다.
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
     - TMI: PR 도 OhMyOpenCode 의 셋업의 Librarian, Explore, Oracle 을 활용하여 우연히 발견하고 해결되었습니다.
+
+*멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo)여*

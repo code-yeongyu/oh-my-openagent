@@ -604,4 +604,4 @@ I have no affiliation with any project or model mentioned here. This is purely p
   - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
     - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.
 
-*Special thanks to @junhoyeo for this amazing hero image.*
+*Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*
