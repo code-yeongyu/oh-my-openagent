@@ -166,6 +166,18 @@ opencode auth login
 # 브라우저에서 OAuth 플로우 완료
 ```
 
+**⚠️ 알려진 이슈**: 현재 공식 npm 패키지에 400 에러(`"No tool call found for function call output with call_id"`)를 유발하는 버그가 있습니다. 수정 버전이 배포될 때까지 **핫픽스 브랜치 사용을 권장합니다**. `~/.config/opencode/package.json`을 수정하세요:
+
+```json
+{
+  "dependencies": {
+    "opencode-openai-codex-auth": "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
+  }
+}
+```
+
+그 후 `cd ~/.config/opencode && bun i`를 실행하세요. `opencode.json`에서는 버전 없이 `"opencode-openai-codex-auth"`로 사용합니다 (`@4.1.0` 제외).
+
 #### 4.4 대안: 프록시 기반 인증
 
 프록시 기반 인증을 선호하는 사용자를 위해 [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.

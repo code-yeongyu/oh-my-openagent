@@ -165,6 +165,18 @@ opencode auth login
 # Complete OAuth flow in browser
 ```
 
+**⚠️ Known Issue**: The official npm package currently has a bug that causes 400 errors (`"No tool call found for function call output with call_id"`). Until a fix is released, **use the hotfix branch instead**. Modify `~/.config/opencode/package.json`:
+
+```json
+{
+  "dependencies": {
+    "opencode-openai-codex-auth": "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
+  }
+}
+```
+
+Then run `cd ~/.config/opencode && bun i`. In your `opencode.json`, use the plugin name without a version: `"opencode-openai-codex-auth"` (not `@4.1.0`).
+
 #### 4.4 Alternative: Proxy-based Authentication
 
 For users who prefer proxy-based authentication, [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
