@@ -441,6 +441,18 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
+### Google Auth
+
+Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
+
+```json
+{
+  "google_auth": true
+}
+```
+
+활성화하면 `opencode auth login` 실행 시 Google 프로바이더에서 "OAuth with Google (Antigravity)" 로그인 옵션이 표시됩니다.
+
 ### Agents
 
 내장 에이전트 설정을 오버라이드할 수 있습니다:

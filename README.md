@@ -439,6 +439,18 @@ Schema autocomplete is supported:
 }
 ```
 
+### Google Auth
+
+Enable built-in Antigravity OAuth for Google Gemini models:
+
+```json
+{
+  "google_auth": true
+}
+```
+
+When enabled, `opencode auth login` will show "OAuth with Google (Antigravity)" as a login option for the Google provider.
+
 ### Agents
 
 Override built-in agent settings:

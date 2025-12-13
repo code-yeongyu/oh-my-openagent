@@ -155,6 +155,47 @@
         }
       }
     },
+    "google_auth": {
+      "type": "boolean",
+      "description": "Enable built-in Antigravity OAuth for Google Gemini models. When true, adds 'OAuth with Google (Antigravity)' login option.",
+      "default": false
+    },
+    "lsp": {
+      "type": "object",
+      "description": "Additional LSP server configurations specific to Oh My OpenCode.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Command and arguments to start the LSP server"
+          },
+          "extensions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "File extensions this server handles (e.g., [\".ts\", \".tsx\"])"
+          },
+          "priority": {
+            "type": "number",
+            "description": "Server priority (higher = preferred)"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Environment variables for the LSP server"
+          },
+          "initialization": {
+            "type": "object",
+            "description": "Custom initialization options"
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Disable this LSP server"
+          }
+        }
+      }
+    },
     "claude_code": {
       "type": "object",
       "description": "Toggle Claude Code compatibility features on/off. All default to true (enabled).",
