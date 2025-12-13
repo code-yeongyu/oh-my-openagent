@@ -1,4 +1,29 @@
-[English](README.md) | 한국어
+<!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
+
+<div align="center">
+
+[![Oh My OpenCode](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+
+[![Preview](./.github/assets/preview.png)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
+
+</div>
+
+> 도핑한 코딩—`oh-my-opencode` 실사용. 백그라운드 에이전트를 돌리고, oracle, librarian, frontend engineer 같은 전문 에이전트를 호출하세요. LSP/AST 도구, 엄선된 MCP, 완전한 Claude Code 호환 레이어를 사용하세요.
+
+<div align="center">
+
+[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
+[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
+[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
+[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
+[![License](https://img.shields.io/badge/license-MIT-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE)
+
+[English](README.md) | [한국어](README.ko.md)
+
+</div>
+
+<!-- </CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 ## 목차
 
