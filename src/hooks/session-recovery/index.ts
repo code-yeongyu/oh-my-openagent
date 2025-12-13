@@ -216,12 +216,24 @@ async function recoverEmptyContentMessage(
 // All error types have dedicated recovery functions (recoverToolResultMissing,
 // recoverThinkingBlockOrder, recoverThinkingDisabledViolation, recoverEmptyContentMessage).
 
-export function createSessionRecoveryHook(ctx: PluginInput) {
+export interface SessionRecoveryHook {
+  handleSessionRecovery: (info: MessageInfo) => Promise<boolean>
+  isRecoverableError: (error: unknown) => boolean
+  setOnAbortCallback: (callback: (sessionID: string) => void) => void
+  setOnRecoveryCompleteCallback: (callback: (sessionID: string) => void) => void
+}
+
+export function createSessionRecoveryHook(ctx: PluginInput): SessionRecoveryHook {
   const processingErrors = new Set<string>()
   let onAbortCallback: ((sessionID: string) => void) | null = null
+  let onRecoveryCompleteCallback: ((sessionID: string) => void) | null = null
 
   const setOnAbortCallback = (callback: (sessionID: string) => void): void => {
     onAbortCallback = callback
+  }
+
+  const setOnRecoveryCompleteCallback = (callback: (sessionID: string) => void): void => {
+    onRecoveryCompleteCallback = callback
   }
 
   const isRecoverableError = (error: unknown): boolean => {
@@ -242,11 +254,11 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
     processingErrors.add(assistantMsgID)
 
     try {
-      await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-
       if (onAbortCallback) {
-        onAbortCallback(sessionID)
+        onAbortCallback(sessionID)  // Mark recovering BEFORE abort
       }
+
+      await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -301,6 +313,11 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
     return false
   } finally {
     processingErrors.delete(assistantMsgID)
+
+    // Always notify recovery complete, regardless of success or failure
+    if (sessionID && onRecoveryCompleteCallback) {
+      onRecoveryCompleteCallback(sessionID)
+    }
   }
   }
 
@@ -308,5 +325,6 @@ export function createSessionRecoveryHook(ctx: PluginInput) {
     handleSessionRecovery,
     isRecoverableError,
     setOnAbortCallback,
+    setOnRecoveryCompleteCallback,
   }
 }

@@ -1,5 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
+export interface TodoContinuationEnforcer {
+  handler: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
+  markRecovering: (sessionID: string) => void
+  markRecoveryComplete: (sessionID: string) => void
+}
+
 interface Todo {
   content: string
   status: string
@@ -32,13 +38,22 @@ function detectInterrupt(error: unknown): boolean {
   return false
 }
 
-export function createTodoContinuationEnforcer(ctx: PluginInput) {
+export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuationEnforcer {
   const remindedSessions = new Set<string>()
   const interruptedSessions = new Set<string>()
   const errorSessions = new Set<string>()
+  const recoveringSessions = new Set<string>()
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  return async ({ event }: { event: { type: string; properties?: unknown } }) => {
+  const markRecovering = (sessionID: string): void => {
+    recoveringSessions.add(sessionID)
+  }
+
+  const markRecoveryComplete = (sessionID: string): void => {
+    recoveringSessions.delete(sessionID)
+  }
+
+  const handler = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.error") {
@@ -72,6 +87,11 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
       // Schedule continuation check
       const timer = setTimeout(async () => {
         pendingTimers.delete(sessionID)
+
+        // Check if session is in recovery mode - if so, skip entirely without clearing state
+        if (recoveringSessions.has(sessionID)) {
+          return
+        }
 
         const shouldBypass = interruptedSessions.has(sessionID) || errorSessions.has(sessionID)
         
@@ -111,7 +131,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
         remindedSessions.add(sessionID)
 
         // Re-check if abort occurred during the delay/fetch
-        if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID)) {
+        if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID) || recoveringSessions.has(sessionID)) {
           remindedSessions.delete(sessionID)
           return
         }
@@ -158,6 +178,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
         remindedSessions.delete(sessionInfo.id)
         interruptedSessions.delete(sessionInfo.id)
         errorSessions.delete(sessionInfo.id)
+        recoveringSessions.delete(sessionInfo.id)
         
         // Cancel pending continuation
         const timer = pendingTimers.get(sessionInfo.id)
@@ -167,5 +188,11 @@ export function createTodoContinuationEnforcer(ctx: PluginInput) {
         }
       }
     }
+  }
+
+  return {
+    handler,
+    markRecovering,
+    markRecoveryComplete,
   }
 }
