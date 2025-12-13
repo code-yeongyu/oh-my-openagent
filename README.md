@@ -230,7 +230,7 @@ The plugin works perfectly with defaults. Aside from the recommended `google_aut
 ### Agents: Your Teammates
 
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`anthropic/claude-haiku-4-5`): Multi-repo analysis, doc lookup, implementation examples. Haiku is fast, smart enough, great at tool calls, and cheap. Inspired by AmpCode.
+- **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Claude Sonnet 4 is fast, smart, great at tool calls, and excellent for documentation research. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
 - **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.

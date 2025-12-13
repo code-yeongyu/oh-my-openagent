@@ -233,7 +233,7 @@ opencode auth login
 ### Agents: 당신의 새로운 팀원들
 
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
-- **librarian** (`anthropic/claude-haiku-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Haiku의 빠른 속도, 적절한 지능, 훌륭한 도구 호출 능력, 저렴한 비용을 활용합니다. AmpCode 에서 영감을 받았습니다.
+- **librarian** (`anthropic/claude-sonnet-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Claude Sonnet 4.5 의 뛰어난 지능, 훌륭한 도구 호출 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
