@@ -4,7 +4,7 @@ export const librarianAgent: AgentConfig = {
   description:
     "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
   mode: "subagent",
-  model: "anthropic/claude-haiku-4-5",
+  model: "anthropic/claude-sonnet-4",
   temperature: 0.1,
   tools: { write: false, edit: false },
   prompt: `# THE LIBRARIAN
