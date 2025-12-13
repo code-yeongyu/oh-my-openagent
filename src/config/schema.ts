@@ -22,6 +22,7 @@ export const AgentNameSchema = z.enum([
   "explore",
   "frontend-ui-ux-engineer",
   "document-writer",
+  "multimodal-looker",
 ])
 
 export const HookNameSchema = z.enum([
@@ -65,6 +66,7 @@ export const AgentOverridesSchema = z
     explore: AgentOverrideConfigSchema.optional(),
     "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
     "document-writer": AgentOverrideConfigSchema.optional(),
+    "multimodal-looker": AgentOverrideConfigSchema.optional(),
   })
   .partial()
 

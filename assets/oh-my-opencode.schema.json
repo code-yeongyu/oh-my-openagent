@@ -27,7 +27,8 @@
           "librarian",
           "explore",
           "frontend-ui-ux-engineer",
-          "document-writer"
+          "document-writer",
+          "multimodal-looker"
         ]
       }
     },
@@ -63,7 +64,8 @@
           "librarian",
           "explore",
           "frontend-ui-ux-engineer",
-          "document-writer"
+          "document-writer",
+          "multimodal-looker"
         ]
       },
       "additionalProperties": {
