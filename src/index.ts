@@ -16,6 +16,7 @@ import {
   createRulesInjectorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
+  createUltraworkModeHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -203,6 +204,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
     ? createAutoUpdateCheckerHook(ctx)
     : null;
+  const ultraworkMode = isHookEnabled("ultrawork-mode")
+    ? createUltraworkModeHook()
+    : null;
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -230,6 +234,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
+      await ultraworkMode?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {
@@ -304,6 +309,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
+      await ultraworkMode?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
