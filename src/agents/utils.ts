@@ -5,6 +5,7 @@ import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
+import { multimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
 
 const allBuiltinAgents: Record<AgentName, AgentConfig> = {
@@ -13,6 +14,7 @@ const allBuiltinAgents: Record<AgentName, AgentConfig> = {
   explore: exploreAgent,
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
   "document-writer": documentWriterAgent,
+  "multimodal-looker": multimodalLookerAgent,
 }
 
 function mergeAgentConfig(

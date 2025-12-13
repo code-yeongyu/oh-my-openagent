@@ -41,7 +41,7 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createCallOmoAgent, createBackgroundTools } from "./tools";
+import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
@@ -218,6 +218,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
+  const lookAt = createLookAt(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -230,6 +231,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...builtinTools,
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
+      look_at: lookAt,
     },
 
     "chat.message": async (input, output) => {
@@ -266,6 +268,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         config.agent.librarian.tools = {
           ...config.agent.librarian.tools,
           call_omo_agent: false,
+        };
+      }
+      if (config.agent["multimodal-looker"]) {
+        config.agent["multimodal-looker"].tools = {
+          ...config.agent["multimodal-looker"].tools,
+          task: false,
+          call_omo_agent: false,
+          look_at: false,
         };
       }
 
