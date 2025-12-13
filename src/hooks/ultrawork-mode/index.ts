@@ -2,6 +2,7 @@ import { detectUltraworkKeyword, extractPromptText } from "./detector"
 import { ULTRAWORK_CONTEXT } from "./constants"
 import type { UltraworkModeState } from "./types"
 import { log } from "../../shared"
+import { injectHookMessage } from "../../features/hook-message-injector"
 
 export * from "./detector"
 export * from "./constants"
@@ -16,13 +17,13 @@ export function clearUltraworkModeState(sessionID: string): void {
 export function createUltraworkModeHook() {
   return {
     /**
-     * chat.message hook - detect ultrawork/ulw keywords, inject context
+     * chat.message hook - detect ultrawork/ulw keywords, inject context via history
      *
      * Execution timing: AFTER claudeCodeHooks["chat.message"]
      * Behavior:
      *   1. Extract text from user prompt
      *   2. Detect ultrawork/ulw keywords (excluding code blocks)
-     *   3. If detected, prepend ULTRAWORK_CONTEXT to first text part
+     *   3. If detected, inject ULTRAWORK_CONTEXT via injectHookMessage (history injection)
      */
     "chat.message": async (
       input: {
@@ -51,13 +52,25 @@ export function createUltraworkModeHook() {
       state.detected = true
       log("Ultrawork keyword detected", { sessionID: input.sessionID })
 
-      const parts = output.parts as Array<{ type: string; text?: string }>
-      const idx = parts.findIndex((p) => p.type === "text" && p.text)
+      const message = output.message as {
+        agent?: string
+        model?: { modelID?: string; providerID?: string }
+        path?: { cwd?: string; root?: string }
+        tools?: Record<string, boolean>
+      }
 
-      if (idx >= 0) {
-        parts[idx].text = `${ULTRAWORK_CONTEXT}${parts[idx].text ?? ""}`
+      const success = injectHookMessage(input.sessionID, ULTRAWORK_CONTEXT, {
+        agent: message.agent,
+        model: message.model,
+        path: message.path,
+        tools: message.tools,
+      })
+
+      if (success) {
         state.injected = true
-        log("Ultrawork context injected", { sessionID: input.sessionID })
+        log("Ultrawork context injected via history", { sessionID: input.sessionID })
+      } else {
+        log("Ultrawork context injection failed", { sessionID: input.sessionID })
       }
 
       ultraworkModeState.set(input.sessionID, state)
