@@ -6,9 +6,10 @@
 
 [![Preview](./.github/assets/preview.png)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
 
+
 </div>
 
-> This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
+> This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
 <div align="center">
 
@@ -28,7 +29,7 @@
 ## Contents
 
 - [Oh My OpenCode](#oh-my-opencode)
-  - [Skip Reading This](#skip-reading-this)
+  - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
     - [10 Minutes to Unlock](#10-minutes-to-unlock)
   - [Installation](#installation)
@@ -89,7 +90,7 @@ I've fixed that.
 Even if you're not a hacker, invest a few minutes. Multiply your skills and productivity.
 Hand this doc to an agent and let them set it up.
 
-## Skip Reading This
+## Just Skip Reading This Readme
 
 ### It's the Age of Agents
 - **Just paste this link into Claude Code / AmpCode / Factory Droid / Cursor and ask it to explain.**
@@ -98,7 +99,9 @@ Hand this doc to an agent and let them set it up.
 
 ### 10 Minutes to Unlock
 
-1. **While Gemini 3 Pro writes the frontend as a background task, Claude Opus 4.5 handles the backend. Stuck debugging? Call GPT 5.2 for help. When the frontend reports done, verify and ship.**
+Just by installing this, you make your agents to work like:
+
+1. While Gemini 3 Pro writes the frontend as a background task, Claude Opus 4.5 handles the backend. Stuck debugging? Call GPT 5.2 for help. When the frontend reports done, verify and ship.
 2. Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
 3. Stop worrying about context management when delegating to LLMs. I've got it covered.
     - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
@@ -600,3 +603,5 @@ I have no affiliation with any project or model mentioned here. This is purely p
 - If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
   - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
     - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.
+
+*Special thanks to @junhoyeo for this amazing hero image.*
