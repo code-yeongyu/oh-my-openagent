@@ -42,7 +42,7 @@ import { builtinTools, createCallOmoAgent, createBackgroundTools } from "./tools
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
-import { log } from "./shared/logger";
+import { log, deepMerge } from "./shared";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -89,10 +89,7 @@ function mergeConfigs(
   return {
     ...base,
     ...override,
-    agents:
-      override.agents !== undefined
-        ? { ...(base.agents ?? {}), ...override.agents }
-        : base.agents,
+    agents: deepMerge(base.agents, override.agents),
     disabled_agents: [
       ...new Set([
         ...(base.disabled_agents ?? []),
@@ -105,10 +102,7 @@ function mergeConfigs(
         ...(override.disabled_mcps ?? []),
       ]),
     ],
-    claude_code:
-      override.claude_code !== undefined || base.claude_code !== undefined
-        ? { ...(base.claude_code ?? {}), ...(override.claude_code ?? {}) }
-        : undefined,
+    claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
 

@@ -5,6 +5,7 @@ import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
+import { deepMerge } from "../shared"
 
 const allBuiltinAgents: Record<AgentName, AgentConfig> = {
   oracle: oracleAgent,
@@ -18,16 +19,7 @@ function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
 ): AgentConfig {
-  return {
-    ...base,
-    ...override,
-    tools: override.tools !== undefined
-      ? { ...(base.tools ?? {}), ...override.tools }
-      : base.tools,
-    permission: override.permission !== undefined
-      ? { ...(base.permission ?? {}), ...override.permission }
-      : base.permission,
-  }
+  return deepMerge(base, override as Partial<AgentConfig>)
 }
 
 export function createBuiltinAgents(
