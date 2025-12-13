@@ -59,6 +59,7 @@ export class BackgroundManager {
       parentSessionID: input.parentSessionID,
       parentMessageID: input.parentMessageID,
       description: input.description,
+      prompt: input.prompt,
       agent: input.agent,
       status: "running",
       startedAt: new Date(),
@@ -316,7 +317,7 @@ export class BackgroundManager {
         if (!messagesResult.error && messagesResult.data) {
           const messages = messagesResult.data as Array<{
             info?: { role?: string }
-            parts?: Array<{ type?: string; tool?: string; name?: string }>
+            parts?: Array<{ type?: string; tool?: string; name?: string; text?: string }>
           }>
           const assistantMsgs = messages.filter(
             (m) => m.info?.role === "assistant"
@@ -324,6 +325,7 @@ export class BackgroundManager {
 
           let toolCalls = 0
           let lastTool: string | undefined
+          let lastMessage: string | undefined
 
           for (const msg of assistantMsgs) {
             const parts = msg.parts ?? []
@@ -331,6 +333,9 @@ export class BackgroundManager {
               if (part.type === "tool_use" || part.tool) {
                 toolCalls++
                 lastTool = part.tool || part.name || "unknown"
+              }
+              if (part.type === "text" && part.text) {
+                lastMessage = part.text
               }
             }
           }
@@ -341,6 +346,10 @@ export class BackgroundManager {
           task.progress.toolCalls = toolCalls
           task.progress.lastTool = lastTool
           task.progress.lastUpdate = new Date()
+          if (lastMessage) {
+            task.progress.lastMessage = lastMessage
+            task.progress.lastMessageAt = new Date()
+          }
         }
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })

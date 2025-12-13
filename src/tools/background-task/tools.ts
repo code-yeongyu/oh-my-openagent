@@ -62,21 +62,51 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength) + "..."
+}
+
 function formatTaskStatus(task: BackgroundTask): string {
   const duration = formatDuration(task.startedAt, task.completedAt)
-  const progress = task.progress
-    ? `\nTool calls: ${task.progress.toolCalls}\nLast tool: ${task.progress.lastTool ?? "N/A"}`
-    : ""
+  const promptPreview = truncateText(task.prompt, 500)
+  
+  let progressSection = ""
+  if (task.progress) {
+    progressSection = `\nTool calls: ${task.progress.toolCalls}\nLast tool: ${task.progress.lastTool ?? "N/A"}`
+  }
 
-  return `Task Status
+  let lastMessageSection = ""
+  if (task.progress?.lastMessage) {
+    const truncated = truncateText(task.progress.lastMessage, 500)
+    const messageTime = task.progress.lastMessageAt 
+      ? task.progress.lastMessageAt.toISOString()
+      : "N/A"
+    lastMessageSection = `
 
-Task ID: ${task.id}
-Description: ${task.description}
-Agent: ${task.agent}
-Status: ${task.status}
-Duration: ${duration}${progress}
+## Last Message (${messageTime})
 
-Session ID: ${task.sessionID}`
+\`\`\`
+${truncated}
+\`\`\``
+  }
+
+  return `# Task Status
+
+| Field | Value |
+|-------|-------|
+| Task ID | \`${task.id}\` |
+| Description | ${task.description} |
+| Agent | ${task.agent} |
+| Status | **${task.status}** |
+| Duration | ${duration} |
+| Session ID | \`${task.sessionID}\` |${progressSection}
+
+## Original Prompt
+
+\`\`\`
+${promptPreview}
+\`\`\`${lastMessageSection}`
 }
 
 async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {

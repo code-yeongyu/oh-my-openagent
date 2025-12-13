@@ -8,6 +8,8 @@ export interface TaskProgress {
   toolCalls: number
   lastTool?: string
   lastUpdate: Date
+  lastMessage?: string
+  lastMessageAt?: Date
 }
 
 export interface BackgroundTask {
@@ -16,6 +18,7 @@ export interface BackgroundTask {
   parentSessionID: string
   parentMessageID: string
   description: string
+  prompt: string
   agent: string
   status: BackgroundTaskStatus
   startedAt: Date
