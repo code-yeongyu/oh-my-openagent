@@ -110,9 +110,11 @@ interface AttemptFetchOptions {
   thoughtSignature?: string
 }
 
+type AttemptFetchResult = Response | null | "pass-through" | "needs-refresh"
+
 async function attemptFetch(
   options: AttemptFetchOptions
-): Promise<Response | null | "pass-through"> {
+): Promise<AttemptFetchResult> {
   const { endpoint, url, init, accessToken, projectId, sessionId, modelName, thoughtSignature } =
     options
   debugLog(`Trying endpoint: ${endpoint}`)
@@ -182,6 +184,11 @@ async function attemptFetch(
       debugLog(
         `[RESP] status=${response.status} content-type=${response.headers.get("content-type") ?? ""} url=${response.url}`
       )
+
+      if (response.status === 401) {
+        debugLog(`[401] Unauthorized response detected, signaling token refresh needed`)
+        return "needs-refresh"
+      }
 
       if (response.status === 403) {
         try {
@@ -448,59 +455,135 @@ export function createAntigravityFetch(
     const thoughtSignature = getThoughtSignature(fetchInstanceId)
     debugLog(`[TSIG][GET] sessionId=${sessionId}, signature=${thoughtSignature ? thoughtSignature.substring(0, 20) + "..." : "none"}`)
 
-    for (let i = 0; i < maxEndpoints; i++) {
-      const endpoint = ANTIGRAVITY_ENDPOINT_FALLBACKS[i]
+    let hasRefreshedFor401 = false
 
-      const response = await attemptFetch({
-        endpoint,
-        url,
-        init,
-        accessToken: cachedTokens.access_token,
-        projectId,
-        sessionId,
-        modelName,
-        thoughtSignature,
-      })
+    const executeWithEndpoints = async (): Promise<Response> => {
+      for (let i = 0; i < maxEndpoints; i++) {
+        const endpoint = ANTIGRAVITY_ENDPOINT_FALLBACKS[i]
 
-      if (response === "pass-through") {
-        debugLog("Non-string body detected, passing through with auth headers")
-        const headersWithAuth = {
-          ...init.headers,
-          Authorization: `Bearer ${cachedTokens.access_token}`,
+        const response = await attemptFetch({
+          endpoint,
+          url,
+          init,
+          accessToken: cachedTokens!.access_token,
+          projectId,
+          sessionId,
+          modelName,
+          thoughtSignature,
+        })
+
+        if (response === "pass-through") {
+          debugLog("Non-string body detected, passing through with auth headers")
+          const headersWithAuth = {
+            ...init.headers,
+            Authorization: `Bearer ${cachedTokens!.access_token}`,
+          }
+          return fetch(url, { ...init, headers: headersWithAuth })
         }
-        return fetch(url, { ...init, headers: headersWithAuth })
+
+        if (response === "needs-refresh") {
+          if (hasRefreshedFor401) {
+            debugLog("[401] Already refreshed once, returning unauthorized error")
+            return new Response(
+              JSON.stringify({
+                error: {
+                  message: "Authentication failed after token refresh",
+                  type: "unauthorized",
+                  code: "token_refresh_failed",
+                },
+              }),
+              {
+                status: 401,
+                statusText: "Unauthorized",
+                headers: { "Content-Type": "application/json" },
+              }
+            )
+          }
+
+          debugLog("[401] Refreshing token and retrying...")
+          hasRefreshedFor401 = true
+
+          try {
+            const newTokens = await refreshAccessToken(
+              refreshParts.refreshToken,
+              clientId,
+              clientSecret
+            )
+
+            cachedTokens = {
+              type: "antigravity",
+              access_token: newTokens.access_token,
+              refresh_token: newTokens.refresh_token,
+              expires_in: newTokens.expires_in,
+              timestamp: Date.now(),
+            }
+
+            clearProjectContextCache()
+
+            const formattedRefresh = formatTokenForStorage(
+              newTokens.refresh_token,
+              refreshParts.projectId || "",
+              refreshParts.managedProjectId
+            )
+
+            await client.set(providerId, {
+              access: newTokens.access_token,
+              refresh: formattedRefresh,
+              expires: Date.now() + newTokens.expires_in * 1000,
+            })
+
+            debugLog("[401] Token refreshed, retrying request...")
+            return executeWithEndpoints()
+          } catch (refreshError) {
+            debugLog(`[401] Token refresh failed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`)
+            return new Response(
+              JSON.stringify({
+                error: {
+                  message: `Token refresh failed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+                  type: "unauthorized",
+                  code: "token_refresh_failed",
+                },
+              }),
+              {
+                status: 401,
+                statusText: "Unauthorized",
+                headers: { "Content-Type": "application/json" },
+              }
+            )
+          }
+        }
+
+        if (response) {
+          debugLog(`Success with endpoint: ${endpoint}`)
+          const transformedResponse = await transformResponseWithThinking(
+            response,
+            modelName || "",
+            fetchInstanceId
+          )
+          return transformedResponse
+        }
       }
 
-      if (response) {
-        debugLog(`Success with endpoint: ${endpoint}`)
-        const transformedResponse = await transformResponseWithThinking(
-          response,
-          modelName || "",
-          fetchInstanceId
-        )
-        return transformedResponse
-      }
+      const errorMessage = `All Antigravity endpoints failed after ${maxEndpoints} attempts`
+      debugLog(errorMessage)
+
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: errorMessage,
+            type: "endpoint_failure",
+            code: "all_endpoints_failed",
+          },
+        }),
+        {
+          status: 503,
+          statusText: "Service Unavailable",
+          headers: { "Content-Type": "application/json" },
+        }
+      )
     }
 
-    // All endpoints failed
-    const errorMessage = `All Antigravity endpoints failed after ${maxEndpoints} attempts`
-    debugLog(errorMessage)
-
-    // Return error response
-    return new Response(
-      JSON.stringify({
-        error: {
-          message: errorMessage,
-          type: "endpoint_failure",
-          code: "all_endpoints_failed",
-        },
-      }),
-      {
-        status: 503,
-        statusText: "Service Unavailable",
-        headers: { "Content-Type": "application/json" },
-      }
-    )
+    return executeWithEndpoints()
   }
 }
 
