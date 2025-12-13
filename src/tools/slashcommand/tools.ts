@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
+import { isMarkdownFile } from "../../shared/file-utils"
 import type { CommandScope, CommandMetadata, CommandInfo } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -14,9 +15,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
   const commands: CommandInfo[] = []
 
   for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue
-    if (!entry.name.endsWith(".md")) continue
-    if (!entry.isFile()) continue
+    if (!isMarkdownFile(entry)) continue
 
     const commandPath = join(commandsDir, entry.name)
     const commandName = basename(entry.name, ".md")

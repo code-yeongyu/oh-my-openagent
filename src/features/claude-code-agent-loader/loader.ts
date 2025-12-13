@@ -3,6 +3,7 @@ import { homedir } from "os"
 import { join, basename } from "path"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
+import { isMarkdownFile } from "../../shared/file-utils"
 import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
@@ -16,10 +17,6 @@ function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefine
     result[tool.toLowerCase()] = true
   }
   return result
-}
-
-function isMarkdownFile(entry: { name: string; isFile: () => boolean }): boolean {
-  return !entry.name.startsWith(".") && entry.name.endsWith(".md") && entry.isFile()
 }
 
 function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] {

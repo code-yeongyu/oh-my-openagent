@@ -1,8 +1,9 @@
-import { existsSync, readdirSync, readFileSync, lstatSync, readlinkSync } from "fs"
+import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { join, resolve } from "path"
+import { join } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
+import { resolveSymlink } from "../../shared/file-utils"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkillAsCommand } from "./types"
 
@@ -21,14 +22,7 @@ function loadSkillsFromDir(skillsDir: string, scope: SkillScope): LoadedSkillAsC
 
     if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
 
-    let resolvedPath = skillPath
-    try {
-      if (lstatSync(skillPath, { throwIfNoEntry: false })?.isSymbolicLink()) {
-        resolvedPath = resolve(skillPath, "..", readlinkSync(skillPath))
-      }
-    } catch {
-      continue
-    }
+    const resolvedPath = resolveSymlink(skillPath)
 
     const skillMdPath = join(resolvedPath, "SKILL.md")
     if (!existsSync(skillMdPath)) continue

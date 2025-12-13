@@ -3,11 +3,8 @@ import { homedir } from "os"
 import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
+import { isMarkdownFile } from "../../shared/file-utils"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
-
-function isMarkdownFile(entry: { name: string; isFile: () => boolean }): boolean {
-  return !entry.name.startsWith(".") && entry.name.endsWith(".md") && entry.isFile()
-}
 
 function loadCommandsFromDir(commandsDir: string, scope: CommandScope): LoadedCommand[] {
   if (!existsSync(commandsDir)) {

@@ -1,9 +1,10 @@
 import { tool } from "@opencode-ai/plugin"
-import { existsSync, readdirSync, lstatSync, readlinkSync, readFileSync } from "fs"
+import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { join, resolve, basename } from "path"
+import { join, basename } from "path"
 import { z } from "zod/v4"
 import { parseFrontmatter, resolveCommandsInText } from "../../shared"
+import { resolveSymlink } from "../../shared/file-utils"
 import { SkillFrontmatterSchema } from "./types"
 import type { SkillScope, SkillMetadata, SkillInfo, LoadedSkill, SkillFrontmatter } from "./types"
 
@@ -37,15 +38,7 @@ function discoverSkillsFromDir(
     const skillPath = join(skillsDir, entry.name)
 
     if (entry.isDirectory() || entry.isSymbolicLink()) {
-      let resolvedPath = skillPath
-      try {
-        const stats = lstatSync(skillPath, { throwIfNoEntry: false })
-        if (stats?.isSymbolicLink()) {
-          resolvedPath = resolve(skillPath, "..", readlinkSync(skillPath))
-        }
-      } catch {
-        continue
-      }
+      const resolvedPath = resolveSymlink(skillPath)
 
       const skillMdPath = join(resolvedPath, "SKILL.md")
       if (!existsSync(skillMdPath)) continue
@@ -82,18 +75,6 @@ const availableSkills = discoverSkillsSync()
 const skillListForDescription = availableSkills
   .map((s) => `- ${s.name}: ${s.description} (${s.scope})`)
   .join("\n")
-
-function resolveSymlink(skillPath: string): string {
-  try {
-    const stats = lstatSync(skillPath, { throwIfNoEntry: false })
-    if (stats?.isSymbolicLink()) {
-      return resolve(skillPath, "..", readlinkSync(skillPath))
-    }
-    return skillPath
-  } catch {
-    return skillPath
-  }
-}
 
 async function parseSkillMd(skillPath: string): Promise<SkillInfo | null> {
   const resolvedPath = resolveSymlink(skillPath)
