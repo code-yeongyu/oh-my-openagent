@@ -218,6 +218,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
+- **multimodal-looker** (`google/gemini-2.5-flash`): 시각적 콘텐츠 해석을 위한 전문 에이전트. PDF, 이미지, 다이어그램을 분석하여 정보를 추출합니다.
 
 각 에이전트는 메인 에이전트가 알아서 호출하지만, 명시적으로 요청할 수도 있습니다:
 
@@ -269,6 +270,12 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **glob**: 타임아웃 보호가 있는 파일 패턴 매칭 (60초). OpenCode 내장 `glob` 도구를 대체합니다.
   - 기본 `glob`은 타임아웃이 없습니다. ripgrep이 멈추면 무한정 대기합니다.
   - 이 도구는 타임아웃을 강제하고 만료 시 프로세스를 종료합니다.
+
+#### 내장 멀티모달 도구 (Built-in Multimodal Tools)
+
+- **look_at**: 시각적 해석이 필요한 미디어 파일(PDF, 이미지, 다이어그램 등)을 Gemini 2.5 Flash를 사용하여 분석합니다. Sourcegraph Ampcode의 `look_at` 도구에서 영감을 받았습니다.
+  - 파라미터: `file_path` (절대 경로), `goal` (추출할 정보)
+  - 사용 사례: PDF 텍스트 추출, 이미지 설명, 다이어그램 분석
 
 #### 내장 MCPs
 

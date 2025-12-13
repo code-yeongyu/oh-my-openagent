@@ -215,6 +215,7 @@ I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI
 - **explore** (`opencode/grok-code`): Fast exploration and pattern matching. Claude Code uses Haiku; we use Grok. It is currently free, blazing fast, and intelligent enough for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
 - **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
+- **multimodal-looker** (`google/gemini-2.5-flash`): Specialized agent for visual content interpretation. Analyzes PDFs, images, and diagrams to extract information.
 
 Each agent is automatically invoked by the main agent, but you can also explicitly request them:
 
@@ -268,6 +269,12 @@ The features you use in your editor—other agents cannot access them. Oh My Ope
 - **glob**: File pattern matching with timeout protection (60s). Overrides OpenCode's built-in `glob` tool.
   - The default `glob` lacks timeout. If ripgrep hangs, it waits indefinitely.
   - This tool enforces timeouts and kills the process on expiration.
+
+#### Built-in Multimodal Tools
+
+- **look_at**: Analyzes media files (PDFs, images, diagrams) that require visual interpretation using Gemini 2.5 Flash. Inspired by Sourcegraph Ampcode's `look_at` tool.
+  - Parameters: `file_path` (absolute path), `goal` (what to extract)
+  - Use cases: PDF text extraction, image description, diagram analysis
 
 #### Built-in MCPs
 
