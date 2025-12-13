@@ -26,6 +26,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-opencode'
     steps:
       - uses: actions/checkout@v4
         with:
