@@ -64,6 +64,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_agents: z.array(AgentNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
+  google_auth: z.boolean().optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>

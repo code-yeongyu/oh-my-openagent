@@ -43,7 +43,7 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   - 이 플러그인은 [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, Anthropic 의 모델을 사용합니다.
     - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요.
     - OpenAI 모델 (ChatGPT Plus/Pro)을 사용하기 위해 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 설치하세요.
-    - Google Gemini 모델을 위해 `oh-my-opencode/google-auth` 플러그인을 추가하세요 (**내장 Antigravity OAuth**).
+    - Google Gemini 모델을 위해 `oh-my-opencode.json`에서 `google_auth: true`를 활성화하세요 (**내장 Antigravity OAuth**).
     - 다른 프로바이더를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.
 - **사실 밑의 내용은 읽지 않아도 됩니다. 그냥 설치하시면 됩니다. 모델 설정하고나면 추가로 공부하거나 알 필요가 없고, 설치하고 나면 그냥 더 좋아집니다.**
 - **이 문서도 그냥 Claude Code, OpenCode, Cursor에 붙여넣고, 설치하고, 사용자의 개입이 필요할 때 알려달라고 프롬프팅하세요. 그럼 그냥 깔립니다.**
@@ -123,14 +123,11 @@ opencode auth login
 
 #### 4.2 Google Gemini (내장 Antigravity OAuth)
 
-먼저 google-auth 플러그인을 추가:
+먼저 `~/.config/opencode/oh-my-opencode.json` (또는 프로젝트 레벨의 `.opencode/oh-my-opencode.json`)에서 Google auth를 활성화:
 
 ```json
 {
-  "plugin": [
-    "oh-my-opencode",
-    "oh-my-opencode/google-auth"
-  ]
+  "google_auth": true
 }
 ```
 

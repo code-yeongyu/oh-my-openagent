@@ -16,6 +16,7 @@ import {
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
 } from "./hooks";
+import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -173,7 +174,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
 
+  const googleAuthHooks = pluginConfig.google_auth
+    ? await createGoogleAntigravityAuthPlugin(ctx)
+    : null;
+
   return {
+    ...(googleAuthHooks ? { auth: googleAuthHooks.auth } : {}),
+
     tool: {
       ...builtinTools,
       ...backgroundTools,

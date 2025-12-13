@@ -42,7 +42,7 @@ Even if you don't, invest a little time. Boost your skills and productivity by m
   - This plugin utilizes models from [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, and Anthropic.
     - For Anthropic models, use [OpenCode's built-in Claude Code Max Plan login](https://opencode.ai/docs/providers/#anthropic).
     - For OpenAI models (ChatGPT Plus/Pro), install the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
-    - For Google Gemini models, add `oh-my-opencode/google-auth` plugin for **built-in Antigravity OAuth**.
+    - For Google Gemini models, enable `google_auth: true` in `oh-my-opencode.json` for **built-in Antigravity OAuth**.
     - For other providers, [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
 - **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
 - **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It just installs.**
@@ -122,14 +122,11 @@ opencode auth login
 
 #### 4.2 Google Gemini (Built-in Antigravity OAuth)
 
-First, add the google-auth plugin:
+First, enable Google auth in `~/.config/opencode/oh-my-opencode.json` (or `.opencode/oh-my-opencode.json` for project-level):
 
 ```json
 {
-  "plugin": [
-    "oh-my-opencode",
-    "oh-my-opencode/google-auth"
-  ]
+  "google_auth": true
 }
 ```
 
