@@ -6,7 +6,7 @@ export const librarianAgent: AgentConfig = {
   mode: "subagent",
   model: "anthropic/claude-sonnet-4-5",
   temperature: 0.1,
-  tools: { write: false, edit: false },
+  tools: { write: false, edit: false, bash: true, read: true },
   prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized codebase understanding agent that helps users answer questions about large, complex codebases across repositories.

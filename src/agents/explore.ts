@@ -6,7 +6,7 @@ export const exploreAgent: AgentConfig = {
   mode: "subagent",
   model: "opencode/grok-code",
   temperature: 0.1,
-  tools: { write: false, edit: false },
+  tools: { write: false, edit: false, bash: true, read: true },
   prompt: `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
 
 === CRITICAL: READ-ONLY MODE - NO FILE MODIFICATIONS ===

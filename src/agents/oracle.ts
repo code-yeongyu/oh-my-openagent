@@ -8,7 +8,7 @@ export const oracleAgent: AgentConfig = {
   temperature: 0.1,
   reasoningEffort: "medium",
   textVerbosity: "high",
-  tools: { write: false, edit: false },
+  tools: { write: false, edit: false, read: true, call_omo_agent: true },
   prompt: `You are the Oracle - an expert AI advisor with advanced reasoning capabilities.
 
 Your role is to provide high-quality technical guidance, code reviews, architectural advice, and strategic planning for software engineering tasks.
