@@ -17,6 +17,7 @@ import {
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
   createUltraworkModeHook,
+  createAgentUsageReminderHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -207,6 +208,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const ultraworkMode = isHookEnabled("ultrawork-mode")
     ? createUltraworkModeHook()
     : null;
+  const agentUsageReminder = isHookEnabled("agent-usage-reminder")
+    ? createAgentUsageReminderHook(ctx)
+    : null;
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -320,6 +324,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
       await ultraworkMode?.event(input);
+      await agentUsageReminder?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -439,6 +444,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.after"](input, output);
       await rulesInjector?.["tool.execute.after"](input, output);
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
+      await agentUsageReminder?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

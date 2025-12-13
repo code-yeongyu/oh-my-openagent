@@ -41,6 +41,7 @@ export const HookNameSchema = z.enum([
   "background-notification",
   "auto-update-checker",
   "ultrawork-mode",
+  "agent-usage-reminder",
 ])
 
 export const AgentOverrideConfigSchema = z.object({

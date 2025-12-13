@@ -14,3 +14,4 @@ export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 export { createUltraworkModeHook } from "./ultrawork-mode";
+export { createAgentUsageReminderHook } from "./agent-usage-reminder";
