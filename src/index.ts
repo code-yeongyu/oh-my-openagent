@@ -4,6 +4,7 @@ import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
   createSessionRecoveryHook,
+  createSessionNotification,
   createCommentCheckerHooks,
   createGrepOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
@@ -161,6 +162,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const sessionRecovery = isHookEnabled("session-recovery")
     ? createSessionRecoveryHook(ctx)
     : null;
+  const sessionNotification = isHookEnabled("session-notification")
+    ? createSessionNotification(ctx)
+    : null;
 
   // Wire up recovery state tracking between session-recovery and todo-continuation-enforcer
   // This prevents the continuation enforcer from injecting prompts during active recovery
@@ -292,6 +296,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await autoUpdateChecker?.event(input);
       await claudeCodeHooks.event(input);
       await backgroundNotificationHook?.event(input);
+      await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
       await contextWindowMonitor?.event(input);
       await directoryAgentsInjector?.event(input);

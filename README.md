@@ -332,6 +332,18 @@ Example workflow:
 - **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
 - **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
 
+You can disable specific built-in hooks using `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+```json
+{
+  "disabled_hooks": ["session-notification", "comment-checker"]
+}
+```
+
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+
+> **Note**: `disabled_hooks` controls Oh My OpenCode's built-in hooks. To disable Claude Code's `settings.json` hooks, use `claude_code.hooks: false` instead (see [Compatibility Toggles](#compatibility-toggles)).
+
 ### Claude Code Compatibility
 
 Oh My OpenCode provides seamless Claude Code configuration compatibility. If you've been using Claude Code, your existing setup works out of the box.

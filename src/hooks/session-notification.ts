@@ -17,6 +17,8 @@ interface SessionNotificationConfig {
   idleConfirmationDelay?: number
   /** Skip notification if there are incomplete todos (default: true) */
   skipIfIncompleteTodos?: boolean
+  /** Maximum number of sessions to track before cleanup (default: 100) */
+  maxTrackedSessions?: number
 }
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
@@ -103,12 +105,31 @@ export function createSessionNotification(
     soundPath: defaultSoundPath,
     idleConfirmationDelay: 1500,
     skipIfIncompleteTodos: true,
+    maxTrackedSessions: 100,
     ...config,
   }
 
   const notifiedSessions = new Set<string>()
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const sessionActivitySinceIdle = new Set<string>()
+  // Track notification execution version to handle race conditions
+  const notificationVersions = new Map<string, number>()
+
+  function cleanupOldSessions() {
+    const maxSessions = mergedConfig.maxTrackedSessions
+    if (notifiedSessions.size > maxSessions) {
+      const sessionsToRemove = Array.from(notifiedSessions).slice(0, notifiedSessions.size - maxSessions)
+      sessionsToRemove.forEach(id => notifiedSessions.delete(id))
+    }
+    if (sessionActivitySinceIdle.size > maxSessions) {
+      const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(0, sessionActivitySinceIdle.size - maxSessions)
+      sessionsToRemove.forEach(id => sessionActivitySinceIdle.delete(id))
+    }
+    if (notificationVersions.size > maxSessions) {
+      const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
+      sessionsToRemove.forEach(id => notificationVersions.delete(id))
+    }
+  }
 
   function cancelPendingNotification(sessionID: string) {
     const timer = pendingTimers.get(sessionID)
@@ -117,6 +138,8 @@ export function createSessionNotification(
       pendingTimers.delete(sessionID)
     }
     sessionActivitySinceIdle.add(sessionID)
+    // Increment version to invalidate any in-flight notifications
+    notificationVersions.set(sessionID, (notificationVersions.get(sessionID) ?? 0) + 1)
   }
 
   function markSessionActivity(sessionID: string) {
@@ -124,8 +147,13 @@ export function createSessionNotification(
     notifiedSessions.delete(sessionID)
   }
 
-  async function executeNotification(sessionID: string) {
+  async function executeNotification(sessionID: string, version: number) {
     pendingTimers.delete(sessionID)
+
+    // Race condition fix: check if version matches (activity happened during async wait)
+    if (notificationVersions.get(sessionID) !== version) {
+      return
+    }
 
     if (sessionActivitySinceIdle.has(sessionID)) {
       sessionActivitySinceIdle.delete(sessionID)
@@ -136,7 +164,15 @@ export function createSessionNotification(
 
     if (mergedConfig.skipIfIncompleteTodos) {
       const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
+      // Re-check version after async call (race condition fix)
+      if (notificationVersions.get(sessionID) !== version) {
+        return
+      }
       if (hasPendingWork) return
+    }
+
+    if (notificationVersions.get(sessionID) !== version) {
+      return
     }
 
     notifiedSessions.add(sessionID)
@@ -172,20 +208,34 @@ export function createSessionNotification(
       if (pendingTimers.has(sessionID)) return
 
       sessionActivitySinceIdle.delete(sessionID)
+      
+      const currentVersion = (notificationVersions.get(sessionID) ?? 0) + 1
+      notificationVersions.set(sessionID, currentVersion)
 
       const timer = setTimeout(() => {
-        executeNotification(sessionID)
+        executeNotification(sessionID, currentVersion)
       }, mergedConfig.idleConfirmationDelay)
 
       pendingTimers.set(sessionID, timer)
+      cleanupOldSessions()
+      return
     }
 
-    if (event.type === "message.updated") {
+    if (event.type === "message.updated" || event.type === "message.created") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       if (sessionID) {
         markSessionActivity(sessionID)
       }
+      return
+    }
+
+    if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
+      const sessionID = props?.sessionID as string | undefined
+      if (sessionID) {
+        markSessionActivity(sessionID)
+      }
+      return
     }
 
     if (event.type === "session.deleted") {
@@ -194,6 +244,7 @@ export function createSessionNotification(
         cancelPendingNotification(sessionInfo.id)
         notifiedSessions.delete(sessionInfo.id)
         sessionActivitySinceIdle.delete(sessionInfo.id)
+        notificationVersions.delete(sessionInfo.id)
       }
     }
   }
