@@ -11,7 +11,6 @@ interface ToolExecuteInput {
   tool: string;
   sessionID: string;
   callID: string;
-  parentSessionID?: string;
 }
 
 interface ToolExecuteOutput {
@@ -60,19 +59,15 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
     input: ToolExecuteInput,
     output: ToolExecuteOutput,
   ) => {
-    const { tool, sessionID, parentSessionID } = input;
+    const { tool, sessionID } = input;
+    const toolLower = tool.toLowerCase();
 
-    // Only run in root sessions (no parent = main session)
-    if (parentSessionID) {
-      return;
-    }
-
-    if ((AGENT_TOOLS as readonly string[]).includes(tool)) {
+    if (AGENT_TOOLS.has(toolLower)) {
       markAgentUsed(sessionID);
       return;
     }
 
-    if (!(TARGET_TOOLS as readonly string[]).includes(tool)) {
+    if (!TARGET_TOOLS.has(toolLower)) {
       return;
     }
 

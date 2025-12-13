@@ -7,23 +7,24 @@ export const AGENT_USAGE_REMINDER_STORAGE = join(
   "agent-usage-reminder",
 );
 
-export const TARGET_TOOLS = [
-  "Grep",
+// All tool names normalized to lowercase for case-insensitive matching
+export const TARGET_TOOLS = new Set([
+  "grep",
   "safe_grep",
-  "Glob",
+  "glob",
   "safe_glob",
-  "WebFetch",
+  "webfetch",
   "context7_resolve-library-id",
   "context7_get-library-docs",
   "websearch_exa_web_search_exa",
-  "grep_app_searchGitHub",
-] as const;
+  "grep_app_searchgithub",
+]);
 
-export const AGENT_TOOLS = [
-  "Task",
+export const AGENT_TOOLS = new Set([
+  "task",
   "call_omo_agent",
   "background_task",
-] as const;
+]);
 
 export const REMINDER_MESSAGE = `
 [Agent Usage Reminder]
