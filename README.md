@@ -1,71 +1,103 @@
-English | [한국어](README.ko.md)
+[English](README.md) | [한국어](README.ko.md)
 
 ## Contents
 
 - [Oh My OpenCode](#oh-my-opencode)
-  - [TL;DR](#tldr)
+  - [Skip Reading This](#skip-reading-this)
+    - [It's the Age of Agents](#its-the-age-of-agents)
+    - [10 Minutes to Unlock](#10-minutes-to-unlock)
   - [Installation](#installation)
-  - [For LLM Agents](#for-llm-agents)
-  - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
+    - [For Humans](#for-humans)
+    - [For LLM Agents](#for-llm-agents)
+    - [Step 1: Verify OpenCode Installation](#step-1-verify-opencode-installation)
+    - [Step 2: Configure oh-my-opencode Plugin](#step-2-configure-oh-my-opencode-plugin)
+    - [Step 3: Verify Setup](#step-3-verify-setup)
+    - [Step 4: Configure Authentication](#step-4-configure-authentication)
+      - [4.1 Anthropic (Claude)](#41-anthropic-claude)
+      - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
+      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
+      - [4.3.1 Model Configuration](#431-model-configuration)
+    - [⚠️ Warning](#️-warning)
   - [Features](#features)
-    - [Agents](#agents)
-    - [Tools](#tools)
-      - [Built-in LSP Tools](#built-in-lsp-tools)
-      - [Built-in AST-Grep Tools](#built-in-ast-grep-tools)
-      - [Grep](#grep)
-      - [Built-in MCPs](#built-in-mcps)
-      - [Background Task](#background-task)
-    - [Hooks](#hooks)
-    - [Claude Code Compatibility](#claude-code-compatibility)
-    - [Other Features](#other-features)
+    - [Agents: Your Teammates](#agents-your-teammates)
+    - [Background Agents: Work Like a Team](#background-agents-work-like-a-team)
+    - [The Tools: Your Teammates Deserve Better](#the-tools-your-teammates-deserve-better)
+      - [Why Are You the Only One Using an IDE?](#why-are-you-the-only-one-using-an-ide)
+      - [Context Is All You Need](#context-is-all-you-need)
+      - [Be Multimodal. Save Tokens.](#be-multimodal-save-tokens)
+      - [I Removed Their Blockers](#i-removed-their-blockers)
+    - [Goodbye Claude Code. Hello Oh My OpenCode.](#goodbye-claude-code-hello-oh-my-opencode)
+      - [Hooks Integration](#hooks-integration)
+      - [Config Loaders](#config-loaders)
+      - [Data Storage](#data-storage)
+      - [Compatibility Toggles](#compatibility-toggles)
+    - [Not Just for the Agents](#not-just-for-the-agents)
   - [Configuration](#configuration)
+    - [Google Auth](#google-auth)
+    - [Agents](#agents)
+    - [MCPs](#mcps)
+    - [LSP](#lsp)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
 
 # Oh My OpenCode
 
-Oh My OpenCode
-
 oMoMoMoMoMo···
 
-If you work in tech, you likely appreciated [Claude Code](https://www.claude.com/product/claude-code).
-If you are a hacker, you will fucking fall in love with [OpenCode](https://github.com/sst/opencode).
 
-Do you remember the first time you switched from Windows to Linux? The excitement of configuring everything just the way you wanted?
-In an era where that romance feels lost, OpenCode will be that project for you.
-If you love coding and computers, OpenCode will feel exactly like that moment you first touched Linux after years of Windows.
-Even if you don't, invest a little time. Boost your skills and productivity by multipliers.
+[Claude Code](https://www.claude.com/product/claude-code) is great.
+But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
 
-## TL;DR
+- Endlessly extensible. Endlessly customizable.
+- Zero screen flicker.
+- [LSP](https://opencode.ai/docs/lsp/), [linters, formatters](https://opencode.ai/docs/formatters/) activate automatically per file—and you can tweak everything.
+- Mix and match models. **Orchestrate them by purpose.**
+- Feature-rich. Beautiful. The terminal doesn't choke. High performance.
 
-- **Model Setup Required**
-  - This plugin utilizes models from [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, and Anthropic.
-    - For Anthropic models, use [OpenCode's built-in Claude Code Max Plan login](https://opencode.ai/docs/providers/#anthropic).
-    - For OpenAI models (ChatGPT Plus/Pro), install the [OpenCode-OpenAI-Codex-Auth plugin](https://github.com/numman-ali/opencode-openai-codex-auth).
-    - For Google Gemini models, enable `google_auth: true` in `oh-my-opencode.json` for **built-in Antigravity OAuth**.
-    - For other providers, [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
-- **Truth be told, the rest is optional. Just install it. Once set up, no further learning is required. It simply evolves.**
-- **Paste this document into Claude Code, OpenCode, or Cursor, instruct it to install, and ask for assistance if needed. It just installs.**
-  - If you are an LLM Agent, install the required plugins and dependencies, then run `opencode auth login` via tmux to assist the user with configuration.
+Remember the first time you switched from Windows to Linux? That rush of configuring everything exactly how you wanted?
+In an age where that magic seems lost, OpenCode brings it back.
+If you love coding and computers, OpenCode is that Linux-after-Windows moment.
+
+**But here's the catch: there's a lot to learn, it's complex, and your time is expensive.**
+
+I've fixed that.
+Even if you're not a hacker, invest a few minutes. Multiply your skills and productivity.
+Hand this doc to an agent and let them set it up.
+
+## Skip Reading This
+
+### It's the Age of Agents
+- **Just paste this link into Claude Code / AmpCode / Factory Droid / Cursor and ask it to explain.**
+  - Ask why it's good, why it's not just another boilerplate setup, what actually gets better.
+  - If you're an LLM agent, explain to the user what becomes possible right now with this project.
+
+### 10 Minutes to Unlock
+
+1. **While Gemini 3 Pro writes the frontend as a background task, Claude Opus 4.5 handles the backend. Stuck debugging? Call GPT 5.2 for help. When the frontend reports done, verify and ship.**
+2. Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
+3. Stop worrying about context management when delegating to LLMs. I've got it covered.
+    - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
+    - **Your agent is now the dev team lead. You're the AI Manager.**
+4. It doesn't stop until the job is done.
+
+
+- Throw complex, massive tasks at it.
+  - Drop the "ultrawork" keyword in your prompt and it handles everything automatically.
 
 ## Installation
 
-Add to `~/.config/opencode/opencode.json`:
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode"
-  ]
-}
-```
+### For Humans
 
-## For LLM Agents
+Let the LLM Agent handle the grunt work. Paste this link and ask it to install and configure.
+
+### For LLM Agents
 
 <details>
-<summary>For LLM Agents (Click to expand)</summary>
+<summary>Instructions for LLM Agents (click to expand)</summary>
 
-If you are an LLM Agent helping a user set up oh-my-opencode, follow these steps:
+If you're an LLM Agent helping set up oh-my-opencode, follow these steps:
+
 
 ### Step 1: Verify OpenCode Installation
 
@@ -74,11 +106,11 @@ if command -v opencode &> /dev/null; then
     echo "OpenCode $(opencode --version) is installed"
 else
     echo "OpenCode is not installed. Please install it first."
-    echo "See: https://opencode.ai/docs"
+    echo "Ref: https://opencode.ai/docs"
 fi
 ```
 
-If OpenCode is not installed, guide the user to [OpenCode Installation Guide](https://opencode.ai/docs).
+If OpenCode isn't installed, check the [OpenCode Installation Guide](https://opencode.ai/docs). To save context, spawn a subagent to handle installation and report back.
 
 ### Step 2: Configure oh-my-opencode Plugin
 
@@ -92,10 +124,10 @@ if [ -f ~/.config/opencode/opencode.json ]; then
             ~/.config/opencode/opencode.json > /tmp/oc.json && \
             mv /tmp/oc.json ~/.config/opencode/opencode.json
     else
-        echo "Add \"oh-my-opencode\" to plugin array in ~/.config/opencode/opencode.json"
+        echo "Please add \"oh-my-opencode\" to the plugin array in ~/.config/opencode/opencode.json"
     fi
 else
-    # New config
+    # Create new config
     echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
 fi
 ```
@@ -103,28 +135,28 @@ fi
 ### Step 3: Verify Setup
 
 ```bash
-opencode --version  # Should be >= 1.0.132
+opencode --version  # Should be 1.0.132 or higher
 cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
 ```
 
 ### Step 4: Configure Authentication
 
-Once `oh-my-opencode` is added to the plugin list, use `tmux` to assist the user with authentication setup. **It is RECOMMENDED to set up Google Auth (Step 4.2) by default.**
+Once oh-my-opencode is in the plugin list, use tmux to walk the user through authentication. Complete all steps below.
 
 #### 4.1 Anthropic (Claude)
 
 ```bash
 opencode auth login
-# Select Provider: Anthropic
-# Select Login method: Claude Pro/Max
-# Complete OAuth flow in browser
+# Provider: Select Anthropic
+# Login method: Select Claude Pro/Max
+# Guide user through OAuth flow in browser
+# Wait for completion
+# Verify success and confirm with user
 ```
 
-#### 4.2 Google Gemini (Built-in Antigravity OAuth)
+#### 4.2 Google Gemini (Antigravity OAuth)
 
-**This is the RECOMMENDED default configuration.**
-
-First, proactively enable Google auth in `~/.config/opencode/oh-my-opencode.json` (or `.opencode/oh-my-opencode.json` for project-level):
+First, enable Google auth in `~/.config/opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -136,9 +168,11 @@ Then authenticate:
 
 ```bash
 opencode auth login
-# Select Provider: Google
-# Select Login method: OAuth with Google (Antigravity)
-# Complete OAuth flow in browser
+# Provider: Select Google
+# Login method: Select OAuth with Google (Antigravity)
+# Guide user through OAuth flow in browser
+# Wait for completion
+# Verify success and confirm with user
 ```
 
 #### 4.3 OpenAI (ChatGPT Plus/Pro)
@@ -154,18 +188,7 @@ First, add the opencode-openai-codex-auth plugin:
 }
 ```
 
-**Important**: You must also configure the full model settings in your `opencode.json`. Copy the provider/models configuration from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json). See the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth) for detailed setup instructions.
-
-Then authenticate:
-
-```bash
-opencode auth login
-# Select Provider: OpenAI
-# Select Login method: ChatGPT Plus/Pro (Codex Subscription)
-# Complete OAuth flow in browser
-```
-
-**⚠️ Known Issue**: The official npm package currently has a bug that causes 400 errors (`"No tool call found for function call output with call_id"`). Until a fix is released, **use the hotfix branch instead**. Modify `~/.config/opencode/package.json`:
+**Important**: The official npm package currently has a bug causing 400 errors (`"No tool call found for function call output with call_id"`). **Use the hotfix branch** until fixed. Edit `~/.config/opencode/package.json`:
 
 ```json
 {
@@ -175,154 +198,98 @@ opencode auth login
 }
 ```
 
-Then run `cd ~/.config/opencode && bun i`. In your `opencode.json`, use the plugin name without a version: `"opencode-openai-codex-auth"` (not `@4.1.0`).
+Then run `cd ~/.config/opencode && bun i`. In `opencode.json`, use `"opencode-openai-codex-auth"` without the version suffix.
 
-#### 4.4 Alternative: Proxy-based Authentication
+#### 4.3.1 Model Configuration
+You'll also need full model settings in `opencode.json`.
+Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json), and merge carefully to avoid breaking the user's existing setup.
 
-For users who prefer proxy-based authentication, [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) or [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) remain available as alternatives.
+Then authenticate:
+
+```bash
+opencode auth login
+# Provider: Select OpenAI
+# Login method: Select ChatGPT Plus/Pro (Codex Subscription)
+# Guide user through OAuth flow in browser
+# Wait for completion
+# Verify success and confirm with user
+```
+
 
 ### ⚠️ Warning
 
-**Do NOT modify model settings or disable features (agents, hooks, MCPs) unless the user explicitly requests it.**
+**Don't change model settings or disable features (agents, hooks, MCPs) unless explicitly requested.**
 
-The plugin works perfectly with default settings. While you SHOULD enable `google_auth: true` as recommended, do not alter other configurations or disable features without a specific request.
+The plugin works perfectly with defaults. Aside from the recommended `google_auth: true`, don't touch other settings without a specific ask.
 
 </details>
 
-## Why OpenCode & Why Oh My OpenCode
-
-OpenCode is limitlessly extensible and customizable. Zero screen flicker.
-[LSP](https://opencode.ai/docs/lsp/), [linters, formatters](https://opencode.ai/docs/formatters/)? Automatic and fully configurable.
-You can mix and orchestrate models to your exact specifications.
-It is feature-rich. It is elegant. It handles the terminal without hesitation. It is high-performance.
-
-But here is the catch: the learning curve is steep. There is a lot to master. And your time is expensive.
-
-Inspired by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/en/overview), I have implemented their features here—often with superior execution.
-Because this is OpenCode.
-
-Consider this a superior AmpCode, a superior Claude Code, or simply a specialized distribution.
-
-I believe in the right tool for the job. For your wallet's sake, use CLIProxyAPI or VibeProxy. Employ the best LLMs from frontier labs. You are in command.
-
-**Note**: This setup is highly opinionated. It represents the generic component of my personal configuration, so it evolves constantly. I have spent tokens worth $20,000 just for my personal programming usages, and this plugin represents the apex of that experience. You simply inherit the best. If you have superior ideas, PRs are welcome.
 
 ## Features
 
-### Agents
-- **oracle** (`openai/gpt-5.2`): The architect. Expert in code reviews and strategy. Uses GPT-5.2 for its unmatched logic and reasoning capabilities. Inspired by AmpCode.
-- **librarian** (`anthropic/claude-haiku-4-5`): Multi-repo analysis, documentation lookup, and implementation examples. Haiku is chosen for its speed, competence, excellent tool usage, and cost-efficiency. Inspired by AmpCode.
-- **explore** (`opencode/grok-code`): Fast exploration and pattern matching. Claude Code uses Haiku; we use Grok. It is currently free, blazing fast, and intelligent enough for file traversal. Inspired by Claude Code.
-- **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Creates stunning UIs. Uses Gemini because its creativity and UI code generation are superior.
-- **document-writer** (`google/gemini-3-pro-preview`): A technical writing expert. Gemini is a wordsmith; it writes prose that flows naturally.
-- **multimodal-looker** (`google/gemini-2.5-flash`): Specialized agent for visual content interpretation. Analyzes PDFs, images, and diagrams to extract information.
+### Agents: Your Teammates
 
-Each agent is automatically invoked by the main agent, but you can also explicitly request them:
+- **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
+- **librarian** (`anthropic/claude-haiku-4-5`): Multi-repo analysis, doc lookup, implementation examples. Haiku is fast, smart enough, great at tool calls, and cheap. Inspired by AmpCode.
+- **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
+- **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
+- **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
+- **multimodal-looker** (`google/gemini-2.5-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
+
+The main agent invokes these automatically, but you can call them explicitly:
 
 ```
-@oracle Please think through the design of this part and suggest an architecture.
-@librarian Tell me how this is implemented — why does the behavior keep changing internally?
-@explore Tell me about the policy for this feature.
+Ask @oracle to review this design and propose an architecture
+Ask @librarian how this is implemented—why does the behavior keep changing?
+Ask @explore for the policy on this feature
 ```
 
-Agent models, prompts, and permissions can be customized via `oh-my-opencode.json`. See [Configuration](#configuration) for details.
+Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](#configuration).
 
-#### Subagent Orchestration (omo_task)
+### Background Agents: Work Like a Team
 
-The `omo_task` tool allows agents (like `oracle`, `frontend-ui-ux-engineer`) to spawn `explore` or `librarian` as subagents to delegate specific tasks. This enables powerful workflows where an agent can "ask" another specialized agent to gather information before proceeding.
+What if you could run these agents relentlessly, never letting them idle?
 
-> **Note**: To prevent infinite recursion, `explore` and `librarian` agents cannot use the `omo_task` tool themselves.
+- Have GPT debug while Claude tries different approaches to find the root cause
+- Gemini writes the frontend while Claude handles the backend
+- Kick off massive parallel searches, continue implementation on other parts, then finish using the search results
 
-### Tools
+These workflows are possible with OhMyOpenCode.
 
-#### Built-in LSP Tools
+Run subagents in the background. The main agent gets notified on completion. Wait for results if needed.
 
-The features you use in your editor—other agents cannot access them. Oh My OpenCode hands those very tools to your LLM Agent. Refactoring, navigation, and analysis are all supported using the same OpenCode configuration.
+**Make your agents work like your team works.**
 
-[OpenCode provides LSP](https://opencode.ai/docs/lsp/), but only for analysis. Oh My OpenCode equips you with navigation and refactoring tools matching the same specification.
+### The Tools: Your Teammates Deserve Better
 
-- **lsp_hover**: Get type info, docs, signatures at position
+#### Why Are You the Only One Using an IDE?
+
+Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now agents writing code...
+
+**Why are you the only one with these tools?**
+**Give them to your agents and watch them level up.**
+
+[OpenCode provides LSP](https://opencode.ai/docs/lsp/), but only for analysis.
+
+The features in your editor? Other agents can't touch them.
+Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
+
+- **lsp_hover**: Type info, docs, signatures at position
 - **lsp_goto_definition**: Jump to symbol definition
 - **lsp_find_references**: Find all usages across workspace
-- **lsp_document_symbols**: Get file's symbol outline
+- **lsp_document_symbols**: Get file symbol outline
 - **lsp_workspace_symbols**: Search symbols by name across project
 - **lsp_diagnostics**: Get errors/warnings before build
 - **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
 - **lsp_rename**: Rename symbol across workspace
 - **lsp_code_actions**: Get available quick fixes/refactorings
-- **lsp_code_action_resolve**: Apply a code action
-
-#### Built-in AST-Grep Tools
-
+- **lsp_code_action_resolve**: Apply code action
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 
-#### Grep
-
-- **grep**: Content search with safety limits (5min timeout, 10MB output). Overrides OpenCode's built-in `grep` tool.
-  - The default `grep` lacks safeguards. On a large codebase, a broad pattern can cause CPU overload and indefinite hanging.
-  - This tool enforces strict limits and completely replaces the built-in `grep`.
-
-#### Glob
-
-- **glob**: File pattern matching with timeout protection (60s). Overrides OpenCode's built-in `glob` tool.
-  - The default `glob` lacks timeout. If ripgrep hangs, it waits indefinitely.
-  - This tool enforces timeouts and kills the process on expiration.
-
-#### Built-in Multimodal Tools
-
-- **look_at**: Analyzes media files (PDFs, images, diagrams) that require visual interpretation using Gemini 2.5 Flash. Inspired by Sourcegraph Ampcode's `look_at` tool.
-  - Parameters: `file_path` (absolute path), `goal` (what to extract)
-  - Use cases: PDF text extraction, image description, diagram analysis
-
-#### Built-in MCPs
-
-- **websearch_exa**: Exa AI web search. Performs real-time web searches and can scrape content from specific URLs. Returns LLM-optimized context from relevant websites.
-- **context7**: Library documentation lookup. Fetches up-to-date documentation for any library to assist with accurate coding.
-
-Don't need these? Disable them via `oh-my-opencode.json`:
-
-```json
-{
-  "disabled_mcps": ["websearch_exa"]
-}
-```
-
-#### Background Task
-
-Run long-running or complex tasks in the background without blocking your main session. The system automatically notifies you when tasks complete.
-
-- **background_task**: Launch a background agent task. Specify description, prompt, and agent type. Returns immediately with a task ID.
-- **background_output**: Check task progress (`block=false`) or wait for results (`block=true`). Supports custom timeout up to 10 minutes.
-- **background_cancel**: Cancel a running background task by task ID.
-
-Key capabilities:
-- **Async Execution**: Offload complex analysis or research while you continue working
-- **Auto Notification**: System notifies the main session when background tasks complete
-- **Status Tracking**: Real-time progress with tool call counts and last tool used
-- **Session Isolation**: Each task runs in an independent session
-
-Example workflow:
-```
-1. Launch: background_task → returns task_id="bg_abc123"
-2. Continue working on other tasks
-3. System notification: "Task bg_abc123 completed"
-4. Retrieve: background_output(task_id="bg_abc123") → get full results
-```
-
-### Hooks
-
-- **Todo Continuation Enforcer**: Forces the agent to complete all tasks before exiting. Eliminates the common LLM issue of "giving up halfway".
-- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/). When context usage exceeds 70%, it reminds the agent that resources are sufficient, preventing rushed or low-quality output.
-- **Session Notification**: Sends a native OS notification when the job is done (macOS, Linux, Windows).
-- **Session Recovery**: Automatically recovers from API errors, ensuring session stability. Handles four scenarios:
-  - **Tool Result Missing**: When `tool_use` block exists without `tool_result` (ESC interrupt) → injects "cancelled" tool results
-  - **Thinking Block Order**: When thinking block must be first but isn't → prepends empty thinking block
-  - **Thinking Disabled Violation**: When thinking blocks exist but thinking is disabled → strips thinking blocks
-  - **Empty Content Message**: When message has only thinking/meta blocks without actual content → injects "(interrupted)" text via filesystem
-- **Comment Checker**: Detects and reports unnecessary comments after code modifications. Smartly ignores valid patterns (BDD, directives, docstrings, shebangs) to keep the codebase clean from AI-generated artifacts.
-- **Directory AGENTS.md Injector**: Automatically injects `AGENTS.md` contents when reading files. Searches upward from the file's directory to project root, collecting **all** `AGENTS.md` files along the path hierarchy. This enables nested, directory-specific instructions:
+#### Context Is All You Need
+- **Directory AGENTS.md / README.md Injector**: Auto-injects `AGENTS.md` and `README.md` when reading files. Walks from file directory to project root, collecting **all** `AGENTS.md` files along the path. Supports nested directory-specific instructions:
   ```
   project/
   ├── AGENTS.md              # Project-wide context
@@ -330,16 +297,15 @@ Example workflow:
   │   ├── AGENTS.md          # src-specific context
   │   └── components/
   │       ├── AGENTS.md      # Component-specific context
-  │       └── Button.tsx     # Reading this injects ALL 3 AGENTS.md files
+  │       └── Button.tsx     # Reading this injects all 3 AGENTS.md files
   ```
-  When reading `Button.tsx`, the hook injects contexts in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected only once per session. Inspired by Claude Code's CLAUDE.md feature.
-- **Directory README.md Injector**: Automatically injects `README.md` contents when reading files. Works identically to the AGENTS.md Injector, searching upward from the file's directory to project root. Provides project documentation context to the LLM agent. Each directory's README is injected only once per session.
-- **Rules Injector**: Automatically injects rules from `.claude/rules/` directory when reading files.
-  - Searches upward from the file's directory to project root, plus `~/.claude/rules/` (user).
+  Reading `Button.tsx` injects in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected once per session.
+- **Conditional Rules Injector**: Not all rules apply all the time. Injects rules from `.claude/rules/` when conditions match.
+  - Walks upward from file directory to project root, plus `~/.claude/rules/` (user).
   - Supports `.md` and `.mdc` files.
-  - Frontmatter-based matching with `globs` field (glob patterns).
-  - `alwaysApply: true` option for rules that should always apply.
-  - Example rule file structure:
+  - Matches via `globs` field in frontmatter.
+  - `alwaysApply: true` for rules that should always fire.
+  - Example rule file:
     ```markdown
     ---
     globs: ["*.ts", "src/**/*.js"]
@@ -348,57 +314,26 @@ Example workflow:
     - Use PascalCase for interface names
     - Use camelCase for function names
     ```
-- **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
-- **Ultrawork Mode**: When user triggers "ultrawork" or "ulw" keywords, automatically injects agent orchestration guidance. Forces the main agent to leverage all available specialized agents (exploration, librarian, planning, UI) via background tasks in parallel, with strict TODO tracking and verification protocols.
-- **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
-- **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
-- **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
+- **Online**: Project rules aren't everything. Built-in exa and context7 MCP for web search.
 
-You can disable specific built-in hooks using `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+#### Be Multimodal. Save Tokens.
 
-```json
-{
-  "disabled_hooks": ["session-notification", "comment-checker"]
-}
-```
+The look_at tool from AmpCode, now in OhMyOpenCode.
+Instead of the agent reading massive files and bloating context, it internally leverages another agent to extract just what it needs.
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `ultrawork-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+#### I Removed Their Blockers
+- Replaces built-in grep and glob tools. Default implementation has no timeout—can hang forever.
 
-> **Note**: `disabled_hooks` controls Oh My OpenCode's built-in hooks. To disable Claude Code's `settings.json` hooks, use `claude_code.hooks: false` instead (see [Compatibility Toggles](#compatibility-toggles)).
 
-### Claude Code Compatibility
+### Goodbye Claude Code. Hello Oh My OpenCode.
 
-Oh My OpenCode provides seamless Claude Code configuration compatibility. If you've been using Claude Code, your existing setup works out of the box.
-
-#### Compatibility Toggles
-
-If you want to disable specific Claude Code compatibility features, use the `claude_code` configuration object:
-
-```json
-{
-  "claude_code": {
-    "mcp": false,
-    "commands": false,
-    "skills": false,
-    "agents": false,
-    "hooks": false
-  }
-}
-```
-
-| Toggle | When `false`, disables loading from... | NOT affected |
-|--------|----------------------------------------|--------------|
-| `mcp` | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json` | Built-in MCPs (context7, websearch_exa) |
-| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md` | `~/.config/opencode/command/`, `./.opencode/command/` |
-| `skills` | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md` | - |
-| `agents` | `~/.claude/agents/*.md`, `./.claude/agents/*.md` | Built-in agents (oracle, librarian, etc.) |
-| `hooks` | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | - |
-
-All toggles default to `true` (enabled). Omit the entire `claude_code` object for full Claude Code compatibility.
+Oh My OpenCode has a Claude Code compatibility layer.
+If you were using Claude Code, your existing config just works.
 
 #### Hooks Integration
 
-Execute custom scripts via Claude Code's `settings.json` hook system. Oh My OpenCode reads and executes hooks defined in:
+Run custom scripts via Claude Code's `settings.json` hook system.
+Oh My OpenCode reads and executes hooks from:
 
 - `~/.claude/settings.json` (user)
 - `./.claude/settings.json` (project)
@@ -407,7 +342,7 @@ Execute custom scripts via Claude Code's `settings.json` hook system. Oh My Open
 Supported hook events:
 - **PreToolUse**: Runs before tool execution. Can block or modify tool input.
 - **PostToolUse**: Runs after tool execution. Can add warnings or context.
-- **UserPromptSubmit**: Runs when user submits a prompt. Can block or inject messages.
+- **UserPromptSubmit**: Runs when user submits prompt. Can block or inject messages.
 - **Stop**: Runs when session goes idle. Can inject follow-up prompts.
 
 Example `settings.json`:
@@ -424,7 +359,7 @@ Example `settings.json`:
 }
 ```
 
-#### Configuration Loaders
+#### Config Loaders
 
 **Command Loader**: Loads markdown-based slash commands from 4 directories:
 - `~/.claude/commands/` (user)
@@ -440,7 +375,7 @@ Example `settings.json`:
 - `~/.claude/agents/*.md` (user)
 - `./.claude/agents/*.md` (project)
 
-**MCP Loader**: Loads MCP server configurations from `.mcp.json` files:
+**MCP Loader**: Loads MCP server configs from `.mcp.json` files:
 - `~/.claude/.mcp.json` (user)
 - `./.mcp.json` (project)
 - `./.claude/.mcp.json` (local)
@@ -448,24 +383,57 @@ Example `settings.json`:
 
 #### Data Storage
 
-**Todo Management**: Session todos are stored in Claude Code compatible format at `~/.claude/todos/`.
+**Todo Management**: Session todos stored in `~/.claude/todos/` in Claude Code compatible format.
 
-**Transcript**: Session activity is logged to `~/.claude/transcripts/` in JSONL format, enabling replay and analysis.
+**Transcript**: Session activity logged to `~/.claude/transcripts/` in JSONL format for replay and analysis.
 
-> **Note on `claude-code-*` naming**: Features under `src/features/claude-code-*/` are migrated from Claude Code's configuration system. This naming convention clearly identifies which features originated from Claude Code.
+#### Compatibility Toggles
 
-### Other Features
+Disable specific Claude Code compatibility features with the `claude_code` config object:
 
-- **Terminal Title**: Auto-updates terminal title with session status (idle ○, processing ◐, tool ⚡, error ✖). Supports tmux.
-- **Session State**: Centralized session tracking module used by event hooks and terminal title updates.
+```json
+{
+  "claude_code": {
+    "mcp": false,
+    "commands": false,
+    "skills": false,
+    "agents": false,
+    "hooks": false
+  }
+}
+```
+
+| Toggle     | When `false`, stops loading from...                                                   | Unaffected                                            |
+| ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, websearch_exa)                |
+| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
+| `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
+| `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | Built-in agents (oracle, librarian, etc.)             |
+| `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+
+All toggles default to `true` (enabled). Omit the `claude_code` object for full Claude Code compatibility.
+
+### Not Just for the Agents
+
+When agents thrive, you thrive. But I want to help you directly too.
+
+- **Ultrawork Mode**: Type "ultrawork" or "ulw" and agent orchestration kicks in. Forces the main agent to max out all available specialists (explore, librarian, plan, UI) via background tasks in parallel, with strict TODO tracking and verification. Just ultrawork. Everything fires at full capacity.
+- **Todo Continuation Enforcer**: Makes agents finish all TODOs before stopping. Kills the chronic LLM habit of quitting halfway.
+- **Comment Checker**: LLMs love comments. Too many comments. This reminds them to cut the noise. Smartly ignores valid patterns (BDD, directives, docstrings) and demands justification for the rest. Clean code wins.
+- **Think Mode**: Auto-detects when extended thinking is needed and switches modes. Catches phrases like "think deeply" or "ultrathink" and dynamically adjusts model settings for maximum reasoning.
+- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/).
+  - At 70%+ usage, reminds agents there's still headroom—prevents rushed, sloppy work.
+- Stability features that felt missing in OpenCode are built in. The Claude Code experience, transplanted. Sessions don't crash mid-run. Even if they do, they recover.
 
 ## Configuration
 
-Configuration file locations (in priority order):
+Highly opinionated, but adjustable to taste.
+
+Config file locations (priority order):
 1. `.opencode/oh-my-opencode.json` (project)
 2. `~/.config/opencode/oh-my-opencode.json` (user)
 
-Schema autocomplete is supported:
+Schema autocomplete supported:
 
 ```json
 {
@@ -483,7 +451,7 @@ Enable built-in Antigravity OAuth for Google Gemini models:
 }
 ```
 
-When enabled, `opencode auth login` will show "OAuth with Google (Antigravity)" as a login option for the Google provider.
+When enabled, `opencode auth login` shows "OAuth with Google (Antigravity)" for the Google provider.
 
 ### Agents
 
@@ -505,7 +473,7 @@ Override built-in agent settings:
 
 Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
-Or you can disable them using `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -517,9 +485,9 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### MCPs
 
-By default, Context7 and Exa MCP are supported.
+Context7 and Exa MCP enabled by default.
 
-If you don't want these, you can disable them using `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -530,10 +498,10 @@ If you don't want these, you can disable them using `disabled_mcps` in `~/.confi
 ### LSP
 
 OpenCode provides LSP tools for analysis.
-Oh My OpenCode provides LSP tools for refactoring (rename, code actions).
-It supports all LSP configurations and custom settings supported by OpenCode (those configured in opencode.json), and you can also configure additional settings specifically for Oh My OpenCode as shown below.
+Oh My OpenCode adds refactoring tools (rename, code actions).
+All OpenCode LSP configs and custom settings (from opencode.json) are supported, plus additional Oh My OpenCode-specific settings.
 
-You can configure additional LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -552,29 +520,46 @@ You can configure additional LSP servers via the `lsp` option in `~/.config/open
 
 Each server supports: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
+
 ## Author's Note
 
-Install Oh My OpenCode. Do not waste time configuring OpenCode from scratch.
-I have resolved the friction so you don't have to. The answers are in this plugin. If OpenCode is Arch Linux, Oh My OpenCode is [Omarchy](https://omarchy.org/).
+Install Oh My OpenCode.
 
-Enjoy the multi-model stability and rich feature set that other harnesses promise but fail to deliver.
-I will continue testing and updating here. I am the primary user of this project.
+I've used LLMs worth $24,000 tokens purely for personal development.
+Tried every tool out there, configured them to death. OpenCode won.
 
-- Who possesses the best raw logic?
-- Who is the debugging god?
+The answers to every problem I hit are baked into this plugin. Just install and go.
+If OpenCode is Debian/Arch, Oh My OpenCode is Ubuntu/[Omarchy](https://omarchy.org/).
+
+
+Heavily influenced by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/overview)—I've ported their features here, often improved. And I'm still building.
+It's **Open**Code, after all.
+
+Enjoy multi-model orchestration, stability, and rich features that other harnesses promise but can't deliver.
+I'll keep testing and updating. I'm this project's most obsessive user.
+- Which model has the sharpest logic?
+- Who's the debugging god?
 - Who writes the best prose?
 - Who dominates frontend?
 - Who owns backend?
 - Which model is fastest for daily driving?
 - What new features are other harnesses shipping?
 
-Do not overthink it. I have done the thinking. I will integrate the best practices. I will update this.
-If this sounds arrogant and you have a superior solution, send a PR. You are welcome.
+This plugin is the distillation of that experience. Just take the best. Got a better idea? PRs are welcome.
 
-As of now, I have no affiliation with any of the projects or models mentioned here. This plugin is purely based on personal experimentation and preference.
+**Stop agonizing over agent harness choices.**
+**I'll do the research, borrow from the best, and ship updates here.**
 
-I constructed 99% of this project using OpenCode. I focused on functional verification, and honestly, I don't know how to write proper TypeScript. **But I personally reviewed and comprehensively rewritten this documentation, so you can rely on it with confidence.**
+If this sounds arrogant and you have a better answer, please contribute. You're welcome.
+
+I have no affiliation with any project or model mentioned here. This is purely personal experimentation and preference.
+
+99% of this project was built using OpenCode. I tested for functionality—I don't really know how to write proper TypeScript. **But I personally reviewed and largely rewrote this doc, so read with confidence.**
+
 ## Warnings
 
-- If you are on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or lower, OpenCode has a bug that might break config.
-  - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132, so use a newer version.
+- Productivity might spike too hard. Don't let your coworker notice.
+  - Actually, I'll spread the word. Let's see who wins.
+- If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
+  - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
+    - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.

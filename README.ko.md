@@ -3,28 +3,45 @@
 ## 목차
 
 - [Oh My OpenCode](#oh-my-opencode)
-  - [세 줄 요약](#세-줄-요약)
+  - [읽지 않아도 됩니다.](#읽지-않아도-됩니다)
+    - [에이전트의 시대이니까요.](#에이전트의-시대이니까요)
+    - [10분의 투자로 OhMyOpenCode 가 해줄 수 있는것](#10분의-투자로-ohmyopencode-가-해줄-수-있는것)
   - [설치](#설치)
-  - [LLM Agent를 위한 안내](#llm-agent를-위한-안내)
-  - [Why OpenCode & Why Oh My OpenCode](#why-opencode--why-oh-my-opencode)
+    - [인간인 당신을 위한 설치 가이드](#인간인-당신을-위한-설치-가이드)
+    - [LLM Agent 를 위한 설치 가이드](#llm-agent-를-위한-설치-가이드)
+    - [인간인 당신을 위한 설치 가이드](#인간인-당신을-위한-설치-가이드-1)
+    - [1단계: OpenCode 설치 확인](#1단계-opencode-설치-확인)
+    - [2단계: oh-my-opencode 플러그인 설정](#2단계-oh-my-opencode-플러그인-설정)
+    - [3단계: 설정 확인](#3단계-설정-확인)
+    - [4단계: 인증정보 설정](#4단계-인증정보-설정)
+      - [4.1 Anthropic (Claude)](#41-anthropic-claude)
+      - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
+      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
+      - [4.3.1 모델 설정](#431-모델-설정)
+    - [⚠️ 주의](#️-주의)
   - [기능](#기능)
-    - [Agents](#agents)
-    - [Tools](#tools)
-      - [내장 LSP Tools](#내장-lsp-tools)
-      - [내장 AST-Grep Tools](#내장-ast-grep-tools)
-      - [Grep](#grep)
-      - [내장 MCPs](#내장-mcps)
-      - [Background Task](#background-task)
-    - [Hooks](#hooks)
-    - [Claude Code 호환성](#claude-code-호환성)
-    - [기타 편의 기능](#기타-편의-기능)
+    - [Agents: 당신의 새로운 팀원들](#agents-당신의-새로운-팀원들)
+    - [백그라운드 에이전트: 진짜 팀 처럼 일 하도록](#백그라운드-에이전트-진짜-팀-처럼-일-하도록)
+    - [도구: 당신의 동료가 더 좋은 도구를 갖고 일하도록](#도구-당신의-동료가-더-좋은-도구를-갖고-일하도록)
+      - [왜 당신만 IDE 를 쓰나요?](#왜-당신만-ide-를-쓰나요)
+      - [Context is all you need.](#context-is-all-you-need)
+      - [멀티모달을 다 활용하면서, 토큰은 덜 쓰도록.](#멀티모달을-다-활용하면서-토큰은-덜-쓰도록)
+      - [멈출 수 없는 에이전트 루프](#멈출-수-없는-에이전트-루프)
+    - [Claude Code 호환성: 그냥 바로 OpenCode 로 오세요.](#claude-code-호환성-그냥-바로-opencode-로-오세요)
+      - [Hooks 통합](#hooks-통합)
+      - [설정 로더](#설정-로더)
+      - [데이터 저장소](#데이터-저장소)
+      - [호환성 토글](#호환성-토글)
+    - [에이전트들을 위한 것이 아니라, 당신을 위한 것](#에이전트들을-위한-것이-아니라-당신을-위한-것)
   - [설정](#설정)
+    - [Google Auth](#google-auth)
+    - [Agents](#agents)
+    - [MCPs](#mcps)
+    - [LSP](#lsp)
   - [작성자의 노트](#작성자의-노트)
   - [주의](#주의)
 
 # Oh My OpenCode
-
-Oh My OpenCode
 
 oMoMoMoMoMo···
 
@@ -32,41 +49,58 @@ oMoMoMoMoMo···
 [Claude Code](https://www.claude.com/product/claude-code) 좋죠?
 근데 당신이 해커라면, [OpenCode](https://github.com/sst/opencode) 와는 사랑에 빠지게 될겁니다.
 
+- OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다.
+- 화면이 깜빡이지 않습니다.
+- 수정하는 파일에 맞게 자동으로 [LSP](https://opencode.ai/docs/lsp/), [Linter, Formatter](https://opencode.ai/docs/formatters/) 가 활성화되며 커스텀 할 수 있습니다.
+- 수많은 모델을 사용 할 수 있으며, **용도에 따라 모델을 섞어 오케스트레이션 할 수 있습니다.**
+- 기능이 아주 많습니다. 아름답습니다. 터미널이 화면을 그리려고 힘들어 하지 않습니다. 고성능입니다.
+
 Windows 만 사용하다가 처음으로 Linux 를 접하고 신나서 잔뜩 세팅하던 경험이 있진 않나요?
 OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 그런 프로젝트가 될겁니다.
 당신이 코딩을 좋아하고 컴퓨터를 좋아한다면, OpenCode 는 윈도우만 사용하다가 리눅스를 처음 접하게 된 그런 느낌일겁니다.
-그렇지 않은 당신도 약간의 시간을 투자해서 당신의 실력과 생산성을 몇배로 부스트하세요.
 
-## 세 줄 요약
+**그런데 문제는 너무나 알아야 할게 많고, 어렵고, 당신의 시간은 비싸다는겁니다.**
 
-- **모델 설정이 필요합니다**
-  - 이 플러그인은 [OpenCode Zen](https://opencode.ai/docs/zen/), Google, OpenAI, Anthropic 의 모델을 사용합니다.
-    - Anthropic 모델들을 사용하기 위해 [OpenCode 의 내장 Claude Code Max Plan 로그인 기능](https://opencode.ai/docs/providers/#anthropic)을 사용하세요.
-    - OpenAI 모델 (ChatGPT Plus/Pro)을 사용하기 위해 [OpenCode-OpenAI-Codex-Auth 플러그인](https://github.com/numman-ali/opencode-openai-codex-auth)을 설치하세요.
-    - Google Gemini 모델을 위해 `oh-my-opencode.json`에서 `google_auth: true`를 활성화하세요 (**내장 Antigravity OAuth**).
-    - 다른 프로바이더를 위해 [VibeProxy (macOS Only)](https://github.com/automazeio/vibeproxy) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.
-- **사실 밑의 내용은 읽지 않아도 됩니다. 그냥 설치하시면 됩니다. 모델 설정하고나면 추가로 공부하거나 알 필요가 없고, 설치하고 나면 그냥 더 좋아집니다.**
-- **이 문서도 그냥 Claude Code, OpenCode, Cursor에 붙여넣고, 설치하고, 사용자의 개입이 필요할 때 알려달라고 프롬프팅하세요. 그럼 그냥 깔립니다.**
-  - 당신이 LLM Agent 라면, 필요한 플러그인과 의존성을 설치하고, tmux 를 통해 opencode auth login 을 실행하여 사용자의 구성을 도와주세요.
+제가 그 문제를 고쳤습니다.
+당신이 해커가 아니라도 좋습니다. 약간의 시간을 투자해서 당신의 실력과 생산성을 몇배로 부스트하세요.
+이 문서를 에이전트에게 넘겨 설정해달라고 하세요.
+
+## 읽지 않아도 됩니다.
+
+### 에이전트의 시대이니까요.
+- **그냥 이 링크를 Claude Code / AmpCode / Factory Droid / Cursor 에게 넣고 설명해달라고 하세요.**
+  - 이게 왜 좋고, 그냥 뻔한 셋업이 아닌지, 당장 무엇이 더 좋아지는지 알려달라고 해보세요.
+  - 당신이 LLM 에이전트라면, 사용자의 입장에서 이 프로젝트와 함께 당장 어떤것들이 가능해지는지 사용자에게 설명하세요.
+
+### 10분의 투자로 OhMyOpenCode 가 해줄 수 있는것
+
+1. **백그라운드 태스크로 Gemini 3 Pro 가 프론트엔드를 작성하게 시켜두는 동안, Claude Opus 4.5 가 백엔드를 작성하고, 디버깅하다 막히면 GPT 5.2 에게 도움을 받습니다. 프론트엔드 구현이 완료되었다고 보고받으면, 이를 다시 확인하고 일하게 만들 수 있습니다.**
+2. 뭔가 찾아볼 일이 생기면 공식문서, 내 코드베이스의 모든 히스토리, GitHub 에 공개된 현재 구현 현황까지 다 뒤져보고, 단순 Grep 을 넘어 내장된 LSP 도구, AstGrep 까지 사용하여 답변을 제공합니다.
+3. LLM 에게 일을 맡길때에 큰 컨텍스트에 대한 걱정은 더 이상 하지마세요. 제가 하겠습니다.
+    - OhMyOpenCode 가 여러 에이전트를 적극 활용하도록 하여 컨텍스트 관리에 관한 부담을 줄입니다.
+    - **당신의 에이전트는 이제 개발팀 리드입니다. 당신은 이제 AI Manager 입니다.**
+4. 하기로 약속 한 일을 완수 할 때 까지 멈추지 않습니다.
+
+
+- 복잡하고 큰 일도 그냥 시키세요.
+  - 프롬프트에서 "ultrawork" 키워드를 감지하면, 위의 모든 과정을 알아서 진행합니다.
 
 ## 설치
 
-`~/.config/opencode/opencode.json`에 추가:
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode"
-  ]
-}
-```
+### 인간인 당신을 위한 설치 가이드
 
-## LLM Agent를 위한 안내
+귀찮은 작업은 LLM Agent 에게 맡기세요. 이 링크를 복사해서 넣어 설치하고 구성해달라고 부탁하세요.
+
+### LLM Agent 를 위한 설치 가이드
 
 <details>
 <summary>LLM Agent를 위한 안내 (클릭하여 펼치기)</summary>
 
 당신이 사용자의 oh-my-opencode 설정을 돕는 LLM Agent라면, 다음 단계를 따르세요:
+
+
+### 인간인 당신을 위한 설치 가이드
 
 ### 1단계: OpenCode 설치 확인
 
@@ -79,7 +113,7 @@ else
 fi
 ```
 
-OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs)를 안내하세요.
+OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs)를 읽고, 설치를 진행하세요. 컨텍스트를 줄이기 위해 Subagent 로 호출하여 설치를 하라고 안내하고, 그 결과를 보고 받는다고 말하세요.
 
 ### 2단계: oh-my-opencode 플러그인 설정
 
@@ -110,7 +144,7 @@ cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있
 
 ### 4단계: 인증정보 설정
 
-plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자의 인증 설정을 도와주세요. **기본적으로 Google Auth (4.2단계) 설정을 권장합니다.**
+plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자의 인증 설정을 진행하세요. 아래의 과정을 모두 진행해야 합니다.
 
 #### 4.1 Anthropic (Claude)
 
@@ -118,14 +152,14 @@ plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자�
 opencode auth login
 # Provider: Anthropic 선택
 # Login method: Claude Pro/Max 선택
-# 브라우저에서 OAuth 플로우 완료
+# 사용자에게 브라우저에서 OAuth 플로우를 완료하도록 안내하세요.
+# 최종 완료까지 대기
+# 진짜 완료되었음을 검증하고 사용자에게 안내
 ```
 
-#### 4.2 Google Gemini (내장 Antigravity OAuth)
+#### 4.2 Google Gemini (Antigravity OAuth)
 
-**권장되는 기본 설정입니다.**
-
-먼저 주도적으로 `~/.config/opencode/oh-my-opencode.json` (또는 프로젝트 레벨의 `.opencode/oh-my-opencode.json`)에서 Google auth를 활성화하세요:
+먼저 `~/.config/opencode/oh-my-opencode.json` 에서 Google auth를 활성화하세요:
 
 ```json
 {
@@ -139,7 +173,9 @@ opencode auth login
 opencode auth login
 # Provider: Google 선택
 # Login method: OAuth with Google (Antigravity) 선택
-# 브라우저에서 OAuth 플로우 완료
+# 사용자에게 브라우저에서 OAuth 플로우를 완료하도록 안내
+# 최종 완료까지 대기
+# 진짜 완료되었음을 검증하고 사용자에게 안내
 ```
 
 #### 4.3 OpenAI (ChatGPT Plus/Pro)
@@ -155,18 +191,7 @@ opencode auth login
 }
 ```
 
-**중요**: `opencode.json`에 전체 모델 설정도 구성해야 합니다. [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json)에서 provider/models 설정을 복사하세요. 자세한 설정 방법은 [opencode-openai-codex-auth 문서](https://github.com/numman-ali/opencode-openai-codex-auth)를 참고하세요.
-
-그 후 인증:
-
-```bash
-opencode auth login
-# Provider: OpenAI 선택
-# Login method: ChatGPT Plus/Pro (Codex Subscription) 선택
-# 브라우저에서 OAuth 플로우 완료
-```
-
-**⚠️ 알려진 이슈**: 현재 공식 npm 패키지에 400 에러(`"No tool call found for function call output with call_id"`)를 유발하는 버그가 있습니다. 수정 버전이 배포될 때까지 **핫픽스 브랜치 사용을 권장합니다**. `~/.config/opencode/package.json`을 수정하세요:
+**중요**: 현재 공식 npm 패키지에 400 에러(`"No tool call found for function call output with call_id"`)를 유발하는 버그가 있습니다. 수정 버전이 배포될 때까지 **핫픽스 브랜치 사용을 권장합니다**. `~/.config/opencode/package.json`을 수정하세요:
 
 ```json
 {
@@ -178,9 +203,21 @@ opencode auth login
 
 그 후 `cd ~/.config/opencode && bun i`를 실행하세요. `opencode.json`에서는 버전 없이 `"opencode-openai-codex-auth"`로 사용합니다 (`@4.1.0` 제외).
 
-#### 4.4 대안: 프록시 기반 인증
+#### 4.3.1 모델 설정
+`opencode.json`에 전체 모델 설정도 구성해야 합니다.
+[opencode-openai-codex-auth 문서](https://github.com/numman-ali/opencode-openai-codex-auth)를 읽고, [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json)에서 provider/models 설정을 복사하여, 사용자의 기존 셋업에 영향을 주지 않도록 깊게 고민하여 적절히 통합하세요.
 
-프록시 기반 인증을 선호하는 사용자를 위해 [VibeProxy](https://github.com/automazeio/vibeproxy) (macOS) 또는 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)를 대안으로 사용할 수 있습니다.
+그 후 인증:
+
+```bash
+opencode auth login
+# Provider: OpenAI 선택
+# Login method: ChatGPT Plus/Pro (Codex Subscription) 선택
+# 사용자에게 브라우저에서 OAuth 플로우를 완료하도록 안내
+# 최종 완료까지 대기
+# 진짜 완료되었음을 검증하고 사용자에게 안내
+```
+
 
 ### ⚠️ 주의
 
@@ -190,28 +227,10 @@ opencode auth login
 
 </details>
 
-## Why OpenCode & Why Oh My OpenCode
-
-OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. 화면이 깜빡이지 않습니다.
-수정하는 파일에 맞게 자동으로 [LSP](https://opencode.ai/docs/lsp/), [Linter, Formatter](https://opencode.ai/docs/formatters/) 가 활성화되며 커스텀 할 수 있습니다.
-수많은 모델을 사용 할 수 있으며, **용도에 따라 모델을 섞어 오케스트레이션 할 수 있습니다.**
-기능이 아주 많습니다. 아름답습니다. 터미널이 화면을 그리려고 힘들어 하지 않습니다. 고성능입니다.
-
-**그런데 문제는 너무나 알아야 할게 많고, 어렵고, 당신의 시간은 비싸다는겁니다.**
-
-[AmpCode](https://ampcode.com), [Claude Code](https://code.claude.com/docs/ko/overview) 에게 강한 영향과 영감을 받고, 그들의 기능을 그대로, 혹은 더 낫게 이 곳에 구현했습니다.
-**Open**Code 이니까요.
-
-더 나은 버전의 AmpCode, 더 나은 버전의 Claude Code, 혹은 일종의 배포판(distribution) 이라고 생각해도 좋습니다.
-
-저는 상황에 맞는 적절한 모델이 있다고 믿습니다. 다양한 모델을 섞어 쓸 때 최고의 팀이 됩니다.
-여러분의 재정 상태를 위해 CLIProxyAPI 혹은 VibeProxy 를 추천합니다. 프론티어 랩들의 LLM 들을 채용해서, 그들의 장점만을 활용하세요. 당신이 이제 팀장입니다.
-
-**Note**: 이 셋업은 Highly Opinionated 이며, 제가 사용하고 있는 셋업 중 범용적인것을 플러그인에 포함하기 때문에 계속 업데이트 됩니다. 저는 여태까지 $20,000 어치의 토큰을 오로지 개인 개발 목적으로 개인적으로 사용했고, 이 플러그인은 그 경험들의 하이라이트입니다. 여러분은 그저 최고를 취하세요. 만약 더 나은 제안이 있다면 언제든 기여에 열려있습니다.
 
 ## 기능
 
-### Agents
+### Agents: 당신의 새로운 팀원들
 
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
 - **librarian** (`anthropic/claude-haiku-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Haiku의 빠른 속도, 적절한 지능, 훌륭한 도구 호출 능력, 저렴한 비용을 활용합니다. AmpCode 에서 영감을 받았습니다.
@@ -230,19 +249,33 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 
 에이전트의 모델, 프롬프트, 권한은 `oh-my-opencode.json`에서 커스텀할 수 있습니다. 자세한 내용은 [설정](#설정)을 참고하세요.
 
-#### 서브 에이전트 오케스트레이션 (omo_task)
+### 백그라운드 에이전트: 진짜 팀 처럼 일 하도록
 
-`omo_task` 도구를 사용하면 에이전트(`oracle`, `frontend-ui-ux-engineer` 등)가 `explore`나 `librarian`을 서브 에이전트로 호출하여 특정 작업을 위임할 수 있습니다. 이를 통해 에이전트가 작업을 진행하기 전에 전문화된 다른 에이전트에게 정보를 요청하는 강력한 워크플로우가 가능합니다.
+위의 에이전트들을 미친듯이 한순간도 놀리지 않고 굴릴 수 있다면 어떨까요?
 
-> **참고**: 무한 재귀를 방지하기 위해 `explore`와 `librarian` 에이전트는 `omo_task` 도구를 직접 사용할 수 없습니다.
+- GPT 에게 디버깅을 시켜놓고, Claude 가 다양한 시도를 해보며 직접 문제를 찾아보는 워크플로우
+- Gemini 가 프론트엔드를 작성하는 동안, Claude 가 백엔드를 작성하는 워크플로우
+- 다량의 병렬 탐색을 진행시켜놓고, 일단 해당 부분은 제외하고 먼저 구현을 진행하다, 탐색 내용을 바탕으로 구현을 마무리하는 워크플로우
 
-### Tools
+이 워크플로우가 OhMyOpenCode 에서는 가능합니다.
 
-#### 내장 LSP Tools
+서브 에이전트를 백그라운드에서 실행 할 수 있습니다. 이러면 메인 에이전트는 작업이 완료되면 알게 됩니다. 필요하다면 결과를 기다릴 수 있습니다.
 
-당신이 에디터에서 사용하는 그 기능을 다른 에이전트들은 사용하지 못합니다. Oh My OpenCode 는 당신만의 그 도구를 LLM Agent 에게 쥐어줍니다. 리팩토링하고, 탐색하고, 분석하는 모든 작업을 OpenCode 의 설정값을 그대로 사용하여 지원합니다.
+**에이전트가 당신의 팀이 일 하듯 일하게하세요**
 
-[OpenCode 는 LSP 를 제공하지만](https://opencode.ai/docs/lsp/), 오로지 분석용으로만 제공합니다. 탐색과 리팩토링을 위한 도구는 OpenCode 와 동일한 스펙과 설정으로 Oh My OpenCode 가 제공합니다.
+### 도구: 당신의 동료가 더 좋은 도구를 갖고 일하도록
+
+#### 왜 당신만 IDE 를 쓰나요?
+
+Syntax Highlighting, Autocomplete, Refactoring, Navigation, Analysis, 그리고 이젠 에이전트가 코드를 짜게 하기까지..
+
+**왜 당신만 사용하나요?**
+**에이전트가 그 도구를 사용한다면 더 코드를 잘 작성할텐데요.**
+
+[OpenCode 는 LSP 를 제공하지만](https://opencode.ai/docs/lsp/), 오로지 분석용으로만 제공합니다.
+
+당신이 에디터에서 사용하는 그 기능을 다른 에이전트들은 사용하지 못합니다.
+뛰어난 동료에게 좋은 도구를 쥐어주세요. 이제 리팩토링도, 탐색도, 분석도 에이전트가 제대로 할 수 있습니다.
 
 - **lsp_hover**: 위치의 타입 정보, 문서, 시그니처 가져오기
 - **lsp_goto_definition**: 심볼 정의로 이동
@@ -255,76 +288,11 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **lsp_rename**: 워크스페이스 전체에서 심볼 이름 변경
 - **lsp_code_actions**: 사용 가능한 빠른 수정/리팩토링 가져오기
 - **lsp_code_action_resolve**: 코드 액션 적용
-
-#### 내장 AST-Grep Tools
 - **ast_grep_search**: AST 인식 코드 패턴 검색 (25개 언어)
 - **ast_grep_replace**: AST 인식 코드 교체
 
-#### Grep
-- **grep**: 안전 제한이 있는 콘텐츠 검색 (5분 타임아웃, 10MB 출력 제한). OpenCode의 내장 `grep` 도구를 대체합니다.
-  - 기본 grep 도구는 시간제한이 걸려있지 않습니다. 대형 코드베이스에서 광범위한 패턴을 검색하면 CPU가 폭발하고 무한히 멈출 수 있습니다.
-  - 이 도구는 엄격한 제한을 적용하며, 내장 `grep`을 완전히 대체합니다.
-
-#### Glob
-
-- **glob**: 타임아웃 보호가 있는 파일 패턴 매칭 (60초). OpenCode 내장 `glob` 도구를 대체합니다.
-  - 기본 `glob`은 타임아웃이 없습니다. ripgrep이 멈추면 무한정 대기합니다.
-  - 이 도구는 타임아웃을 강제하고 만료 시 프로세스를 종료합니다.
-
-#### 내장 멀티모달 도구 (Built-in Multimodal Tools)
-
-- **look_at**: 시각적 해석이 필요한 미디어 파일(PDF, 이미지, 다이어그램 등)을 Gemini 2.5 Flash를 사용하여 분석합니다. Sourcegraph Ampcode의 `look_at` 도구에서 영감을 받았습니다.
-  - 파라미터: `file_path` (절대 경로), `goal` (추출할 정보)
-  - 사용 사례: PDF 텍스트 추출, 이미지 설명, 다이어그램 분석
-
-#### 내장 MCPs
-
-- **websearch_exa**: Exa AI 웹 검색. 실시간 웹 검색과 콘텐츠 스크래핑을 수행합니다. 관련 웹사이트에서 LLM에 최적화된 컨텍스트를 반환합니다.
-- **context7**: 라이브러리 문서 조회. 정확한 코딩을 위해 최신 라이브러리 문서를 가져옵니다.
-
-필요 없다면 `oh-my-opencode.json`에서 비활성화할 수 있습니다:
-
-```json
-{
-  "disabled_mcps": ["websearch_exa"]
-}
-```
-
-#### Background Task
-
-장시간 실행되는 작업이나 복잡한 분석을 메인 세션을 차단하지 않고 백그라운드에서 실행합니다. 작업이 완료되면 시스템이 자동으로 알림을 보냅니다.
-
-- **background_task**: 백그라운드 에이전트 작업을 시작합니다. 설명, 프롬프트, 에이전트 타입을 지정하면 즉시 task ID를 반환합니다.
-- **background_output**: 작업 진행 상황 확인(`block=false`) 또는 결과 대기(`block=true`). 최대 10분까지 커스텀 타임아웃을 지원합니다.
-- **background_cancel**: task ID로 실행 중인 백그라운드 작업을 취소합니다.
-
-주요 기능:
-- **비동기 실행**: 복잡한 분석이나 연구 작업을 백그라운드에서 처리하면서 다른 작업 계속 가능
-- **자동 알림**: 백그라운드 작업 완료 시 메인 세션에 자동 알림
-- **상태 추적**: 도구 호출 횟수, 마지막 사용 도구 등 실시간 진행 상황 모니터링
-- **세션 격리**: 각 작업은 독립된 세션에서 실행
-
-사용 예시:
-```
-1. 시작: background_task → task_id="bg_abc123" 반환
-2. 다른 작업 계속 진행
-3. 시스템 알림: "Task bg_abc123 completed"
-4. 결과 조회: background_output(task_id="bg_abc123") → 전체 결과 획득
-```
-
-### Hooks
-
-- **Todo Continuation Enforcer**: 에이전트가 멈추기 전 모든 TODO 항목을 완료하도록 강제합니다. LLM의 고질적인 "중도 포기" 문제를 방지합니다.
-- **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
-  - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
-- **Session Notification**: 에이전트가 작업을 마치면 OS 네이티브 알림을 보냅니다 (macOS, Linux, Windows).
-- **Session Recovery**: API 에러로부터 자동으로 복구하여 세션 안정성을 보장합니다. 네 가지 시나리오를 처리합니다:
-  - **Tool Result Missing**: `tool_use` 블록이 있지만 `tool_result`가 없을 때 (ESC 인터럽트) → "cancelled" tool result 주입
-  - **Thinking Block Order**: thinking 블록이 첫 번째여야 하는데 아닐 때 → 빈 thinking 블록 추가
-  - **Thinking Disabled Violation**: thinking 이 비활성화인데 thinking 블록이 있을 때 → thinking 블록 제거
-  - **Empty Content Message**: 메시지가 thinking/meta 블록만 있고 실제 내용이 없을 때 → 파일시스템을 통해 "(interrupted)" 텍스트 주입
-- **Comment Checker**: 코드 수정 후 불필요한 주석을 감지하여 보고합니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, AI가 남긴 흔적을 제거하여 코드를 깨끗하게 유지합니다.
-- **Directory AGENTS.md Injector**: 파일을 읽을 때 `AGENTS.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 경로 상의 **모든** `AGENTS.md` 파일을 수집합니다. 중첩된 디렉토리별 지침을 지원합니다:
+#### Context is all you need.
+- **Directory AGENTS.md / README.md Injector**: 파일을 읽을 때 `AGENTS.md`, `README.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 경로 상의 **모든** `AGENTS.md` 파일을 수집합니다. 중첩된 디렉토리별 지침을 지원합니다:
   ```
   project/
   ├── AGENTS.md              # 프로젝트 전체 컨텍스트
@@ -334,9 +302,8 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
   │       ├── AGENTS.md      # 컴포넌트 전용 컨텍스트
   │       └── Button.tsx     # 이 파일을 읽으면 위 3개 AGENTS.md 모두 주입
   ```
-  `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다. Claude Code의 CLAUDE.md 기능에서 영감을 받았습니다.
-- **Directory README.md Injector**: 파일을 읽을 때 `README.md` 내용을 자동으로 주입합니다. AGENTS.md Injector와 동일하게 동작하며, 파일 디렉토리부터 프로젝트 루트까지 탐색합니다. LLM 에이전트에게 프로젝트 문서 컨텍스트를 제공합니다. 각 디렉토리의 README는 세션당 한 번만 주입됩니다.
-- **Rules Injector**: 파일을 읽을 때 `.claude/rules/` 디렉토리의 규칙을 자동으로 주입합니다.
+  `Button.tsx`를 읽으면 순서대로 주입됩니다: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. 각 디렉토리의 컨텍스트는 세션당 한 번만 주입됩니다.
+- **Conditional Rules Injector**: 모든 규칙이 항상 필요하진 않습니다. 특정 규칙을 만족한다면, 파일을 읽을 때 `.claude/rules/` 디렉토리의 규칙을 자동으로 주입합니다.
   - 파일 디렉토리부터 프로젝트 루트까지 상향 탐색하며, `~/.claude/rules/` (사용자) 경로도 포함합니다.
   - `.md` 및 `.mdc` 파일을 지원합니다.
   - Frontmatter의 `globs` 필드(glob 패턴)를 기반으로 매칭합니다.
@@ -350,57 +317,26 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
     - Use PascalCase for interface names
     - Use camelCase for function names
     ```
-- **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
-- **Ultrawork Mode**: 사용자가 "ultrawork" 또는 "ulw" 키워드를 입력하면 자동으로 에이전트 오케스트레이션 가이드를 주입합니다. 메인 에이전트가 모든 가용한 전문 에이전트(탐색, 사서, 계획, UI)를 백그라운드 작업을 통해 병렬로 최대한 활용하도록 강제하며, 엄격한 TODO 추적 및 검증 프로토콜을 따르게 합니다.
-- **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
-- **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
-- **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
+- **Online**: 프로젝트 규칙이 전부는 아니겠죠. exa, context7 mcp 를 내장하여 검색 기능을 제공합니다.
 
-필요 없는 훅이 있다면, `~/.config/opencode/oh-my-opencode.json` 혹은 `.opencode/oh-my-opencode.json`의 `disabled_hooks`를 사용하여 비활성화할 수 있습니다:
+#### 멀티모달을 다 활용하면서, 토큰은 덜 쓰도록.
 
-```json
-{
-  "disabled_hooks": ["session-notification", "comment-checker"]
-}
-```
+AmpCode 에서 영감을 받은 look_at 도구를, OhMyOpenCode 에서도 제공합니다.
+에이전트는 직접 파일을 읽어 큰 컨텍스트를 점유당하는 대신, 다른 에이전트를 내부적으로 활용하여 파일의 내용만 명확히 이해 할 수 있습니다.
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `ultrawork-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+#### 멈출 수 없는 에이전트 루프
+- 내장 grep, glob 도구를 대체합니다. 기본 구현에서는 타임아웃이 없어 무한정 대기할 수 있습니다.
 
-> **참고**: `disabled_hooks`는 Oh My OpenCode의 내장 훅을 제어합니다. Claude Code의 `settings.json` 훅을 비활성화하려면 `claude_code.hooks: false`를 대신 사용하세요 ([호환성 토글](#호환성-토글) 참고).
 
-### Claude Code 호환성
+### Claude Code 호환성: 그냥 바로 OpenCode 로 오세요.
 
-Oh My OpenCode는 Claude Code 설정과 완벽하게 호환됩니다. Claude Code를 사용하셨다면, 기존 설정을 그대로 사용할 수 있습니다.
-
-#### 호환성 토글
-
-특정 Claude Code 호환 기능을 비활성화하려면 `claude_code` 설정 객체를 사용하세요:
-
-```json
-{
-  "claude_code": {
-    "mcp": false,
-    "commands": false,
-    "skills": false,
-    "agents": false,
-    "hooks": false
-  }
-}
-```
-
-| 토글 | `false`일 때 로딩 비활성화 경로 | 영향 받지 않음 |
-|------|-------------------------------|---------------|
-| `mcp` | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json` | 내장 MCP (context7, websearch_exa) |
-| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md` | `~/.config/opencode/command/`, `./.opencode/command/` |
-| `skills` | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md` | - |
-| `agents` | `~/.claude/agents/*.md`, `./.claude/agents/*.md` | 내장 에이전트 (oracle, librarian 등) |
-| `hooks` | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | - |
-
-모든 토글은 기본값이 `true` (활성화)입니다. 완전한 Claude Code 호환성을 원하면 `claude_code` 객체를 생략하세요.
+Oh My OpenCode 에는 Claude Code 호환성 레이어가 존재합니다.
+Claude Code를 사용하셨다면, 기존 설정을 그대로 사용할 수 있습니다.
 
 #### Hooks 통합
 
-Claude Code의 `settings.json` 훅 시스템을 통해 커스텀 스크립트를 실행합니다. Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
+Claude Code의 `settings.json` 훅 시스템을 통해 커스텀 스크립트를 실행합니다.
+Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 - `~/.claude/settings.json` (사용자)
 - `./.claude/settings.json` (프로젝트)
@@ -454,14 +390,47 @@ Claude Code의 `settings.json` 훅 시스템을 통해 커스텀 스크립트를
 
 **Transcript**: 세션 활동이 `~/.claude/transcripts/`에 JSONL 형식으로 기록되어 재생 및 분석이 가능합니다.
 
-> **`claude-code-*` 네이밍에 대해**: `src/features/claude-code-*/` 아래의 기능들은 Claude Code의 설정 시스템에서 마이그레이션되었습니다. 이 네이밍 규칙은 어떤 기능이 Claude Code에서 유래했는지 명확히 식별합니다.
+#### 호환성 토글
 
-### 기타 편의 기능
+특정 Claude Code 호환 기능을 비활성화하려면 `claude_code` 설정 객체를 사용 할 수 도 있습니다:
 
-- **Terminal Title**: 세션 상태에 따라 터미널 타이틀을 자동 업데이트합니다 (유휴 ○, 처리중 ◐, 도구 ⚡, 에러 ✖). tmux를 지원합니다.
-- **Session State**: 이벤트 훅과 터미널 타이틀 업데이트에 사용되는 중앙집중식 세션 추적 모듈입니다.
+```json
+{
+  "claude_code": {
+    "mcp": false,
+    "commands": false,
+    "skills": false,
+    "agents": false,
+    "hooks": false
+  }
+}
+```
+
+| 토글       | `false`일 때 로딩 비활성화 경로                                                       | 영향 받지 않음                                        |
+| ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | 내장 MCP (context7, websearch_exa)                    |
+| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
+| `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
+| `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | 내장 에이전트 (oracle, librarian 등)                  |
+| `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+
+모든 토글은 기본값이 `true` (활성화)입니다. 완전한 Claude Code 호환성을 원하면 `claude_code` 객체를 생략하세요.
+
+### 에이전트들을 위한 것이 아니라, 당신을 위한 것
+
+에이전트들이 행복해지면, 당신이 제일 행복해집니다, 그렇지만 저는 당신도 돕고싶습니다.
+
+- **Ultrawork Mode**: 사용자가 "ultrawork" 또는 "ulw" 키워드를 입력하면 자동으로 에이전트 오케스트레이션 가이드를 주입합니다. 메인 에이전트가 모든 가용한 전문 에이전트(탐색, 사서, 계획, UI)를 백그라운드 작업을 통해 병렬로 최대한 활용하도록 강제하며, 엄격한 TODO 추적 및 검증 프로토콜을 따르게 합니다. 그냥 ultrawork 하세요. 말한 모든 기능이 최대로 활용되도록 에이전트가 최적화됩니다.
+- **Todo Continuation Enforcer**: 에이전트가 멈추기 전 모든 TODO 항목을 완료하도록 강제합니다. LLM의 고질적인 "중도 포기" 문제를 방지합니다.
+- **Comment Checker**: 학습 과정의 습관 때문일까요. LLM 들은 주석이 너무 많습니다. LLM 들이 쓸모없는 주석을 작성하지 않도록 상기시킵니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, 그렇지 않는 주석들에 대해 해명을 요구하며 깔끔한 코드를 구성하게 합니다.
+- **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
+- **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
+  - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
+- OpenCode 에서 누락되거나 부족하다고 느끼는 안정성 보강 기능들이 내장되어있습니다. 클로드 코드에서의 안정적인 경험을 그대로 가져갈 수 있습니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
 
 ## 설정
+
+비록 Highly Opinionated 한 설정이지만, 여러분의 입맛대로 조정 할 수 있습니다.
 
 설정 파일 위치 (우선순위 순):
 1. `.opencode/oh-my-opencode.json` (프로젝트)
@@ -554,10 +523,20 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 
 각 서버는 다음을 지원합니다: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
+
 ## 작성자의 노트
 
-Oh My OpenCode 를 설치하세요. 복잡하게 OpenCode 구성을 만들지마세요.
-제가 밟아보고 경험한 문제들의 해답을 이 플러그인에 담았고, 그저 깔고 사용하면 됩니다. OpenCode 가 ArchLinux 라면, Oh My OpenCode 는 [Omarchy](https://omarchy.org/) 입니다.
+Oh My OpenCode 를 설치하세요.
+
+저는 여태까지 $24,000 어치의 토큰을 오로지 개인 개발 목적으로 개인적으로 사용했습니다.
+다양한 도구를 시도해보고 끝까지 구성해보았습니다. 제 선택은 OpenCode 였습니다.
+
+제가 밟아보고 경험한 문제들의 해답을 이 플러그인에 담았고, 그저 깔고 사용하면 됩니다.
+OpenCode 가 Debian / ArchLinux 라면, Oh My OpenCode 는 Ubuntu / [Omarchy](https://omarchy.org/) 입니다.
+
+
+[AmpCode](https://ampcode.com), [Claude Code](https://code.claude.com/docs/ko/overview) 에게 강한 영향과 영감을 받고, 그들의 기능을 그대로, 혹은 더 낫게 이 곳에 구현했습니다. 그리고 구현하고 있습니다.
+**Open**Code 이니까요.
 
 다른 에이전트 하니스 제공자들이 이야기하는 다중 모델, 안정성, 풍부한 기능을 그저 OpenCode 에서 누리세요.
 제가 테스트하고, 이 곳에 업데이트 하겠습니다. 저는 이 프로젝트의 가장 열렬한 사용자이기도 하니까요.
@@ -569,13 +548,21 @@ Oh My OpenCode 를 설치하세요. 복잡하게 OpenCode 구성을 만들지마
 - 주로 겪는 상황에 맞는 빠른 모델은 무엇인지
 - 다른 에이전트 하니스에 제공되는 새로운 기능은 무엇인지.
 
-고민하지마세요. 제가 고민할거고, 다른 사람들의 경험을 차용해 올것이고, 그래서 이 곳에 업데이트 하겠습니다.
+이 플러그인은 그 경험들의 하이라이트입니다. 여러분은 그저 최고를 취하세요. 만약 더 나은 제안이 있다면 언제든 기여에 열려있습니다.
+
+**Agent Harness 에 대해 고민하지마세요.**
+**제가 고민할거고, 다른 사람들의 경험을 차용해 올것이고, 그래서 이 곳에 업데이트 하겠습니다.**
+
 이 글이 오만하다고 느껴지고, 더 나은 해답이 있다면, 편히 기여해주세요. 환영합니다.
 
 지금 시점에 여기에 언급된 어떤 프로젝트와 모델하고도 관련이 있지 않습니다. 온전히 개인적인 실험과 선호를 바탕으로 이 플러그인을 만들었습니다.
+
 OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능 위주로 테스트했고, 저는 TS 를 제대로 작성 할 줄 모릅니다. **그치만 이 문서는 제가 직접 검토하고 전반적으로 다시 작성했으니 안심하고 읽으셔도 됩니다.**
 
 ## 주의
 
+- 생산성이 너무 올라 갈 수 있습니다. 옆자리 동료한테 들키지 않도록 조심하세요.
+  - 그렇지만 제가 소문 내겠습니다. 누가 이기나 내기해봅시다.
 - [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) 혹은 이것보다 낮은 버전을 사용중이라면, OpenCode 의 버그로 인해 제대로 구성이 되지 않을 수 있습니다.
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
+    - TMI: PR 도 OhMyOpenCode 의 셋업의 Librarian, Explore, Oracle 을 활용하여 우연히 발견하고 해결되었습니다.
