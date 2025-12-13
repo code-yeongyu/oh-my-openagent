@@ -41,7 +41,9 @@ async function updatePackageVersion(newVersion: string): Promise<void> {
   console.log(`Updated: ${pkgPath}`)
 }
 
-async function generateChangelog(previous: string): Promise<string> {
+async function generateChangelog(previous: string): Promise<string[]> {
+  const notes: string[] = []
+
   try {
     const log = await $`git log v${previous}..HEAD --oneline --format="%h %s"`.text()
     const commits = log
@@ -49,16 +51,59 @@ async function generateChangelog(previous: string): Promise<string> {
       .filter((line) => line && !line.match(/^\w+ (ignore:|test:|chore:|ci:|release:)/i))
 
     if (commits.length > 0) {
-      const changelog = commits.map((c) => `- ${c}`).join("\n")
+      for (const commit of commits) {
+        notes.push(`- ${commit}`)
+      }
       console.log("\n--- Changelog ---")
-      console.log(changelog)
+      console.log(notes.join("\n"))
       console.log("-----------------\n")
-      return changelog
     }
   } catch {
     console.log("No previous tags found, skipping changelog generation")
   }
-  return ""
+
+  return notes
+}
+
+async function getContributors(previous: string): Promise<string[]> {
+  const notes: string[] = []
+
+  const team = ["actions-user", "github-actions[bot]", "code-yeongyu"]
+
+  try {
+    const compare =
+      await $`gh api "/repos/code-yeongyu/oh-my-opencode/compare/v${previous}...HEAD" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
+    const contributors = new Map<string, string[]>()
+
+    for (const line of compare.split("\n").filter(Boolean)) {
+      const { login, message } = JSON.parse(line) as { login: string | null; message: string }
+      const title = message.split("\n")[0] ?? ""
+      if (title.match(/^(ignore:|test:|chore:|ci:|release:)/i)) continue
+
+      if (login && !team.includes(login)) {
+        if (!contributors.has(login)) contributors.set(login, [])
+        contributors.get(login)?.push(title)
+      }
+    }
+
+    if (contributors.size > 0) {
+      notes.push("")
+      notes.push(`**Thank you to ${contributors.size} community contributor${contributors.size > 1 ? "s" : ""}:**`)
+      for (const [username, userCommits] of contributors) {
+        notes.push(`- @${username}:`)
+        for (const commit of userCommits) {
+          notes.push(`  - ${commit}`)
+        }
+      }
+      console.log("\n--- Contributors ---")
+      console.log(notes.join("\n"))
+      console.log("--------------------\n")
+    }
+  } catch (error) {
+    console.log("Failed to fetch contributors:", error)
+  }
+
+  return notes
 }
 
 async function buildAndPublish(): Promise<void> {
@@ -71,7 +116,7 @@ async function buildAndPublish(): Promise<void> {
   }
 }
 
-async function gitTagAndRelease(newVersion: string, changelog: string): Promise<void> {
+async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<void> {
   if (!process.env.CI) return
 
   console.log("\nCommitting and tagging...")
@@ -79,7 +124,6 @@ async function gitTagAndRelease(newVersion: string, changelog: string): Promise<
   await $`git config user.name "github-actions[bot]"`
   await $`git add package.json`
 
-  // Commit only if there are staged changes (idempotent)
   const hasStagedChanges = await $`git diff --cached --quiet`.nothrow()
   if (hasStagedChanges.exitCode !== 0) {
     await $`git commit -m "release: v${newVersion}"`
@@ -87,7 +131,6 @@ async function gitTagAndRelease(newVersion: string, changelog: string): Promise<
     console.log("No changes to commit (version already updated)")
   }
 
-  // Tag only if it doesn't exist (idempotent)
   const tagExists = await $`git rev-parse v${newVersion}`.nothrow()
   if (tagExists.exitCode !== 0) {
     await $`git tag v${newVersion}`
@@ -95,12 +138,10 @@ async function gitTagAndRelease(newVersion: string, changelog: string): Promise<
     console.log(`Tag v${newVersion} already exists`)
   }
 
-  // Push (idempotent - git push is already idempotent)
   await $`git push origin HEAD --tags`
 
-  // Create release only if it doesn't exist (idempotent)
   console.log("\nCreating GitHub release...")
-  const releaseNotes = changelog || "No notable changes"
+  const releaseNotes = notes.length > 0 ? notes.join("\n") : "No notable changes"
   const releaseExists = await $`gh release view v${newVersion}`.nothrow()
   if (releaseExists.exitCode !== 0) {
     await $`gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}`
@@ -130,8 +171,11 @@ async function main() {
 
   await updatePackageVersion(newVersion)
   const changelog = await generateChangelog(previous)
+  const contributors = await getContributors(previous)
+  const notes = [...changelog, ...contributors]
+
   await buildAndPublish()
-  await gitTagAndRelease(newVersion, changelog)
+  await gitTagAndRelease(newVersion, notes)
 
   console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} ===`)
 }
