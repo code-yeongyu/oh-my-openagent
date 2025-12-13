@@ -55,12 +55,14 @@ export const THINKING_CONFIGS: Record<string, Record<string, unknown>> = {
       type: "enabled",
       budgetTokens: 64000,
     },
+    maxTokens: 128000,
   },
   "amazon-bedrock": {
     reasoningConfig: {
       type: "enabled",
       budgetTokens: 32000,
     },
+    maxTokens: 64000,
   },
   google: {
     providerOptions: {

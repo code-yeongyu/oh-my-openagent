@@ -1,6 +1,7 @@
 import { detectThinkKeyword, extractPromptText } from "./detector"
-import { getHighVariant, isAlreadyHighVariant } from "./switcher"
+import { getHighVariant, isAlreadyHighVariant, getThinkingConfig } from "./switcher"
 import type { ThinkModeState, ThinkModeInput } from "./types"
+import { log } from "../../shared"
 
 export * from "./detector"
 export * from "./switcher"
@@ -23,6 +24,7 @@ export function createThinkModeHook() {
       const state: ThinkModeState = {
         requested: false,
         modelSwitched: false,
+        thinkingConfigInjected: false,
       }
 
       if (!detectThinkKeyword(promptText)) {
@@ -47,17 +49,31 @@ export function createThinkModeHook() {
       }
 
       const highVariant = getHighVariant(currentModel.modelID)
+      const thinkingConfig = getThinkingConfig(currentModel.providerID, currentModel.modelID)
 
-      if (!highVariant) {
-        thinkModeState.set(sessionID, state)
-        return
+      if (highVariant) {
+        output.message.model = {
+          providerID: currentModel.providerID,
+          modelID: highVariant,
+        }
+        state.modelSwitched = true
+        log("Think mode: model switched to high variant", {
+          sessionID,
+          from: currentModel.modelID,
+          to: highVariant,
+        })
       }
 
-      output.message.model = {
-        providerID: currentModel.providerID,
-        modelID: highVariant,
+      if (thinkingConfig) {
+        Object.assign(output.message, thinkingConfig)
+        state.thinkingConfigInjected = true
+        log("Think mode: thinking config injected", {
+          sessionID,
+          provider: currentModel.providerID,
+          config: thinkingConfig,
+        })
       }
-      state.modelSwitched = true
+
       thinkModeState.set(sessionID, state)
     },
 
