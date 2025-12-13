@@ -330,6 +330,7 @@ Example workflow:
     - Use camelCase for function names
     ```
 - **Think Mode**: Automatic extended thinking detection and mode switching. Detects when user requests deep thinking (e.g., "think deeply", "ultrathink") and dynamically adjusts model settings for enhanced reasoning.
+- **Ultrawork Mode**: When user triggers "ultrawork" or "ulw" keywords, automatically injects agent orchestration guidance. Forces the main agent to leverage all available specialized agents (exploration, librarian, planning, UI) via background tasks in parallel, with strict TODO tracking and verification protocols.
 - **Anthropic Auto Compact**: Automatically compacts conversation history when approaching context limits for Anthropic models.
 - **Empty Task Response Detector**: Detects when subagent tasks return empty or meaningless responses and handles gracefully.
 - **Grep Output Truncator**: Prevents grep output from overwhelming the context by truncating excessively long results.
@@ -342,7 +343,7 @@ You can disable specific built-in hooks using `disabled_hooks` in `~/.config/ope
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `ultrawork-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
 
 > **Note**: `disabled_hooks` controls Oh My OpenCode's built-in hooks. To disable Claude Code's `settings.json` hooks, use `claude_code.hooks: false` instead (see [Compatibility Toggles](#compatibility-toggles)).
 

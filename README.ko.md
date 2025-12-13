@@ -332,6 +332,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
     - Use camelCase for function names
     ```
 - **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
+- **Ultrawork Mode**: 사용자가 "ultrawork" 또는 "ulw" 키워드를 입력하면 자동으로 에이전트 오케스트레이션 가이드를 주입합니다. 메인 에이전트가 모든 가용한 전문 에이전트(탐색, 사서, 계획, UI)를 백그라운드 작업을 통해 병렬로 최대한 활용하도록 강제하며, 엄격한 TODO 추적 및 검증 프로토콜을 따르게 합니다.
 - **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
 - **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
 - **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
@@ -344,7 +345,7 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `ultrawork-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
 
 > **참고**: `disabled_hooks`는 Oh My OpenCode의 내장 훅을 제어합니다. Claude Code의 `settings.json` 훅을 비활성화하려면 `claude_code.hooks: false`를 대신 사용하세요 ([호환성 토글](#호환성-토글) 참고).
 
