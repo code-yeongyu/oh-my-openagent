@@ -72,8 +72,8 @@ function formatTaskStatus(task: BackgroundTask): string {
   const promptPreview = truncateText(task.prompt, 500)
   
   let progressSection = ""
-  if (task.progress) {
-    progressSection = `\nTool calls: ${task.progress.toolCalls}\nLast tool: ${task.progress.lastTool ?? "N/A"}`
+  if (task.progress?.lastTool) {
+    progressSection = `\n| Last tool | ${task.progress.lastTool} |`
   }
 
   let lastMessageSection = ""
@@ -91,6 +91,17 @@ ${truncated}
 \`\`\``
   }
 
+  let statusNote = ""
+  if (task.status === "running") {
+    statusNote = `
+
+> **Note**: No need to wait explicitly - the system will notify you when this task completes.`
+  } else if (task.status === "error") {
+    statusNote = `
+
+> **Failed**: The task encountered an error. Check the last message for details.`
+  }
+
   return `# Task Status
 
 | Field | Value |
@@ -101,7 +112,7 @@ ${truncated}
 | Status | **${task.status}** |
 | Duration | ${duration} |
 | Session ID | \`${task.sessionID}\` |${progressSection}
-
+${statusNote}
 ## Original Prompt
 
 \`\`\`
