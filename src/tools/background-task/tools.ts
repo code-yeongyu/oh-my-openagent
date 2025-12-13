@@ -26,14 +26,18 @@ export function createBackgroundTask(manager: BackgroundManager) {
     args: {
       description: tool.schema.string().describe("Short task description (shown in status)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      agent: tool.schema.string().describe("Agent type to use (any agent allowed)"),
+      agent: tool.schema.string().describe("Agent type to use (any registered agent)"),
     },
     async execute(args: BackgroundTaskArgs, toolContext) {
+      if (!args.agent || args.agent.trim() === "") {
+        return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
+      }
+
       try {
         const task = await manager.launch({
           description: args.description,
           prompt: args.prompt,
-          agent: args.agent,
+          agent: args.agent.trim(),
           parentSessionID: toolContext.sessionID,
           parentMessageID: toolContext.messageID,
         })

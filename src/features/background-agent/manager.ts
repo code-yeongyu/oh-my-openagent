@@ -39,6 +39,10 @@ export class BackgroundManager {
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
+    if (!input.agent || input.agent.trim() === "") {
+      throw new Error("Agent parameter is required")
+    }
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
@@ -71,7 +75,7 @@ export class BackgroundManager {
     this.tasks.set(task.id, task)
     this.startPolling()
 
-    log("[background-agent] Launching task:", { taskId: task.id, sessionID })
+    log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
     this.client.session.promptAsync({
       path: { id: sessionID },
@@ -90,8 +94,15 @@ export class BackgroundManager {
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
-        existingTask.error = String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+        } else {
+          existingTask.error = errorMessage
+        }
         existingTask.completedAt = new Date()
+        this.markForNotification(existingTask)
+        this.notifyParentSession(existingTask)
       }
     })
 
