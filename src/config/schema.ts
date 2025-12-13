@@ -16,7 +16,7 @@ const AgentPermissionSchema = z.object({
   external_directory: PermissionValue.optional(),
 })
 
-export const AgentNameSchema = z.enum([
+export const BuiltinAgentNameSchema = z.enum([
   "oracle",
   "librarian",
   "explore",
@@ -24,6 +24,18 @@ export const AgentNameSchema = z.enum([
   "document-writer",
   "multimodal-looker",
 ])
+
+export const OverridableAgentNameSchema = z.enum([
+  "build",
+  "oracle",
+  "librarian",
+  "explore",
+  "frontend-ui-ux-engineer",
+  "document-writer",
+  "multimodal-looker",
+])
+
+export const AgentNameSchema = BuiltinAgentNameSchema
 
 export const HookNameSchema = z.enum([
   "todo-continuation-enforcer",
@@ -62,6 +74,7 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AgentOverridesSchema = z
   .object({
+    build: AgentOverrideConfigSchema.optional(),
     oracle: AgentOverrideConfigSchema.optional(),
     librarian: AgentOverrideConfigSchema.optional(),
     explore: AgentOverrideConfigSchema.optional(),
@@ -82,7 +95,7 @@ export const ClaudeCodeConfigSchema = z.object({
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
-  disabled_agents: z.array(AgentNameSchema).optional(),
+  disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),

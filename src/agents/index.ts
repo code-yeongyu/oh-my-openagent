@@ -17,3 +17,4 @@ export const builtinAgents: Record<string, AgentConfig> = {
 
 export * from "./types"
 export { createBuiltinAgents } from "./utils"
+export { BUILD_AGENT_PROMPT_EXTENSION } from "./build"

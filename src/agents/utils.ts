@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentName, AgentOverrideConfig, AgentOverrides } from "./types"
+import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides } from "./types"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
@@ -8,7 +8,7 @@ import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
 
-const allBuiltinAgents: Record<AgentName, AgentConfig> = {
+const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   oracle: oracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,
@@ -25,13 +25,13 @@ function mergeAgentConfig(
 }
 
 export function createBuiltinAgents(
-  disabledAgents: AgentName[] = [],
+  disabledAgents: BuiltinAgentName[] = [],
   agentOverrides: AgentOverrides = {}
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
   for (const [name, config] of Object.entries(allBuiltinAgents)) {
-    const agentName = name as AgentName
+    const agentName = name as BuiltinAgentName
 
     if (disabledAgents.includes(agentName)) {
       continue

@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { createBuiltinAgents } from "./agents";
+import { createBuiltinAgents, BUILD_AGENT_PROMPT_EXTENSION } from "./agents";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -258,6 +258,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...projectAgents,
         ...config.agent,
       };
+
+      if (config.agent.build) {
+        const existingPrompt = config.agent.build.prompt || "";
+        const userOverride = pluginConfig.agents?.build?.prompt || "";
+        config.agent.build = {
+          ...config.agent.build,
+          prompt: existingPrompt + BUILD_AGENT_PROMPT_EXTENSION + userOverride,
+        };
+      }
+
       config.tools = {
         ...config.tools,
       };
