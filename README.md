@@ -109,7 +109,7 @@ cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugi
 
 ### Step 4: Configure Authentication
 
-Once `oh-my-opencode` is added to the plugin list, use `tmux` to assist the user with authentication setup.
+Once `oh-my-opencode` is added to the plugin list, use `tmux` to assist the user with authentication setup. **It is RECOMMENDED to set up Google Auth (Step 4.2) by default.**
 
 #### 4.1 Anthropic (Claude)
 
@@ -122,7 +122,9 @@ opencode auth login
 
 #### 4.2 Google Gemini (Built-in Antigravity OAuth)
 
-First, enable Google auth in `~/.config/opencode/oh-my-opencode.json` (or `.opencode/oh-my-opencode.json` for project-level):
+**This is the RECOMMENDED default configuration.**
+
+First, proactively enable Google auth in `~/.config/opencode/oh-my-opencode.json` (or `.opencode/oh-my-opencode.json` for project-level):
 
 ```json
 {
@@ -169,9 +171,9 @@ For users who prefer proxy-based authentication, [VibeProxy](https://github.com/
 
 ### ⚠️ Warning
 
-**Do NOT create or modify the `oh-my-opencode.json` configuration file unless the user explicitly requests it.**
+**Do NOT modify model settings or disable features (agents, hooks, MCPs) unless the user explicitly requests it.**
 
-The plugin works perfectly with default settings without any configuration file. The configuration file is only needed when the user wants customization.
+The plugin works perfectly with default settings. While you SHOULD enable `google_auth: true` as recommended, do not alter other configurations or disable features without a specific request.
 
 </details>
 

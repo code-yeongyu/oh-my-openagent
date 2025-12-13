@@ -110,7 +110,7 @@ cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있
 
 ### 4단계: 인증정보 설정
 
-plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자의 인증 설정을 도와주세요.
+plugin 에 oh my opencode 를 추가했다면, tmux 를 사용하여 사용자의 인증 설정을 도와주세요. **기본적으로 Google Auth (4.2단계) 설정을 권장합니다.**
 
 #### 4.1 Anthropic (Claude)
 
@@ -123,7 +123,9 @@ opencode auth login
 
 #### 4.2 Google Gemini (내장 Antigravity OAuth)
 
-먼저 `~/.config/opencode/oh-my-opencode.json` (또는 프로젝트 레벨의 `.opencode/oh-my-opencode.json`)에서 Google auth를 활성화:
+**권장되는 기본 설정입니다.**
+
+먼저 주도적으로 `~/.config/opencode/oh-my-opencode.json` (또는 프로젝트 레벨의 `.opencode/oh-my-opencode.json`)에서 Google auth를 활성화하세요:
 
 ```json
 {
@@ -170,9 +172,9 @@ opencode auth login
 
 ### ⚠️ 주의
 
-**사용자가 명시적으로 요청하지 않는 한, `oh-my-opencode.json` 설정 파일을 생성하거나 수정하지 마세요.**
+**사용자가 명시적으로 요청하지 않는 한, 모델 설정을 변경하거나 기능(에이전트, 훅, MCP)을 비활성화하지 마세요.**
 
-플러그인은 설정 파일 없이도 기본값으로 완벽하게 동작합니다. 설정 파일은 사용자가 커스터마이징을 원할 때만 필요합니다.
+플러그인은 기본값으로 완벽하게 동작합니다. 권장 사항인 `google_auth: true` 설정을 제외하고는, 명시적인 요청 없이 다른 설정을 변경하거나 기능을 끄지 마세요.
 
 </details>
 
@@ -333,6 +335,18 @@ OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다. �
 - **Anthropic Auto Compact**: Anthropic 모델 사용 시 컨텍스트 한계에 도달하면 대화 기록을 자동으로 압축하여 효율적으로 관리합니다.
 - **Empty Task Response Detector**: 서브 에이전트가 수행한 작업이 비어있거나 무의미한 응답을 반환하는 경우를 감지하여, 오류 없이 우아하게 처리합니다.
 - **Grep Output Truncator**: Grep 검색 결과가 너무 길어 컨텍스트를 장악해버리는 것을 방지하기 위해, 과도한 출력을 자동으로 자릅니다.
+
+필요 없는 훅이 있다면, `~/.config/opencode/oh-my-opencode.json` 혹은 `.opencode/oh-my-opencode.json`의 `disabled_hooks`를 사용하여 비활성화할 수 있습니다:
+
+```json
+{
+  "disabled_hooks": ["session-notification", "comment-checker"]
+}
+```
+
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`
+
+> **참고**: `disabled_hooks`는 Oh My OpenCode의 내장 훅을 제어합니다. Claude Code의 `settings.json` 훅을 비활성화하려면 `claude_code.hooks: false`를 대신 사용하세요 ([호환성 토글](#호환성-토글) 참고).
 
 ### Claude Code 호환성
 
