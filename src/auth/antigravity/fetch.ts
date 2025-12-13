@@ -70,6 +70,21 @@ function isRetryableError(status: number): boolean {
   return false
 }
 
+const GCP_PERMISSION_ERROR_PATTERNS = [
+  "PERMISSION_DENIED",
+  "does not have permission",
+  "Cloud AI Companion API has not been used",
+  "has not been enabled",
+] as const
+
+function isGcpPermissionError(text: string): boolean {
+  return GCP_PERMISSION_ERROR_PATTERNS.some((pattern) => text.includes(pattern))
+}
+
+function calculateRetryDelay(attempt: number): number {
+  return Math.min(200 * Math.pow(2, attempt), 2000)
+}
+
 async function isRetryableResponse(response: Response): Promise<boolean> {
   if (isRetryableError(response.status)) return true
   if (response.status === 403) {
@@ -155,23 +170,43 @@ async function attemptFetch(
 
     debugLog(`[REQ] streaming=${transformed.streaming}, url=${transformed.url}`)
 
-    const response = await fetch(transformed.url, {
-      method: init.method || "POST",
-      headers: transformed.headers,
-      body: JSON.stringify(transformed.body),
-      signal: init.signal,
-    })
+    const maxPermissionRetries = 10
+    for (let attempt = 0; attempt <= maxPermissionRetries; attempt++) {
+      const response = await fetch(transformed.url, {
+        method: init.method || "POST",
+        headers: transformed.headers,
+        body: JSON.stringify(transformed.body),
+        signal: init.signal,
+      })
 
-    debugLog(
-      `[RESP] status=${response.status} content-type=${response.headers.get("content-type") ?? ""} url=${response.url}`
-    )
+      debugLog(
+        `[RESP] status=${response.status} content-type=${response.headers.get("content-type") ?? ""} url=${response.url}`
+      )
 
-    if (!response.ok && (await isRetryableResponse(response))) {
-      debugLog(`Endpoint failed: ${endpoint} (status: ${response.status}), trying next`)
-      return null
+      if (response.status === 403) {
+        try {
+          const text = await response.clone().text()
+          if (isGcpPermissionError(text)) {
+            if (attempt < maxPermissionRetries) {
+              const delay = calculateRetryDelay(attempt)
+              debugLog(`[RETRY] GCP permission error, retry ${attempt + 1}/${maxPermissionRetries} after ${delay}ms`)
+              await new Promise((resolve) => setTimeout(resolve, delay))
+              continue
+            }
+            debugLog(`[RETRY] GCP permission error, max retries exceeded`)
+          }
+        } catch {}
+      }
+
+      if (!response.ok && (await isRetryableResponse(response))) {
+        debugLog(`Endpoint failed: ${endpoint} (status: ${response.status}), trying next`)
+        return null
+      }
+
+      return response
     }
 
-    return response
+    return null
   } catch (error) {
     debugLog(
       `Endpoint failed: ${endpoint} (${error instanceof Error ? error.message : "Unknown error"}), trying next`
