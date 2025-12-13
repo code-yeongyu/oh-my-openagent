@@ -79,7 +79,12 @@ Hand this doc to an agent and let them set it up.
     - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
     - **Your agent is now the dev team lead. You're the AI Manager.**
 4. It doesn't stop until the job is done.
+5. Don't want to dive deep into this project? No problem. Just type 'ultrathink'.
 
+Note: Installing this doesn't magically make OpenCode behave this way. Above explanation is like "you can utilize even like this". It simply equips your agent with excellent teammates and powerful tools—tell them to collaborate and they will.
+You're in full control.
+You can enable automatic behavior via ultrathink, but you don't have to. This project doesn't dictate your AI agent workflow.
+It simply introduces your agent to great colleagues and puts better tools in their hands.
 
 - Throw complex, massive tasks at it.
   - Drop the "ultrawork" keyword in your prompt and it handles everything automatically.
