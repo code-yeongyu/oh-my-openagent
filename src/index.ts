@@ -42,7 +42,7 @@ import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools, createCallOmoAgent, createBackgroundTools } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge } from "./shared";
 import * as fs from "fs";
 import * as path from "path";
@@ -103,6 +103,12 @@ function mergeConfigs(
         ...(override.disabled_mcps ?? []),
       ]),
     ],
+    disabled_hooks: [
+      ...new Set([
+        ...(base.disabled_hooks ?? []),
+        ...(override.disabled_hooks ?? []),
+      ]),
+    ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
@@ -135,6 +141,7 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
     agents: config.agents,
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
+    disabled_hooks: config.disabled_hooks,
     claude_code: config.claude_code,
   });
   return config;
@@ -142,34 +149,64 @@ function loadPluginConfig(directory: string): OhMyOpenCodeConfig {
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory);
+  const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+  const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
-  const todoContinuationEnforcer = createTodoContinuationEnforcer(ctx);
-  const contextWindowMonitor = createContextWindowMonitorHook(ctx);
-  const sessionRecovery = createSessionRecoveryHook(ctx);
+  const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
+    ? createTodoContinuationEnforcer(ctx)
+    : null;
+  const contextWindowMonitor = isHookEnabled("context-window-monitor")
+    ? createContextWindowMonitorHook(ctx)
+    : null;
+  const sessionRecovery = isHookEnabled("session-recovery")
+    ? createSessionRecoveryHook(ctx)
+    : null;
 
   // Wire up recovery state tracking between session-recovery and todo-continuation-enforcer
   // This prevents the continuation enforcer from injecting prompts during active recovery
-  sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
-  sessionRecovery.setOnRecoveryCompleteCallback(todoContinuationEnforcer.markRecoveryComplete);
+  if (sessionRecovery && todoContinuationEnforcer) {
+    sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
+    sessionRecovery.setOnRecoveryCompleteCallback(todoContinuationEnforcer.markRecoveryComplete);
+  }
 
-  const commentChecker = createCommentCheckerHooks();
-  const grepOutputTruncator = createGrepOutputTruncatorHook(ctx);
-  const directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
-  const directoryReadmeInjector = createDirectoryReadmeInjectorHook(ctx);
-  const emptyTaskResponseDetector = createEmptyTaskResponseDetectorHook(ctx);
-  const thinkMode = createThinkModeHook();
+  const commentChecker = isHookEnabled("comment-checker")
+    ? createCommentCheckerHooks()
+    : null;
+  const grepOutputTruncator = isHookEnabled("grep-output-truncator")
+    ? createGrepOutputTruncatorHook(ctx)
+    : null;
+  const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
+    ? createDirectoryAgentsInjectorHook(ctx)
+    : null;
+  const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
+    ? createDirectoryReadmeInjectorHook(ctx)
+    : null;
+  const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
+    ? createEmptyTaskResponseDetectorHook(ctx)
+    : null;
+  const thinkMode = isHookEnabled("think-mode")
+    ? createThinkModeHook()
+    : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
-  const anthropicAutoCompact = createAnthropicAutoCompactHook(ctx);
-  const rulesInjector = createRulesInjectorHook(ctx);
-  const autoUpdateChecker = createAutoUpdateCheckerHook(ctx);
+  const anthropicAutoCompact = isHookEnabled("anthropic-auto-compact")
+    ? createAnthropicAutoCompactHook(ctx)
+    : null;
+  const rulesInjector = isHookEnabled("rules-injector")
+    ? createRulesInjectorHook(ctx)
+    : null;
+  const autoUpdateChecker = isHookEnabled("auto-update-checker")
+    ? createAutoUpdateCheckerHook(ctx)
+    : null;
 
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
 
-  const backgroundNotificationHook = createBackgroundNotificationHook(backgroundManager);
+  const backgroundNotificationHook = isHookEnabled("background-notification")
+    ? createBackgroundNotificationHook(backgroundManager)
+    : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
@@ -252,16 +289,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     event: async (input) => {
-      await autoUpdateChecker.event(input);
+      await autoUpdateChecker?.event(input);
       await claudeCodeHooks.event(input);
-      await backgroundNotificationHook.event(input);
-      await todoContinuationEnforcer.handler(input);
-      await contextWindowMonitor.event(input);
-      await directoryAgentsInjector.event(input);
-      await directoryReadmeInjector.event(input);
-      await rulesInjector.event(input);
-      await thinkMode.event(input);
-      await anthropicAutoCompact.event(input);
+      await backgroundNotificationHook?.event(input);
+      await todoContinuationEnforcer?.handler(input);
+      await contextWindowMonitor?.event(input);
+      await directoryAgentsInjector?.event(input);
+      await directoryReadmeInjector?.event(input);
+      await rulesInjector?.event(input);
+      await thinkMode?.event(input);
+      await anthropicAutoCompact?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -313,7 +350,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const sessionID = props?.sessionID as string | undefined;
         const error = props?.error;
 
-        if (sessionRecovery.isRecoverableError(error)) {
+        if (sessionRecovery?.isRecoverableError(error)) {
           const messageInfo = {
             id: props?.messageID as string | undefined,
             role: "assistant" as const,
@@ -359,7 +396,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.before": async (input, output) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
-      await commentChecker["tool.execute.before"](input, output);
+      await commentChecker?.["tool.execute.before"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({
@@ -374,13 +411,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       await claudeCodeHooks["tool.execute.after"](input, output);
-      await grepOutputTruncator["tool.execute.after"](input, output);
-      await contextWindowMonitor["tool.execute.after"](input, output);
-      await commentChecker["tool.execute.after"](input, output);
-      await directoryAgentsInjector["tool.execute.after"](input, output);
-      await directoryReadmeInjector["tool.execute.after"](input, output);
-      await rulesInjector["tool.execute.after"](input, output);
-      await emptyTaskResponseDetector["tool.execute.after"](input, output);
+      await grepOutputTruncator?.["tool.execute.after"](input, output);
+      await contextWindowMonitor?.["tool.execute.after"](input, output);
+      await commentChecker?.["tool.execute.after"](input, output);
+      await directoryAgentsInjector?.["tool.execute.after"](input, output);
+      await directoryReadmeInjector?.["tool.execute.after"](input, output);
+      await rulesInjector?.["tool.execute.after"](input, output);
+      await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({
@@ -402,4 +439,5 @@ export type {
   AgentOverrideConfig,
   AgentOverrides,
   McpName,
+  HookName,
 } from "./config";

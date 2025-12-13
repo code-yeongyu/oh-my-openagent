@@ -4,6 +4,7 @@ export {
   AgentOverridesSchema,
   McpNameSchema,
   AgentNameSchema,
+  HookNameSchema,
 } from "./schema"
 
 export type {
@@ -12,4 +13,5 @@ export type {
   AgentOverrides,
   McpName,
   AgentName,
+  HookName,
 } from "./schema"
