@@ -317,7 +317,10 @@ Syntax Highlighting, Autocomplete, Refactoring, Navigation, Analysis, 그리고 
     - Use PascalCase for interface names
     - Use camelCase for function names
     ```
-- **Online**: 프로젝트 규칙이 전부는 아니겠죠. exa, context7 mcp 를 내장하여 검색 기능을 제공합니다.
+- **Online**: 프로젝트 규칙이 전부는 아니겠죠. 확장 기능을 위한 내장 MCP를 제공합니다:
+  - **context7**: 공식 문서 조회
+  - **websearch_exa**: 실시간 웹 검색
+  - **grep_app**: 공개 GitHub 저장소에서 초고속 코드 검색 (구현 예제 찾기에 최적)
 
 #### 멀티모달을 다 활용하면서, 토큰은 덜 쓰도록.
 
@@ -488,13 +491,17 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 
 ### MCPs
 
-기본적으로 Context7, Exa MCP 를 지원합니다.
+기본적으로 Context7, Exa, grep.app MCP 를 지원합니다.
+
+- **context7**: 라이브러리의 최신 공식 문서를 가져옵니다
+- **websearch_exa**: Exa AI 기반 실시간 웹 검색
+- **grep_app**: [grep.app](https://grep.app)을 통해 수백만 개의 공개 GitHub 저장소에서 초고속 코드 검색
 
 이것이 마음에 들지 않는다면, ~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `disabled_mcps` 를 사용하여 비활성화할 수 있습니다:
 
 ```json
 {
-  "disabled_mcps": ["context7", "websearch_exa"]
+  "disabled_mcps": ["context7", "websearch_exa", "grep_app"]
 }
 ```
 

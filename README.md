@@ -314,7 +314,10 @@ Hand your best tools to your best colleagues. Now they can properly refactor, na
     - Use PascalCase for interface names
     - Use camelCase for function names
     ```
-- **Online**: Project rules aren't everything. Built-in exa and context7 MCP for web search.
+- **Online**: Project rules aren't everything. Built-in MCPs for extended capabilities:
+  - **context7**: Official documentation lookup
+  - **websearch_exa**: Real-time web search
+  - **grep_app**: Ultra-fast code search across public GitHub repos (great for finding implementation examples)
 
 #### Be Multimodal. Save Tokens.
 
@@ -485,13 +488,17 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### MCPs
 
-Context7 and Exa MCP enabled by default.
+Context7, Exa, and grep.app MCP enabled by default.
+
+- **context7**: Fetches up-to-date official documentation for libraries
+- **websearch_exa**: Real-time web search powered by Exa AI
+- **grep_app**: Ultra-fast code search across millions of public GitHub repositories via [grep.app](https://grep.app)
 
 Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
-  "disabled_mcps": ["context7", "websearch_exa"]
+  "disabled_mcps": ["context7", "websearch_exa", "grep_app"]
 }
 ```
 

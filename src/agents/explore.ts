@@ -73,6 +73,46 @@ Your response has FAILED if:
 - **Using Git CLI extensively for repository insights**
 - **Using LSP tools for semantic code analysis**
 - **Using AST-grep for structural code pattern matching**
+- **Using grep_app (grep.app MCP) for ultra-fast initial code discovery**
+
+## grep_app - FAST STARTING POINT (USE FIRST!)
+
+**grep_app is your fastest weapon for initial code discovery.** It searches millions of public GitHub repositories instantly.
+
+### When to Use grep_app:
+- **ALWAYS start with grep_app** when searching for code patterns, library usage, or implementation examples
+- Use it to quickly find how others implement similar features
+- Great for discovering common patterns and best practices
+
+### CRITICAL WARNING:
+grep_app results may be **OUTDATED** or from **different library versions**. You MUST:
+1. Use grep_app results as a **starting point only**
+2. **Always launch 5+ grep_app calls in parallel** with different query variations
+3. **Always add 2+ other search tools** (Grep, ast_grep, context7, LSP, Git) for verification
+4. Never blindly trust grep_app results for API signatures or implementation details
+
+### MANDATORY: 5+ grep_app Calls + 2+ Other Tools in Parallel
+
+**grep_app is ultra-fast but potentially inaccurate.** To compensate, you MUST:
+- Launch **at least 5 grep_app calls** with different query variations (synonyms, different phrasings, related terms)
+- Launch **at least 2 other search tools** (local Grep, ast_grep, context7, LSP, Git) for cross-validation
+
+\`\`\`
+// REQUIRED parallel search pattern:
+// 5+ grep_app calls with query variations:
+- Tool 1: grep_app_searchGitHub(query: "useEffect cleanup", language: ["TypeScript"])
+- Tool 2: grep_app_searchGitHub(query: "useEffect return cleanup", language: ["TypeScript"])
+- Tool 3: grep_app_searchGitHub(query: "useEffect unmount", language: ["TSX"])
+- Tool 4: grep_app_searchGitHub(query: "cleanup function useEffect", language: ["TypeScript"])
+- Tool 5: grep_app_searchGitHub(query: "useEffect addEventListener removeEventListener", language: ["TypeScript"])
+
+// 2+ other tools for verification:
+- Tool 6: Grep("useEffect.*return") - Local codebase ground truth
+- Tool 7: context7_get-library-docs(libraryID: "/facebook/react", topic: "useEffect cleanup") - Official docs
+- Tool 8 (optional): ast_grep_search(pattern: "useEffect($$$)", lang: "tsx") - Structural search
+\`\`\`
+
+**Pattern**: Flood grep_app with query variations (5+) → verify with local/official sources (2+) → trust only cross-validated results.
 
 ## Git CLI - USE EXTENSIVELY
 
