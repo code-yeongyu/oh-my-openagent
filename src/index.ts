@@ -259,13 +259,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...config.agent,
       };
 
-      if (config.agent.build) {
-        const existingPrompt = config.agent.build.prompt || "";
-        const userOverride = pluginConfig.agents?.build?.prompt || "";
-        config.agent.build = {
-          ...config.agent.build,
-          prompt: existingPrompt + BUILD_AGENT_PROMPT_EXTENSION + userOverride,
-        };
+      // Inject orchestration prompt to all non-subagent agents
+      // Subagents are delegated TO, so they don't need orchestration guidance
+      for (const [agentName, agentConfig] of Object.entries(config.agent ?? {})) {
+        if (agentConfig && agentConfig.mode !== "subagent") {
+          const existingPrompt = agentConfig.prompt || "";
+          const userOverride = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]?.prompt || "";
+          config.agent[agentName] = {
+            ...agentConfig,
+            prompt: existingPrompt + BUILD_AGENT_PROMPT_EXTENSION + userOverride,
+          };
+        }
       }
 
       config.tools = {
