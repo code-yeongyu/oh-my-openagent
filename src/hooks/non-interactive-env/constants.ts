@@ -1,7 +1,5 @@
 export const HOOK_NAME = "non-interactive-env"
 
-export const NULL_DEVICE = process.platform === "win32" ? "NUL" : "/dev/null"
-
 export const NON_INTERACTIVE_ENV: Record<string, string> = {
   CI: "true",
   DEBIAN_FRONTEND: "noninteractive",
