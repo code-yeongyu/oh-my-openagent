@@ -262,8 +262,9 @@ The plugin works perfectly with defaults. Aside from the recommended `google_aut
 
 ### Agents: Your Teammates
 
+- **OmO** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Claude Sonnet 4 is fast, smart, great at tool calls, and excellent for documentation research. Inspired by AmpCode.
+- **librarian** (`opencode/big-pickle`): Multi-repo analysis, doc lookup, implementation examples. Uses GLM-4.6 (big-pickle) via OpenCode Zen—free, fast, and excellent for documentation research. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
 - **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
@@ -525,6 +526,22 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 ```
 
 Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+
+### OmO Agent
+
+Configure the default OmO agent behavior:
+
+```json
+{
+  "omo_agent": {
+    "disable_build": false
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `disable_build` | `false` | When `true`, hides the default Build agent. OmO becomes the only primary agent. |
 
 ### Hooks
 

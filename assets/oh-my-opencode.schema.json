@@ -251,6 +251,17 @@
           "description": "Execute hooks from ~/.claude/settings.json, ./.claude/settings.json, ./.claude/settings.local.json"
         }
       }
+    },
+    "omo_agent": {
+      "type": "object",
+      "description": "Configuration for the default OmO agent behavior.",
+      "properties": {
+        "disable_build": {
+          "type": "boolean",
+          "description": "When true, hides the default Build agent. OmO becomes the only primary agent.",
+          "default": false
+        }
+      }
     }
   }
 }

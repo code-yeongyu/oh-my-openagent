@@ -261,8 +261,9 @@ opencode auth login
 
 ### Agents: 당신의 새로운 팀원들
 
+- **OmO** (`anthropic/claude-opus-4-5`): **기본 에이전트입니다.** OpenCode를 위한 강력한 AI 오케스트레이터입니다. 전문 서브에이전트를 활용하여 복잡한 작업을 계획, 위임, 실행합니다. 백그라운드 태스크 위임과 todo 기반 워크플로우를 강조합니다. 최대 추론 능력을 위해 Claude Opus 4.5와 확장된 사고(32k 버짓)를 사용합니다.
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
-- **librarian** (`anthropic/claude-sonnet-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Claude Sonnet 4.5 의 뛰어난 지능, 훌륭한 도구 호출 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
+- **librarian** (`opencode/big-pickle`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. OpenCode Zen을 통해 GLM-4.6(big-pickle)을 사용합니다—무료이고 빠르며 문서 조사에 탁월합니다. AmpCode 에서 영감을 받았습니다.
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
@@ -524,6 +525,22 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 ```
 
 사용 가능한 에이전트: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+
+### OmO Agent
+
+기본 OmO 에이전트 동작을 설정합니다:
+
+```json
+{
+  "omo_agent": {
+    "disable_build": false
+  }
+}
+```
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `disable_build` | `false` | `true`로 설정하면 기본 Build 에이전트를 숨깁니다. OmO가 유일한 primary 에이전트가 됩니다. |
 
 ### Hooks
 
