@@ -1,16 +1,16 @@
 export const HOOK_NAME = "interactive-bash-blocker"
 
-export const INTERACTIVE_FLAG_PATTERNS = [
-  /\bgit\s+(?:rebase|add|stash|reset|checkout|commit|merge|revert|cherry-pick)\s+.*-i\b/,
-  /\bgit\s+(?:rebase|add|stash|reset|checkout|commit|merge|revert|cherry-pick)\s+.*--interactive\b/,
-  /\bgit\s+.*-p\b/,
-  /\bgit\s+add\s+.*--patch\b/,
-  /\bgit\s+stash\s+.*--patch\b/,
-  
+export const NON_INTERACTIVE_ENV = {
+  CI: "true",
+  DEBIAN_FRONTEND: "noninteractive",
+  GIT_TERMINAL_PROMPT: "0",
+  GCM_INTERACTIVE: "never",
+  HOMEBREW_NO_AUTO_UPDATE: "1",
+}
+
+export const ALWAYS_BLOCK_PATTERNS = [
   /\b(?:vim?|nvim|nano|emacs|pico|joe|micro|helix|hx)\b/,
-  
   /^\s*(?:python|python3|ipython|node|bun|deno|irb|pry|ghci|erl|iex|lua|R)\s*$/,
-  
   /\btop\b(?!\s+\|)/,
   /\bhtop\b/,
   /\bbtop\b/,
@@ -18,15 +18,6 @@ export const INTERACTIVE_FLAG_PATTERNS = [
   /\bmore\b(?!\s+\|)/,
   /\bman\b/,
   /\bwatch\b/,
-  /\bssh\b(?!.*-[oTNf])/,
-  /\btelnet\b/,
-  /\bftp\b/,
-  /\bsftp\b/,
-  /\bmysql\b(?!.*-e)/,
-  /\bpsql\b(?!.*-c)/,
-  /\bmongo\b(?!.*--eval)/,
-  /\bredis-cli\b(?!.*[^\s])/,
-  
   /\bncurses\b/,
   /\bdialog\b/,
   /\bwhiptail\b/,
@@ -39,32 +30,14 @@ export const INTERACTIVE_FLAG_PATTERNS = [
   /\blazygit\b/,
   /\blazydocker\b/,
   /\bk9s\b/,
-  
-  /\bapt\s+(?:install|remove|upgrade|dist-upgrade)\b(?!.*-y)/,
-  /\bapt-get\s+(?:install|remove|upgrade|dist-upgrade)\b(?!.*-y)/,
-  /\byum\s+(?:install|remove|update)\b(?!.*-y)/,
-  /\bdnf\s+(?:install|remove|update)\b(?!.*-y)/,
-  /\bpacman\s+-S\b(?!.*--noconfirm)/,
-  /\bbrew\s+(?:install|uninstall|upgrade)\b(?!.*--force)/,
-  
-  /\bread\b(?!\s+.*<)/,
-  
   /\bselect\b.*\bin\b/,
-]
-
-export const STDIN_REQUIRING_COMMANDS = [
-  "passwd",
-  "su",
-  "sudo -S",
-  "gpg --gen-key",
-  "ssh-keygen",
 ]
 
 export const TMUX_SUGGESTION = `
 [interactive-bash-blocker]
-This command requires interactive input which is not supported in this environment.
+This command requires a full interactive terminal (TUI) which cannot be emulated.
 
-**Recommendation**: Use tmux for interactive commands.
+**Recommendation**: Use tmux for TUI commands.
 
 Example with interactive-terminal skill:
 \`\`\`

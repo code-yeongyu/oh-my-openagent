@@ -1,42 +1,34 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import {
-  HOOK_NAME,
-  INTERACTIVE_FLAG_PATTERNS,
-  STDIN_REQUIRING_COMMANDS,
-  TMUX_SUGGESTION,
-} from "./constants"
+import { HOOK_NAME, NON_INTERACTIVE_ENV, ALWAYS_BLOCK_PATTERNS, TMUX_SUGGESTION } from "./constants"
 import type { BlockResult } from "./types"
 import { log } from "../../shared"
 
 export * from "./constants"
 export * from "./types"
 
-function checkInteractiveCommand(command: string): BlockResult {
+function checkTUICommand(command: string): BlockResult {
   const normalizedCmd = command.trim()
 
-  for (const pattern of INTERACTIVE_FLAG_PATTERNS) {
+  for (const pattern of ALWAYS_BLOCK_PATTERNS) {
     if (pattern.test(normalizedCmd)) {
       return {
         blocked: true,
-        reason: `Command contains interactive pattern`,
+        reason: `Command requires full TUI`,
         command: normalizedCmd,
         matchedPattern: pattern.source,
       }
     }
   }
 
-  for (const cmd of STDIN_REQUIRING_COMMANDS) {
-    if (normalizedCmd.includes(cmd)) {
-      return {
-        blocked: true,
-        reason: `Command requires stdin interaction: ${cmd}`,
-        command: normalizedCmd,
-        matchedPattern: cmd,
-      }
-    }
-  }
-
   return { blocked: false }
+}
+
+function wrapWithNonInteractiveEnv(command: string): string {
+  const envPrefix = Object.entries(NON_INTERACTIVE_ENV)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ")
+
+  return `${envPrefix} ${command} < /dev/null 2>&1 || ${envPrefix} ${command} 2>&1`
 }
 
 export function createInteractiveBashBlockerHook(ctx: PluginInput) {
@@ -56,10 +48,10 @@ export function createInteractiveBashBlockerHook(ctx: PluginInput) {
         return
       }
 
-      const result = checkInteractiveCommand(command)
+      const result = checkTUICommand(command)
 
       if (result.blocked) {
-        log(`[${HOOK_NAME}] Blocking interactive command`, {
+        log(`[${HOOK_NAME}] Blocking TUI command`, {
           sessionID: input.sessionID,
           command: result.command,
           pattern: result.matchedPattern,
@@ -68,7 +60,7 @@ export function createInteractiveBashBlockerHook(ctx: PluginInput) {
         ctx.client.tui
           .showToast({
             body: {
-              title: "Interactive Command Blocked",
+              title: "TUI Command Blocked",
               message: `${result.reason}\nUse tmux or interactive-terminal skill instead.`,
               variant: "error",
               duration: 5000,
@@ -78,11 +70,19 @@ export function createInteractiveBashBlockerHook(ctx: PluginInput) {
 
         throw new Error(
           `[${HOOK_NAME}] ${result.reason}\n` +
-          `Command: ${result.command}\n` +
-          `Pattern: ${result.matchedPattern}\n` +
-          TMUX_SUGGESTION
+            `Command: ${result.command}\n` +
+            `Pattern: ${result.matchedPattern}\n` +
+            TMUX_SUGGESTION
         )
       }
+
+      output.args.command = wrapWithNonInteractiveEnv(command)
+
+      log(`[${HOOK_NAME}] Wrapped command with non-interactive environment`, {
+        sessionID: input.sessionID,
+        original: command,
+        wrapped: output.args.command,
+      })
     },
   }
 }

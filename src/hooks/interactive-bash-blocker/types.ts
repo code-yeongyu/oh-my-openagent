@@ -1,6 +1,4 @@
 export interface InteractiveBashBlockerConfig {
-  additionalPatterns?: string[]
-  allowPatterns?: string[]
   disabled?: boolean
 }
 
