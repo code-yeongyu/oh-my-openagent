@@ -467,7 +467,12 @@ When agents thrive, you thrive. But I want to help you directly too.
 - **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
 - **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
 - **Auto Update Checker**: Notifies you when a new version of oh-my-opencode is available.
+- **Startup Toast**: Shows a welcome message when OhMyOpenCode loads. A little "oMoMoMo" to start your session right.
 - **Background Notification**: Get notified when background agent tasks complete.
+- **Session Notification**: Sends OS notifications when agents go idle. Works on macOS, Linux, and Windows—never miss when your agent needs input.
+- **Empty Task Response Detector**: Catches when Task tool returns nothing. Warns you about potential agent failures so you don't wait forever for a response that already came back empty.
+- **Grep Output Truncator**: Grep can return mountains of text. This dynamically truncates output based on your remaining context window—keeps 50% headroom, caps at 50k tokens.
+- **Tool Output Truncator**: Same idea, broader scope. Truncates output from Grep, Glob, LSP tools, and AST-grep. Prevents one verbose search from eating your entire context.
 
 ## Configuration
 
@@ -518,6 +523,32 @@ Override built-in agent settings:
 Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
 You can also override settings for `OmO` (the main orchestrator) and `build` (the default agent) using the same options.
+
+#### Permission Options
+
+Fine-grained control over what agents can do:
+
+```json
+{
+  "agents": {
+    "explore": {
+      "permission": {
+        "edit": "deny",
+        "bash": "ask",
+        "webfetch": "allow"
+      }
+    }
+  }
+}
+```
+
+| Permission | Description | Values |
+|------------|-------------|--------|
+| `edit` | File editing permission | `ask` / `allow` / `deny` |
+| `bash` | Bash command execution | `ask` / `allow` / `deny` or per-command: `{ "git": "allow", "rm": "deny" }` |
+| `webfetch` | Web request permission | `ask` / `allow` / `deny` |
+| `doom_loop` | Allow infinite loop detection override | `ask` / `allow` / `deny` |
+| `external_directory` | Access files outside project root | `ask` / `allow` / `deny` |
 
 Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 

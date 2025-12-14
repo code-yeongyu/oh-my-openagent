@@ -65,6 +65,7 @@
       "propertyNames": {
         "type": "string",
         "enum": [
+          "build",
           "OmO",
           "oracle",
           "librarian",

@@ -466,7 +466,12 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Anthropic Auto Compact**: Claude 모델이 토큰 제한에 도달하면 자동으로 세션을 요약하고 압축합니다. 수동 개입 없이 작업을 계속할 수 있습니다.
 - **Session Recovery**: 세션 에러(누락된 도구 결과, thinking 블록 문제, 빈 메시지 등)에서 자동 복구합니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
 - **Auto Update Checker**: oh-my-opencode의 새 버전이 출시되면 알림을 표시합니다.
+- **Startup Toast**: OhMyOpenCode 로드 시 환영 메시지를 표시합니다. 세션을 제대로 시작하기 위한 작은 "oMoMoMo".
 - **Background Notification**: 백그라운드 에이전트 작업이 완료되면 알림을 받습니다.
+- **Session Notification**: 에이전트가 대기 상태가 되면 OS 알림을 보냅니다. macOS, Linux, Windows에서 작동—에이전트가 입력을 기다릴 때 놓치지 마세요.
+- **Empty Task Response Detector**: Task 도구가 빈 응답을 반환하면 감지합니다. 이미 빈 응답이 왔는데 무한정 기다리는 상황을 방지합니다.
+- **Grep Output Truncator**: grep은 산더미 같은 텍스트를 반환할 수 있습니다. 남은 컨텍스트 윈도우에 따라 동적으로 출력을 축소합니다—50% 여유 공간 유지, 최대 50k 토큰.
+- **Tool Output Truncator**: 같은 아이디어, 더 넓은 범위. Grep, Glob, LSP 도구, AST-grep의 출력을 축소합니다. 한 번의 장황한 검색이 전체 컨텍스트를 잡아먹는 것을 방지합니다.
 
 ## 설정
 
@@ -517,6 +522,32 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
 `OmO` (메인 오케스트레이터)와 `build` (기본 에이전트)도 동일한 옵션으로 설정을 오버라이드할 수 있습니다.
+
+#### Permission 옵션
+
+에이전트가 할 수 있는 작업을 세밀하게 제어합니다:
+
+```json
+{
+  "agents": {
+    "explore": {
+      "permission": {
+        "edit": "deny",
+        "bash": "ask",
+        "webfetch": "allow"
+      }
+    }
+  }
+}
+```
+
+| Permission | 설명 | 값 |
+|------------|------|-----|
+| `edit` | 파일 편집 권한 | `ask` / `allow` / `deny` |
+| `bash` | Bash 명령 실행 권한 | `ask` / `allow` / `deny` 또는 명령별: `{ "git": "allow", "rm": "deny" }` |
+| `webfetch` | 웹 요청 권한 | `ask` / `allow` / `deny` |
+| `doom_loop` | 무한 루프 감지 오버라이드 허용 | `ask` / `allow` / `deny` |
+| `external_directory` | 프로젝트 루트 외부 파일 접근 | `ask` / `allow` / `deny` |
 
 또는 ~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `disabled_agents` 를 사용하여 비활성화할 수 있습니다:
 
