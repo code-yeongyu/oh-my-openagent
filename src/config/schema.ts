@@ -17,6 +17,7 @@ const AgentPermissionSchema = z.object({
 })
 
 export const BuiltinAgentNameSchema = z.enum([
+  "OmO",
   "oracle",
   "librarian",
   "explore",
@@ -27,6 +28,7 @@ export const BuiltinAgentNameSchema = z.enum([
 
 export const OverridableAgentNameSchema = z.enum([
   "build",
+  "OmO",
   "oracle",
   "librarian",
   "explore",
@@ -76,6 +78,7 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
+  OmO: AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
