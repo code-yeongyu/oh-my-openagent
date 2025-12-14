@@ -24,6 +24,7 @@
       "items": {
         "type": "string",
         "enum": [
+          "OmO",
           "oracle",
           "librarian",
           "explore",
@@ -56,7 +57,8 @@
           "auto-update-checker",
           "startup-toast",
           "keyword-detector",
-          "agent-usage-reminder"
+          "agent-usage-reminder",
+          "interactive-bash-blocker"
         ]
       }
     },
@@ -66,7 +68,9 @@
         "type": "string",
         "enum": [
           "build",
+          "plan",
           "OmO",
+          "OmO-Plan",
           "oracle",
           "librarian",
           "explore",
@@ -258,9 +262,9 @@
       "type": "object",
       "description": "Configuration for the default OmO agent behavior.",
       "properties": {
-        "disable_build": {
+        "disabled": {
           "type": "boolean",
-          "description": "When true, hides the default Build agent. OmO becomes the only primary agent.",
+          "description": "When true, disables OmO agents and restores original build/plan as primary.",
           "default": false
         }
       }
