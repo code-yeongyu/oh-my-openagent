@@ -452,13 +452,20 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 에이전트들이 행복해지면, 당신이 제일 행복해집니다, 그렇지만 저는 당신도 돕고싶습니다.
 
-- **Ultrawork Mode**: 사용자가 "ultrawork" 또는 "ulw" 키워드를 입력하면 자동으로 에이전트 오케스트레이션 가이드를 주입합니다. 메인 에이전트가 모든 가용한 전문 에이전트(탐색, 사서, 계획, UI)를 백그라운드 작업을 통해 병렬로 최대한 활용하도록 강제하며, 엄격한 TODO 추적 및 검증 프로토콜을 따르게 합니다. 그냥 ultrawork 하세요. 말한 모든 기능이 최대로 활용되도록 에이전트가 최적화됩니다.
+- **Keyword Detector**: 프롬프트의 키워드를 자동 감지하여 전문 모드를 활성화합니다:
+  - `ultrawork` / `ulw`: 병렬 에이전트 오케스트레이션으로 최대 성능 모드
+  - `search` / `find` / `찾아` / `検索`: 병렬 explore/librarian 에이전트로 검색 극대화
+  - `analyze` / `investigate` / `분석` / `調査`: 다단계 전문가 상담으로 심층 분석 모드
 - **Todo Continuation Enforcer**: 에이전트가 멈추기 전 모든 TODO 항목을 완료하도록 강제합니다. LLM의 고질적인 "중도 포기" 문제를 방지합니다.
 - **Comment Checker**: 학습 과정의 습관 때문일까요. LLM 들은 주석이 너무 많습니다. LLM 들이 쓸모없는 주석을 작성하지 않도록 상기시킵니다. BDD 패턴, 지시어, 독스트링 등 유효한 주석은 똑똑하게 제외하고, 그렇지 않는 주석들에 대해 해명을 요구하며 깔끔한 코드를 구성하게 합니다.
 - **Think Mode**: 확장된 사고(Extended Thinking)가 필요한 상황을 자동으로 감지하고 모드를 전환합니다. 사용자가 깊은 사고를 요청하는 표현(예: "think deeply", "ultrathink")을 감지하면, 추론 능력을 극대화하도록 모델 설정을 동적으로 조정합니다.
 - **Context Window Monitor**: [컨텍스트 윈도우 불안 관리](https://agentic-patterns.com/patterns/context-window-anxiety-management/) 패턴을 구현합니다.
   - 사용량이 70%를 넘으면 에이전트에게 아직 토큰이 충분하다고 상기시켜, 급하게 불완전한 작업을 하는 것을 완화합니다.
-- OpenCode 에서 누락되거나 부족하다고 느끼는 안정성 보강 기능들이 내장되어있습니다. 클로드 코드에서의 안정적인 경험을 그대로 가져갈 수 있습니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
+- **Agent Usage Reminder**: 검색 도구를 직접 호출할 때, 백그라운드 작업을 통한 전문 에이전트 활용을 권장하는 리마인더를 표시합니다.
+- **Anthropic Auto Compact**: Claude 모델이 토큰 제한에 도달하면 자동으로 세션을 요약하고 압축합니다. 수동 개입 없이 작업을 계속할 수 있습니다.
+- **Session Recovery**: 세션 에러(누락된 도구 결과, thinking 블록 문제, 빈 메시지 등)에서 자동 복구합니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
+- **Auto Update Checker**: oh-my-opencode의 새 버전이 출시되면 알림을 표시합니다.
+- **Background Notification**: 백그라운드 에이전트 작업이 완료되면 알림을 받습니다.
 
 ## 설정
 
@@ -516,7 +523,19 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 }
 ```
 
-사용 가능한 에이전트: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+사용 가능한 에이전트: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+
+### Hooks
+
+`~/.config/opencode/oh-my-opencode.json` 또는 `.opencode/oh-my-opencode.json`의 `disabled_hooks`를 통해 특정 내장 훅을 비활성화할 수 있습니다:
+
+```json
+{
+  "disabled_hooks": ["comment-checker", "agent-usage-reminder"]
+}
+```
+
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`
 
 ### MCPs
 

@@ -14,7 +14,8 @@
         "type": "string",
         "enum": [
           "websearch_exa",
-          "context7"
+          "context7",
+          "grep_app"
         ]
       }
     },
@@ -44,6 +45,7 @@
           "session-notification",
           "comment-checker",
           "grep-output-truncator",
+          "tool-output-truncator",
           "directory-agents-injector",
           "directory-readme-injector",
           "empty-task-response-detector",
@@ -51,7 +53,10 @@
           "anthropic-auto-compact",
           "rules-injector",
           "background-notification",
-          "auto-update-checker"
+          "auto-update-checker",
+          "startup-toast",
+          "keyword-detector",
+          "agent-usage-reminder"
         ]
       }
     },

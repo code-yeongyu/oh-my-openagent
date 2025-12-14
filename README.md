@@ -453,13 +453,20 @@ All toggles default to `true` (enabled). Omit the `claude_code` object for full 
 
 When agents thrive, you thrive. But I want to help you directly too.
 
-- **Ultrawork Mode**: Type "ultrawork" or "ulw" and agent orchestration kicks in. Forces the main agent to max out all available specialists (explore, librarian, plan, UI) via background tasks in parallel, with strict TODO tracking and verification. Just ultrawork. Everything fires at full capacity.
+- **Keyword Detector**: Automatically detects keywords in your prompts and activates specialized modes:
+  - `ultrawork` / `ulw`: Maximum performance mode with parallel agent orchestration
+  - `search` / `find` / `찾아` / `検索`: Maximized search effort with parallel explore and librarian agents
+  - `analyze` / `investigate` / `분석` / `調査`: Deep analysis mode with multi-phase expert consultation
 - **Todo Continuation Enforcer**: Makes agents finish all TODOs before stopping. Kills the chronic LLM habit of quitting halfway.
 - **Comment Checker**: LLMs love comments. Too many comments. This reminds them to cut the noise. Smartly ignores valid patterns (BDD, directives, docstrings) and demands justification for the rest. Clean code wins.
 - **Think Mode**: Auto-detects when extended thinking is needed and switches modes. Catches phrases like "think deeply" or "ultrathink" and dynamically adjusts model settings for maximum reasoning.
 - **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/).
   - At 70%+ usage, reminds agents there's still headroom—prevents rushed, sloppy work.
-- Stability features that felt missing in OpenCode are built in. The Claude Code experience, transplanted. Sessions don't crash mid-run. Even if they do, they recover.
+- **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
+- **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
+- **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
+- **Auto Update Checker**: Notifies you when a new version of oh-my-opencode is available.
+- **Background Notification**: Get notified when background agent tasks complete.
 
 ## Configuration
 
@@ -517,7 +524,19 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`
+Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+
+### Hooks
+
+Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+```json
+{
+  "disabled_hooks": ["comment-checker", "agent-usage-reminder"]
+}
+```
+
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`
 
 ### MCPs
 
