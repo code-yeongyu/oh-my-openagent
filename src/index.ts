@@ -18,7 +18,7 @@ import {
   createAutoUpdateCheckerHook,
   createKeywordDetectorHook,
   createAgentUsageReminderHook,
-  createInteractiveBashBlockerHook,
+  createNonInteractiveEnvHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -239,8 +239,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)
     : null;
-  const interactiveBashBlocker = isHookEnabled("interactive-bash-blocker")
-    ? createInteractiveBashBlockerHook(ctx)
+  const nonInteractiveEnv = isHookEnabled("non-interactive-env")
+    ? createNonInteractiveEnvHook(ctx)
     : null;
 
   updateTerminalTitle({ sessionId: "main" });
@@ -483,7 +483,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.before": async (input, output) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
-      await interactiveBashBlocker?.["tool.execute.before"](input, output);
+      await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
 
       if (input.sessionID === getMainSessionID()) {

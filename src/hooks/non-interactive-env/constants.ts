@@ -1,6 +1,8 @@
-export const HOOK_NAME = "interactive-bash-blocker"
+export const HOOK_NAME = "non-interactive-env"
 
-export const NON_INTERACTIVE_ENV = {
+export const NULL_DEVICE = process.platform === "win32" ? "NUL" : "/dev/null"
+
+export const NON_INTERACTIVE_ENV: Record<string, string> = {
   CI: "true",
   DEBIAN_FRONTEND: "noninteractive",
   GIT_TERMINAL_PROMPT: "0",
@@ -8,7 +10,7 @@ export const NON_INTERACTIVE_ENV = {
   HOMEBREW_NO_AUTO_UPDATE: "1",
 }
 
-export const ALWAYS_BLOCK_PATTERNS = [
+export const TUI_PATTERNS = [
   /\b(?:vim?|nvim|nano|emacs|pico|joe|micro|helix|hx)\b/,
   /^\s*(?:python|python3|ipython|node|bun|deno|irb|pry|ghci|erl|iex|lua|R)\s*$/,
   /\btop\b(?!\s+\|)/,
@@ -33,8 +35,8 @@ export const ALWAYS_BLOCK_PATTERNS = [
   /\bselect\b.*\bin\b/,
 ]
 
-export const TMUX_SUGGESTION = `
-[interactive-bash-blocker]
+export const TUI_SUGGESTION = `
+[non-interactive-env]
 This command requires a full interactive terminal (TUI) which cannot be emulated.
 
 **Recommendation**: Use tmux for TUI commands.
