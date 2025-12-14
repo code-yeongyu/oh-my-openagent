@@ -567,14 +567,14 @@ Configure the default OmO agent behavior:
 ```json
 {
   "omo_agent": {
-    "disable_build": false
+    "disable_build": true
   }
 }
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `disable_build` | `false` | When `true`, hides the default Build agent. OmO becomes the only primary agent. |
+| `disable_build` | `true` | When `true`, hides the default Build agent. OmO becomes the only primary agent. Set to `false` to show Build agent alongside OmO. |
 
 ### Hooks
 
