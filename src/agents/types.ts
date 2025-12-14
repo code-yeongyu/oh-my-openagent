@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
 export type BuiltinAgentName =
+  | "OmO"
   | "oracle"
   | "librarian"
   | "explore"
