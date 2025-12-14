@@ -82,10 +82,8 @@ export class BackgroundManager {
       body: {
         agent: input.agent,
         tools: {
+          task: false,
           background_task: false,
-          background_output: false,
-          background_cancel: false,
-          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },

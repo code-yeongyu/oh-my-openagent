@@ -123,6 +123,9 @@ async function executeSync(
         tools: {
           task: false,
           call_omo_agent: false,
+          background_task: false,
+          background_output: false,
+          background_cancel: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
