@@ -34,12 +34,13 @@ $ARGUMENTS
 
       const formattedDescription = `(${scope}) ${data.description || ""}`
 
+      const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
       const definition: CommandDefinition = {
         name: commandName,
         description: formattedDescription,
         template: wrappedTemplate,
         agent: data.agent,
-        model: sanitizeModelField(data.model),
+        model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
         subtask: data.subtask,
         argumentHint: data["argument-hint"],
       }

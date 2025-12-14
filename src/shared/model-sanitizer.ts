@@ -1,13 +1,12 @@
-/**
- * Sanitizes model field from frontmatter.
- * Always returns undefined to let SDK use default model.
- *
- * Claude Code and OpenCode use different model ID formats,
- * so we ignore the model field and let OpenCode use its configured default.
- *
- * @param _model - Raw model value from frontmatter (ignored)
- * @returns Always undefined to inherit default model
- */
-export function sanitizeModelField(_model: unknown): undefined {
+type CommandSource = "claude-code" | "opencode"
+
+export function sanitizeModelField(model: unknown, source: CommandSource = "claude-code"): string | undefined {
+  if (source === "claude-code") {
+    return undefined
+  }
+  
+  if (typeof model === "string" && model.trim().length > 0) {
+    return model.trim()
+  }
   return undefined
 }

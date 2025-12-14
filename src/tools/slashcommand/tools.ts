@@ -24,11 +24,12 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
       const content = readFileSync(commandPath, "utf-8")
       const { data, body } = parseFrontmatter(content)
 
+      const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
       const metadata: CommandMetadata = {
         name: commandName,
         description: data.description || "",
         argumentHint: data["argument-hint"],
-        model: sanitizeModelField(data.model),
+        model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
         agent: data.agent,
         subtask: Boolean(data.subtask),
       }
