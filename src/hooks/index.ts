@@ -4,6 +4,7 @@ export { createSessionNotification } from "./session-notification";
 export { createSessionRecoveryHook, type SessionRecoveryHook } from "./session-recovery";
 export { createCommentCheckerHooks } from "./comment-checker";
 export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
+export { createToolOutputTruncatorHook } from "./tool-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
@@ -13,5 +14,6 @@ export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
-export { createUltraworkModeHook } from "./ultrawork-mode";
+
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
+export { createKeywordDetectorHook } from "./keyword-detector";

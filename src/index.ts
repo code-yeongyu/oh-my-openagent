@@ -6,7 +6,7 @@ import {
   createSessionRecoveryHook,
   createSessionNotification,
   createCommentCheckerHooks,
-  createGrepOutputTruncatorHook,
+  createToolOutputTruncatorHook,
   createDirectoryAgentsInjectorHook,
   createDirectoryReadmeInjectorHook,
   createEmptyTaskResponseDetectorHook,
@@ -16,7 +16,7 @@ import {
   createRulesInjectorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
-  createUltraworkModeHook,
+  createKeywordDetectorHook,
   createAgentUsageReminderHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
@@ -178,8 +178,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const commentChecker = isHookEnabled("comment-checker")
     ? createCommentCheckerHooks()
     : null;
-  const grepOutputTruncator = isHookEnabled("grep-output-truncator")
-    ? createGrepOutputTruncatorHook(ctx)
+  const toolOutputTruncator = isHookEnabled("tool-output-truncator")
+    ? createToolOutputTruncatorHook(ctx)
     : null;
   const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
     ? createDirectoryAgentsInjectorHook(ctx)
@@ -205,8 +205,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
     ? createAutoUpdateCheckerHook(ctx)
     : null;
-  const ultraworkMode = isHookEnabled("ultrawork-mode")
-    ? createUltraworkModeHook()
+  const keywordDetector = isHookEnabled("keyword-detector")
+    ? createKeywordDetectorHook()
     : null;
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)
@@ -240,7 +240,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
-      await ultraworkMode?.["chat.message"]?.(input, output);
+      await keywordDetector?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {
@@ -337,7 +337,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
-      await ultraworkMode?.event(input);
+      await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
 
       const { event } = input;
@@ -451,7 +451,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       await claudeCodeHooks["tool.execute.after"](input, output);
-      await grepOutputTruncator?.["tool.execute.after"](input, output);
+      await toolOutputTruncator?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);
       await commentChecker?.["tool.execute.after"](input, output);
       await directoryAgentsInjector?.["tool.execute.after"](input, output);
