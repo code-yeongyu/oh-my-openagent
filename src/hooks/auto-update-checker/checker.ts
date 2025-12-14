@@ -1,5 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { fileURLToPath } from "node:url"
 import type { NpmDistTags, OpencodeConfig, PackageJson, UpdateCheckResult } from "./types"
 import {
   PACKAGE_NAME,
@@ -14,6 +15,10 @@ export function isLocalDevMode(directory: string): boolean {
   return getLocalDevPath(directory) !== null
 }
 
+function stripJsonComments(json: string): string {
+  return json.replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")
+}
+
 export function getLocalDevPath(directory: string): string | null {
   const projectConfig = path.join(directory, ".opencode", "opencode.json")
 
@@ -21,7 +26,7 @@ export function getLocalDevPath(directory: string): string | null {
     try {
       if (!fs.existsSync(configPath)) continue
       const content = fs.readFileSync(configPath, "utf-8")
-      const config = JSON.parse(content) as OpencodeConfig
+      const config = JSON.parse(stripJsonComments(content)) as OpencodeConfig
       const plugins = config.plugin ?? []
 
       for (const entry of plugins) {
@@ -37,13 +42,35 @@ export function getLocalDevPath(directory: string): string | null {
   return null
 }
 
+function findPackageJsonUp(startPath: string): string | null {
+  try {
+    const stat = fs.statSync(startPath)
+    let dir = stat.isDirectory() ? startPath : path.dirname(startPath)
+    
+    for (let i = 0; i < 10; i++) {
+      const pkgPath = path.join(dir, "package.json")
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const content = fs.readFileSync(pkgPath, "utf-8")
+          const pkg = JSON.parse(content) as PackageJson
+          if (pkg.name === PACKAGE_NAME) return pkgPath
+        } catch {}
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  } catch {}
+  return null
+}
+
 export function getLocalDevVersion(directory: string): string | null {
   const localPath = getLocalDevPath(directory)
   if (!localPath) return null
 
   try {
-    const pkgPath = path.join(localPath, "package.json")
-    if (!fs.existsSync(pkgPath)) return null
+    const pkgPath = findPackageJsonUp(localPath)
+    if (!pkgPath) return null
     const content = fs.readFileSync(pkgPath, "utf-8")
     const pkg = JSON.parse(content) as PackageJson
     return pkg.version ?? null
@@ -65,7 +92,7 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
     try {
       if (!fs.existsSync(configPath)) continue
       const content = fs.readFileSync(configPath, "utf-8")
-      const config = JSON.parse(content) as OpencodeConfig
+      const config = JSON.parse(stripJsonComments(content)) as OpencodeConfig
       const plugins = config.plugin ?? []
 
       for (const entry of plugins) {
@@ -96,13 +123,16 @@ export function getCachedVersion(): string | null {
   } catch {}
 
   try {
-    const pkgPath = path.resolve(import.meta.dirname, "..", "..", "..", "package.json")
-    if (fs.existsSync(pkgPath)) {
+    const currentDir = path.dirname(fileURLToPath(import.meta.url))
+    const pkgPath = findPackageJsonUp(currentDir)
+    if (pkgPath) {
       const content = fs.readFileSync(pkgPath, "utf-8")
       const pkg = JSON.parse(content) as PackageJson
       if (pkg.version) return pkg.version
     }
-  } catch {}
+  } catch (err) {
+    log("[auto-update-checker] Failed to resolve version from current directory:", err)
+  }
 
   return null
 }
