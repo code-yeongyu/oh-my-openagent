@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
+import { getInstalledRipgrepPath, downloadAndInstallRipgrep } from "./downloader"
 
 export type GrepBackend = "rg" | "grep"
 
@@ -10,6 +11,7 @@ interface ResolvedCli {
 }
 
 let cachedCli: ResolvedCli | null = null
+let autoInstallAttempted = false
 
 function findExecutable(name: string): string | null {
   const isWindows = process.platform === "win32"
@@ -21,20 +23,18 @@ function findExecutable(name: string): string | null {
       return result.stdout.trim().split("\n")[0]
     }
   } catch {
-    // ignore
+    // Command execution failed
   }
   return null
 }
 
 function getOpenCodeBundledRg(): string | null {
-  // OpenCode binary directory (where opencode executable lives)
   const execPath = process.execPath
   const execDir = dirname(execPath)
 
   const isWindows = process.platform === "win32"
   const rgName = isWindows ? "rg.exe" : "rg"
 
-  // Check common bundled locations
   const candidates = [
     join(execDir, rgName),
     join(execDir, "bin", rgName),
@@ -54,30 +54,54 @@ function getOpenCodeBundledRg(): string | null {
 export function resolveGrepCli(): ResolvedCli {
   if (cachedCli) return cachedCli
 
-  // Priority 1: OpenCode bundled rg
   const bundledRg = getOpenCodeBundledRg()
   if (bundledRg) {
     cachedCli = { path: bundledRg, backend: "rg" }
     return cachedCli
   }
 
-  // Priority 2: System rg
   const systemRg = findExecutable("rg")
   if (systemRg) {
     cachedCli = { path: systemRg, backend: "rg" }
     return cachedCli
   }
 
-  // Priority 3: grep (fallback)
+  const installedRg = getInstalledRipgrepPath()
+  if (installedRg) {
+    cachedCli = { path: installedRg, backend: "rg" }
+    return cachedCli
+  }
+
   const grep = findExecutable("grep")
   if (grep) {
     cachedCli = { path: grep, backend: "grep" }
     return cachedCli
   }
 
-  // Last resort: assume rg is in PATH
   cachedCli = { path: "rg", backend: "rg" }
   return cachedCli
+}
+
+export async function resolveGrepCliWithAutoInstall(): Promise<ResolvedCli> {
+  const current = resolveGrepCli()
+
+  if (current.backend === "rg") {
+    return current
+  }
+
+  if (autoInstallAttempted) {
+    return current
+  }
+
+  autoInstallAttempted = true
+
+  try {
+    const rgPath = await downloadAndInstallRipgrep()
+    cachedCli = { path: rgPath, backend: "rg" }
+    return cachedCli
+  } catch {
+    return current
+  }
 }
 
 export const DEFAULT_MAX_DEPTH = 20
