@@ -56,7 +56,7 @@ async function sendNotification(
       await ctx.$`osascript -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`
       break
     case "linux":
-      await ctx.$`notify-send ${escapedTitle} ${escapedMessage}`
+      await ctx.$`notify-send ${escapedTitle} ${escapedMessage}`.catch(() => {})
       break
     case "win32":
       await ctx.$`powershell -Command ${"[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); [System.Windows.Forms.MessageBox]::Show('" + escapedMessage + "', '" + escapedTitle + "')"}`
