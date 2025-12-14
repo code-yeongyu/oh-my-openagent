@@ -5,6 +5,7 @@ export {
   McpNameSchema,
   AgentNameSchema,
   HookNameSchema,
+  OmoAgentConfigSchema,
 } from "./schema"
 
 export type {
@@ -14,4 +15,5 @@ export type {
   McpName,
   AgentName,
   HookName,
+  OmoAgentConfig,
 } from "./schema"

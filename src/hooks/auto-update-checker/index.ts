@@ -1,10 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { checkForUpdate } from "./checker"
-import { invalidateCache } from "./cache"
+import { checkForUpdate, getCachedVersion } from "./checker"
+import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import type { AutoUpdateCheckerOptions } from "./types"
 
-export function createAutoUpdateCheckerHook(ctx: PluginInput) {
+export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
+  const { showStartupToast = true } = options
   let hasChecked = false
 
   return {
@@ -22,21 +24,35 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput) {
 
         if (result.isLocalDev) {
           log("[auto-update-checker] Skipped: local development mode")
+          if (showStartupToast) {
+            await showVersionToast(ctx, getCachedVersion())
+          }
+          return
+        }
+
+        if (result.isPinned) {
+          log(`[auto-update-checker] Skipped: version pinned to ${result.currentVersion}`)
+          if (showStartupToast) {
+            await showVersionToast(ctx, result.currentVersion)
+          }
           return
         }
 
         if (!result.needsUpdate) {
           log("[auto-update-checker] No update needed")
+          if (showStartupToast) {
+            await showVersionToast(ctx, result.currentVersion)
+          }
           return
         }
 
-        invalidateCache()
+        invalidatePackage(PACKAGE_NAME)
 
         await ctx.client.tui
           .showToast({
             body: {
-              title: `${PACKAGE_NAME} Update`,
-              message: `v${result.latestVersion} available (current: v${result.currentVersion}). Restart OpenCode to apply.`,
+              title: `OhMyOpenCode ${result.latestVersion}`,
+              message: `OpenCode is now on Steroids. oMoMoMoMo...\nv${result.latestVersion} available. Restart OpenCode to apply.`,
               variant: "info" as const,
               duration: 8000,
             },
@@ -51,6 +67,21 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput) {
   }
 }
 
-export type { UpdateCheckResult } from "./types"
+async function showVersionToast(ctx: PluginInput, version: string | null): Promise<void> {
+  const displayVersion = version ?? "unknown"
+  await ctx.client.tui
+    .showToast({
+      body: {
+        title: `OhMyOpenCode ${displayVersion}`,
+        message: "OpenCode is now on Steroids. oMoMoMoMo...",
+        variant: "info" as const,
+        duration: 5000,
+      },
+    })
+    .catch(() => {})
+  log(`[auto-update-checker] Startup toast shown: v${displayVersion}`)
+}
+
+export type { UpdateCheckResult, AutoUpdateCheckerOptions } from "./types"
 export { checkForUpdate } from "./checker"
-export { invalidateCache } from "./cache"
+export { invalidatePackage, invalidateCache } from "./cache"

@@ -53,6 +53,7 @@ export const HookNameSchema = z.enum([
   "rules-injector",
   "background-notification",
   "auto-update-checker",
+  "startup-toast",
   "keyword-detector",
   "agent-usage-reminder",
 ])
@@ -93,6 +94,10 @@ export const ClaudeCodeConfigSchema = z.object({
   hooks: z.boolean().optional(),
 })
 
+export const OmoAgentConfigSchema = z.object({
+  disable_build: z.boolean().optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
@@ -101,6 +106,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   agents: AgentOverridesSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
+  omo_agent: OmoAgentConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -108,5 +114,6 @@ export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
+export type OmoAgentConfig = z.infer<typeof OmoAgentConfigSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"

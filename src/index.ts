@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { createBuiltinAgents, BUILD_AGENT_PROMPT_EXTENSION } from "./agents";
+import { createBuiltinAgents } from "./agents";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -203,7 +203,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createRulesInjectorHook(ctx)
     : null;
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
-    ? createAutoUpdateCheckerHook(ctx)
+    ? createAutoUpdateCheckerHook(ctx, {
+        showStartupToast: isHookEnabled("startup-toast"),
+      })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
     ? createKeywordDetectorHook()
@@ -252,25 +254,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
 
+      const shouldHideBuild = pluginConfig.omo_agent?.disable_build !== false;
+
       config.agent = {
         ...builtinAgents,
         ...userAgents,
         ...projectAgents,
         ...config.agent,
+        ...(shouldHideBuild ? { build: { mode: "subagent" } } : {}),
       };
-
-      // Inject orchestration prompt to all non-subagent agents
-      // Subagents are delegated TO, so they don't need orchestration guidance
-      for (const [agentName, agentConfig] of Object.entries(config.agent ?? {})) {
-        if (agentConfig && agentConfig.mode !== "subagent") {
-          const existingPrompt = agentConfig.prompt || "";
-          const userOverride = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]?.prompt || "";
-          config.agent[agentName] = {
-            ...agentConfig,
-            prompt: existingPrompt + BUILD_AGENT_PROMPT_EXTENSION + userOverride,
-          };
-        }
-      }
 
       config.tools = {
         ...config.tools,

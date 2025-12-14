@@ -33,7 +33,13 @@ export function isLocalDevMode(directory: string): boolean {
   return false
 }
 
-export function findPluginEntry(directory: string): string | null {
+export interface PluginEntryInfo {
+  entry: string
+  isPinned: boolean
+  pinnedVersion: string | null
+}
+
+export function findPluginEntry(directory: string): PluginEntryInfo | null {
   const projectConfig = path.join(directory, ".opencode", "opencode.json")
 
   for (const configPath of [projectConfig, USER_OPENCODE_CONFIG]) {
@@ -44,8 +50,13 @@ export function findPluginEntry(directory: string): string | null {
       const plugins = config.plugin ?? []
 
       for (const entry of plugins) {
-        if (entry === PACKAGE_NAME || entry.startsWith(`${PACKAGE_NAME}@`)) {
-          return entry
+        if (entry === PACKAGE_NAME) {
+          return { entry, isPinned: false, pinnedVersion: null }
+        }
+        if (entry.startsWith(`${PACKAGE_NAME}@`)) {
+          const pinnedVersion = entry.slice(PACKAGE_NAME.length + 1)
+          const isPinned = pinnedVersion !== "latest"
+          return { entry, isPinned, pinnedVersion: isPinned ? pinnedVersion : null }
         }
       }
     } catch {
@@ -91,29 +102,35 @@ export async function getLatestVersion(): Promise<string | null> {
 export async function checkForUpdate(directory: string): Promise<UpdateCheckResult> {
   if (isLocalDevMode(directory)) {
     log("[auto-update-checker] Local dev mode detected, skipping update check")
-    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: true }
+    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: true, isPinned: false }
   }
 
-  const pluginEntry = findPluginEntry(directory)
-  if (!pluginEntry) {
+  const pluginInfo = findPluginEntry(directory)
+  if (!pluginInfo) {
     log("[auto-update-checker] Plugin not found in config")
-    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false }
+    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false, isPinned: false }
+  }
+
+  // Respect version pinning
+  if (pluginInfo.isPinned) {
+    log(`[auto-update-checker] Version pinned to ${pluginInfo.pinnedVersion}, skipping update check`)
+    return { needsUpdate: false, currentVersion: pluginInfo.pinnedVersion, latestVersion: null, isLocalDev: false, isPinned: true }
   }
 
   const currentVersion = getCachedVersion()
   if (!currentVersion) {
     log("[auto-update-checker] No cached version found")
-    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false }
+    return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false, isPinned: false }
   }
 
   const latestVersion = await getLatestVersion()
   if (!latestVersion) {
     log("[auto-update-checker] Failed to fetch latest version")
-    return { needsUpdate: false, currentVersion, latestVersion: null, isLocalDev: false }
+    return { needsUpdate: false, currentVersion, latestVersion: null, isLocalDev: false, isPinned: false }
   }
 
   const needsUpdate = currentVersion !== latestVersion
   log(`[auto-update-checker] Current: ${currentVersion}, Latest: ${latestVersion}, NeedsUpdate: ${needsUpdate}`)
 
-  return { needsUpdate, currentVersion, latestVersion, isLocalDev: false }
+  return { needsUpdate, currentVersion, latestVersion, isLocalDev: false, isPinned: false }
 }

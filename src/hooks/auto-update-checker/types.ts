@@ -19,4 +19,9 @@ export interface UpdateCheckResult {
   currentVersion: string | null
   latestVersion: string | null
   isLocalDev: boolean
+  isPinned: boolean
+}
+
+export interface AutoUpdateCheckerOptions {
+  showStartupToast?: boolean
 }
