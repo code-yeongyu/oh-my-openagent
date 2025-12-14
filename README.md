@@ -562,19 +562,21 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### OmO Agent
 
-Configure the default OmO agent behavior:
+OmO is enabled by default and becomes the default primary agent. It replaces the built-in "build" agent while keeping the `builtIn` flag, ensuring OmO appears first in the agent list.
+
+To disable OmO and restore the original build agent:
 
 ```json
 {
   "omo_agent": {
-    "disable_build": true
+    "disabled": true
   }
 }
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `disable_build` | `true` | When `true`, hides the default Build agent. OmO becomes the only primary agent. Set to `false` to show Build agent alongside OmO. |
+| `disabled` | `false` | When `true`, disables OmO and restores the original build agent. When `false` (default), OmO replaces the build agent as the default primary agent. |
 
 ### Hooks
 

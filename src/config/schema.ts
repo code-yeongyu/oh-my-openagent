@@ -96,7 +96,7 @@ export const ClaudeCodeConfigSchema = z.object({
 })
 
 export const OmoAgentConfigSchema = z.object({
-  disable_build: z.boolean().optional(),
+  disabled: z.boolean().optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({

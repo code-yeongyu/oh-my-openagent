@@ -279,15 +279,32 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
 
-      const shouldHideBuild = pluginConfig.omo_agent?.disable_build !== false;
+      const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
 
-      config.agent = {
-        ...builtinAgents,
-        ...userAgents,
-        ...projectAgents,
-        ...config.agent,
-        ...(shouldHideBuild ? { build: { mode: "subagent" } } : {}),
-      };
+      if (isOmoEnabled && builtinAgents.OmO) {
+        // TODO: When OpenCode releases `default_agent` config option (PR #5313),
+        // remove this hack and use `config.default_agent = "OmO"` instead.
+        // This hack works by:
+        // 1. Setting build agent's display name to "OmO" (builtIn: true, appears first in TUI)
+        // 2. Adding OmO as a subagent (actual execution target when "OmO" is selected)
+        // Tracking: https://github.com/sst/opencode/pull/5313
+        const { OmO: omoConfig, ...restAgents } = builtinAgents;
+        config.agent = {
+          ...restAgents,
+          ...userAgents,
+          ...projectAgents,
+          ...config.agent,
+          build: { ...omoConfig, name: "OmO" },
+          OmO: { ...omoConfig, mode: "subagent" },
+        };
+      } else {
+        config.agent = {
+          ...builtinAgents,
+          ...userAgents,
+          ...projectAgents,
+          ...config.agent,
+        };
+      }
 
       config.tools = {
         ...config.tools,

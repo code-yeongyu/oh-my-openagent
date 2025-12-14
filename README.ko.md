@@ -561,19 +561,21 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 
 ### OmO Agent
 
-기본 OmO 에이전트 동작을 설정합니다:
+OmO는 기본적으로 활성화되며, 기본 primary 에이전트가 됩니다. 내장 "build" 에이전트를 대체하면서 `builtIn` 플래그를 유지하여, OmO가 에이전트 목록에서 첫 번째로 표시됩니다.
+
+OmO를 비활성화하고 원래 build 에이전트를 복원하려면:
 
 ```json
 {
   "omo_agent": {
-    "disable_build": true
+    "disabled": true
   }
 }
 ```
 
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
-| `disable_build` | `true` | `true`면 기본 Build 에이전트를 숨깁니다. OmO가 유일한 primary 에이전트가 됩니다. `false`로 설정하면 Build 에이전트가 OmO와 함께 표시됩니다. |
+| `disabled` | `false` | `true`면 OmO를 비활성화하고 원래 build 에이전트를 복원합니다. `false`(기본값)면 OmO가 build 에이전트를 대체하여 기본 primary 에이전트가 됩니다. |
 
 ### Hooks
 
