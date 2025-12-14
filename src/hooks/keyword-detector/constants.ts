@@ -28,7 +28,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
 2. Spawn exploration/librarian agents via background_task in PARALLEL (10+ if needed)
-3. Use planning agents to create detailed work breakdown
+3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
 </ultrawork-mode>

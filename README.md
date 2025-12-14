@@ -562,9 +562,14 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 
 ### OmO Agent
 
-OmO is enabled by default and becomes the default primary agent. It replaces the built-in "build" agent while keeping the `builtIn` flag, ensuring OmO appears first in the agent list.
+When enabled (default), OmO adds two primary agents and demotes the built-in agents to subagents:
 
-To disable OmO and restore the original build agent:
+- **OmO**: Primary orchestrator agent (Claude Opus 4.5)
+- **OmO-Plan**: Inherits all settings from OpenCode's plan agent at runtime (description appended with "OhMyOpenCode version")
+- **build**: Demoted to subagent
+- **plan**: Demoted to subagent
+
+To disable OmO and restore the original build/plan agents:
 
 ```json
 {
@@ -574,9 +579,25 @@ To disable OmO and restore the original build agent:
 }
 ```
 
+You can also customize OmO and OmO-Plan like other agents:
+
+```json
+{
+  "agents": {
+    "OmO": {
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 0.3
+    },
+    "OmO-Plan": {
+      "model": "openai/gpt-5.2"
+    }
+  }
+}
+```
+
 | Option | Default | Description |
 |--------|---------|-------------|
-| `disabled` | `false` | When `true`, disables OmO and restores the original build agent. When `false` (default), OmO replaces the build agent as the default primary agent. |
+| `disabled` | `false` | When `true`, disables OmO agents and restores original build/plan as primary. When `false` (default), OmO and OmO-Plan become primary agents. |
 
 ### Hooks
 

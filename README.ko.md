@@ -561,9 +561,14 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 
 ### OmO Agent
 
-OmO는 기본적으로 활성화되며, 기본 primary 에이전트가 됩니다. 내장 "build" 에이전트를 대체하면서 `builtIn` 플래그를 유지하여, OmO가 에이전트 목록에서 첫 번째로 표시됩니다.
+활성화 시(기본값), OmO는 두 개의 primary 에이전트를 추가하고 내장 에이전트를 subagent로 강등합니다:
 
-OmO를 비활성화하고 원래 build 에이전트를 복원하려면:
+- **OmO**: Primary 오케스트레이터 에이전트 (Claude Opus 4.5)
+- **OmO-Plan**: OpenCode plan 에이전트의 모든 설정을 런타임에 상속 (description에 "OhMyOpenCode version" 추가)
+- **build**: subagent로 강등
+- **plan**: subagent로 강등
+
+OmO를 비활성화하고 원래 build/plan 에이전트를 복원하려면:
 
 ```json
 {
@@ -573,9 +578,25 @@ OmO를 비활성화하고 원래 build 에이전트를 복원하려면:
 }
 ```
 
+다른 에이전트처럼 OmO와 OmO-Plan도 커스터마이징할 수 있습니다:
+
+```json
+{
+  "agents": {
+    "OmO": {
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 0.3
+    },
+    "OmO-Plan": {
+      "model": "openai/gpt-5.2"
+    }
+  }
+}
+```
+
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
-| `disabled` | `false` | `true`면 OmO를 비활성화하고 원래 build 에이전트를 복원합니다. `false`(기본값)면 OmO가 build 에이전트를 대체하여 기본 primary 에이전트가 됩니다. |
+| `disabled` | `false` | `true`면 OmO 에이전트를 비활성화하고 원래 build/plan을 primary로 복원합니다. `false`(기본값)면 OmO와 OmO-Plan이 primary 에이전트가 됩니다. |
 
 ### Hooks
 

@@ -283,19 +283,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (isOmoEnabled && builtinAgents.OmO) {
         // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // remove this hack and use `config.default_agent = "OmO"` instead.
-        // This hack works by:
-        // 1. Setting build agent's display name to "OmO" (builtIn: true, appears first in TUI)
-        // 2. Adding OmO as a subagent (actual execution target when "OmO" is selected)
+        // use `config.default_agent = "OmO"` instead of demoting build/plan.
         // Tracking: https://github.com/sst/opencode/pull/5313
-        const { OmO: omoConfig, ...restAgents } = builtinAgents;
+        const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
+        const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
+        const omoPlanBase = {
+          ...builtinAgents.OmO,
+          ...planConfigWithoutName,
+          description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
+          color: config.agent?.plan?.color ?? "#6495ED",
+        };
+
+        const omoPlanConfig = omoPlanOverride ? deepMerge(omoPlanBase, omoPlanOverride) : omoPlanBase;
+
         config.agent = {
-          ...restAgents,
+          OmO: builtinAgents.OmO,
+          "OmO-Plan": omoPlanConfig,
+          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "OmO")),
           ...userAgents,
           ...projectAgents,
           ...config.agent,
-          build: { ...omoConfig, name: "OmO" },
-          OmO: { ...omoConfig, mode: "subagent" },
+          build: { ...config.agent?.build, mode: "subagent" },
+          plan: { ...config.agent?.plan, mode: "subagent" },
         };
       } else {
         config.agent = {
