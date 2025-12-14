@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { checkForUpdate, getCachedVersion } from "./checker"
+import { checkForUpdate, getCachedVersion, getLocalDevVersion } from "./checker"
 import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
@@ -25,7 +25,8 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
         if (result.isLocalDev) {
           log("[auto-update-checker] Skipped: local development mode")
           if (showStartupToast) {
-            await showVersionToast(ctx, getCachedVersion())
+            const version = getLocalDevVersion(ctx.directory) ?? getCachedVersion()
+            await showVersionToast(ctx, version)
           }
           return
         }

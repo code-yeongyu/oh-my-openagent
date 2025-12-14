@@ -11,6 +11,10 @@ import {
 import { log } from "../../shared/logger"
 
 export function isLocalDevMode(directory: string): boolean {
+  return getLocalDevPath(directory) !== null
+}
+
+export function getLocalDevPath(directory: string): string | null {
   const projectConfig = path.join(directory, ".opencode", "opencode.json")
 
   for (const configPath of [projectConfig, USER_OPENCODE_CONFIG]) {
@@ -22,7 +26,7 @@ export function isLocalDevMode(directory: string): boolean {
 
       for (const entry of plugins) {
         if (entry.startsWith("file://") && entry.includes(PACKAGE_NAME)) {
-          return true
+          return entry.replace("file://", "")
         }
       }
     } catch {
@@ -30,7 +34,22 @@ export function isLocalDevMode(directory: string): boolean {
     }
   }
 
-  return false
+  return null
+}
+
+export function getLocalDevVersion(directory: string): string | null {
+  const localPath = getLocalDevPath(directory)
+  if (!localPath) return null
+
+  try {
+    const pkgPath = path.join(localPath, "package.json")
+    if (!fs.existsSync(pkgPath)) return null
+    const content = fs.readFileSync(pkgPath, "utf-8")
+    const pkg = JSON.parse(content) as PackageJson
+    return pkg.version ?? null
+  } catch {
+    return null
+  }
 }
 
 export interface PluginEntryInfo {
@@ -69,13 +88,23 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
 
 export function getCachedVersion(): string | null {
   try {
-    if (!fs.existsSync(INSTALLED_PACKAGE_JSON)) return null
-    const content = fs.readFileSync(INSTALLED_PACKAGE_JSON, "utf-8")
-    const pkg = JSON.parse(content) as PackageJson
-    return pkg.version ?? null
-  } catch {
-    return null
-  }
+    if (fs.existsSync(INSTALLED_PACKAGE_JSON)) {
+      const content = fs.readFileSync(INSTALLED_PACKAGE_JSON, "utf-8")
+      const pkg = JSON.parse(content) as PackageJson
+      if (pkg.version) return pkg.version
+    }
+  } catch {}
+
+  try {
+    const pkgPath = path.resolve(import.meta.dirname, "..", "..", "..", "package.json")
+    if (fs.existsSync(pkgPath)) {
+      const content = fs.readFileSync(pkgPath, "utf-8")
+      const pkg = JSON.parse(content) as PackageJson
+      if (pkg.version) return pkg.version
+    }
+  } catch {}
+
+  return null
 }
 
 export async function getLatestVersion(): Promise<string | null> {
