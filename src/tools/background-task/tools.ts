@@ -211,18 +211,18 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
         const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
 
-        // Non-blocking: return status immediately
-        if (!shouldBlock) {
-          return formatTaskStatus(task)
-        }
-
-        // Already completed: return result immediately
+        // Already completed: return result immediately (regardless of block flag)
         if (task.status === "completed") {
           return await formatTaskResult(task, client)
         }
 
         // Error or cancelled: return status immediately
         if (task.status === "error" || task.status === "cancelled") {
+          return formatTaskStatus(task)
+        }
+
+        // Non-blocking and still running: return status
+        if (!shouldBlock) {
           return formatTaskStatus(task)
         }
 
