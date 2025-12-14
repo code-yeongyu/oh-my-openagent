@@ -516,6 +516,8 @@ Google Gemini 모델을 위한 내장 Antigravity OAuth를 활성화합니다:
 
 각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
+`OmO` (메인 오케스트레이터)와 `build` (기본 에이전트)도 동일한 옵션으로 설정을 오버라이드할 수 있습니다.
+
 또는 ~/.config/opencode/oh-my-opencode.json 혹은 .opencode/oh-my-opencode.json 의 `disabled_agents` 를 사용하여 비활성화할 수 있습니다:
 
 ```json

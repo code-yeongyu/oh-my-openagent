@@ -517,6 +517,8 @@ Override built-in agent settings:
 
 Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
+You can also override settings for `OmO` (the main orchestrator) and `build` (the default agent) using the same options.
+
 Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
