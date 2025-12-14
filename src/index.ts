@@ -65,11 +65,36 @@ function getUserConfigDir(): string {
   return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
 }
 
+const AGENT_NAME_MAP: Record<string, string> = {
+  omo: "OmO",
+  build: "build",
+  oracle: "oracle",
+  librarian: "librarian",
+  explore: "explore",
+  "frontend-ui-ux-engineer": "frontend-ui-ux-engineer",
+  "document-writer": "document-writer",
+  "multimodal-looker": "multimodal-looker",
+};
+
+function normalizeAgentNames(agents: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(agents)) {
+    const normalizedKey = AGENT_NAME_MAP[key.toLowerCase()] ?? key;
+    normalized[normalizedKey] = value;
+  }
+  return normalized;
+}
+
 function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
       const rawConfig = JSON.parse(content);
+
+      if (rawConfig.agents && typeof rawConfig.agents === "object") {
+        rawConfig.agents = normalizeAgentNames(rawConfig.agents);
+      }
+
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
       if (!result.success) {
