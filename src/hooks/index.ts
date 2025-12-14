@@ -17,3 +17,4 @@ export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
 export { createKeywordDetectorHook } from "./keyword-detector";
+export { createInteractiveBashBlockerHook } from "./interactive-bash-blocker";

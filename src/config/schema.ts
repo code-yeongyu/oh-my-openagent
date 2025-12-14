@@ -60,6 +60,7 @@ export const HookNameSchema = z.enum([
   "startup-toast",
   "keyword-detector",
   "agent-usage-reminder",
+  "interactive-bash-blocker",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
