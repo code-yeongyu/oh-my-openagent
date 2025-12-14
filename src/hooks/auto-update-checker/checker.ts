@@ -8,6 +8,7 @@ import {
   NPM_FETCH_TIMEOUT,
   INSTALLED_PACKAGE_JSON,
   USER_OPENCODE_CONFIG,
+  USER_OPENCODE_CONFIG_JSONC,
 } from "./constants"
 import { log } from "../../shared/logger"
 
@@ -16,13 +17,22 @@ export function isLocalDevMode(directory: string): boolean {
 }
 
 function stripJsonComments(json: string): string {
-  return json.replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")
+  return json
+    .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g) => (g ? "" : m))
+    .replace(/,(\s*[}\]])/g, "$1")
+}
+
+function getConfigPaths(directory: string): string[] {
+  return [
+    path.join(directory, ".opencode", "opencode.json"),
+    path.join(directory, ".opencode", "opencode.jsonc"),
+    USER_OPENCODE_CONFIG,
+    USER_OPENCODE_CONFIG_JSONC,
+  ]
 }
 
 export function getLocalDevPath(directory: string): string | null {
-  const projectConfig = path.join(directory, ".opencode", "opencode.json")
-
-  for (const configPath of [projectConfig, USER_OPENCODE_CONFIG]) {
+  for (const configPath of getConfigPaths(directory)) {
     try {
       if (!fs.existsSync(configPath)) continue
       const content = fs.readFileSync(configPath, "utf-8")
@@ -31,7 +41,11 @@ export function getLocalDevPath(directory: string): string | null {
 
       for (const entry of plugins) {
         if (entry.startsWith("file://") && entry.includes(PACKAGE_NAME)) {
-          return entry.replace("file://", "")
+          try {
+            return fileURLToPath(entry)
+          } catch {
+            return entry.replace("file://", "")
+          }
         }
       }
     } catch {
@@ -86,9 +100,7 @@ export interface PluginEntryInfo {
 }
 
 export function findPluginEntry(directory: string): PluginEntryInfo | null {
-  const projectConfig = path.join(directory, ".opencode", "opencode.json")
-
-  for (const configPath of [projectConfig, USER_OPENCODE_CONFIG]) {
+  for (const configPath of getConfigPaths(directory)) {
     try {
       if (!fs.existsSync(configPath)) continue
       const content = fs.readFileSync(configPath, "utf-8")
@@ -170,7 +182,6 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
     return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false, isPinned: false }
   }
 
-  // Respect version pinning
   if (pluginInfo.isPinned) {
     log(`[auto-update-checker] Version pinned to ${pluginInfo.pinnedVersion}, skipping update check`)
     return { needsUpdate: false, currentVersion: pluginInfo.pinnedVersion, latestVersion: null, isLocalDev: false, isPinned: true }
@@ -190,6 +201,5 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
 
   const needsUpdate = currentVersion !== latestVersion
   log(`[auto-update-checker] Current: ${currentVersion}, Latest: ${latestVersion}, NeedsUpdate: ${needsUpdate}`)
-
   return { needsUpdate, currentVersion, latestVersion, isLocalDev: false, isPinned: false }
 }

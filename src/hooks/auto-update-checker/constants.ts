@@ -38,3 +38,4 @@ function getUserConfigDir(): string {
 
 export const USER_CONFIG_DIR = getUserConfigDir()
 export const USER_OPENCODE_CONFIG = path.join(USER_CONFIG_DIR, "opencode", "opencode.json")
+export const USER_OPENCODE_CONFIG_JSONC = path.join(USER_CONFIG_DIR, "opencode", "opencode.jsonc")
