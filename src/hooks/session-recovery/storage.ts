@@ -133,20 +133,15 @@ export function findEmptyMessages(sessionID: string): string[] {
 
 export function findEmptyMessageByIndex(sessionID: string, targetIndex: number): string | null {
   const messages = readMessages(sessionID)
-  
-  // Try multiple indices to handle system message offset
-  // API includes system message at index 0, storage may not
-  const indicesToTry = [targetIndex, targetIndex - 1]
-  
+
+  // API index may differ from storage index due to system messages
+  const indicesToTry = [targetIndex, targetIndex - 1, targetIndex - 2]
+
   for (const idx of indicesToTry) {
     if (idx < 0 || idx >= messages.length) continue
 
     const targetMsg = messages[idx]
-    
-    // NOTE: Do NOT skip last assistant message here
-    // If API returned an error, this message is NOT the final assistant message
-    // (the API only allows empty content for the ACTUAL final assistant message)
-    
+
     if (!messageHasContent(targetMsg.id)) {
       return targetMsg.id
     }
@@ -170,6 +165,28 @@ export function findMessagesWithThinkingBlocks(sessionID: string): string[] {
     const parts = readParts(msg.id)
     const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
     if (hasThinking) {
+      result.push(msg.id)
+    }
+  }
+
+  return result
+}
+
+export function findMessagesWithThinkingOnly(sessionID: string): string[] {
+  const messages = readMessages(sessionID)
+  const result: string[] = []
+
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue
+
+    const parts = readParts(msg.id)
+    if (parts.length === 0) continue
+
+    const hasThinking = parts.some((p) => THINKING_TYPES.has(p.type))
+    const hasTextContent = parts.some(hasContent)
+
+    // Has thinking but no text content = orphan thinking
+    if (hasThinking && !hasTextContent) {
       result.push(msg.id)
     }
   }

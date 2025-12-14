@@ -6,6 +6,7 @@ import {
   findMessageByIndexNeedingThinking,
   findMessagesWithOrphanThinking,
   findMessagesWithThinkingBlocks,
+  findMessagesWithThinkingOnly,
   injectTextPart,
   prependThinkingPart,
   stripThinkingParts,
@@ -177,6 +178,8 @@ async function recoverThinkingDisabledViolation(
   return anySuccess
 }
 
+const PLACEHOLDER_TEXT = "[user interrupted]"
+
 async function recoverEmptyContentMessage(
   _client: Client,
   sessionID: string,
@@ -187,23 +190,28 @@ async function recoverEmptyContentMessage(
   const targetIndex = extractMessageIndex(error)
   const failedID = failedAssistantMsg.info?.id
 
+  const thinkingOnlyIDs = findMessagesWithThinkingOnly(sessionID)
+  for (const messageID of thinkingOnlyIDs) {
+    injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT)
+  }
+
   if (targetIndex !== null) {
     const targetMessageID = findEmptyMessageByIndex(sessionID, targetIndex)
     if (targetMessageID) {
-      return injectTextPart(sessionID, targetMessageID, "(interrupted)")
+      return injectTextPart(sessionID, targetMessageID, PLACEHOLDER_TEXT)
     }
   }
 
   if (failedID) {
-    if (injectTextPart(sessionID, failedID, "(interrupted)")) {
+    if (injectTextPart(sessionID, failedID, PLACEHOLDER_TEXT)) {
       return true
     }
   }
 
   const emptyMessageIDs = findEmptyMessages(sessionID)
-  let anySuccess = false
+  let anySuccess = thinkingOnlyIDs.length > 0
   for (const messageID of emptyMessageIDs) {
-    if (injectTextPart(sessionID, messageID, "(interrupted)")) {
+    if (injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT)) {
       anySuccess = true
     }
   }
