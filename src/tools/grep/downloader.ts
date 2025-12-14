@@ -1,6 +1,20 @@
-import { existsSync, mkdirSync, chmodSync, unlinkSync } from "node:fs"
+import { existsSync, mkdirSync, chmodSync, unlinkSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { spawn } from "bun"
+
+export function findFileRecursive(dir: string, filename: string): string | null {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true, recursive: true })
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name === filename) {
+        return join(entry.parentPath ?? dir, entry.name)
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
 
 const RG_VERSION = "14.1.1"
 
@@ -70,14 +84,12 @@ async function extractZipWindows(archivePath: string, destDir: string): Promise<
     throw new Error("Failed to extract zip with PowerShell")
   }
 
-  const { globSync } = await import("glob")
-  const rgFiles = globSync("**/rg.exe", { cwd: destDir })
-  if (rgFiles.length > 0) {
-    const srcPath = join(destDir, rgFiles[0])
+  const foundPath = findFileRecursive(destDir, "rg.exe")
+  if (foundPath) {
     const destPath = join(destDir, "rg.exe")
-    if (srcPath !== destPath) {
+    if (foundPath !== destPath) {
       const { renameSync } = await import("node:fs")
-      renameSync(srcPath, destPath)
+      renameSync(foundPath, destPath)
     }
   }
 }
@@ -92,14 +104,12 @@ async function extractZipUnix(archivePath: string, destDir: string): Promise<voi
     throw new Error("Failed to extract zip")
   }
 
-  const { globSync } = await import("glob")
-  const rgFiles = globSync("**/rg", { cwd: destDir })
-  if (rgFiles.length > 0) {
-    const srcPath = join(destDir, rgFiles[0])
+  const foundPath = findFileRecursive(destDir, "rg")
+  if (foundPath) {
     const destPath = join(destDir, "rg")
-    if (srcPath !== destPath) {
+    if (foundPath !== destPath) {
       const { renameSync } = await import("node:fs")
-      renameSync(srcPath, destPath)
+      renameSync(foundPath, destPath)
     }
   }
 }

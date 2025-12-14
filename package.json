@@ -51,7 +51,6 @@
     "@code-yeongyu/comment-checker": "^0.5.0",
     "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "^1.0.150",
-    "glob": "^13.0.0",
     "hono": "^4.10.4",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
