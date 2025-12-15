@@ -278,6 +278,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const builtinAgents = createBuiltinAgents(
         pluginConfig.disabled_agents,
         pluginConfig.agents,
+        ctx.directory,
       );
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};

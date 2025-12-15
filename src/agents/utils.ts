@@ -19,6 +19,39 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "multimodal-looker": multimodalLookerAgent,
 }
 
+export function createEnvContext(directory: string): string {
+  const now = new Date()
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale
+
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  })
+
+  const platform = process.platform as "darwin" | "linux" | "win32" | string
+
+  return `
+Here is some useful information about the environment you are running in:
+<env>
+  Working directory: ${directory}
+  Platform: ${platform}
+  Today's date: ${dateStr}
+  Current time: ${timeStr}
+  Timezone: ${timezone}
+  Locale: ${locale}
+</env>`
+}
+
 function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
@@ -28,7 +61,8 @@ function mergeAgentConfig(
 
 export function createBuiltinAgents(
   disabledAgents: BuiltinAgentName[] = [],
-  agentOverrides: AgentOverrides = {}
+  agentOverrides: AgentOverrides = {},
+  directory?: string
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
@@ -39,11 +73,21 @@ export function createBuiltinAgents(
       continue
     }
 
+    let finalConfig = config
+
+    if (agentName === "OmO" && directory && config.prompt) {
+      const envContext = createEnvContext(directory)
+      finalConfig = {
+        ...config,
+        prompt: config.prompt + envContext,
+      }
+    }
+
     const override = agentOverrides[agentName]
     if (override) {
-      result[name] = mergeAgentConfig(config, override)
+      result[name] = mergeAgentConfig(finalConfig, override)
     } else {
-      result[name] = config
+      result[name] = finalConfig
     }
   }
 
