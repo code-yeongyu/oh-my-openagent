@@ -492,6 +492,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
 
+      if (input.tool === "task") {
+        const args = output.args as Record<string, unknown>;
+        const subagentType = args.subagent_type as string;
+        const isExploreOrLibrarian = ["explore", "librarian"].includes(subagentType);
+
+        args.tools = {
+          ...(args.tools as Record<string, boolean> | undefined),
+          background_task: false,
+          ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
+        };
+      }
+
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({
           sessionId: input.sessionID,
