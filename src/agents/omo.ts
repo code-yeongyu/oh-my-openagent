@@ -568,8 +568,12 @@ export const omoAgent: AgentConfig = {
   description:
     "Powerful AI orchestrator for OpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
   mode: "primary",
-  model: "anthropic/claude-sonnet-4-20250514",
-  maxTokens: 16000,
+  model: "anthropic/claude-opus-4-5",
+  thinking: {
+    type: "enabled",
+    budgetTokens: 32000,
+  },
+  maxTokens: 64000,
   prompt: OMO_SYSTEM_PROMPT,
   color: "#00CED1",
 }
