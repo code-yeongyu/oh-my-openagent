@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin/tool"
-import { DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
+import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 import { getCachedTmuxPath } from "./utils"
 
 /**
@@ -60,6 +60,11 @@ export const interactive_bash = tool({
 
       if (parts.length === 0) {
         return "Error: Empty tmux command"
+      }
+
+      const subcommand = parts[0].toLowerCase()
+      if (BLOCKED_TMUX_SUBCOMMANDS.includes(subcommand)) {
+        return `Error: '${parts[0]}' is blocked. Use bash tool instead for capturing/printing terminal output.`
       }
 
       const proc = Bun.spawn([tmuxPath, ...parts], {
