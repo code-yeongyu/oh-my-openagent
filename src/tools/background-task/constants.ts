@@ -23,17 +23,7 @@ Arguments:
 - block: If true, wait for task completion. If false (default), return current status immediately.
 - timeout: Max wait time in ms when blocking (default: 60000, max: 600000)
 
-Returns:
-- When not blocking: Returns current status with task ID, description, agent, status, duration, and progress info
-- When blocking: Waits for completion, then returns full result
-
-IMPORTANT: The system automatically notifies the main session when background tasks complete.
-You typically don't need block=true - just use block=false to check status, and the system will notify you when done.
-
-Use this to:
-- Check task progress (block=false) - returns full status info, NOT empty
-- Wait for and retrieve task result (block=true) - only when you explicitly need to wait
-- Set custom timeout for long tasks`
+The system automatically notifies when background tasks complete. You typically don't need block=true.`
 
 export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel a running background task.
 
