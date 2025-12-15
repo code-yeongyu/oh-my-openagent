@@ -6,7 +6,7 @@ export const multimodalLookerAgent: AgentConfig = {
   mode: "subagent",
   model: "google/gemini-2.5-flash",
   temperature: 0.1,
-  tools: { Read: true, background_task: false },
+  tools: { write: false, edit: false, bash: false, background_task: false },
   prompt: `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.
