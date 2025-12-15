@@ -9,6 +9,7 @@ import {
   findMessagesWithThinkingOnly,
   injectTextPart,
   prependThinkingPart,
+  readParts,
   stripThinkingParts,
 } from "./storage"
 import type { MessageData } from "./types"
@@ -100,7 +101,17 @@ async function recoverToolResultMissing(
   sessionID: string,
   failedAssistantMsg: MessageData
 ): Promise<boolean> {
-  const parts = failedAssistantMsg.parts || []
+  // Try API parts first, fallback to filesystem if empty
+  let parts = failedAssistantMsg.parts || []
+  if (parts.length === 0 && failedAssistantMsg.info?.id) {
+    const storedParts = readParts(failedAssistantMsg.info.id)
+    parts = storedParts.map((p) => ({
+      type: p.type === "tool" ? "tool_use" : p.type,
+      id: "callID" in p ? (p as { callID?: string }).callID : p.id,
+      name: "tool" in p ? (p as { tool?: string }).tool : undefined,
+      input: "state" in p ? (p as { state?: { input?: Record<string, unknown> } }).state?.input : undefined,
+    }))
+  }
   const toolUseIds = extractToolUseIds(parts)
 
   if (toolUseIds.length === 0) {
