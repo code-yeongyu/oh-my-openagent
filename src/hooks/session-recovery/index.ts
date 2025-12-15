@@ -50,12 +50,29 @@ interface MessagePart {
 function getErrorMessage(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error.toLowerCase()
-  const errorObj = error as {
-    data?: { message?: string }
-    message?: string
-    error?: { message?: string }
+
+  const errorObj = error as Record<string, unknown>
+  const paths = [
+    errorObj.data,
+    errorObj.error,
+    errorObj,
+    (errorObj.data as Record<string, unknown>)?.error,
+  ]
+
+  for (const obj of paths) {
+    if (obj && typeof obj === "object") {
+      const msg = (obj as Record<string, unknown>).message
+      if (typeof msg === "string" && msg.length > 0) {
+        return msg.toLowerCase()
+      }
+    }
   }
-  return (errorObj.data?.message || errorObj.error?.message || errorObj.message || "").toLowerCase()
+
+  try {
+    return JSON.stringify(error).toLowerCase()
+  } catch {
+    return ""
+  }
 }
 
 function extractMessageIndex(error: unknown): number | null {
@@ -85,7 +102,12 @@ function detectErrorType(error: unknown): RecoveryErrorType {
     return "thinking_disabled_violation"
   }
 
-  if (message.includes("non-empty content") || message.includes("must have non-empty content")) {
+  if (
+    message.includes("non-empty content") ||
+    message.includes("must have non-empty content") ||
+    (message.includes("content") && message.includes("is empty")) ||
+    (message.includes("content field") && message.includes("empty"))
+  ) {
     return "empty_content_message"
   }
 
