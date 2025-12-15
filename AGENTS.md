@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-14T17:16:30+09:00
-**Commit:** 7f27fbc
+**Generated:** 2025-12-15T22:57:00+09:00
+**Commit:** cea64e4
 **Branch:** master
 
 ## OVERVIEW
@@ -14,10 +14,10 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 oh-my-opencode/
 ├── src/
 │   ├── agents/        # AI agents (OmO, oracle, librarian, explore, frontend, document-writer, multimodal-looker)
-│   ├── hooks/         # 19 lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
-│   ├── tools/         # LSP (11), AST-Grep, Grep, background-task, glob, look-at, skill, slashcommand
+│   ├── hooks/         # 21 lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
+│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
 │   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app)
-│   ├── features/      # Terminal features, Claude Code loaders (agent, command, skill, mcp, session-state)
+│   ├── features/      # Terminal, Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
 │   ├── config/        # Zod schema, TypeScript types
 │   ├── auth/          # Google Antigravity OAuth
 │   ├── shared/        # Utilities (deep-merge, pattern-matcher, logger, etc.)
@@ -40,6 +40,8 @@ oh-my-opencode/
 | Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google models |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` after changes |
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
+| Background agents | `src/features/background-agent/` | manager.ts for task management |
+| Interactive terminal | `src/tools/interactive-bash/` | tmux session management |
 
 ## CONVENTIONS
 
