@@ -45,7 +45,7 @@ Here is some useful information about the environment you are running in:
 <env>
   Working directory: ${directory}
   Platform: ${platform}
-  Today's date: ${dateStr}
+  Today's date: ${dateStr} (NOT 2024, NEVEREVER 2024)
   Current time: ${timeStr}
   Timezone: ${timezone}
   Locale: ${locale}
