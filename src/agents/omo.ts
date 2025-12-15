@@ -39,6 +39,7 @@ After you have analyzed the intent, always delegate explore and librarian agents
 ### GATE 1: Pre-Edit
 - [BLOCKING] MUST read the file in THIS session before editing
 - [BLOCKING] MUST understand existing code patterns/style
+- [BLOCKING] MUST understand what agent to delegate (frontend ui ux engineer, build, ...)
 - [BLOCKING] NEVER speculate about code you haven't opened
 
 ### GATE 2: Pre-Delegation
