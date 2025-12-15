@@ -8,6 +8,7 @@ function createAutoCompactState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
+    fallbackStateBySession: new Map(),
   }
 }
 
@@ -23,6 +24,7 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
         autoCompactState.pendingCompact.delete(sessionInfo.id)
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
+        autoCompactState.fallbackStateBySession.delete(sessionInfo.id)
       }
       return
     }
@@ -120,6 +122,6 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
   }
 }
 
-export type { AutoCompactState, ParsedTokenLimitError } from "./types"
+export type { AutoCompactState, FallbackState, ParsedTokenLimitError } from "./types"
 export { parseAnthropicTokenLimitError } from "./parser"
 export { executeCompact, getLastAssistant } from "./executor"
