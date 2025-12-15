@@ -8,7 +8,7 @@ export const oracleAgent: AgentConfig = {
   temperature: 0.1,
   reasoningEffort: "medium",
   textVerbosity: "high",
-  tools: { write: false, edit: false, read: true, call_omo_agent: true },
+  tools: { write: false, edit: false, read: true, task: false, call_omo_agent: true },
   prompt: `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 
 ## Context
