@@ -1,4 +1,10 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import {
+  findNearestMessageWithFields,
+  MESSAGE_STORAGE,
+} from "../features/hook-message-injector"
 
 export interface TodoContinuationEnforcer {
   handler: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
@@ -20,6 +26,20 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 - Proceed without asking for permission
 - Mark each task complete when finished
 - Do not stop until all tasks are done`
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
+}
 
 function detectInterrupt(error: unknown): boolean {
   if (!error) return false
@@ -137,9 +157,14 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         }
 
         try {
+          // Get previous message's agent info to respect agent mode
+          const messageDir = getMessageDir(sessionID)
+          const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
           await ctx.client.session.prompt({
             path: { id: sessionID },
             body: {
+              agent: prevMessage?.agent,
               parts: [
                 {
                   type: "text",

@@ -3,13 +3,13 @@ import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart } from "./types"
 
-interface StoredMessage {
+export interface StoredMessage {
   agent?: string
   model?: { providerID?: string; modelID?: string }
   tools?: Record<string, boolean>
 }
 
-function findNearestMessageWithFields(messageDir: string): StoredMessage | null {
+export function findNearestMessageWithFields(messageDir: string): StoredMessage | null {
   try {
     const files = readdirSync(messageDir)
       .filter((f) => f.endsWith(".json"))

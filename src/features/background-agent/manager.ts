@@ -1,9 +1,15 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type {
   BackgroundTask,
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
+import {
+  findNearestMessageWithFields,
+  MESSAGE_STORAGE,
+} from "../hook-message-injector"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -22,6 +28,20 @@ interface EventProperties {
 interface Event {
   type: string
   properties?: EventProperties
+}
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
 }
 
 export class BackgroundManager {
@@ -253,9 +273,13 @@ export class BackgroundManager {
 
     setTimeout(async () => {
       try {
+        const messageDir = getMessageDir(task.parentSessionID)
+        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
         await this.client.session.prompt({
           path: { id: task.parentSessionID },
           body: {
+            agent: prevMessage?.agent,
             parts: [{ type: "text", text: message }],
           },
           query: { directory: this.directory },
