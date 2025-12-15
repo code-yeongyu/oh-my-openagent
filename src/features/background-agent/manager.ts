@@ -30,6 +30,13 @@ interface Event {
   properties?: EventProperties
 }
 
+interface Todo {
+  content: string
+  status: string
+  priority: string
+  id: string
+}
+
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
@@ -103,7 +110,6 @@ export class BackgroundManager {
         agent: input.agent,
         tools: {
           task: false,
-          call_omo_agent: false,
           background_task: false,
         },
         parts: [{ type: "text", text: input.prompt }],
@@ -151,6 +157,23 @@ export class BackgroundManager {
     return undefined
   }
 
+  private async checkSessionTodos(sessionID: string): Promise<boolean> {
+    try {
+      const response = await this.client.session.todo({
+        path: { id: sessionID },
+      })
+      const todos = (response.data ?? response) as Todo[]
+      if (!todos || todos.length === 0) return false
+
+      const incomplete = todos.filter(
+        (t) => t.status !== "completed" && t.status !== "cancelled"
+      )
+      return incomplete.length > 0
+    } catch {
+      return false
+    }
+  }
+
   handleEvent(event: Event): void {
     const props = event.properties
 
@@ -183,11 +206,18 @@ export class BackgroundManager {
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
 
-      task.status = "completed"
-      task.completedAt = new Date()
-      this.markForNotification(task)
-      this.notifyParentSession(task)
-      log("[background-agent] Task completed via session.idle event:", task.id)
+      this.checkSessionTodos(sessionID).then((hasIncompleteTodos) => {
+        if (hasIncompleteTodos) {
+          log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
+          return
+        }
+
+        task.status = "completed"
+        task.completedAt = new Date()
+        this.markForNotification(task)
+        this.notifyParentSession(task)
+        log("[background-agent] Task completed via session.idle event:", task.id)
+      })
     }
 
     if (event.type === "session.deleted") {
@@ -329,6 +359,12 @@ export class BackgroundManager {
         }
 
         if (sessionStatus.type === "idle") {
+          const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+          if (hasIncompleteTodos) {
+            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+            continue
+          }
+
           task.status = "completed"
           task.completedAt = new Date()
           this.markForNotification(task)
