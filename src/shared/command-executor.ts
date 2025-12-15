@@ -2,8 +2,13 @@ import { spawn } from "child_process"
 import { exec } from "child_process"
 import { promisify } from "util"
 import { existsSync } from "fs"
+import { homedir } from "os"
 
 const DEFAULT_ZSH_PATHS = ["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh"]
+
+function getHomeDir(): string {
+  return process.env.HOME || process.env.USERPROFILE || homedir()
+}
 
 function findZshPath(customZshPath?: string): string | null {
   if (customZshPath && existsSync(customZshPath)) {
@@ -39,7 +44,7 @@ export async function executeHookCommand(
   cwd: string,
   options?: ExecuteHookOptions
 ): Promise<CommandResult> {
-  const home = process.env.HOME ?? ""
+  const home = getHomeDir()
 
   let expandedCommand = command
     .replace(/^~(?=\/|$)/g, home)

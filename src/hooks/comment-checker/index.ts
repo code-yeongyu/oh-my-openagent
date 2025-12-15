@@ -3,9 +3,11 @@ import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type Hoo
 
 import * as fs from "fs"
 import { existsSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
-const DEBUG_FILE = "/tmp/comment-checker-debug.log"
+const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {

@@ -1,11 +1,11 @@
 import { spawn } from "bun"
 import { existsSync, mkdirSync, chmodSync, unlinkSync, appendFileSync } from "fs"
 import { join } from "path"
-import { homedir } from "os"
+import { homedir, tmpdir } from "os"
 import { createRequire } from "module"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
-const DEBUG_FILE = "/tmp/comment-checker-debug.log"
+const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {

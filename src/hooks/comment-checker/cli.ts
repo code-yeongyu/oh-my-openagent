@@ -3,10 +3,11 @@ import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
 import * as fs from "fs"
+import { tmpdir } from "os"
 import { getCachedBinaryPath, ensureCommentCheckerBinary } from "./downloader"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
-const DEBUG_FILE = "/tmp/comment-checker-debug.log"
+const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {
