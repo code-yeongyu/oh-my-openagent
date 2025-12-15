@@ -1,5 +1,6 @@
 import { tool } from "@opencode-ai/plugin/tool"
 import { DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
+import { getCachedTmuxPath } from "./utils"
 
 /**
  * Quote-aware command tokenizer with escape handling
@@ -53,13 +54,15 @@ export const interactive_bash = tool({
   },
   execute: async (args) => {
     try {
+      const tmuxPath = getCachedTmuxPath() ?? "tmux"
+
       const parts = tokenizeCommand(args.tmux_command)
 
       if (parts.length === 0) {
         return "Error: Empty tmux command"
       }
 
-      const proc = Bun.spawn(["tmux", ...parts], {
+      const proc = Bun.spawn([tmuxPath, ...parts], {
         stdout: "pipe",
         stderr: "pipe",
       })

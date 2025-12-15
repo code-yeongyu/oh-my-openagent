@@ -44,7 +44,7 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt } from "./tools";
+import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, interactive_bash, getTmuxPath } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
@@ -263,6 +263,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? await createGoogleAntigravityAuthPlugin(ctx)
     : null;
 
+  const tmuxAvailable = await getTmuxPath();
+
   return {
     ...(googleAuthHooks ? { auth: googleAuthHooks.auth } : {}),
 
@@ -271,6 +273,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
+      ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
     "chat.message": async (input, output) => {
