@@ -2,8 +2,10 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createDynamicTruncator } from "../shared/dynamic-truncator"
 
 const TRUNCATABLE_TOOLS = [
+  "grep",
   "Grep",
   "safe_grep",
+  "glob",
   "Glob",
   "safe_glob",
   "lsp_find_references",

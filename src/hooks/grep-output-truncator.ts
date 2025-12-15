@@ -75,7 +75,7 @@ function truncateToTokenLimit(output: string, maxTokens: number): { result: stri
 }
 
 export function createGrepOutputTruncatorHook(ctx: PluginInput) {
-  const GREP_TOOLS = ["safe_grep", "Grep"]
+  const GREP_TOOLS = ["grep", "Grep", "safe_grep"]
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
