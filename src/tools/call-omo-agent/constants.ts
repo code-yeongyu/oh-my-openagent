@@ -21,4 +21,5 @@ Usage notes:
 3. Each agent invocation is stateless unless you provide a session_id
 4. Your prompt should contain a highly detailed task description for the agent to perform autonomously
 5. Clearly tell the agent whether you expect it to write code or just to do research
-6. For long-running research tasks, use run_in_background=true to avoid blocking`
+6. For long-running research tasks, use run_in_background=true to avoid blocking
+7. **IMPORTANT**: Always write prompts in English regardless of user's language. LLMs perform significantly better with English prompts.`

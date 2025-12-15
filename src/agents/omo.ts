@@ -165,6 +165,15 @@ CONTEXT:
 - Files: src/auth/token.py, src/auth/middleware.py
 """, subagent_type="executor")
 \`\`\`
+
+### Language Rule (MANDATORY)
+
+**ALWAYS write subagent prompts in English, regardless of the user's language.**
+
+- LLMs perform significantly better with English prompts
+- Internal agent communication must be in English for consistency
+- User-facing responses should match the user's language
+- Subagent prompts, task descriptions, and expected outcomes: ALWAYS English
 </Delegation_Rules>
 
 <Parallel_Execution>

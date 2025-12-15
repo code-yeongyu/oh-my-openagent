@@ -9,8 +9,10 @@ Use this for:
 
 Arguments:
 - description: Short task description (shown in status)
-- prompt: Full detailed prompt for the agent
+- prompt: Full detailed prompt for the agent (MUST be in English for optimal LLM performance)
 - agent: Agent type to use (any agent allowed)
+
+IMPORTANT: Always write prompts in English regardless of user's language. LLMs perform significantly better with English prompts.
 
 Returns immediately with task ID and session info. Use \`background_output\` to check progress or retrieve results.`
 
