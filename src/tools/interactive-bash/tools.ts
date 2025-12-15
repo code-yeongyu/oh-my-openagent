@@ -1,6 +1,51 @@
 import { tool } from "@opencode-ai/plugin/tool"
 import { DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 
+/**
+ * Quote-aware command tokenizer with escape handling
+ * Handles single/double quotes and backslash escapes without external dependencies
+ */
+export function tokenizeCommand(cmd: string): string[] {
+  const tokens: string[] = []
+  let current = ""
+  let inQuote = false
+  let quoteChar = ""
+  let escaped = false
+
+  for (let i = 0; i < cmd.length; i++) {
+    const char = cmd[i]
+
+    if (escaped) {
+      current += char
+      escaped = false
+      continue
+    }
+
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+
+    if ((char === "'" || char === '"') && !inQuote) {
+      inQuote = true
+      quoteChar = char
+    } else if (char === quoteChar && inQuote) {
+      inQuote = false
+      quoteChar = ""
+    } else if (char === " " && !inQuote) {
+      if (current) {
+        tokens.push(current)
+        current = ""
+      }
+    } else {
+      current += char
+    }
+  }
+
+  if (current) tokens.push(current)
+  return tokens
+}
+
 export const interactive_bash = tool({
   description: INTERACTIVE_BASH_DESCRIPTION,
   args: {
@@ -8,7 +53,7 @@ export const interactive_bash = tool({
   },
   execute: async (args) => {
     try {
-      const parts = args.tmux_command.split(/\s+/).filter((p) => p.length > 0)
+      const parts = tokenizeCommand(args.tmux_command)
 
       if (parts.length === 0) {
         return "Error: Empty tmux command"
@@ -27,12 +72,20 @@ export const interactive_bash = tool({
         proc.exited.then(() => clearTimeout(id))
       })
 
-      const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
-      const stderr = await new Response(proc.stderr).text()
-      const exitCode = await proc.exited
+      // Read stdout and stderr in parallel to avoid race conditions
+      const [stdout, stderr, exitCode] = await Promise.race([
+        Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+          proc.exited,
+        ]),
+        timeoutPromise,
+      ])
 
-      if (exitCode !== 0 && stderr.trim()) {
-        return `Error: ${stderr.trim()}`
+      // Check exitCode properly - return error even if stderr is empty
+      if (exitCode !== 0) {
+        const errorMsg = stderr.trim() || `Command failed with exit code ${exitCode}`
+        return `Error: ${errorMsg}`
       }
 
       return stdout || "(no output)"

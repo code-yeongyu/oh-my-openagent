@@ -208,17 +208,21 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       log(`[${HOOK_NAME}] message.updated received`, { sessionID, role: info?.role })
+      
       if (sessionID && info?.role === "user") {
-        remindedSessions.delete(sessionID)
-        log(`[${HOOK_NAME}] Cleared remindedSessions on user message`, { sessionID })
-        
-        // Cancel pending continuation on user interaction
+        // Cancel pending continuation on user interaction (real user input)
         const timer = pendingTimers.get(sessionID)
         if (timer) {
           clearTimeout(timer)
           pendingTimers.delete(sessionID)
           log(`[${HOOK_NAME}] Cancelled pending timer on user message`, { sessionID })
         }
+      }
+      
+      // Clear reminded state when assistant responds (allows re-remind on next idle)
+      if (sessionID && info?.role === "assistant" && remindedSessions.has(sessionID)) {
+        remindedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Cleared remindedSessions on assistant response`, { sessionID })
       }
     }
 

@@ -1,9 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createDynamicTruncator } from "../shared/dynamic-truncator"
 
+// Note: "grep" and "Grep" are handled by dedicated grep-output-truncator.ts
 const TRUNCATABLE_TOOLS = [
-  "grep",
-  "Grep",
   "safe_grep",
   "glob",
   "Glob",

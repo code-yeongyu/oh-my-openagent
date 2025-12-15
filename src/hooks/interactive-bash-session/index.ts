@@ -27,6 +27,125 @@ interface EventInput {
   };
 }
 
+/**
+ * Quote-aware command tokenizer with escape handling
+ * Handles single/double quotes and backslash escapes
+ */
+function tokenizeCommand(cmd: string): string[] {
+  const tokens: string[] = []
+  let current = ""
+  let inQuote = false
+  let quoteChar = ""
+  let escaped = false
+
+  for (let i = 0; i < cmd.length; i++) {
+    const char = cmd[i]
+
+    if (escaped) {
+      current += char
+      escaped = false
+      continue
+    }
+
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+
+    if ((char === "'" || char === '"') && !inQuote) {
+      inQuote = true
+      quoteChar = char
+    } else if (char === quoteChar && inQuote) {
+      inQuote = false
+      quoteChar = ""
+    } else if (char === " " && !inQuote) {
+      if (current) {
+        tokens.push(current)
+        current = ""
+      }
+    } else {
+      current += char
+    }
+  }
+
+  if (current) tokens.push(current)
+  return tokens
+}
+
+/**
+ * Normalize session name by stripping :window and .pane suffixes
+ * e.g., "omo-x:1" -> "omo-x", "omo-x:1.2" -> "omo-x"
+ */
+function normalizeSessionName(name: string): string {
+  return name.split(":")[0].split(".")[0]
+}
+
+function findFlagValue(tokens: string[], flag: string): string | null {
+  for (let i = 0; i < tokens.length - 1; i++) {
+    if (tokens[i] === flag) return tokens[i + 1]
+  }
+  return null
+}
+
+/**
+ * Extract session name from tokens, considering the subCommand
+ * For new-session: prioritize -s over -t
+ * For other commands: use -t
+ */
+function extractSessionNameFromTokens(tokens: string[], subCommand: string): string | null {
+  if (subCommand === "new-session") {
+    const sFlag = findFlagValue(tokens, "-s")
+    if (sFlag) return normalizeSessionName(sFlag)
+    const tFlag = findFlagValue(tokens, "-t")
+    if (tFlag) return normalizeSessionName(tFlag)
+  } else {
+    const tFlag = findFlagValue(tokens, "-t")
+    if (tFlag) return normalizeSessionName(tFlag)
+  }
+  return null
+}
+
+/**
+ * Find the tmux subcommand from tokens, skipping global options.
+ * tmux allows global options before the subcommand:
+ * e.g., `tmux -L socket-name new-session -s omo-x`
+ * Global options with args: -L, -S, -f, -c, -T
+ * Standalone flags: -C, -v, -V, etc.
+ * Special: -- (end of options marker)
+ */
+function findSubcommand(tokens: string[]): string {
+  // Options that require an argument: -L, -S, -f, -c, -T
+  const globalOptionsWithArgs = new Set(["-L", "-S", "-f", "-c", "-T"])
+
+  let i = 0
+  while (i < tokens.length) {
+    const token = tokens[i]
+
+    // Handle end of options marker
+    if (token === "--") {
+      // Next token is the subcommand
+      return tokens[i + 1] ?? ""
+    }
+
+    if (globalOptionsWithArgs.has(token)) {
+      // Skip the option and its argument
+      i += 2
+      continue
+    }
+
+    if (token.startsWith("-")) {
+      // Skip standalone flags like -C, -v, -V
+      i++
+      continue
+    }
+
+    // Found the subcommand
+    return token
+  }
+
+  return ""
+}
+
 export function createInteractiveBashSessionHook(_ctx: PluginInput) {
   const sessionStates = new Map<string, InteractiveBashSessionState>();
 
@@ -41,11 +160,6 @@ export function createInteractiveBashSessionHook(_ctx: PluginInput) {
       sessionStates.set(sessionID, state);
     }
     return sessionStates.get(sessionID)!;
-  }
-
-  function extractSessionNameFromFlags(tmuxCommand: string): string | null {
-    const sessionFlagMatch = tmuxCommand.match(/(?:-s|-t)\s+(\S+)/);
-    return sessionFlagMatch?.[1] ?? null;
   }
 
   function isOmoSession(sessionName: string | null): boolean {
@@ -77,23 +191,34 @@ export function createInteractiveBashSessionHook(_ctx: PluginInput) {
       return;
     }
 
-    const tmuxCommand = (args?.tmux_command as string) ?? "";
+    if (typeof args?.tmux_command !== "string") {
+      return;
+    }
+
+    const tmuxCommand = args.tmux_command;
+    const tokens = tokenizeCommand(tmuxCommand);
+    const subCommand = findSubcommand(tokens);
     const state = getOrCreateState(sessionID);
     let stateChanged = false;
 
-    const hasNewSession = tmuxCommand.includes("new-session");
-    const hasKillSession = tmuxCommand.includes("kill-session");
-    const hasKillServer = tmuxCommand.includes("kill-server");
+    const toolOutput = output?.output ?? ""
+    if (toolOutput.startsWith("Error:")) {
+      return
+    }
 
-    const sessionName = extractSessionNameFromFlags(tmuxCommand);
+    const isNewSession = subCommand === "new-session";
+    const isKillSession = subCommand === "kill-session";
+    const isKillServer = subCommand === "kill-server";
 
-    if (hasNewSession && isOmoSession(sessionName)) {
+    const sessionName = extractSessionNameFromTokens(tokens, subCommand);
+
+    if (isNewSession && isOmoSession(sessionName)) {
       state.tmuxSessions.add(sessionName!);
       stateChanged = true;
-    } else if (hasKillSession && isOmoSession(sessionName)) {
+    } else if (isKillSession && isOmoSession(sessionName)) {
       state.tmuxSessions.delete(sessionName!);
       stateChanged = true;
-    } else if (hasKillServer) {
+    } else if (isKillServer) {
       state.tmuxSessions.clear();
       stateChanged = true;
     }
@@ -103,7 +228,7 @@ export function createInteractiveBashSessionHook(_ctx: PluginInput) {
       saveInteractiveBashSessionState(state);
     }
 
-    const isSessionOperation = hasNewSession || hasKillSession || hasKillServer;
+    const isSessionOperation = isNewSession || isKillSession || isKillServer;
     if (isSessionOperation) {
       const reminder = buildSessionReminderMessage(
         Array.from(state.tmuxSessions),
