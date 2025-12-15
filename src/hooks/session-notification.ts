@@ -56,7 +56,7 @@ async function sendNotification(
       await ctx.$`osascript -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`
       break
     case "linux":
-      await ctx.$`notify-send ${escapedTitle} ${escapedMessage}`.catch(() => {})
+      await ctx.$`notify-send ${escapedTitle} ${escapedMessage} 2>/dev/null`.catch(() => {})
       break
     case "win32":
       await ctx.$`powershell -Command ${"[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); [System.Windows.Forms.MessageBox]::Show('" + escapedMessage + "', '" + escapedTitle + "')"}`
@@ -70,8 +70,8 @@ async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Prom
       ctx.$`afplay ${soundPath}`.catch(() => {})
       break
     case "linux":
-      ctx.$`paplay ${soundPath}`.catch(() => {
-        ctx.$`aplay ${soundPath}`.catch(() => {})
+      ctx.$`paplay ${soundPath} 2>/dev/null`.catch(() => {
+        ctx.$`aplay ${soundPath} 2>/dev/null`.catch(() => {})
       })
       break
     case "win32":
