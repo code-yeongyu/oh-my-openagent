@@ -19,6 +19,7 @@ import {
   createKeywordDetectorHook,
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
+  createInteractiveBashSessionHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -242,6 +243,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
     ? createNonInteractiveEnvHook(ctx)
     : null;
+  const interactiveBashSession = isHookEnabled("interactive-bash-session")
+    ? createInteractiveBashSessionHook(ctx)
+    : null;
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -387,6 +391,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await anthropicAutoCompact?.event(input);
       await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
+      await interactiveBashSession?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -508,6 +513,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.["tool.execute.after"](input, output);
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
+      await interactiveBashSession?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

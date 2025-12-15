@@ -21,6 +21,7 @@ import { grep } from "./grep"
 import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 import { skill } from "./skill"
+import { interactive_bash } from "./interactive-bash"
 
 import {
   createBackgroundTask,
@@ -62,4 +63,5 @@ export const builtinTools = {
   glob,
   slashcommand,
   skill,
+  interactive_bash,
 }

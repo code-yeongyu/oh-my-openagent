@@ -13,6 +13,8 @@ const TRUNCATABLE_TOOLS = [
   "lsp_workspace_symbols",
   "lsp_diagnostics",
   "ast_grep_search",
+  "interactive_bash",
+  "Interactive_bash",
 ]
 
 export function createToolOutputTruncatorHook(ctx: PluginInput) {

@@ -18,3 +18,4 @@ export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
 export { createKeywordDetectorHook } from "./keyword-detector";
 export { createNonInteractiveEnvHook } from "./non-interactive-env";
+export { createInteractiveBashSessionHook } from "./interactive-bash-session";
