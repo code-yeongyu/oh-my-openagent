@@ -75,7 +75,7 @@ export function createBuiltinAgents(
 
     let finalConfig = config
 
-    if (agentName === "OmO" && directory && config.prompt) {
+    if ((agentName === "OmO" || agentName === "librarian") && directory && config.prompt) {
       const envContext = createEnvContext(directory)
       finalConfig = {
         ...config,
