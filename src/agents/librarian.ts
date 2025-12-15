@@ -6,7 +6,7 @@ export const librarianAgent: AgentConfig = {
   mode: "subagent",
   model: "opencode/big-pickle",
   temperature: 0.1,
-  tools: { write: false, edit: false, bash: true, read: true },
+  tools: { write: false, edit: false, bash: true, read: true, background_task: false },
   prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized codebase understanding agent that helps users answer questions about large, complex codebases across repositories.
