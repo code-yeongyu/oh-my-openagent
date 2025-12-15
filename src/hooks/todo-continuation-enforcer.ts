@@ -5,6 +5,9 @@ import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../features/hook-message-injector"
+import { log } from "../shared/logger"
+
+const HOOK_NAME = "todo-continuation-enforcer"
 
 export interface TodoContinuationEnforcer {
   handler: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
@@ -79,10 +82,12 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
+        const isInterrupt = detectInterrupt(props?.error)
         errorSessions.add(sessionID)
-        if (detectInterrupt(props?.error)) {
+        if (isInterrupt) {
           interruptedSessions.add(sessionID)
         }
+        log(`[${HOOK_NAME}] session.error received`, { sessionID, isInterrupt, error: props?.error })
         
         // Cancel pending continuation if error occurs
         const timer = pendingTimers.get(sessionID)
@@ -98,18 +103,23 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
+      log(`[${HOOK_NAME}] session.idle received`, { sessionID })
+
       // Cancel any existing timer to debounce
       const existingTimer = pendingTimers.get(sessionID)
       if (existingTimer) {
         clearTimeout(existingTimer)
+        log(`[${HOOK_NAME}] Cancelled existing timer`, { sessionID })
       }
 
       // Schedule continuation check
       const timer = setTimeout(async () => {
         pendingTimers.delete(sessionID)
+        log(`[${HOOK_NAME}] Timer fired, checking conditions`, { sessionID })
 
         // Check if session is in recovery mode - if so, skip entirely without clearing state
         if (recoveringSessions.has(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: session in recovery mode`, { sessionID })
           return
         }
 
@@ -119,24 +129,30 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         errorSessions.delete(sessionID)
 
         if (shouldBypass) {
+          log(`[${HOOK_NAME}] Skipped: error/interrupt bypass`, { sessionID })
           return
         }
 
         if (remindedSessions.has(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: already reminded this session`, { sessionID })
           return
         }
 
         let todos: Todo[] = []
         try {
+          log(`[${HOOK_NAME}] Fetching todos for session`, { sessionID })
           const response = await ctx.client.session.todo({
             path: { id: sessionID },
           })
           todos = (response.data ?? response) as Todo[]
-        } catch {
+          log(`[${HOOK_NAME}] Todo API response`, { sessionID, todosCount: todos?.length ?? 0 })
+        } catch (err) {
+          log(`[${HOOK_NAME}] Todo API error`, { sessionID, error: String(err) })
           return
         }
 
         if (!todos || todos.length === 0) {
+          log(`[${HOOK_NAME}] No todos found`, { sessionID })
           return
         }
 
@@ -145,13 +161,16 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         )
 
         if (incomplete.length === 0) {
+          log(`[${HOOK_NAME}] All todos completed`, { sessionID, total: todos.length })
           return
         }
 
+        log(`[${HOOK_NAME}] Found incomplete todos`, { sessionID, incomplete: incomplete.length, total: todos.length })
         remindedSessions.add(sessionID)
 
         // Re-check if abort occurred during the delay/fetch
         if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID) || recoveringSessions.has(sessionID)) {
+          log(`[${HOOK_NAME}] Abort occurred during delay/fetch`, { sessionID })
           remindedSessions.delete(sessionID)
           return
         }
@@ -161,6 +180,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           const messageDir = getMessageDir(sessionID)
           const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
+          log(`[${HOOK_NAME}] Injecting continuation prompt`, { sessionID, agent: prevMessage?.agent })
           await ctx.client.session.prompt({
             path: { id: sessionID },
             body: {
@@ -174,7 +194,9 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
             },
             query: { directory: ctx.directory },
           })
-        } catch {
+          log(`[${HOOK_NAME}] Continuation prompt injected successfully`, { sessionID })
+        } catch (err) {
+          log(`[${HOOK_NAME}] Prompt injection failed`, { sessionID, error: String(err) })
           remindedSessions.delete(sessionID)
         }
       }, 200)
@@ -185,14 +207,17 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
+      log(`[${HOOK_NAME}] message.updated received`, { sessionID, role: info?.role })
       if (sessionID && info?.role === "user") {
         remindedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Cleared remindedSessions on user message`, { sessionID })
         
         // Cancel pending continuation on user interaction
         const timer = pendingTimers.get(sessionID)
         if (timer) {
           clearTimeout(timer)
           pendingTimers.delete(sessionID)
+          log(`[${HOOK_NAME}] Cancelled pending timer on user message`, { sessionID })
         }
       }
     }
