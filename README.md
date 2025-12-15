@@ -20,7 +20,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![License](https://img.shields.io/badge/license-MIT-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE)
 
-[English](README.md) | [한국어](README.ko.md)
+[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md)
 
 </div>
 
@@ -264,7 +264,7 @@ The plugin works perfectly with defaults. Aside from the recommended `google_aut
 
 - **OmO** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`opencode/big-pickle`): Multi-repo analysis, doc lookup, implementation examples. Uses GLM-4.6 (big-pickle) via OpenCode Zen—free, fast, and excellent for documentation research. Inspired by AmpCode.
+- **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Uses Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
 - **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
@@ -609,7 +609,7 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`
 
 ### MCPs
 
