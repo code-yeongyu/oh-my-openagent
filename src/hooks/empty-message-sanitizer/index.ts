@@ -47,7 +47,10 @@ export function createEmptyMessageSanitizerHook(): MessagesTransformHook {
 
         const parts = message.parts
 
-        if (!hasValidContent(parts) && parts.length > 0) {
+        // FIX: Removed `&& parts.length > 0` - empty arrays also need sanitization
+        // When parts is [], the message has no content and would cause API error:
+        // "all messages must have non-empty content except for the optional final assistant message"
+        if (!hasValidContent(parts)) {
           let injected = false
 
           for (const part of parts) {

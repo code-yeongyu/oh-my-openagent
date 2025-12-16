@@ -204,35 +204,27 @@ Following is the configuration guides for each providers. Please use interactive
 
 ```bash
 opencode auth login
-# Provider: Select Anthropic
-# Login method: Select Claude Pro/Max
+# Interactive Terminal: find Provider: Select Anthropic
+# Interactive Terminal: find Login method: Select Claude Pro/Max
 # Guide user through OAuth flow in browser
 # Wait for completion
 # Verify success and confirm with user
 ```
 
-#### 4.2 Google Gemini (Antigravity OAuth)
-
-First, enable Google auth in `~/.config/opencode/oh-my-opencode.json`:
-
-```json
-{
-  "google_auth": true
-}
-```
+#### Google Gemini (Antigravity OAuth)
 
 Then authenticate:
 
 ```bash
 opencode auth login
-# Provider: Select Google
-# Login method: Select OAuth with Google (Antigravity)
-# Guide user through OAuth flow in browser
+# Interactive Terminal: find Provider: Select Google
+# Interactive Terminal: find Login method: Select Google
+# Guide user through OAuth flow in browser. You use tools like pbcopy or other equivalents depending on your OS, and tell user that you have copied the link and paste it to the browser
 # Wait for completion
 # Verify success and confirm with user
 ```
 
-#### 4.3 OpenAI (ChatGPT Plus/Pro)
+#### OpenAI (ChatGPT Plus/Pro)
 
 First, add the opencode-openai-codex-auth plugin:
 
@@ -257,7 +249,7 @@ First, add the opencode-openai-codex-auth plugin:
 
 Then run `cd ~/.config/opencode && bun i`. In `opencode.json`, use `"opencode-openai-codex-auth"` without the version suffix.
 
-#### 4.3.1 Model Configuration
+##### Model Configuration
 You'll also need full model settings in `opencode.json`.
 Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json), and merge carefully to avoid breaking the user's existing setup.
 
@@ -265,19 +257,29 @@ Then authenticate:
 
 ```bash
 opencode auth login
-# Provider: Select OpenAI
-# Login method: Select ChatGPT Plus/Pro (Codex Subscription)
-# Guide user through OAuth flow in browser
+# Interactive Terminal: Provider: Select OpenAI
+# Interactive Terminal: Login method: Select ChatGPT Plus/Pro (Codex Subscription)
+# Interactive Terminal: Guide user through OAuth flow in browser
 # Wait for completion
 # Verify success and confirm with user
 ```
 
 
-### ⚠️ Warning
+### Verify the setup
 
-**Don't change model settings or disable features (agents, hooks, MCPs) unless explicitly requested.**
+Read this document again, think about you have done everything correctly.
 
-The plugin works perfectly with defaults. Aside from the recommended `google_auth: true`, don't touch other settings without a specific ask.
+### Say 'Congratulations! 🎉' to the user
+
+Say to user: Congratulations! 🎉 You have successfully set up OhMyOpenCode! Type `opencode` in your terminal to start using it.
+
+And as our readme suggests, list some catalogs and the features that our plugin suggests- with some great usecase examples that you can imagine.
+
+### Too Complicated?
+
+If this all seems overwhelming, just remember one thing: **include the word `ultrawork` in your prompt**.
+
+That's it. The agent will figure out the rest and handle everything automatically.
 
 </details>
 
