@@ -4,7 +4,6 @@
  */
 
 import {
-  ANTIGRAVITY_DEFAULT_PROJECT_ID,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_API_VERSION,
   ANTIGRAVITY_HEADERS,
@@ -14,10 +13,18 @@ import type {
   AntigravityLoadCodeAssistResponse,
 } from "./types"
 
-/**
- * In-memory cache for project context per access token.
- * Prevents redundant API calls for the same token.
- */
+// CLIProxyAPI-compatible random project ID generation
+// https://github.com/anthropics/anthropic-quickstarts/blob/main/internal/runtime/executor/antigravity_executor.go#L784-L791
+const PROJECT_ID_ADJECTIVES = ["useful", "bright", "swift", "calm", "bold"] as const
+const PROJECT_ID_NOUNS = ["fuze", "wave", "spark", "flow", "core"] as const
+
+function generateRandomProjectId(): string {
+  const adj = PROJECT_ID_ADJECTIVES[Math.floor(Math.random() * PROJECT_ID_ADJECTIVES.length)]
+  const noun = PROJECT_ID_NOUNS[Math.floor(Math.random() * PROJECT_ID_NOUNS.length)]
+  const randomPart = crypto.randomUUID().slice(0, 5).toLowerCase()
+  return `${adj}-${noun}-${randomPart}`
+}
+
 const projectContextCache = new Map<string, AntigravityProjectContext>()
 
 /**
@@ -134,12 +141,10 @@ export async function fetchProjectContext(
     : undefined
 
   const result: AntigravityProjectContext = {
-    cloudaicompanionProject: projectId || "",
+    cloudaicompanionProject: projectId || generateRandomProjectId(),
   }
 
-  if (projectId) {
-    projectContextCache.set(accessToken, result)
-  }
+  projectContextCache.set(accessToken, result)
 
   return result
 }
