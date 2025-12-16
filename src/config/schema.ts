@@ -62,6 +62,7 @@ export const HookNameSchema = z.enum([
   "agent-usage-reminder",
   "non-interactive-env",
   "interactive-bash-session",
+  "empty-message-sanitizer",
 ])
 
 export const AgentOverrideConfigSchema = z.object({

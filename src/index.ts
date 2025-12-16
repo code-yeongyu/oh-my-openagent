@@ -20,6 +20,7 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
+  createEmptyMessageSanitizerHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -246,6 +247,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
     ? createInteractiveBashSessionHook(ctx)
     : null;
+  const emptyMessageSanitizer = isHookEnabled("empty-message-sanitizer")
+    ? createEmptyMessageSanitizerHook()
+    : null;
 
   updateTerminalTitle({ sessionId: "main" });
 
@@ -279,6 +283,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
+    },
+
+    "experimental.chat.messages.transform": async (
+      input: Record<string, never>,
+      output: { messages: Array<{ info: unknown; parts: unknown[] }> }
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output as any);
     },
 
     config: async (config) => {
