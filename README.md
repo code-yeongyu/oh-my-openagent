@@ -31,19 +31,11 @@
 - [Oh My OpenCode](#oh-my-opencode)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
-    - [10 Minutes to Unlock](#10-minutes-to-unlock)
+    - [For Those Who Want to Read](#for-those-who-want-to-read)
+      - [Just Install It.](#just-install-it)
   - [Installation](#installation)
     - [For Humans](#for-humans)
     - [For LLM Agents](#for-llm-agents)
-    - [Step 1: Verify OpenCode Installation](#step-1-verify-opencode-installation)
-    - [Step 2: Configure oh-my-opencode Plugin](#step-2-configure-oh-my-opencode-plugin)
-    - [Step 3: Verify Setup](#step-3-verify-setup)
-    - [Step 4: Configure Authentication](#step-4-configure-authentication)
-      - [4.1 Anthropic (Claude)](#41-anthropic-claude)
-      - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
-      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
-      - [4.3.1 Model Configuration](#431-model-configuration)
-    - [⚠️ Warning](#️-warning)
   - [Features](#features)
     - [Agents: Your Teammates](#agents-your-teammates)
     - [Background Agents: Work Like a Team](#background-agents-work-like-a-team)
@@ -61,6 +53,9 @@
   - [Configuration](#configuration)
     - [Google Auth](#google-auth)
     - [Agents](#agents)
+      - [Permission Options](#permission-options)
+    - [OmO Agent](#omo-agent)
+    - [Hooks](#hooks)
     - [MCPs](#mcps)
     - [LSP](#lsp)
   - [Author's Note](#authors-note)
@@ -97,7 +92,33 @@ Hand this doc to an agent and let them set it up.
   - Ask why it's good, why it's not just another boilerplate setup, what actually gets better.
   - If you're an LLM agent, explain to the user what becomes possible right now with this project.
 
-### 10 Minutes to Unlock
+### For Those Who Want to Read
+
+Welcome. Introducing OmO (Oh-Mo).
+Everything below is customizable. Take what you want. All features are enabled by default. You don't have to do anything.
+
+- Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
+- Full LSP / AstGrep Support: Refactor with confidence.
+- Todo Continuation Enforcer: Forces the agent to continue if it quits halfway.
+- Comment Checker: Prevents AI from adding excessive comments.
+- Curated Agents
+  - OmO: Super smart main agent (Opus 4.5 High)
+  - Oracle: Design, debugging (GPT 5.2 Medium)
+  - Frontend UI/UX Engineer: Frontend development (Gemini 3 Pro)
+  - Librarian: Official docs, open source implementations, codebase exploration (Claude Sonnet 4.5)
+  - Explore: Blazing fast codebase exploration (Contextual Grep) (Grok Code)
+- Curated MCPs:
+  - Exa (Web Search)
+  - Context7 (Official Documentation)
+  - Grep.app (GitHub Code Search)
+- Curated Tools:
+  - Full LSP Support: Refactor with confidence.
+  - AstGrep Integration: Refactor with confidence.
+  - Tmux Integration: Refactor with confidence.
+- Async Agents
+- ...
+
+#### Just Install It.
 
 Just by installing this, you make your agents to work like:
 
@@ -109,13 +130,7 @@ Just by installing this, you make your agents to work like:
 4. It doesn't stop until the job is done.
 5. Don't want to dive deep into this project? No problem. Just type 'ultrathink'.
 
-Note: Installing this doesn't magically make OpenCode behave this way. Above explanation is like "you can utilize even like this". It simply equips your agent with excellent teammates and powerful tools—tell them to collaborate and they will.
-You're in full control.
-You can enable automatic behavior via ultrathink, but you don't have to. This project doesn't dictate your AI agent workflow.
-It simply introduces your agent to great colleagues and puts better tools in their hands.
-
-- Throw complex, massive tasks at it.
-  - Drop the "ultrawork" keyword in your prompt and it handles everything automatically.
+If you don't want all this, as mentioned, you can just pick and choose specific features.
 
 ## Installation
 
@@ -264,6 +279,12 @@ opencode auth login
 # Verify success and confirm with user
 ```
 
+
+### ⚠️ Warning
+
+**Unless the user explicitly requests it, do not change model settings or disable features (agents, hooks, MCPs).**
+
+The plugin works perfectly by default. Except for the recommended `google_auth: true` setting, do not change other settings or turn off features without an explicit request.
 
 ### Verify the setup
 
@@ -569,13 +590,13 @@ Fine-grained control over what agents can do:
 }
 ```
 
-| Permission | Description | Values |
-|------------|-------------|--------|
-| `edit` | File editing permission | `ask` / `allow` / `deny` |
-| `bash` | Bash command execution | `ask` / `allow` / `deny` or per-command: `{ "git": "allow", "rm": "deny" }` |
-| `webfetch` | Web request permission | `ask` / `allow` / `deny` |
-| `doom_loop` | Allow infinite loop detection override | `ask` / `allow` / `deny` |
-| `external_directory` | Access files outside project root | `ask` / `allow` / `deny` |
+| Permission           | Description                            | Values                                                                      |
+| -------------------- | -------------------------------------- | --------------------------------------------------------------------------- |
+| `edit`               | File editing permission                | `ask` / `allow` / `deny`                                                    |
+| `bash`               | Bash command execution                 | `ask` / `allow` / `deny` or per-command: `{ "git": "allow", "rm": "deny" }` |
+| `webfetch`           | Web request permission                 | `ask` / `allow` / `deny`                                                    |
+| `doom_loop`          | Allow infinite loop detection override | `ask` / `allow` / `deny`                                                    |
+| `external_directory` | Access files outside project root      | `ask` / `allow` / `deny`                                                    |
 
 Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
@@ -622,8 +643,8 @@ You can also customize OmO and OmO-Plan like other agents:
 }
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
+| Option     | Default | Description                                                                                                                                   |
+| ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `disabled` | `false` | When `true`, disables OmO agents and restores original build/plan as primary. When `false` (default), OmO and OmO-Plan become primary agents. |
 
 ### Hooks
