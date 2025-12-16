@@ -80,7 +80,7 @@ oh-my-opencode/
 |-------|-------|---------|
 | OmO | anthropic/claude-opus-4-5 | Primary orchestrator, team leader |
 | oracle | openai/gpt-5.2 | Strategic advisor, code review, architecture |
-| librarian | opencode/big-pickle | Multi-repo analysis, docs lookup, GitHub examples |
+| librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs lookup, GitHub examples |
 | explore | opencode/grok-code | Fast codebase exploration, file patterns |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, design-focused |
 | document-writer | google/gemini-3-pro-preview | Technical documentation |

@@ -474,6 +474,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 - **Background Notification**: バックグラウンドエージェントのタスクが完了すると通知を受け取ります。
 - **Session Notification**: エージェントがアイドル状態になると OS 通知を送ります。macOS、Linux、Windows で動作します—エージェントが入力を待っている時を見逃しません。
 - **Empty Task Response Detector**: Task ツールが空の応答を返すと検知します。既に空の応答が返ってきているのに、いつまでも待ち続ける状況を防ぎます。
+- **Empty Message Sanitizer**: 空のチャットメッセージによるAPIエラーを防止します。送信前にメッセージ内容を自動的にサニタイズします。
 - **Grep Output Truncator**: grep は山のようなテキストを返すことがあります。残りのコンテキストウィンドウに応じて動的に出力を切り詰めます—50% の余裕を維持し、最大 50k トークンに制限します。
 - **Tool Output Truncator**: 同じ考え方をより広範囲に適用します。Grep、Glob、LSP ツール、AST-grep の出力を切り詰めます。一度の冗長な検索がコンテキスト全体を食いつぶすのを防ぎます。
 
@@ -612,7 +613,7 @@ OmO を無効化して元の build/plan エージェントを復元するには�
 }
 ```
 
-利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`
+利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
 
 ### MCPs
 

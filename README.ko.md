@@ -470,6 +470,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Background Notification**: 백그라운드 에이전트 작업이 완료되면 알림을 받습니다.
 - **Session Notification**: 에이전트가 대기 상태가 되면 OS 알림을 보냅니다. macOS, Linux, Windows에서 작동—에이전트가 입력을 기다릴 때 놓치지 마세요.
 - **Empty Task Response Detector**: Task 도구가 빈 응답을 반환하면 감지합니다. 이미 빈 응답이 왔는데 무한정 기다리는 상황을 방지합니다.
+- **Empty Message Sanitizer**: 빈 채팅 메시지로 인한 API 오류를 방지합니다. 전송 전 메시지 내용을 자동으로 정리합니다.
 - **Grep Output Truncator**: grep은 산더미 같은 텍스트를 반환할 수 있습니다. 남은 컨텍스트 윈도우에 따라 동적으로 출력을 축소합니다—50% 여유 공간 유지, 최대 50k 토큰.
 - **Tool Output Truncator**: 같은 아이디어, 더 넓은 범위. Grep, Glob, LSP 도구, AST-grep의 출력을 축소합니다. 한 번의 장황한 검색이 전체 컨텍스트를 잡아먹는 것을 방지합니다.
 
@@ -608,7 +609,7 @@ OmO를 비활성화하고 원래 build/plan 에이전트를 복원하려면:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
 
 ### MCPs
 
