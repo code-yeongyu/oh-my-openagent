@@ -21,6 +21,11 @@ interface StoredToolPart {
     input: Record<string, unknown>
     output?: string
     error?: string
+    time?: {
+      start: number
+      end?: number
+      compacted?: number
+    }
   }
   truncated?: boolean
   originalSize?: number
@@ -123,6 +128,11 @@ export function truncateToolResult(partPath: string): {
     part.truncated = true
     part.originalSize = originalSize
     part.state.output = TRUNCATION_MESSAGE
+
+    if (!part.state.time) {
+      part.state.time = { start: Date.now() }
+    }
+    part.state.time.compacted = Date.now()
 
     writeFileSync(partPath, JSON.stringify(part, null, 2))
 
