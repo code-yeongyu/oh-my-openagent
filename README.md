@@ -11,6 +11,8 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
@@ -36,6 +38,21 @@
   - [Installation](#installation)
     - [For Humans](#for-humans)
     - [For LLM Agents](#for-llm-agents)
+    - [Step 0: Ask user about the setup.](#step-0-ask-user-about-the-setup)
+    - [Step 1: Install OpenCode, if not](#step-1-install-opencode-if-not)
+    - [Step 2: Configure oh-my-opencode Plugin](#step-2-configure-oh-my-opencode-plugin)
+      - [JSONC](#jsonc)
+      - [JSON](#json)
+    - [Step 3: Verify Setup](#step-3-verify-setup)
+    - [Step 4: Configure Authentication](#step-4-configure-authentication)
+      - [Anthropic (Claude)](#anthropic-claude)
+      - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
+      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
+        - [Model Configuration](#model-configuration)
+    - [⚠️ Warning](#️-warning)
+    - [Verify the setup](#verify-the-setup)
+    - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
+    - [Too Complicated?](#too-complicated)
   - [Features](#features)
     - [Agents: Your Teammates](#agents-your-teammates)
     - [Background Agents: Work Like a Team](#background-agents-work-like-a-team)
@@ -68,6 +85,7 @@ oMoMoMoMoMo···
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
 But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
+**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
 
 - Endlessly extensible. Endlessly customizable.
 - Zero screen flicker.

@@ -67,6 +67,7 @@ oMoMoMoMoMo···
 
 [Claude Code](https://www.claude.com/product/claude-code) 좋죠?
 근데 당신이 해커라면, [OpenCode](https://github.com/sst/opencode) 와는 사랑에 빠지게 될겁니다.
+**당장 시작하세요. 지금 당장 ChatGPT, Claude, Gemini 구독으로 사용 할 수 있습니다.**
 
 - OpenCode 는 아주 확장가능하고 아주 커스터마이저블합니다.
 - 화면이 깜빡이지 않습니다.

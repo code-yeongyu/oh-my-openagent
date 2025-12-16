@@ -66,6 +66,7 @@ oMoMoMoMoMo···
 
 [Claude Code](https://www.claude.com/product/claude-code) は素晴らしいですよね。
 でも、もしあなたがハッカーなら、[OpenCode](https://github.com/sst/opencode) と恋に落ちることになるでしょう。
+**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプションですぐに使えます。**
 
 - 無限に拡張可能で、無限にカスタマイズ可能です。
 - 画面のチラつき（フリッカー）がありません。
