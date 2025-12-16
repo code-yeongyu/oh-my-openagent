@@ -43,6 +43,7 @@ export function createKeywordDetectorHook() {
       }
 
       const context = messages.join("\n")
+      log(`[keyword-detector] Injecting context for ${messages.length} keywords`, { sessionID: input.sessionID, contextLength: context.length })
       const success = injectHookMessage(input.sessionID, context, {
         agent: message.agent,
         model: message.model,

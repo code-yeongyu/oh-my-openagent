@@ -8,6 +8,12 @@ interface MessageWithParts {
 }
 
 type MessagesTransformHook = {
+// NOTE: This sanitizer runs on experimental.chat.messages.transform hook,
+// which executes AFTER chat.message hooks. Filesystem-injected messages
+// from hooks like claude-code-hooks and keyword-detector may bypass this
+// sanitizer if they inject empty content. Validation should be done at
+// injection time in injectHookMessage().
+
   "experimental.chat.messages.transform"?: (
     input: Record<string, never>,
     output: { messages: MessageWithParts[] }

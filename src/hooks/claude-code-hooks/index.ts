@@ -111,6 +111,7 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
         if (result.messages.length > 0) {
           const hookContent = result.messages.join("\n\n")
+          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length })
           const message = output.message as {
             agent?: string
             model?: { modelID?: string; providerID?: string }

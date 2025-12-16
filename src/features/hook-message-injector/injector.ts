@@ -71,6 +71,16 @@ export function injectHookMessage(
   hookContent: string,
   originalMessage: OriginalMessageContext
 ): boolean {
+  // Validate hook content to prevent empty message injection
+  if (!hookContent || hookContent.trim().length === 0) {
+    console.warn("[hook-message-injector] Attempted to inject empty hook content, skipping injection", {
+      sessionID,
+      hasAgent: !!originalMessage.agent,
+      hasModel: !!(originalMessage.model?.providerID && originalMessage.model?.modelID)
+    })
+    return false
+  }
+
   const messageDir = getOrCreateMessageDir(sessionID)
 
   const needsFallback =
