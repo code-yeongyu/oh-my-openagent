@@ -130,6 +130,8 @@ export function createSessionNotification(
   const sessionActivitySinceIdle = new Set<string>()
   // Track notification execution version to handle race conditions
   const notificationVersions = new Map<string, number>()
+  // Track sessions currently executing notification (prevents duplicate execution)
+  const executingNotifications = new Set<string>()
 
   function cleanupOldSessions() {
     const maxSessions = mergedConfig.maxTrackedSessions
@@ -144,6 +146,10 @@ export function createSessionNotification(
     if (notificationVersions.size > maxSessions) {
       const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
       sessionsToRemove.forEach(id => notificationVersions.delete(id))
+    }
+    if (executingNotifications.size > maxSessions) {
+      const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
+      sessionsToRemove.forEach(id => executingNotifications.delete(id))
     }
   }
 
@@ -164,42 +170,57 @@ export function createSessionNotification(
   }
 
   async function executeNotification(sessionID: string, version: number) {
-    pendingTimers.delete(sessionID)
+    if (executingNotifications.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+      return
+    }
 
-    // Race condition fix: check if version matches (activity happened during async wait)
     if (notificationVersions.get(sessionID) !== version) {
+      pendingTimers.delete(sessionID)
       return
     }
 
     if (sessionActivitySinceIdle.has(sessionID)) {
       sessionActivitySinceIdle.delete(sessionID)
+      pendingTimers.delete(sessionID)
       return
     }
 
-    if (notifiedSessions.has(sessionID)) return
+    if (notifiedSessions.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+      return
+    }
 
-    if (mergedConfig.skipIfIncompleteTodos) {
-      const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
-      // Re-check version after async call (race condition fix)
+    executingNotifications.add(sessionID)
+    try {
+      if (mergedConfig.skipIfIncompleteTodos) {
+        const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
+        if (notificationVersions.get(sessionID) !== version) {
+          return
+        }
+        if (hasPendingWork) return
+      }
+
       if (notificationVersions.get(sessionID) !== version) {
         return
       }
-      if (hasPendingWork) return
-    }
 
-    if (notificationVersions.get(sessionID) !== version) {
-      return
-    }
+      if (sessionActivitySinceIdle.has(sessionID)) {
+        sessionActivitySinceIdle.delete(sessionID)
+        return
+      }
 
-    notifiedSessions.add(sessionID)
+      notifiedSessions.add(sessionID)
 
-    try {
       await sendNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.message)
 
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await playSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
-    } catch {}
+    } finally {
+      executingNotifications.delete(sessionID)
+      pendingTimers.delete(sessionID)
+    }
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -224,6 +245,7 @@ export function createSessionNotification(
 
       if (notifiedSessions.has(sessionID)) return
       if (pendingTimers.has(sessionID)) return
+      if (executingNotifications.has(sessionID)) return
 
       sessionActivitySinceIdle.delete(sessionID)
       
@@ -263,6 +285,7 @@ export function createSessionNotification(
         notifiedSessions.delete(sessionInfo.id)
         sessionActivitySinceIdle.delete(sessionInfo.id)
         notificationVersions.delete(sessionInfo.id)
+        executingNotifications.delete(sessionInfo.id)
       }
     }
   }

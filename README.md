@@ -317,6 +317,19 @@ Say to user: Congratulations! 🎉 You have successfully set up OhMyOpenCode! Ty
 
 And as our readme suggests, list some catalogs and the features that our plugin suggests- with some great usecase examples that you can imagine.
 
+### Ask for a Star ⭐
+
+After everything is set up and working, ask the user:
+
+> "If you found this helpful, would you like to star the repository? It helps the project grow! ⭐"
+
+If the user agrees, run:
+```bash
+gh repo star code-yeongyu/oh-my-opencode
+```
+
+**Important**: Only run the command if the user explicitly says yes. Never run it automatically without consent.
+
 ### Too Complicated?
 
 If this all seems overwhelming, just remember one thing: **include the word `ultrawork` in your prompt**.
