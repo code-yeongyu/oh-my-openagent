@@ -129,10 +129,26 @@ Let the LLM Agent handle the grunt work. Paste this link and ask it to install a
 <details>
 <summary>Instructions for LLM Agents (click to expand)</summary>
 
-If you're an LLM Agent helping set up oh-my-opencode, follow these steps:
+If you're an LLM Agent helping set up oh-my-opencode, Welcome! You'll now help your user to install the best agent harness, OhMyOpenCode. Tell user this with greetings, with test 'oMoMoMoMo...'
 
+follow these steps:
 
-### Step 1: Verify OpenCode Installation
+### Step 0: Ask user about the setup.
+
+Since OpenCode Supports various models, and our plugin suggests various frontier LLMs. Thus, you must ask user, following questions:
+1. Do you have a Claude Pro/Max Subscription? Otherwise, we'll use 'opencode/big-pickle' (known for glm 4.6) as a main orchestrator model (not recommended)
+  -> If user said yes, add ToDo: "Setup user Claude Pro/Max Auth"
+  -> If user said no, add ToDo: "Override OmO agent model on oh-my-opencode.json as opencode/big-pickle"
+2. Do you have a ChatGPT Subscription? Otherwise, we'll use 'claude-opus-4-5' with 32k thinking option for oracle agent.
+  -> If user said yes, add ToDo: "Setup user ChatGPT Auth"
+  -> If user said no, add ToDo: "Override oracle agent model on oh-my-opencode.json as claude-opus-4-5 with 32k thinking"
+3. Will you integrate Gemini models? Otherwise, you cannot enjoy the beautiful design.
+  -> If user said yes, add ToDo: "Setup Google OAuth"
+  -> If user said no, add ToDo: "Override frontend-ui-ux-engineer agent model on oh-my-opencode.json as claude-opus-4-5 with 32k thinking"
+
+### Step 1: Install OpenCode, if not
+
+Run following command to verify OpenCode Installation:
 
 ```bash
 if command -v opencode &> /dev/null; then
@@ -143,9 +159,16 @@ else
 fi
 ```
 
-If OpenCode isn't installed, check the [OpenCode Installation Guide](https://opencode.ai/docs). To save context, spawn a subagent to handle installation and report back.
+If OpenCode isn't installed, check the [OpenCode Installation Guide](https://opencode.ai/docs).
+Spawn a subagent to handle installation and report back - to save context.
 
 ### Step 2: Configure oh-my-opencode Plugin
+
+#### JSONC
+- If `~/.config/opencode/opencode.jsonc` exists, work in there to add `oh-my-opencode` plugin
+
+#### JSON
+- If no opencode.jsonc exists, run following command to create and register it.
 
 ```bash
 mkdir -p ~/.config/opencode
@@ -169,14 +192,15 @@ fi
 
 ```bash
 opencode --version  # Should be 1.0.132 or higher
-cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
+cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array, or maybe check jsonc
 ```
 
 ### Step 4: Configure Authentication
 
-Once oh-my-opencode is in the plugin list, use tmux to walk the user through authentication. Complete all steps below.
+As your todo, please configure authentication as user have answered to you.
+Following is the configuration guides for each providers. Please use interactive terminal like tmux to do following:
 
-#### 4.1 Anthropic (Claude)
+#### Anthropic (Claude)
 
 ```bash
 opencode auth login
