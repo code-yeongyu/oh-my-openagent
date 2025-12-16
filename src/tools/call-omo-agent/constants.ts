@@ -1,25 +1,7 @@
 export const ALLOWED_AGENTS = ["explore", "librarian"] as const
 
-export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.
+export const CALL_OMO_AGENT_DESCRIPTION = `Spawn explore/librarian agent. run_in_background REQUIRED (true=async with task_id, false=sync).
 
-This is a restricted version of the Task tool that only allows spawning explore and librarian agents.
+Available: {agents}
 
-Available agent types:
-{agents}
-
-When using this tool, you must specify a subagent_type parameter to select which agent type to use.
-
-**IMPORTANT: run_in_background parameter is REQUIRED**
-- \`run_in_background=true\`: Task runs asynchronously in background. Returns immediately with task_id.
-  The system will notify you when the task completes.
-  Use \`background_output\` tool with task_id to check progress (block=false returns full status info).
-- \`run_in_background=false\`: Task runs synchronously. Waits for completion and returns full result.
-
-Usage notes:
-1. Launch multiple agents concurrently whenever possible, to maximize performance
-2. When the agent is done, it will return a single message back to you
-3. Each agent invocation is stateless unless you provide a session_id
-4. Your prompt should contain a highly detailed task description for the agent to perform autonomously
-5. Clearly tell the agent whether you expect it to write code or just to do research
-6. For long-running research tasks, use run_in_background=true to avoid blocking
-7. **IMPORTANT**: Always write prompts in English regardless of user's language. LLMs perform significantly better with English prompts.`
+Prompts MUST be in English. Use \`background_output\` for async results.`
