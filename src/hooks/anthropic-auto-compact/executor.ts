@@ -15,9 +15,13 @@ type Client = {
       body: { messageID: string; partID?: string }
       query: { directory: string }
     }) => Promise<unknown>
+    prompt_async: (opts: {
+      path: { sessionID: string }
+      body: { parts: Array<{ type: string; text: string }> }
+      query: { directory: string }
+    }) => Promise<unknown>
   }
   tui: {
-    submitPrompt: (opts: { query: { directory: string } }) => Promise<unknown>
     showToast: (opts: {
       body: { title: string; message: string; variant: string; duration: number }
     }) => Promise<unknown>
@@ -190,7 +194,11 @@ export async function executeCompact(
 
         setTimeout(async () => {
           try {
-            await (client as Client).tui.submitPrompt({ query: { directory } })
+            await (client as Client).session.prompt_async({
+              path: { sessionID },
+              body: { parts: [{ type: "text", text: "Continue" }] },
+              query: { directory },
+            })
           } catch {}
         }, 500)
         return
@@ -230,7 +238,11 @@ export async function executeCompact(
 
         setTimeout(async () => {
           try {
-            await (client as Client).tui.submitPrompt({ query: { directory } })
+            await (client as Client).session.prompt_async({
+              path: { sessionID },
+              body: { parts: [{ type: "text", text: "Continue" }] },
+              query: { directory },
+            })
           } catch {}
         }, 500)
         return
