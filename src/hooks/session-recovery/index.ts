@@ -4,12 +4,14 @@ import {
   findEmptyMessages,
   findEmptyMessageByIndex,
   findMessageByIndexNeedingThinking,
+  findMessagesWithEmptyTextParts,
   findMessagesWithOrphanThinking,
   findMessagesWithThinkingBlocks,
   findMessagesWithThinkingOnly,
   injectTextPart,
   prependThinkingPart,
   readParts,
+  replaceEmptyTextParts,
   stripThinkingParts,
 } from "./storage"
 import type { MessageData } from "./types"
@@ -222,28 +224,48 @@ async function recoverEmptyContentMessage(
 ): Promise<boolean> {
   const targetIndex = extractMessageIndex(error)
   const failedID = failedAssistantMsg.info?.id
+  let anySuccess = false
+
+  const messagesWithEmptyText = findMessagesWithEmptyTextParts(sessionID)
+  for (const messageID of messagesWithEmptyText) {
+    if (replaceEmptyTextParts(messageID, PLACEHOLDER_TEXT)) {
+      anySuccess = true
+    }
+  }
 
   const thinkingOnlyIDs = findMessagesWithThinkingOnly(sessionID)
   for (const messageID of thinkingOnlyIDs) {
-    injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT)
+    if (injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT)) {
+      anySuccess = true
+    }
   }
 
   if (targetIndex !== null) {
     const targetMessageID = findEmptyMessageByIndex(sessionID, targetIndex)
     if (targetMessageID) {
-      return injectTextPart(sessionID, targetMessageID, PLACEHOLDER_TEXT)
+      if (replaceEmptyTextParts(targetMessageID, PLACEHOLDER_TEXT)) {
+        return true
+      }
+      if (injectTextPart(sessionID, targetMessageID, PLACEHOLDER_TEXT)) {
+        return true
+      }
     }
   }
 
   if (failedID) {
+    if (replaceEmptyTextParts(failedID, PLACEHOLDER_TEXT)) {
+      return true
+    }
     if (injectTextPart(sessionID, failedID, PLACEHOLDER_TEXT)) {
       return true
     }
   }
 
   const emptyMessageIDs = findEmptyMessages(sessionID)
-  let anySuccess = thinkingOnlyIDs.length > 0
   for (const messageID of emptyMessageIDs) {
+    if (replaceEmptyTextParts(messageID, PLACEHOLDER_TEXT)) {
+      anySuccess = true
+    }
     if (injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT)) {
       anySuccess = true
     }
