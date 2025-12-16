@@ -312,7 +312,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
         const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
         const omoPlanBase = {
-          ...builtinAgents.OmO,
           ...planConfigWithoutName,
           description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
           color: config.agent?.plan?.color ?? "#6495ED",
