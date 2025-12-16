@@ -129,10 +129,7 @@ Everything below is customizable. Take what you want. All features are enabled b
   - Exa (Web Search)
   - Context7 (Official Documentation)
   - Grep.app (GitHub Code Search)
-- Curated Tools:
-  - Full LSP Support: Refactor with confidence.
-  - AstGrep Integration: Refactor with confidence.
-  - Tmux Integration: Refactor with confidence.
+- Interactive Terminal Supported - Tmux Integration
 - Async Agents
 - ...
 

@@ -11,6 +11,8 @@
 
 > `oh-my-opencode` をインストールして、ドーピングしたかのようにコーディングしましょう。バックグラウンドでエージェントを走らせ、oracle、librarian、frontend engineer のような専門エージェントを呼び出してください。丹精込めて作られた LSP/AST ツール、厳選された MCP、そして完全な Claude Code 互換レイヤーを、たった一行で手に入れましょう。
 
+**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプションで使えます。**
+
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
@@ -34,6 +36,8 @@
     - [読みたい方のために](#読みたい方のために)
       - [インストールするだけで。](#インストールするだけで)
   - [インストール](#インストール)
+    - [人間の方へ](#人間の方へ)
+    - [LLM エージェントの方へ](#llm-エージェントの方へ)
   - [機能](#機能)
     - [Agents: あなたの新しいチームメイト](#agents-あなたの新しいチームメイト)
     - [バックグラウンドエージェント: 本当のチームのように働く](#バックグラウンドエージェント-本当のチームのように働く)
@@ -110,10 +114,7 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
   - Exa (Web Search)
   - Context7 (Official Documentation)
   - Grep.app (GitHub Code Search)
-- Curated Tools:
-  - Full LSP Support: 決定的にリファクタリングしましょう。
-  - AstGrep Integration: 決定的にリファクタリングしましょう。
-  - Tmux Integration: 決定的にリファクタリングしましょう。
+- Interactive Terminal Supported - Tmux Integration
 - Async Agents
 - ...
 

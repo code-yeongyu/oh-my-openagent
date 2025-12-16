@@ -113,10 +113,7 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   - Exa (Web Search)
   - Context7 (Official Documentation)
   - Grep.app (GitHub Code Search)
-- Curated Tools:
-  - Full LSP Support: 결정적이게 리팩토링하세요.
-  - AstGrep Integration: 결정적이게 리팩토링하세요.
-  - Tmux Integration: 결정적이게 리팩토링하세요.
+- Interactive Terminal Supported - Tmux Integration
 - Async Agents
 - ...
 
