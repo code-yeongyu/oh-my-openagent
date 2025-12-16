@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
+import { subagentSessions } from "../features/claude-code-session-state"
 
 interface Todo {
   content: string
@@ -218,6 +219,8 @@ export function createSessionNotification(
     if (event.type === "session.idle") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
+
+      if (subagentSessions.has(sessionID)) return
 
       if (notifiedSessions.has(sessionID)) return
       if (pendingTimers.has(sessionID)) return

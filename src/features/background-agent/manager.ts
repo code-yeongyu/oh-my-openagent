@@ -10,6 +10,7 @@ import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
+import { subagentSessions } from "../claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -82,6 +83,7 @@ export class BackgroundManager {
     }
 
     const sessionID = createResult.data.id
+    subagentSessions.add(sessionID)
 
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
@@ -236,6 +238,7 @@ export class BackgroundManager {
 
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
+      subagentSessions.delete(sessionID)
     }
   }
 
