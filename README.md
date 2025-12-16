@@ -11,7 +11,12 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+
+No stupid token consumption massive subagents here. No bloat tools here.
+
+**Certified, Verified, Tested, Actually Useful Harness in Production, after $24,000 worth of tokens spent.**
 **START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+
 
 <div align="center">
 
