@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-15T22:57:00+09:00
-**Commit:** cea64e4
+**Generated:** 2025-12-16T16:00:00+09:00
+**Commit:** a2d2109
 **Branch:** master
 
 ## OVERVIEW
@@ -127,8 +127,8 @@ gh run list --workflow=publish
 ## NOTES
 
 - **No tests**: Test framework not configured
-- **OpenCode version**: Requires >= 1.0.132 (earlier versions have config bugs)
-- **Multi-language docs**: README.md (EN), README.ko.md (KO)
+- **OpenCode version**: Requires >= 1.0.150 (earlier versions have config bugs)
+- **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA)
 - **Config locations**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Schema autocomplete**: Add `$schema` field in config for IDE support
 - **Trusted dependencies**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
