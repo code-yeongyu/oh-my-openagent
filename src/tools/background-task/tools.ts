@@ -263,11 +263,42 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
   return tool({
     description: BACKGROUND_CANCEL_DESCRIPTION,
     args: {
-      taskId: tool.schema.string().describe("Task ID to cancel"),
+      taskId: tool.schema.string().optional().describe("Task ID to cancel (required if all=false)"),
+      all: tool.schema.boolean().optional().describe("Cancel all running background tasks (default: false)"),
     },
-    async execute(args: BackgroundCancelArgs) {
+    async execute(args: BackgroundCancelArgs, toolContext) {
       try {
-        const task = manager.getTask(args.taskId)
+        const cancelAll = args.all === true
+
+        if (!cancelAll && !args.taskId) {
+          return `❌ Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
+        }
+
+        if (cancelAll) {
+          const tasks = manager.getTasksByParentSession(toolContext.sessionID)
+          const runningTasks = tasks.filter(t => t.status === "running")
+
+          if (runningTasks.length === 0) {
+            return `✅ No running background tasks to cancel.`
+          }
+
+          const results: string[] = []
+          for (const task of runningTasks) {
+            client.session.abort({
+              path: { id: task.sessionID },
+            }).catch(() => {})
+
+            task.status = "cancelled"
+            task.completedAt = new Date()
+            results.push(`- ${task.id}: ${task.description}`)
+          }
+
+          return `✅ Cancelled ${runningTasks.length} background task(s):
+
+${results.join("\n")}`
+        }
+
+        const task = manager.getTask(args.taskId!)
         if (!task) {
           return `❌ Task not found: ${args.taskId}`
         }

@@ -25,9 +25,12 @@ Arguments:
 
 The system automatically notifies when background tasks complete. You typically don't need block=true.`
 
-export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel a running background task.
+export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel running background task(s).
 
 Only works for tasks with status "running". Aborts the background session and marks the task as cancelled.
 
 Arguments:
-- taskId: Required task ID to cancel.`
+- taskId: Task ID to cancel (optional if all=true)
+- all: Set to true to cancel ALL running background tasks at once (default: false)
+
+**Cleanup Before Answer**: When you have gathered sufficient information and are ready to provide your final answer to the user, use \`all=true\` to cancel ALL running background tasks first, then deliver your response. This conserves resources and ensures clean workflow completion.`
