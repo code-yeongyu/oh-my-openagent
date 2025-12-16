@@ -107,17 +107,17 @@ Use it as a **peer tool**, not a fallback. Fire liberally.
 | Single keyword/pattern suffices | Unfamiliar module structure |
 | Known file location | Cross-layer pattern discovery |
 
-### Librarian Agent = Research Specialist
+### Librarian Agent = Reference Grep
 
-Use it for **external knowledge** not in the codebase. Fire proactively when libraries are involved.
+Search **external references** (docs, OSS, web). Fire proactively when libraries are involved.
 
-| Use Explore (Internal) | Use Librarian (External) |
-|------------------------|--------------------------|
-| How does OUR code work? | How does THIS LIBRARY work? |
+| Contextual Grep (Internal) | Reference Grep (External) |
+|----------------------------|---------------------------|
+| Search OUR codebase | Search EXTERNAL resources |
 | Find patterns in THIS repo | Find examples in OTHER repos |
-| Internal implementation | Official API documentation |
-| Project-specific logic | Library best practices |
-| | Third-party behavior/quirks |
+| How does our code work? | How does this library work? |
+| Project-specific logic | Official API documentation |
+| | Library best practices & quirks |
 | | OSS implementation examples |
 
 **Trigger phrases** (fire librarian immediately):
@@ -133,9 +133,12 @@ Use it for **external knowledge** not in the codebase. Fire proactively when lib
 
 \`\`\`typescript
 // CORRECT: Always background, always parallel
-background_task(agent="explore", prompt="Find auth implementations...")
-background_task(agent="explore", prompt="Find error handling patterns...")
-background_task(agent="librarian", prompt="Look up JWT best practices...")
+// Contextual Grep (internal)
+background_task(agent="explore", prompt="Find auth implementations in our codebase...")
+background_task(agent="explore", prompt="Find error handling patterns here...")
+// Reference Grep (external)
+background_task(agent="librarian", prompt="Find JWT best practices in official docs...")
+background_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
