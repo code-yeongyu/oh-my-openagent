@@ -48,19 +48,34 @@ async function sendNotification(
   title: string,
   message: string
 ): Promise<void> {
-  const escapedTitle = title.replace(/"/g, '\\"').replace(/'/g, "\\'")
-  const escapedMessage = message.replace(/"/g, '\\"').replace(/'/g, "\\'")
-
   switch (p) {
-    case "darwin":
-      await ctx.$`osascript -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`
+    case "darwin": {
+      const esTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+      const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+      await ctx.$`osascript -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`
       break
+    }
     case "linux":
-      await ctx.$`notify-send ${escapedTitle} ${escapedMessage} 2>/dev/null`.catch(() => {})
+      await ctx.$`notify-send ${title} ${message} 2>/dev/null`.catch(() => {})
       break
-    case "win32":
-      await ctx.$`powershell -Command ${"[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); [System.Windows.Forms.MessageBox]::Show('" + escapedMessage + "', '" + escapedTitle + "')"}`
+    case "win32": {
+      const psTitle = title.replace(/'/g, "''")
+      const psMessage = message.replace(/'/g, "''")
+      const toastScript = `
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+$Template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$RawXml = [xml] $Template.GetXml()
+($RawXml.toast.visual.binding.text | Where-Object {$_.id -eq '1'}).AppendChild($RawXml.CreateTextNode('${psTitle}')) | Out-Null
+($RawXml.toast.visual.binding.text | Where-Object {$_.id -eq '2'}).AppendChild($RawXml.CreateTextNode('${psMessage}')) | Out-Null
+$SerializedXml = New-Object Windows.Data.Xml.Dom.XmlDocument
+$SerializedXml.LoadXml($RawXml.OuterXml)
+$Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
+$Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
+$Notifier.Show($Toast)
+`.trim().replace(/\n/g, "; ")
+      await ctx.$`powershell -Command ${toastScript}`.catch(() => {})
       break
+    }
   }
 }
 
