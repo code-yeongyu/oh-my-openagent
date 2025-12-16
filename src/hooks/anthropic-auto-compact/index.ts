@@ -9,6 +9,8 @@ function createAutoCompactState(): AutoCompactState {
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
     fallbackStateBySession: new Map(),
+    truncateStateBySession: new Map(),
+    compactionInProgress: new Set<string>(),
   }
 }
 
@@ -25,6 +27,8 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
         autoCompactState.fallbackStateBySession.delete(sessionInfo.id)
+        autoCompactState.truncateStateBySession.delete(sessionInfo.id)
+        autoCompactState.compactionInProgress.delete(sessionInfo.id)
       }
       return
     }
@@ -37,6 +41,37 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
       if (parsed) {
         autoCompactState.pendingCompact.add(sessionID)
         autoCompactState.errorDataBySession.set(sessionID, parsed)
+
+        if (autoCompactState.compactionInProgress.has(sessionID)) {
+          return
+        }
+
+        const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
+        const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)
+        const modelID = parsed.modelID ?? (lastAssistant?.modelID as string | undefined)
+
+        if (providerID && modelID) {
+          await ctx.client.tui
+            .showToast({
+              body: {
+                title: "Context Limit Hit",
+                message: "Truncating large tool outputs and recovering...",
+                variant: "warning" as const,
+                duration: 3000,
+              },
+            })
+            .catch(() => {})
+
+          setTimeout(() => {
+            executeCompact(
+              sessionID,
+              { providerID, modelID },
+              autoCompactState,
+              ctx.client,
+              ctx.directory
+            )
+          }, 300)
+        }
       }
       return
     }
@@ -122,6 +157,6 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
   }
 }
 
-export type { AutoCompactState, FallbackState, ParsedTokenLimitError } from "./types"
+export type { AutoCompactState, FallbackState, ParsedTokenLimitError, TruncateState } from "./types"
 export { parseAnthropicTokenLimitError } from "./parser"
 export { executeCompact, getLastAssistant } from "./executor"
