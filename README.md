@@ -113,12 +113,13 @@ Hand this doc to an agent and let them set it up.
 ### For Those Who Want to Read
 
 Welcome. Introducing OmO (Oh-Mo).
-Everything below is customizable. Take what you want. All features are enabled by default. You don't have to do anything.
+Everything below is customizable. Take what you want.
+All features are enabled by default. You don't have to do anything. Battery Included, works out of the box.
 
 - Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-- Full LSP / AstGrep Support: Refactor with confidence.
+- Comment Checker: No AI-like Comments Anymore.
+- Full LSP / AstGrep Support: Explore precisely, Refactor with confidence.
 - Todo Continuation Enforcer: Forces the agent to continue if it quits halfway.
-- Comment Checker: Prevents AI from adding excessive comments.
 - Curated Agents
   - OmO: Super smart main agent (Opus 4.5 High)
   - Oracle: Design, debugging (GPT 5.2 Medium)
