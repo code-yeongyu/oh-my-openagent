@@ -56,12 +56,23 @@ export interface AntigravityLoadCodeAssistRequest {
   metadata: AntigravityClientMetadata
 }
 
-/**
- * Response from loadCodeAssist API
- */
+export interface AntigravityUserTier {
+  id?: string
+  isDefault?: boolean
+  userDefinedCloudaicompanionProject?: boolean
+}
+
 export interface AntigravityLoadCodeAssistResponse {
-  /** Project ID - can be string or object with id field */
   cloudaicompanionProject?: string | { id: string }
+  currentTier?: { id?: string }
+  allowedTiers?: AntigravityUserTier[]
+}
+
+export interface AntigravityOnboardUserPayload {
+  done?: boolean
+  response?: {
+    cloudaicompanionProject?: { id?: string }
+  }
 }
 
 /**
