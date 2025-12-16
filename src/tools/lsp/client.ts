@@ -21,6 +21,45 @@ class LSPServerManager {
 
   private constructor() {
     this.startCleanupTimer()
+    this.registerProcessCleanup()
+  }
+
+  private registerProcessCleanup(): void {
+    const cleanup = () => {
+      for (const [, managed] of this.clients) {
+        try {
+          managed.client.stop()
+        } catch {}
+      }
+      this.clients.clear()
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval)
+        this.cleanupInterval = null
+      }
+    }
+
+    // Works on all platforms
+    process.on("exit", cleanup)
+
+    // Ctrl+C - works on all platforms
+    process.on("SIGINT", () => {
+      cleanup()
+      process.exit(0)
+    })
+
+    // Kill signal - Unix/macOS
+    process.on("SIGTERM", () => {
+      cleanup()
+      process.exit(0)
+    })
+
+    // Ctrl+Break - Windows specific
+    if (process.platform === "win32") {
+      process.on("SIGBREAK", () => {
+        cleanup()
+        process.exit(0)
+      })
+    }
   }
 
   static getInstance(): LSPServerManager {
