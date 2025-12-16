@@ -17,11 +17,18 @@ export interface FallbackState {
   lastRevertedMessageID?: string
 }
 
+export interface TruncateState {
+  truncateAttempt: number
+  lastTruncatedPartId?: string
+}
+
 export interface AutoCompactState {
   pendingCompact: Set<string>
   errorDataBySession: Map<string, ParsedTokenLimitError>
   retryStateBySession: Map<string, RetryState>
   fallbackStateBySession: Map<string, FallbackState>
+  truncateStateBySession: Map<string, TruncateState>
+  compactionInProgress: Set<string>
 }
 
 export const RETRY_CONFIG = {
@@ -34,4 +41,9 @@ export const RETRY_CONFIG = {
 export const FALLBACK_CONFIG = {
   maxRevertAttempts: 3,
   minMessagesRequired: 2,
+} as const
+
+export const TRUNCATE_CONFIG = {
+  maxTruncateAttempts: 10,
+  minOutputSizeToTruncate: 1000,
 } as const

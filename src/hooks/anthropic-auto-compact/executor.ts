@@ -1,5 +1,6 @@
-import type { AutoCompactState, FallbackState, RetryState } from "./types"
-import { FALLBACK_CONFIG, RETRY_CONFIG } from "./types"
+import type { AutoCompactState, FallbackState, RetryState, TruncateState } from "./types"
+import { FALLBACK_CONFIG, RETRY_CONFIG, TRUNCATE_CONFIG } from "./types"
+import { findLargestToolResult, truncateToolResult } from "./storage"
 
 type Client = {
   session: {
@@ -23,16 +24,6 @@ type Client = {
   }
 }
 
-function calculateRetryDelay(attempt: number): number {
-  const delay = RETRY_CONFIG.initialDelayMs * Math.pow(RETRY_CONFIG.backoffFactor, attempt - 1)
-  return Math.min(delay, RETRY_CONFIG.maxDelayMs)
-}
-
-function shouldRetry(retryState: RetryState | undefined): boolean {
-  if (!retryState) return true
-  return retryState.attempt < RETRY_CONFIG.maxAttempts
-}
-
 function getOrCreateRetryState(
   autoCompactState: AutoCompactState,
   sessionID: string
@@ -53,6 +44,18 @@ function getOrCreateFallbackState(
   if (!state) {
     state = { revertAttempt: 0 }
     autoCompactState.fallbackStateBySession.set(sessionID, state)
+  }
+  return state
+}
+
+function getOrCreateTruncateState(
+  autoCompactState: AutoCompactState,
+  sessionID: string
+): TruncateState {
+  let state = autoCompactState.truncateStateBySession.get(sessionID)
+  if (!state) {
+    state = { truncateAttempt: 0 }
+    autoCompactState.truncateStateBySession.set(sessionID, state)
   }
   return state
 }
@@ -104,61 +107,10 @@ async function getLastMessagePair(
   }
 }
 
-async function executeRevertFallback(
-  sessionID: string,
-  autoCompactState: AutoCompactState,
-  client: Client,
-  directory: string
-): Promise<boolean> {
-  const fallbackState = getOrCreateFallbackState(autoCompactState, sessionID)
-
-  if (fallbackState.revertAttempt >= FALLBACK_CONFIG.maxRevertAttempts) {
-    return false
-  }
-
-  const pair = await getLastMessagePair(sessionID, client, directory)
-  if (!pair) {
-    return false
-  }
-
-  await client.tui
-    .showToast({
-      body: {
-        title: "⚠️ Emergency Recovery",
-        message: `Context too large. Removing last message pair to recover session...`,
-        variant: "warning",
-        duration: 4000,
-      },
-    })
-    .catch(() => {})
-
-  try {
-    if (pair.assistantMessageID) {
-      await client.session.revert({
-        path: { id: sessionID },
-        body: { messageID: pair.assistantMessageID },
-        query: { directory },
-      })
-    }
-
-    await client.session.revert({
-      path: { id: sessionID },
-      body: { messageID: pair.userMessageID },
-      query: { directory },
-    })
-
-    fallbackState.revertAttempt++
-    fallbackState.lastRevertedMessageID = pair.userMessageID
-
-    const retryState = autoCompactState.retryStateBySession.get(sessionID)
-    if (retryState) {
-      retryState.attempt = 0
-    }
-
-    return true
-  } catch {
-    return false
-  }
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
 }
 
 export async function getLastAssistant(
@@ -194,6 +146,8 @@ function clearSessionState(autoCompactState: AutoCompactState, sessionID: string
   autoCompactState.errorDataBySession.delete(sessionID)
   autoCompactState.retryStateBySession.delete(sessionID)
   autoCompactState.fallbackStateBySession.delete(sessionID)
+  autoCompactState.truncateStateBySession.delete(sessionID)
+  autoCompactState.compactionInProgress.delete(sessionID)
 }
 
 export async function executeCompact(
@@ -204,91 +158,154 @@ export async function executeCompact(
   client: any,
   directory: string
 ): Promise<void> {
-  const retryState = getOrCreateRetryState(autoCompactState, sessionID)
+  if (autoCompactState.compactionInProgress.has(sessionID)) {
+    return
+  }
+  autoCompactState.compactionInProgress.add(sessionID)
 
-  if (!shouldRetry(retryState)) {
-    const fallbackState = getOrCreateFallbackState(autoCompactState, sessionID)
+  const truncateState = getOrCreateTruncateState(autoCompactState, sessionID)
 
-    if (fallbackState.revertAttempt < FALLBACK_CONFIG.maxRevertAttempts) {
-      const reverted = await executeRevertFallback(
-        sessionID,
-        autoCompactState,
-        client as Client,
-        directory
-      )
+  if (truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts) {
+    const largest = findLargestToolResult(sessionID)
 
-      if (reverted) {
+    if (largest && largest.outputSize >= TRUNCATE_CONFIG.minOutputSizeToTruncate) {
+      const result = truncateToolResult(largest.partPath)
+
+      if (result.success) {
+        truncateState.truncateAttempt++
+        truncateState.lastTruncatedPartId = largest.partId
+
         await (client as Client).tui
           .showToast({
             body: {
-              title: "Recovery Attempt",
-              message: "Message removed. Retrying compaction...",
-              variant: "info",
+              title: "Truncating Large Output",
+              message: `Truncated ${result.toolName} (${formatBytes(result.originalSize ?? 0)}). Retrying...`,
+              variant: "warning",
               duration: 3000,
             },
           })
           .catch(() => {})
 
-        setTimeout(() => {
-          executeCompact(sessionID, msg, autoCompactState, client, directory)
-        }, 1000)
+        autoCompactState.compactionInProgress.delete(sessionID)
+
+        setTimeout(async () => {
+          try {
+            await (client as Client).tui.submitPrompt({ query: { directory } })
+          } catch {}
+        }, 500)
         return
       }
     }
-
-    clearSessionState(autoCompactState, sessionID)
-
-    await (client as Client).tui
-      .showToast({
-        body: {
-          title: "Auto Compact Failed",
-          message: `Failed after ${RETRY_CONFIG.maxAttempts} retries and ${FALLBACK_CONFIG.maxRevertAttempts} message removals. Please start a new session.`,
-          variant: "error",
-          duration: 5000,
-        },
-      })
-      .catch(() => {})
-    return
   }
 
-  retryState.attempt++
-  retryState.lastAttemptTime = Date.now()
+  const retryState = getOrCreateRetryState(autoCompactState, sessionID)
 
-  try {
+  if (retryState.attempt < RETRY_CONFIG.maxAttempts) {
+    retryState.attempt++
+    retryState.lastAttemptTime = Date.now()
+
     const providerID = msg.providerID as string | undefined
     const modelID = msg.modelID as string | undefined
 
     if (providerID && modelID) {
-      await (client as Client).session.summarize({
-        path: { id: sessionID },
-        body: { providerID, modelID },
-        query: { directory },
-      })
+      try {
+        await (client as Client).tui
+          .showToast({
+            body: {
+              title: "Auto Compact",
+              message: `Summarizing session (attempt ${retryState.attempt}/${RETRY_CONFIG.maxAttempts})...`,
+              variant: "warning",
+              duration: 3000,
+            },
+          })
+          .catch(() => {})
 
-      clearSessionState(autoCompactState, sessionID)
+        await (client as Client).session.summarize({
+          path: { id: sessionID },
+          body: { providerID, modelID },
+          query: { directory },
+        })
 
-      setTimeout(async () => {
-        try {
-          await (client as Client).tui.submitPrompt({ query: { directory } })
-        } catch {}
-      }, 500)
+        clearSessionState(autoCompactState, sessionID)
+
+        setTimeout(async () => {
+          try {
+            await (client as Client).tui.submitPrompt({ query: { directory } })
+          } catch {}
+        }, 500)
+        return
+      } catch {
+        autoCompactState.compactionInProgress.delete(sessionID)
+
+        const delay = RETRY_CONFIG.initialDelayMs * Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
+        const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs)
+
+        setTimeout(() => {
+          executeCompact(sessionID, msg, autoCompactState, client, directory)
+        }, cappedDelay)
+        return
+      }
     }
-  } catch {
-    const delay = calculateRetryDelay(retryState.attempt)
-
-    await (client as Client).tui
-      .showToast({
-        body: {
-          title: "Auto Compact Retry",
-          message: `Attempt ${retryState.attempt}/${RETRY_CONFIG.maxAttempts} failed. Retrying in ${Math.round(delay / 1000)}s...`,
-          variant: "warning",
-          duration: delay,
-        },
-      })
-      .catch(() => {})
-
-    setTimeout(() => {
-      executeCompact(sessionID, msg, autoCompactState, client, directory)
-    }, delay)
   }
+
+  const fallbackState = getOrCreateFallbackState(autoCompactState, sessionID)
+
+  if (fallbackState.revertAttempt < FALLBACK_CONFIG.maxRevertAttempts) {
+    const pair = await getLastMessagePair(sessionID, client as Client, directory)
+
+    if (pair) {
+      try {
+        await (client as Client).tui
+          .showToast({
+            body: {
+              title: "Emergency Recovery",
+              message: "Removing last message pair...",
+              variant: "warning",
+              duration: 3000,
+            },
+          })
+          .catch(() => {})
+
+        if (pair.assistantMessageID) {
+          await (client as Client).session.revert({
+            path: { id: sessionID },
+            body: { messageID: pair.assistantMessageID },
+            query: { directory },
+          })
+        }
+
+        await (client as Client).session.revert({
+          path: { id: sessionID },
+          body: { messageID: pair.userMessageID },
+          query: { directory },
+        })
+
+        fallbackState.revertAttempt++
+        fallbackState.lastRevertedMessageID = pair.userMessageID
+
+        retryState.attempt = 0
+        truncateState.truncateAttempt = 0
+
+        autoCompactState.compactionInProgress.delete(sessionID)
+
+        setTimeout(() => {
+          executeCompact(sessionID, msg, autoCompactState, client, directory)
+        }, 1000)
+        return
+      } catch {}
+    }
+  }
+
+  clearSessionState(autoCompactState, sessionID)
+
+  await (client as Client).tui
+    .showToast({
+      body: {
+        title: "Auto Compact Failed",
+        message: "All recovery attempts failed. Please start a new session.",
+        variant: "error",
+        duration: 5000,
+      },
+    })
+    .catch(() => {})
 }
