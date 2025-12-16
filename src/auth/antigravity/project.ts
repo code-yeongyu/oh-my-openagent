@@ -19,6 +19,12 @@ import type {
 
 const projectContextCache = new Map<string, AntigravityProjectContext>()
 
+function debugLog(message: string): void {
+  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+    console.log(`[antigravity-project] ${message}`)
+  }
+}
+
 const CODE_ASSIST_METADATA = {
   ideType: "IDE_UNSPECIFIED",
   platform: "PLATFORM_UNSPECIFIED",
@@ -51,6 +57,12 @@ function getDefaultTierId(allowedTiers?: AntigravityUserTier[]): string | undefi
   return allowedTiers[0]?.id
 }
 
+function isFreeTier(tierId: string | undefined): boolean {
+  if (!tierId) return false
+  const lower = tierId.toLowerCase()
+  return lower === "free" || lower === "free-tier" || lower.startsWith("free")
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -75,18 +87,26 @@ async function callLoadCodeAssistAPI(
 
   for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
     const url = `${baseEndpoint}/${ANTIGRAVITY_API_VERSION}:loadCodeAssist`
+    debugLog(`[loadCodeAssist] Trying: ${url}`)
     try {
       const response = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(requestBody),
       })
-      if (!response.ok) continue
-      return (await response.json()) as AntigravityLoadCodeAssistResponse
-    } catch {
+      if (!response.ok) {
+        debugLog(`[loadCodeAssist] Failed: ${response.status} ${response.statusText}`)
+        continue
+      }
+      const data = (await response.json()) as AntigravityLoadCodeAssistResponse
+      debugLog(`[loadCodeAssist] Success: ${JSON.stringify(data)}`)
+      return data
+    } catch (err) {
+      debugLog(`[loadCodeAssist] Error: ${err}`)
       continue
     }
   }
+  debugLog(`[loadCodeAssist] All endpoints failed`)
   return null
 }
 
@@ -97,12 +117,17 @@ async function onboardManagedProject(
   attempts = 10,
   delayMs = 5000
 ): Promise<string | undefined> {
+  debugLog(`[onboardUser] Starting with tierId=${tierId}, projectId=${projectId || "none"}`)
+  
   const metadata: Record<string, string> = { ...CODE_ASSIST_METADATA }
   if (projectId) metadata.duetProject = projectId
 
   const requestBody: Record<string, unknown> = { tierId, metadata }
-  if (tierId !== "FREE") {
-    if (!projectId) return undefined
+  if (!isFreeTier(tierId)) {
+    if (!projectId) {
+      debugLog(`[onboardUser] Non-FREE tier requires projectId, returning undefined`)
+      return undefined
+    }
     requestBody.cloudaicompanionProject = projectId
   }
 
@@ -114,67 +139,102 @@ async function onboardManagedProject(
     "Client-Metadata": ANTIGRAVITY_HEADERS["Client-Metadata"],
   }
 
+  debugLog(`[onboardUser] Request body: ${JSON.stringify(requestBody)}`)
+
   for (let attempt = 0; attempt < attempts; attempt++) {
+    debugLog(`[onboardUser] Attempt ${attempt + 1}/${attempts}`)
     for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
       const url = `${baseEndpoint}/${ANTIGRAVITY_API_VERSION}:onboardUser`
+      debugLog(`[onboardUser] Trying: ${url}`)
       try {
         const response = await fetch(url, {
           method: "POST",
           headers,
           body: JSON.stringify(requestBody),
         })
-        if (!response.ok) continue
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "")
+          debugLog(`[onboardUser] Failed: ${response.status} ${response.statusText} - ${errorText}`)
+          continue
+        }
 
         const payload = (await response.json()) as AntigravityOnboardUserPayload
+        debugLog(`[onboardUser] Response: ${JSON.stringify(payload)}`)
         const managedProjectId = payload.response?.cloudaicompanionProject?.id
-        if (payload.done && managedProjectId) return managedProjectId
-        if (payload.done && projectId) return projectId
-      } catch {
+        if (payload.done && managedProjectId) {
+          debugLog(`[onboardUser] Success! Got managed project ID: ${managedProjectId}`)
+          return managedProjectId
+        }
+        if (payload.done && projectId) {
+          debugLog(`[onboardUser] Done but no managed ID, using original: ${projectId}`)
+          return projectId
+        }
+        debugLog(`[onboardUser] Not done yet, payload.done=${payload.done}`)
+      } catch (err) {
+        debugLog(`[onboardUser] Error: ${err}`)
         continue
       }
     }
-    if (attempt < attempts - 1) await wait(delayMs)
+    if (attempt < attempts - 1) {
+      debugLog(`[onboardUser] Waiting ${delayMs}ms before next attempt...`)
+      await wait(delayMs)
+    }
   }
+  debugLog(`[onboardUser] All attempts exhausted, returning undefined`)
   return undefined
 }
 
 export async function fetchProjectContext(
   accessToken: string
 ): Promise<AntigravityProjectContext> {
+  debugLog(`[fetchProjectContext] Starting...`)
+  
   const cached = projectContextCache.get(accessToken)
-  if (cached) return cached
+  if (cached) {
+    debugLog(`[fetchProjectContext] Returning cached result: ${JSON.stringify(cached)}`)
+    return cached
+  }
 
   const loadPayload = await callLoadCodeAssistAPI(accessToken)
 
   // If loadCodeAssist returns a project ID, use it directly
   if (loadPayload?.cloudaicompanionProject) {
     const projectId = extractProjectId(loadPayload.cloudaicompanionProject)
+    debugLog(`[fetchProjectContext] loadCodeAssist returned project: ${projectId}`)
     if (projectId) {
       const result: AntigravityProjectContext = { cloudaicompanionProject: projectId }
       projectContextCache.set(accessToken, result)
+      debugLog(`[fetchProjectContext] Using loadCodeAssist project ID: ${projectId}`)
       return result
     }
   }
 
   // No project ID from loadCodeAssist - check tier and onboard if FREE
   if (!loadPayload) {
+    debugLog(`[fetchProjectContext] loadCodeAssist returned null, returning empty`)
     return { cloudaicompanionProject: "" }
   }
 
   const currentTierId = loadPayload.currentTier?.id
-  if (currentTierId && currentTierId !== "FREE") {
+  debugLog(`[fetchProjectContext] currentTier: ${currentTierId}, allowedTiers: ${JSON.stringify(loadPayload.allowedTiers)}`)
+  
+  if (currentTierId && !isFreeTier(currentTierId)) {
     // PAID tier requires user-provided project ID
+    debugLog(`[fetchProjectContext] PAID tier detected, returning empty (user must provide project)`)
     return { cloudaicompanionProject: "" }
   }
 
   const defaultTierId = getDefaultTierId(loadPayload.allowedTiers)
-  const tierId = defaultTierId ?? "FREE"
+  const tierId = defaultTierId ?? "free-tier"
+  debugLog(`[fetchProjectContext] Resolved tierId: ${tierId}`)
 
-  if (tierId !== "FREE") {
+  if (!isFreeTier(tierId)) {
+    debugLog(`[fetchProjectContext] Non-FREE tier without project, returning empty`)
     return { cloudaicompanionProject: "" }
   }
 
   // FREE tier - onboard to get server-assigned managed project ID
+  debugLog(`[fetchProjectContext] FREE tier detected (${tierId}), calling onboardUser...`)
   const managedProjectId = await onboardManagedProject(accessToken, tierId)
   if (managedProjectId) {
     const result: AntigravityProjectContext = {
@@ -182,9 +242,11 @@ export async function fetchProjectContext(
       managedProjectId,
     }
     projectContextCache.set(accessToken, result)
+    debugLog(`[fetchProjectContext] Got managed project ID: ${managedProjectId}`)
     return result
   }
 
+  debugLog(`[fetchProjectContext] Failed to get managed project ID, returning empty`)
   return { cloudaicompanionProject: "" }
 }
 
