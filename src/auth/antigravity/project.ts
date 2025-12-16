@@ -1,6 +1,8 @@
 /**
  * Antigravity project context management.
  * Handles fetching GCP project ID via Google's loadCodeAssist API.
+ * For FREE tier users, onboards via onboardUser API to get server-assigned managed project ID.
+ * Reference: https://github.com/shekohex/opencode-google-antigravity-auth
  */
 
 import {
@@ -11,53 +13,26 @@ import {
 import type {
   AntigravityProjectContext,
   AntigravityLoadCodeAssistResponse,
+  AntigravityOnboardUserPayload,
+  AntigravityUserTier,
 } from "./types"
-
-// CLIProxyAPI-compatible random project ID generation
-// https://github.com/anthropics/anthropic-quickstarts/blob/main/internal/runtime/executor/antigravity_executor.go#L784-L791
-const PROJECT_ID_ADJECTIVES = ["useful", "bright", "swift", "calm", "bold"] as const
-const PROJECT_ID_NOUNS = ["fuze", "wave", "spark", "flow", "core"] as const
-
-function generateRandomProjectId(): string {
-  const adj = PROJECT_ID_ADJECTIVES[Math.floor(Math.random() * PROJECT_ID_ADJECTIVES.length)]
-  const noun = PROJECT_ID_NOUNS[Math.floor(Math.random() * PROJECT_ID_NOUNS.length)]
-  const randomPart = crypto.randomUUID().slice(0, 5).toLowerCase()
-  return `${adj}-${noun}-${randomPart}`
-}
 
 const projectContextCache = new Map<string, AntigravityProjectContext>()
 
-/**
- * Client metadata for loadCodeAssist API request.
- * Matches cliproxyapi implementation.
- */
 const CODE_ASSIST_METADATA = {
   ideType: "IDE_UNSPECIFIED",
   platform: "PLATFORM_UNSPECIFIED",
   pluginType: "GEMINI",
 } as const
 
-/**
- * Extracts the project ID from a cloudaicompanionProject field.
- * Handles both string and object formats.
- *
- * @param project - The cloudaicompanionProject value from API response
- * @returns Extracted project ID string, or undefined if not found
- */
 function extractProjectId(
   project: string | { id: string } | undefined
 ): string | undefined {
-  if (!project) {
-    return undefined
-  }
-
-  // Handle string format
+  if (!project) return undefined
   if (typeof project === "string") {
     const trimmed = project.trim()
     return trimmed || undefined
   }
-
-  // Handle object format { id: string }
   if (typeof project === "object" && "id" in project) {
     const id = project.id
     if (typeof id === "string") {
@@ -65,22 +40,70 @@ function extractProjectId(
       return trimmed || undefined
     }
   }
-
   return undefined
 }
 
-/**
- * Calls the loadCodeAssist API to get project context.
- * Tries each endpoint in the fallback list until one succeeds.
- *
- * @param accessToken - Valid OAuth access token
- * @returns API response or null if all endpoints fail
- */
+function getDefaultTierId(allowedTiers?: AntigravityUserTier[]): string | undefined {
+  if (!allowedTiers || allowedTiers.length === 0) return undefined
+  for (const tier of allowedTiers) {
+    if (tier?.isDefault) return tier.id
+  }
+  return allowedTiers[0]?.id
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function callLoadCodeAssistAPI(
-  accessToken: string
+  accessToken: string,
+  projectId?: string
 ): Promise<AntigravityLoadCodeAssistResponse | null> {
-  const requestBody = {
-    metadata: CODE_ASSIST_METADATA,
+  const metadata: Record<string, string> = { ...CODE_ASSIST_METADATA }
+  if (projectId) metadata.duetProject = projectId
+
+  const requestBody: Record<string, unknown> = { metadata }
+  if (projectId) requestBody.cloudaicompanionProject = projectId
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "User-Agent": ANTIGRAVITY_HEADERS["User-Agent"],
+    "X-Goog-Api-Client": ANTIGRAVITY_HEADERS["X-Goog-Api-Client"],
+    "Client-Metadata": ANTIGRAVITY_HEADERS["Client-Metadata"],
+  }
+
+  for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
+    const url = `${baseEndpoint}/${ANTIGRAVITY_API_VERSION}:loadCodeAssist`
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      })
+      if (!response.ok) continue
+      return (await response.json()) as AntigravityLoadCodeAssistResponse
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
+async function onboardManagedProject(
+  accessToken: string,
+  tierId: string,
+  projectId?: string,
+  attempts = 10,
+  delayMs = 5000
+): Promise<string | undefined> {
+  const metadata: Record<string, string> = { ...CODE_ASSIST_METADATA }
+  if (projectId) metadata.duetProject = projectId
+
+  const requestBody: Record<string, unknown> = { tierId, metadata }
+  if (tierId !== "FREE") {
+    if (!projectId) return undefined
+    requestBody.cloudaicompanionProject = projectId
   }
 
   const headers: Record<string, string> = {
@@ -91,70 +114,80 @@ async function callLoadCodeAssistAPI(
     "Client-Metadata": ANTIGRAVITY_HEADERS["Client-Metadata"],
   }
 
-  // Try each endpoint in the fallback list
-  for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
-    const url = `${baseEndpoint}/${ANTIGRAVITY_API_VERSION}:loadCodeAssist`
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
+      const url = `${baseEndpoint}/${ANTIGRAVITY_API_VERSION}:onboardUser`
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(requestBody),
+        })
+        if (!response.ok) continue
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        // Try next endpoint on failure
+        const payload = (await response.json()) as AntigravityOnboardUserPayload
+        const managedProjectId = payload.response?.cloudaicompanionProject?.id
+        if (payload.done && managedProjectId) return managedProjectId
+        if (payload.done && projectId) return projectId
+      } catch {
         continue
       }
-
-      const data =
-        (await response.json()) as AntigravityLoadCodeAssistResponse
-      return data
-    } catch {
-      // Network or parsing error, try next endpoint
-      continue
     }
+    if (attempt < attempts - 1) await wait(delayMs)
   }
-
-  // All endpoints failed
-  return null
+  return undefined
 }
 
-/**
- * Fetch project context from Google's loadCodeAssist API.
- * Extracts the cloudaicompanionProject from the response.
- *
- * @param accessToken - Valid OAuth access token
- * @returns Project context with cloudaicompanionProject ID
- */
 export async function fetchProjectContext(
   accessToken: string
 ): Promise<AntigravityProjectContext> {
   const cached = projectContextCache.get(accessToken)
-  if (cached) {
-    return cached
+  if (cached) return cached
+
+  const loadPayload = await callLoadCodeAssistAPI(accessToken)
+
+  // If loadCodeAssist returns a project ID, use it directly
+  if (loadPayload?.cloudaicompanionProject) {
+    const projectId = extractProjectId(loadPayload.cloudaicompanionProject)
+    if (projectId) {
+      const result: AntigravityProjectContext = { cloudaicompanionProject: projectId }
+      projectContextCache.set(accessToken, result)
+      return result
+    }
   }
 
-  const response = await callLoadCodeAssistAPI(accessToken)
-  const projectId = response
-    ? extractProjectId(response.cloudaicompanionProject)
-    : undefined
-
-  const result: AntigravityProjectContext = {
-    cloudaicompanionProject: projectId || generateRandomProjectId(),
+  // No project ID from loadCodeAssist - check tier and onboard if FREE
+  if (!loadPayload) {
+    return { cloudaicompanionProject: "" }
   }
 
-  projectContextCache.set(accessToken, result)
+  const currentTierId = loadPayload.currentTier?.id
+  if (currentTierId && currentTierId !== "FREE") {
+    // PAID tier requires user-provided project ID
+    return { cloudaicompanionProject: "" }
+  }
 
-  return result
+  const defaultTierId = getDefaultTierId(loadPayload.allowedTiers)
+  const tierId = defaultTierId ?? "FREE"
+
+  if (tierId !== "FREE") {
+    return { cloudaicompanionProject: "" }
+  }
+
+  // FREE tier - onboard to get server-assigned managed project ID
+  const managedProjectId = await onboardManagedProject(accessToken, tierId)
+  if (managedProjectId) {
+    const result: AntigravityProjectContext = {
+      cloudaicompanionProject: managedProjectId,
+      managedProjectId,
+    }
+    projectContextCache.set(accessToken, result)
+    return result
+  }
+
+  return { cloudaicompanionProject: "" }
 }
 
-/**
- * Clear the project context cache.
- * Call this when tokens are refreshed or invalidated.
- *
- * @param accessToken - Optional specific token to clear, or clears all if not provided
- */
 export function clearProjectContextCache(accessToken?: string): void {
   if (accessToken) {
     projectContextCache.delete(accessToken)
