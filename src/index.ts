@@ -263,7 +263,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
 
-  const googleAuthHooks = pluginConfig.google_auth
+  const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
     : null;
 
