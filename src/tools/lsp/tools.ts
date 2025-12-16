@@ -35,12 +35,11 @@ import type {
 
 
 export const lsp_hover = tool({
-  description:
-    "Get type information, documentation, and signature for a symbol at a specific position in a file. Use this when you need to understand what a variable, function, class, or any identifier represents.",
+  description: "Get type info, docs, and signature for a symbol at position.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    line: tool.schema.number().min(1).describe("Line number (1-based)"),
-    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+    filePath: tool.schema.string(),
+    line: tool.schema.number().min(1).describe("1-based"),
+    character: tool.schema.number().min(0).describe("0-based"),
   },
   execute: async (args, context) => {
     try {
@@ -57,12 +56,11 @@ export const lsp_hover = tool({
 })
 
 export const lsp_goto_definition = tool({
-  description:
-    "Jump to the source definition of a symbol (variable, function, class, type, import, etc.). Use this when you need to find WHERE something is defined.",
+  description: "Jump to symbol definition. Find WHERE something is defined.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    line: tool.schema.number().min(1).describe("Line number (1-based)"),
-    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+    filePath: tool.schema.string(),
+    line: tool.schema.number().min(1).describe("1-based"),
+    character: tool.schema.number().min(0).describe("0-based"),
   },
   execute: async (args, context) => {
     try {
@@ -95,12 +93,11 @@ export const lsp_goto_definition = tool({
 })
 
 export const lsp_find_references = tool({
-  description:
-    "Find ALL usages/references of a symbol across the entire workspace. Use this when you need to understand the impact of changing something.",
+  description: "Find ALL usages/references of a symbol across the entire workspace.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    line: tool.schema.number().min(1).describe("Line number (1-based)"),
-    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+    filePath: tool.schema.string(),
+    line: tool.schema.number().min(1).describe("1-based"),
+    character: tool.schema.number().min(0).describe("0-based"),
     includeDeclaration: tool.schema.boolean().optional().describe("Include the declaration itself"),
   },
   execute: async (args, context) => {
@@ -133,10 +130,9 @@ export const lsp_find_references = tool({
 })
 
 export const lsp_document_symbols = tool({
-  description:
-    "Get a hierarchical outline of all symbols (classes, functions, methods, variables, types, constants) in a single file. Use this to quickly understand a file's structure.",
+  description: "Get hierarchical outline of all symbols in a file.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
+    filePath: tool.schema.string(),
   },
   execute: async (args, context) => {
     try {
@@ -172,12 +168,11 @@ export const lsp_document_symbols = tool({
 })
 
 export const lsp_workspace_symbols = tool({
-  description:
-    "Search for symbols by name across the ENTIRE workspace/project. Use this when you know (or partially know) a symbol's name but don't know which file it's in.",
+  description: "Search symbols by name across ENTIRE workspace.",
   args: {
-    filePath: tool.schema.string().describe("A file path in the workspace to determine the workspace root"),
-    query: tool.schema.string().describe("The symbol name to search for (supports fuzzy matching)"),
-    limit: tool.schema.number().optional().describe("Maximum number of results to return"),
+    filePath: tool.schema.string(),
+    query: tool.schema.string().describe("Symbol name (fuzzy match)"),
+    limit: tool.schema.number().optional().describe("Max results"),
   },
   execute: async (args, context) => {
     try {
@@ -208,10 +203,9 @@ export const lsp_workspace_symbols = tool({
 })
 
 export const lsp_diagnostics = tool({
-  description:
-    "Get all errors, warnings, and hints for a file from the language server. Use this to check if code has type errors, syntax issues, or linting problems BEFORE running the build.",
+  description: "Get errors, warnings, hints from language server BEFORE running build.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
+    filePath: tool.schema.string(),
     severity: tool.schema
       .enum(["error", "warning", "information", "hint", "all"])
       .optional()
@@ -256,7 +250,7 @@ export const lsp_diagnostics = tool({
 })
 
 export const lsp_servers = tool({
-  description: "List all available LSP servers and check if they are installed. Use this to see what language support is available.",
+  description: "List available LSP servers and installation status.",
   args: {},
   execute: async (_args, context) => {
     try {
@@ -278,12 +272,11 @@ export const lsp_servers = tool({
 })
 
 export const lsp_prepare_rename = tool({
-  description:
-    "Check if a symbol at a specific position can be renamed. Use this BEFORE attempting to rename to validate the operation and get the current symbol name.",
+  description: "Check if rename is valid. Use BEFORE lsp_rename.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    line: tool.schema.number().min(1).describe("Line number (1-based)"),
-    character: tool.schema.number().min(0).describe("Character position (0-based)"),
+    filePath: tool.schema.string(),
+    line: tool.schema.number().min(1).describe("1-based"),
+    character: tool.schema.number().min(0).describe("0-based"),
   },
   execute: async (args, context) => {
     try {
@@ -303,13 +296,12 @@ export const lsp_prepare_rename = tool({
 })
 
 export const lsp_rename = tool({
-  description:
-    "Rename a symbol across the entire workspace. This APPLIES the rename to all files. Use lsp_prepare_rename first to check if rename is possible.",
+  description: "Rename symbol across entire workspace. APPLIES changes to all files.",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    line: tool.schema.number().min(1).describe("Line number (1-based)"),
-    character: tool.schema.number().min(0).describe("Character position (0-based)"),
-    newName: tool.schema.string().describe("The new name for the symbol"),
+    filePath: tool.schema.string(),
+    line: tool.schema.number().min(1).describe("1-based"),
+    character: tool.schema.number().min(0).describe("0-based"),
+    newName: tool.schema.string().describe("New symbol name"),
   },
   execute: async (args, context) => {
     try {
@@ -327,14 +319,13 @@ export const lsp_rename = tool({
 })
 
 export const lsp_code_actions = tool({
-  description:
-    "Get available code actions for a range in the file. Code actions include quick fixes, refactorings (extract, inline, rewrite), and source actions (organize imports, fix all). Use this to discover what automated changes the language server can perform.",
+  description: "Get available quick fixes, refactorings, and source actions (organize imports, fix all).",
   args: {
-    filePath: tool.schema.string().describe("The absolute path to the file"),
-    startLine: tool.schema.number().min(1).describe("Start line number (1-based)"),
-    startCharacter: tool.schema.number().min(0).describe("Start character position (0-based)"),
-    endLine: tool.schema.number().min(1).describe("End line number (1-based)"),
-    endCharacter: tool.schema.number().min(0).describe("End character position (0-based)"),
+    filePath: tool.schema.string(),
+    startLine: tool.schema.number().min(1).describe("1-based"),
+    startCharacter: tool.schema.number().min(0).describe("0-based"),
+    endLine: tool.schema.number().min(1).describe("1-based"),
+    endCharacter: tool.schema.number().min(0).describe("0-based"),
     kind: tool.schema
       .enum([
         "quickfix",
@@ -372,13 +363,10 @@ export const lsp_code_actions = tool({
 })
 
 export const lsp_code_action_resolve = tool({
-  description:
-    "Resolve and APPLY a code action. This resolves the full details and applies the changes to files. Use after getting a code action from lsp_code_actions.",
+  description: "Resolve and APPLY a code action from lsp_code_actions.",
   args: {
-    filePath: tool.schema
-      .string()
-      .describe("The absolute path to a file in the workspace (used to find the LSP server)"),
-    codeAction: tool.schema.string().describe("The code action JSON object as returned by lsp_code_actions (stringified)"),
+    filePath: tool.schema.string(),
+    codeAction: tool.schema.string().describe("Code action JSON from lsp_code_actions"),
   },
   execute: async (args, context) => {
     try {

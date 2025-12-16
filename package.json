@@ -48,9 +48,9 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
-    "@code-yeongyu/comment-checker": "^0.5.0",
+    "@code-yeongyu/comment-checker": "^0.6.0",
     "@openauthjs/openauth": "^0.4.3",
-    "@opencode-ai/plugin": "^1.0.150",
+    "@opencode-ai/plugin": "^1.0.162",
     "hono": "^4.10.4",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
