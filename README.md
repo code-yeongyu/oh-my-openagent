@@ -58,6 +58,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
     - [Verify the setup](#verify-the-setup)
     - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
     - [Too Complicated?](#too-complicated)
+  - [Uninstallation](#uninstallation)
   - [Features](#features)
     - [Agents: Your Teammates](#agents-your-teammates)
     - [Background Agents: Work Like a Team](#background-agents-work-like-a-team)
@@ -399,6 +400,38 @@ If this all seems overwhelming, just remember one thing: **include the word `ult
 That's it. The agent will figure out the rest and handle everything automatically.
 
 </details>
+
+## Uninstallation
+
+To remove oh-my-opencode:
+
+1. **Remove the plugin from your OpenCode config**
+
+   Edit `~/.config/opencode/opencode.json` (or `opencode.jsonc`) and remove `"oh-my-opencode"` from the `plugin` array:
+
+   ```bash
+   # Using jq
+   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+       ~/.config/opencode/opencode.json > /tmp/oc.json && \
+       mv /tmp/oc.json ~/.config/opencode/opencode.json
+   ```
+
+2. **Remove configuration files (optional)**
+
+   ```bash
+   # Remove user config
+   rm -f ~/.config/opencode/oh-my-opencode.json
+
+   # Remove project config (if exists)
+   rm -f .opencode/oh-my-opencode.json
+   ```
+
+3. **Verify removal**
+
+   ```bash
+   opencode --version
+   # Plugin should no longer be loaded
+   ```
 
 
 ## Features
