@@ -39,12 +39,9 @@ import {
 } from "./features/claude-code-agent-loader";
 import { loadMcpConfigs } from "./features/claude-code-mcp-loader";
 import {
-  setCurrentSession,
   setMainSession,
   getMainSessionID,
-  getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
-import { updateTerminalTitle } from "./features/terminal";
 import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, interactive_bash, getTmuxPath } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
@@ -252,8 +249,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEmptyMessageSanitizerHook()
     : null;
 
-  updateTerminalTitle({ sessionId: "main" });
-
   const backgroundManager = new BackgroundManager(ctx);
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
@@ -427,28 +422,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           | undefined;
         if (!sessionInfo?.parentID) {
           setMainSession(sessionInfo?.id);
-          setCurrentSession(sessionInfo?.id, sessionInfo?.title);
-          updateTerminalTitle({
-            sessionId: sessionInfo?.id || "main",
-            status: "idle",
-            directory: ctx.directory,
-            sessionTitle: sessionInfo?.title,
-          });
-        }
-      }
-
-      if (event.type === "session.updated") {
-        const sessionInfo = props?.info as
-          | { id?: string; title?: string; parentID?: string }
-          | undefined;
-        if (!sessionInfo?.parentID) {
-          setCurrentSession(sessionInfo?.id, sessionInfo?.title);
-          updateTerminalTitle({
-            sessionId: sessionInfo?.id || "main",
-            status: "processing",
-            directory: ctx.directory,
-            sessionTitle: sessionInfo?.title,
-          });
         }
       }
 
@@ -456,11 +429,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const sessionInfo = props?.info as { id?: string } | undefined;
         if (sessionInfo?.id === getMainSessionID()) {
           setMainSession(undefined);
-          setCurrentSession(undefined, undefined);
-          updateTerminalTitle({
-            sessionId: "main",
-            status: "idle",
-          });
         }
       }
 
@@ -488,27 +456,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
               .catch(() => {});
           }
         }
-
-        if (sessionID && sessionID === getMainSessionID()) {
-          updateTerminalTitle({
-            sessionId: sessionID,
-            status: "error",
-            directory: ctx.directory,
-            sessionTitle: getCurrentSessionTitle(),
-          });
-        }
-      }
-
-      if (event.type === "session.idle") {
-        const sessionID = props?.sessionID as string | undefined;
-        if (sessionID && sessionID === getMainSessionID()) {
-          updateTerminalTitle({
-            sessionId: sessionID,
-            status: "idle",
-            directory: ctx.directory,
-            sessionTitle: getCurrentSessionTitle(),
-          });
-        }
       }
     },
 
@@ -528,16 +475,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
         };
       }
-
-      if (input.sessionID === getMainSessionID()) {
-        updateTerminalTitle({
-          sessionId: input.sessionID,
-          status: "tool",
-          currentTool: input.tool,
-          directory: ctx.directory,
-          sessionTitle: getCurrentSessionTitle(),
-        });
-      }
     },
 
     "tool.execute.after": async (input, output) => {
@@ -551,15 +488,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
-
-      if (input.sessionID === getMainSessionID()) {
-        updateTerminalTitle({
-          sessionId: input.sessionID,
-          status: "idle",
-          directory: ctx.directory,
-          sessionTitle: getCurrentSessionTitle(),
-        });
-      }
     },
   };
 };
