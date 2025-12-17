@@ -59,11 +59,7 @@
   "devDependencies": {
     "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
-    "oh-my-opencode": "^0.1.30",
     "typescript": "^5.7.3"
-  },
-  "peerDependencies": {
-    "bun": ">=1.0.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",

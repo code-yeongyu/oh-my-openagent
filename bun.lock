@@ -18,11 +18,7 @@
       "devDependencies": {
         "@types/picomatch": "^3.0.2",
         "bun-types": "latest",
-        "oh-my-opencode": "^0.1.30",
         "typescript": "^5.7.3",
-      },
-      "peerDependencies": {
-        "bun": ">=1.0.0",
       },
     },
   },
@@ -86,28 +82,6 @@
 
     "@oslojs/jwt": ["@oslojs/jwt@0.2.0", "", { "dependencies": { "@oslojs/encoding": "0.4.1" } }, "sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg=="],
 
-    "@oven/bun-darwin-aarch64": ["@oven/bun-darwin-aarch64@1.3.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-eJopQrUk0WR7jViYDC29+Rp50xGvs4GtWOXBeqCoFMzutkkO3CZvHehA4JqnjfWMTSS8toqvRhCSOpOz62Wf9w=="],
-
-    "@oven/bun-darwin-x64": ["@oven/bun-darwin-x64@1.3.3", "", { "os": "darwin", "cpu": "x64" }, "sha512-xGDePueVFrNgkS+iN0QdEFeRrx2MQ5hQ9ipRFu7N73rgoSSJsFlOKKt2uGZzunczedViIfjYl0ii0K4E9aZ0Ow=="],
-
-    "@oven/bun-darwin-x64-baseline": ["@oven/bun-darwin-x64-baseline@1.3.3", "", { "os": "darwin", "cpu": "x64" }, "sha512-1ij4wQ9ECLFf1XFry+IFUN+28if40ozDqq6+QtuyOhIwraKzXOlAUbILhRMGvM3ED3yBex2mTwlKpA4Vja/V2g=="],
-
-    "@oven/bun-linux-aarch64": ["@oven/bun-linux-aarch64@1.3.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-DabZ3Mt1XcJneWdEEug8l7bCPVvDBRBpjUIpNnRnMFWFnzr8KBEpMcaWTwYOghjXyJdhB4MPKb19MwqyQ+FHAw=="],
-
-    "@oven/bun-linux-aarch64-musl": ["@oven/bun-linux-aarch64-musl@1.3.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-XWQ3tV/gtZj0wn2AdSUq/tEOKWT4OY+Uww70EbODgrrq00jxuTfq5nnYP6rkLD0M/T5BHJdQRSfQYdIni9vldw=="],
-
-    "@oven/bun-linux-x64": ["@oven/bun-linux-x64@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-7eIARtKZKZDtah1aCpQUj/1/zT/zHRR063J6oAxZP9AuA547j5B9OM2D/vi/F4En7Gjk9FPjgPGTSYeqpQDzJw=="],
-
-    "@oven/bun-linux-x64-baseline": ["@oven/bun-linux-x64-baseline@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-IU8pxhIf845psOv55LqJyL+tSUc6HHMfs6FGhuJcAnyi92j+B1HjOhnFQh9MW4vjoo7do5F8AerXlvk59RGH2w=="],
-
-    "@oven/bun-linux-x64-musl": ["@oven/bun-linux-x64-musl@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-xNSDRPn1yyObKteS8fyQogwsS4eCECswHHgaKM+/d4wy/omZQrXn8ZyGm/ZF9B73UfQytUfbhE7nEnrFq03f0w=="],
-
-    "@oven/bun-linux-x64-musl-baseline": ["@oven/bun-linux-x64-musl-baseline@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-JoRTPdAXRkNYouUlJqEncMWUKn/3DiWP03A7weBbtbsKr787gcdNna2YeyQKCb1lIXE4v1k18RM3gaOpQobGIQ=="],
-
-    "@oven/bun-windows-x64": ["@oven/bun-windows-x64@1.3.3", "", { "os": "win32", "cpu": "x64" }, "sha512-kWqa1LKvDdAIzyfHxo3zGz3HFWbFHDlrNK77hKjUN42ycikvZJ+SHSX76+1OW4G8wmLETX4Jj+4BM1y01DQRIQ=="],
-
-    "@oven/bun-windows-x64-baseline": ["@oven/bun-windows-x64-baseline@1.3.3", "", { "os": "win32", "cpu": "x64" }, "sha512-u5eZHKq6TPJSE282KyBOicGQ2trkFml0RoUfqkPOJVo7TXGrsGYYzdsugZRnVQY/WEmnxGtBy4T3PAaPqgQViA=="],
-
     "@standard-schema/spec": ["@standard-schema/spec@1.0.0-beta.3", "", {}, "sha512-0ifF3BjA1E8SY9C+nUew8RefNOIq0cDlYALPty4rhUm8Rrl6tCM8hBT4bhGhx7I7iXD0uAgt50lgo8dD73ACMw=="],
 
     "@types/node": ["@types/node@24.10.1", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ=="],
@@ -118,8 +92,6 @@
 
     "aws4fetch": ["aws4fetch@1.0.20", "", {}, "sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g=="],
 
-    "bun": ["bun@1.3.3", "", { "optionalDependencies": { "@oven/bun-darwin-aarch64": "1.3.3", "@oven/bun-darwin-x64": "1.3.3", "@oven/bun-darwin-x64-baseline": "1.3.3", "@oven/bun-linux-aarch64": "1.3.3", "@oven/bun-linux-aarch64-musl": "1.3.3", "@oven/bun-linux-x64": "1.3.3", "@oven/bun-linux-x64-baseline": "1.3.3", "@oven/bun-linux-x64-musl": "1.3.3", "@oven/bun-linux-x64-musl-baseline": "1.3.3", "@oven/bun-windows-x64": "1.3.3", "@oven/bun-windows-x64-baseline": "1.3.3" }, "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "bun": "bin/bun.exe", "bunx": "bin/bunx.exe" } }, "sha512-2hJ4ocTZ634/Ptph4lysvO+LbbRZq8fzRvMwX0/CqaLBxrF2UB5D1LdMB8qGcdtCer4/VR9Bx5ORub0yn+yzmw=="],
-
     "bun-types": ["bun-types@1.3.3", "", { "dependencies": { "@types/node": "*" } }, "sha512-z3Xwlg7j2l9JY27x5Qn3Wlyos8YAp0kKRlrePAOjgjMGS5IG6E7Jnlx736vH9UVI4wUICwwhC9anYL++XeOgTQ=="],
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
@@ -127,8 +99,6 @@
     "hono": ["hono@4.10.8", "", {}, "sha512-DDT0A0r6wzhe8zCGoYOmMeuGu3dyTAE40HHjwUsWFTEy5WxK1x2WDSsBPlEXgPbRIFY6miDualuUDbasPogIww=="],
 
     "jose": ["jose@5.9.6", "", {}, "sha512-AMlnetc9+CV9asI19zHmrgS/WYsWUwCn2R7RzlbJWD7F9eWYUTGyBmU9o6PxngtLGOiDGPRu+Uc4fhKzbpteZQ=="],
-
-    "oh-my-opencode": ["oh-my-opencode@0.1.30", "", { "dependencies": { "@ast-grep/cli": "^0.40.0", "@ast-grep/napi": "^0.40.0", "@code-yeongyu/comment-checker": "^0.4.1", "@opencode-ai/plugin": "^1.0.7", "xdg-basedir": "^5.1.0", "zod": "^4.1.8" }, "peerDependencies": { "bun": ">=1.0.0" } }, "sha512-pXGGgL/7Jcz3yuGJJTI72BKern2egwfRz2LQZTBq+jl+pNCybOvGvXtFmR+WGlF8O3ZjL1wIHypBbIVuHOBzxg=="],
 
     "picomatch": ["picomatch@4.0.3", "", {}, "sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q=="],
 
@@ -141,11 +111,5 @@
     "zod": ["zod@4.1.8", "", {}, "sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ=="],
 
     "@oslojs/jwt/@oslojs/encoding": ["@oslojs/encoding@0.4.1", "", {}, "sha512-hkjo6MuIK/kQR5CrGNdAPZhS01ZCXuWDRJ187zh6qqF2+yMHZpD9fAYpX8q2bOO6Ryhl3XpCT6kUX76N8hhm4Q=="],
-
-    "oh-my-opencode/@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.4.1", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-E7p1V8CsRj9hMbwENd9BfxZGWYu+lKS5tXGuNNcNtkRMhWvwM/ononysKpLB7LXdxfSYAn0j7heJydyzEmm+lg=="],
-
-    "oh-my-opencode/@opencode-ai/plugin": ["@opencode-ai/plugin@1.0.128", "", { "dependencies": { "@opencode-ai/sdk": "1.0.128", "zod": "4.1.8" } }, "sha512-M5vjz3I6KeoBSNduWmT5iHXRtTLCqICM5ocs+WrB3uxVorslcO3HVwcLzrERh/ntpxJ/1xhnHQaeG6Mg+P744A=="],
-
-    "oh-my-opencode/@opencode-ai/plugin/@opencode-ai/sdk": ["@opencode-ai/sdk@1.0.128", "", {}, "sha512-Kow3Ivg8bR8dNRp8C0LwF9e8+woIrwFgw3ZALycwCfqS/UujDkJiBeYHdr1l/07GSHP9sZPmvJ6POuvfZ923EA=="],
   }
 }
