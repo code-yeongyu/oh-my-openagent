@@ -9,6 +9,7 @@ import {
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_API_VERSION,
   ANTIGRAVITY_HEADERS,
+  ANTIGRAVITY_DEFAULT_PROJECT_ID,
 } from "./constants"
 import type {
   AntigravityProjectContext,
@@ -58,7 +59,7 @@ function getDefaultTierId(allowedTiers?: AntigravityUserTier[]): string | undefi
 }
 
 function isFreeTier(tierId: string | undefined): boolean {
-  if (!tierId) return false
+  if (!tierId) return true // No tier = assume free tier (default behavior)
   const lower = tierId.toLowerCase()
   return lower === "free" || lower === "free-tier" || lower.startsWith("free")
 }
@@ -209,19 +210,28 @@ export async function fetchProjectContext(
     }
   }
 
-  // No project ID from loadCodeAssist - check tier and onboard if FREE
+  // No project ID from loadCodeAssist - try with fallback project ID
   if (!loadPayload) {
-    debugLog(`[fetchProjectContext] loadCodeAssist returned null, returning empty`)
-    return { cloudaicompanionProject: "" }
+    debugLog(`[fetchProjectContext] loadCodeAssist returned null, trying with fallback project ID`)
+    const fallbackPayload = await callLoadCodeAssistAPI(accessToken, ANTIGRAVITY_DEFAULT_PROJECT_ID)
+    const fallbackProjectId = extractProjectId(fallbackPayload?.cloudaicompanionProject)
+    if (fallbackProjectId) {
+      const result: AntigravityProjectContext = { cloudaicompanionProject: fallbackProjectId }
+      projectContextCache.set(accessToken, result)
+      debugLog(`[fetchProjectContext] Using fallback project ID: ${fallbackProjectId}`)
+      return result
+    }
+    debugLog(`[fetchProjectContext] Fallback also failed, using default: ${ANTIGRAVITY_DEFAULT_PROJECT_ID}`)
+    return { cloudaicompanionProject: ANTIGRAVITY_DEFAULT_PROJECT_ID }
   }
 
   const currentTierId = loadPayload.currentTier?.id
   debugLog(`[fetchProjectContext] currentTier: ${currentTierId}, allowedTiers: ${JSON.stringify(loadPayload.allowedTiers)}`)
   
   if (currentTierId && !isFreeTier(currentTierId)) {
-    // PAID tier requires user-provided project ID
-    debugLog(`[fetchProjectContext] PAID tier detected, returning empty (user must provide project)`)
-    return { cloudaicompanionProject: "" }
+    // PAID tier - still use fallback if no project provided
+    debugLog(`[fetchProjectContext] PAID tier detected (${currentTierId}), using fallback: ${ANTIGRAVITY_DEFAULT_PROJECT_ID}`)
+    return { cloudaicompanionProject: ANTIGRAVITY_DEFAULT_PROJECT_ID }
   }
 
   const defaultTierId = getDefaultTierId(loadPayload.allowedTiers)
@@ -229,8 +239,8 @@ export async function fetchProjectContext(
   debugLog(`[fetchProjectContext] Resolved tierId: ${tierId}`)
 
   if (!isFreeTier(tierId)) {
-    debugLog(`[fetchProjectContext] Non-FREE tier without project, returning empty`)
-    return { cloudaicompanionProject: "" }
+    debugLog(`[fetchProjectContext] Non-FREE tier (${tierId}) without project, using fallback: ${ANTIGRAVITY_DEFAULT_PROJECT_ID}`)
+    return { cloudaicompanionProject: ANTIGRAVITY_DEFAULT_PROJECT_ID }
   }
 
   // FREE tier - onboard to get server-assigned managed project ID
@@ -246,8 +256,8 @@ export async function fetchProjectContext(
     return result
   }
 
-  debugLog(`[fetchProjectContext] Failed to get managed project ID, returning empty`)
-  return { cloudaicompanionProject: "" }
+  debugLog(`[fetchProjectContext] Failed to get managed project ID, using fallback: ${ANTIGRAVITY_DEFAULT_PROJECT_ID}`)
+  return { cloudaicompanionProject: ANTIGRAVITY_DEFAULT_PROJECT_ID }
 }
 
 export function clearProjectContextCache(accessToken?: string): void {
