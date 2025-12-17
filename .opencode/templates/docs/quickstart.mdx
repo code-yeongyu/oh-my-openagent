@@ -1,0 +1,154 @@
+---
+title: Quickstart
+description: Get started with {{project.name}} in under 5 minutes
+---
+
+# Quickstart Guide
+
+This guide will help you set up {{project.name}} and run your first example.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 18.0 or higher
+  </Card>
+  <Card title="Package Manager" icon="box">
+    npm, yarn, pnpm, or bun
+  </Card>
+</CardGroup>
+
+## Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install {{project.name}}
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add {{project.name}}
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add {{project.name}}
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun add {{project.name}}
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration
+
+Create a configuration file in your project root:
+
+```bash
+touch {{project.config_file}}
+```
+
+Add your configuration:
+
+```json
+{
+  "name": "my-project",
+  "version": "1.0.0"
+}
+```
+
+## Basic Usage
+
+<Steps>
+  <Step title="Import the library">
+    ```typescript
+    import { {{project.main_export}} } from '{{project.name}}';
+    ```
+  </Step>
+  <Step title="Initialize">
+    ```typescript
+    const instance = new {{project.main_export}}({
+      // configuration options
+    });
+    ```
+  </Step>
+  <Step title="Use the API">
+    ```typescript
+    const result = await instance.execute();
+    console.log(result);
+    ```
+  </Step>
+</Steps>
+
+## Verify Installation
+
+Run the following command to verify everything is set up correctly:
+
+```bash
+npx {{project.name}} --version
+```
+
+You should see the version number printed to the console.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Architecture Overview"
+    icon="sitemap"
+    href="/architecture/overview"
+  >
+    Understand how {{project.name}} is designed
+  </Card>
+  <Card
+    title="Development Guide"
+    icon="code"
+    href="/guides/development"
+  >
+    Learn development best practices
+  </Card>
+  <Card
+    title="API Reference"
+    icon="rectangle-terminal"
+    href="/api-reference"
+  >
+    Explore the complete API
+  </Card>
+  <Card
+    title="Examples"
+    icon="flask"
+    href="/guides/examples"
+  >
+    See real-world usage examples
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Installation fails with permission error">
+    Try running with elevated permissions or use a Node version manager like nvm.
+    
+    ```bash
+    nvm use 18
+    npm install {{project.name}}
+    ```
+  </Accordion>
+  <Accordion title="Module not found error">
+    Ensure your `package.json` has the correct dependencies and run:
+    
+    ```bash
+    rm -rf node_modules
+    npm install
+    ```
+  </Accordion>
+  <Accordion title="Configuration not loading">
+    Verify your configuration file is in the project root and has valid JSON syntax.
+  </Accordion>
+</AccordionGroup>
+

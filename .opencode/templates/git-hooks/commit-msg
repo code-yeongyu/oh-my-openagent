@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Git commit-msg hook for validating conventional commits format
+# Install: cp .opencode/templates/git-hooks/commit-msg .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+#
+
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+# Conventional commit regex pattern
+# Format: type(scope): description [LINEAR-ID]
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_-]+\))?: .{1,100}( \[[A-Z]+-[0-9]+\])?$"
+
+# Check first line (subject)
+first_line=$(echo "$commit_msg" | head -n1)
+
+if ! echo "$first_line" | grep -qE "$pattern"; then
+    echo "❌ Invalid commit message format!"
+    echo ""
+    echo "Expected format: type(scope): description [LINEAR-ID]"
+    echo ""
+    echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+    echo ""
+    echo "Examples:"
+    echo "  feat(auth): add OAuth2 support [ABC-123]"
+    echo "  fix(api): resolve rate limiting issue [ABC-456]"
+    echo "  docs: update README"
+    echo "  chore(deps): update dependencies"
+    echo ""
+    echo "Your message: $first_line"
+    exit 1
+fi
+
+# Check subject line length (max 100 characters)
+subject_length=${#first_line}
+if [ "$subject_length" -gt 100 ]; then
+    echo "❌ Commit subject too long ($subject_length > 100 characters)"
+    exit 1
+fi
+
+# Check for blank line after subject if body exists
+line_count=$(echo "$commit_msg" | wc -l)
+if [ "$line_count" -gt 1 ]; then
+    second_line=$(echo "$commit_msg" | sed -n '2p')
+    if [ -n "$second_line" ]; then
+        echo "❌ Second line must be blank (separate subject from body)"
+        exit 1
+    fi
+fi
+
+echo "✅ Commit message format valid"
+exit 0
+

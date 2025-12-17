@@ -1,0 +1,226 @@
+---
+title: API Reference
+description: Complete API documentation for {{project.name}}
+---
+
+# API Reference
+
+Welcome to the {{project.name}} API reference. This documentation provides complete details about all available endpoints, request/response formats, and authentication requirements.
+
+## Base URL
+
+<CodeGroup>
+  ```bash Production
+  https://api.{{project.domain}}/v1
+  ```
+  
+  ```bash Staging
+  https://api.staging.{{project.domain}}/v1
+  ```
+  
+  ```bash Development
+  http://localhost:3000/v1
+  ```
+</CodeGroup>
+
+## Authentication
+
+<Info>
+  All API requests require authentication unless otherwise noted.
+</Info>
+
+### API Key Authentication
+
+Include your API key in the request header:
+
+```bash
+curl -X GET "https://api.{{project.domain}}/v1/resource" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### JWT Authentication
+
+For user-specific operations, use JWT tokens:
+
+```bash
+curl -X GET "https://api.{{project.domain}}/v1/resource" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+## Request Format
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes | Bearer token for authentication |
+| `Content-Type` | Yes* | `application/json` for POST/PUT/PATCH |
+| `Accept` | No | `application/json` (default) |
+| `X-Request-ID` | No | Client-generated request ID for tracing |
+
+### Query Parameters
+
+Common query parameters for list endpoints:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Number of items to return (max 100) |
+| `cursor` | string | - | Pagination cursor |
+| `sort` | string | `created_at` | Sort field |
+| `order` | string | `desc` | Sort order (`asc` or `desc`) |
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    // Resource data
+  },
+  "meta": {
+    "requestId": "req_abc123",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### List Response
+
+```json
+{
+  "success": true,
+  "data": [
+    // Array of resources
+  ],
+  "pagination": {
+    "cursor": "eyJpZCI6MTAwfQ==",
+    "hasMore": true,
+    "total": 150
+  },
+  "meta": {
+    "requestId": "req_abc123",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request parameters",
+    "details": {
+      "field": "email",
+      "reason": "Invalid email format"
+    }
+  },
+  "meta": {
+    "requestId": "req_abc123",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+## Error Codes
+
+<Tabs>
+  <Tab title="4xx Errors">
+    | Code | HTTP Status | Description |
+    |------|-------------|-------------|
+    | `BAD_REQUEST` | 400 | Invalid request syntax |
+    | `VALIDATION_ERROR` | 400 | Request validation failed |
+    | `UNAUTHORIZED` | 401 | Missing or invalid authentication |
+    | `FORBIDDEN` | 403 | Insufficient permissions |
+    | `NOT_FOUND` | 404 | Resource not found |
+    | `CONFLICT` | 409 | Resource already exists |
+    | `RATE_LIMITED` | 429 | Too many requests |
+  </Tab>
+  <Tab title="5xx Errors">
+    | Code | HTTP Status | Description |
+    |------|-------------|-------------|
+    | `INTERNAL_ERROR` | 500 | Internal server error |
+    | `SERVICE_UNAVAILABLE` | 503 | Service temporarily unavailable |
+    | `GATEWAY_TIMEOUT` | 504 | Upstream service timeout |
+  </Tab>
+</Tabs>
+
+## Rate Limiting
+
+<Warning>
+  API requests are rate limited to ensure fair usage and system stability.
+</Warning>
+
+| Plan | Requests/minute | Requests/day |
+|------|-----------------|--------------|
+| Free | 60 | 1,000 |
+| Pro | 600 | 50,000 |
+| Enterprise | 6,000 | Unlimited |
+
+Rate limit headers are included in every response:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1705315800
+```
+
+## Versioning
+
+The API uses URL-based versioning. The current version is `v1`.
+
+<Note>
+  Breaking changes will result in a new API version. Non-breaking changes may be added to existing versions.
+</Note>
+
+## SDKs
+
+<CardGroup cols={3}>
+  <Card title="TypeScript" icon="js" href="/api-reference/sdks/typescript">
+    Official TypeScript SDK
+  </Card>
+  <Card title="Python" icon="python" href="/api-reference/sdks/python">
+    Official Python SDK
+  </Card>
+  <Card title="Go" icon="golang" href="/api-reference/sdks/go">
+    Official Go SDK
+  </Card>
+</CardGroup>
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="Authentication"
+    icon="lock"
+    href="/api-reference/auth"
+  >
+    Login, logout, and token management
+  </Card>
+  <Card
+    title="Users"
+    icon="users"
+    href="/api-reference/users"
+  >
+    User management endpoints
+  </Card>
+  <Card
+    title="Resources"
+    icon="database"
+    href="/api-reference/resources"
+  >
+    Core resource operations
+  </Card>
+  <Card
+    title="Webhooks"
+    icon="webhook"
+    href="/api-reference/webhooks"
+  >
+    Webhook configuration
+  </Card>
+</CardGroup>
+

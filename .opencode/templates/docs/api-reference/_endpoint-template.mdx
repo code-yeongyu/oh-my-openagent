@@ -1,0 +1,177 @@
+---
+title: "{{endpoint.name}}"
+description: "{{endpoint.description}}"
+api: "{{endpoint.method}} {{endpoint.path}}"
+---
+
+# {{endpoint.name}}
+
+{{endpoint.description}}
+
+<Info>
+  **Authentication Required**: {{endpoint.auth_required}}  
+  **Rate Limit**: {{endpoint.rate_limit}} requests/minute
+</Info>
+
+## Request
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | Resource identifier |
+
+### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `include` | string | No | - | Related resources to include |
+| `fields` | string | No | - | Fields to return |
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  The name of the resource
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description
+</ParamField>
+
+<ParamField body="options" type="object">
+  Configuration options
+  
+  <Expandable title="properties">
+    <ParamField body="options.enabled" type="boolean" default="true">
+      Whether the feature is enabled
+    </ParamField>
+    <ParamField body="options.limit" type="number" default="100">
+      Maximum limit
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The response data
+  
+  <Expandable title="properties">
+    <ResponseField name="data.id" type="string">
+      Unique identifier
+    </ResponseField>
+    <ResponseField name="data.name" type="string">
+      Resource name
+    </ResponseField>
+    <ResponseField name="data.createdAt" type="string">
+      ISO 8601 timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+  ```bash cURL
+  curl -X {{endpoint.method}} "https://api.{{project.domain}}/v1{{endpoint.path}}" \
+    -H "Authorization: Bearer YOUR_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "Example",
+      "description": "Example description"
+    }'
+  ```
+
+  ```typescript TypeScript
+  import { Client } from '{{project.name}}';
+
+  const client = new Client({ apiKey: 'YOUR_API_KEY' });
+
+  const result = await client.{{endpoint.sdk_method}}({
+    name: 'Example',
+    description: 'Example description',
+  });
+  ```
+
+  ```python Python
+  from {{project.name}} import Client
+
+  client = Client(api_key="YOUR_API_KEY")
+
+  result = client.{{endpoint.sdk_method}}(
+      name="Example",
+      description="Example description"
+  )
+  ```
+</CodeGroup>
+
+## Response Examples
+
+<Tabs>
+  <Tab title="Success">
+    ```json
+    {
+      "success": true,
+      "data": {
+        "id": "res_abc123",
+        "name": "Example",
+        "description": "Example description",
+        "createdAt": "2024-01-15T10:30:00Z",
+        "updatedAt": "2024-01-15T10:30:00Z"
+      },
+      "meta": {
+        "requestId": "req_xyz789"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Error">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid request parameters",
+        "details": {
+          "name": ["Name is required"]
+        }
+      },
+      "meta": {
+        "requestId": "req_xyz789"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `VALIDATION_ERROR` | Invalid input | Check request body format |
+| `NOT_FOUND` | Resource not found | Verify resource ID |
+| `CONFLICT` | Resource already exists | Use update endpoint |
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="List {{endpoint.resource}}"
+    icon="list"
+    href="/api-reference/{{endpoint.resource}}/list"
+  >
+    Get all {{endpoint.resource}}
+  </Card>
+  <Card
+    title="Delete {{endpoint.resource}}"
+    icon="trash"
+    href="/api-reference/{{endpoint.resource}}/delete"
+  >
+    Delete a {{endpoint.resource}}
+  </Card>
+</CardGroup>
+

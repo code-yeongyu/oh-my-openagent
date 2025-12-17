@@ -39,6 +39,15 @@ type OpencodeClient = PluginInput["client"]
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 
+// Governance tools
+export {
+  createLinearBranchTool,
+  createLinearUpdateStatusTool,
+  createLinearCreateIssueTool,
+} from "./linear"
+export { createReadContextTool } from "./project-context"
+export { createSpecFolderTool } from "./spec"
+
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {
     background_task: createBackgroundTask(manager),

@@ -1,0 +1,84 @@
+# Hexagonal Architecture Pattern (Ports & Adapters)
+# Maximum testability and flexibility through dependency inversion
+
+pattern: hexagonal
+description: "Ports and adapters architecture for maximum testability and flexibility. The domain core is isolated from external concerns through well-defined ports and adapters."
+
+layers:
+  - name: domain
+    path: "src/domain"
+    description: "Core business logic - entities, value objects, domain services, and business rules"
+    agents_md: "domain-AGENTS.md"
+    
+  - name: ports
+    path: "src/ports"
+    description: "Interface definitions - inbound ports (use cases) and outbound ports (driven)"
+    agents_md: "ports-AGENTS.md"
+    
+  - name: adapters
+    path: "src/adapters"
+    description: "External integrations - database, HTTP, messaging, and infrastructure adapters"
+    agents_md: "adapters-AGENTS.md"
+    
+  - name: application
+    path: "src/application"
+    description: "Application services - use case implementations and orchestration"
+    agents_md: "application-AGENTS.md"
+
+dependency_rules:
+  domain:
+    may_import: []  # Domain has NO external dependencies
+    must_not_import:
+      - ports
+      - adapters
+      - application
+  ports:
+    may_import:
+      - domain
+    must_not_import:
+      - adapters
+      - application
+  application:
+    may_import:
+      - domain
+      - ports
+    must_not_import:
+      - adapters  # Only knows ports, not concrete adapters
+  adapters:
+    may_import:
+      - domain
+      - ports
+      - application
+    must_not_import: []  # Adapters can import from anywhere except being imported
+
+recommended_for:
+  - api
+  - library
+  - microservices
+
+considerations:
+  pros:
+    - Complete isolation of domain from infrastructure
+    - Extremely testable - mock any port
+    - Technology-agnostic core
+    - Easy to swap implementations
+    - Clear boundary between business and technical concerns
+  cons:
+    - Higher initial complexity
+    - More files and abstractions
+    - Can feel over-engineered for simple applications
+    - Learning curve for team members
+
+best_practices:
+  - Keep domain pure - no framework dependencies
+  - Define ports as interfaces, not implementations
+  - Adapters implement ports, never the reverse
+  - Use dependency injection to wire adapters to ports
+  - Test domain and application layers without adapters
+
+key_concepts:
+  inbound_ports: "Interfaces that define how the outside world can interact with the application (use cases)"
+  outbound_ports: "Interfaces that define what the application needs from the outside world (repositories, services)"
+  primary_adapters: "Drive the application (HTTP handlers, CLI, GraphQL)"
+  secondary_adapters: "Are driven by the application (database, external APIs)"
+

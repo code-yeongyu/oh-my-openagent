@@ -1,0 +1,98 @@
+# Feature-Based Architecture Pattern (Vertical Slices)
+# Self-contained feature modules organized by business capability
+
+pattern: feature-based
+description: "Feature-based organization with vertical slices. Each feature is self-contained with its own layers, promoting cohesion and reducing cross-feature dependencies."
+
+layers:
+  - name: features
+    path: "src/features"
+    description: "Feature modules - each feature is self-contained with its own components, services, and data access"
+    agents_md: "feature-AGENTS.md"
+    
+  - name: shared
+    path: "src/shared"
+    description: "Shared utilities, components, types, and cross-cutting concerns used by multiple features"
+    agents_md: "shared-AGENTS.md"
+    
+  - name: infrastructure
+    path: "src/infrastructure"
+    description: "Infrastructure concerns - database configuration, external service clients, framework setup"
+    agents_md: "infrastructure-AGENTS.md"
+
+feature_structure:
+  description: "Standard structure for each feature module"
+  directories:
+    - name: components
+      description: "UI components specific to this feature (frontend)"
+    - name: hooks
+      description: "Custom React/Vue hooks for this feature (frontend)"
+    - name: api
+      description: "API routes and handlers for this feature"
+    - name: services
+      description: "Business logic and domain services"
+    - name: repositories
+      description: "Data access and persistence"
+    - name: models
+      description: "Feature-specific types and DTOs"
+    - name: utils
+      description: "Feature-specific utility functions"
+    - name: tests
+      description: "Feature tests (unit, integration)"
+    - name: index.ts
+      description: "Public API - single export point"
+
+dependency_rules:
+  features:
+    may_import:
+      - shared
+      - infrastructure
+    must_not_import:
+      - other_features  # Features should not import from each other
+  shared:
+    may_import: []  # Shared has no dependencies
+    must_not_import:
+      - features
+      - infrastructure
+  infrastructure:
+    may_import:
+      - shared
+    must_not_import:
+      - features
+
+recommended_for:
+  - web-app
+  - monorepo
+  - large-teams
+
+considerations:
+  pros:
+    - High cohesion within features
+    - Low coupling between features
+    - Easy to understand feature boundaries
+    - Teams can own entire features
+    - Easy to add/remove features
+    - Scales well with team size
+  cons:
+    - Potential code duplication across features
+    - Shared code decisions can be challenging
+    - May require more upfront planning
+    - Cross-feature operations need careful design
+
+best_practices:
+  - Keep features independent - avoid cross-feature imports
+  - Use events or shared services for cross-feature communication
+  - Keep the shared layer minimal and stable
+  - Co-locate tests with feature code
+  - Export only what's needed from each feature's index
+  - Name features after business capabilities, not technical concepts
+
+cross_feature_communication:
+  patterns:
+    - name: events
+      description: "Use event bus/emitter for loose coupling"
+    - name: shared_services
+      description: "Common services in shared for cross-cutting concerns"
+    - name: api_calls
+      description: "Features communicate via API (like microservices)"
+

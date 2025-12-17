@@ -1,0 +1,557 @@
+{
+  "agents": [
+    {
+      "slug": "ai-engineer-agentic",
+      "name": "AI Engineer (Agentic)",
+      "file": ".opencode/agent/ai-engineer-agentic.md",
+      "category": "ai-ml",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "implementation-specialist"
+      ],
+      "accepts_from": [
+        "product-strategist",
+        "strategic-architect"
+      ]
+    },
+    {
+      "slug": "brd-creator",
+      "name": "BRD Creator",
+      "file": ".opencode/agent/brd-creator.md",
+      "category": "documentation",
+      "capabilities": [
+        "read",
+        "edit",
+        "command"
+      ],
+      "accepts_from": [
+        "implementation-specialist",
+        "documentation-master"
+      ]
+    },
+    {
+      "slug": "chat-auditor",
+      "name": "Chat Auditor",
+      "file": ".opencode/agent/chat-auditor.md",
+      "category": "quality",
+      "capabilities": [
+        "read",
+        "edit",
+        "command"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "code-reviewer",
+      "name": "Code Reviewer",
+      "file": ".opencode/agent/code-reviewer.md",
+      "category": "quality",
+      "capabilities": [
+        "read",
+        "browser",
+        "command",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7",
+        "chrome-devtools"
+      ],
+      "delegates_to": [
+        "test-engineer"
+      ],
+      "accepts_from": [
+        "implementation-specialist",
+        "quick-fixer"
+      ]
+    },
+    {
+      "slug": "context-steward",
+      "name": "Context Steward",
+      "file": ".opencode/agent/context-steward.md",
+      "category": "governance",
+      "capabilities": [
+        "read",
+        "edit",
+        "command"
+      ],
+      "accepts_from": [
+        "all-agents"
+      ]
+    },
+    {
+      "slug": "devops-specialist",
+      "name": "DevOps Specialist",
+      "file": ".opencode/agent/devops-specialist.md",
+      "category": "operations",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "test-engineer"
+      ],
+      "accepts_from": [
+        "strategic-architect",
+        "implementation-specialist"
+      ]
+    },
+    {
+      "slug": "documentation-master",
+      "name": "Documentation Master",
+      "file": ".opencode/agent/documentation-master.md",
+      "category": "quality",
+      "capabilities": [
+        "read",
+        "edit",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "accepts_from": [
+        "implementation-specialist",
+        "code-reviewer",
+        "test-engineer"
+      ]
+    },
+    {
+      "slug": "historian",
+      "name": "Historian",
+      "file": ".opencode/agent/historian.md",
+      "category": "governance",
+      "capabilities": [
+        "read",
+        "edit"
+      ],
+      "accepts_from": [
+        "all-agents"
+      ]
+    },
+    {
+      "slug": "implementation-specialist",
+      "name": "Implementation Specialist",
+      "file": ".opencode/agent/implementation-specialist.md",
+      "category": "implementation",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7",
+        "chrome-devtools"
+      ],
+      "delegates_to": [
+        "code-reviewer",
+        "test-engineer"
+      ],
+      "accepts_from": [
+        "strategic-architect",
+        "quick-fixer"
+      ]
+    },
+    {
+      "slug": "linear-coordinator",
+      "name": "Linear Coordinator",
+      "file": ".opencode/agent/linear-coordinator.md",
+      "category": "planning",
+      "capabilities": [
+        "read",
+        "edit",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "linear"
+      ],
+      "delegates_to": [
+        "implementation-specialist",
+        "quick-fixer"
+      ],
+      "accepts_from": [
+        "product-strategist",
+        "strategic-architect"
+      ]
+    },
+    {
+      "slug": "meta-improvement-analyst",
+      "name": "Meta-Improvement Analyst",
+      "file": ".opencode/agent/meta-improvement-analyst.md",
+      "category": "governance",
+      "capabilities": [
+        "read",
+        "edit"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "ml-engineer",
+      "name": "ML Engineer",
+      "file": ".opencode/agent/ml-engineer.md",
+      "category": "ai-ml",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "implementation-specialist"
+      ],
+      "accepts_from": [
+        "product-strategist",
+        "strategic-architect"
+      ]
+    },
+    {
+      "slug": "mode-auditor",
+      "name": "Mode Auditor",
+      "file": ".opencode/agent/mode-auditor.md",
+      "category": "governance",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "product-strategist",
+      "name": "Product Strategist",
+      "file": ".opencode/agent/product-strategist.md",
+      "category": "planning",
+      "capabilities": [
+        "read",
+        "edit",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "strategic-architect",
+        "linear-coordinator"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "project-guru",
+      "name": "Project Guru",
+      "file": ".opencode/agent/project-guru.md",
+      "category": "knowledge",
+      "capabilities": [
+        "read",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "quick-fixer",
+      "name": "Quick Fixer",
+      "file": ".opencode/agent/quick-fixer.md",
+      "category": "maintenance",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7",
+        "chrome-devtools"
+      ],
+      "delegates_to": [
+        "code-reviewer",
+        "test-engineer"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "rag-architect",
+      "name": "RAG Architect",
+      "file": ".opencode/agent/rag-architect.md",
+      "category": "ai-ml",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "implementation-specialist"
+      ],
+      "accepts_from": [
+        "product-strategist",
+        "strategic-architect"
+      ]
+    },
+    {
+      "slug": "rule-engineer",
+      "name": "Rule Engineer",
+      "file": ".opencode/agent/rule-engineer.md",
+      "category": "governance",
+      "capabilities": [
+        "read",
+        "edit",
+        "command"
+      ],
+      "accepts_from": [
+        "orchestrator"
+      ]
+    },
+    {
+      "slug": "strategic-architect",
+      "name": "Strategic Architect",
+      "file": ".opencode/agent/strategic-architect.md",
+      "category": "planning",
+      "capabilities": [
+        "read",
+        "browser",
+        "command",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7"
+      ],
+      "delegates_to": [
+        "implementation-specialist",
+        "code-reviewer"
+      ],
+      "accepts_from": [
+        "product-strategist"
+      ]
+    },
+    {
+      "slug": "test-engineer",
+      "name": "Test Engineer",
+      "file": ".opencode/agent/test-engineer.md",
+      "category": "quality",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7",
+        "chrome-devtools"
+      ],
+      "delegates_to": [
+        "documentation-master"
+      ],
+      "accepts_from": [
+        "implementation-specialist",
+        "code-reviewer"
+      ]
+    },
+    {
+      "slug": "web-design-guru",
+      "name": "Web Design Guru",
+      "file": ".opencode/agent/web-design-guru.md",
+      "category": "design",
+      "capabilities": [
+        "read",
+        "edit",
+        "command",
+        "browser",
+        "mcp"
+      ],
+      "mcp_servers": [
+        "context7",
+        "chrome-devtools"
+      ],
+      "delegates_to": [
+        "implementation-specialist"
+      ],
+      "accepts_from": [
+        "product-strategist",
+        "strategic-architect"
+      ]
+    }
+  ],
+  "workflow_patterns": {
+    "new_feature": [
+      "product-strategist",
+      "strategic-architect",
+      "linear-coordinator",
+      "implementation-specialist",
+      "code-reviewer",
+      "test-engineer",
+      "documentation-master",
+      "devops-specialist"
+    ],
+    "bug_fix": [
+      "quick-fixer",
+      "linear-coordinator",
+      "code-reviewer",
+      "test-engineer"
+    ],
+    "performance": [
+      "code-reviewer",
+      "product-strategist",
+      "strategic-architect",
+      "implementation-specialist",
+      "test-engineer"
+    ],
+    "infrastructure": [
+      "strategic-architect",
+      "devops-specialist",
+      "test-engineer"
+    ],
+    "security": [
+      "code-reviewer",
+      "strategic-architect",
+      "linear-coordinator",
+      "implementation-specialist",
+      "test-engineer"
+    ],
+    "ai_ml": [
+      "product-strategist",
+      "strategic-architect",
+      "rag-architect",
+      "ml-engineer",
+      "implementation-specialist",
+      "test-engineer"
+    ],
+    "codebase_inquiry": [
+      "project-guru",
+      "documentation-master"
+    ],
+    "pre_commit_review": [
+      "code-reviewer"
+    ],
+    "refactoring": [
+      "code-reviewer",
+      "product-strategist",
+      "strategic-architect",
+      "implementation-specialist",
+      "test-engineer",
+      "documentation-master"
+    ],
+    "documentation_cleanup": [
+      "documentation-master",
+      "brd-creator",
+      "historian"
+    ],
+    "agentic_ai": [
+      "product-strategist",
+      "rag-architect",
+      "ai-engineer-agentic",
+      "implementation-specialist",
+      "test-engineer",
+      "devops-specialist"
+    ],
+    "conversation_audit": [
+      "chat-auditor"
+    ]
+  },
+  "governance_chain": [
+    "context-steward",
+    "historian",
+    "agent-auditor",
+    "meta-improvement-analyst"
+  ],
+  "mcp_servers": {
+    "context7": {
+      "purpose": "Library documentation, API verification, best practices research",
+      "used_by": [
+        "product-strategist",
+        "strategic-architect",
+        "implementation-specialist",
+        "documentation-master",
+        "code-reviewer",
+        "test-engineer",
+        "rag-architect",
+        "ml-engineer",
+        "devops-specialist",
+        "web-design-guru",
+        "project-guru",
+        "ai-engineer-agentic"
+      ]
+    },
+    "chrome-devtools": {
+      "purpose": "Live browser testing, security validation, performance profiling, accessibility audits",
+      "used_by": [
+        "implementation-specialist",
+        "code-reviewer",
+        "test-engineer",
+        "web-design-guru"
+      ]
+    },
+    "linear": {
+      "purpose": "Linear issue creation, querying, and management",
+      "used_by": [
+        "linear-coordinator"
+      ]
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-01-20",
+    "total_agents": 21,
+    "governance_agents": 4,
+    "execution_agents": 17,
+    "categories": [
+      "planning",
+      "implementation",
+      "quality",
+      "governance",
+      "ai-ml",
+      "operations",
+      "design",
+      "knowledge",
+      "maintenance",
+      "documentation"
+    ]
+  }
+}

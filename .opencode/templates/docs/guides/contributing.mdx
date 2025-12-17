@@ -1,0 +1,330 @@
+---
+title: Contributing Guide
+description: Guidelines for contributing to {{project.name}}
+---
+
+# Contributing Guide
+
+Thank you for your interest in contributing to {{project.name}}! This guide will help you get started with the contribution process.
+
+## Code of Conduct
+
+<Info>
+  By participating in this project, you agree to abide by our Code of Conduct. Please read it before contributing.
+</Info>
+
+We are committed to providing a welcoming and inclusive environment for everyone.
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork the repository">
+    Click the "Fork" button on GitHub to create your own copy.
+  </Step>
+  <Step title="Clone your fork">
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/{{project.name}}.git
+    cd {{project.name}}
+    ```
+  </Step>
+  <Step title="Add upstream remote">
+    ```bash
+    git remote add upstream {{integrations.github.repo}}.git
+    ```
+  </Step>
+  <Step title="Set up development environment">
+    Follow the [Development Guide](/guides/development) to set up your local environment.
+  </Step>
+</Steps>
+
+## Types of Contributions
+
+<CardGroup cols={2}>
+  <Card title="Bug Reports" icon="bug">
+    Report bugs with detailed reproduction steps
+  </Card>
+  <Card title="Feature Requests" icon="lightbulb">
+    Suggest new features or improvements
+  </Card>
+  <Card title="Documentation" icon="book">
+    Improve or add documentation
+  </Card>
+  <Card title="Code" icon="code">
+    Fix bugs or implement features
+  </Card>
+</CardGroup>
+
+## Reporting Bugs
+
+<AccordionGroup>
+  <Accordion title="Before submitting" icon="search">
+    1. Search existing issues to avoid duplicates
+    2. Try to reproduce with the latest version
+    3. Gather relevant information (logs, screenshots)
+  </Accordion>
+  <Accordion title="Bug report template" icon="file-lines">
+    ```markdown
+    ## Description
+    A clear description of the bug.
+
+    ## Steps to Reproduce
+    1. Step 1
+    2. Step 2
+    3. Step 3
+
+    ## Expected Behavior
+    What you expected to happen.
+
+    ## Actual Behavior
+    What actually happened.
+
+    ## Environment
+    - OS: [e.g., macOS 14.0]
+    - Node.js: [e.g., 20.10.0]
+    - Version: [e.g., 1.0.0]
+
+    ## Additional Context
+    Any other relevant information.
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Feature Requests
+
+Before requesting a feature:
+
+1. Check if it already exists or is planned
+2. Consider if it fits the project scope
+3. Think about the implementation approach
+
+Use the feature request template:
+
+```markdown
+## Problem Statement
+What problem does this solve?
+
+## Proposed Solution
+How should it work?
+
+## Alternatives Considered
+What other approaches did you consider?
+
+## Additional Context
+Any mockups, examples, or references.
+```
+
+## Pull Request Process
+
+### Before You Start
+
+<Warning>
+  For significant changes, please open an issue first to discuss the approach.
+</Warning>
+
+1. Check for existing PRs addressing the same issue
+2. Create a Linear issue if one doesn't exist
+3. Ensure your change aligns with project goals
+
+### Creating a Pull Request
+
+<Steps>
+  <Step title="Create a branch">
+    ```bash
+    git checkout main
+    git pull upstream main
+    git checkout -b feat/ABC-123-feature-name
+    ```
+    
+    Use the branch naming convention:
+    - `feat/ABC-123-description` for features
+    - `fix/ABC-123-description` for bug fixes
+    - `docs/ABC-123-description` for documentation
+  </Step>
+  <Step title="Make your changes">
+    - Write clear, documented code
+    - Follow the code style guidelines
+    - Add tests for new functionality
+    - Update documentation as needed
+  </Step>
+  <Step title="Commit your changes">
+    ```bash
+    git add .
+    git commit -m "feat(scope): add feature description [ABC-123]"
+    ```
+    
+    Follow [Conventional Commits](https://www.conventionalcommits.org/):
+    - `feat`: New feature
+    - `fix`: Bug fix
+    - `docs`: Documentation
+    - `style`: Code style
+    - `refactor`: Refactoring
+    - `test`: Tests
+    - `chore`: Maintenance
+  </Step>
+  <Step title="Push and create PR">
+    ```bash
+    git push origin feat/ABC-123-feature-name
+    ```
+    
+    Then create a pull request on GitHub.
+  </Step>
+</Steps>
+
+### Pull Request Template
+
+```markdown
+## Description
+Brief description of changes.
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Linear Issue
+Closes ABC-123
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] No new warnings
+```
+
+### Review Process
+
+<Tabs>
+  <Tab title="What to Expect">
+    1. Automated checks run (tests, linting)
+    2. A maintainer reviews your code
+    3. You may receive feedback or requests for changes
+    4. Once approved, your PR will be merged
+  </Tab>
+  <Tab title="Review Criteria">
+    - Code quality and readability
+    - Test coverage
+    - Documentation
+    - Performance implications
+    - Security considerations
+    - Backward compatibility
+  </Tab>
+  <Tab title="Addressing Feedback">
+    - Respond to all comments
+    - Make requested changes
+    - Push additional commits (don't force push)
+    - Request re-review when ready
+  </Tab>
+</Tabs>
+
+## Code Style Guidelines
+
+### TypeScript
+
+```typescript
+// ✅ Good
+export async function createUser(data: CreateUserInput): Promise<User> {
+  const validated = validateUserInput(data);
+  return userRepository.create(validated);
+}
+
+// ❌ Bad
+export async function createUser(data: any) {
+  return userRepository.create(data);
+}
+```
+
+### Testing
+
+```typescript
+// ✅ Good - descriptive test names
+describe('UserService', () => {
+  describe('createUser', () => {
+    it('should create a user with valid email and password', async () => {
+      // ...
+    });
+
+    it('should throw ValidationError when email is invalid', async () => {
+      // ...
+    });
+  });
+});
+
+// ❌ Bad - vague test names
+describe('UserService', () => {
+  it('works', () => {
+    // ...
+  });
+});
+```
+
+### Documentation
+
+- Use JSDoc for public APIs
+- Include examples in documentation
+- Keep README up to date
+- Document breaking changes
+
+## Communication
+
+### Where to Ask Questions
+
+<CardGroup cols={2}>
+  <Card
+    title="GitHub Discussions"
+    icon="comments"
+    href="{{integrations.github.repo}}/discussions"
+  >
+    General questions and ideas
+  </Card>
+  <Card
+    title="GitHub Issues"
+    icon="circle-exclamation"
+    href="{{integrations.github.repo}}/issues"
+  >
+    Bug reports and feature requests
+  </Card>
+</CardGroup>
+
+### Response Times
+
+- Issues: Within 2-3 business days
+- Pull requests: Within 5 business days
+- Discussions: Best effort
+
+## Recognition
+
+Contributors are recognized in:
+
+- Release notes
+- README contributors section
+- Annual contributor highlights
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the same license as the project.
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Development Guide"
+    icon="code"
+    href="/guides/development"
+  >
+    Set up your development environment
+  </Card>
+  <Card
+    title="Architecture"
+    icon="sitemap"
+    href="/architecture/overview"
+  >
+    Understand the codebase
+  </Card>
+</CardGroup>
+

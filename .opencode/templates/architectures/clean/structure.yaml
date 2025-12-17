@@ -1,0 +1,87 @@
+# Clean Architecture Pattern
+# Uncle Bob's Clean Architecture with dependency rule
+
+pattern: clean
+description: "Uncle Bob's Clean Architecture with strict dependency rule. Inner layers know nothing about outer layers. Dependencies point inward."
+
+layers:
+  - name: entities
+    path: "src/entities"
+    description: "Enterprise business rules - core entities and business logic that would exist even without the application"
+    agents_md: "entities-AGENTS.md"
+    
+  - name: use-cases
+    path: "src/use-cases"
+    description: "Application business rules - use case interactors that orchestrate data flow to and from entities"
+    agents_md: "use-cases-AGENTS.md"
+    
+  - name: interfaces
+    path: "src/interfaces"
+    description: "Interface adapters - controllers, presenters, gateways that convert data between use cases and external formats"
+    agents_md: "interfaces-AGENTS.md"
+    
+  - name: frameworks
+    path: "src/frameworks"
+    description: "Frameworks and drivers - web frameworks, databases, external tools and delivery mechanisms"
+    agents_md: "frameworks-AGENTS.md"
+
+dependency_rules:
+  # The Dependency Rule: Source code dependencies can only point inwards
+  entities:
+    may_import: []  # Entities have NO external dependencies
+    must_not_import:
+      - use-cases
+      - interfaces
+      - frameworks
+  use-cases:
+    may_import:
+      - entities
+    must_not_import:
+      - interfaces
+      - frameworks
+  interfaces:
+    may_import:
+      - entities
+      - use-cases
+    must_not_import:
+      - frameworks
+  frameworks:
+    may_import:
+      - entities
+      - use-cases
+      - interfaces
+    must_not_import: []
+
+recommended_for:
+  - web-app
+  - api
+  - enterprise
+
+considerations:
+  pros:
+    - Framework independent - not wedded to any specific technology
+    - Testable - business rules can be tested without UI, database, or external elements
+    - UI independent - UI can change easily without changing the rest of the system
+    - Database independent - business rules not bound to the database
+    - Independent of external agencies - business rules don't know about interfaces to the outside world
+  cons:
+    - Initial complexity - more layers and indirection
+    - Learning curve - team needs to understand the architecture
+    - Potential over-engineering for simple applications
+    - More files and abstractions to manage
+
+best_practices:
+  - Entities contain enterprise-wide business rules
+  - Use cases contain application-specific business rules
+  - Use dependency injection to satisfy the dependency rule
+  - Data crosses boundaries in simple data structures (DTOs)
+  - Nothing in an inner circle knows about outer circles
+  - Concrete implementations in outer layers, abstractions in inner layers
+
+key_concepts:
+  dependency_rule: "Source code dependencies must point only inward, toward higher-level policies"
+  entities: "Enterprise-wide business rules and data - could be used by many applications"
+  use_cases: "Application-specific business rules - orchestrate data flow"
+  interface_adapters: "Convert data from use case format to external format (and vice versa)"
+  frameworks_drivers: "Glue code that communicates with frameworks and tools"
+

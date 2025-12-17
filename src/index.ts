@@ -20,6 +20,10 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
+  // Governance hooks
+  createGovernancePathValidatorHook,
+  createGovernanceHistorianHook,
+  createGovernanceLinearInjectorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -44,7 +48,20 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, interactive_bash, getTmuxPath } from "./tools";
+import {
+  builtinTools,
+  createCallOmoAgent,
+  createBackgroundTools,
+  createLookAt,
+  interactive_bash,
+  getTmuxPath,
+  // Governance tools
+  createLinearBranchTool,
+  createLinearUpdateStatusTool,
+  createLinearCreateIssueTool,
+  createReadContextTool,
+  createSpecFolderTool,
+} from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
@@ -247,6 +264,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createInteractiveBashSessionHook(ctx)
     : null;
 
+  // Governance hooks
+  const governancePathValidator = isHookEnabled("governance-path-validator")
+    ? createGovernancePathValidatorHook(ctx, pluginConfig.governance?.path_validation)
+    : null;
+  const governanceHistorian = isHookEnabled("governance-historian")
+    ? createGovernanceHistorianHook(ctx, pluginConfig.governance?.historian)
+    : null;
+  const governanceLinearInjector = isHookEnabled("governance-linear-injector")
+    ? createGovernanceLinearInjectorHook(ctx, pluginConfig.governance?.linear)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -258,6 +286,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
+
+  // Governance tools
+  const linearBranch = createLinearBranchTool(ctx);
+  const linearUpdateStatus = createLinearUpdateStatusTool(ctx);
+  const linearCreateIssue = createLinearCreateIssueTool(ctx);
+  const readContext = createReadContextTool(ctx);
+  const createSpecFolder = createSpecFolderTool(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -273,12 +308,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
+      // Governance tools
+      linear_branch: linearBranch,
+      linear_update_status: linearUpdateStatus,
+      linear_create_issue: linearCreateIssue,
+      read_context: readContext,
+      create_spec_folder: createSpecFolder,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
+      // Governance: Linear context injection
+      await governanceLinearInjector?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {
@@ -395,6 +438,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
+      // Governance: Historian and Linear injector events
+      await governanceHistorian?.event(input);
+      await governanceLinearInjector?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -494,6 +540,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
+      // Governance: Path validation (runs LAST to allow other hooks first)
+      await governancePathValidator?.["tool.execute.before"](input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
@@ -529,6 +577,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
+      // Governance: Historian tracking (runs LAST to capture all changes)
+      await governanceHistorian?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

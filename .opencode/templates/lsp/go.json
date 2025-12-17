@@ -1,0 +1,7 @@
+{
+  "go": {
+    "command": ["gopls"],
+    "extensions": [".go"]
+  }
+}
+

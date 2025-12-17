@@ -1,0 +1,355 @@
+---
+title: Development Guide
+description: Best practices and workflows for developing {{project.name}}
+---
+
+# Development Guide
+
+This guide covers the development workflow, best practices, and tooling for contributing to {{project.name}}.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 18.0 or higher
+  </Card>
+  <Card title="Git" icon="git-alt">
+    Version 2.30 or higher
+  </Card>
+  <Card title="Docker" icon="docker">
+    For local services (optional)
+  </Card>
+  <Card title="VS Code" icon="code">
+    Recommended IDE
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+### Clone the Repository
+
+```bash
+git clone {{integrations.github.repo}}.git
+cd {{project.name}}
+```
+
+### Install Dependencies
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn install
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm install
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun install
+    ```
+  </Tab>
+</Tabs>
+
+### Environment Setup
+
+<Steps>
+  <Step title="Copy environment template">
+    ```bash
+    cp .env.example .env.local
+    ```
+  </Step>
+  <Step title="Configure environment variables">
+    Edit `.env.local` with your local configuration:
+    
+    ```bash
+    DATABASE_URL=postgresql://localhost:5432/{{project.name}}_dev
+    REDIS_URL=redis://localhost:6379
+    API_KEY=your-development-api-key
+    ```
+  </Step>
+  <Step title="Start local services">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+  <Step title="Run database migrations">
+    ```bash
+    npm run db:migrate
+    ```
+  </Step>
+</Steps>
+
+### Start Development Server
+
+```bash
+npm run dev
+```
+
+The server will start at `http://localhost:3000`.
+
+## Project Structure
+
+```
+{{project.root}}/
+├── src/
+│   ├── api/              # API routes
+│   │   ├── routes/       # Route handlers
+│   │   └── middleware/   # Express middleware
+│   ├── services/         # Business logic
+│   ├── models/           # Data models
+│   ├── utils/            # Utilities
+│   └── config/           # Configuration
+├── tests/
+│   ├── unit/             # Unit tests
+│   ├── integration/      # Integration tests
+│   └── fixtures/         # Test fixtures
+├── docs/                 # Documentation
+├── scripts/              # Build scripts
+└── docker/               # Docker configs
+```
+
+## Code Style
+
+### TypeScript Guidelines
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions" icon="tag">
+    - **Files**: `kebab-case.ts`
+    - **Classes**: `PascalCase`
+    - **Functions/Variables**: `camelCase`
+    - **Constants**: `UPPER_SNAKE_CASE`
+    - **Interfaces**: `PascalCase` (no `I` prefix)
+  </Accordion>
+  <Accordion title="Import Order" icon="sort">
+    1. Node.js built-in modules
+    2. External dependencies
+    3. Internal modules (absolute paths)
+    4. Relative imports
+    
+    ```typescript
+    import { readFile } from 'fs/promises';
+    
+    import express from 'express';
+    import { z } from 'zod';
+    
+    import { config } from '@/config';
+    import { UserService } from '@/services/user';
+    
+    import { validateInput } from './middleware';
+    ```
+  </Accordion>
+  <Accordion title="Error Handling" icon="triangle-exclamation">
+    - Use custom error classes
+    - Always include error codes
+    - Provide actionable error messages
+    
+    ```typescript
+    throw new ValidationError('Invalid email format', {
+      field: 'email',
+      code: 'INVALID_EMAIL',
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Linting and Formatting
+
+```bash
+# Run linter
+npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Format code
+npm run format
+```
+
+## Testing
+
+### Running Tests
+
+<Tabs>
+  <Tab title="All Tests">
+    ```bash
+    npm test
+    ```
+  </Tab>
+  <Tab title="Unit Tests">
+    ```bash
+    npm run test:unit
+    ```
+  </Tab>
+  <Tab title="Integration Tests">
+    ```bash
+    npm run test:integration
+    ```
+  </Tab>
+  <Tab title="Watch Mode">
+    ```bash
+    npm run test:watch
+    ```
+  </Tab>
+</Tabs>
+
+### Writing Tests
+
+Follow the AAA pattern (Arrange-Act-Assert):
+
+```typescript
+describe('UserService', () => {
+  describe('createUser', () => {
+    it('should create a user with valid data', async () => {
+      // Arrange
+      const userData = { email: 'test@example.com', name: 'Test' };
+      
+      // Act
+      const user = await userService.createUser(userData);
+      
+      // Assert
+      expect(user.email).toBe('test@example.com');
+      expect(user.id).toBeDefined();
+    });
+  });
+});
+```
+
+### Test Coverage
+
+```bash
+npm run test:coverage
+```
+
+<Warning>
+  Maintain minimum 80% code coverage for new code.
+</Warning>
+
+## Git Workflow
+
+### Branch Naming
+
+Use the Linear issue ID in branch names:
+
+```bash
+git checkout -b feat/ABC-123-add-user-authentication
+git checkout -b fix/ABC-456-fix-login-redirect
+git checkout -b docs/ABC-789-update-api-docs
+```
+
+### Commit Messages
+
+Follow conventional commits:
+
+```
+type(scope): description [LINEAR-ID]
+
+- Detail 1
+- Detail 2
+
+Refs: LINEAR-ID
+```
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+### Pull Request Process
+
+<Steps>
+  <Step title="Create branch from main">
+    ```bash
+    git checkout main
+    git pull origin main
+    git checkout -b feat/ABC-123-feature-name
+    ```
+  </Step>
+  <Step title="Make changes and commit">
+    ```bash
+    git add .
+    git commit -m "feat(auth): add OAuth support [ABC-123]"
+    ```
+  </Step>
+  <Step title="Push and create PR">
+    ```bash
+    git push origin feat/ABC-123-feature-name
+    ```
+  </Step>
+  <Step title="Request review">
+    - Add reviewers
+    - Link Linear issue
+    - Fill PR template
+  </Step>
+</Steps>
+
+## Debugging
+
+### VS Code Configuration
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Server",
+      "program": "${workspaceFolder}/src/index.ts",
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}
+```
+
+### Logging
+
+Use structured logging:
+
+```typescript
+import { logger } from '@/utils/logger';
+
+logger.info('User created', { userId: user.id, email: user.email });
+logger.error('Failed to create user', { error, email });
+```
+
+## Useful Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm test` | Run all tests |
+| `npm run lint` | Run linter |
+| `npm run db:migrate` | Run database migrations |
+| `npm run db:seed` | Seed database |
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Deployment Guide"
+    icon="rocket"
+    href="/guides/deployment"
+  >
+    Deploy to production
+  </Card>
+  <Card
+    title="Contributing Guide"
+    icon="code-pull-request"
+    href="/guides/contributing"
+  >
+    Contribution guidelines
+  </Card>
+</CardGroup>
+

@@ -1,0 +1,7 @@
+{
+  "python": {
+    "command": ["pylsp"],
+    "extensions": [".py"]
+  }
+}
+

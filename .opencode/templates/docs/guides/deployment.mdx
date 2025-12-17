@@ -1,0 +1,400 @@
+---
+title: Deployment Guide
+description: Deploy {{project.name}} to production environments
+---
+
+# Deployment Guide
+
+This guide covers deploying {{project.name}} to various environments and platforms.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker">
+    For containerized deployments
+  </Card>
+  <Card title="Cloud CLI" icon="cloud">
+    AWS CLI, gcloud, or Azure CLI
+  </Card>
+  <Card title="Terraform" icon="code">
+    For infrastructure as code (optional)
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra">
+    For orchestrated deployments (optional)
+  </Card>
+</CardGroup>
+
+## Build Process
+
+### Production Build
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm run build
+    ```
+  </Tab>
+  <Tab title="Docker">
+    ```bash
+    docker build -t {{project.name}}:latest .
+    ```
+  </Tab>
+</Tabs>
+
+### Environment Variables
+
+<Warning>
+  Never commit secrets to version control. Use environment variables or secret management services.
+</Warning>
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NODE_ENV` | Yes | `production` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `REDIS_URL` | Yes | Redis connection string |
+| `API_SECRET` | Yes | Secret for JWT signing |
+| `SENTRY_DSN` | No | Sentry error tracking |
+
+## Deployment Options
+
+<Tabs>
+  <Tab title="Docker">
+    ### Docker Compose
+    
+    ```yaml
+    # docker-compose.prod.yml
+    version: '3.8'
+    services:
+      app:
+        image: {{project.name}}:latest
+        ports:
+          - "3000:3000"
+        environment:
+          - NODE_ENV=production
+          - DATABASE_URL=${DATABASE_URL}
+          - REDIS_URL=${REDIS_URL}
+        depends_on:
+          - postgres
+          - redis
+      
+      postgres:
+        image: postgres:15-alpine
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+        environment:
+          - POSTGRES_DB={{project.name}}
+          - POSTGRES_USER=${DB_USER}
+          - POSTGRES_PASSWORD=${DB_PASSWORD}
+      
+      redis:
+        image: redis:7-alpine
+        volumes:
+          - redis_data:/data
+    
+    volumes:
+      postgres_data:
+      redis_data:
+    ```
+    
+    Deploy:
+    ```bash
+    docker-compose -f docker-compose.prod.yml up -d
+    ```
+  </Tab>
+  <Tab title="Kubernetes">
+    ### Kubernetes Deployment
+    
+    ```yaml
+    # k8s/deployment.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: {{project.name}}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: {{project.name}}
+      template:
+        metadata:
+          labels:
+            app: {{project.name}}
+        spec:
+          containers:
+            - name: {{project.name}}
+              image: {{project.name}}:latest
+              ports:
+                - containerPort: 3000
+              env:
+                - name: NODE_ENV
+                  value: production
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{project.name}}-secrets
+                      key: database-url
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 3000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+    ```
+    
+    Deploy:
+    ```bash
+    kubectl apply -f k8s/
+    ```
+  </Tab>
+  <Tab title="Vercel">
+    ### Vercel Deployment
+    
+    ```json
+    // vercel.json
+    {
+      "version": 2,
+      "builds": [
+        {
+          "src": "src/index.ts",
+          "use": "@vercel/node"
+        }
+      ],
+      "routes": [
+        {
+          "src": "/(.*)",
+          "dest": "src/index.ts"
+        }
+      ]
+    }
+    ```
+    
+    Deploy:
+    ```bash
+    vercel --prod
+    ```
+  </Tab>
+  <Tab title="Railway">
+    ### Railway Deployment
+    
+    ```toml
+    # railway.toml
+    [build]
+    builder = "nixpacks"
+    buildCommand = "npm run build"
+    
+    [deploy]
+    startCommand = "npm start"
+    healthcheckPath = "/health"
+    healthcheckTimeout = 100
+    restartPolicyType = "on_failure"
+    restartPolicyMaxRetries = 3
+    ```
+    
+    Deploy via Railway CLI or GitHub integration.
+  </Tab>
+</Tabs>
+
+## CI/CD Pipeline
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+        run: |
+          # Add deployment commands here
+          echo "Deploying..."
+```
+
+## Database Migrations
+
+<Steps>
+  <Step title="Generate migration">
+    ```bash
+    npm run db:migrate:generate -- --name add_user_roles
+    ```
+  </Step>
+  <Step title="Review migration">
+    Check the generated SQL in `migrations/` directory
+  </Step>
+  <Step title="Apply migration">
+    ```bash
+    npm run db:migrate:deploy
+    ```
+  </Step>
+  <Step title="Rollback if needed">
+    ```bash
+    npm run db:migrate:rollback
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Always backup your database before running migrations in production.
+</Warning>
+
+## Health Checks
+
+### Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Basic health check |
+| `GET /health/ready` | Readiness check (includes dependencies) |
+| `GET /health/live` | Liveness check |
+
+### Example Response
+
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "checks": {
+    "database": "healthy",
+    "redis": "healthy",
+    "memory": "healthy"
+  }
+}
+```
+
+## Monitoring
+
+### Metrics
+
+Expose Prometheus metrics at `/metrics`:
+
+```typescript
+import { collectDefaultMetrics, Registry } from 'prom-client';
+
+const register = new Registry();
+collectDefaultMetrics({ register });
+```
+
+### Logging
+
+Configure structured logging for production:
+
+```typescript
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: process.env.NODE_ENV === 'production'
+    ? undefined
+    : { target: 'pino-pretty' },
+});
+```
+
+### Error Tracking
+
+```typescript
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 0.1,
+});
+```
+
+## Rollback Procedure
+
+<Steps>
+  <Step title="Identify the issue">
+    Check logs and monitoring dashboards
+  </Step>
+  <Step title="Rollback deployment">
+    ```bash
+    # Kubernetes
+    kubectl rollout undo deployment/{{project.name}}
+    
+    # Docker
+    docker-compose -f docker-compose.prod.yml down
+    docker-compose -f docker-compose.prod.yml up -d --no-deps app
+    ```
+  </Step>
+  <Step title="Rollback database (if needed)">
+    ```bash
+    npm run db:migrate:rollback
+    ```
+  </Step>
+  <Step title="Verify">
+    Check health endpoints and monitoring
+  </Step>
+</Steps>
+
+## Security Checklist
+
+- [ ] Environment variables are set correctly
+- [ ] Secrets are not exposed in logs
+- [ ] HTTPS is enforced
+- [ ] Security headers are configured
+- [ ] Rate limiting is enabled
+- [ ] Database connections are encrypted
+- [ ] Backups are configured
+- [ ] Monitoring alerts are set up
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Development Guide"
+    icon="code"
+    href="/guides/development"
+  >
+    Local development setup
+  </Card>
+  <Card
+    title="Architecture"
+    icon="sitemap"
+    href="/architecture/overview"
+  >
+    System architecture
+  </Card>
+</CardGroup>
+

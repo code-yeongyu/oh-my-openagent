@@ -1,0 +1,75 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "{{project.name}}",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "{{integrations.github.repo}}"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart"]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/overview",
+        "architecture/patterns",
+        {
+          "group": "Decisions",
+          "pages": ["architecture/decisions/adr-001"]
+        }
+      ]
+    },
+    {
+      "group": "Features",
+      "pages": []
+    },
+    {
+      "group": "API Reference",
+      "pages": []
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/development",
+        "guides/deployment",
+        "guides/contributing"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "{{integrations.github.repo}}"
+  },
+  "anchors": [
+    {
+      "name": "API Reference",
+      "icon": "rectangle-terminal",
+      "url": "api-reference"
+    },
+    {
+      "name": "Changelog",
+      "icon": "list",
+      "url": "changelog"
+    }
+  ],
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ]
+}
+

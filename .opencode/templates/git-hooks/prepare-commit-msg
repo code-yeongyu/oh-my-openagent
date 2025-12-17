@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Git prepare-commit-msg hook for auto-populating Linear issue ID from branch name
+# Install: cp .opencode/templates/git-hooks/prepare-commit-msg .git/hooks/prepare-commit-msg && chmod +x .git/hooks/prepare-commit-msg
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Only modify if this is not a merge, squash, or amend
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+    exit 0
+fi
+
+# Get current branch name
+branch_name=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ -z "$branch_name" ]; then
+    exit 0
+fi
+
+# Extract Linear issue ID from branch name (e.g., feat/ABC-123-description -> ABC-123)
+issue_id=$(echo "$branch_name" | grep -oE '[A-Z]+-[0-9]+' | head -n1)
+
+if [ -z "$issue_id" ]; then
+    exit 0
+fi
+
+# Check if the commit message already contains the issue ID
+if grep -q "$issue_id" "$COMMIT_MSG_FILE"; then
+    exit 0
+fi
+
+# Get the current commit message
+current_msg=$(cat "$COMMIT_MSG_FILE")
+
+# If message is empty or just comments, add template
+if [ -z "$(echo "$current_msg" | grep -v '^#')" ]; then
+    # Create template with issue ID
+    cat > "$COMMIT_MSG_FILE" << EOF
+type(scope): description [$issue_id]
+
+# Detailed description of changes (optional)
+
+# Linear Issue: $issue_id
+# 
+# Commit Types:
+#   feat:     New feature
+#   fix:      Bug fix
+#   docs:     Documentation changes
+#   style:    Code style (formatting, semicolons, etc)
+#   refactor: Code refactoring
+#   perf:     Performance improvements
+#   test:     Adding/updating tests
+#   build:    Build system changes
+#   ci:       CI configuration changes
+#   chore:    Other changes (deps, configs)
+#   revert:   Revert previous commit
+#
+# Example: feat(auth): add OAuth2 support [$issue_id]
+EOF
+else
+    # Append issue ID to existing message if not present
+    # Check if first line already has the format
+    first_line=$(echo "$current_msg" | head -n1)
+    if echo "$first_line" | grep -qE '^\w+(\([^)]+\))?: ' && ! echo "$first_line" | grep -qE '\[[A-Z]+-[0-9]+\]$'; then
+        # Add issue ID to first line
+        new_first_line="$first_line [$issue_id]"
+        rest_of_msg=$(echo "$current_msg" | tail -n +2)
+        echo "$new_first_line" > "$COMMIT_MSG_FILE"
+        echo "$rest_of_msg" >> "$COMMIT_MSG_FILE"
+    fi
+fi
+
+exit 0
+

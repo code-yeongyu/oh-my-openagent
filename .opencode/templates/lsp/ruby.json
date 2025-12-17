@@ -1,0 +1,7 @@
+{
+  "ruby": {
+    "command": ["solargraph", "stdio"],
+    "extensions": [".rb", ".rake", ".gemspec"]
+  }
+}
+

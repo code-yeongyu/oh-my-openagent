@@ -1,0 +1,298 @@
+---
+title: Design Patterns
+description: Common design patterns and conventions used in {{project.name}}
+---
+
+# Design Patterns
+
+This document describes the design patterns and conventions used throughout {{project.name}}.
+
+## Architectural Patterns
+
+### Repository Pattern
+
+We use the repository pattern to abstract data access:
+
+```typescript
+// Interface definition
+interface IUserRepository {
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  create(data: CreateUserDTO): Promise<User>;
+  update(id: string, data: UpdateUserDTO): Promise<User>;
+  delete(id: string): Promise<void>;
+}
+
+// Implementation
+class UserRepository implements IUserRepository {
+  constructor(private db: Database) {}
+
+  async findById(id: string): Promise<User | null> {
+    return this.db.users.findUnique({ where: { id } });
+  }
+
+  // ... other methods
+}
+```
+
+<Note>
+  The repository pattern allows us to swap out data sources without changing business logic.
+</Note>
+
+### Service Layer Pattern
+
+Business logic is encapsulated in service classes:
+
+```typescript
+class UserService {
+  constructor(
+    private userRepository: IUserRepository,
+    private emailService: IEmailService,
+  ) {}
+
+  async registerUser(data: RegisterDTO): Promise<User> {
+    // Validation
+    const existingUser = await this.userRepository.findByEmail(data.email);
+    if (existingUser) {
+      throw new ConflictError("Email already registered");
+    }
+
+    // Create user
+    const user = await this.userRepository.create({
+      ...data,
+      password: await hash(data.password),
+    });
+
+    // Send welcome email
+    await this.emailService.sendWelcome(user);
+
+    return user;
+  }
+}
+```
+
+### Dependency Injection
+
+We use constructor injection for dependencies:
+
+```typescript
+// Container setup
+const container = new Container();
+container.bind<IUserRepository>(TYPES.UserRepository).to(UserRepository);
+container.bind<IEmailService>(TYPES.EmailService).to(EmailService);
+container.bind<UserService>(TYPES.UserService).to(UserService);
+
+// Usage
+const userService = container.get<UserService>(TYPES.UserService);
+```
+
+## Code Patterns
+
+### Error Handling
+
+Custom error classes for different scenarios:
+
+```typescript
+// Base error
+abstract class AppError extends Error {
+  abstract statusCode: number;
+  abstract code: string;
+
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+// Specific errors
+class NotFoundError extends AppError {
+  statusCode = 404;
+  code = "NOT_FOUND";
+}
+
+class ValidationError extends AppError {
+  statusCode = 400;
+  code = "VALIDATION_ERROR";
+
+  constructor(
+    message: string,
+    public errors: Record<string, string[]>,
+  ) {
+    super(message);
+  }
+}
+```
+
+### Result Pattern
+
+For operations that can fail:
+
+```typescript
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E };
+
+async function parseConfig(path: string): Promise<Result<Config, ParseError>> {
+  try {
+    const content = await readFile(path, "utf-8");
+    const config = JSON.parse(content);
+    return { success: true, data: config };
+  } catch (error) {
+    return { success: false, error: new ParseError(error.message) };
+  }
+}
+
+// Usage
+const result = await parseConfig("config.json");
+if (result.success) {
+  console.log(result.data);
+} else {
+  console.error(result.error);
+}
+```
+
+### Factory Pattern
+
+For creating complex objects:
+
+```typescript
+class NotificationFactory {
+  static create(type: NotificationType, data: NotificationData): Notification {
+    switch (type) {
+      case "email":
+        return new EmailNotification(data);
+      case "push":
+        return new PushNotification(data);
+      case "sms":
+        return new SmsNotification(data);
+      default:
+        throw new Error(`Unknown notification type: ${type}`);
+    }
+  }
+}
+```
+
+## API Patterns
+
+### RESTful Conventions
+
+| Operation | HTTP Method | URL Pattern | Response Code |
+|-----------|-------------|-------------|---------------|
+| List | GET | `/resources` | 200 |
+| Get | GET | `/resources/:id` | 200 |
+| Create | POST | `/resources` | 201 |
+| Update | PUT | `/resources/:id` | 200 |
+| Patch | PATCH | `/resources/:id` | 200 |
+| Delete | DELETE | `/resources/:id` | 204 |
+
+### Response Format
+
+Consistent response structure:
+
+```typescript
+// Success response
+interface SuccessResponse<T> {
+  success: true;
+  data: T;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+  };
+}
+
+// Error response
+interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+```
+
+### Pagination
+
+Cursor-based pagination for large datasets:
+
+```typescript
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    cursor: string | null;
+    hasMore: boolean;
+    total: number;
+  };
+}
+```
+
+## Testing Patterns
+
+### Test Structure
+
+Follow the Arrange-Act-Assert pattern:
+
+```typescript
+describe("UserService", () => {
+  describe("registerUser", () => {
+    it("should create a new user and send welcome email", async () => {
+      // Arrange
+      const mockRepo = createMockUserRepository();
+      const mockEmail = createMockEmailService();
+      const service = new UserService(mockRepo, mockEmail);
+
+      // Act
+      const user = await service.registerUser({
+        email: "test@example.com",
+        password: "secure123",
+      });
+
+      // Assert
+      expect(user.email).toBe("test@example.com");
+      expect(mockEmail.sendWelcome).toHaveBeenCalledWith(user);
+    });
+  });
+});
+```
+
+### Test Fixtures
+
+Centralized test data:
+
+```typescript
+// fixtures/users.ts
+export const testUsers = {
+  admin: {
+    id: "user-1",
+    email: "admin@example.com",
+    role: "admin",
+  },
+  regular: {
+    id: "user-2",
+    email: "user@example.com",
+    role: "user",
+  },
+};
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Architecture Overview"
+    icon="sitemap"
+    href="/architecture/overview"
+  >
+    High-level system architecture
+  </Card>
+  <Card
+    title="ADRs"
+    icon="file-lines"
+    href="/architecture/decisions/adr-001"
+  >
+    Architecture Decision Records
+  </Card>
+</CardGroup>
+

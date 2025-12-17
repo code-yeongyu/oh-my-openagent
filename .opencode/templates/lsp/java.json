@@ -1,0 +1,7 @@
+{
+  "java": {
+    "command": ["jdtls"],
+    "extensions": [".java"]
+  }
+}
+

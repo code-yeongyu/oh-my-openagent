@@ -1,0 +1,7 @@
+{
+  "rust": {
+    "command": ["rust-analyzer"],
+    "extensions": [".rs"]
+  }
+}
+

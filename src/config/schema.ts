@@ -62,6 +62,10 @@ export const HookNameSchema = z.enum([
   "agent-usage-reminder",
   "non-interactive-env",
   "interactive-bash-session",
+  // Governance hooks
+  "governance-path-validator",
+  "governance-historian",
+  "governance-linear-injector",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
@@ -105,6 +109,43 @@ export const OmoAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
 })
 
+// Governance configuration schemas
+export const GovernancePathValidationSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["warn", "block", "disabled"]).default("warn"),
+  allowed_paths: z.array(z.string()).default([
+    "context/specs/",
+    "context/memory/",
+    ".cursor/specs/",
+    ".cursor/memory/",
+    ".opencode/",
+    "src/",
+    "tests/",
+    "docs/",
+    "lib/",
+    "packages/",
+  ]),
+})
+
+export const GovernanceHistorianSchema = z.object({
+  enabled: z.boolean().default(true),
+  auto_create: z.boolean().default(true),
+  changelog_path: z.string().default("changelog/"),
+  min_changes: z.number().default(1),
+})
+
+export const GovernanceLinearSchema = z.object({
+  enabled: z.boolean().default(true),
+  team_prefix: z.string().default("LIF"),
+  cache_issues: z.boolean().default(true),
+})
+
+export const GovernanceConfigSchema = z.object({
+  path_validation: GovernancePathValidationSchema.optional(),
+  historian: GovernanceHistorianSchema.optional(),
+  linear: GovernanceLinearSchema.optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
@@ -114,6 +155,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
   omo_agent: OmoAgentConfigSchema.optional(),
+  governance: GovernanceConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -122,5 +164,9 @@ export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
 export type OmoAgentConfig = z.infer<typeof OmoAgentConfigSchema>
+export type GovernanceConfig = z.infer<typeof GovernanceConfigSchema>
+export type GovernancePathValidationConfig = z.infer<typeof GovernancePathValidationSchema>
+export type GovernanceHistorianConfig = z.infer<typeof GovernanceHistorianSchema>
+export type GovernanceLinearConfig = z.infer<typeof GovernanceLinearSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"

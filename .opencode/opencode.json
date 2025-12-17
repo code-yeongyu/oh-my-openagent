@@ -1,0 +1,140 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "model": "opencode/gemini-3-flash",
+  "small_model": "opencode/gemini-3-flash",
+
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "*": "ask",
+      "git status": "allow",
+      "git diff": "allow",
+      "git log": "allow",
+      "git branch": "allow",
+      "git show *": "allow",
+      "git remote *": "allow",
+      "git config *": "allow",
+      "git add *": "allow",
+      "git commit *": "allow",
+      "git push *": "allow",
+      "git pull *": "allow",
+      "git rebase *": "allow",
+      "git merge *": "allow",
+      "git checkout *": "allow",
+      "git switch *": "allow",
+      "git reset *": "allow",
+      "git stash *": "allow",
+      "git tag *": "allow",
+      "git fetch *": "allow",
+      "git clone *": "allow",
+      "gh pr *": "allow",
+      "gh repo *": "allow",
+      "gh issue *": "allow",
+      "gh workflow *": "allow",
+      "npm test": "allow",
+      "npm run lint": "allow",
+      "npm run *": "allow",
+      "npm list *": "allow",
+      "npm view *": "allow",
+      "pytest": "allow",
+      "pytest *": "allow",
+      "python -m pytest *": "allow",
+      "python -m *": "allow",
+      "python3 -m *": "allow",
+      "node *": "allow",
+      "npx *": "allow",
+      "mkdir *": "allow",
+      "rmdir *": "allow",
+      "touch *": "allow",
+      "cp *": "allow",
+      "mv *": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "echo *": "allow",
+      "cd *": "allow",
+      "pwd": "allow",
+      "find *": "allow",
+      "grep *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "diff *": "allow",
+      "which *": "allow",
+      "whereis *": "allow",
+      "type *": "allow",
+      "sort *": "allow",
+      "uniq *": "allow",
+      "sed *": "allow",
+      "awk *": "allow",
+      "cut *": "allow",
+      "tr *": "allow",
+      "date": "allow",
+      "date *": "allow",
+      "whoami": "allow",
+      "uname *": "allow",
+      "env": "allow",
+      "ps *": "allow",
+      "curl *": "allow",
+      "wget *": "allow",
+      "ping *": "allow",
+      "jq *": "allow",
+      "yq *": "allow",
+      "docker ps *": "allow",
+      "docker images *": "allow",
+      "docker logs *": "allow",
+      "docker inspect *": "allow"
+    },
+    "webfetch": "allow"
+  },
+
+  "share": "manual",
+
+  "tools": {},
+
+  "plugin": [
+    "opencode-skills",
+    "opencode-gemini-auth",
+    "opencode-openai-codex-auth"
+  ],
+
+  "watcher": {
+    "ignore": [
+      ".rulesync/",
+      ".claude/"
+    ]
+  },
+
+  "mcp": {
+    "linear": {
+      "type": "remote",
+      "url": "https://mcp.linear.app/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer {env:LINEAR_API_KEY}"
+      }
+    },
+    "deepwiki": {
+      "type": "remote",
+      "url": "https://mcp.deepwiki.com/mcp",
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      },
+      "enabled": true
+    }
+  },
+
+  "lsp": {},
+
+  "instructions": [
+    ".opencode/instructions/governance.md",
+    ".opencode/instructions/custom-tools.md",
+    ".opencode/instructions/deepwiki-integration.md"
+  ]
+}
+

@@ -1,0 +1,76 @@
+# Layered Architecture Pattern
+# Traditional layered architecture with clear separation of concerns
+
+pattern: layered
+description: "Traditional layered architecture with clear separation of concerns. Each layer has specific responsibilities and can only depend on layers below it."
+
+layers:
+  - name: controllers
+    path: "src/controllers"
+    description: "Presentation layer - HTTP handlers, request validation, and response formatting"
+    agents_md: "controllers-AGENTS.md"
+    
+  - name: services
+    path: "src/services"
+    description: "Business logic layer - application rules, workflows, and orchestration"
+    agents_md: "services-AGENTS.md"
+    
+  - name: repositories
+    path: "src/repositories"
+    description: "Data access layer - database queries, ORM operations, and data persistence"
+    agents_md: "repositories-AGENTS.md"
+    
+  - name: models
+    path: "src/models"
+    description: "Data models layer - entity definitions, DTOs, and type schemas"
+    agents_md: "models-AGENTS.md"
+
+dependency_rules:
+  controllers:
+    may_import:
+      - services
+      - models
+    must_not_import:
+      - repositories
+  services:
+    may_import:
+      - repositories
+      - models
+    must_not_import:
+      - controllers
+  repositories:
+    may_import:
+      - models
+    must_not_import:
+      - controllers
+      - services
+  models:
+    may_import: []
+    must_not_import:
+      - controllers
+      - services
+      - repositories
+
+recommended_for:
+  - web-app
+  - api
+
+considerations:
+  pros:
+    - Simple to understand and implement
+    - Clear separation of concerns
+    - Easy to test each layer independently
+    - Well-documented pattern with extensive resources
+  cons:
+    - Can lead to bloated services layer
+    - May encourage tight coupling within layers
+    - Database-centric design can limit flexibility
+    - Changes often require modifications across multiple layers
+
+best_practices:
+  - Keep controllers thin - delegate to services
+  - Business logic belongs ONLY in services
+  - Repositories should be entity-focused
+  - Use DTOs to transfer data between layers
+  - Avoid circular dependencies between layers
+

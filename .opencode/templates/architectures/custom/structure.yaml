@@ -1,0 +1,86 @@
+# Custom Architecture Pattern Template
+# Use this as a starting point for defining your own architecture
+
+pattern: custom
+name: "your-pattern-name"  # Give your pattern a descriptive name
+description: "Describe your architectural pattern and when to use it"
+version: "1.0.0"
+
+# Define your layers
+layers:
+  - name: layer1
+    path: "src/layer1"
+    description: "Description of this layer's responsibilities"
+    agents_md: true  # Whether to generate AGENTS.md for this layer
+    
+  - name: layer2
+    path: "src/layer2"
+    description: "Description of this layer's responsibilities"
+    agents_md: true
+    
+  - name: layer3
+    path: "src/layer3"
+    description: "Description of this layer's responsibilities"
+    agents_md: true
+
+# Define dependency rules
+dependency_rules:
+  layer1:
+    may_import:
+      - layer2
+    must_not_import:
+      - layer3
+      
+  layer2:
+    may_import:
+      - layer3
+    must_not_import:
+      - layer1
+      
+  layer3:
+    may_import: []
+    must_not_import:
+      - layer1
+      - layer2
+
+# What project types this pattern works well with
+recommended_for:
+  - web-app
+  - api
+  - cli
+
+# Pros and cons of this pattern
+considerations:
+  pros:
+    - "List advantages of this pattern"
+    - "E.g., 'Clear separation of concerns'"
+  cons:
+    - "List disadvantages or challenges"
+    - "E.g., 'Higher initial complexity'"
+
+# Key practices for this pattern
+best_practices:
+  - "Best practice 1"
+  - "Best practice 2"
+  - "Best practice 3"
+
+# Optional: How layers communicate
+communication_patterns:
+  - name: "Pattern Name"
+    description: "How this communication pattern works"
+    between:
+      - layer1
+      - layer2
+
+# Optional: Rationale for this architecture
+rationale: |
+  Explain why this architecture was chosen and what problems it solves.
+  Include any domain-specific considerations.
+
+# Optional: Migration guidance
+migration:
+  from: "previous-pattern"
+  strategy: "how to migrate"
+  notes: |
+    Additional notes about the migration process.
+

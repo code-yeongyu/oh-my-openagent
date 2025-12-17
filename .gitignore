@@ -28,3 +28,14 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
+
+# IDE/Editor configs
+.cursor/
+.codex/
+
+# OpenCode - personal/workspace-specific
+.opencode/project-context.yaml
+.opencode/node_modules/
+
+# One-off scripts
+fix_frontmatter.py
