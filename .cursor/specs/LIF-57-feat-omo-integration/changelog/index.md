@@ -4,6 +4,9 @@
 
 ### 2025-12-17
 
+- [Documentation Master - Configuration System Documentation](./2025-12-17__documentation-master__configuration-docs.md)
+- [Documentation Master - Feature Loaders Documentation](./2025-12-17__documentation-master__feature-loaders-docs.md)
+- [Documentation Master - MCP Integration Architecture](./2025-12-17__documentation-master__mcp-integration-docs.md)
 - [Documentation Master - Agent System Architecture Documentation](./2025-12-17__documentation-master__agent-system-docs.md)
 - [Documentation Master - Tool System Documentation](./2025-12-17__documentation-master__tool-system-docs.md)
 - [Documentation Master - Governance System](./2025-12-17__documentation-master__governance-system.md)
