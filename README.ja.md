@@ -223,13 +223,38 @@ opencode auth login
 
 #### 4.2 Google Gemini (Antigravity OAuth)
 
-まず、`~/.config/opencode/oh-my-opencode.json` で Google auth を有効にします：
+まず、opencode-antigravity-auth プラグインを追加します：
 
 ```json
 {
-  "google_auth": true
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-antigravity-auth@1.1.2"
+  ]
 }
 ```
+
+#### 4.2.1 モデル設定
+
+`opencode.json` に完全なモデル設定も構成する必要があります。
+[opencode-antigravity-auth ドキュメント](https://github.com/NoeFabris/opencode-antigravity-auth)を読み、README から provider/models 設定をコピーして、ユーザーの既存のセットアップを壊さないよう慎重にマージしてください。
+
+#### 4.2.2 oh-my-opencode エージェントモデルのオーバーライド
+
+`opencode-antigravity-auth` プラグインは内蔵 Google auth と異なるモデル名を使用します。`oh-my-opencode.json`（または `.opencode/oh-my-opencode.json`）でエージェントモデルをオーバーライドし、内蔵 `google_auth` を無効化してください：
+
+```json
+{
+  "google_auth": false,
+  "agents": {
+    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+  }
+}
+```
+
+**利用可能なモデル名**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 その後、認証を行います：
 
@@ -237,10 +262,12 @@ opencode auth login
 opencode auth login
 # Provider: Google を選択
 # Login method: OAuth with Google (Antigravity) を選択
-# ユーザーにブラウザでの OAuth フロー完了を案内
-# 完了まで待機
+# ブラウザでサインイン完了（自動検出）
+# オプション：マルチアカウントロードバランシング用に追加の Google アカウントを登録
 # 成功を確認し、ユーザーに報告
 ```
+
+**マルチアカウントロードバランシング**: プラグインは最大10個の Google アカウントをサポートします。1つのアカウントがレートリミットに達すると、自動的に次のアカウントに切り替わります。
 
 #### 4.3 OpenAI (ChatGPT Plus/Pro)
 
@@ -559,15 +586,28 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 ### Google Auth
 
-Google Gemini モデルのための内蔵 Antigravity OAuth を有効化します：
+**推奨**: 外部の [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) プラグインを使用してください。マルチアカウントロードバランシング、より多くのモデル（Antigravity 経由の Claude を含む）、活発なメンテナンスを提供します。[インストール > Google Gemini](#42-google-gemini-antigravity-oauth) を参照。
+
+`opencode-antigravity-auth` 使用時は内蔵 auth を無効化し、`oh-my-opencode.json` でエージェントモデルをオーバーライドしてください：
+
+```json
+{
+  "google_auth": false,
+  "agents": {
+    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+  }
+}
+```
+
+**代替案**: 内蔵 Antigravity OAuth を有効化（単一アカウント、Gemini モデルのみ）：
 
 ```json
 {
   "google_auth": true
 }
 ```
-
-有効化すると、`opencode auth login` 実行時に Google プロバイダーで "OAuth with Google (Antigravity)" ログインオプションが表示されます。
 
 ### Agents
 

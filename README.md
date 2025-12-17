@@ -249,16 +249,51 @@ opencode auth login
 
 #### Google Gemini (Antigravity OAuth)
 
+First, add the opencode-antigravity-auth plugin:
+
+```json
+{
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-antigravity-auth@1.1.2"
+  ]
+}
+```
+
+##### Model Configuration
+
+You'll also need full model settings in `opencode.json`.
+Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy provider/models config from the README, and merge carefully to avoid breaking the user's existing setup.
+
+##### oh-my-opencode Agent Model Override
+
+The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`) and disable the built-in `google_auth`:
+
+```json
+{
+  "google_auth": false,
+  "agents": {
+    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+  }
+}
+```
+
+**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+
 Then authenticate:
 
 ```bash
 opencode auth login
-# Interactive Terminal: find Provider: Select Google
-# Interactive Terminal: find Login method: Select Google
-# Guide user through OAuth flow in browser. You use tools like pbcopy or other equivalents depending on your OS, and tell user that you have copied the link and paste it to the browser
-# Wait for completion
+# Interactive Terminal: Provider: Select Google
+# Interactive Terminal: Login method: Select OAuth with Google (Antigravity)
+# Complete sign-in in browser (auto-detected)
+# Optional: Add more Google accounts for multi-account load balancing
 # Verify success and confirm with user
 ```
+
+**Multi-Account Load Balancing**: The plugin supports up to 10 Google accounts. When one account hits rate limits, it automatically switches to the next available account.
 
 #### OpenAI (ChatGPT Plus/Pro)
 
@@ -574,15 +609,28 @@ Schema autocomplete supported:
 
 ### Google Auth
 
-Enable built-in Antigravity OAuth for Google Gemini models:
+**Recommended**: Use the external [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
+
+When using `opencode-antigravity-auth`, disable the built-in auth and override agent models in `oh-my-opencode.json`:
+
+```json
+{
+  "google_auth": false,
+  "agents": {
+    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+  }
+}
+```
+
+**Alternative**: Enable built-in Antigravity OAuth (single account, Gemini models only):
 
 ```json
 {
   "google_auth": true
 }
 ```
-
-When enabled, `opencode auth login` shows "OAuth with Google (Antigravity)" for the Google provider.
 
 ### Agents
 
