@@ -3,6 +3,7 @@
 ## 2025-12
 
 ### 2025-12-17
+- [Documentation Master - Plugin Core Architecture](./2025-12-17__documentation-master__plugin-core-architecture.md)
 - [Documentation Master - Background Task System Docs](./2025-12-17__documentation-master__background-task-system-docs.md)
 - [Documentation Master - Architecture Docs](./2025-12-17__documentation-master__architecture-docs.md)
 - [Strategic Architect - LIF-57 Integration Gap Analysis](./2025-12-17__strategic-architect__lif-57-integration-gap-analysis.md)
