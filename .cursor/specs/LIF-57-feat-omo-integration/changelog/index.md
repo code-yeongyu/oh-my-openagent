@@ -4,6 +4,7 @@
 
 ### 2025-12-17
 
+- [Documentation Master - Inter-component Interactions Documentation](./2025-12-17__documentation-master__inter-component-docs.md)
 - [Documentation Master - Data Flow Documentation](./2025-12-17__documentation-master__data-flow-docs.md)
 - [Documentation Master - Configuration System Documentation](./2025-12-17__documentation-master__configuration-docs.md)
 - [Documentation Master - Feature Loaders Documentation](./2025-12-17__documentation-master__feature-loaders-docs.md)
