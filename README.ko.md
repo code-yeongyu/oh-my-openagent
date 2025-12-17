@@ -147,15 +147,42 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 ### 0단계: 사용자에게 설정에 대해 물어보세요.
 
 OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프론티어 LLM 사용을 제안합니다. 따라서 사용자에게 다음 질문을 해야 합니다:
-1. Claude Pro/Max 구독이 있으신가요? 그렇지 않다면 메인 오케스트레이터 모델로 'opencode/big-pickle'(glm 4.6으로 알려짐)을 사용하게 됩니다 (권장하지 않음).
-  -> 사용자가 '예'라고 답하면, 할 일 추가: "사용자 Claude Pro/Max 인증 설정"
-  -> 사용자가 '아니오'라고 답하면, 할 일 추가: "oh-my-opencode.json의 OmO 에이전트 모델을 opencode/big-pickle로 재정의"
-2. ChatGPT 구독이 있으신가요? 그렇지 않다면 oracle 에이전트에 32k thinking 옵션이 있는 'claude-opus-4-5'를 사용하게 됩니다.
-  -> 사용자가 '예'라고 답하면, 할 일 추가: "사용자 ChatGPT 인증 설정"
-  -> 사용자가 '아니오'라고 답하면, 할 일 추가: "oh-my-opencode.json의 oracle 에이전트 모델을 32k thinking이 있는 claude-opus-4-5로 재정의"
-3. Gemini 모델을 통합하시겠습니까? 그렇지 않다면 아름다운 디자인을 즐길 수 없습니다.
-  -> 사용자가 '예'라고 답하면, 할 일 추가: "Google OAuth 설정"
-  -> 사용자가 '아니오'라고 답하면, 할 일 추가: "oh-my-opencode.json의 frontend-ui-ux-engineer 에이전트 모델을 32k thinking이 있는 claude-opus-4-5로 재정의"
+
+1. **Claude Pro/Max 구독이 있으신가요?** 그렇지 않다면 메인 오케스트레이터 모델로 'opencode/big-pickle'(GLM 4.6으로 알려짐)을 사용하게 됩니다 (권장하지 않음).
+   - 사용자가 **'예'**라고 답하면, 할 일 추가: "사용자 Claude Pro/Max 인증 설정"
+   - 사용자가 **'아니오'**라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장:
+     ```json
+     {
+       "agents": {
+         "OmO": { "model": "opencode/big-pickle" },
+         "librarian": { "model": "opencode/big-pickle" }
+       }
+     }
+     ```
+
+2. **ChatGPT 구독이 있으신가요?** 그렇지 않다면 oracle 에이전트에 'anthropic/claude-opus-4-5'를 사용하게 됩니다.
+   - 사용자가 **'예'**라고 답하면, 할 일 추가: "사용자 ChatGPT 인증 설정"
+   - 사용자가 **'아니오'**라고 답하면, `oh-my-opencode.json`에 다음을 병합:
+     ```json
+     {
+       "agents": {
+         "oracle": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
+
+3. **Gemini 모델을 통합하시겠습니까?** 그렇지 않다면 아름다운 디자인을 즐길 수 없습니다.
+   - 사용자가 **'예'**라고 답하면, 할 일 추가: "Google OAuth 설정"
+   - 사용자가 **'아니오'**라고 답하면, `oh-my-opencode.json`에 다음을 병합:
+     ```json
+     {
+       "agents": {
+         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+         "document-writer": { "model": "anthropic/claude-opus-4-5" },
+         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
 
 ### 1단계: OpenCode 설치 확인
 

@@ -150,15 +150,42 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 ### ステップ 0: セットアップについてユーザーに尋ねる
 
 OpenCode は様々なモデルをサポートしており、当プラグインは様々な最先端 LLM の使用を提案しています。そのため、ユーザーに以下の質問をする必要があります：
-1. Claude Pro/Max のサブスクリプションをお持ちですか？お持ちでない場合、メインオーケストレーターモデルとして 'opencode/big-pickle' (glm 4.6 として知られる) を使用することになります (非推奨)。
-  -> ユーザーが「はい」と答えた場合、ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"
-  -> ユーザーが「いいえ」と答えた場合、ToDo 追加: "oh-my-opencode.json の OmO エージェントモデルを opencode/big-pickle にオーバーライド"
-2. ChatGPT のサブスクリプションをお持ちですか？お持ちでない場合、oracle エージェントに 32k thinking オプション付きの 'claude-opus-4-5' を使用することになります。
-  -> ユーザーが「はい」と答えた場合、ToDo 追加: "ユーザーの ChatGPT 認証設定"
-  -> ユーザーが「いいえ」と答えた場合、ToDo 追加: "oh-my-opencode.json の oracle エージェントモデルを 32k thinking 付きの claude-opus-4-5 にオーバーライド"
-3. Gemini モデルを統合しますか？統合しない場合、美しいデザインを享受できません。
-  -> ユーザーが「はい」と答えた場合、ToDo 追加: "Google OAuth 設定"
-  -> ユーザーが「いいえ」と答えた場合、ToDo 追加: "oh-my-opencode.json の frontend-ui-ux-engineer エージェントモデルを 32k thinking 付きの claude-opus-4-5 にオーバーライド"
+
+1. **Claude Pro/Max のサブスクリプションをお持ちですか？** お持ちでない場合、メインオーケストレーターモデルとして 'opencode/big-pickle' (GLM 4.6 として知られる) を使用することになります (非推奨)。
+   - ユーザーが**「はい」**と答えた場合、ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"
+   - ユーザーが**「いいえ」**と答えた場合、`~/.config/opencode/oh-my-opencode.json` に以下を保存:
+     ```json
+     {
+       "agents": {
+         "OmO": { "model": "opencode/big-pickle" },
+         "librarian": { "model": "opencode/big-pickle" }
+       }
+     }
+     ```
+
+2. **ChatGPT のサブスクリプションをお持ちですか？** お持ちでない場合、oracle エージェントに 'anthropic/claude-opus-4-5' を使用することになります。
+   - ユーザーが**「はい」**と答えた場合、ToDo 追加: "ユーザーの ChatGPT 認証設定"
+   - ユーザーが**「いいえ」**と答えた場合、`oh-my-opencode.json` に以下をマージ:
+     ```json
+     {
+       "agents": {
+         "oracle": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
+
+3. **Gemini モデルを統合しますか？** 統合しない場合、美しいデザインを享受できません。
+   - ユーザーが**「はい」**と答えた場合、ToDo 追加: "Google OAuth 設定"
+   - ユーザーが**「いいえ」**と答えた場合、`oh-my-opencode.json` に以下をマージ:
+     ```json
+     {
+       "agents": {
+         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+         "document-writer": { "model": "anthropic/claude-opus-4-5" },
+         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
 
 ### ステップ 1: OpenCode インストール確認
 

@@ -172,15 +172,42 @@ follow these steps:
 ### Step 0: Ask user about the setup.
 
 Since OpenCode Supports various models, and our plugin suggests various frontier LLMs. Thus, you must ask user, following questions:
-1. Do you have a Claude Pro/Max Subscription? Otherwise, we'll use 'opencode/big-pickle' (known for glm 4.6) as a main orchestrator model (not recommended)
-  -> If user said yes, add ToDo: "Setup user Claude Pro/Max Auth"
-  -> If user said no, add ToDo: "Override OmO agent model on oh-my-opencode.json as opencode/big-pickle"
-2. Do you have a ChatGPT Subscription? Otherwise, we'll use 'claude-opus-4-5' with 32k thinking option for oracle agent.
-  -> If user said yes, add ToDo: "Setup user ChatGPT Auth"
-  -> If user said no, add ToDo: "Override oracle agent model on oh-my-opencode.json as claude-opus-4-5 with 32k thinking"
-3. Will you integrate Gemini models? Otherwise, you cannot enjoy the beautiful design.
-  -> If user said yes, add ToDo: "Setup Google OAuth"
-  -> If user said no, add ToDo: "Override frontend-ui-ux-engineer agent model on oh-my-opencode.json as claude-opus-4-5 with 32k thinking"
+
+1. **Do you have a Claude Pro/Max Subscription?** Otherwise, we'll use 'opencode/big-pickle' (known for GLM 4.6) as a main orchestrator model (not recommended)
+   - If user said **yes**, add ToDo: "Setup user Claude Pro/Max Auth"
+   - If user said **no**, merge the following to `~/.config/opencode/oh-my-opencode.json`:
+     ```json
+     {
+       "agents": {
+         "OmO": { "model": "opencode/big-pickle" },
+         "librarian": { "model": "opencode/big-pickle" }
+       }
+     }
+     ```
+
+2. **Do you have a ChatGPT Subscription?** Otherwise, we'll use 'anthropic/claude-opus-4-5' with 32k thinking option for oracle agent.
+   - If user said **yes**, add ToDo: "Setup user ChatGPT Auth"
+   - If user said **no**, merge the following to `oh-my-opencode.json`:
+     ```json
+     {
+       "agents": {
+         "oracle": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
+
+3. **Will you integrate Gemini models?** Otherwise, you cannot enjoy the beautiful design.
+   - If user said **yes**, add ToDo: "Setup Google OAuth"
+   - If user said **no**, merge the following to `oh-my-opencode.json`:
+     ```json
+     {
+       "agents": {
+         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+         "document-writer": { "model": "anthropic/claude-opus-4-5" },
+         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+       }
+     }
+     ```
 
 ### Step 1: Install OpenCode, if not
 
