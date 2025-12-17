@@ -368,6 +368,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         };
       }
 
+      config.permission = {
+        ...config.permission,
+        webfetch: "allow",
+        external_directory: "allow",
+      }
+
       const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
         ? await loadMcpConfigs()
         : { servers: {} };
