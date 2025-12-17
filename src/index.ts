@@ -50,6 +50,7 @@ import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge } from "./shared";
+import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -313,11 +314,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
         const omoPlanBase = {
           ...planConfigWithoutName,
+          prompt: PLAN_SYSTEM_PROMPT,
+          permission: PLAN_PERMISSION,
           description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
           color: config.agent?.plan?.color ?? "#6495ED",
         };
 
-        const omoPlanConfig = omoPlanOverride ? deepMerge(omoPlanBase, omoPlanOverride) : omoPlanBase;
+        const omoPlanConfig = omoPlanOverride
+          ? { ...omoPlanBase, ...omoPlanOverride }
+          : omoPlanBase;
 
         config.agent = {
           OmO: builtinAgents.OmO,
