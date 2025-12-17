@@ -50,28 +50,26 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
         const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)
         const modelID = parsed.modelID ?? (lastAssistant?.modelID as string | undefined)
 
-        if (providerID && modelID) {
-          await ctx.client.tui
-            .showToast({
-              body: {
-                title: "Context Limit Hit",
-                message: "Truncating large tool outputs and recovering...",
-                variant: "warning" as const,
-                duration: 3000,
-              },
-            })
-            .catch(() => {})
+        await ctx.client.tui
+          .showToast({
+            body: {
+              title: "Context Limit Hit",
+              message: "Truncating large tool outputs and recovering...",
+              variant: "warning" as const,
+              duration: 3000,
+            },
+          })
+          .catch(() => {})
 
-          setTimeout(() => {
-            executeCompact(
-              sessionID,
-              { providerID, modelID },
-              autoCompactState,
-              ctx.client,
-              ctx.directory
-            )
-          }, 300)
-        }
+        setTimeout(() => {
+          executeCompact(
+            sessionID,
+            { providerID, modelID },
+            autoCompactState,
+            ctx.client,
+            ctx.directory
+          )
+        }, 300)
       }
       return
     }
@@ -99,56 +97,34 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
       if (!autoCompactState.pendingCompact.has(sessionID)) return
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
-      if (errorData?.providerID && errorData?.modelID) {
-        await ctx.client.tui
-          .showToast({
-            body: {
-              title: "Auto Compact",
-              message: "Token limit exceeded. Summarizing session...",
-              variant: "warning" as const,
-              duration: 3000,
-            },
-          })
-          .catch(() => {})
-
-        await executeCompact(
-          sessionID,
-          { providerID: errorData.providerID, modelID: errorData.modelID },
-          autoCompactState,
-          ctx.client,
-          ctx.directory
-        )
-        return
-      }
-
       const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
-      if (!lastAssistant) {
+
+      if (lastAssistant?.summary === true) {
         autoCompactState.pendingCompact.delete(sessionID)
         return
       }
 
-      if (lastAssistant.summary === true) {
-        autoCompactState.pendingCompact.delete(sessionID)
-        return
-      }
-
-      if (!lastAssistant.modelID || !lastAssistant.providerID) {
-        autoCompactState.pendingCompact.delete(sessionID)
-        return
-      }
+      const providerID = errorData?.providerID ?? (lastAssistant?.providerID as string | undefined)
+      const modelID = errorData?.modelID ?? (lastAssistant?.modelID as string | undefined)
 
       await ctx.client.tui
         .showToast({
           body: {
             title: "Auto Compact",
-            message: "Token limit exceeded. Summarizing session...",
+            message: "Token limit exceeded. Attempting recovery...",
             variant: "warning" as const,
             duration: 3000,
           },
         })
         .catch(() => {})
 
-      await executeCompact(sessionID, lastAssistant, autoCompactState, ctx.client, ctx.directory)
+      await executeCompact(
+        sessionID,
+        { providerID, modelID },
+        autoCompactState,
+        ctx.client,
+        ctx.directory
+      )
     }
   }
 
