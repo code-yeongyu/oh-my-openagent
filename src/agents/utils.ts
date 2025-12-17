@@ -62,7 +62,8 @@ function mergeAgentConfig(
 export function createBuiltinAgents(
   disabledAgents: BuiltinAgentName[] = [],
   agentOverrides: AgentOverrides = {},
-  directory?: string
+  directory?: string,
+  systemDefaultModel?: string
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
@@ -84,6 +85,18 @@ export function createBuiltinAgents(
     }
 
     const override = agentOverrides[agentName]
+
+    // Apply model fallback chain for OmO agent:
+    // 1. oh-my-opencode.json agents.OmO.model (highest priority)
+    // 2. OpenCode system config.model (middle priority)
+    // 3. Hardcoded default in omoAgent (lowest priority / fallback)
+    if (agentName === "OmO" && systemDefaultModel && !override?.model) {
+      finalConfig = {
+        ...finalConfig,
+        model: systemDefaultModel,
+      }
+    }
+
     if (override) {
       result[name] = mergeAgentConfig(finalConfig, override)
     } else {
