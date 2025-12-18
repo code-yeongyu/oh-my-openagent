@@ -510,6 +510,15 @@ When UI/visual work detected:
 | UI/UX work | frontend-ui-ux-engineer | Visual work detected |
 | Documentation | document-writer | Docs requested |
 
+### Governance Tools
+| Need | Tool |
+|------|------|
+| Get Linear branch name | linear_branch |
+| Update Linear issue status | linear_update_status |
+| Create Linear issue | linear_create_issue |
+| Read project context | read_context |
+| Create spec folder | create_spec_folder |
+
 ALWAYS prefer direct tools. Agents are for when direct tools aren't enough.
 </Tools>
 
@@ -744,7 +753,57 @@ When suspected:
 | "Complex architecture decision" | Oracle |
 | "Write documentation" | Document Writer |
 | "Simple file edit" | Direct edit, no agents |
+| "Start work on Linear issue" | linear_branch → get branch name |
+| "Complete a task" | linear_update_status → mark done |
+| "New feature request" | linear_create_issue → create ticket |
+| "Understand project setup" | read_context → get config |
+| "Start new feature" | create_spec_folder → setup spec dir |
 </Decision_Matrix>
+
+<Governance>
+## Governance Integration
+
+Governance = Automatic Hooks + Explicit Tools
+
+### What Hooks Do Automatically
+- **Path Validation**: Validates file paths on write/edit operations. Warns or blocks writes to non-standard locations.
+- **Historian Tracking**: Tracks file modifications during sessions. Auto-creates changelog entries on session end.
+- **Linear Context Injection**: Detects Linear issue references (e.g., LIF-123) and injects issue context into prompts.
+
+### Governance Tools (Use Explicitly)
+| Tool | Purpose |
+|------|---------|
+| \`linear_branch\` | Get the correct git branch name for a Linear issue |
+| \`linear_update_status\` | Update issue status (todo/in_progress/in_review/done/canceled) |
+| \`linear_create_issue\` | Create new Linear issues with title, description, labels |
+| \`read_context\` | Read project-context.yaml for project configuration |
+| \`create_spec_folder\` | Create spec folder structure for new features |
+
+### Workflow Integration
+
+**Starting work on a Linear issue:**
+1. User mentions issue (e.g., "work on LIF-123")
+2. Linear context auto-injected by hook
+3. Call \`linear_branch\` to get branch name
+4. Create/checkout the branch
+5. Call \`create_spec_folder\` if new feature work
+6. Implement the feature
+7. Call \`linear_update_status\` when done
+
+**Path Discipline:**
+- Spec files → \`context/specs/{ISSUE-ID}-{type}-{name}/\` or \`.cursor/specs/\`
+- Memory files → \`context/memory/\` or \`.cursor/memory/\`
+- Source code → \`src/\`, \`tests/\`, \`docs/\`
+
+### When to Use Governance Tools
+| Trigger | Tool/Action |
+|---------|-------------|
+| User mentions "LIF-XXX" | \`linear_branch\` → get branch |
+| Starting new feature | \`create_spec_folder\` |
+| Completing task | \`linear_update_status\` |
+| Need project config | \`read_context\` |
+| Creating new issue | \`linear_create_issue\` |
+</Governance>
 
 <Final_Reminders>
 ## Remember

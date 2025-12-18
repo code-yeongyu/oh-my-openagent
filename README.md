@@ -63,6 +63,7 @@
     - [Agents](#agents)
     - [MCPs](#mcps)
     - [LSP](#lsp)
+    - [Governance](#governance)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
 
@@ -609,7 +610,7 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `governance-path-validator`, `governance-historian`, `governance-linear-injector`
 
 ### MCPs
 
@@ -651,6 +652,90 @@ Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json`
 ```
 
 Each server supports: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
+
+### Governance
+
+Oh My OpenCode includes governance features for project organization and Linear integration.
+
+#### Governance Hooks
+
+Three hooks work automatically in the background:
+
+| Hook | Purpose |
+|------|---------|
+| `governance-path-validator` | Validates file paths on write/edit operations. Warns or blocks writes to non-standard locations. |
+| `governance-historian` | Tracks file modifications during sessions. Auto-creates changelog entries on session end. |
+| `governance-linear-injector` | Detects Linear issue references (e.g., LIF-123) and injects issue context into prompts. |
+
+#### Governance Tools
+
+Five tools are available for explicit governance operations:
+
+| Tool | Purpose |
+|------|---------|
+| `linear_branch` | Get the correct git branch name for a Linear issue |
+| `linear_update_status` | Update issue status (todo/in_progress/in_review/done/canceled) |
+| `linear_create_issue` | Create new Linear issues with title, description, labels |
+| `read_context` | Read project-context.yaml for project configuration |
+| `create_spec_folder` | Create spec folder structure for new features |
+
+#### Governance Configuration
+
+Configure governance features in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+```json
+{
+  "governance": {
+    "path_validation": {
+      "enabled": true,
+      "mode": "warn",
+      "allowed_paths": [
+        "context/specs/",
+        "context/memory/",
+        "src/",
+        "tests/",
+        "docs/",
+        ".opencode/",
+        ".cursor/specs/"
+      ]
+    },
+    "historian": {
+      "enabled": true,
+      "auto_create": true,
+      "changelog_path": "changelog/",
+      "min_changes": 1
+    },
+    "linear": {
+      "enabled": true,
+      "team_prefix": "LIF",
+      "cache_issues": true
+    }
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `path_validation.enabled` | `true` | Enable path validation hook |
+| `path_validation.mode` | `"warn"` | `"warn"` logs warnings, `"block"` prevents writes, `"disabled"` turns off |
+| `path_validation.allowed_paths` | See above | List of allowed path prefixes |
+| `historian.enabled` | `true` | Enable historian hook |
+| `historian.auto_create` | `true` | Auto-create changelog on session end |
+| `historian.changelog_path` | `"changelog/"` | Directory for changelog files |
+| `historian.min_changes` | `1` | Minimum file changes to create changelog |
+| `linear.enabled` | `true` | Enable Linear context injection |
+| `linear.team_prefix` | `"LIF"` | Linear team prefix for issue detection |
+| `linear.cache_issues` | `true` | Cache issue data per session |
+
+Disable governance hooks via `disabled_hooks`:
+
+```json
+{
+  "disabled_hooks": ["governance-path-validator", "governance-historian", "governance-linear-injector"]
+}
+```
+
+**Note**: Governance tools require the Linear MCP to be configured in your `opencode.json` for Linear-related features.
 
 
 ## Author's Note
