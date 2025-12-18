@@ -180,6 +180,13 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           const messageDir = getMessageDir(sessionID)
           const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
+          const agentHasWritePermission = !prevMessage?.tools || (prevMessage.tools.write !== false && prevMessage.tools.edit !== false)
+          if (!agentHasWritePermission) {
+            log(`[${HOOK_NAME}] Skipped: previous agent lacks write permission`, { sessionID, agent: prevMessage?.agent, tools: prevMessage?.tools })
+            remindedSessions.delete(sessionID)
+            return
+          }
+
           log(`[${HOOK_NAME}] Injecting continuation prompt`, { sessionID, agent: prevMessage?.agent })
           await ctx.client.session.prompt({
             path: { id: sessionID },
@@ -199,7 +206,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           log(`[${HOOK_NAME}] Prompt injection failed`, { sessionID, error: String(err) })
           remindedSessions.delete(sessionID)
         }
-      }, 200)
+      }, 5000)
 
       pendingTimers.set(sessionID, timer)
     }
