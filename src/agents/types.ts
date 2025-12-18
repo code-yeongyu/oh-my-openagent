@@ -1,5 +1,10 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
+/**
+ * All built-in agent names.
+ * 
+ * LIF-62: Now includes manager and specialist agents for multi-layered orchestration.
+ */
 export type BuiltinAgentName =
   | "OmO"
   | "oracle"
@@ -8,21 +13,10 @@ export type BuiltinAgentName =
   | "frontend-ui-ux-engineer"
   | "document-writer"
   | "multimodal-looker"
-
-/**
- * Future agent names for multi-layered orchestration (LIF-62).
- * These will be added to BuiltinAgentName when the agents are implemented in Phase 4-6.
- */
-export type FutureAgentName =
+  // LIF-62: New agents for multi-layered orchestration
   | "implementation-specialist"
   | "backend-typescript"
   | "frontend-react"
-
-/**
- * All agent names including future agents.
- * Use this type when you need to reference agents that may not exist yet.
- */
-export type AllAgentName = BuiltinAgentName | FutureAgentName
 
 export type OverridableAgentName =
   | "build"
@@ -97,8 +91,9 @@ export function isExtendedAgentConfig(
 }
 
 /**
- * Agents currently allowed for delegation via call_omo_agent tool.
- * This list will be expanded when new agents are implemented in Phase 4-6.
+ * Agents allowed for delegation via call_omo_agent tool.
+ * 
+ * LIF-62: Now includes manager and specialist agents for multi-layered orchestration.
  */
 export const DELEGATABLE_AGENTS = [
   // Utility agents (read-only)
@@ -108,23 +103,11 @@ export const DELEGATABLE_AGENTS = [
   // Specialist agents (can modify files)
   "frontend-ui-ux-engineer",
   "document-writer",
-] as const
-
-export type DelegatableAgentName = (typeof DELEGATABLE_AGENTS)[number]
-
-/**
- * Future delegatable agents for multi-layered orchestration (LIF-62).
- * These will be added to DELEGATABLE_AGENTS when implemented in Phase 4-6.
- */
-export const FUTURE_DELEGATABLE_AGENTS = [
+  // LIF-62: Manager agent (can delegate to specialists)
   "implementation-specialist",
+  // LIF-62: Specialist agents (cannot delegate further)
   "backend-typescript",
   "frontend-react",
 ] as const
 
-export type FutureDelegatableAgentName = (typeof FUTURE_DELEGATABLE_AGENTS)[number]
-
-/**
- * All delegatable agent names including future agents.
- */
-export type AllDelegatableAgentName = DelegatableAgentName | FutureDelegatableAgentName
+export type DelegatableAgentName = (typeof DELEGATABLE_AGENTS)[number]

@@ -1,8 +1,31 @@
-export const ALLOWED_AGENTS = ["explore", "librarian"] as const
+/**
+ * Agents allowed for delegation via call_omo_agent tool.
+ * 
+ * LIF-62: Expanded to include manager and specialist agents for multi-layered orchestration.
+ * 
+ * Role-based restrictions are applied at runtime via getToolConfigForRole():
+ * - team-lead (OmO): Can delegate to any agent
+ * - manager (implementation-specialist): Can delegate to specialists only
+ * - specialist/advisor/utility: Cannot delegate (task tool disabled)
+ */
+export const ALLOWED_AGENTS = [
+  // Utility agents (read-only)
+  "explore",
+  "librarian",
+  "multimodal-looker",
+  // Specialist agents (can modify files)
+  "frontend-ui-ux-engineer",
+  "document-writer",
+  // NEW: Manager agent (can delegate to specialists)
+  "implementation-specialist",
+  // NEW: Specialist agents (cannot delegate further)
+  "backend-typescript",
+  "frontend-react",
+] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.
 
-This is a restricted version of the Task tool that only allows spawning explore and librarian agents.
+This tool allows spawning specialized agents for different tasks. Role-based restrictions apply.
 
 Available agent types:
 {agents}

@@ -12,6 +12,10 @@ import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
+// LIF-62: Import new agents
+import { implementationSpecialistAgent } from "./implementation-specialist"
+import { backendTypescriptAgent } from "./backend-typescript"
+import { frontendReactAgent } from "./frontend-react"
 import { deepMerge } from "../shared"
 import { getGovernanceTemplate } from "../config/governance-template"
 
@@ -23,6 +27,10 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
   "document-writer": documentWriterAgent,
   "multimodal-looker": multimodalLookerAgent,
+  // LIF-62: New agents for multi-layered orchestration
+  "implementation-specialist": implementationSpecialistAgent,
+  "backend-typescript": backendTypescriptAgent,
+  "frontend-react": frontendReactAgent,
 }
 
 /**
@@ -33,13 +41,21 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
  * OmO already has governance in its prompt, so it's "none" here to avoid duplication.
  */
 const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
+  // Team Lead - already has governance
   OmO: "none",                      // Already has governance in prompt
+  // Advisor - read-only
   oracle: "none",                   // Read-only advisor
+  // Utility - read-only
   librarian: "none",                // Read-only research
   explore: "none",                  // Read-only exploration
+  "multimodal-looker": "none",       // Read-only analysis
+  // Specialists - file-modifying (existing)
   "frontend-ui-ux-engineer": "full", // File-modifying specialist
   "document-writer": "full",         // File-modifying specialist
-  "multimodal-looker": "none",       // Read-only analysis
+  // LIF-62: New agents
+  "implementation-specialist": "full", // Manager - can modify files
+  "backend-typescript": "full",        // Specialist - can modify files
+  "frontend-react": "full",            // Specialist - can modify files
 }
 
 export function createEnvContext(directory: string): string {

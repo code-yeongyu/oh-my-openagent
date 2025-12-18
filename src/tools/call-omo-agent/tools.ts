@@ -3,6 +3,8 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { getToolConfigForRole } from "../../config/tool-config"
+import { AGENT_ROLE_REGISTRY } from "../../agents"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
@@ -116,14 +118,21 @@ async function executeSync(
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
+    // LIF-62: Get role-based tool restrictions for the target agent
+    const agentRole = AGENT_ROLE_REGISTRY[args.subagent_type] ?? "specialist"
+    const toolConfig = getToolConfigForRole(agentRole)
+    
+    log(`[call_omo_agent] Applying role-based config for ${args.subagent_type} (role: ${agentRole})`)
+    
     await ctx.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,
         tools: {
-          task: false,
-          call_omo_agent: false,
-          background_task: false,
+          // Apply role-based restrictions from tool-config.ts
+          task: toolConfig.task ?? false,
+          call_omo_agent: toolConfig.call_omo_agent ?? false,
+          background_task: toolConfig.background_task ?? false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },

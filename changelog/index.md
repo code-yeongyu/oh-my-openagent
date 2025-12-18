@@ -9,6 +9,7 @@
 
 ### 2025-12-17
 
+- [Implementation Specialist - LIF-62 Phase 4 Multi-Layered Delegation](./2025-12-17__implementation-specialist__LIF-62-phase4-multi-layered-delegation.md)
 - [Implementation Specialist - LIF-62 Phase 3 Governance Injection](./2025-12-17__implementation-specialist__LIF-62-phase3-governance-injection.md)
 - [Implementation Specialist - LIF-62 Phase 1-2 Foundation](./2025-12-17__implementation-specialist__LIF-62-phase1-2-foundation.md)
 

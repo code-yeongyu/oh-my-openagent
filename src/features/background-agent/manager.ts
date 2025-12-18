@@ -10,6 +10,8 @@ import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
+import { getToolConfigForRole } from "../../config/tool-config"
+import { AGENT_ROLE_REGISTRY } from "../../agents"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -104,13 +106,21 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
+    // LIF-62: Get role-based tool restrictions for the target agent
+    const agentRole = AGENT_ROLE_REGISTRY[input.agent] ?? "specialist"
+    const toolConfig = getToolConfigForRole(agentRole)
+    
+    log(`[background-agent] Applying role-based config for ${input.agent} (role: ${agentRole})`)
+
     this.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: input.agent,
         tools: {
-          task: false,
-          background_task: false,
+          // Apply role-based restrictions from tool-config.ts
+          task: toolConfig.task ?? false,
+          call_omo_agent: toolConfig.call_omo_agent ?? false,
+          background_task: toolConfig.background_task ?? false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
