@@ -3,7 +3,6 @@ import { checkForUpdate, getCachedVersion, getLocalDevVersion } from "./checker"
 import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { getUserConfigPath } from "../../shared/config-path"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
 import type { AutoUpdateCheckerOptions } from "./types"
 
@@ -94,12 +93,11 @@ async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {
 
 async function showVersionToast(ctx: PluginInput, version: string | null): Promise<void> {
   const displayVersion = version ?? "unknown"
-  const configPath = getUserConfigPath()
   await ctx.client.tui
     .showToast({
       body: {
         title: `OhMyOpenCode ${displayVersion}`,
-        message: `OpenCode is now on Steroids. oMoMoMoMo...\nConfig: ${configPath}`,
+        message: `OpenCode is now on Steroids. oMoMoMoMo...`,
         variant: "info" as const,
         duration: 5000,
       },
