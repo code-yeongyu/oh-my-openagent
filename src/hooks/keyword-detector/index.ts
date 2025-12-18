@@ -6,8 +6,6 @@ export * from "./detector"
 export * from "./constants"
 export * from "./types"
 
-const injectedSessions = new Set<string>()
-
 export function createKeywordDetectorHook() {
   return {
     "chat.message": async (
@@ -22,10 +20,6 @@ export function createKeywordDetectorHook() {
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
-      if (injectedSessions.has(input.sessionID)) {
-        return
-      }
-
       const promptText = extractPromptText(output.parts)
       const messages = detectKeywords(promptText)
 
@@ -52,21 +46,7 @@ export function createKeywordDetectorHook() {
       })
 
       if (success) {
-        injectedSessions.add(input.sessionID)
         log("Keyword context injected", { sessionID: input.sessionID })
-      }
-    },
-
-    event: async ({
-      event,
-    }: {
-      event: { type: string; properties?: unknown }
-    }) => {
-      if (event.type === "session.deleted") {
-        const props = event.properties as { info?: { id?: string } } | undefined
-        if (props?.info?.id) {
-          injectedSessions.delete(props.info.id)
-        }
       }
     },
   }

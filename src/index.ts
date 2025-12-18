@@ -410,7 +410,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
-      await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
 
