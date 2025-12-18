@@ -25,6 +25,23 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "multimodal-looker": multimodalLookerAgent,
 }
 
+/**
+ * Governance level mapping for built-in agents (LIF-62).
+ * 
+ * Agents that modify files need governance awareness.
+ * Read-only agents (explore, librarian, oracle, multimodal-looker) have "none".
+ * OmO already has governance in its prompt, so it's "none" here to avoid duplication.
+ */
+const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
+  OmO: "none",                      // Already has governance in prompt
+  oracle: "none",                   // Read-only advisor
+  librarian: "none",                // Read-only research
+  explore: "none",                  // Read-only exploration
+  "frontend-ui-ux-engineer": "full", // File-modifying specialist
+  "document-writer": "full",         // File-modifying specialist
+  "multimodal-looker": "none",       // Read-only analysis
+}
+
 export function createEnvContext(directory: string): string {
   const now = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -81,12 +98,19 @@ export function createBuiltinAgents(
 
     let finalConfig = config
 
+    // Inject environment context for agents that need it
     if ((agentName === "OmO" || agentName === "librarian") && directory && config.prompt) {
       const envContext = createEnvContext(directory)
       finalConfig = {
         ...config,
         prompt: config.prompt + envContext,
       }
+    }
+
+    // LIF-62: Inject governance template for file-modifying agents
+    const governanceLevel = AGENT_GOVERNANCE_LEVELS[agentName]
+    if (governanceLevel && governanceLevel !== "none") {
+      finalConfig = injectGovernance(finalConfig, governanceLevel)
     }
 
     const override = agentOverrides[agentName]
