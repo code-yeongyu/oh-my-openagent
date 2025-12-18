@@ -305,13 +305,13 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
   "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-flash" },
     "multimodal-looker": { "model": "google/gemini-2.5-flash" }
   }
 }
 ```
 
-**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 Then authenticate:
 
@@ -681,7 +681,7 @@ When using `opencode-antigravity-auth`, disable the built-in auth and override a
   "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-flash" },
     "multimodal-looker": { "model": "google/gemini-2.5-flash" }
   }
 }

@@ -275,13 +275,13 @@ opencode auth login
   "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-flash" },
     "multimodal-looker": { "model": "google/gemini-2.5-flash" }
   }
 }
 ```
 
-**利用可能なモデル名**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**利用可能なモデル名**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 その後、認証を行います：
 
@@ -622,7 +622,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
   "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-pro-high" },
+    "document-writer": { "model": "google/gemini-3-flash" },
     "multimodal-looker": { "model": "google/gemini-2.5-flash" }
   }
 }
