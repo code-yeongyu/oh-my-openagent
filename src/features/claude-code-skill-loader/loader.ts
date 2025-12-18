@@ -36,6 +36,9 @@ function loadSkillsFromDir(skillsDir: string, scope: SkillScope): LoadedSkillAsC
       const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
       const wrappedTemplate = `<skill-instruction>
+Base directory for this skill: ${resolvedPath}/
+File references (@path) in this skill are relative to this directory.
+
 ${body.trim()}
 </skill-instruction>
 
