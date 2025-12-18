@@ -1,5 +1,10 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides } from "./types"
+import type {
+  BuiltinAgentName,
+  AgentOverrideConfig,
+  AgentOverrides,
+  GovernanceLevel,
+} from "./types"
 import { omoAgent } from "./omo"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
@@ -8,6 +13,7 @@ import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
+import { getGovernanceTemplate } from "../config/governance-template"
 
 const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   OmO: omoAgent,
@@ -92,4 +98,53 @@ export function createBuiltinAgents(
   }
 
   return result
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Governance Injection (LIF-62)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Inject governance template into an agent's prompt based on governance level.
+ *
+ * This function appends the appropriate governance template to the agent's prompt,
+ * enabling file-modifying agents to be aware of governance rules (path validation,
+ * changelog tracking, Linear integration, spec-driven workflow).
+ *
+ * @param config - The agent configuration to inject governance into
+ * @param governanceLevel - The level of governance to inject ("full", "minimal", or "none")
+ * @returns A new AgentConfig with governance template appended to the prompt
+ *
+ * @example
+ * ```typescript
+ * const governedConfig = injectGovernance(frontendAgent, "full")
+ * // governedConfig.prompt now includes governance rules
+ * ```
+ *
+ * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/plan.md
+ */
+export function injectGovernance(
+  config: AgentConfig,
+  governanceLevel: GovernanceLevel
+): AgentConfig {
+  // Skip injection for agents with no governance requirement
+  if (governanceLevel === "none") {
+    return config
+  }
+
+  const governancePrompt = getGovernanceTemplate(governanceLevel)
+
+  // If no prompt exists, just add the governance template
+  if (!config.prompt) {
+    return {
+      ...config,
+      prompt: governancePrompt,
+    }
+  }
+
+  // Append governance template to existing prompt
+  return {
+    ...config,
+    prompt: config.prompt + "\n\n" + governancePrompt,
+  }
 }
