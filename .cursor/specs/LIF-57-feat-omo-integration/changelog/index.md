@@ -4,6 +4,7 @@
 
 ### 2025-12-17
 
+- [Orchestrator - Phase 4 Planning](./2025-12-17__orchestrator__phase-4-planning.md)
 - [Documentation Master - Inter-component Interactions Documentation](./2025-12-17__documentation-master__inter-component-docs.md)
 - [Documentation Master - Data Flow Documentation](./2025-12-17__documentation-master__data-flow-docs.md)
 - [Documentation Master - Configuration System Documentation](./2025-12-17__documentation-master__configuration-docs.md)

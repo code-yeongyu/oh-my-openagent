@@ -124,11 +124,19 @@ gh run list --workflow=publish
 - Never run `bun publish` directly (OIDC provenance issue)
 - Never bump version locally
 
+## PROJECT MEMORY
+
+- **Constitution**: `.cursor/memory/constitution.md` - Core principles and constraints
+- **Architecture**: `.cursor/memory/architecture.md` - System design and components
+- **Tech Stack**: `.cursor/memory/tech-stack.md` - Technologies and frameworks
+- **Glossary**: `.cursor/memory/glossary.md` - Domain terms and concepts
+- **Project Context**: `.opencode/project-context.yaml` - Full project configuration
+
 ## NOTES
 
 - **No tests**: Test framework not configured
 - **OpenCode version**: Requires >= 1.0.132 (earlier versions have config bugs)
-- **Multi-language docs**: README.md (EN), README.ko.md (KO)
+- **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA)
 - **Config locations**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Schema autocomplete**: Add `$schema` field in config for IDE support
 - **Trusted dependencies**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker

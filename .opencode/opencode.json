@@ -8,6 +8,7 @@
     "edit": "allow",
     "bash": {
       "*": "ask",
+      ".cursor/scripts/bash/create-feature.sh *": "allow",
       "git status": "allow",
       "git diff": "allow",
       "git log": "allow",
