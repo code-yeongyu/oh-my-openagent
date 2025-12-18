@@ -25,6 +25,7 @@ const TOKEN_LIMIT_KEYWORDS = [
   "token limit",
   "context length",
   "too many tokens",
+  "non-empty content",
 ]
 
 function extractTokensFromMessage(message: string): { current: number; max: number } | null {
@@ -46,6 +47,13 @@ function isTokenLimitError(text: string): boolean {
 
 export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
   if (typeof err === "string") {
+    if (err.toLowerCase().includes("non-empty content")) {
+      return {
+        currentTokens: 0,
+        maxTokens: 0,
+        errorType: "non-empty content",
+      }
+    }
     if (isTokenLimitError(err)) {
       const tokens = extractTokensFromMessage(err)
       return {
@@ -139,6 +147,14 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
         maxTokens: tokens.max,
         errorType: "token_limit_exceeded",
       }
+    }
+  }
+
+  if (combinedText.toLowerCase().includes("non-empty content")) {
+    return {
+      currentTokens: 0,
+      maxTokens: 0,
+      errorType: "non-empty content",
     }
   }
 

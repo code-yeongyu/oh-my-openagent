@@ -28,6 +28,7 @@ export interface AutoCompactState {
   retryStateBySession: Map<string, RetryState>
   fallbackStateBySession: Map<string, FallbackState>
   truncateStateBySession: Map<string, TruncateState>
+  emptyContentAttemptBySession: Map<string, number>
   compactionInProgress: Set<string>
 }
 
@@ -44,6 +45,8 @@ export const FALLBACK_CONFIG = {
 } as const
 
 export const TRUNCATE_CONFIG = {
-  maxTruncateAttempts: 10,
-  minOutputSizeToTruncate: 1000,
+  maxTruncateAttempts: 20,
+  minOutputSizeToTruncate: 500,
+  targetTokenRatio: 0.5,
+  charsPerToken: 4,
 } as const

@@ -177,7 +177,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createContextWindowMonitorHook(ctx)
     : null;
   const sessionRecovery = isHookEnabled("session-recovery")
-    ? createSessionRecoveryHook(ctx)
+    ? createSessionRecoveryHook(ctx, { experimental: pluginConfig.experimental })
     : null;
   const sessionNotification = isHookEnabled("session-notification")
     ? createSessionNotification(ctx)
@@ -212,7 +212,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
   const anthropicAutoCompact = isHookEnabled("anthropic-auto-compact")
-    ? createAnthropicAutoCompactHook(ctx)
+    ? createAnthropicAutoCompactHook(ctx, { experimental: pluginConfig.experimental })
     : null;
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)

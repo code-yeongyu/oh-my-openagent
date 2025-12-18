@@ -1,8 +1,19 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
 import { xdgData } from "xdg-basedir"
 
-const OPENCODE_STORAGE = join(xdgData ?? "", "opencode", "storage")
+let OPENCODE_STORAGE = join(xdgData ?? "", "opencode", "storage")
+
+// Fix for macOS where xdg-basedir points to ~/Library/Application Support
+// but OpenCode (cli) uses ~/.local/share
+if (process.platform === "darwin" && !existsSync(OPENCODE_STORAGE)) {
+  const localShare = join(homedir(), ".local", "share", "opencode", "storage")
+  if (existsSync(localShare)) {
+    OPENCODE_STORAGE = localShare
+  }
+}
+
 const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
 const PART_STORAGE = join(OPENCODE_STORAGE, "part")
 
@@ -170,4 +181,77 @@ export function countTruncatedResults(sessionID: string): number {
   }
 
   return count
+}
+
+export interface AggressiveTruncateResult {
+  success: boolean
+  sufficient: boolean
+  truncatedCount: number
+  totalBytesRemoved: number
+  targetBytesToRemove: number
+  truncatedTools: Array<{ toolName: string; originalSize: number }>
+}
+
+export function truncateUntilTargetTokens(
+  sessionID: string,
+  currentTokens: number,
+  maxTokens: number,
+  targetRatio: number = 0.8,
+  charsPerToken: number = 4
+): AggressiveTruncateResult {
+  const targetTokens = Math.floor(maxTokens * targetRatio)
+  const tokensToReduce = currentTokens - targetTokens
+  const charsToReduce = tokensToReduce * charsPerToken
+
+  if (tokensToReduce <= 0) {
+    return {
+      success: true,
+      sufficient: true,
+      truncatedCount: 0,
+      totalBytesRemoved: 0,
+      targetBytesToRemove: 0,
+      truncatedTools: [],
+    }
+  }
+
+  const results = findToolResultsBySize(sessionID)
+
+  if (results.length === 0) {
+    return {
+      success: false,
+      sufficient: false,
+      truncatedCount: 0,
+      totalBytesRemoved: 0,
+      targetBytesToRemove: charsToReduce,
+      truncatedTools: [],
+    }
+  }
+
+  let totalRemoved = 0
+  let truncatedCount = 0
+  const truncatedTools: Array<{ toolName: string; originalSize: number }> = []
+
+  for (const result of results) {
+    const truncateResult = truncateToolResult(result.partPath)
+    if (truncateResult.success) {
+      truncatedCount++
+      const removedSize = truncateResult.originalSize ?? result.outputSize
+      totalRemoved += removedSize
+      truncatedTools.push({
+        toolName: truncateResult.toolName ?? result.toolName,
+        originalSize: removedSize,
+      })
+    }
+  }
+
+  const sufficient = totalRemoved >= charsToReduce
+
+  return {
+    success: truncatedCount > 0,
+    sufficient,
+    truncatedCount,
+    totalBytesRemoved: totalRemoved,
+    targetBytesToRemove: charsToReduce,
+    truncatedTools,
+  }
 }

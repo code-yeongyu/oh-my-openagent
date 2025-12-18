@@ -1,6 +1,9 @@
 import type { AutoCompactState, FallbackState, RetryState, TruncateState } from "./types"
+import type { ExperimentalConfig } from "../../config"
 import { FALLBACK_CONFIG, RETRY_CONFIG, TRUNCATE_CONFIG } from "./types"
-import { findLargestToolResult, truncateToolResult } from "./storage"
+import { findLargestToolResult, truncateToolResult, truncateUntilTargetTokens } from "./storage"
+import { findEmptyMessages, injectTextPart } from "../session-recovery/storage"
+import { log } from "../../shared/logger"
 
 type Client = {
   session: {
@@ -151,7 +154,60 @@ function clearSessionState(autoCompactState: AutoCompactState, sessionID: string
   autoCompactState.retryStateBySession.delete(sessionID)
   autoCompactState.fallbackStateBySession.delete(sessionID)
   autoCompactState.truncateStateBySession.delete(sessionID)
+  autoCompactState.emptyContentAttemptBySession.delete(sessionID)
   autoCompactState.compactionInProgress.delete(sessionID)
+}
+
+function getOrCreateEmptyContentAttempt(
+  autoCompactState: AutoCompactState,
+  sessionID: string
+): number {
+  return autoCompactState.emptyContentAttemptBySession.get(sessionID) ?? 0
+}
+
+async function fixEmptyMessages(
+  sessionID: string,
+  autoCompactState: AutoCompactState,
+  client: Client
+): Promise<boolean> {
+  const attempt = getOrCreateEmptyContentAttempt(autoCompactState, sessionID)
+  autoCompactState.emptyContentAttemptBySession.set(sessionID, attempt + 1)
+
+  const emptyMessageIds = findEmptyMessages(sessionID)
+  if (emptyMessageIds.length === 0) {
+    await client.tui
+      .showToast({
+        body: {
+          title: "Empty Content Error",
+          message: "No empty messages found in storage. Cannot auto-recover.",
+          variant: "error",
+          duration: 5000,
+        },
+      })
+      .catch(() => {})
+    return false
+  }
+
+  let fixed = false
+  for (const messageID of emptyMessageIds) {
+    const success = injectTextPart(sessionID, messageID, "[user interrupted]")
+    if (success) fixed = true
+  }
+
+  if (fixed) {
+    await client.tui
+      .showToast({
+        body: {
+          title: "Session Recovery",
+          message: `Fixed ${emptyMessageIds.length} empty messages. Retrying...`,
+          variant: "warning",
+          duration: 3000,
+        },
+      })
+      .catch(() => {})
+  }
+
+  return fixed
 }
 
 export async function executeCompact(
@@ -160,14 +216,88 @@ export async function executeCompact(
   autoCompactState: AutoCompactState,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client: any,
-  directory: string
+  directory: string,
+  experimental?: ExperimentalConfig
 ): Promise<void> {
   if (autoCompactState.compactionInProgress.has(sessionID)) {
     return
   }
   autoCompactState.compactionInProgress.add(sessionID)
 
+  const errorData = autoCompactState.errorDataBySession.get(sessionID)
   const truncateState = getOrCreateTruncateState(autoCompactState, sessionID)
+
+  if (
+    experimental?.aggressive_truncation &&
+    errorData?.currentTokens &&
+    errorData?.maxTokens &&
+    errorData.currentTokens > errorData.maxTokens &&
+    truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts
+  ) {
+    log("[auto-compact] aggressive truncation triggered (experimental)", {
+      currentTokens: errorData.currentTokens,
+      maxTokens: errorData.maxTokens,
+      targetRatio: TRUNCATE_CONFIG.targetTokenRatio,
+    })
+
+    const aggressiveResult = truncateUntilTargetTokens(
+      sessionID,
+      errorData.currentTokens,
+      errorData.maxTokens,
+      TRUNCATE_CONFIG.targetTokenRatio,
+      TRUNCATE_CONFIG.charsPerToken
+    )
+
+    if (aggressiveResult.truncatedCount > 0) {
+      truncateState.truncateAttempt += aggressiveResult.truncatedCount
+
+      const toolNames = aggressiveResult.truncatedTools.map((t) => t.toolName).join(", ")
+      const statusMsg = aggressiveResult.sufficient
+        ? `Truncated ${aggressiveResult.truncatedCount} outputs (${formatBytes(aggressiveResult.totalBytesRemoved)})`
+        : `Truncated ${aggressiveResult.truncatedCount} outputs (${formatBytes(aggressiveResult.totalBytesRemoved)}) but need ${formatBytes(aggressiveResult.targetBytesToRemove)}. Falling back to summarize/revert...`
+
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: aggressiveResult.sufficient ? "Aggressive Truncation" : "Partial Truncation",
+            message: `${statusMsg}: ${toolNames}`,
+            variant: "warning",
+            duration: 4000,
+          },
+        })
+        .catch(() => {})
+
+      log("[auto-compact] aggressive truncation completed", aggressiveResult)
+
+      if (aggressiveResult.sufficient) {
+        autoCompactState.compactionInProgress.delete(sessionID)
+
+        setTimeout(async () => {
+          try {
+            await (client as Client).session.prompt_async({
+              path: { sessionID },
+              body: { parts: [{ type: "text", text: "Continue" }] },
+              query: { directory },
+            })
+          } catch {}
+        }, 500)
+        return
+      }
+    } else {
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Truncation Skipped",
+            message: "No tool outputs found to truncate.",
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
+    }
+  }
+
+  let skipSummarize = false
 
   if (truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts) {
     const largest = findLargestToolResult(sessionID)
@@ -203,12 +333,68 @@ export async function executeCompact(
         }, 500)
         return
       }
+    } else if (errorData?.currentTokens && errorData?.maxTokens && errorData.currentTokens > errorData.maxTokens) {
+      skipSummarize = true
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Summarize Skipped",
+            message: `Over token limit (${errorData.currentTokens}/${errorData.maxTokens}) with nothing to truncate. Going to revert...`,
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
+    } else if (!errorData?.currentTokens) {
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Truncation Skipped",
+            message: "No large tool outputs found.",
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
     }
   }
 
   const retryState = getOrCreateRetryState(autoCompactState, sessionID)
 
-  if (retryState.attempt < RETRY_CONFIG.maxAttempts) {
+  if (experimental?.empty_message_recovery && errorData?.errorType?.includes("non-empty content")) {
+    const attempt = getOrCreateEmptyContentAttempt(autoCompactState, sessionID)
+    if (attempt < 3) {
+      const fixed = await fixEmptyMessages(sessionID, autoCompactState, client as Client)
+      if (fixed) {
+        autoCompactState.compactionInProgress.delete(sessionID)
+        setTimeout(() => {
+          executeCompact(sessionID, msg, autoCompactState, client, directory, experimental)
+        }, 500)
+        return
+      }
+    } else {
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Recovery Failed",
+            message: "Max recovery attempts (3) reached for empty content error. Please start a new session.",
+            variant: "error",
+            duration: 10000,
+          },
+        })
+        .catch(() => {})
+      autoCompactState.compactionInProgress.delete(sessionID)
+      return
+    }
+  }
+
+  if (Date.now() - retryState.lastAttemptTime > 300000) {
+    retryState.attempt = 0
+    autoCompactState.fallbackStateBySession.delete(sessionID)
+    autoCompactState.truncateStateBySession.delete(sessionID)
+  }
+
+  if (!skipSummarize && retryState.attempt < RETRY_CONFIG.maxAttempts) {
     retryState.attempt++
     retryState.lastAttemptTime = Date.now()
 
@@ -234,7 +420,7 @@ export async function executeCompact(
           query: { directory },
         })
 
-        clearSessionState(autoCompactState, sessionID)
+        autoCompactState.compactionInProgress.delete(sessionID)
 
         setTimeout(async () => {
           try {
@@ -253,10 +439,21 @@ export async function executeCompact(
         const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs)
 
         setTimeout(() => {
-          executeCompact(sessionID, msg, autoCompactState, client, directory)
+          executeCompact(sessionID, msg, autoCompactState, client, directory, experimental)
         }, cappedDelay)
         return
       }
+    } else {
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Summarize Skipped",
+            message: "Missing providerID or modelID. Skipping to revert...",
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
     }
   }
 
@@ -301,10 +498,21 @@ export async function executeCompact(
         autoCompactState.compactionInProgress.delete(sessionID)
 
         setTimeout(() => {
-          executeCompact(sessionID, msg, autoCompactState, client, directory)
+          executeCompact(sessionID, msg, autoCompactState, client, directory, experimental)
         }, 1000)
         return
       } catch {}
+    } else {
+      await (client as Client).tui
+        .showToast({
+          body: {
+            title: "Revert Skipped",
+            message: "Could not find last message pair to revert.",
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
     }
   }
 

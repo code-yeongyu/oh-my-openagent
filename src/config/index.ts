@@ -6,6 +6,7 @@ export {
   AgentNameSchema,
   HookNameSchema,
   OmoAgentConfigSchema,
+  ExperimentalConfigSchema,
 } from "./schema"
 
 export type {
@@ -16,4 +17,5 @@ export type {
   AgentName,
   HookName,
   OmoAgentConfig,
+  ExperimentalConfig,
 } from "./schema"

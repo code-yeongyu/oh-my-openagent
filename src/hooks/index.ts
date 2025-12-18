@@ -1,14 +1,14 @@
 export { createTodoContinuationEnforcer, type TodoContinuationEnforcer } from "./todo-continuation-enforcer";
 export { createContextWindowMonitorHook } from "./context-window-monitor";
 export { createSessionNotification } from "./session-notification";
-export { createSessionRecoveryHook, type SessionRecoveryHook } from "./session-recovery";
+export { createSessionRecoveryHook, type SessionRecoveryHook, type SessionRecoveryOptions } from "./session-recovery";
 export { createCommentCheckerHooks } from "./comment-checker";
 export { createGrepOutputTruncatorHook } from "./grep-output-truncator";
 export { createToolOutputTruncatorHook } from "./tool-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
-export { createAnthropicAutoCompactHook } from "./anthropic-auto-compact";
+export { createAnthropicAutoCompactHook, type AnthropicAutoCompactOptions } from "./anthropic-auto-compact";
 export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";

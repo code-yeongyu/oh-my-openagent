@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { ExperimentalConfig } from "../../config"
 import {
   findEmptyMessages,
   findEmptyMessageByIndex,
@@ -14,7 +15,11 @@ import {
   replaceEmptyTextParts,
   stripThinkingParts,
 } from "./storage"
-import type { MessageData } from "./types"
+import type { MessageData, ResumeConfig } from "./types"
+
+export interface SessionRecoveryOptions {
+  experimental?: ExperimentalConfig
+}
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -22,7 +27,6 @@ type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
-  | "empty_content_message"
   | null
 
 interface MessageInfo {
@@ -47,6 +51,41 @@ interface MessagePart {
   thinking?: string
   name?: string
   input?: Record<string, unknown>
+}
+
+const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
+
+function findLastUserMessage(messages: MessageData[]): MessageData | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].info?.role === "user") {
+      return messages[i]
+    }
+  }
+  return undefined
+}
+
+function extractResumeConfig(userMessage: MessageData | undefined, sessionID: string): ResumeConfig {
+  return {
+    sessionID,
+    agent: userMessage?.info?.agent,
+    model: userMessage?.info?.model,
+  }
+}
+
+async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
+  try {
+    await client.session.prompt({
+      path: { id: config.sessionID },
+      body: {
+        parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
+        agent: config.agent,
+        model: config.model,
+      },
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 function getErrorMessage(error: unknown): string {
@@ -102,15 +141,6 @@ function detectErrorType(error: unknown): RecoveryErrorType {
 
   if (message.includes("thinking is disabled") && message.includes("cannot contain")) {
     return "thinking_disabled_violation"
-  }
-
-  if (
-    message.includes("non-empty content") ||
-    message.includes("must have non-empty content") ||
-    (message.includes("content") && message.includes("is empty")) ||
-    (message.includes("content field") && message.includes("empty"))
-  ) {
-    return "empty_content_message"
   }
 
   return null
@@ -286,8 +316,9 @@ export interface SessionRecoveryHook {
   setOnRecoveryCompleteCallback: (callback: (sessionID: string) => void) => void
 }
 
-export function createSessionRecoveryHook(ctx: PluginInput): SessionRecoveryHook {
+export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRecoveryOptions): SessionRecoveryHook {
   const processingErrors = new Set<string>()
+  const experimental = options?.experimental
   let onAbortCallback: ((sessionID: string) => void) | null = null
   let onRecoveryCompleteCallback: ((sessionID: string) => void) | null = null
 
@@ -338,13 +369,11 @@ export function createSessionRecoveryHook(ctx: PluginInput): SessionRecoveryHook
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
-        empty_content_message: "Empty Message Recovery",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
-        empty_content_message: "Fixing empty message...",
       }
 
       await ctx.client.tui
@@ -364,13 +393,21 @@ export function createSessionRecoveryHook(ctx: PluginInput): SessionRecoveryHook
         success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
       } else if (errorType === "thinking_block_order") {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
+        if (success && experimental?.auto_resume) {
+          const lastUser = findLastUserMessage(msgs ?? [])
+          const resumeConfig = extractResumeConfig(lastUser, sessionID)
+          await resumeSession(ctx.client, resumeConfig)
+        }
       } else if (errorType === "thinking_disabled_violation") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
-      } else if (errorType === "empty_content_message") {
-        success = await recoverEmptyContentMessage(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
+        if (success && experimental?.auto_resume) {
+          const lastUser = findLastUserMessage(msgs ?? [])
+          const resumeConfig = extractResumeConfig(lastUser, sessionID)
+          await resumeSession(ctx.client, resumeConfig)
+        }
       }
 
-    return success
+      return success
   } catch (err) {
     console.error("[session-recovery] Recovery failed:", err)
     return false

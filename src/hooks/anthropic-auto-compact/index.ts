@@ -1,7 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { AutoCompactState, ParsedTokenLimitError } from "./types"
+import type { ExperimentalConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
+import { log } from "../../shared/logger"
+
+export interface AnthropicAutoCompactOptions {
+  experimental?: ExperimentalConfig
+}
 
 function createAutoCompactState(): AutoCompactState {
   return {
@@ -10,12 +16,14 @@ function createAutoCompactState(): AutoCompactState {
     retryStateBySession: new Map(),
     fallbackStateBySession: new Map(),
     truncateStateBySession: new Map(),
+    emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
   }
 }
 
-export function createAnthropicAutoCompactHook(ctx: PluginInput) {
+export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: AnthropicAutoCompactOptions) {
   const autoCompactState = createAutoCompactState()
+  const experimental = options?.experimental
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -28,6 +36,7 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
         autoCompactState.fallbackStateBySession.delete(sessionInfo.id)
         autoCompactState.truncateStateBySession.delete(sessionInfo.id)
+        autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
         autoCompactState.compactionInProgress.delete(sessionInfo.id)
       }
       return
@@ -35,9 +44,11 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
 
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
+      log("[auto-compact] session.error received", { sessionID, error: props?.error })
       if (!sessionID) return
 
       const parsed = parseAnthropicTokenLimitError(props?.error)
+      log("[auto-compact] parsed result", { parsed, hasError: !!props?.error })
       if (parsed) {
         autoCompactState.pendingCompact.add(sessionID)
         autoCompactState.errorDataBySession.set(sessionID, parsed)
@@ -67,7 +78,8 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
             { providerID, modelID },
             autoCompactState,
             ctx.client,
-            ctx.directory
+            ctx.directory,
+            experimental
           )
         }, 300)
       }
@@ -79,7 +91,9 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
       const sessionID = info?.sessionID as string | undefined
 
       if (sessionID && info?.role === "assistant" && info.error) {
+        log("[auto-compact] message.updated with error", { sessionID, error: info.error })
         const parsed = parseAnthropicTokenLimitError(info.error)
+        log("[auto-compact] message.updated parsed result", { parsed })
         if (parsed) {
           parsed.providerID = info.providerID as string | undefined
           parsed.modelID = info.modelID as string | undefined
@@ -123,7 +137,8 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput) {
         { providerID, modelID },
         autoCompactState,
         ctx.client,
-        ctx.directory
+        ctx.directory,
+        experimental
       )
     }
   }

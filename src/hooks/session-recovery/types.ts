@@ -69,6 +69,13 @@ export interface MessageData {
     sessionID?: string
     parentID?: string
     error?: unknown
+    agent?: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    system?: string
+    tools?: Record<string, boolean>
   }
   parts?: Array<{
     type: string
@@ -79,4 +86,13 @@ export interface MessageData {
     input?: Record<string, unknown>
     callID?: string
   }>
+}
+
+export interface ResumeConfig {
+  sessionID: string
+  agent?: string
+  model?: {
+    providerID: string
+    modelID: string
+  }
 }
