@@ -13,10 +13,22 @@ export type BuiltinAgentName =
   | "frontend-ui-ux-engineer"
   | "document-writer"
   | "multimodal-looker"
-  // LIF-62: New agents for multi-layered orchestration
+  // LIF-62 Phase 4A: Manager and initial specialists
   | "implementation-specialist"
   | "backend-typescript"
   | "frontend-react"
+  // LIF-62 Phase 4B: Language/Platform Specialists
+  | "backend-rust"
+  | "backend-python"
+  | "mobile-xcode"
+  | "mobile-react-native"
+  // LIF-62 Phase 4B: AI/ML Specialists
+  | "ai-ml-expert"
+  | "agent-specialist"
+  // LIF-62 Phase 4B: Cross-Cutting Specialists
+  | "security-specialist"
+  | "test-specialist"
+  | "optimization-specialist"
 
 export type OverridableAgentName =
   | "build"
@@ -100,14 +112,26 @@ export const DELEGATABLE_AGENTS = [
   "explore",
   "librarian",
   "multimodal-looker",
-  // Specialist agents (can modify files)
+  // Specialist agents (can modify files) - existing
   "frontend-ui-ux-engineer",
   "document-writer",
-  // LIF-62: Manager agent (can delegate to specialists)
+  // LIF-62 Phase 4A: Manager agent (can delegate to specialists)
   "implementation-specialist",
-  // LIF-62: Specialist agents (cannot delegate further)
+  // LIF-62 Phase 4A: Specialist agents (cannot delegate further)
   "backend-typescript",
   "frontend-react",
+  // LIF-62 Phase 4B: Language/Platform Specialists
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  // LIF-62 Phase 4B: AI/ML Specialists
+  "ai-ml-expert",
+  "agent-specialist",
+  // LIF-62 Phase 4B: Cross-Cutting Specialists
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
 ] as const
 
 export type DelegatableAgentName = (typeof DELEGATABLE_AGENTS)[number]

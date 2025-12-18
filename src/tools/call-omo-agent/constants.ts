@@ -13,14 +13,26 @@ export const ALLOWED_AGENTS = [
   "explore",
   "librarian",
   "multimodal-looker",
-  // Specialist agents (can modify files)
+  // Specialist agents (can modify files) - existing
   "frontend-ui-ux-engineer",
   "document-writer",
-  // NEW: Manager agent (can delegate to specialists)
+  // LIF-62 Phase 4A: Manager agent (can delegate to specialists)
   "implementation-specialist",
-  // NEW: Specialist agents (cannot delegate further)
+  // LIF-62 Phase 4A: Initial specialists (cannot delegate further)
   "backend-typescript",
   "frontend-react",
+  // LIF-62 Phase 4B: Language/Platform Specialists
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  // LIF-62 Phase 4B: AI/ML Specialists
+  "ai-ml-expert",
+  "agent-specialist",
+  // LIF-62 Phase 4B: Cross-Cutting Specialists
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
 ] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.

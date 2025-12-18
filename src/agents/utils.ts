@@ -12,10 +12,22 @@ import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
-// LIF-62: Import new agents
+// LIF-62 Phase 4A: Manager and initial specialists
 import { implementationSpecialistAgent } from "./implementation-specialist"
 import { backendTypescriptAgent } from "./backend-typescript"
 import { frontendReactAgent } from "./frontend-react"
+// LIF-62 Phase 4B: Language/Platform Specialists
+import { backendRustAgent } from "./backend-rust"
+import { backendPythonAgent } from "./backend-python"
+import { mobileXcodeAgent } from "./mobile-xcode"
+import { mobileReactNativeAgent } from "./mobile-react-native"
+// LIF-62 Phase 4B: AI/ML Specialists
+import { aiMlExpertAgent } from "./ai-ml-expert"
+import { agentSpecialistAgent } from "./agent-specialist"
+// LIF-62 Phase 4B: Cross-Cutting Specialists
+import { securitySpecialistAgent } from "./security-specialist"
+import { testSpecialistAgent } from "./test-specialist"
+import { optimizationSpecialistAgent } from "./optimization-specialist"
 import { deepMerge } from "../shared"
 import { getGovernanceTemplate } from "../config/governance-template"
 
@@ -27,10 +39,22 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
   "document-writer": documentWriterAgent,
   "multimodal-looker": multimodalLookerAgent,
-  // LIF-62: New agents for multi-layered orchestration
+  // LIF-62 Phase 4A: Manager and initial specialists
   "implementation-specialist": implementationSpecialistAgent,
   "backend-typescript": backendTypescriptAgent,
   "frontend-react": frontendReactAgent,
+  // LIF-62 Phase 4B: Language/Platform Specialists
+  "backend-rust": backendRustAgent,
+  "backend-python": backendPythonAgent,
+  "mobile-xcode": mobileXcodeAgent,
+  "mobile-react-native": mobileReactNativeAgent,
+  // LIF-62 Phase 4B: AI/ML Specialists
+  "ai-ml-expert": aiMlExpertAgent,
+  "agent-specialist": agentSpecialistAgent,
+  // LIF-62 Phase 4B: Cross-Cutting Specialists
+  "security-specialist": securitySpecialistAgent,
+  "test-specialist": testSpecialistAgent,
+  "optimization-specialist": optimizationSpecialistAgent,
 }
 
 /**
@@ -52,10 +76,22 @@ const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
   // Specialists - file-modifying (existing)
   "frontend-ui-ux-engineer": "full", // File-modifying specialist
   "document-writer": "full",         // File-modifying specialist
-  // LIF-62: New agents
+  // LIF-62 Phase 4A: Manager and initial specialists
   "implementation-specialist": "full", // Manager - can modify files
   "backend-typescript": "full",        // Specialist - can modify files
   "frontend-react": "full",            // Specialist - can modify files
+  // LIF-62 Phase 4B: Language/Platform Specialists
+  "backend-rust": "full",              // Specialist - can modify files
+  "backend-python": "full",            // Specialist - can modify files
+  "mobile-xcode": "full",              // Specialist - can modify files
+  "mobile-react-native": "full",       // Specialist - can modify files
+  // LIF-62 Phase 4B: AI/ML Specialists
+  "ai-ml-expert": "full",              // Specialist - can modify files
+  "agent-specialist": "full",          // Specialist - can modify files
+  // LIF-62 Phase 4B: Cross-Cutting Specialists
+  "security-specialist": "full",       // Specialist - can modify files
+  "test-specialist": "full",           // Specialist - can modify files
+  "optimization-specialist": "full",   // Specialist - can modify files
 }
 
 export function createEnvContext(directory: string): string {
