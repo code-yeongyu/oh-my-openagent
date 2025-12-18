@@ -29,8 +29,10 @@ test-injection/
 notepad.md
 oauth-success.html
 
-# IDE/Editor configs
-.cursor/
+# IDE/Editor configs - ignore .cursor/ except memory/ and specs/
+.cursor/*
+!.cursor/memory/
+!.cursor/specs/
 .codex/
 
 # OpenCode - personal/workspace-specific
