@@ -3,6 +3,8 @@ import { checkForUpdate, getCachedVersion, getLocalDevVersion } from "./checker"
 import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { getUserConfigPath } from "../../shared/config-path"
+import { getConfigLoadErrors, clearConfigLoadErrors } from "../../index"
 import type { AutoUpdateCheckerOptions } from "./types"
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
@@ -64,17 +66,40 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
       } catch (err) {
         log("[auto-update-checker] Error during update check:", err)
       }
+
+      await showConfigErrorsIfAny(ctx)
     },
   }
 }
 
+async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {
+  const errors = getConfigLoadErrors()
+  if (errors.length === 0) return
+
+  const errorMessages = errors.map(e => `${e.path}: ${e.error}`).join("\n")
+  await ctx.client.tui
+    .showToast({
+      body: {
+        title: "Config Load Error",
+        message: `Failed to load config:\n${errorMessages}`,
+        variant: "error" as const,
+        duration: 10000,
+      },
+    })
+    .catch(() => {})
+
+  log(`[auto-update-checker] Config load errors shown: ${errors.length} error(s)`)
+  clearConfigLoadErrors()
+}
+
 async function showVersionToast(ctx: PluginInput, version: string | null): Promise<void> {
   const displayVersion = version ?? "unknown"
+  const configPath = getUserConfigPath()
   await ctx.client.tui
     .showToast({
       body: {
         title: `OhMyOpenCode ${displayVersion}`,
-        message: "OpenCode is now on Steroids. oMoMoMoMo...",
+        message: `OpenCode is now on Steroids. oMoMoMoMo...\nConfig: ${configPath}`,
         variant: "info" as const,
         duration: 5000,
       },

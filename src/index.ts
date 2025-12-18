@@ -46,25 +46,10 @@ import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, 
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge } from "./shared";
+import { log, deepMerge, getUserConfigDir } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
-
-/**
- * Returns the user-level config directory based on the OS.
- * - Linux/macOS: XDG_CONFIG_HOME or ~/.config
- * - Windows: %APPDATA%
- */
-function getUserConfigDir(): string {
-  if (process.platform === "win32") {
-    return process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-  }
-
-  // Linux, macOS, and other Unix-like systems: respect XDG_CONFIG_HOME
-  return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-}
 
 const AGENT_NAME_MAP: Record<string, string> = {
   omo: "OmO",
@@ -76,6 +61,21 @@ const AGENT_NAME_MAP: Record<string, string> = {
   "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
 };
+
+export type ConfigLoadError = {
+  path: string;
+  error: string;
+};
+
+let configLoadErrors: ConfigLoadError[] = [];
+
+export function getConfigLoadErrors(): ConfigLoadError[] {
+  return configLoadErrors;
+}
+
+export function clearConfigLoadErrors(): void {
+  configLoadErrors = [];
+}
 
 function normalizeAgentNames(agents: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
@@ -99,7 +99,9 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
       if (!result.success) {
+        const errorMsg = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
         log(`Config validation error in ${configPath}:`, result.error.issues);
+        configLoadErrors.push({ path: configPath, error: `Validation error: ${errorMsg}` });
         return null;
       }
 
@@ -107,7 +109,9 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
       return result.data;
     }
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     log(`Error loading config from ${configPath}:`, err);
+    configLoadErrors.push({ path: configPath, error: errorMsg });
   }
   return null;
 }

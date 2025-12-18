@@ -57,7 +57,9 @@
           "startup-toast",
           "keyword-detector",
           "agent-usage-reminder",
-          "non-interactive-env"
+          "non-interactive-env",
+          "interactive-bash-session",
+          "empty-message-sanitizer"
         ]
       }
     },

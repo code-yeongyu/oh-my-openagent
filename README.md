@@ -660,7 +660,12 @@ Highly opinionated, but adjustable to taste.
 
 Config file locations (priority order):
 1. `.opencode/oh-my-opencode.json` (project)
-2. `~/.config/opencode/oh-my-opencode.json` (user)
+2. User config (platform-specific):
+
+| Platform | User Config Path |
+|----------|------------------|
+| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 Schema autocomplete supported:
 

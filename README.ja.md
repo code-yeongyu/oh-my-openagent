@@ -601,7 +601,12 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 設定ファイルの場所（優先順）：
 1. `.opencode/oh-my-opencode.json` (プロジェクト)
-2. `~/.config/opencode/oh-my-opencode.json` (ユーザー)
+2. ユーザー設定（プラットフォーム別）：
+
+| プラットフォーム | ユーザー設定パス |
+|------------------|------------------|
+| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 スキーマ自動補完がサポートされています：
 

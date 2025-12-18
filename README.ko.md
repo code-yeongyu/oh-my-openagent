@@ -595,7 +595,12 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 설정 파일 위치 (우선순위 순):
 1. `.opencode/oh-my-opencode.json` (프로젝트)
-2. `~/.config/opencode/oh-my-opencode.json` (사용자)
+2. 사용자 설정 (플랫폼별):
+
+| 플랫폼 | 사용자 설정 경로 |
+|--------|------------------|
+| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 Schema 자동 완성이 지원됩니다:
 
