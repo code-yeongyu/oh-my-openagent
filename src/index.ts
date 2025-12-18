@@ -46,7 +46,7 @@ import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, 
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge, getUserConfigDir } from "./shared";
+import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
@@ -61,21 +61,6 @@ const AGENT_NAME_MAP: Record<string, string> = {
   "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
 };
-
-export type ConfigLoadError = {
-  path: string;
-  error: string;
-};
-
-let configLoadErrors: ConfigLoadError[] = [];
-
-export function getConfigLoadErrors(): ConfigLoadError[] {
-  return configLoadErrors;
-}
-
-export function clearConfigLoadErrors(): void {
-  configLoadErrors = [];
-}
 
 function normalizeAgentNames(agents: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
@@ -101,7 +86,7 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
       if (!result.success) {
         const errorMsg = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
         log(`Config validation error in ${configPath}:`, result.error.issues);
-        configLoadErrors.push({ path: configPath, error: `Validation error: ${errorMsg}` });
+        addConfigLoadError({ path: configPath, error: `Validation error: ${errorMsg}` });
         return null;
       }
 
@@ -111,7 +96,7 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     log(`Error loading config from ${configPath}:`, err);
-    configLoadErrors.push({ path: configPath, error: errorMsg });
+    addConfigLoadError({ path: configPath, error: errorMsg });
   }
   return null;
 }
@@ -506,3 +491,8 @@ export type {
   McpName,
   HookName,
 } from "./config";
+
+// NOTE: Do NOT export functions from main index.ts!
+// OpenCode treats ALL exports as plugin instances and calls them.
+// Config error utilities are available via "./shared/config-errors" for internal use only.
+export type { ConfigLoadError } from "./shared/config-errors";
