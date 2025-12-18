@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides } from "./types"
-import { omoAgent } from "./omo"
+import { sisyphusAgent } from "./sisyphus"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
@@ -10,7 +10,7 @@ import { multimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
 
 const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
-  OmO: omoAgent,
+  Sisyphus: sisyphusAgent,
   oracle: oracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,
@@ -76,7 +76,7 @@ export function createBuiltinAgents(
 
     let finalConfig = config
 
-    if ((agentName === "OmO" || agentName === "librarian") && directory && config.prompt) {
+    if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
       const envContext = createEnvContext(directory)
       finalConfig = {
         ...config,
@@ -86,11 +86,7 @@ export function createBuiltinAgents(
 
     const override = agentOverrides[agentName]
 
-    // Apply model fallback chain for OmO agent:
-    // 1. oh-my-opencode.json agents.OmO.model (highest priority)
-    // 2. OpenCode system config.model (middle priority)
-    // 3. Hardcoded default in omoAgent (lowest priority / fallback)
-    if (agentName === "OmO" && systemDefaultModel && !override?.model) {
+    if (agentName === "Sisyphus" && systemDefaultModel && !override?.model) {
       finalConfig = {
         ...finalConfig,
         model: systemDefaultModel,

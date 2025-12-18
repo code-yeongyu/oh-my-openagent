@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { omoAgent } from "./omo"
+import { sisyphusAgent } from "./sisyphus"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
@@ -8,7 +8,7 @@ import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
 
 export const builtinAgents: Record<string, AgentConfig> = {
-  OmO: omoAgent,
+  Sisyphus: sisyphusAgent,
   oracle: oracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,

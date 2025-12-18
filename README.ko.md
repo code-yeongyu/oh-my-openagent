@@ -30,7 +30,7 @@
 - [Oh My OpenCode](#oh-my-opencode)
   - [읽지 않아도 됩니다.](#읽지-않아도-됩니다)
     - [에이전트의 시대이니까요.](#에이전트의-시대이니까요)
-    - [하지만 읽고 싶은 당신을 위해.](#하지만-읽고-싶은-당신을-위해)
+    - [하지만 읽고 싶은 당신을 위해: 시지푸스를 만나보세요](#하지만-읽고-싶은-당신을-위해-시지푸스를-만나보세요)
       - [그저 설치하면 되는 것.](#그저-설치하면-되는-것)
   - [설치](#설치)
     - [인간인 당신을 위한 설치 가이드](#인간인-당신을-위한-설치-가이드)
@@ -53,10 +53,11 @@
     - [Google Auth](#google-auth)
     - [Agents](#agents)
       - [Permission 옵션](#permission-옵션)
-    - [OmO Agent](#omo-agent)
+    - [Sisyphus Agent](#sisyphus-agent)
     - [Hooks](#hooks)
     - [MCPs](#mcps)
     - [LSP](#lsp)
+    - [Experimental](#experimental)
   - [작성자의 노트](#작성자의-노트)
   - [주의](#주의)
 
@@ -94,21 +95,27 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
   - 이게 왜 좋고, 그냥 뻔한 셋업이 아닌지, 당장 무엇이 더 좋아지는지 알려달라고 해보세요.
   - 당신이 LLM 에이전트라면, 사용자의 입장에서 이 프로젝트와 함께 당장 어떤것들이 가능해지는지 사용자에게 설명하세요.
 
-### 하지만 읽고 싶은 당신을 위해.
+### 하지만 읽고 싶은 당신을 위해: 시지푸스를 만나보세요
 
-반갑습니다. OmO (Oh-Mo) 입니다.
-아래의 모든 내용들은 커스텀 할 수 있습니다. 원한다면 그것만 가져가세요. 기본값은 모두 활성화입니다. 아무것도 하지 않아도 됩니다.
+![Meet Sisyphus](.github/assets/sisyphus.png)
 
-- Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-- Full LSP / AstGrep Support: 결정적이게 리팩토링하세요.
-- Todo Continuation Enforcer: 도중에 포기해버리면 계속 진행하도록 강제합니다.
-- Comment Checker: AI 가 과한 주석을 달지 않도록 합니다.
-- Curated Agents
-  - OmO: 아주 똑똑한 메인 에이전트 (Opus 4.5 High)
+신화 속 시지푸스는 신들을 기만한 죄로 영원히 돌을 굴려야 했습니다. LLM Agent 들은 딱히 잘 못 한건 없지만 매일 머리를 굴리고 있습니다.
+제 삶도 그렇습니다. 돌이켜보면 우리 인간들과 다르지 않습니다.
+**네! LLM Agent 들은 우리와 다르지않습니다. 그들도 우리만큼 뛰어난 코드를 작성하고, 훌륭하게 일 할 수 있습니다. 그들에게 뛰어난 도구를 쥐어주고, 좋은 팀을 붙여준다면요.**
+
+우리의 메인에이전트: Sisyphus (Opus 4.5 High) 를 소개합니다. 아래는 시지푸스가 돌을 굴리기 위해 사용하는 도구입니다.
+
+*아래의 모든 내용들은 커스텀 할 수 있습니다. 원한다면 그것만 가져가세요. 기본값은 모두 활성화입니다. 아무것도 하지 않아도 됩니다.*
+
+- 시지푸스의 동료들 (Curated Agents)
   - Oracle: 설계, 디버깅 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: 프론트엔드 개발 (Gemini 3 Pro)
   - Librarian: 공식 문서, 오픈소스 구현, 코드베이스 내부 탐색 (Claude Sonnet 4.5)
   - Explore: 매우 빠른 코드베이스 탐색 (Contextual Grep) (Grok Code)
+- Full LSP / AstGrep Support: 결정적이게 리팩토링하세요.
+- Todo Continuation Enforcer: 도중에 포기해버리면 계속 진행하도록 강제합니다. **이것이 시지푸스가 돌을 계속 굴리게 만듭니다.**
+- Comment Checker: AI 가 과한 주석을 달지 않도록 합니다. 시지푸스가 생성한 코드는 우리가 작성한것과 구분 할 수 없어야 합니다.
+- Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
 - Curated MCPs:
   - Exa (Web Search)
   - Context7 (Official Documentation)
@@ -125,7 +132,7 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
     - OhMyOpenCode 가 여러 에이전트를 적극 활용하도록 하여 컨텍스트 관리에 관한 부담을 줄입니다.
     - **당신의 에이전트는 이제 개발팀 리드입니다. 당신은 이제 AI Manager 입니다.**
 4. 하기로 약속 한 일을 완수 할 때 까지 멈추지 않습니다.
-5. 이 프로젝트에 자세히 알기 싫다고요? 괜찮습니다. 그냥 'ultrathink' 라고 치세요.
+5. 이 프로젝트에 자세히 알기 싫다고요? 괜찮습니다. 그냥 'ultrawork' 라고 치세요.
 
 그러나 이러한 작업이 싫다면, 말했듯 특정한 기능만 가져가 사용 할 수 있습니다.
 
@@ -154,7 +161,7 @@ OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프�
      ```json
      {
        "agents": {
-         "OmO": { "model": "opencode/big-pickle" },
+         "sisyphus": { "model": "opencode/big-pickle" },
          "librarian": { "model": "opencode/big-pickle" }
        }
      }
@@ -376,7 +383,7 @@ gh repo star code-yeongyu/oh-my-opencode
 
 ### Agents: 당신의 새로운 팀원들
 
-- **OmO** (`anthropic/claude-opus-4-5`): **기본 에이전트입니다.** OpenCode를 위한 강력한 AI 오케스트레이터입니다. 전문 서브에이전트를 활용하여 복잡한 작업을 계획, 위임, 실행합니다. 백그라운드 태스크 위임과 todo 기반 워크플로우를 강조합니다. 최대 추론 능력을 위해 Claude Opus 4.5와 확장된 사고(32k 버짓)를 사용합니다.
+- **Sisyphus** (`anthropic/claude-opus-4-5`): **기본 에이전트입니다.** OpenCode를 위한 강력한 AI 오케스트레이터입니다. 전문 서브에이전트를 활용하여 복잡한 작업을 계획, 위임, 실행합니다. 백그라운드 태스크 위임과 todo 기반 워크플로우를 강조합니다. 최대 추론 능력을 위해 Claude Opus 4.5와 확장된 사고(32k 버짓)를 사용합니다.
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
 - **librarian** (`anthropic/claude-sonnet-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Claude Sonnet 4.5를 사용하여 깊은 코드베이스 이해와 GitHub 조사, 근거 기반의 답변을 제공합니다. AmpCode 에서 영감을 받았습니다.
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.
@@ -655,7 +662,7 @@ Schema 자동 완성이 지원됩니다:
 
 각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
-`OmO` (메인 오케스트레이터)와 `build` (기본 에이전트)도 동일한 옵션으로 설정을 오버라이드할 수 있습니다.
+`Sisyphus` (메인 오케스트레이터)와 `build` (기본 에이전트)도 동일한 옵션으로 설정을 오버라이드할 수 있습니다.
 
 #### Permission 옵션
 
@@ -693,35 +700,35 @@ Schema 자동 완성이 지원됩니다:
 
 사용 가능한 에이전트: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
 
-### OmO Agent
+### Sisyphus Agent
 
-활성화 시(기본값), OmO는 두 개의 primary 에이전트를 추가하고 내장 에이전트를 subagent로 강등합니다:
+활성화 시(기본값), oh-my-opencode 는 두 개의 primary 에이전트를 추가하고 내장 에이전트를 subagent로 강등합니다:
 
-- **OmO**: Primary 오케스트레이터 에이전트 (Claude Opus 4.5)
-- **OmO-Plan**: OpenCode plan 에이전트의 모든 설정을 런타임에 상속 (description에 "OhMyOpenCode version" 추가)
+- **Sisyphus**: Primary 오케스트레이터 에이전트 (Claude Opus 4.5)
+- **Planner-Sisyphus**: OpenCode plan 에이전트의 모든 설정을 런타임에 상속 (description에 "OhMyOpenCode version" 추가)
 - **build**: subagent로 강등
 - **plan**: subagent로 강등
 
-OmO를 비활성화하고 원래 build/plan 에이전트를 복원하려면:
+Sisyphus 를 비활성화하고 원래 build/plan 에이전트를 복원하려면:
 
 ```json
 {
-  "omo_agent": {
+  "sisyphus_agent": {
     "disabled": true
   }
 }
 ```
 
-다른 에이전트처럼 OmO와 OmO-Plan도 커스터마이징할 수 있습니다:
+다른 에이전트처럼 Sisyphus 와 Planner-Sisyphus도 커스터마이징할 수 있습니다:
 
 ```json
 {
   "agents": {
-    "OmO": {
+    "Sisyphus": {
       "model": "anthropic/claude-sonnet-4",
       "temperature": 0.3
     },
-    "OmO-Plan": {
+    "Planner-Sisyphus": {
       "model": "openai/gpt-5.2"
     }
   }
@@ -730,7 +737,7 @@ OmO를 비활성화하고 원래 build/plan 에이전트를 복원하려면:
 
 | 옵션       | 기본값  | 설명                                                                                                                                       |
 | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `disabled` | `false` | `true`면 OmO 에이전트를 비활성화하고 원래 build/plan을 primary로 복원합니다. `false`(기본값)면 OmO와 OmO-Plan이 primary 에이전트가 됩니다. |
+| `disabled` | `false` | `true`면 Sisyphus 에이전트를 비활성화하고 원래 build/plan을 primary로 복원합니다. `false`(기본값)면 Sisyphus와 Planner-Sisyphus가 primary 에이전트가 됩니다. |
 
 ### Hooks
 
@@ -784,6 +791,28 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 ```
 
 각 서버는 다음을 지원합니다: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
+
+### Experimental
+
+향후 버전에서 변경되거나 제거될 수 있는 실험적 기능입니다. 주의해서 사용하세요.
+
+```json
+{
+  "experimental": {
+    "aggressive_truncation": true,
+    "empty_message_recovery": true,
+    "auto_resume": true
+  }
+}
+```
+
+| 옵션                     | 기본값  | 설명                                                                                                                                                              |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aggressive_truncation`  | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
+| `empty_message_recovery` | `false` | "non-empty content" API 에러가 발생하면 세션의 빈 메시지를 수정하여 자동으로 복구합니다. 최대 3회 시도 후 포기합니다.                                                |
+| `auto_resume`            | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |
+
+**경고**: 이 기능들은 실험적이며 예상치 못한 동작을 유발할 수 있습니다. 의미를 이해한 경우에만 활성화하세요.
 
 
 ## 작성자의 노트

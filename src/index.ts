@@ -51,8 +51,16 @@ import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
 
+// Migration map: old keys → new keys (for backward compatibility)
 const AGENT_NAME_MAP: Record<string, string> = {
-  omo: "OmO",
+  // Legacy names (backward compatibility)
+  omo: "Sisyphus",
+  "OmO": "Sisyphus",
+  "OmO-Plan": "Planner-Sisyphus",
+  "omo-plan": "Planner-Sisyphus",
+  // Current names
+  sisyphus: "Sisyphus",
+  "planner-sisyphus": "Planner-Sisyphus",
   build: "build",
   oracle: "oracle",
   librarian: "librarian",
@@ -62,13 +70,48 @@ const AGENT_NAME_MAP: Record<string, string> = {
   "multimodal-looker": "multimodal-looker",
 };
 
-function normalizeAgentNames(agents: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
+function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
+  const migrated: Record<string, unknown> = {};
+  let changed = false;
+
   for (const [key, value] of Object.entries(agents)) {
-    const normalizedKey = AGENT_NAME_MAP[key.toLowerCase()] ?? key;
-    normalized[normalizedKey] = value;
+    const newKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key;
+    if (newKey !== key) {
+      changed = true;
+    }
+    migrated[newKey] = value;
   }
-  return normalized;
+
+  return { migrated, changed };
+}
+
+function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown>): boolean {
+  let needsWrite = false;
+
+  if (rawConfig.agents && typeof rawConfig.agents === "object") {
+    const { migrated, changed } = migrateAgentNames(rawConfig.agents as Record<string, unknown>);
+    if (changed) {
+      rawConfig.agents = migrated;
+      needsWrite = true;
+    }
+  }
+
+  if (rawConfig.omo_agent) {
+    rawConfig.sisyphus_agent = rawConfig.omo_agent;
+    delete rawConfig.omo_agent;
+    needsWrite = true;
+  }
+
+  if (needsWrite) {
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n", "utf-8");
+      log(`Migrated config file: ${configPath} (OmO → Sisyphus)`);
+    } catch (err) {
+      log(`Failed to write migrated config to ${configPath}:`, err);
+    }
+  }
+
+  return needsWrite;
 }
 
 function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
@@ -77,9 +120,7 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
       const content = fs.readFileSync(configPath, "utf-8");
       const rawConfig = JSON.parse(content);
 
-      if (rawConfig.agents && typeof rawConfig.agents === "object") {
-        rawConfig.agents = normalizeAgentNames(rawConfig.agents);
-      }
+      migrateConfigFile(configPath, rawConfig);
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
@@ -220,6 +261,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
     ? createAutoUpdateCheckerHook(ctx, {
         showStartupToast: isHookEnabled("startup-toast"),
+        isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
       })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
@@ -289,15 +331,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
 
-      const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
+      const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
 
-      if (isOmoEnabled && builtinAgents.OmO) {
+      if (isSisyphusEnabled && builtinAgents.Sisyphus) {
         // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // use `config.default_agent = "OmO"` instead of demoting build/plan.
+        // use `config.default_agent = "Sisyphus"` instead of demoting build/plan.
         // Tracking: https://github.com/sst/opencode/pull/5313
         const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
-        const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
-        const omoPlanBase = {
+        const plannerSisyphusOverride = pluginConfig.agents?.["Planner-Sisyphus"];
+        const plannerSisyphusBase = {
           ...planConfigWithoutName,
           prompt: PLAN_SYSTEM_PROMPT,
           permission: PLAN_PERMISSION,
@@ -305,14 +347,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           color: config.agent?.plan?.color ?? "#6495ED",
         };
 
-        const omoPlanConfig = omoPlanOverride
-          ? { ...omoPlanBase, ...omoPlanOverride }
-          : omoPlanBase;
+        const plannerSisyphusConfig = plannerSisyphusOverride
+          ? { ...plannerSisyphusBase, ...plannerSisyphusOverride }
+          : plannerSisyphusBase;
 
         config.agent = {
-          OmO: builtinAgents.OmO,
-          "OmO-Plan": omoPlanConfig,
-          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "OmO")),
+          Sisyphus: builtinAgents.Sisyphus,
+          "Planner-Sisyphus": plannerSisyphusConfig,
+          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")),
           ...userAgents,
           ...projectAgents,
           ...config.agent,
