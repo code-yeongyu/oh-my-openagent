@@ -150,6 +150,19 @@ export class BackgroundManager {
     return result
   }
 
+  getAllDescendantTasks(sessionID: string): BackgroundTask[] {
+    const result: BackgroundTask[] = []
+    const directChildren = this.getTasksByParentSession(sessionID)
+
+    for (const child of directChildren) {
+      result.push(child)
+      const descendants = this.getAllDescendantTasks(child.sessionID)
+      result.push(...descendants)
+    }
+
+    return result
+  }
+
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.sessionID === sessionID) {

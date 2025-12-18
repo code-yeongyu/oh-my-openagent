@@ -275,7 +275,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
         }
 
         if (cancelAll) {
-          const tasks = manager.getTasksByParentSession(toolContext.sessionID)
+          const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
           const runningTasks = tasks.filter(t => t.status === "running")
 
           if (runningTasks.length === 0) {
