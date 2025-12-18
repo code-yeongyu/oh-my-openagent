@@ -334,7 +334,7 @@ First, add the opencode-openai-codex-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth@4.1.0"
+    "opencode-openai-codex-auth@4.1.1"
   ]
 }
 ```
