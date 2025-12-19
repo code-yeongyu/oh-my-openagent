@@ -1222,6 +1222,9 @@
           "type": "boolean"
         }
       }
+    },
+    "auto_update": {
+      "type": "boolean"
     }
   }
 }
