@@ -22,6 +22,7 @@ OhMyOpenCode (OMO) is a comprehensive plugin for OpenCode that transforms the de
 | [09 - Feature Loaders](/architecture/09-feature-loaders) | Claude Code compatibility layer |
 | [10 - Data Flows](/architecture/10-data-flows) | Visual diagrams of all flows |
 | [11 - Inter-Component](/architecture/11-inter-component) | Dependencies and interactions |
+| [12 - Workflow System](/architecture/12-workflow-system) | Spec-driven workflow, preflight, state persistence |
 
 ### Architecture Decision Records
 
@@ -30,6 +31,7 @@ OhMyOpenCode (OMO) is a comprehensive plugin for OpenCode that transforms the de
 | [ADR-001](/architecture/decisions/ADR-001-agent-orchestration) | Multi-model agent orchestration pattern |
 | [ADR-002](/architecture/decisions/ADR-002-background-task-design) | Child session background task design |
 | [ADR-003](/architecture/decisions/ADR-003-governance-hooks) | Governance via lifecycle hooks |
+| [ADR-004](/architecture/decisions/ADR-004-workflow-command-system) | Spec-driven workflow with preflight validation |
 
 ## System Architecture
 

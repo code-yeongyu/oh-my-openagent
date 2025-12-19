@@ -51,3 +51,13 @@ $ARGUMENTS
 
 6. **Report completion**:
    - Review summary, issues found, readiness for `/test`
+
+7. **Persist Workflow State** (REQUIRED):
+   ```
+   update_workflow_state({
+     specPath: "{SPEC_DIR}",
+     step: "review",
+     linearStatus: "in_review"
+   })
+   ```
+   This enables session continuity and resume messages.

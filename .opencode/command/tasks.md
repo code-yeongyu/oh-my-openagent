@@ -56,6 +56,16 @@ Create a task breakdown from the implementation plan in the current spec folder.
 6. **Report completion**:
    - Tasks file path, number of tasks created, readiness for `/implement`
 
+7. **Persist Workflow State** (REQUIRED):
+   ```
+   update_workflow_state({
+     specPath: "{SPEC_DIR}",
+     step: "tasks",
+     linearStatus: "in_progress"
+   })
+   ```
+   This enables session continuity and resume messages.
+
 ## Agent Integration
 
 When Linear Coordinator agent is invoked:

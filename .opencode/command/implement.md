@@ -59,6 +59,16 @@ Implement the feature according to the plan and tasks in the current spec folder
 5. **Report completion**:
    - Implementation summary, files created/modified, readiness for `/code-review` or `/test`
 
+6. **Persist Workflow State** (REQUIRED):
+   ```
+   update_workflow_state({
+     specPath: "{SPEC_DIR}",
+     step: "implement",
+     linearStatus: "in_progress"
+   })
+   ```
+   This enables session continuity and resume messages.
+
 ## Agent Integration
 
 When Implementation Specialist agent is invoked:
