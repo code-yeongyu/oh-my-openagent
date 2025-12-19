@@ -492,14 +492,19 @@ export async function executeCompact(
         fallbackState.revertAttempt++
         fallbackState.lastRevertedMessageID = pair.userMessageID
 
-        retryState.attempt = 0
-        truncateState.truncateAttempt = 0
+        // Clear all state after successful revert - don't recurse
+        clearSessionState(autoCompactState, sessionID)
 
-        autoCompactState.compactionInProgress.delete(sessionID)
-
-        setTimeout(() => {
-          executeCompact(sessionID, msg, autoCompactState, client, directory, experimental)
-        }, 1000)
+        // Send "Continue" prompt to resume session
+        setTimeout(async () => {
+          try {
+            await (client as Client).session.prompt_async({
+              path: { sessionID },
+              body: { parts: [{ type: "text", text: "Continue" }] },
+              query: { directory },
+            })
+          } catch {}
+        }, 500)
         return
       } catch {}
     } else {
