@@ -1,3 +1,5 @@
+NOTICE: News regarding oh-my-opencode used to posted on my X account, but since it got suspended innocently, my friend [@_junhoyeo](https://x.com/_junhoyeo) will post on behalf of me. (THE GUY WHO MADE HERO IMAGE)
+
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
