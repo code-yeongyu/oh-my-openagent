@@ -109,6 +109,10 @@ export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
     command: ["astro-ls", "--stdio"],
     extensions: [".astro"],
   },
+  "bash-ls": {
+    command: ["bash-language-server", "start"],
+    extensions: [".sh", ".bash", ".zsh", ".ksh"],
+  },
   jdtls: {
     command: ["jdtls"],
     extensions: [".java"],
