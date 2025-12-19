@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Add comprehensive documentation for code, features, or APIs.
 ---
 

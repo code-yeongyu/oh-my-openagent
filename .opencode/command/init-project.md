@@ -1,5 +1,6 @@
 ---
 name: init-project
+category: project
 description: Initialize OpenCode configuration for new or existing projects
 agent: orchestrator
 ---

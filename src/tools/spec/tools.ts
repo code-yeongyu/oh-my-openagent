@@ -1,6 +1,12 @@
 import { tool, type PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import type { CreateSpecFolderResult, SpecType } from "./types"
+import {
+  updateWorkflowState,
+  readWorkflowState,
+  formatResumeMessage,
+  type WorkflowStep,
+} from "../../shared/workflow-context"
+import type { CreateSpecFolderResult, SpecType, UpdateWorkflowStateResult } from "./types"
 import { SPEC_TEMPLATE_FILES, SPEC_BASE_PATHS, DEFAULT_SPEC_BASE_PATH } from "./types"
 import * as fs from "fs"
 import * as path from "path"
@@ -285,6 +291,88 @@ export function createSpecFolderTool(ctx: PluginInput) {
         const result: CreateSpecFolderResult = {
           success: false,
           message: `Failed to create spec folder`,
+          error: errorMessage,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+    },
+  })
+}
+
+const UPDATE_WORKFLOW_STATE_DESCRIPTION = `Update the workflow state for a spec folder.
+
+Call this tool after completing a workflow step to persist progress:
+- Tracks completed steps (specify, plan, tasks, implement, review, test)
+- Enables session resumption with context
+- Detects artifact drift between sessions
+
+Use after: /specify, /plan, /tasks, /implement, /review, /test commands complete.`
+
+export function updateWorkflowStateTool(ctx: PluginInput) {
+  return tool({
+    description: UPDATE_WORKFLOW_STATE_DESCRIPTION,
+    args: {
+      specPath: tool.schema
+        .string()
+        .describe("Path to the spec folder (e.g., '.cursor/specs/LIF-123-feat-auth')"),
+      step: tool.schema
+        .enum(["specify", "plan", "tasks", "implement", "review", "test", "complete"] as const)
+        .describe("The workflow step that was completed"),
+      linearStatus: tool.schema
+        .string()
+        .describe("Current Linear issue status (e.g., 'in_progress', 'in_review')")
+        .optional(),
+    },
+    async execute(args: {
+      specPath: string
+      step: WorkflowStep
+      linearStatus?: string
+    }): Promise<string> {
+      log(`[update_workflow_state] Updating state for: ${args.specPath}, step: ${args.step}`)
+
+      try {
+        const fullSpecPath = path.isAbsolute(args.specPath)
+          ? args.specPath
+          : path.join(ctx.directory, args.specPath)
+
+        if (!fs.existsSync(fullSpecPath)) {
+          const result: UpdateWorkflowStateResult = {
+            success: false,
+            specPath: args.specPath,
+            step: args.step,
+            completedSteps: [],
+            message: `Spec folder not found: ${args.specPath}`,
+            error: "Spec folder does not exist",
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const previousState = readWorkflowState(fullSpecPath)
+        const previousStep = previousState?.currentStep
+
+        const newState = updateWorkflowState(fullSpecPath, args.step, args.linearStatus)
+
+        const result: UpdateWorkflowStateResult = {
+          success: true,
+          specPath: args.specPath,
+          step: args.step,
+          previousStep,
+          completedSteps: newState.completedSteps,
+          message: `Workflow state updated: ${args.step}. ${formatResumeMessage(newState)}`,
+        }
+
+        log(`[update_workflow_state] Success:`, result)
+        return JSON.stringify(result, null, 2)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[update_workflow_state] Error:`, errorMessage)
+
+        const result: UpdateWorkflowStateResult = {
+          success: false,
+          specPath: args.specPath,
+          step: args.step,
+          completedSteps: [],
+          message: "Failed to update workflow state",
           error: errorMessage,
         }
         return JSON.stringify(result, null, 2)

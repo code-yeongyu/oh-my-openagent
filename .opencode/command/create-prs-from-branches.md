@@ -1,4 +1,5 @@
 ---
+category: git
 description: Analyze active branches and create PRs to GitHub with Linear integration.
 ---
 

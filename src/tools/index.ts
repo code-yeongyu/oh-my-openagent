@@ -46,7 +46,7 @@ export {
   createLinearCreateIssueTool,
 } from "./linear"
 export { createReadContextTool } from "./project-context"
-export { createSpecFolderTool } from "./spec"
+export { createSpecFolderTool, updateWorkflowStateTool } from "./spec"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {

@@ -1,4 +1,5 @@
 ---
+category: research
 description: Collaborative analytical partner for exploring ideas and problems.
 ---
 

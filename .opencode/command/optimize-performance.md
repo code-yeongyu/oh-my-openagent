@@ -1,4 +1,5 @@
 ---
+category: research
 description: Analyze code for performance bottlenecks and provide optimization recommendations.
 ---
 

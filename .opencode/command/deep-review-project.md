@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Full review of pending changes in the current branch with detailed analysis.
 ---
 

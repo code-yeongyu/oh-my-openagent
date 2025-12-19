@@ -1,2 +1,2 @@
 export * from "./types"
-export { createSpecFolderTool } from "./tools"
+export { createSpecFolderTool, updateWorkflowStateTool } from "./tools"

@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Implement comprehensive error handling for robust and resilient code.
 ---
 

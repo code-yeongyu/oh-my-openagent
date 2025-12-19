@@ -1,5 +1,6 @@
 ---
 description: Perform thorough code review for functionality, maintainability, and security.
+category: quality
 ---
 
 # Code Review

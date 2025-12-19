@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Create a detailed implementation plan for an approach or feature.
 ---
 

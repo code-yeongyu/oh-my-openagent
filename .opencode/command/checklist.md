@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Create checklist for feature validation, quality assurance, or compliance.
 ---
 

@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Create extensive, detailed plan with first-principles and chain-of-thought reasoning.
 ---
 

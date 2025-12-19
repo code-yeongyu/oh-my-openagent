@@ -1,4 +1,5 @@
 ---
+category: quality
 description: Analyze code for linting issues and automatically fix them.
 ---
 

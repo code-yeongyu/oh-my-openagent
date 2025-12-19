@@ -1,3 +1,8 @@
+---
+description: ""
+category: utils
+---
+
 # Superwhisper Custom Mode Design Prompt (XML Output Required)
 
 ## Overview of Superwhisper
