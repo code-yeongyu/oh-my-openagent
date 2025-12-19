@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { getMainSessionID } from "../features/claude-code-session-state"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
@@ -112,6 +113,12 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
 
       log(`[${HOOK_NAME}] session.idle received`, { sessionID })
 
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) {
+        log(`[${HOOK_NAME}] Skipped: not main session`, { sessionID, mainSessionID })
+        return
+      }
+
       const existingCountdown = pendingCountdowns.get(sessionID)
       if (existingCountdown) {
         clearInterval(existingCountdown.intervalId)
@@ -119,11 +126,61 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         log(`[${HOOK_NAME}] Cancelled existing countdown`, { sessionID })
       }
 
+      // Check if session is in recovery mode - if so, skip entirely without clearing state
+      if (recoveringSessions.has(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: session in recovery mode`, { sessionID })
+        return
+      }
+
+      const shouldBypass = interruptedSessions.has(sessionID) || errorSessions.has(sessionID)
+      
+      if (shouldBypass) {
+        interruptedSessions.delete(sessionID)
+        errorSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Skipped: error/interrupt bypass`, { sessionID })
+        return
+      }
+
+      if (remindedSessions.has(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: already reminded this session`, { sessionID })
+        return
+      }
+
+      // Check for incomplete todos BEFORE starting countdown
+      let todos: Todo[] = []
+      try {
+        log(`[${HOOK_NAME}] Fetching todos for session`, { sessionID })
+        const response = await ctx.client.session.todo({
+          path: { id: sessionID },
+        })
+        todos = (response.data ?? response) as Todo[]
+        log(`[${HOOK_NAME}] Todo API response`, { sessionID, todosCount: todos?.length ?? 0 })
+      } catch (err) {
+        log(`[${HOOK_NAME}] Todo API error`, { sessionID, error: String(err) })
+        return
+      }
+
+      if (!todos || todos.length === 0) {
+        log(`[${HOOK_NAME}] No todos found`, { sessionID })
+        return
+      }
+
+      const incomplete = todos.filter(
+        (t) => t.status !== "completed" && t.status !== "cancelled"
+      )
+
+      if (incomplete.length === 0) {
+        log(`[${HOOK_NAME}] All todos completed`, { sessionID, total: todos.length })
+        return
+      }
+
+      log(`[${HOOK_NAME}] Found incomplete todos, starting countdown`, { sessionID, incomplete: incomplete.length, total: todos.length })
+
       const showCountdownToast = async (seconds: number): Promise<void> => {
         await ctx.client.tui.showToast({
           body: {
             title: "Todo Continuation",
-            message: `Resuming in ${seconds}s...`,
+            message: `Resuming in ${seconds}s... (${incomplete.length} tasks remaining)`,
             variant: "warning" as const,
             duration: TOAST_DURATION_MS,
           },
@@ -132,65 +189,22 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
 
       const executeAfterCountdown = async (): Promise<void> => {
         pendingCountdowns.delete(sessionID)
-        log(`[${HOOK_NAME}] Countdown finished, checking conditions`, { sessionID })
+        log(`[${HOOK_NAME}] Countdown finished, executing continuation`, { sessionID })
 
-        // Check if session is in recovery mode - if so, skip entirely without clearing state
+        // Re-check conditions after countdown
         if (recoveringSessions.has(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: session in recovery mode`, { sessionID })
+          log(`[${HOOK_NAME}] Abort: session entered recovery mode during countdown`, { sessionID })
           return
         }
 
-        const shouldBypass = interruptedSessions.has(sessionID) || errorSessions.has(sessionID)
-        
-        interruptedSessions.delete(sessionID)
-        errorSessions.delete(sessionID)
-
-        if (shouldBypass) {
-          log(`[${HOOK_NAME}] Skipped: error/interrupt bypass`, { sessionID })
+        if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID)) {
+          log(`[${HOOK_NAME}] Abort: error/interrupt occurred during countdown`, { sessionID })
+          interruptedSessions.delete(sessionID)
+          errorSessions.delete(sessionID)
           return
         }
 
-        if (remindedSessions.has(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: already reminded this session`, { sessionID })
-          return
-        }
-
-        let todos: Todo[] = []
-        try {
-          log(`[${HOOK_NAME}] Fetching todos for session`, { sessionID })
-          const response = await ctx.client.session.todo({
-            path: { id: sessionID },
-          })
-          todos = (response.data ?? response) as Todo[]
-          log(`[${HOOK_NAME}] Todo API response`, { sessionID, todosCount: todos?.length ?? 0 })
-        } catch (err) {
-          log(`[${HOOK_NAME}] Todo API error`, { sessionID, error: String(err) })
-          return
-        }
-
-        if (!todos || todos.length === 0) {
-          log(`[${HOOK_NAME}] No todos found`, { sessionID })
-          return
-        }
-
-        const incomplete = todos.filter(
-          (t) => t.status !== "completed" && t.status !== "cancelled"
-        )
-
-        if (incomplete.length === 0) {
-          log(`[${HOOK_NAME}] All todos completed`, { sessionID, total: todos.length })
-          return
-        }
-
-        log(`[${HOOK_NAME}] Found incomplete todos`, { sessionID, incomplete: incomplete.length, total: todos.length })
         remindedSessions.add(sessionID)
-
-        // Re-check if abort occurred during the delay/fetch
-        if (interruptedSessions.has(sessionID) || errorSessions.has(sessionID) || recoveringSessions.has(sessionID)) {
-          log(`[${HOOK_NAME}] Abort occurred during delay/fetch`, { sessionID })
-          remindedSessions.delete(sessionID)
-          return
-        }
 
         try {
           // Get previous message's agent info to respect agent mode
