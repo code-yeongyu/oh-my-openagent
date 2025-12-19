@@ -159,8 +159,17 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 OpenCode は様々なモデルをサポートしており、当プラグインは様々な最先端 LLM の使用を提案しています。そのため、ユーザーに以下の質問をする必要があります：
 
 1. **Claude Pro/Max のサブスクリプションをお持ちですか？** お持ちでない場合、メインオーケストレーターモデルとして 'opencode/big-pickle' (GLM 4.6 として知られる) を使用することになります (非推奨)。
-   - ユーザーが**「はい」**と答えた場合、ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"
-   - ユーザーが**「いいえ」**と答えた場合、`~/.config/opencode/oh-my-opencode.json` に以下を保存:
+   - ユーザーが**「はい」**と答えた場合、追加質問: **max20 (20x モード) を使用していますか？**
+     - **「はい」 (max20)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定" — librarian に Claude Sonnet 4.5 をフル使用
+     - **「いいえ」 (max20 ではない)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"、そして `~/.config/opencode/oh-my-opencode.json` に以下をマージ:
+       ```json
+       {
+         "agents": {
+           "librarian": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
+   - ユーザーが**「いいえ」** (Claude サブスクリプションなし) と答えた場合、`~/.config/opencode/oh-my-opencode.json` に以下を保存:
      ```json
      {
        "agents": {

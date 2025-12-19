@@ -165,8 +165,17 @@ Install and configure by following the instructions here https://raw.githubuserc
 OpenCode 支持各种模型，我们这个插件也建议用各种前沿 LLM。所以先问清楚：
 
 1. **有 Claude Pro/Max 订阅吗？** 没有的话，主编排模型只能用 'opencode/big-pickle'（也就是 GLM 4.6），这体验可不太好（不推荐）。
-   - 用户说**有**，加个待办："配置用户 Claude Pro/Max 认证"
-   - 用户说**没有**，把这坨配置写到 `~/.config/opencode/oh-my-opencode.json`：
+   - 用户说**有**，继续问：**你用的是 max20 (20x 模式) 吗？**
+     - **是 (max20)**：加个待办："配置用户 Claude Pro/Max 认证" — librarian 用完整的 Claude Sonnet 4.5
+     - **不是 (没有 max20)**：加个待办："配置用户 Claude Pro/Max 认证"，然后把这个合并到 `~/.config/opencode/oh-my-opencode.json`：
+       ```json
+       {
+         "agents": {
+           "librarian": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
+   - 用户说**没有** (没有 Claude 订阅)，把这坨配置写到 `~/.config/opencode/oh-my-opencode.json`：
      ```json
      {
        "agents": {
