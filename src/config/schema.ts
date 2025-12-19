@@ -137,10 +137,13 @@ export const GovernanceHistorianSchema = z.object({
   min_changes: z.number().default(1),
 })
 
+export const LinearPolicySchema = z.enum(["off", "optional", "required"])
+
 export const GovernanceLinearSchema = z.object({
   enabled: z.boolean().default(true),
   team_prefix: z.string().default("LIF"),
   cache_issues: z.boolean().default(true),
+  policy: LinearPolicySchema.default("optional"),
 })
 
 export const GovernanceHookHealthSchema = z.object({
@@ -223,5 +226,6 @@ export type GovernanceGitSafetyConfig = z.infer<typeof GovernanceGitSafetySchema
 export type GovernanceSecurityScannerConfig = z.infer<typeof GovernanceSecurityScannerSchema>
 export type GovernanceConflictDetectorConfig = z.infer<typeof GovernanceConflictDetectorSchema>
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
+export type LinearPolicy = z.infer<typeof LinearPolicySchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"

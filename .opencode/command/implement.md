@@ -1,5 +1,16 @@
 ---
 description: Implement feature according to plan and tasks.
+step: implement
+requires:
+  - spec.md
+  - plan.md
+  - tasks.md
+produces:
+  - implementation/
+next: review
+linear_status: in_progress
+category: workflow
+primary: true
 handoffs:
   - label: Review Code
     agent: code-review

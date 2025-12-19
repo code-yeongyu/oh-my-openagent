@@ -1,5 +1,15 @@
 ---
 description: Create task breakdown from implementation plan.
+step: tasks
+requires:
+  - spec.md
+  - plan.md
+produces:
+  - tasks.md
+next: implement
+linear_status: in_progress
+category: workflow
+primary: true
 handoffs:
   - label: Implement Tasks
     agent: implement

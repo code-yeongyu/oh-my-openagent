@@ -1,5 +1,13 @@
 ---
 description: Create or update the feature specification from a natural language feature description.
+step: specify
+requires: []
+produces:
+  - spec.md
+next: plan
+linear_status: todo
+category: workflow
+primary: true
 handoffs: 
   - label: Build Technical Plan
     agent: plan

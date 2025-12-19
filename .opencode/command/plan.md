@@ -1,5 +1,14 @@
 ---
 description: Create implementation plan from feature specification.
+step: plan
+requires:
+  - spec.md
+produces:
+  - plan.md
+next: tasks
+linear_status: in_progress
+category: workflow
+primary: true
 handoffs:
   - label: Create Tasks
     agent: tasks
