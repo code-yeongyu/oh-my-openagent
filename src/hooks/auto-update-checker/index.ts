@@ -23,7 +23,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
   let hasChecked = false
 
   return {
-    event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    event: ({ event }: { event: { type: string; properties?: unknown } }) => {
       if (event.type !== "session.created") return
       if (hasChecked) return
 
@@ -32,23 +32,29 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
 
       hasChecked = true
 
-      const cachedVersion = getCachedVersion()
-      const localDevVersion = getLocalDevVersion(ctx.directory)
-      const displayVersion = localDevVersion ?? cachedVersion
+      setTimeout(() => {
+        const cachedVersion = getCachedVersion()
+        const localDevVersion = getLocalDevVersion(ctx.directory)
+        const displayVersion = localDevVersion ?? cachedVersion
 
-      if (showStartupToast) {
-        showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
-      }
-      showConfigErrorsIfAny(ctx).catch(() => {})
+        showConfigErrorsIfAny(ctx).catch(() => {})
 
-      if (localDevVersion) {
-        log("[auto-update-checker] Skipped: local development mode")
-        return
-      }
+        if (localDevVersion) {
+          if (showStartupToast) {
+            showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
+          }
+          log("[auto-update-checker] Local development mode")
+          return
+        }
 
-      runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch(err => {
-        log("[auto-update-checker] Background update check failed:", err)
-      })
+        if (showStartupToast) {
+          showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
+        }
+
+        runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch(err => {
+          log("[auto-update-checker] Background update check failed:", err)
+        })
+      }, 0)
     },
   }
 }
@@ -170,6 +176,24 @@ async function showAutoUpdatedToast(ctx: PluginInput, oldVersion: string, newVer
     })
     .catch(() => {})
   log(`[auto-update-checker] Auto-updated toast shown: v${oldVersion} → v${newVersion}`)
+}
+
+async function showLocalDevToast(ctx: PluginInput, version: string | null, isSisyphusEnabled: boolean): Promise<void> {
+  const displayVersion = version ?? "dev"
+  const message = isSisyphusEnabled
+    ? "Sisyphus running in local development mode."
+    : "Running in local development mode. oMoMoMo..."
+  await ctx.client.tui
+    .showToast({
+      body: {
+        title: `OhMyOpenCode ${displayVersion} (dev)`,
+        message,
+        variant: "warning" as const,
+        duration: 5000,
+      },
+    })
+    .catch(() => {})
+  log(`[auto-update-checker] Local dev toast shown: v${displayVersion}`)
 }
 
 export type { UpdateCheckResult, AutoUpdateCheckerOptions } from "./types"
