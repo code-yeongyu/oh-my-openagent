@@ -9,6 +9,7 @@
     "bash": {
       "*": "ask",
       ".cursor/scripts/bash/create-feature.sh *": "allow",
+      ".cursor/scripts/bash/setup-plan.sh *": "allow",
       "git status": "allow",
       "git diff": "allow",
       "git log": "allow",
@@ -316,7 +317,8 @@
   "plugin": [
     "opencode-skills",
     "opencode-gemini-auth",
-    "opencode-openai-codex-auth"
+    "opencode-openai-codex-auth",
+    "file:///Users/eru/Documents/GitHub/oh-my-opencode/src/index.ts"
   ],
 
   "watcher": {
@@ -355,7 +357,9 @@
   "instructions": [
     ".opencode/instructions/governance.md",
     ".opencode/instructions/custom-tools.md",
-    ".opencode/instructions/deepwiki-integration.md"
+    ".opencode/instructions/deepwiki-integration.md",
+    ".opencode/instructions/simplicity-first.md",
+    ".opencode/instructions/concision.md"
   ]
 }
 

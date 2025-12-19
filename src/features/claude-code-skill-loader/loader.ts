@@ -73,8 +73,8 @@ export function loadUserSkillsAsCommands(): Record<string, CommandDefinition> {
   }, {} as Record<string, CommandDefinition>)
 }
 
-export function loadProjectSkillsAsCommands(): Record<string, CommandDefinition> {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+export function loadProjectSkillsAsCommands(directory?: string): Record<string, CommandDefinition> {
+  const projectSkillsDir = join(directory ?? process.cwd(), ".claude", "skills")
   const skills = loadSkillsFromDir(projectSkillsDir, "project")
   return skills.reduce((acc, skill) => {
     acc[skill.name] = skill.definition

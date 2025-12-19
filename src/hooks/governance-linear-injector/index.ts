@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
+import { getIssue, isLinearAvailable } from "../../tools/linear/api"
 import {
   type LinearInjectorConfig,
   type LinearIssueContext,
@@ -73,7 +74,7 @@ function formatIssueContext(issues: LinearIssueContext[]): string {
  * @returns Hook handlers
  */
 export function createGovernanceLinearInjectorHook(
-  ctx: PluginInput,
+  _ctx: PluginInput,
   config?: Partial<LinearInjectorConfig>
 ) {
   const finalConfig: LinearInjectorConfig = {
@@ -110,52 +111,40 @@ export function createGovernanceLinearInjectorHook(
   }
 
   /**
-   * Fetch issue context from Linear MCP
+   * Fetch issue context from Linear API
    */
   async function fetchIssueContext(
     identifier: string
-  ): Promise<LinearIssueContext | null> {
+  ): Promise<LinearIssueContext | undefined> {
+    // Check if Linear API is available
+    if (!isLinearAvailable()) {
+      log(`[linear-injector] LINEAR_API_KEY not set, skipping ${identifier}`)
+      return undefined
+    }
+
     try {
-      const result = await ctx.client.mcp.call({
-        server: "linear",
-        method: "tools/call",
-        params: {
-          name: "linear_get_issue",
-          arguments: { id: identifier },
-        },
-      })
+      const result = await getIssue(identifier)
 
-      if (result.error) {
+      if (result.error || !result.issue) {
         log(`[linear-injector] Failed to fetch ${identifier}:`, result.error)
-        return null
+        return undefined
       }
 
-      const data = result.data as {
-        id?: string
-        identifier?: string
-        title?: string
-        state?: { name?: string }
-        description?: string
-        branchName?: string
-        url?: string
-        parent?: { identifier?: string }
-        labels?: { nodes?: Array<{ name?: string }> }
-      }
-
+      const issue = result.issue
       return {
-        id: data.id || "",
-        identifier: data.identifier || identifier,
-        title: data.title || "Unknown",
-        status: data.state?.name || "Unknown",
-        description: data.description,
-        branchName: data.branchName,
-        url: data.url || `https://linear.app/issue/${identifier}`,
-        parentIdentifier: data.parent?.identifier,
-        labels: data.labels?.nodes?.map((l) => l.name || "").filter(Boolean),
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        status: issue.state?.name || "Unknown",
+        description: issue.description,
+        branchName: issue.branchName,
+        url: issue.url,
+        parentIdentifier: issue.parent?.identifier,
+        labels: issue.labels?.nodes?.map((l) => l.name).filter(Boolean),
       }
     } catch (error) {
       log(`[linear-injector] Error fetching ${identifier}:`, error)
-      return null
+      return undefined
     }
   }
 

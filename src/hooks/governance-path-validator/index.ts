@@ -95,11 +95,10 @@ export function createGovernancePathValidatorHook(
       input: {
         tool: string
         sessionID: string
-        args: Record<string, unknown>
+        callID: string
       },
       output: {
         args: Record<string, unknown>
-        metadata?: Record<string, unknown>
       }
     ): Promise<void> => {
       // Only validate write and edit tools
@@ -133,17 +132,7 @@ export function createGovernancePathValidatorHook(
         log(message)
 
         if (finalConfig.mode === "block") {
-          // Add metadata to indicate blocked operation
-          output.metadata = {
-            ...output.metadata,
-            governance_blocked: true,
-            governance_reason: result.reason,
-            governance_suggestion: result.suggestion,
-          }
-
-          // Modify the output to prevent the operation
-          // Note: This depends on how OpenCode handles tool.execute.before output
-          // If it supports cancellation, we would use that mechanism here
+          // Throw error to prevent the operation
           throw new Error(
             `[Governance] Operation blocked: ${result.reason}${
               result.suggestion ? `\nSuggestion: ${result.suggestion}` : ""
@@ -151,13 +140,7 @@ export function createGovernancePathValidatorHook(
           )
         }
 
-        // In warn mode, add metadata but allow operation to proceed
-        output.metadata = {
-          ...output.metadata,
-          governance_warning: true,
-          governance_reason: result.reason,
-          governance_suggestion: result.suggestion,
-        }
+        // In warn mode, just log the warning (already logged above)
       }
     },
   }

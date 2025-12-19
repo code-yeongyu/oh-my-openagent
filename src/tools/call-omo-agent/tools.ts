@@ -5,6 +5,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 import { getToolConfigForRole } from "../../config/tool-config"
 import { AGENT_ROLE_REGISTRY } from "../../agents"
+import { DelegationTracker } from "../../features/orchestration"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
@@ -35,14 +36,32 @@ export function createCallOmoAgent(
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
 
+      const delegationTracker = DelegationTracker.getInstance()
+      delegationTracker.setSessionId(toolContext.sessionID)
+      
+      const fromAgent = "orchestrator"
+      const toAgent = args.subagent_type
+      
+      const delegationCheck = delegationTracker.canDelegate(fromAgent, toAgent)
+      if (!delegationCheck.allowed) {
+        log(`[call_omo_agent] Delegation blocked: ${delegationCheck.reason}`)
+        return `Error: Delegation blocked.\n\n${delegationCheck.reason}\n\nCurrent delegation depth: ${delegationCheck.depth}`
+      }
+
+      delegationTracker.recordDelegation(fromAgent, toAgent, toolContext.sessionID)
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolContext, backgroundManager)
+        const result = await executeBackground(args, toolContext, backgroundManager)
+        delegationTracker.popDelegation()
+        return result
       }
 
-      return await executeSync(args, toolContext, ctx)
+      const result = await executeSync(args, toolContext, ctx)
+      delegationTracker.popDelegation()
+      return result
     },
   })
 }

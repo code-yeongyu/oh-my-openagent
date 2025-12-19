@@ -46,10 +46,11 @@ function discoverSkillsFromDir(
       try {
         const content = readFileSync(skillMdPath, "utf-8")
         const { data } = parseFrontmatter(content)
+        const parsed = parseSkillFrontmatter(data)
 
         skills.push({
-          name: data.name || entry.name,
-          description: data.description || "",
+          name: parsed.name || entry.name,
+          description: parsed.description || "",
           scope,
         })
       } catch {

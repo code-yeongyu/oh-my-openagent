@@ -16,6 +16,7 @@ export type {
   AgentName,
   HookName,
   OmoAgentConfig,
+  GovernanceHookHealthConfig,
 } from "./schema"
 
 // Governance template exports (LIF-62)

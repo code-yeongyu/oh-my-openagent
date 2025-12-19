@@ -111,6 +111,9 @@ export function createGovernanceHistorianHook(
 
   // Track session states
   const sessionStates = new Map<string, SessionState>()
+  
+  // Track tool call args (callID -> args) for use in tool.execute.after
+  const pendingToolCalls = new Map<string, Record<string, unknown>>()
 
   log("Governance historian initialized", {
     auto_create: finalConfig.auto_create,
@@ -195,15 +198,14 @@ export function createGovernanceHistorianHook(
   }
 
   return {
-    "tool.execute.after": async (
+    "tool.execute.before": async (
       input: {
         tool: string
         sessionID: string
-        args: Record<string, unknown>
+        callID: string
       },
       output: {
-        output: string | Record<string, unknown>
-        metadata?: Record<string, unknown>
+        args: Record<string, unknown>
       }
     ): Promise<void> => {
       // Only track write and edit tools
@@ -211,10 +213,39 @@ export function createGovernanceHistorianHook(
         return
       }
 
+      // Store args for use in tool.execute.after
+      pendingToolCalls.set(input.callID, output.args)
+    },
+
+    "tool.execute.after": async (
+      input: {
+        tool: string
+        sessionID: string
+        callID: string
+      },
+      _output: {
+        title: string
+        output: string
+        metadata: unknown
+      }
+    ): Promise<void> => {
+      // Only track write and edit tools
+      if (!["write", "edit"].includes(input.tool)) {
+        return
+      }
+
+      // Get args from pending tool calls
+      const args = pendingToolCalls.get(input.callID)
+      pendingToolCalls.delete(input.callID)
+      
+      if (!args) {
+        return
+      }
+
       const state = getSessionState(input.sessionID)
 
       // Extract file path from args
-      const filePath = (input.args.filePath || input.args.path) as string | undefined
+      const filePath = (args.filePath || args.path) as string | undefined
       if (!filePath) {
         return
       }

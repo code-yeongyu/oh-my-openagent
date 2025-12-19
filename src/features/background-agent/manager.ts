@@ -300,14 +300,14 @@ export class BackgroundManager {
       tuiClient.tui.showToast({
         body: {
           title: "Background Task Completed",
-          message: `Task "${task.description}" finished in ${duration}.`,
+          message: `@${task.agent}: "${task.description}" finished in ${duration}.`,
           variant: "success",
           duration: 5000,
         },
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
+    const message = `[BACKGROUND TASK COMPLETED] Agent @${task.agent}: "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
 
     log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
 

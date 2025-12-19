@@ -13,6 +13,13 @@ import type {
   LinearIssueStatus,
 } from "./types"
 import { STATUS_TO_STATE_TYPE } from "./types"
+import {
+  getIssue,
+  updateIssueState,
+  createComment,
+  createIssue,
+  isLinearAvailable,
+} from "./api"
 
 /**
  * Slugify a string for use in branch names
@@ -36,7 +43,7 @@ function generateFallbackBranch(issueId: string, title: string): string {
 /**
  * Creates the linear_branch tool
  */
-export function createLinearBranchTool(ctx: PluginInput) {
+export function createLinearBranchTool(_ctx: PluginInput) {
   return tool({
     description: LINEAR_BRANCH_DESCRIPTION,
     args: {
@@ -47,21 +54,26 @@ export function createLinearBranchTool(ctx: PluginInput) {
     async execute(args: { issueId: string }): Promise<string> {
       log(`[linear_branch] Getting branch for issue: ${args.issueId}`)
 
-      try {
-        // Use Linear MCP to fetch issue details
-        // The Linear MCP should be available via ctx.client.mcp
-        const mcpResult = await ctx.client.mcp.call({
-          server: "linear",
-          method: "tools/call",
-          params: {
-            name: "linear_get_issue",
-            arguments: { id: args.issueId },
-          },
-        })
+      // Check if Linear API is available
+      if (!isLinearAvailable()) {
+        const fallbackBranch = generateFallbackBranch(args.issueId, "feature")
+        const result: LinearBranchResult = {
+          success: true,
+          branchName: fallbackBranch,
+          generated: true,
+          issueTitle: "Unknown (LINEAR_API_KEY not set)",
+          issueUrl: `https://linear.app/issue/${args.issueId}`,
+          issueIdentifier: args.issueId,
+          error: "LINEAR_API_KEY environment variable not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
 
-        if (mcpResult.error) {
-          log(`[linear_branch] MCP error:`, mcpResult.error)
-          // Generate fallback branch name
+      try {
+        const issueResult = await getIssue(args.issueId)
+
+        if (issueResult.error || !issueResult.issue) {
+          log(`[linear_branch] API error:`, issueResult.error)
           const fallbackBranch = generateFallbackBranch(args.issueId, "feature")
           const result: LinearBranchResult = {
             success: true,
@@ -70,32 +82,23 @@ export function createLinearBranchTool(ctx: PluginInput) {
             issueTitle: "Unknown (Linear unavailable)",
             issueUrl: `https://linear.app/issue/${args.issueId}`,
             issueIdentifier: args.issueId,
+            error: issueResult.error,
           }
           return JSON.stringify(result, null, 2)
         }
 
-        // Parse the MCP response
-        const issueData = mcpResult.data as {
-          branchName?: string
-          title?: string
-          url?: string
-          identifier?: string
-        }
-
+        const issue = issueResult.issue
         const branchName =
-          issueData.branchName ||
-          generateFallbackBranch(
-            issueData.identifier || args.issueId,
-            issueData.title || "feature"
-          )
+          issue.branchName ||
+          generateFallbackBranch(issue.identifier, issue.title)
 
         const result: LinearBranchResult = {
           success: true,
           branchName,
-          generated: !issueData.branchName,
-          issueTitle: issueData.title || "Unknown",
-          issueUrl: issueData.url || `https://linear.app/issue/${args.issueId}`,
-          issueIdentifier: issueData.identifier || args.issueId,
+          generated: !issue.branchName,
+          issueTitle: issue.title,
+          issueUrl: issue.url,
+          issueIdentifier: issue.identifier,
         }
 
         log(`[linear_branch] Success:`, result)
@@ -104,7 +107,6 @@ export function createLinearBranchTool(ctx: PluginInput) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         log(`[linear_branch] Error:`, errorMessage)
 
-        // Generate fallback on error
         const fallbackBranch = generateFallbackBranch(args.issueId, "feature")
         const result: LinearBranchResult = {
           success: true,
@@ -124,7 +126,7 @@ export function createLinearBranchTool(ctx: PluginInput) {
 /**
  * Creates the linear_update_status tool
  */
-export function createLinearUpdateStatusTool(ctx: PluginInput) {
+export function createLinearUpdateStatusTool(_ctx: PluginInput) {
   return tool({
     description: LINEAR_UPDATE_STATUS_DESCRIPTION,
     args: {
@@ -144,24 +146,26 @@ export function createLinearUpdateStatusTool(ctx: PluginInput) {
     }): Promise<string> {
       log(`[linear_update_status] Updating ${args.issueId} to ${args.status}`)
 
+      // Check if Linear API is available
+      if (!isLinearAvailable()) {
+        const result: LinearUpdateStatusResult = {
+          success: false,
+          issueId: args.issueId,
+          newStatus: args.status,
+          commentAdded: false,
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
       try {
-        // First, get the workflow states for the team to find the right state ID
         const stateType = STATUS_TO_STATE_TYPE[args.status]
 
-        // Update the issue status via Linear MCP
-        const updateResult = await ctx.client.mcp.call({
-          server: "linear",
-          method: "tools/call",
-          params: {
-            name: "linear_update_issue",
-            arguments: {
-              id: args.issueId,
-              state: stateType,
-            },
-          },
-        })
+        // Update the issue status
+        const updateResult = await updateIssueState(args.issueId, stateType)
 
-        if (updateResult.error) {
+        if (!updateResult.success) {
           log(`[linear_update_status] Update error:`, updateResult.error)
           const result: LinearUpdateStatusResult = {
             success: false,
@@ -169,7 +173,7 @@ export function createLinearUpdateStatusTool(ctx: PluginInput) {
             newStatus: args.status,
             commentAdded: false,
             message: `Failed to update issue status`,
-            error: String(updateResult.error),
+            error: updateResult.error,
           }
           return JSON.stringify(result, null, 2)
         }
@@ -177,19 +181,9 @@ export function createLinearUpdateStatusTool(ctx: PluginInput) {
         // Add comment if provided
         let commentAdded = false
         if (args.comment) {
-          const commentResult = await ctx.client.mcp.call({
-            server: "linear",
-            method: "tools/call",
-            params: {
-              name: "linear_create_comment",
-              arguments: {
-                issueId: args.issueId,
-                body: args.comment,
-              },
-            },
-          })
-          commentAdded = !commentResult.error
-          if (commentResult.error) {
+          const commentResult = await createComment(args.issueId, args.comment)
+          commentAdded = commentResult.success
+          if (!commentResult.success) {
             log(`[linear_update_status] Comment error:`, commentResult.error)
           }
         }
@@ -227,7 +221,7 @@ export function createLinearUpdateStatusTool(ctx: PluginInput) {
 /**
  * Creates the linear_create_issue tool
  */
-export function createLinearCreateIssueTool(ctx: PluginInput) {
+export function createLinearCreateIssueTool(_ctx: PluginInput) {
   return tool({
     description: LINEAR_CREATE_ISSUE_DESCRIPTION,
     args: {
@@ -253,43 +247,40 @@ export function createLinearCreateIssueTool(ctx: PluginInput) {
     }): Promise<string> {
       log(`[linear_create_issue] Creating issue: ${args.title}`)
 
+      // Check if Linear API is available
+      if (!isLinearAvailable()) {
+        const result: LinearCreateIssueResult = {
+          success: false,
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
       try {
-        const createResult = await ctx.client.mcp.call({
-          server: "linear",
-          method: "tools/call",
-          params: {
-            name: "linear_create_issue",
-            arguments: {
-              title: args.title,
-              description: args.description,
-              team: args.team || DEFAULT_LINEAR_TEAM,
-              labels: args.labels,
-            },
-          },
+        const createResult = await createIssue({
+          title: args.title,
+          description: args.description,
+          teamName: args.team || DEFAULT_LINEAR_TEAM,
+          labels: args.labels,
         })
 
-        if (createResult.error) {
+        if (!createResult.success || !createResult.issue) {
           log(`[linear_create_issue] Create error:`, createResult.error)
           const result: LinearCreateIssueResult = {
             success: false,
             message: `Failed to create issue`,
-            error: String(createResult.error),
+            error: createResult.error,
           }
           return JSON.stringify(result, null, 2)
         }
 
-        const issueData = createResult.data as {
-          id?: string
-          identifier?: string
-          url?: string
-        }
-
         const result: LinearCreateIssueResult = {
           success: true,
-          issueId: issueData.id,
-          issueIdentifier: issueData.identifier,
-          issueUrl: issueData.url,
-          message: `Created issue ${issueData.identifier}: ${args.title}`,
+          issueId: createResult.issue.id,
+          issueIdentifier: createResult.issue.identifier,
+          issueUrl: createResult.issue.url,
+          message: `Created issue ${createResult.issue.identifier}: ${args.title}`,
         }
 
         log(`[linear_create_issue] Success:`, result)

@@ -20,10 +20,13 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
-  // Governance hooks
   createGovernancePathValidatorHook,
   createGovernanceHistorianHook,
   createGovernanceLinearInjectorHook,
+  HookHealthManager,
+  createGitSafetyValidatorHook,
+  createSecurityScannerHook,
+  createConflictDetectorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -199,6 +202,37 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
+  const hookHealthConfig = pluginConfig.governance?.hook_health;
+  const hookHealthManager = isHookEnabled("hook-health-manager")
+    ? HookHealthManager.getInstance({
+        circuitBreakerThreshold: hookHealthConfig?.circuit_breaker_threshold,
+        slowHookThresholdMs: hookHealthConfig?.slow_hook_threshold_ms,
+        metricsRetentionCount: hookHealthConfig?.metrics_retention_count,
+        enableMetrics: hookHealthConfig?.enable_metrics,
+        logWarnings: hookHealthConfig?.log_warnings,
+      })
+    : null;
+
+  async function safeHookCall<T>(
+    hookName: string,
+    fn: () => Promise<T> | T
+  ): Promise<T | undefined> {
+    if (!hookHealthManager) {
+      try {
+        return await fn();
+      } catch (err) {
+        log(`[Hook Error] ${hookName}:`, err);
+        return undefined;
+      }
+    }
+
+    const result = await hookHealthManager.executeWithHealth(hookName, fn);
+    if (result.skipped) {
+      log(`[Hook Skipped] ${hookName}: ${result.skipReason}`);
+    }
+    return result.result;
+  }
+
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx)
     : null;
@@ -275,6 +309,33 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createGovernanceLinearInjectorHook(ctx, pluginConfig.governance?.linear)
     : null;
 
+  // Safety hooks (LIF-63)
+  const gitSafetyValidator = isHookEnabled("git-safety-validator")
+    ? createGitSafetyValidatorHook(ctx, {
+        protectedBranches: pluginConfig.governance?.git_safety?.protected_branches,
+        blockForceOperations: pluginConfig.governance?.git_safety?.block_force_operations,
+        warnOnDestructive: pluginConfig.governance?.git_safety?.warn_on_destructive,
+        allowListPatterns: pluginConfig.governance?.git_safety?.allow_list_patterns,
+      })
+    : null;
+  const securityScanner = isHookEnabled("security-scanner")
+    ? createSecurityScannerHook(ctx, {
+        enabled: pluginConfig.governance?.security_scanner?.enabled,
+        scanOnWrite: pluginConfig.governance?.security_scanner?.scan_on_write,
+        scanOnEdit: pluginConfig.governance?.security_scanner?.scan_on_edit,
+        maskInOutput: pluginConfig.governance?.security_scanner?.mask_in_output,
+        allowListPatterns: pluginConfig.governance?.security_scanner?.allow_list_patterns,
+      })
+    : null;
+  const conflictDetector = isHookEnabled("conflict-detector")
+    ? createConflictDetectorHook(ctx, {
+        enabled: pluginConfig.governance?.conflict_detector?.enabled,
+        lockTimeoutMs: pluginConfig.governance?.conflict_detector?.lock_timeout_ms,
+        warnOnConflict: pluginConfig.governance?.conflict_detector?.warn_on_conflict,
+        blockOnConflict: pluginConfig.governance?.conflict_detector?.block_on_conflict,
+      })
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -332,7 +393,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       );
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
-      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
+      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents(ctx.directory) : {};
 
       const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
 
@@ -396,7 +457,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
-        ? await loadMcpConfigs()
+        ? await loadMcpConfigs(ctx.directory)
         : { servers: {} };
       config.mcp = {
         ...config.mcp,
@@ -407,10 +468,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
       const opencodeGlobalCommands = loadOpencodeGlobalCommands();
       const systemCommands = config.command ?? {};
-      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
-      const opencodeProjectCommands = loadOpencodeProjectCommands();
+      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands(ctx.directory) : {};
+      const opencodeProjectCommands = loadOpencodeProjectCommands(ctx.directory);
       const userSkills = (pluginConfig.claude_code?.skills ?? true) ? loadUserSkillsAsCommands() : {};
-      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands() : {};
+      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands(ctx.directory) : {};
 
       config.command = {
         ...userCommands,
@@ -540,7 +601,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
-      // Governance: Path validation (runs LAST to allow other hooks first)
+      await gitSafetyValidator?.["tool.execute.before"](input, output);
+      await securityScanner?.["tool.execute.before"](input, output);
+      await conflictDetector?.["tool.execute.before"](input, output);
       await governancePathValidator?.["tool.execute.before"](input, output);
 
       if (input.tool === "task") {
@@ -577,7 +640,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
-      // Governance: Historian tracking (runs LAST to capture all changes)
+      await gitSafetyValidator?.["tool.execute.after"](input, output);
+      await securityScanner?.["tool.execute.after"](input, output);
+      await conflictDetector?.["tool.execute.after"](input, output);
       await governanceHistorian?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {

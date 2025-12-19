@@ -15,14 +15,14 @@ interface McpConfigPath {
   scope: McpScope
 }
 
-function getMcpConfigPaths(): McpConfigPath[] {
+function getMcpConfigPaths(directory?: string): McpConfigPath[] {
   const home = homedir()
-  const cwd = process.cwd()
+  const projectDir = directory ?? process.cwd()
 
   return [
     { path: join(home, ".claude", ".mcp.json"), scope: "user" },
-    { path: join(cwd, ".mcp.json"), scope: "project" },
-    { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
+    { path: join(projectDir, ".mcp.json"), scope: "project" },
+    { path: join(projectDir, ".claude", ".mcp.json"), scope: "local" },
   ]
 }
 
@@ -42,10 +42,10 @@ async function loadMcpConfigFile(
   }
 }
 
-export async function loadMcpConfigs(): Promise<McpLoadResult> {
+export async function loadMcpConfigs(directory?: string): Promise<McpLoadResult> {
   const servers: McpLoadResult["servers"] = {}
   const loadedServers: LoadedMcpServer[] = []
-  const paths = getMcpConfigPaths()
+  const paths = getMcpConfigPaths(directory)
 
   for (const { path, scope } of paths) {
     const config = await loadMcpConfigFile(path)

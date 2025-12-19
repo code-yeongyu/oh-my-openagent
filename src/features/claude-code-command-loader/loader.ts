@@ -73,8 +73,8 @@ export function loadUserCommands(): Record<string, CommandDefinition> {
   return commandsToRecord(commands)
 }
 
-export function loadProjectCommands(): Record<string, CommandDefinition> {
-  const projectCommandsDir = join(process.cwd(), ".claude", "commands")
+export function loadProjectCommands(directory?: string): Record<string, CommandDefinition> {
+  const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const commands = loadCommandsFromDir(projectCommandsDir, "project")
   return commandsToRecord(commands)
 }
@@ -85,8 +85,8 @@ export function loadOpencodeGlobalCommands(): Record<string, CommandDefinition> 
   return commandsToRecord(commands)
 }
 
-export function loadOpencodeProjectCommands(): Record<string, CommandDefinition> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
+export function loadOpencodeProjectCommands(directory?: string): Record<string, CommandDefinition> {
+  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
   const commands = loadCommandsFromDir(opencodeProjectDir, "opencode-project")
   return commandsToRecord(commands)
 }

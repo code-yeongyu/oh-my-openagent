@@ -62,10 +62,13 @@ export const HookNameSchema = z.enum([
   "agent-usage-reminder",
   "non-interactive-env",
   "interactive-bash-session",
-  // Governance hooks
   "governance-path-validator",
   "governance-historian",
   "governance-linear-injector",
+  "hook-health-manager",
+  "git-safety-validator",
+  "security-scanner",
+  "conflict-detector",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
@@ -140,10 +143,57 @@ export const GovernanceLinearSchema = z.object({
   cache_issues: z.boolean().default(true),
 })
 
+export const GovernanceHookHealthSchema = z.object({
+  enabled: z.boolean().default(true),
+  circuit_breaker_threshold: z.number().default(3),
+  slow_hook_threshold_ms: z.number().default(1000),
+  metrics_retention_count: z.number().default(100),
+  enable_metrics: z.boolean().default(true),
+  log_warnings: z.boolean().default(true),
+})
+
+export const GovernanceGitSafetySchema = z.object({
+  enabled: z.boolean().default(true),
+  protected_branches: z.array(z.string()).default(["main", "master", "production", "prod"]),
+  block_force_operations: z.boolean().default(true),
+  warn_on_destructive: z.boolean().default(true),
+  allow_list_patterns: z.array(z.string()).default([]),
+})
+
+export const GovernanceSecurityScannerSchema = z.object({
+  enabled: z.boolean().default(true),
+  scan_on_write: z.boolean().default(true),
+  scan_on_edit: z.boolean().default(true),
+  mask_in_output: z.boolean().default(true),
+  allow_list_patterns: z.array(z.string()).default([]),
+})
+
+export const GovernanceConflictDetectorSchema = z.object({
+  enabled: z.boolean().default(true),
+  lock_timeout_ms: z.number().default(60000),
+  warn_on_conflict: z.boolean().default(true),
+  block_on_conflict: z.boolean().default(false),
+})
+
+export const OrchestrationConfigSchema = z.object({
+  max_turns: z.number().default(10),
+  max_delegation_depth: z.number().default(5),
+  detect_loops: z.boolean().default(true),
+  warn_on_deep_chain: z.boolean().default(true),
+  retry_max_attempts: z.number().default(3),
+  retry_initial_delay_ms: z.number().default(1000),
+  retry_max_delay_ms: z.number().default(30000),
+})
+
 export const GovernanceConfigSchema = z.object({
   path_validation: GovernancePathValidationSchema.optional(),
   historian: GovernanceHistorianSchema.optional(),
   linear: GovernanceLinearSchema.optional(),
+  hook_health: GovernanceHookHealthSchema.optional(),
+  git_safety: GovernanceGitSafetySchema.optional(),
+  security_scanner: GovernanceSecurityScannerSchema.optional(),
+  conflict_detector: GovernanceConflictDetectorSchema.optional(),
+  orchestration: OrchestrationConfigSchema.optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -168,5 +218,10 @@ export type GovernanceConfig = z.infer<typeof GovernanceConfigSchema>
 export type GovernancePathValidationConfig = z.infer<typeof GovernancePathValidationSchema>
 export type GovernanceHistorianConfig = z.infer<typeof GovernanceHistorianSchema>
 export type GovernanceLinearConfig = z.infer<typeof GovernanceLinearSchema>
+export type GovernanceHookHealthConfig = z.infer<typeof GovernanceHookHealthSchema>
+export type GovernanceGitSafetyConfig = z.infer<typeof GovernanceGitSafetySchema>
+export type GovernanceSecurityScannerConfig = z.infer<typeof GovernanceSecurityScannerSchema>
+export type GovernanceConflictDetectorConfig = z.infer<typeof GovernanceConflictDetectorSchema>
+export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"

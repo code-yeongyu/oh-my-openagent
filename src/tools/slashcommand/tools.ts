@@ -25,13 +25,19 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
       const { data, body } = parseFrontmatter(content)
 
       const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
+      const description = typeof data.description === "string" ? data.description : ""
+      const argumentHint = typeof data["argument-hint"] === "string" ? data["argument-hint"] : undefined
+      const model = typeof data.model === "string" ? data.model : undefined
+      const agent = typeof data.agent === "string" ? data.agent : undefined
+      const subtask = Boolean(data.subtask)
+      
       const metadata: CommandMetadata = {
         name: commandName,
-        description: data.description || "",
-        argumentHint: data["argument-hint"],
-        model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
-        agent: data.agent,
-        subtask: Boolean(data.subtask),
+        description,
+        argumentHint,
+        model: sanitizeModelField(model, isOpencodeSource ? "opencode" : "claude-code"),
+        agent,
+        subtask,
       }
 
       commands.push({

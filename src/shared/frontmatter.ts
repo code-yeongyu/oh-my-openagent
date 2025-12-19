@@ -1,9 +1,11 @@
-export interface FrontmatterResult<T = Record<string, string>> {
+import * as yaml from "yaml"
+
+export interface FrontmatterResult<T = Record<string, unknown>> {
   data: T
   body: string
 }
 
-export function parseFrontmatter<T = Record<string, string>>(
+export function parseFrontmatter<T = Record<string, unknown>>(
   content: string
 ): FrontmatterResult<T> {
   const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/
@@ -16,19 +18,11 @@ export function parseFrontmatter<T = Record<string, string>>(
   const yamlContent = match[1]
   const body = match[2]
 
-  const data: Record<string, string | boolean> = {}
-  for (const line of yamlContent.split("\n")) {
-    const colonIndex = line.indexOf(":")
-    if (colonIndex !== -1) {
-      const key = line.slice(0, colonIndex).trim()
-      let value: string | boolean = line.slice(colonIndex + 1).trim()
-
-      if (value === "true") value = true
-      else if (value === "false") value = false
-
-      data[key] = value
-    }
+  try {
+    const data = yaml.parse(yamlContent) as T
+    return { data: data ?? ({} as T), body }
+  } catch {
+    // Fallback to empty data if YAML parsing fails
+    return { data: {} as T, body }
   }
-
-  return { data: data as T, body }
 }
