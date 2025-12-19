@@ -1,4 +1,5 @@
 ---
+category: research
 description: Analyze feature specification, plan, or implementation for issues, improvements, or insights.
 ---
 

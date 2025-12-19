@@ -1,4 +1,5 @@
 ---
+category: utils
 description: A prompt for proceeding to next steps
 ---
 Proceed, ensure you are utilizing your todos tool to the full extent in conjunction with our current project context:

@@ -1,4 +1,5 @@
 ---
+category: git
 description: Create a well-structured pull request with proper description, labels, and reviewers.
 ---
 

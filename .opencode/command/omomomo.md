@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Easter egg command - about oh-my-opencode
 ---
 

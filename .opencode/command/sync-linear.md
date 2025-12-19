@@ -1,4 +1,5 @@
 ---
+category: project
 description: Sync local Linear artifacts (tasks, issues) with Linear workspace via Linear MCP.
 ---
 

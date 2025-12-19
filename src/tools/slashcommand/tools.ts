@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
+import { commandPreflight, formatPreflightResult, type PreflightResult } from "../../shared/command-preflight"
 import { isMarkdownFile } from "../../shared/file-utils"
 import type { CommandScope, CommandMetadata, CommandInfo, CommandCategory } from "./types"
 
@@ -91,10 +92,41 @@ const commandListForDescription = availableCommands
   })
   .join("\n")
 
-async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
-  const sections: string[] = []
+interface FormatCommandResult {
+  content: string
+  preflight: PreflightResult | null
+  blocked: boolean
+}
 
-  sections.push(`# /${cmd.name} Command\n`)
+async function formatLoadedCommand(cmd: CommandInfo): Promise<FormatCommandResult> {
+  const sections: string[] = []
+  let preflight: PreflightResult | null = null
+  let blocked = false
+
+  if (cmd.metadata.step) {
+    preflight = commandPreflight({
+      command: cmd.metadata.step,
+      requiredArtifacts: cmd.metadata.requires,
+      createSpecFolder: cmd.metadata.step === "specify",
+    })
+
+    if (preflight.status === "blocked") {
+      blocked = true
+      sections.push(`# /${cmd.name} Command - BLOCKED\n`)
+      sections.push("## Preflight Validation Failed\n")
+      sections.push(formatPreflightResult(preflight))
+      sections.push("\n---\n")
+      sections.push("**Action Required**: Resolve the issues above before proceeding.\n")
+      return { content: sections.join("\n"), preflight, blocked }
+    }
+
+    sections.push(`# /${cmd.name} Command\n`)
+    sections.push("## Preflight Validation\n")
+    sections.push(formatPreflightResult(preflight))
+    sections.push("\n---\n")
+  } else {
+    sections.push(`# /${cmd.name} Command\n`)
+  }
 
   if (cmd.metadata.description) {
     sections.push(`**Description**: ${cmd.metadata.description}\n`)
@@ -125,7 +157,24 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   sections.push(resolvedContent.trim())
 
-  return sections.join("\n")
+  if (cmd.metadata.step && preflight?.context.specPath) {
+    sections.push("\n\n---\n")
+    sections.push("## Workflow State (Post-Completion)\n")
+    sections.push(`After completing this command, update workflow state:\n`)
+    sections.push("```")
+    sections.push(`Spec folder: ${preflight.context.specPath}`)
+    sections.push(`Current step: ${cmd.metadata.step}`)
+    if (cmd.metadata.next) {
+      sections.push(`Next step: /${cmd.metadata.next}`)
+    }
+    if (cmd.metadata.linearStatus) {
+      sections.push(`Linear status: ${cmd.metadata.linearStatus}`)
+    }
+    sections.push("```")
+    sections.push("\nThe workflow state will be automatically tracked.")
+  }
+
+  return { content: sections.join("\n"), preflight, blocked }
 }
 
 const CATEGORY_LABELS: Record<string, { label: string; order: number }> = {
@@ -327,7 +376,8 @@ ${commandListForDescription}`,
     )
 
     if (exactMatch) {
-      return await formatLoadedCommand(exactMatch)
+      const result = await formatLoadedCommand(exactMatch)
+      return result.content
     }
 
     const partialMatches = commands.filter((cmd) =>

@@ -94,6 +94,16 @@ Given that feature description, do this:
 7. **Report completion**:
    - Branch name, spec file path, readiness for next phase (`/plan` or `/clarify`)
 
+8. **Persist Workflow State** (REQUIRED):
+   ```
+   update_workflow_state({
+     specPath: "{SPEC_DIR}",
+     step: "specify",
+     linearStatus: "todo"
+   })
+   ```
+   This enables session continuity and resume messages.
+
 ## Linear Branch Policy
 
 **CRITICAL**: When Linear is used:

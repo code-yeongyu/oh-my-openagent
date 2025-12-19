@@ -1,4 +1,5 @@
 ---
+category: quality
 description: Create comprehensive unit tests for the current code with high coverage.
 ---
 

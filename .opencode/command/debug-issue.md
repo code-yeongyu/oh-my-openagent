@@ -1,4 +1,5 @@
 ---
+category: research
 description: Systematically debug issues with structured analysis and actionable solutions.
 ---
 

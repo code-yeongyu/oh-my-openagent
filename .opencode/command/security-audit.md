@@ -1,4 +1,5 @@
 ---
+category: quality
 description: Comprehensive security review to identify and fix vulnerabilities in the codebase.
 ---
 

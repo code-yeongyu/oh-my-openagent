@@ -65,6 +65,16 @@ Create an implementation plan from the feature specification in the current spec
 7. **Report completion**:
    - Plan file path, readiness for next phase (`/tasks` or `/implement`)
 
+8. **Persist Workflow State** (REQUIRED):
+   ```
+   update_workflow_state({
+     specPath: "{SPEC_DIR}",
+     step: "plan",
+     linearStatus: "in_progress"
+   })
+   ```
+   This enables session continuity and resume messages.
+
 ## Agent Integration
 
 When Strategic Architect agent is invoked:

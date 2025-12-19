@@ -36,10 +36,17 @@ export const SPEC_TEMPLATE_FILES = [
  */
 export const DEFAULT_SPEC_BASE_PATH = "context/specs"
 
-/**
- * Alternative spec folder base paths to check
- */
 export const SPEC_BASE_PATHS = [
   "context/specs",
   ".cursor/specs",
 ]
+
+export interface UpdateWorkflowStateResult {
+  success: boolean
+  specPath: string
+  step: string
+  previousStep?: string
+  completedSteps: string[]
+  message: string
+  error?: string
+}

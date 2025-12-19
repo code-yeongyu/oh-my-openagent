@@ -1,4 +1,5 @@
 ---
+category: project
 description: Manage project context files (constitution, architecture, tech-stack, glossary) with smart auto-detection, diff/branch extraction, pattern detection, versioning, and anti-bloat guardrails.
 ---
 

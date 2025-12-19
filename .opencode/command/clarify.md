@@ -1,4 +1,5 @@
 ---
+category: research
 description: Clarify specification requirements that need clarification.
 ---
 

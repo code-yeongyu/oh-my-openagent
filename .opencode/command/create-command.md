@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Generate a new custom command based on workflow description and best practices.
 ---
 

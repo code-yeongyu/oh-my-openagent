@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Refactor selected code to improve quality while maintaining functionality.
 ---
 

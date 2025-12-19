@@ -64,6 +64,7 @@ import {
   createLinearCreateIssueTool,
   createReadContextTool,
   createSpecFolderTool,
+  updateWorkflowStateTool,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
@@ -355,6 +356,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const linearCreateIssue = createLinearCreateIssueTool(ctx);
   const readContext = createReadContextTool(ctx);
   const createSpecFolder = createSpecFolderTool(ctx);
+  const updateWorkflowState = updateWorkflowStateTool(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -376,6 +378,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       linear_create_issue: linearCreateIssue,
       read_context: readContext,
       create_spec_folder: createSpecFolder,
+      update_workflow_state: updateWorkflowState,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 

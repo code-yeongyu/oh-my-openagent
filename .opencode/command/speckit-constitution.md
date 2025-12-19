@@ -1,4 +1,5 @@
 ---
+category: utils
 description: DEPRECATED - Use /update-context command instead.
 ---
 

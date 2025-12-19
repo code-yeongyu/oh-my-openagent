@@ -1,4 +1,5 @@
 ---
+category: quality
 description: Execute full test suite and systematically fix any failures.
 ---
 

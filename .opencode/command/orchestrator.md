@@ -1,4 +1,5 @@
 ---
+category: utils
 description: Intelligent workflow orchestrator (delegates to orchestrator agent)
 handoffs:
   - label: Execute Plan
