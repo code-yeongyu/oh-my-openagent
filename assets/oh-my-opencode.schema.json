@@ -24,7 +24,7 @@
       "items": {
         "type": "string",
         "enum": [
-          "OmO",
+          "Sisyphus",
           "oracle",
           "librarian",
           "explore",
@@ -288,7 +288,7 @@
             }
           }
         },
-        "OmO": {
+        "Sisyphus": {
           "type": "object",
           "properties": {
             "model": {
@@ -399,7 +399,7 @@
             }
           }
         },
-        "OmO-Plan": {
+        "Planner-Sisyphus": {
           "type": "object",
           "properties": {
             "model": {
@@ -1201,10 +1201,24 @@
     "google_auth": {
       "type": "boolean"
     },
-    "omo_agent": {
+    "sisyphus_agent": {
       "type": "object",
       "properties": {
         "disabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "experimental": {
+      "type": "object",
+      "properties": {
+        "aggressive_truncation": {
+          "type": "boolean"
+        },
+        "empty_message_recovery": {
+          "type": "boolean"
+        },
+        "auto_resume": {
           "type": "boolean"
         }
       }
