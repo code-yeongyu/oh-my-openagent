@@ -18,7 +18,7 @@ export const backendRustAgent: AgentConfig = {
   description:
     "A Rust backend specialist for systems programming, high-performance services, and WebAssembly. Expert in ownership, borrowing, and async Rust. Cannot delegate.",
   mode: "subagent",
-  model: "anthropic/claude-sonnet-4-5",
+  model: "opencode/gemini-3-flash",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,
