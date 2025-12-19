@@ -6,6 +6,7 @@ import { log } from "../../shared/logger"
 import { getToolConfigForRole } from "../../config/tool-config"
 import { AGENT_ROLE_REGISTRY } from "../../agents"
 import { DelegationTracker } from "../../features/orchestration"
+import { setSessionAgent } from "../../features/claude-code-session-state/agent-registry"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
@@ -130,6 +131,7 @@ async function executeSync(
     }
 
     sessionID = createResult.data.id
+    setSessionAgent(sessionID, args.subagent_type)
     log(`[call_omo_agent] Created session: ${sessionID}`)
   }
 

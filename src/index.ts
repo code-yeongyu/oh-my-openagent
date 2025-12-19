@@ -69,6 +69,7 @@ import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge } from "./shared";
+import { MaxTurnsEnforcer } from "./features/orchestration";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -519,6 +520,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             directory: ctx.directory,
             sessionTitle: sessionInfo?.title,
           });
+          
+          if (sessionInfo?.id) {
+            MaxTurnsEnforcer.getInstance(sessionInfo.id, {
+              maxTurns: 100,
+              warnAtTurn: 80,
+            });
+          }
         }
       }
 
@@ -539,13 +547,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (event.type === "session.deleted") {
         const sessionInfo = props?.info as { id?: string } | undefined;
-        if (sessionInfo?.id === getMainSessionID()) {
-          setMainSession(undefined);
-          setCurrentSession(undefined, undefined);
-          updateTerminalTitle({
-            sessionId: "main",
-            status: "idle",
-          });
+        if (sessionInfo?.id) {
+          MaxTurnsEnforcer.removeInstance(sessionInfo.id);
+          
+          if (sessionInfo.id === getMainSessionID()) {
+            setMainSession(undefined);
+            setCurrentSession(undefined, undefined);
+            updateTerminalTitle({
+              sessionId: "main",
+              status: "idle",
+            });
+          }
         }
       }
 
@@ -595,12 +607,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           });
         }
       }
+      
+      if (event.type === "message.updated") {
+        const info = props?.info as Record<string, unknown> | undefined;
+        const sessionID = info?.sessionID as string | undefined;
+        
+        if (sessionID && info?.role === "assistant") {
+          const enforcer = MaxTurnsEnforcer.getInstance(sessionID);
+          enforcer.incrementTurn();
+        }
+      }
     },
 
     "tool.execute.before": async (input, output) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
-      await commentChecker?.["tool.execute.before"](input, output);
+      await safeHookCall("comment-checker", () => commentChecker?.["tool.execute.before"](input, output));
       
       // Validation hooks that may throw (run BEFORE lock acquisition)
       await gitSafetyValidator?.["tool.execute.before"](input, output);
@@ -635,15 +657,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       await claudeCodeHooks["tool.execute.after"](input, output);
-      await toolOutputTruncator?.["tool.execute.after"](input, output);
-      await contextWindowMonitor?.["tool.execute.after"](input, output);
-      await commentChecker?.["tool.execute.after"](input, output);
-      await directoryAgentsInjector?.["tool.execute.after"](input, output);
-      await directoryReadmeInjector?.["tool.execute.after"](input, output);
-      await rulesInjector?.["tool.execute.after"](input, output);
-      await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
-      await agentUsageReminder?.["tool.execute.after"](input, output);
-      await interactiveBashSession?.["tool.execute.after"](input, output);
+      await safeHookCall("tool-output-truncator", () => toolOutputTruncator?.["tool.execute.after"](input, output));
+      await safeHookCall("context-window-monitor", () => contextWindowMonitor?.["tool.execute.after"](input, output));
+      await safeHookCall("comment-checker", () => commentChecker?.["tool.execute.after"](input, output));
+      await safeHookCall("directory-agents-injector", () => directoryAgentsInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("directory-readme-injector", () => directoryReadmeInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("rules-injector", () => rulesInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("empty-task-response-detector", () => emptyTaskResponseDetector?.["tool.execute.after"](input, output));
+      await safeHookCall("agent-usage-reminder", () => agentUsageReminder?.["tool.execute.after"](input, output));
+      await safeHookCall("interactive-bash-session", () => interactiveBashSession?.["tool.execute.after"](input, output));
       await securityScanner?.["tool.execute.after"](input, output);
       await conflictDetector?.["tool.execute.after"](input, output);
       await governanceHistorian?.["tool.execute.after"](input, output);

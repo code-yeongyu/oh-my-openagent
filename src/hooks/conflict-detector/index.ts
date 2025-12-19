@@ -3,6 +3,7 @@ import type { ConflictDetectorConfig } from "./types";
 import { FileEditRegistry } from "./registry";
 import { DEFAULT_CONFLICT_DETECTOR_CONFIG, CONFLICT_DETECTOR_NAME, WARNING_MESSAGES } from "./constants";
 import { log } from "../../shared";
+import { getAgentForSession } from "../../features/claude-code-session-state/agent-registry";
 
 export type { FileEditLock, ConflictDetectorConfig, ConflictCheckResult } from "./types";
 export { FileEditRegistry } from "./registry";
@@ -46,7 +47,7 @@ export function createConflictDetectorHook(
         return;
       }
 
-      const agentName = (output.args._agentName as string) || "unknown";
+      const agentName = getAgentForSession(input.sessionID);
       const operation = toolLower as "write" | "edit";
 
       const conflict = registry.hasConflict(filePath, agentName);
@@ -80,7 +81,7 @@ export function createConflictDetectorHook(
 
       const metadata = output.metadata as Record<string, unknown> | undefined;
       const filePath = metadata?.filePath as string | undefined;
-      const agentName = (metadata?._agentName as string) || "unknown";
+      const agentName = getAgentForSession(input.sessionID);
 
       if (filePath) {
         registry.releaseLock(filePath, agentName);
