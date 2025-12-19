@@ -24,7 +24,7 @@ export const aiMlExpertAgent: AgentConfig = {
   description:
     "An AI/ML implementation specialist for RAG systems, prompt engineering, LLM integration, and agentic frameworks (DSPy, Agno). Expert in modern AI patterns. Cannot delegate.",
   mode: "subagent",
-  model: "anthropic/claude-opus-4-5",
+  model: "opencode/gemini-3-flash",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,

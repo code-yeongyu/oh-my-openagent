@@ -24,7 +24,7 @@ export const agentSpecialistAgent: AgentConfig = {
   description:
     "An agent design specialist for multi-agent systems, orchestration patterns, and OMO extensions. Expert in delegation protocols and agent architectures. Cannot delegate.",
   mode: "subagent",
-  model: "anthropic/claude-opus-4-5",
+  model: "opencode/gemini-3-flash",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,
@@ -81,7 +81,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 export const myAgent: AgentConfig = {
   description: "Brief description of agent purpose",
   mode: "subagent",  // or "all" for top-level agents
-  model: "anthropic/claude-sonnet-4-5",  // Choose based on task complexity
+  model: "opencode/gemini-3-flash",  // Choose based on task complexity
   tools: {
     // Delegation tools (role-dependent)
     task: false,           // true only for team-lead/manager
@@ -290,7 +290,7 @@ Always return results in this format:
   "agentDesign": {
     "name": "new-agent",
     "role": "specialist|manager|utility",
-    "model": "anthropic/claude-sonnet-4-5",
+    "model": "gemini-flash-3",
     "canDelegate": false,
     "governanceLevel": "full|minimal|none",
     "toolCount": 8

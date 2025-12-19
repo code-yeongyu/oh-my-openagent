@@ -23,7 +23,7 @@ export const testSpecialistAgent: AgentConfig = {
   description:
     "A technology-agnostic testing specialist for unit, integration, e2e, and performance tests. Expert in test patterns and coverage strategies. Cannot delegate.",
   mode: "subagent",
-  model: "anthropic/claude-sonnet-4-5",
+  model: "opencode/gemini-3-flash",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,
