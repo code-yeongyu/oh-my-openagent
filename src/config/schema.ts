@@ -122,6 +122,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   google_auth: z.boolean().optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
   experimental: ExperimentalConfigSchema.optional(),
+  auto_update: z.boolean().optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
