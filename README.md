@@ -184,8 +184,17 @@ follow these steps:
 Since OpenCode Supports various models, and our plugin suggests various frontier LLMs. Thus, you must ask user, following questions:
 
 1. **Do you have a Claude Pro/Max Subscription?** Otherwise, we'll use 'opencode/big-pickle' (known for GLM 4.6) as a main orchestrator model (not recommended)
-   - If user said **yes**, add ToDo: "Setup user Claude Pro/Max Auth"
-   - If user said **no**, merge the following to `~/.config/opencode/oh-my-opencode.json`:
+   - If user said **yes**, ask follow-up: **Are you on max20 (20x mode)?**
+     - If **yes (max20)**: Add ToDo: "Setup user Claude Pro/Max Auth" — full Claude Sonnet 4.5 for librarian
+     - If **no (not max20)**: Add ToDo: "Setup user Claude Pro/Max Auth", then merge the following to `~/.config/opencode/oh-my-opencode.json`:
+       ```json
+       {
+         "agents": {
+           "librarian": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
+   - If user said **no** (no Claude subscription), merge the following to `~/.config/opencode/oh-my-opencode.json`:
      ```json
      {
        "agents": {

@@ -156,12 +156,21 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프론티어 LLM 사용을 제안합니다. 따라서 사용자에게 다음 질문을 해야 합니다:
 
 1. **Claude Pro/Max 구독이 있으신가요?** 그렇지 않다면 메인 오케스트레이터 모델로 'opencode/big-pickle'(GLM 4.6으로 알려짐)을 사용하게 됩니다 (권장하지 않음).
-   - 사용자가 **'예'**라고 답하면, 할 일 추가: "사용자 Claude Pro/Max 인증 설정"
-   - 사용자가 **'아니오'**라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장:
+   - 사용자가 **'예'**라고 답하면, 추가 질문: **max20 (20x 모드)를 사용하고 계신가요?**
+     - **'예' (max20)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정" — librarian에 Claude Sonnet 4.5 전체 사용
+     - **'아니오' (max20 아님)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정", 그리고 `~/.config/opencode/oh-my-opencode.json`에 다음을 병합:
+       ```json
+       {
+         "agents": {
+           "librarian": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
+   - 사용자가 **'아니오'** (Claude 구독 없음)라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장:
      ```json
      {
        "agents": {
-         "sisyphus": { "model": "opencode/big-pickle" },
+         "Sisyphus": { "model": "opencode/big-pickle" },
          "librarian": { "model": "opencode/big-pickle" }
        }
      }
