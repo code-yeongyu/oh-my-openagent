@@ -61,12 +61,20 @@ function detectInterrupt(error: unknown): boolean {
   return false
 }
 
+const COUNTDOWN_SECONDS = 5
+const TOAST_DURATION_MS = 900 // Slightly less than 1s so toasts don't overlap
+
+interface CountdownState {
+  secondsRemaining: number
+  intervalId: ReturnType<typeof setInterval>
+}
+
 export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuationEnforcer {
   const remindedSessions = new Set<string>()
   const interruptedSessions = new Set<string>()
   const errorSessions = new Set<string>()
   const recoveringSessions = new Set<string>()
-  const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const pendingCountdowns = new Map<string, CountdownState>()
 
   const markRecovering = (sessionID: string): void => {
     recoveringSessions.add(sessionID)
@@ -89,11 +97,10 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         }
         log(`[${HOOK_NAME}] session.error received`, { sessionID, isInterrupt, error: props?.error })
         
-        // Cancel pending continuation if error occurs
-        const timer = pendingTimers.get(sessionID)
-        if (timer) {
-          clearTimeout(timer)
-          pendingTimers.delete(sessionID)
+        const countdown = pendingCountdowns.get(sessionID)
+        if (countdown) {
+          clearInterval(countdown.intervalId)
+          pendingCountdowns.delete(sessionID)
         }
       }
       return
@@ -105,17 +112,27 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
 
       log(`[${HOOK_NAME}] session.idle received`, { sessionID })
 
-      // Cancel any existing timer to debounce
-      const existingTimer = pendingTimers.get(sessionID)
-      if (existingTimer) {
-        clearTimeout(existingTimer)
-        log(`[${HOOK_NAME}] Cancelled existing timer`, { sessionID })
+      const existingCountdown = pendingCountdowns.get(sessionID)
+      if (existingCountdown) {
+        clearInterval(existingCountdown.intervalId)
+        pendingCountdowns.delete(sessionID)
+        log(`[${HOOK_NAME}] Cancelled existing countdown`, { sessionID })
       }
 
-      // Schedule continuation check
-      const timer = setTimeout(async () => {
-        pendingTimers.delete(sessionID)
-        log(`[${HOOK_NAME}] Timer fired, checking conditions`, { sessionID })
+      const showCountdownToast = async (seconds: number): Promise<void> => {
+        await ctx.client.tui.showToast({
+          body: {
+            title: "Todo Continuation",
+            message: `Resuming in ${seconds}s...`,
+            variant: "warning" as const,
+            duration: TOAST_DURATION_MS,
+          },
+        }).catch(() => {})
+      }
+
+      const executeAfterCountdown = async (): Promise<void> => {
+        pendingCountdowns.delete(sessionID)
+        log(`[${HOOK_NAME}] Countdown finished, checking conditions`, { sessionID })
 
         // Check if session is in recovery mode - if so, skip entirely without clearing state
         if (recoveringSessions.has(sessionID)) {
@@ -206,9 +223,32 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           log(`[${HOOK_NAME}] Prompt injection failed`, { sessionID, error: String(err) })
           remindedSessions.delete(sessionID)
         }
-      }, 5000)
+      }
 
-      pendingTimers.set(sessionID, timer)
+      let secondsRemaining = COUNTDOWN_SECONDS
+      showCountdownToast(secondsRemaining).catch(() => {})
+
+      const intervalId = setInterval(() => {
+        secondsRemaining--
+        
+        if (secondsRemaining <= 0) {
+          clearInterval(intervalId)
+          pendingCountdowns.delete(sessionID)
+          executeAfterCountdown()
+          return
+        }
+
+        const countdown = pendingCountdowns.get(sessionID)
+        if (!countdown) {
+          clearInterval(intervalId)
+          return
+        }
+
+        countdown.secondsRemaining = secondsRemaining
+        showCountdownToast(secondsRemaining).catch(() => {})
+      }, 1000)
+
+      pendingCountdowns.set(sessionID, { secondsRemaining, intervalId })
     }
 
     if (event.type === "message.updated") {
@@ -217,12 +257,11 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
       log(`[${HOOK_NAME}] message.updated received`, { sessionID, role: info?.role })
       
       if (sessionID && info?.role === "user") {
-        // Cancel pending continuation on user interaction (real user input)
-        const timer = pendingTimers.get(sessionID)
-        if (timer) {
-          clearTimeout(timer)
-          pendingTimers.delete(sessionID)
-          log(`[${HOOK_NAME}] Cancelled pending timer on user message`, { sessionID })
+        const countdown = pendingCountdowns.get(sessionID)
+        if (countdown) {
+          clearInterval(countdown.intervalId)
+          pendingCountdowns.delete(sessionID)
+          log(`[${HOOK_NAME}] Cancelled countdown on user message`, { sessionID })
         }
       }
       
@@ -241,11 +280,10 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         errorSessions.delete(sessionInfo.id)
         recoveringSessions.delete(sessionInfo.id)
         
-        // Cancel pending continuation
-        const timer = pendingTimers.get(sessionInfo.id)
-        if (timer) {
-          clearTimeout(timer)
-          pendingTimers.delete(sessionInfo.id)
+        const countdown = pendingCountdowns.get(sessionInfo.id)
+        if (countdown) {
+          clearInterval(countdown.intervalId)
+          pendingCountdowns.delete(sessionInfo.id)
         }
       }
     }
