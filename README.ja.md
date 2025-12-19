@@ -156,12 +156,14 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 
 ### ステップ 0: セットアップについてユーザーに尋ねる
 
-OpenCode は様々なモデルをサポートしており、当プラグインは様々な最先端 LLM の使用を提案しています。そのため、ユーザーに以下の質問をする必要があります：
+OpenCode は様々なモデルをサポートしており、当プラグインは様々な最先端 LLM の使用を提案しています。そのため、ユーザーに以下の質問をする必要があります。
+
+**重要**: ユーザーがどのプロバイダーを持っているか追跡してください。ユーザーが Claude を持っていると確認した場合のみ、`anthropic/claude-opus-4-5` をフォールバックとして使用できます。Claude がない場合は、代わりに `opencode/big-pickle` をフォールバックとして使用してください。
 
 1. **Claude Pro/Max のサブスクリプションをお持ちですか？** お持ちでない場合、メインオーケストレーターモデルとして 'opencode/big-pickle' (GLM 4.6 として知られる) を使用することになります (非推奨)。
    - ユーザーが**「はい」**と答えた場合、追加質問: **max20 (20x モード) を使用していますか？**
-     - **「はい」 (max20)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定" — librarian に Claude Sonnet 4.5 をフル使用
-     - **「いいえ」 (max20 ではない)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"、そして `~/.config/opencode/oh-my-opencode.json` に以下をマージ:
+     - **「はい」 (max20)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定" — librarian に Claude Sonnet 4.5 をフル使用。**記憶: Claude がフォールバックとして使用可能。**
+     - **「いいえ」 (max20 ではない)**: ToDo 追加: "ユーザーの Claude Pro/Max 認証設定"、そして `~/.config/opencode/oh-my-opencode.json` に以下をマージ。**記憶: Claude がフォールバックとして使用可能。**
        ```json
        {
          "agents": {
@@ -169,7 +171,7 @@ OpenCode は様々なモデルをサポートしており、当プラグイン�
          }
        }
        ```
-   - ユーザーが**「いいえ」** (Claude サブスクリプションなし) と答えた場合、`~/.config/opencode/oh-my-opencode.json` に以下を保存:
+   - ユーザーが**「いいえ」** (Claude サブスクリプションなし) と答えた場合、`~/.config/opencode/oh-my-opencode.json` に以下を保存。**記憶: Claude は使用不可 — すべてのフォールバックは `opencode/big-pickle` を使用する必要があります。**
      ```json
      {
        "agents": {
@@ -179,29 +181,49 @@ OpenCode は様々なモデルをサポートしており、当プラグイン�
      }
      ```
 
-2. **ChatGPT のサブスクリプションをお持ちですか？** お持ちでない場合、oracle エージェントに 'anthropic/claude-opus-4-5' を使用することになります。
+2. **ChatGPT のサブスクリプションをお持ちですか？** お持ちでない場合、oracle エージェントにフォールバックモデルを使用することになります。
    - ユーザーが**「はい」**と答えた場合、ToDo 追加: "ユーザーの ChatGPT 認証設定"
-   - ユーザーが**「いいえ」**と答えた場合、`oh-my-opencode.json` に以下をマージ:
-     ```json
-     {
-       "agents": {
-         "oracle": { "model": "anthropic/claude-opus-4-5" }
+   - ユーザーが**「いいえ」**と答えた場合:
+     - **Claude が使用可能な場合**: `oh-my-opencode.json` に以下をマージ:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **Claude が使用不可の場合**: `oh-my-opencode.json` に以下をマージ:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 3. **Gemini モデルを統合しますか？** 統合しない場合、美しいデザインを享受できません。
    - ユーザーが**「はい」**と答えた場合、ToDo 追加: "Google OAuth 設定"
-   - ユーザーが**「いいえ」**と答えた場合、`oh-my-opencode.json` に以下をマージ:
-     ```json
-     {
-       "agents": {
-         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-         "document-writer": { "model": "anthropic/claude-opus-4-5" },
-         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+   - ユーザーが**「いいえ」**と答えた場合:
+     - **Claude が使用可能な場合**: `oh-my-opencode.json` に以下をマージ:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+           "document-writer": { "model": "anthropic/claude-opus-4-5" },
+           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **Claude が使用不可の場合**: `oh-my-opencode.json` に以下をマージ:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
+           "document-writer": { "model": "opencode/big-pickle" },
+           "multimodal-looker": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 ### ステップ 1: OpenCode インストール確認
 

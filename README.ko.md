@@ -153,12 +153,14 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 
 ### 0단계: 사용자에게 설정에 대해 물어보세요.
 
-OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프론티어 LLM 사용을 제안합니다. 따라서 사용자에게 다음 질문을 해야 합니다:
+OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프론티어 LLM 사용을 제안합니다. 따라서 사용자에게 다음 질문을 해야 합니다.
+
+**중요**: 사용자가 어떤 프로바이더를 가지고 있는지 추적하세요. 사용자가 Claude가 있다고 확인한 경우에만 `anthropic/claude-opus-4-5`를 폴백으로 사용할 수 있습니다. Claude가 없다면 `opencode/big-pickle`을 폴백으로 사용해야 합니다.
 
 1. **Claude Pro/Max 구독이 있으신가요?** 그렇지 않다면 메인 오케스트레이터 모델로 'opencode/big-pickle'(GLM 4.6으로 알려짐)을 사용하게 됩니다 (권장하지 않음).
    - 사용자가 **'예'**라고 답하면, 추가 질문: **max20 (20x 모드)를 사용하고 계신가요?**
-     - **'예' (max20)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정" — librarian에 Claude Sonnet 4.5 전체 사용
-     - **'아니오' (max20 아님)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정", 그리고 `~/.config/opencode/oh-my-opencode.json`에 다음을 병합:
+     - **'예' (max20)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정" — librarian에 Claude Sonnet 4.5 전체 사용. **기억: Claude를 폴백으로 사용 가능.**
+     - **'아니오' (max20 아님)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정", 그리고 `~/.config/opencode/oh-my-opencode.json`에 다음을 병합. **기억: Claude를 폴백으로 사용 가능.**
        ```json
        {
          "agents": {
@@ -166,7 +168,7 @@ OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프�
          }
        }
        ```
-   - 사용자가 **'아니오'** (Claude 구독 없음)라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장:
+   - 사용자가 **'아니오'** (Claude 구독 없음)라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장. **기억: Claude 사용 불가 — 모든 폴백은 `opencode/big-pickle`을 사용해야 함.**
      ```json
      {
        "agents": {
@@ -176,29 +178,49 @@ OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프�
      }
      ```
 
-2. **ChatGPT 구독이 있으신가요?** 그렇지 않다면 oracle 에이전트에 'anthropic/claude-opus-4-5'를 사용하게 됩니다.
+2. **ChatGPT 구독이 있으신가요?** 그렇지 않다면 oracle 에이전트에 폴백 모델을 사용하게 됩니다.
    - 사용자가 **'예'**라고 답하면, 할 일 추가: "사용자 ChatGPT 인증 설정"
-   - 사용자가 **'아니오'**라고 답하면, `oh-my-opencode.json`에 다음을 병합:
-     ```json
-     {
-       "agents": {
-         "oracle": { "model": "anthropic/claude-opus-4-5" }
+   - 사용자가 **'아니오'**라고 답하면:
+     - **Claude가 사용 가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **Claude가 사용 불가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 3. **Gemini 모델을 통합하시겠습니까?** 그렇지 않다면 아름다운 디자인을 즐길 수 없습니다.
    - 사용자가 **'예'**라고 답하면, 할 일 추가: "Google OAuth 설정"
-   - 사용자가 **'아니오'**라고 답하면, `oh-my-opencode.json`에 다음을 병합:
-     ```json
-     {
-       "agents": {
-         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-         "document-writer": { "model": "anthropic/claude-opus-4-5" },
-         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+   - 사용자가 **'아니오'**라고 답하면:
+     - **Claude가 사용 가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+           "document-writer": { "model": "anthropic/claude-opus-4-5" },
+           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **Claude가 사용 불가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
+           "document-writer": { "model": "opencode/big-pickle" },
+           "multimodal-looker": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 ### 1단계: OpenCode 설치 확인
 

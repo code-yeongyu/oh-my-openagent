@@ -181,12 +181,14 @@ follow these steps:
 
 ### Step 0: Ask user about the setup.
 
-Since OpenCode Supports various models, and our plugin suggests various frontier LLMs. Thus, you must ask user, following questions:
+Since OpenCode supports various models, and our plugin suggests various frontier LLMs, you must ask user the following questions.
+
+**IMPORTANT**: Track which providers the user has. Only use `anthropic/claude-opus-4-5` as fallback when the user confirmed they have Claude. If they don't have Claude, use `opencode/big-pickle` as fallback instead.
 
 1. **Do you have a Claude Pro/Max Subscription?** Otherwise, we'll use 'opencode/big-pickle' (known for GLM 4.6) as a main orchestrator model (not recommended)
    - If user said **yes**, ask follow-up: **Are you on max20 (20x mode)?**
-     - If **yes (max20)**: Add ToDo: "Setup user Claude Pro/Max Auth" — full Claude Sonnet 4.5 for librarian
-     - If **no (not max20)**: Add ToDo: "Setup user Claude Pro/Max Auth", then merge the following to `~/.config/opencode/oh-my-opencode.json`:
+     - If **yes (max20)**: Add ToDo: "Setup user Claude Pro/Max Auth" — full Claude Sonnet 4.5 for librarian. **Remember: Claude is available for fallbacks.**
+     - If **no (not max20)**: Add ToDo: "Setup user Claude Pro/Max Auth", then merge the following to `~/.config/opencode/oh-my-opencode.json`. **Remember: Claude is available for fallbacks.**
        ```json
        {
          "agents": {
@@ -194,7 +196,7 @@ Since OpenCode Supports various models, and our plugin suggests various frontier
          }
        }
        ```
-   - If user said **no** (no Claude subscription), merge the following to `~/.config/opencode/oh-my-opencode.json`:
+   - If user said **no** (no Claude subscription), merge the following to `~/.config/opencode/oh-my-opencode.json`. **Remember: Claude is NOT available — all fallbacks must use `opencode/big-pickle`.**
      ```json
      {
        "agents": {
@@ -204,29 +206,49 @@ Since OpenCode Supports various models, and our plugin suggests various frontier
      }
      ```
 
-2. **Do you have a ChatGPT Subscription?** Otherwise, we'll use 'anthropic/claude-opus-4-5' with 32k thinking option for oracle agent.
+2. **Do you have a ChatGPT Subscription?** Otherwise, we'll use a fallback model for oracle agent.
    - If user said **yes**, add ToDo: "Setup user ChatGPT Auth"
-   - If user said **no**, merge the following to `oh-my-opencode.json`:
-     ```json
-     {
-       "agents": {
-         "oracle": { "model": "anthropic/claude-opus-4-5" }
+   - If user said **no**:
+     - **If Claude is available**: merge the following to `oh-my-opencode.json`:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **If Claude is NOT available**: merge the following to `oh-my-opencode.json`:
+       ```json
+       {
+         "agents": {
+           "oracle": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 3. **Will you integrate Gemini models?** Otherwise, you cannot enjoy the beautiful design.
    - If user said **yes**, add ToDo: "Setup Google OAuth"
-   - If user said **no**, merge the following to `oh-my-opencode.json`:
-     ```json
-     {
-       "agents": {
-         "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-         "document-writer": { "model": "anthropic/claude-opus-4-5" },
-         "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+   - If user said **no**:
+     - **If Claude is available**: merge the following to `oh-my-opencode.json`:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
+           "document-writer": { "model": "anthropic/claude-opus-4-5" },
+           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
+         }
        }
-     }
-     ```
+       ```
+     - **If Claude is NOT available**: merge the following to `oh-my-opencode.json`:
+       ```json
+       {
+         "agents": {
+           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
+           "document-writer": { "model": "opencode/big-pickle" },
+           "multimodal-looker": { "model": "opencode/big-pickle" }
+         }
+       }
+       ```
 
 ### Step 1: Install OpenCode, if not
 
