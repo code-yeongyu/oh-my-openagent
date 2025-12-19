@@ -10,6 +10,7 @@
       "*": "ask",
       ".cursor/scripts/bash/create-feature.sh *": "allow",
       ".cursor/scripts/bash/setup-plan.sh *": "allow",
+      "/Users/eru/Documents/GitHub/oh-my-opencode/.cursor/scripts/bash/setup-plan.sh *": "allow",
       "git status": "allow",
       "git diff": "allow",
       "git log": "allow",
