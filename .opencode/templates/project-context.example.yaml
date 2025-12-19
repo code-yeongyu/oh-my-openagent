@@ -67,6 +67,7 @@ integrations:
     enabled: true
     team_id: "TEAM-123"
     project_id: "PROJECT-456"
+    policy: "optional"  # off | optional | required - controls workflow command behavior
     labels:
       - "feature"
       - "bug"
