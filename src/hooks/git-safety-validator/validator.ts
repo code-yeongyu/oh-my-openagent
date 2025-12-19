@@ -7,6 +7,49 @@ import {
   SUGGESTIONS,
 } from "./constants";
 
+function parseShellArgs(input: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inQuote: string | null = null;
+  let escapeNext = false;
+  
+  for (const char of input) {
+    if (escapeNext) {
+      current += char;
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === "\\" && inQuote !== "'") {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (inQuote) {
+      if (char === inQuote) {
+        inQuote = null;
+      } else {
+        current += char;
+      }
+    } else if (char === '"' || char === "'") {
+      inQuote = char;
+    } else if (char === " " || char === "\t") {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+    } else {
+      current += char;
+    }
+  }
+  
+  if (current) {
+    args.push(current);
+  }
+  
+  return args;
+}
+
 /**
  * Parse a bash command to extract git command details
  */
@@ -20,7 +63,7 @@ export function parseGitCommand(command: string): ParsedGitCommand | null {
   }
 
   const gitPart = gitMatch[1];
-  const parts = gitPart.split(/\s+/);
+  const parts = parseShellArgs(gitPart);
 
   if (parts.length === 0) {
     return null;
@@ -164,9 +207,13 @@ export function validateGitCommand(
   command: string,
   config: Partial<GitSafetyConfig> = {}
 ): GitSafetyResult {
+  // Merge config with defaults, filtering out undefined values to prevent overwriting
   const fullConfig: GitSafetyConfig = {
     ...DEFAULT_GIT_SAFETY_CONFIG,
-    ...config,
+    ...(config?.protectedBranches !== undefined && { protectedBranches: config.protectedBranches }),
+    ...(config?.blockForceOperations !== undefined && { blockForceOperations: config.blockForceOperations }),
+    ...(config?.warnOnDestructive !== undefined && { warnOnDestructive: config.warnOnDestructive }),
+    ...(config?.allowListPatterns !== undefined && { allowListPatterns: config.allowListPatterns }),
   };
 
   // Check allowlist first

@@ -8,21 +8,17 @@ export type { GitSafetyConfig, GitSafetyResult, ParsedGitCommand } from "./types
 export { validateGitCommand, parseGitCommand, isProtectedBranch } from "./validator";
 export { DEFAULT_GIT_SAFETY_CONFIG, GIT_SAFETY_VALIDATOR_NAME } from "./constants";
 
-/**
- * Create the Git Safety Validator hook
- *
- * This hook intercepts bash commands and validates git operations for safety:
- * - Blocks force push to protected branches (main, master, production)
- * - Warns on destructive operations (reset --hard, clean -f, etc.)
- * - Provides suggestions for safer alternatives
- */
 export function createGitSafetyValidatorHook(
   _ctx: PluginInput,
   config?: Partial<GitSafetyConfig>
 ) {
+  // Merge config with defaults, filtering out undefined values to prevent overwriting
   const fullConfig: GitSafetyConfig = {
     ...DEFAULT_GIT_SAFETY_CONFIG,
-    ...config,
+    ...(config?.protectedBranches !== undefined && { protectedBranches: config.protectedBranches }),
+    ...(config?.blockForceOperations !== undefined && { blockForceOperations: config.blockForceOperations }),
+    ...(config?.warnOnDestructive !== undefined && { warnOnDestructive: config.warnOnDestructive }),
+    ...(config?.allowListPatterns !== undefined && { allowListPatterns: config.allowListPatterns }),
   };
 
   return {
@@ -45,35 +41,14 @@ export function createGitSafetyValidatorHook(
       const result = validateGitCommand(command, fullConfig);
 
       if (!result.allowed) {
-        // Block the operation by modifying the command to echo the error
         log(`[${GIT_SAFETY_VALIDATOR_NAME}] Blocked: ${command}`);
         log(`[${GIT_SAFETY_VALIDATOR_NAME}] Reason: ${result.reason}`);
-
-        // Replace the command with an error message
-        output.args.command = `echo "${result.reason}\n\n${result.suggestion || ""}" && exit 1`;
-        return;
+        throw new Error(`🚫 Git Safety: ${result.reason}${result.suggestion ? `\n\n💡 ${result.suggestion}` : ""}`);
       }
 
       if (result.reason && result.severity === "warn") {
         // Log warning but allow the command
         log(`[${GIT_SAFETY_VALIDATOR_NAME}] Warning: ${result.reason}`);
-      }
-    },
-
-    "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { title: string; output: string; metadata: unknown }
-    ): Promise<void> => {
-      // Only process bash commands
-      const toolLower = input.tool.toLowerCase();
-      if (toolLower !== "bash") {
-        return;
-      }
-
-      // Check if the output contains our blocked message
-      if (output.output.includes("BLOCKED:")) {
-        // Add additional context to the output
-        output.output += "\n\n💡 Tip: Use the suggestion above for a safer approach.";
       }
     },
   };

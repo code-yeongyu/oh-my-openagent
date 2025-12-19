@@ -12,9 +12,13 @@ export function createConflictDetectorHook(
   _ctx: PluginInput,
   config?: Partial<ConflictDetectorConfig>
 ) {
+  // Merge config with defaults, filtering out undefined values to prevent overwriting
   const fullConfig: ConflictDetectorConfig = {
     ...DEFAULT_CONFLICT_DETECTOR_CONFIG,
-    ...config,
+    ...(config?.enabled !== undefined && { enabled: config.enabled }),
+    ...(config?.lockTimeoutMs !== undefined && { lockTimeoutMs: config.lockTimeoutMs }),
+    ...(config?.warnOnConflict !== undefined && { warnOnConflict: config.warnOnConflict }),
+    ...(config?.blockOnConflict !== undefined && { blockOnConflict: config.blockOnConflict }),
   };
 
   if (!fullConfig.enabled) {
@@ -57,8 +61,7 @@ export function createConflictDetectorHook(
         log(`[${CONFLICT_DETECTOR_NAME}] ${warningMessage}`);
 
         if (fullConfig.blockOnConflict) {
-          output.args.content = `# BLOCKED: File conflict detected\n\n${warningMessage}`;
-          return;
+          throw new Error(`⚠️ Conflict: ${warningMessage}`);
         }
       }
 

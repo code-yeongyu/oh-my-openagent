@@ -4,6 +4,7 @@
 
 ### 2025-12-18
 
+- [Quick Fixer - Hook Config Undefined Fix](./2025-12-18__quick-fixer__hook-config-undefined-fix.md)
 - [Product Strategist - LIF-62 Phase 4B Spec](./2025-12-18__product-strategist__LIF-62-phase4b-spec.md)
 - [Linear Coordinator - LIF-62 Task Breakdown](./2025-12-18__linear-coordinator__LIF-62-task-breakdown.md)
 - [Strategic Architect - LIF-62 Multi-Layered Orchestration](./2025-12-18__strategic-architect__LIF-62-multi-layered-orchestration.md)

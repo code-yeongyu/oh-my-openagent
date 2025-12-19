@@ -14,9 +14,15 @@ export function createSecurityScannerHook(
   _ctx: PluginInput,
   config?: Partial<SecurityScannerConfig>
 ) {
+  // Merge config with defaults, filtering out undefined values to prevent overwriting
   const fullConfig: SecurityScannerConfig = {
     ...DEFAULT_SECURITY_SCANNER_CONFIG,
-    ...config,
+    ...(config?.enabled !== undefined && { enabled: config.enabled }),
+    ...(config?.patterns !== undefined && { patterns: config.patterns }),
+    ...(config?.allowListPatterns !== undefined && { allowListPatterns: config.allowListPatterns }),
+    ...(config?.scanOnWrite !== undefined && { scanOnWrite: config.scanOnWrite }),
+    ...(config?.scanOnEdit !== undefined && { scanOnEdit: config.scanOnEdit }),
+    ...(config?.maskInOutput !== undefined && { maskInOutput: config.maskInOutput }),
   };
 
   if (!fullConfig.enabled) {
@@ -65,13 +71,7 @@ export function createSecurityScannerHook(
         
         if (hasCritical) {
           const errorMessage = formatScanResult(result, filePath);
-          
-          if (toolLower === "write") {
-            output.args.content = `# BLOCKED: Security scan failed\n\n${errorMessage}\n\n# Original content was blocked due to detected secrets.`;
-          } else if (toolLower === "edit") {
-            output.args.newString = output.args.oldString;
-            output.args.new_string = output.args.old_string;
-          }
+          throw new Error(`🔐 Security Scan Failed:\n\n${errorMessage}`);
         }
       }
     },

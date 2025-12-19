@@ -601,10 +601,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
+      
+      // Validation hooks that may throw (run BEFORE lock acquisition)
       await gitSafetyValidator?.["tool.execute.before"](input, output);
       await securityScanner?.["tool.execute.before"](input, output);
-      await conflictDetector?.["tool.execute.before"](input, output);
       await governancePathValidator?.["tool.execute.before"](input, output);
+      
+      // Lock acquisition (run AFTER all validation hooks to prevent lock leaks)
+      await conflictDetector?.["tool.execute.before"](input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
@@ -640,7 +644,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
-      await gitSafetyValidator?.["tool.execute.after"](input, output);
       await securityScanner?.["tool.execute.after"](input, output);
       await conflictDetector?.["tool.execute.after"](input, output);
       await governanceHistorian?.["tool.execute.after"](input, output);
