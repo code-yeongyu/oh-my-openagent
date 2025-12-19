@@ -29,6 +29,8 @@ export type BuiltinAgentName =
   | "security-specialist"
   | "test-specialist"
   | "optimization-specialist"
+  // Documentation specialists
+  | "docs-publisher"
 
 export type OverridableAgentName =
   | "build"
@@ -132,6 +134,8 @@ export const DELEGATABLE_AGENTS = [
   "security-specialist",
   "test-specialist",
   "optimization-specialist",
+  // Documentation specialists
+  "docs-publisher",
 ] as const
 
 export type DelegatableAgentName = (typeof DELEGATABLE_AGENTS)[number]

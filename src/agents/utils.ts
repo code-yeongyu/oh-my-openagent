@@ -28,6 +28,7 @@ import { agentSpecialistAgent } from "./agent-specialist"
 import { securitySpecialistAgent } from "./security-specialist"
 import { testSpecialistAgent } from "./test-specialist"
 import { optimizationSpecialistAgent } from "./optimization-specialist"
+import { docsPublisherAgent } from "./docs-publisher"
 import { deepMerge } from "../shared"
 import { getGovernanceTemplate } from "../config/governance-template"
 
@@ -55,6 +56,7 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "security-specialist": securitySpecialistAgent,
   "test-specialist": testSpecialistAgent,
   "optimization-specialist": optimizationSpecialistAgent,
+  "docs-publisher": docsPublisherAgent,
 }
 
 /**
@@ -92,6 +94,7 @@ const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
   "security-specialist": "full",       // Specialist - can modify files
   "test-specialist": "full",           // Specialist - can modify files
   "optimization-specialist": "full",   // Specialist - can modify files
+  "docs-publisher": "full",            // Specialist - can modify files
 }
 
 export function createEnvContext(directory: string): string {
