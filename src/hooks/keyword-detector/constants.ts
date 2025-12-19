@@ -53,17 +53,16 @@ NEVER stop at first result - be exhaustive.`,
     pattern:
       /\b(analyze|analyse|investigate|examine|research|study|deep[\s-]?dive|inspect|audit|evaluate|assess|review|diagnose|scrutinize|dissect|debug|comprehend|interpret|breakdown|understand)\b|why\s+is|how\s+does|how\s+to|분석|조사|파악|연구|검토|진단|이해|설명|원인|이유|뜯어봐|따져봐|평가|해석|디버깅|디버그|어떻게|왜|살펴|分析|調査|解析|検討|研究|診断|理解|説明|検証|精査|究明|デバッグ|なぜ|どう|仕組み|调查|检查|剖析|深入|诊断|解释|调试|为什么|原理|搞清楚|弄明白|phân tích|điều tra|nghiên cứu|kiểm tra|xem xét|chẩn đoán|giải thích|tìm hiểu|gỡ lỗi|tại sao/i,
     message: `[analyze-mode]
-DEEP ANALYSIS MODE. Execute in phases:
+ANALYSIS MODE. Gather context before diving deep:
 
-PHASE 1 - GATHER CONTEXT (10+ agents parallel):
-- 3+ explore agents (codebase structure, patterns, implementations)
-- 3+ librarian agents (official docs, best practices, examples)
-- 2+ general agents (different analytical perspectives)
+CONTEXT GATHERING (parallel):
+- 1-2 explore agents (codebase patterns, implementations)
+- 1-2 librarian agents (if external library involved)
+- Direct tools: Grep, AST-grep, LSP for targeted searches
 
-PHASE 2 - EXPERT CONSULTATION (after Phase 1):
-- 3+ oracle agents in parallel with gathered context
-- Each oracle: different angle (architecture, performance, edge cases)
+IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
+- Consult oracle for strategic guidance
 
-SYNTHESIZE: Cross-reference findings, identify consensus & contradictions.`,
+SYNTHESIZE findings before proceeding.`,
   },
 ]
