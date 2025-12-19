@@ -67,3 +67,61 @@ jobs:
         run: |
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
+
+  draft-release:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest published release tag
+        id: latest-release
+        run: |
+          LATEST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "Latest published release: ${LATEST_TAG:-none}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          if [ -n "${{ steps.latest-release.outputs.tag }}" ]; then
+            NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name=next \
+              -f previous_tag_name=${{ steps.latest-release.outputs.tag }} \
+              --jq '.body')
+          else
+            NOTES="Initial release"
+          fi
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update draft release
+        run: |
+          EXISTING_DRAFT=$(gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true and .tagName == "next") | .tagName')
+          
+          if [ -n "$EXISTING_DRAFT" ]; then
+            echo "Updating existing draft release..."
+            gh release edit next \
+              --title "Upcoming Changes 🍿" \
+              --notes "${{ steps.notes.outputs.notes }}" \
+              --draft
+          else
+            echo "Creating new draft release..."
+            gh release create next \
+              --title "Upcoming Changes 🍿" \
+              --notes "${{ steps.notes.outputs.notes }}" \
+              --draft \
+              --target ${{ github.sha }}
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
