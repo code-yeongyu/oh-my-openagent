@@ -5,6 +5,7 @@ export interface ParsedTokenLimitError {
   errorType: string
   providerID?: string
   modelID?: string
+  messageIndex?: number
 }
 
 export interface RetryState {
