@@ -8,6 +8,7 @@ export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicAutoCompactHook, type AnthropicAutoCompactOptions } from "./anthropic-auto-compact";
+export { createPreemptiveCompactionHook, type PreemptiveCompactionOptions } from "./preemptive-compaction";
 export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
