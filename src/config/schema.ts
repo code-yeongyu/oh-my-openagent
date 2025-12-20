@@ -65,6 +65,7 @@ export const HookNameSchema = z.enum([
   "governance-path-validator",
   "governance-historian",
   "governance-linear-injector",
+  "governance-docs-delegation",
   "hook-health-manager",
   "git-safety-validator",
   "security-scanner",
@@ -178,6 +179,24 @@ export const GovernanceConflictDetectorSchema = z.object({
   block_on_conflict: z.boolean().default(false),
 })
 
+export const GovernanceDocsBlockingSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["warn", "block", "disabled"]).default("block"),
+})
+
+export const GovernanceArtifactTruncationSchema = z.object({
+  enabled: z.boolean().default(true),
+  max_summary_tokens: z.number().default(200),
+  max_output_chars: z.number().default(4000),
+  keep_task_metadata: z.boolean().default(true),
+})
+
+export const GovernanceDelegationComplianceSchema = z.object({
+  enabled: z.boolean().default(false),
+  track_violations: z.boolean().default(true),
+  strikes_to_block: z.number().default(3),
+})
+
 export const OrchestrationConfigSchema = z.object({
   max_turns: z.number().default(10),
   max_delegation_depth: z.number().default(5),
@@ -197,6 +216,9 @@ export const GovernanceConfigSchema = z.object({
   security_scanner: GovernanceSecurityScannerSchema.optional(),
   conflict_detector: GovernanceConflictDetectorSchema.optional(),
   orchestration: OrchestrationConfigSchema.optional(),
+  docs_blocking: GovernanceDocsBlockingSchema.optional(),
+  artifact_truncation: GovernanceArtifactTruncationSchema.optional(),
+  delegation_compliance: GovernanceDelegationComplianceSchema.optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -225,6 +247,9 @@ export type GovernanceHookHealthConfig = z.infer<typeof GovernanceHookHealthSche
 export type GovernanceGitSafetyConfig = z.infer<typeof GovernanceGitSafetySchema>
 export type GovernanceSecurityScannerConfig = z.infer<typeof GovernanceSecurityScannerSchema>
 export type GovernanceConflictDetectorConfig = z.infer<typeof GovernanceConflictDetectorSchema>
+export type GovernanceDocsBlockingConfig = z.infer<typeof GovernanceDocsBlockingSchema>
+export type GovernanceArtifactTruncationConfig = z.infer<typeof GovernanceArtifactTruncationSchema>
+export type GovernanceDelegationComplianceConfig = z.infer<typeof GovernanceDelegationComplianceSchema>
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
 export type LinearPolicy = z.infer<typeof LinearPolicySchema>
 

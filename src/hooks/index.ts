@@ -24,6 +24,8 @@ export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 export { createGovernancePathValidatorHook } from "./governance-path-validator";
 export { createGovernanceHistorianHook } from "./governance-historian";
 export { createGovernanceLinearInjectorHook } from "./governance-linear-injector";
+export { createGovernanceDocsDelegationHook } from "./governance-docs-delegation";
+export type { DocsDelegationConfig } from "./governance-docs-delegation";
 
 // Hook Health Manager
 export { HookHealthManager } from "./hook-health-manager";

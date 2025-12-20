@@ -23,6 +23,7 @@ import {
   createGovernancePathValidatorHook,
   createGovernanceHistorianHook,
   createGovernanceLinearInjectorHook,
+  createGovernanceDocsDelegationHook,
   HookHealthManager,
   createGitSafetyValidatorHook,
   createSecurityScannerHook,
@@ -310,6 +311,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const governanceLinearInjector = isHookEnabled("governance-linear-injector")
     ? createGovernanceLinearInjectorHook(ctx, pluginConfig.governance?.linear)
     : null;
+  const governanceDocsDelegation = isHookEnabled("governance-docs-delegation")
+    ? createGovernanceDocsDelegationHook(ctx, pluginConfig.governance?.docs_blocking)
+    : null;
 
   // Safety hooks (LIF-63)
   const gitSafetyValidator = isHookEnabled("git-safety-validator")
@@ -347,7 +351,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
+  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager, pluginConfig);
   const lookAt = createLookAt(ctx);
 
   // Governance tools
@@ -631,6 +635,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await gitSafetyValidator?.["tool.execute.before"](input, output);
       await securityScanner?.["tool.execute.before"](input, output);
       await governancePathValidator?.["tool.execute.before"](input, output);
+      await governanceDocsDelegation?.["tool.execute.before"](input, output);
       
       // Lock acquisition (run AFTER all validation hooks to prevent lock leaks)
       await conflictDetector?.["tool.execute.before"](input, output);
