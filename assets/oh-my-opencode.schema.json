@@ -1215,9 +1215,6 @@
         "aggressive_truncation": {
           "type": "boolean"
         },
-        "empty_message_recovery": {
-          "type": "boolean"
-        },
         "auto_resume": {
           "type": "boolean"
         },
