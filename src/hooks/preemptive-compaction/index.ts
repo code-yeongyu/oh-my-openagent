@@ -8,8 +8,19 @@ import {
 } from "./constants"
 import { log } from "../../shared/logger"
 
+export interface SummarizeContext {
+  sessionID: string
+  providerID: string
+  modelID: string
+  usageRatio: number
+  directory: string
+}
+
+export type BeforeSummarizeCallback = (ctx: SummarizeContext) => Promise<void> | void
+
 export interface PreemptiveCompactionOptions {
   experimental?: ExperimentalConfig
+  onBeforeSummarize?: BeforeSummarizeCallback
 }
 
 interface MessageInfo {
@@ -68,6 +79,7 @@ export function createPreemptiveCompactionHook(
   options?: PreemptiveCompactionOptions
 ) {
   const experimental = options?.experimental
+  const onBeforeSummarize = options?.onBeforeSummarize
   const enabled = experimental?.preemptive_compaction !== false
   const threshold = experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD
 
@@ -132,6 +144,16 @@ export function createPreemptiveCompactionHook(
     log("[preemptive-compaction] triggering compaction", { sessionID, usageRatio })
 
     try {
+      if (onBeforeSummarize) {
+        await onBeforeSummarize({
+          sessionID,
+          providerID,
+          modelID,
+          usageRatio,
+          directory: ctx.directory,
+        })
+      }
+
       await ctx.client.session.summarize({
         path: { id: sessionID },
         body: { providerID, modelID },
