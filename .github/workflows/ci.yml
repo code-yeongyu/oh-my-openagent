@@ -48,8 +48,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [test, typecheck]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -67,6 +71,19 @@ jobs:
         run: |
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
+
+      - name: Auto-commit schema changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          if git diff --quiet assets/oh-my-opencode.schema.json; then
+            echo "No schema changes to commit"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add assets/oh-my-opencode.schema.json
+            git commit -m "chore: auto-update schema.json"
+            git push
+          fi
 
   draft-release:
     runs-on: ubuntu-latest
