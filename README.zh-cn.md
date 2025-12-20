@@ -837,7 +837,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 {
   "experimental": {
     "aggressive_truncation": true,
-    "empty_message_recovery": true,
     "auto_resume": true
   }
 }
@@ -846,7 +845,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 | 选项                     | 默认值  | 说明                                                                                                                                           |
 | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aggressive_truncation`  | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
-| `empty_message_recovery` | `false` | 遇到 "non-empty content" API 错误时，自动修复会话中的空消息进行恢复。最多尝试 3 次后放弃。                                                       |
 | `auto_resume`            | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
 
 **警告**：这些功能是实验性的，可能会导致意外行为。只有在理解其影响的情况下才启用。

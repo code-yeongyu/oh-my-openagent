@@ -897,7 +897,6 @@ Opt-in experimental features that may change or be removed in future versions. U
 {
   "experimental": {
     "aggressive_truncation": true,
-    "empty_message_recovery": true,
     "auto_resume": true
   }
 }
@@ -906,7 +905,6 @@ Opt-in experimental features that may change or be removed in future versions. U
 | Option                   | Default | Description                                                                                                                                                                                  |
 | ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aggressive_truncation`  | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
-| `empty_message_recovery` | `false` | Automatically recovers from "non-empty content" API errors by fixing empty messages in the session. Up to 3 recovery attempts before giving up.                                              |
 | `auto_resume`            | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                            |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.

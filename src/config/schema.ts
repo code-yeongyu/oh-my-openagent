@@ -108,7 +108,6 @@ export const SisyphusAgentConfigSchema = z.object({
 
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
-  empty_message_recovery: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
   /** Enable preemptive compaction at threshold (default: true) */
   preemptive_compaction: z.boolean().optional(),
