@@ -147,11 +147,31 @@ export function isServerInstalled(command: string[]): boolean {
   if (command.length === 0) return false
 
   const cmd = command[0]
+  const isWindows = process.platform === "win32"
+  const ext = isWindows ? ".exe" : ""
+
   const pathEnv = process.env.PATH || ""
-  const paths = pathEnv.split(":")
+  const pathSeparator = isWindows ? ";" : ":"
+  const paths = pathEnv.split(pathSeparator)
 
   for (const p of paths) {
-    if (existsSync(join(p, cmd))) {
+    if (existsSync(join(p, cmd)) || existsSync(join(p, cmd + ext))) {
+      return true
+    }
+  }
+
+  const cwd = process.cwd()
+  const additionalPaths = [
+    join(cwd, "node_modules", ".bin", cmd),
+    join(cwd, "node_modules", ".bin", cmd + ext),
+    join(homedir(), ".config", "opencode", "bin", cmd),
+    join(homedir(), ".config", "opencode", "bin", cmd + ext),
+    join(homedir(), ".config", "opencode", "node_modules", ".bin", cmd),
+    join(homedir(), ".config", "opencode", "node_modules", ".bin", cmd + ext),
+  ]
+
+  for (const p of additionalPaths) {
+    if (existsSync(p)) {
       return true
     }
   }
