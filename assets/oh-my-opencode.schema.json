@@ -1220,6 +1220,14 @@
         },
         "auto_resume": {
           "type": "boolean"
+        },
+        "preemptive_compaction": {
+          "type": "boolean"
+        },
+        "preemptive_compaction_threshold": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 0.95
         }
       }
     },
