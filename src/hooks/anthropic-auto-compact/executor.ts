@@ -2,7 +2,12 @@ import type { AutoCompactState, FallbackState, RetryState, TruncateState } from 
 import type { ExperimentalConfig } from "../../config"
 import { FALLBACK_CONFIG, RETRY_CONFIG, TRUNCATE_CONFIG } from "./types"
 import { findLargestToolResult, truncateToolResult, truncateUntilTargetTokens } from "./storage"
-import { findEmptyMessages, injectTextPart } from "../session-recovery/storage"
+import {
+  findEmptyMessages,
+  findEmptyMessageByIndex,
+  injectTextPart,
+  replaceEmptyTextParts,
+} from "../session-recovery/storage"
 import { log } from "../../shared/logger"
 
 type Client = {
@@ -168,30 +173,61 @@ function getOrCreateEmptyContentAttempt(
 async function fixEmptyMessages(
   sessionID: string,
   autoCompactState: AutoCompactState,
-  client: Client
+  client: Client,
+  messageIndex?: number
 ): Promise<boolean> {
   const attempt = getOrCreateEmptyContentAttempt(autoCompactState, sessionID)
   autoCompactState.emptyContentAttemptBySession.set(sessionID, attempt + 1)
 
-  const emptyMessageIds = findEmptyMessages(sessionID)
-  if (emptyMessageIds.length === 0) {
-    await client.tui
-      .showToast({
-        body: {
-          title: "Empty Content Error",
-          message: "No empty messages found in storage. Cannot auto-recover.",
-          variant: "error",
-          duration: 5000,
-        },
-      })
-      .catch(() => {})
-    return false
+  let fixed = false
+  const fixedMessageIds: string[] = []
+
+  if (messageIndex !== undefined) {
+    const targetMessageId = findEmptyMessageByIndex(sessionID, messageIndex)
+    if (targetMessageId) {
+      const replaced = replaceEmptyTextParts(targetMessageId, "[user interrupted]")
+      if (replaced) {
+        fixed = true
+        fixedMessageIds.push(targetMessageId)
+      } else {
+        const injected = injectTextPart(sessionID, targetMessageId, "[user interrupted]")
+        if (injected) {
+          fixed = true
+          fixedMessageIds.push(targetMessageId)
+        }
+      }
+    }
   }
 
-  let fixed = false
-  for (const messageID of emptyMessageIds) {
-    const success = injectTextPart(sessionID, messageID, "[user interrupted]")
-    if (success) fixed = true
+  if (!fixed) {
+    const emptyMessageIds = findEmptyMessages(sessionID)
+    if (emptyMessageIds.length === 0) {
+      await client.tui
+        .showToast({
+          body: {
+            title: "Empty Content Error",
+            message: "No empty messages found in storage. Cannot auto-recover.",
+            variant: "error",
+            duration: 5000,
+          },
+        })
+        .catch(() => {})
+      return false
+    }
+
+    for (const messageID of emptyMessageIds) {
+      const replaced = replaceEmptyTextParts(messageID, "[user interrupted]")
+      if (replaced) {
+        fixed = true
+        fixedMessageIds.push(messageID)
+      } else {
+        const injected = injectTextPart(sessionID, messageID, "[user interrupted]")
+        if (injected) {
+          fixed = true
+          fixedMessageIds.push(messageID)
+        }
+      }
+    }
   }
 
   if (fixed) {
@@ -199,7 +235,7 @@ async function fixEmptyMessages(
       .showToast({
         body: {
           title: "Session Recovery",
-          message: `Fixed ${emptyMessageIds.length} empty messages. Retrying...`,
+          message: `Fixed ${fixedMessageIds.length} empty message(s). Retrying...`,
           variant: "warning",
           duration: 3000,
         },
@@ -361,10 +397,15 @@ export async function executeCompact(
 
   const retryState = getOrCreateRetryState(autoCompactState, sessionID)
 
-  if (experimental?.empty_message_recovery && errorData?.errorType?.includes("non-empty content")) {
+  if (errorData?.errorType?.includes("non-empty content")) {
     const attempt = getOrCreateEmptyContentAttempt(autoCompactState, sessionID)
     if (attempt < 3) {
-      const fixed = await fixEmptyMessages(sessionID, autoCompactState, client as Client)
+      const fixed = await fixEmptyMessages(
+        sessionID,
+        autoCompactState,
+        client as Client,
+        errorData.messageIndex
+      )
       if (fixed) {
         autoCompactState.compactionInProgress.delete(sessionID)
         setTimeout(() => {

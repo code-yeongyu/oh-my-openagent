@@ -28,6 +28,8 @@ const TOKEN_LIMIT_KEYWORDS = [
   "non-empty content",
 ]
 
+const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
+
 function extractTokensFromMessage(message: string): { current: number; max: number } | null {
   for (const pattern of TOKEN_LIMIT_PATTERNS) {
     const match = message.match(pattern)
@@ -38,6 +40,14 @@ function extractTokensFromMessage(message: string): { current: number; max: numb
     }
   }
   return null
+}
+
+function extractMessageIndex(text: string): number | undefined {
+  const match = text.match(MESSAGE_INDEX_PATTERN)
+  if (match) {
+    return parseInt(match[1], 10)
+  }
+  return undefined
 }
 
 function isTokenLimitError(text: string): boolean {
@@ -52,6 +62,7 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
         currentTokens: 0,
         maxTokens: 0,
         errorType: "non-empty content",
+        messageIndex: extractMessageIndex(err),
       }
     }
     if (isTokenLimitError(err)) {
@@ -155,6 +166,7 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
       currentTokens: 0,
       maxTokens: 0,
       errorType: "non-empty content",
+      messageIndex: extractMessageIndex(combinedText),
     }
   }
 
