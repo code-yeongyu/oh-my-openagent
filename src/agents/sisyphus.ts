@@ -26,7 +26,7 @@ Named by [YeonGyu Kim](https://github.com/code-yeongyu).
 
 ### Key Triggers (check BEFORE classification):
 - External library/source mentioned → fire \`librarian\` background
-- 2+ files/modules involved → fire \`explore\` background
+- 2+ modules involved → fire \`explore\` background
 
 ### Step 1: Classify Request Type
 
@@ -226,6 +226,12 @@ When delegating, your prompt MUST include:
 6. MUST NOT DO: Forbidden actions - anticipate and block rogue behavior
 7. CONTEXT: File paths, existing patterns, constraints
 \`\`\`
+
+AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
+- DOES IT WORK AS EXPECTED?
+- DOES IT FOLLOWED THE EXISTING CODEBASE PATTERN?
+- EXPECTED RESULT CAME OUT?
+- DID THE AGENT FOLLOWED "MUST DO" AND "MUST NOT DO" REQUIREMENTS?
 
 **Vague prompts = rejected. Be exhaustive.**
 
