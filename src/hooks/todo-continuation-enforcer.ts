@@ -62,7 +62,7 @@ function detectInterrupt(error: unknown): boolean {
   return false
 }
 
-const COUNTDOWN_SECONDS = 5
+const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900 // Slightly less than 1s so toasts don't overlap
 
 interface CountdownState {
@@ -279,11 +279,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         }
       }
       
-      // Clear reminded state when assistant responds (allows re-remind on next idle)
-      if (sessionID && info?.role === "assistant" && remindedSessions.has(sessionID)) {
-        remindedSessions.delete(sessionID)
-        log(`[${HOOK_NAME}] Cleared remindedSessions on assistant response`, { sessionID })
-      }
+
     }
 
     if (event.type === "session.deleted") {
