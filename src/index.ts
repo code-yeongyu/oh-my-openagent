@@ -13,6 +13,7 @@ import {
   createThinkModeHook,
   createClaudeCodeHooksHook,
   createAnthropicAutoCompactHook,
+  createPreemptiveCompactionHook,
   createRulesInjectorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
@@ -255,6 +256,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const anthropicAutoCompact = isHookEnabled("anthropic-auto-compact")
     ? createAnthropicAutoCompactHook(ctx, { experimental: pluginConfig.experimental })
     : null;
+  const preemptiveCompaction = createPreemptiveCompactionHook(ctx, { experimental: pluginConfig.experimental });
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
     : null;
@@ -442,6 +444,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
+      await preemptiveCompaction?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
 
