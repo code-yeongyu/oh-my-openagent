@@ -268,9 +268,11 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
-      log(`[${HOOK_NAME}] message.updated received`, { sessionID, role: info?.role })
+      const role = info?.role as string | undefined
+      const finish = info?.finish as boolean | undefined
+      log(`[${HOOK_NAME}] message.updated received`, { sessionID, role, finish })
       
-      if (sessionID && info?.role === "user") {
+      if (sessionID && role === "user") {
         const countdown = pendingCountdowns.get(sessionID)
         if (countdown) {
           clearInterval(countdown.intervalId)
@@ -278,8 +280,11 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           log(`[${HOOK_NAME}] Cancelled countdown on user message`, { sessionID })
         }
       }
-      
 
+      if (sessionID && role === "assistant" && finish) {
+        remindedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Cleared reminded state on assistant finish`, { sessionID })
+      }
     }
 
     if (event.type === "session.deleted") {
