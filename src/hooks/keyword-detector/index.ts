@@ -6,6 +6,8 @@ export * from "./detector"
 export * from "./constants"
 export * from "./types"
 
+const sessionFirstMessageProcessed = new Set<string>()
+
 export function createKeywordDetectorHook() {
   return {
     "chat.message": async (
@@ -20,6 +22,14 @@ export function createKeywordDetectorHook() {
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
+      const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
+      sessionFirstMessageProcessed.add(input.sessionID)
+
+      if (isFirstMessage) {
+        log("Skipping keyword detection on first message for title generation", { sessionID: input.sessionID })
+        return
+      }
+
       const promptText = extractPromptText(output.parts)
       const messages = detectKeywords(promptText)
 
