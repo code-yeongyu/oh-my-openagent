@@ -831,7 +831,6 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 {
   "experimental": {
     "aggressive_truncation": true,
-    "empty_message_recovery": true,
     "auto_resume": true
   }
 }
@@ -840,7 +839,6 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 | 옵션                     | 기본값  | 설명                                                                                                                                                              |
 | ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aggressive_truncation`  | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
-| `empty_message_recovery` | `false` | "non-empty content" API 에러가 발생하면 세션의 빈 메시지를 수정하여 자동으로 복구합니다. 최대 3회 시도 후 포기합니다.                                                |
 | `auto_resume`            | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |
 
 **경고**: 이 기능들은 실험적이며 예상치 못한 동작을 유발할 수 있습니다. 의미를 이해한 경우에만 활성화하세요.
