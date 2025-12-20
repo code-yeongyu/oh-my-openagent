@@ -31,35 +31,15 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
-</ultrawork-mode>
-
----
-
-`,
-  },
-  // PROVE-YOURSELF: frustration keywords
-  {
-    pattern: /\b(wtf|what the fuck|what the hell|wth|bullshit|bs|fucking|씨발|시발|존나|개같이|뭐야|제대로|ちくしょう|くそ|なんだよ|ふざけんな)\b/i,
-    message: `<prove-yourself-mode>
-[PROVE YOURSELF] User frustration detected. Stop. Re-read the ENTIRE conversation.
-
-COMMON FAILURE PATTERNS YOU LIKELY COMMITTED:
-1. **Scope Reduction**: Making "demo", "skeleton", "simplified", "basic" versions instead of full implementation
-2. **Partial Completion**: Stopping at 60-80% saying "you can extend this..."
-3. **Lazy Placeholders**: Using "// TODO", "...", "etc." instead of actual code
-4. **Assumed Shortcuts**: Skipping requirements you deemed "optional" or "can be added later"
-5. **Premature Stopping**: Not finishing all TODOs before declaring done
+## ZERO TOLERANCE FAILURES
+- **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
+- **NO Partial Completion**: Never stop at 60-80% saying "you can extend this..." - finish 100%
+- **NO Assumed Shortcuts**: Never skip requirements you deem "optional" or "can be added later"
+- **NO Premature Stopping**: Never declare done until ALL TODOs are completed and verified
 
 THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
 
-RECOVERY PROTOCOL:
-1. Identify EXACTLY what you failed to deliver
-2. Create TODO items for EVERY remaining piece - no matter how many
-3. Execute ALL of them to completion
-4. Verify against original request before reporting done
-
-No task is "too big". Break it down, track with TODOs obsessively, execute relentlessly. That's your job.
-</prove-yourself-mode>
+</ultrawork-mode>
 
 ---
 
