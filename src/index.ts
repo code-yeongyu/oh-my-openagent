@@ -14,6 +14,7 @@ import {
   createClaudeCodeHooksHook,
   createAnthropicAutoCompactHook,
   createPreemptiveCompactionHook,
+  createCompactionContextInjector,
   createRulesInjectorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
@@ -256,7 +257,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const anthropicAutoCompact = isHookEnabled("anthropic-auto-compact")
     ? createAnthropicAutoCompactHook(ctx, { experimental: pluginConfig.experimental })
     : null;
-  const preemptiveCompaction = createPreemptiveCompactionHook(ctx, { experimental: pluginConfig.experimental });
+  const compactionContextInjector = createCompactionContextInjector();
+  const preemptiveCompaction = createPreemptiveCompactionHook(ctx, {
+    experimental: pluginConfig.experimental,
+    onBeforeSummarize: compactionContextInjector,
+  });
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
     : null;
