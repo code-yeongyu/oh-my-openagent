@@ -643,7 +643,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 | プラットフォーム | ユーザー設定パス |
 |------------------|------------------|
-| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (優先) または `%APPDATA%\opencode\oh-my-opencode.json` (フォールバック) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 スキーマ自動補完がサポートされています：

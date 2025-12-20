@@ -703,7 +703,7 @@ Config file locations (priority order):
 
 | Platform | User Config Path |
 |----------|------------------|
-| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 Schema autocomplete supported:
