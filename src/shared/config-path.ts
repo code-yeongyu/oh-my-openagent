@@ -1,17 +1,34 @@
 import * as path from "path"
 import * as os from "os"
+import * as fs from "fs"
 
 /**
  * Returns the user-level config directory based on the OS.
  * - Linux/macOS: XDG_CONFIG_HOME or ~/.config
- * - Windows: %APPDATA%
+ * - Windows: Checks ~/.config first (cross-platform), then %APPDATA% (fallback)
+ *
+ * On Windows, prioritizes ~/.config for cross-platform consistency.
+ * Falls back to %APPDATA% for backward compatibility with existing installations.
  */
 export function getUserConfigDir(): string {
   if (process.platform === "win32") {
-    return process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
+    const crossPlatformDir = path.join(os.homedir(), ".config")
+    const crossPlatformConfigPath = path.join(crossPlatformDir, "opencode", "oh-my-opencode.json")
+
+    const appdataDir = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
+    const appdataConfigPath = path.join(appdataDir, "opencode", "oh-my-opencode.json")
+
+    if (fs.existsSync(crossPlatformConfigPath)) {
+      return crossPlatformDir
+    }
+
+    if (fs.existsSync(appdataConfigPath)) {
+      return appdataDir
+    }
+
+    return crossPlatformDir
   }
 
-  // Linux, macOS, and other Unix-like systems: respect XDG_CONFIG_HOME
   return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config")
 }
 

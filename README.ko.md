@@ -637,7 +637,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 | 플랫폼 | 사용자 설정 경로 |
 |--------|------------------|
-| **Windows** | `%APPDATA%\opencode\oh-my-opencode.json` |
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (우선) 또는 `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 Schema 자동 완성이 지원됩니다:
