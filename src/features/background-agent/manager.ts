@@ -6,6 +6,7 @@ import type {
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
+import { setSessionAgent, clearSessionAgent } from "../claude-code-session-state/agent-registry"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
@@ -84,6 +85,9 @@ export class BackgroundManager {
     }
 
     const sessionID = createResult.data.id
+
+    // LIF-70: Register session agent for governance hooks to identify allowed agents
+    setSessionAgent(sessionID, input.agent)
 
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
@@ -246,6 +250,7 @@ export class BackgroundManager {
 
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
+      clearSessionAgent(sessionID)
     }
   }
 
