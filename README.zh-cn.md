@@ -1,3 +1,5 @@
+公告：oh-my-opencode 的相关消息之前在我的 X 账号发布，但由于账号被无辜封禁，现在由 [@justsisyphus](https://x.com/justsisyphus) 代为管理更新。
+
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
