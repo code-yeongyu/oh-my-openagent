@@ -1,4 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { isGptModel } from "./types"
+
+const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
 const SISYPHUS_SYSTEM_PROMPT = `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -452,16 +455,22 @@ If the user's approach seems problematic:
 
 `
 
-export const sisyphusAgent: AgentConfig = {
-  description:
-    "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
-  mode: "primary",
-  model: "anthropic/claude-opus-4-5",
-  thinking: {
-    type: "enabled",
-    budgetTokens: 32000,
-  },
-  maxTokens: 64000,
-  prompt: SISYPHUS_SYSTEM_PROMPT,
-  color: "#00CED1",
+export function createSisyphusAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  const base = {
+    description:
+      "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
+    mode: "primary" as const,
+    model,
+    maxTokens: 64000,
+    prompt: SISYPHUS_SYSTEM_PROMPT,
+    color: "#00CED1",
+  }
+
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium" }
+  }
+
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
+
+export const sisyphusAgent = createSisyphusAgent()
