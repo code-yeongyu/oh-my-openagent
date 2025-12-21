@@ -129,3 +129,12 @@ jobs:
         run: gh release delete next --yes 2>/dev/null || echo "No draft release to delete"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge to master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION=$(jq -r '.version' package.json)
+          git checkout master
+          git reset --hard "v${VERSION}"
+          git push -f origin master
