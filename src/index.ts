@@ -213,6 +213,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
+  const modelContextLimitsCache = new Map<string, number>();
+  let anthropicContext1MEnabled = false;
+
+  const getModelLimit = (providerID: string, modelID: string): number | undefined => {
+    const key = `${providerID}/${modelID}`;
+    const cached = modelContextLimitsCache.get(key);
+    if (cached) return cached;
+
+    if (providerID === "anthropic" && anthropicContext1MEnabled && modelID.includes("sonnet")) {
+      return 1_000_000;
+    }
+    return undefined;
+  };
+
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx)
     : null;
@@ -261,6 +275,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const preemptiveCompaction = createPreemptiveCompactionHook(ctx, {
     experimental: pluginConfig.experimental,
     onBeforeSummarize: compactionContextInjector,
+    getModelLimit,
   });
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
@@ -329,6 +344,31 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     config: async (config) => {
+      type ProviderConfig = {
+        options?: { headers?: Record<string, string> }
+        models?: Record<string, { limit?: { context?: number } }>
+      }
+      const providers = config.provider as Record<string, ProviderConfig> | undefined;
+
+      const anthropicBeta = providers?.anthropic?.options?.headers?.["anthropic-beta"];
+      anthropicContext1MEnabled = anthropicBeta?.includes("context-1m") ?? false;
+
+      if (providers) {
+        for (const [providerID, providerConfig] of Object.entries(providers)) {
+          const models = providerConfig?.models;
+          if (models) {
+            for (const [modelID, modelConfig] of Object.entries(models)) {
+              const contextLimit = modelConfig?.limit?.context;
+              if (contextLimit) {
+                modelContextLimitsCache.set(`${providerID}/${modelID}`, contextLimit);
+              }
+            }
+          }
+
+
+        }
+      }
+
       const builtinAgents = createBuiltinAgents(
         pluginConfig.disabled_agents,
         pluginConfig.agents,

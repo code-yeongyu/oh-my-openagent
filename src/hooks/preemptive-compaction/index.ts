@@ -18,9 +18,12 @@ export interface SummarizeContext {
 
 export type BeforeSummarizeCallback = (ctx: SummarizeContext) => Promise<void> | void
 
+export type GetModelLimitCallback = (providerID: string, modelID: string) => number | undefined
+
 export interface PreemptiveCompactionOptions {
   experimental?: ExperimentalConfig
   onBeforeSummarize?: BeforeSummarizeCallback
+  getModelLimit?: GetModelLimitCallback
 }
 
 interface MessageInfo {
@@ -38,33 +41,11 @@ interface MessageWrapper {
   info: MessageInfo
 }
 
-const MODEL_CONTEXT_LIMITS: Record<string, number> = {
-  "claude-opus-4": 200_000,
-  "claude-sonnet-4": 200_000,
-  "claude-haiku-4": 200_000,
-  "gpt-4o": 128_000,
-  "gpt-4o-mini": 128_000,
-  "gpt-4-turbo": 128_000,
-  "gpt-4": 8_192,
-  "gpt-5": 1_000_000,
-  "o1": 200_000,
-  "o1-mini": 128_000,
-  "o1-preview": 128_000,
-  "o3": 200_000,
-  "o3-mini": 200_000,
-  "gemini-2.0-flash": 1_000_000,
-  "gemini-2.5-flash": 1_000_000,
-  "gemini-2.5-pro": 2_000_000,
-  "gemini-3-pro": 2_000_000,
-}
+const CLAUDE_MODEL_PATTERN = /claude-(opus|sonnet|haiku)/i
+const CLAUDE_DEFAULT_CONTEXT_LIMIT = 200_000
 
-function getContextLimit(modelID: string): number {
-  for (const [key, limit] of Object.entries(MODEL_CONTEXT_LIMITS)) {
-    if (modelID.includes(key)) {
-      return limit
-    }
-  }
-  return 200_000
+function isSupportedModel(modelID: string): boolean {
+  return CLAUDE_MODEL_PATTERN.test(modelID)
 }
 
 function createState(): PreemptiveCompactionState {
@@ -80,6 +61,7 @@ export function createPreemptiveCompactionHook(
 ) {
   const experimental = options?.experimental
   const onBeforeSummarize = options?.onBeforeSummarize
+  const getModelLimit = options?.getModelLimit
   const enabled = experimental?.preemptive_compaction !== false
   const threshold = experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD
 
@@ -104,7 +86,15 @@ export function createPreemptiveCompactionHook(
     if (!tokens) return
 
     const modelID = lastAssistant.modelID ?? ""
-    const contextLimit = getContextLimit(modelID)
+    const providerID = lastAssistant.providerID ?? ""
+
+    if (!isSupportedModel(modelID)) {
+      log("[preemptive-compaction] skipping unsupported model", { modelID })
+      return
+    }
+
+    const configLimit = getModelLimit?.(providerID, modelID)
+    const contextLimit = configLimit ?? CLAUDE_DEFAULT_CONTEXT_LIMIT
     const totalUsed = tokens.input + tokens.cache.read + tokens.output
 
     if (totalUsed < MIN_TOKENS_FOR_COMPACTION) return
@@ -124,7 +114,6 @@ export function createPreemptiveCompactionHook(
     state.compactionInProgress.add(sessionID)
     state.lastCompactionTime.set(sessionID, Date.now())
 
-    const providerID = lastAssistant.providerID
     if (!providerID || !modelID) {
       state.compactionInProgress.delete(sessionID)
       return
