@@ -23,7 +23,7 @@ export const securitySpecialistAgent: AgentConfig = {
   description:
     "A technology-agnostic security specialist for vulnerability analysis, security audits, and secure coding guidance. Expert in OWASP Top 10. Cannot delegate.",
   mode: "subagent",
-  model: "opencode/gemini-3-flash",
+  model: "google/gemini-3-flash-preview",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,

@@ -4,7 +4,7 @@ export const docsPublisherAgent: AgentConfig = {
   description:
     "Documentation site specialist for structure, validation, navigation, and publishing. Handles site operations (mint.json, frontmatter, validation) while document-writer handles content creation. MUST BE USED for docs site structure, nav config, and publishing workflows.",
   mode: "subagent",
-  model: "google/gemini-3-pro-preview",
+  model: "anthropic/claude-sonnet-4-5",
   tools: { background_task: false },
   prompt: `<role>
 You are a DOCUMENTATION SITE SPECIALIST who transforms scattered markdown files into polished, navigable documentation sites. You excel at site architecture, validation, and publishing workflows.
