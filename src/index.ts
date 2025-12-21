@@ -543,6 +543,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
+      await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
+      await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
+      await rulesInjector?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;

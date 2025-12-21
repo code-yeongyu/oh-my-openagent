@@ -28,6 +28,15 @@ interface ToolExecuteOutput {
   metadata: unknown;
 }
 
+interface ToolExecuteBeforeOutput {
+  args: unknown;
+}
+
+interface BatchToolCall {
+  tool: string;
+  parameters: Record<string, unknown>;
+}
+
 interface EventInput {
   event: {
     type: string;
@@ -49,6 +58,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     string,
     { contentHashes: Set<string>; realPaths: Set<string> }
   >();
+  const pendingBatchFiles = new Map<string, string[]>();
 
   function getSessionCache(sessionID: string): {
     contentHashes: Set<string>;
@@ -60,26 +70,25 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     return sessionCaches.get(sessionID)!;
   }
 
-  function resolveFilePath(title: string): string | null {
-    if (!title) return null;
-    if (title.startsWith("/")) return title;
-    return resolve(ctx.directory, title);
+  function resolveFilePath(path: string): string | null {
+    if (!path) return null;
+    if (path.startsWith("/")) return path;
+    return resolve(ctx.directory, path);
   }
 
-  const toolExecuteAfter = async (
-    input: ToolExecuteInput,
+  function processFilePathForInjection(
+    filePath: string,
+    sessionID: string,
     output: ToolExecuteOutput
-  ) => {
-    if (!TRACKED_TOOLS.includes(input.tool.toLowerCase())) return;
+  ): void {
+    const resolved = resolveFilePath(filePath);
+    if (!resolved) return;
 
-    const filePath = resolveFilePath(output.title);
-    if (!filePath) return;
-
-    const projectRoot = findProjectRoot(filePath);
-    const cache = getSessionCache(input.sessionID);
+    const projectRoot = findProjectRoot(resolved);
+    const cache = getSessionCache(sessionID);
     const home = homedir();
 
-    const ruleFileCandidates = findRuleFiles(projectRoot, home, filePath);
+    const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved);
     const toInject: RuleToInject[] = [];
 
     for (const candidate of ruleFileCandidates) {
@@ -89,7 +98,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
         const rawContent = readFileSync(candidate.path, "utf-8");
         const { metadata, body } = parseRuleFrontmatter(rawContent);
 
-        const matchResult = shouldApplyRule(metadata, filePath, projectRoot);
+        const matchResult = shouldApplyRule(metadata, resolved, projectRoot);
         if (!matchResult.applies) continue;
 
         const contentHash = createContentHash(body);
@@ -119,7 +128,58 @@ export function createRulesInjectorHook(ctx: PluginInput) {
       output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${rule.content}`;
     }
 
-    saveInjectedRules(input.sessionID, cache);
+    saveInjectedRules(sessionID, cache);
+  }
+
+  function extractFilePathFromToolCall(call: BatchToolCall): string | null {
+    const params = call.parameters;
+    return (params?.filePath ?? params?.file_path ?? params?.path) as string | null;
+  }
+
+  const toolExecuteBefore = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteBeforeOutput
+  ) => {
+    if (input.tool.toLowerCase() !== "batch") return;
+
+    const args = output.args as { tool_calls?: BatchToolCall[] } | undefined;
+    if (!args?.tool_calls) return;
+
+    const filePaths: string[] = [];
+    for (const call of args.tool_calls) {
+      if (TRACKED_TOOLS.includes(call.tool.toLowerCase())) {
+        const filePath = extractFilePathFromToolCall(call);
+        if (filePath) {
+          filePaths.push(filePath);
+        }
+      }
+    }
+
+    if (filePaths.length > 0) {
+      pendingBatchFiles.set(input.callID, filePaths);
+    }
+  };
+
+  const toolExecuteAfter = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteOutput
+  ) => {
+    const toolName = input.tool.toLowerCase();
+
+    if (TRACKED_TOOLS.includes(toolName)) {
+      processFilePathForInjection(output.title, input.sessionID, output);
+      return;
+    }
+
+    if (toolName === "batch") {
+      const filePaths = pendingBatchFiles.get(input.callID);
+      if (filePaths) {
+        for (const filePath of filePaths) {
+          processFilePathForInjection(filePath, input.sessionID, output);
+        }
+        pendingBatchFiles.delete(input.callID);
+      }
+    }
   };
 
   const eventHandler = async ({ event }: EventInput) => {
@@ -144,6 +204,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
   };
 
   return {
+    "tool.execute.before": toolExecuteBefore,
     "tool.execute.after": toolExecuteAfter,
     event: eventHandler,
   };

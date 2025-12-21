@@ -20,6 +20,15 @@ interface ToolExecuteOutput {
   metadata: unknown;
 }
 
+interface ToolExecuteBeforeOutput {
+  args: unknown;
+}
+
+interface BatchToolCall {
+  tool: string;
+  parameters: Record<string, unknown>;
+}
+
 interface EventInput {
   event: {
     type: string;
@@ -29,6 +38,7 @@ interface EventInput {
 
 export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
   const sessionCaches = new Map<string, Set<string>>();
+  const pendingBatchReads = new Map<string, string[]>();
 
   function getSessionCache(sessionID: string): Set<string> {
     if (!sessionCaches.has(sessionID)) {
@@ -37,10 +47,10 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
     return sessionCaches.get(sessionID)!;
   }
 
-  function resolveFilePath(title: string): string | null {
-    if (!title) return null;
-    if (title.startsWith("/")) return title;
-    return resolve(ctx.directory, title);
+  function resolveFilePath(path: string): string | null {
+    if (!path) return null;
+    if (path.startsWith("/")) return path;
+    return resolve(ctx.directory, path);
   }
 
   function findAgentsMdUp(startDir: string): string[] {
@@ -63,20 +73,17 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
     return found.reverse();
   }
 
-  const toolExecuteAfter = async (
-    input: ToolExecuteInput,
+  function processFilePathForInjection(
+    filePath: string,
+    sessionID: string,
     output: ToolExecuteOutput,
-  ) => {
-    if (input.tool.toLowerCase() !== "read") return;
+  ): void {
+    const resolved = resolveFilePath(filePath);
+    if (!resolved) return;
 
-    const filePath = resolveFilePath(output.title);
-    if (!filePath) return;
-
-    const dir = dirname(filePath);
-    const cache = getSessionCache(input.sessionID);
+    const dir = dirname(resolved);
+    const cache = getSessionCache(sessionID);
     const agentsPaths = findAgentsMdUp(dir);
-
-    const toInject: { path: string; content: string }[] = [];
 
     for (const agentsPath of agentsPaths) {
       const agentsDir = dirname(agentsPath);
@@ -84,18 +91,55 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
 
       try {
         const content = readFileSync(agentsPath, "utf-8");
-        toInject.push({ path: agentsPath, content });
+        output.output += `\n\n[Directory Context: ${agentsPath}]\n${content}`;
         cache.add(agentsDir);
       } catch {}
     }
 
-    if (toInject.length === 0) return;
+    saveInjectedPaths(sessionID, cache);
+  }
 
-    for (const { path, content } of toInject) {
-      output.output += `\n\n[Directory Context: ${path}]\n${content}`;
+  const toolExecuteBefore = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteBeforeOutput,
+  ) => {
+    if (input.tool.toLowerCase() !== "batch") return;
+
+    const args = output.args as { tool_calls?: BatchToolCall[] } | undefined;
+    if (!args?.tool_calls) return;
+
+    const readFilePaths: string[] = [];
+    for (const call of args.tool_calls) {
+      if (call.tool.toLowerCase() === "read" && call.parameters?.filePath) {
+        readFilePaths.push(call.parameters.filePath as string);
+      }
     }
 
-    saveInjectedPaths(input.sessionID, cache);
+    if (readFilePaths.length > 0) {
+      pendingBatchReads.set(input.callID, readFilePaths);
+    }
+  };
+
+  const toolExecuteAfter = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteOutput,
+  ) => {
+    const toolName = input.tool.toLowerCase();
+
+    if (toolName === "read") {
+      processFilePathForInjection(output.title, input.sessionID, output);
+      return;
+    }
+
+    if (toolName === "batch") {
+      const filePaths = pendingBatchReads.get(input.callID);
+      if (filePaths) {
+        for (const filePath of filePaths) {
+          processFilePathForInjection(filePath, input.sessionID, output);
+        }
+        pendingBatchReads.delete(input.callID);
+      }
+    }
   };
 
   const eventHandler = async ({ event }: EventInput) => {
@@ -120,6 +164,7 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
   };
 
   return {
+    "tool.execute.before": toolExecuteBefore,
     "tool.execute.after": toolExecuteAfter,
     event: eventHandler,
   };
