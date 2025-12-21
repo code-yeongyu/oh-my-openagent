@@ -1,8 +1,8 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-16T16:00:00+09:00
-**Commit:** a2d2109
-**Branch:** master
+**Generated:** 2025-12-22T02:23:00+09:00
+**Commit:** aad7a72
+**Branch:** dev
 
 ## OVERVIEW
 
@@ -13,16 +13,16 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (OmO, oracle, librarian, explore, frontend, document-writer, multimodal-looker)
+│   ├── agents/        # AI agents (Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker)
 │   ├── hooks/         # 21 lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
 │   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
 │   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app)
-│   ├── features/      # Terminal, Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
+│   ├── features/      # Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
 │   ├── config/        # Zod schema, TypeScript types
 │   ├── auth/          # Google Antigravity OAuth
 │   ├── shared/        # Utilities (deep-merge, pattern-matcher, logger, etc.)
 │   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
-├── script/            # build-schema.ts, publish.ts
+├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
 └── dist/              # Build output (ESM + .d.ts)
 ```
@@ -52,6 +52,7 @@ oh-my-opencode/
 - **Directory naming**: kebab-case (`ast-grep/`, `claude-code-hooks/`)
 - **Tool structure**: Each tool has index.ts, types.ts, constants.ts, tools.ts, utils.ts
 - **Hook pattern**: `createXXXHook(input: PluginInput)` returning event handlers
+- **Test style**: BDD comments `#given`, `#when`, `#then` (same as AAA pattern)
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -63,6 +64,7 @@ oh-my-opencode/
 - **Local version bump**: Version managed by CI workflow, never modify locally
 - **Rush completion**: Never mark tasks complete without verification
 - **Interrupting work**: Complete tasks fully before stopping
+- **Over-exploration**: Stop searching when sufficient context found
 
 ## UNIQUE STYLES
 
@@ -73,12 +75,13 @@ oh-my-opencode/
 - **Agent tools restriction**: Use `tools: { include: [...] }` or `tools: { exclude: [...] }`
 - **Temperature**: Most agents use `0.1` for consistency
 - **Hook naming**: `createXXXHook` function naming convention
+- **Date references**: NEVER use 2024 in code/prompts (use current year)
 
 ## AGENT MODELS
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| OmO | anthropic/claude-opus-4-5 | Primary orchestrator, team leader |
+| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator, team leader |
 | oracle | openai/gpt-5.2 | Strategic advisor, code review, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs lookup, GitHub examples |
 | explore | opencode/grok-code | Fast codebase exploration, file patterns |
@@ -100,6 +103,9 @@ bun run rebuild
 
 # Build schema only
 bun run build:schema
+
+# Run tests
+bun test
 ```
 
 ## DEPLOYMENT
@@ -124,11 +130,18 @@ gh run list --workflow=publish
 - Never run `bun publish` directly (OIDC provenance issue)
 - Never bump version locally
 
+## CI PIPELINE
+
+- **ci.yml**: Parallel test/typecheck jobs, build verification, auto-commit schema changes on master
+- **publish.yml**: Manual workflow_dispatch, version bump, changelog generation, OIDC npm publishing
+- Schema auto-commit prevents build drift
+- Draft release creation on dev branch
+
 ## NOTES
 
-- **No tests**: Test framework not configured
+- **Testing**: Bun native test framework (`bun test`), BDD-style with `#given/#when/#then` comments
 - **OpenCode version**: Requires >= 1.0.150 (earlier versions have config bugs)
-- **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA)
+- **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config locations**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Schema autocomplete**: Add `$schema` field in config for IDE support
 - **Trusted dependencies**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
