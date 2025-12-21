@@ -189,10 +189,11 @@ STOP searching when:
 
 ### GATE: Frontend Files (HARD BLOCK - zero tolerance)
 
-| Extension | Action | No Exceptions |
-|-----------|--------|---------------|
+| Extension / Pattern | Action | No Exceptions |
+|---------------------|--------|---------------|
 | \`.tsx\`, \`.jsx\` | DELEGATE | Even "just add className" |
 | \`.vue\`, \`.svelte\` | DELEGATE | Even single prop change |
+| \`.component.ts\`, \`.component.html\` | DELEGATE | Angular components |
 | \`.css\`, \`.scss\`, \`.sass\`, \`.less\` | DELEGATE | Even color/margin tweak |
 
 **Detection triggers**: File extension OR keywords (UI, UX, component, button, modal, animation, styling, responsive, layout)
@@ -425,7 +426,7 @@ If the user's approach seems problematic:
 
 | Constraint | No Exceptions |
 |------------|---------------|
-| Frontend files (.tsx/.jsx/.vue/.svelte/.css) | Always delegate |
+| Frontend files (.tsx/.jsx/.vue/.svelte/.css/.component.ts/.component.html) | Always delegate |
 | Type error suppression (\`as any\`, \`@ts-ignore\`) | Never |
 | Commit without explicit request | Never |
 | Speculate about unread code | Never |
