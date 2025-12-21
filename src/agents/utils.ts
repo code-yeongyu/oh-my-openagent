@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides } from "./types"
-import { sisyphusAgent } from "./sisyphus"
-import { oracleAgent } from "./oracle"
+import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory } from "./types"
+import { createSisyphusAgent } from "./sisyphus"
+import { createOracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
@@ -9,14 +9,24 @@ import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
 
-const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
-  Sisyphus: sisyphusAgent,
-  oracle: oracleAgent,
+type AgentSource = AgentFactory | AgentConfig
+
+const agentSources: Record<BuiltinAgentName, AgentSource> = {
+  Sisyphus: createSisyphusAgent,
+  oracle: createOracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
   "document-writer": documentWriterAgent,
   "multimodal-looker": multimodalLookerAgent,
+}
+
+function isFactory(source: AgentSource): source is AgentFactory {
+  return typeof source === "function"
+}
+
+function buildAgent(source: AgentSource, model?: string): AgentConfig {
+  return isFactory(source) ? source(model) : source
 }
 
 export function createEnvContext(directory: string): string {
@@ -67,37 +77,29 @@ export function createBuiltinAgents(
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
-  for (const [name, config] of Object.entries(allBuiltinAgents)) {
+  for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
     if (disabledAgents.includes(agentName)) {
       continue
     }
 
-    let finalConfig = config
+    const override = agentOverrides[agentName]
+    const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
+
+    let config = buildAgent(source, model)
 
     if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
       const envContext = createEnvContext(directory)
-      finalConfig = {
-        ...config,
-        prompt: config.prompt + envContext,
-      }
-    }
-
-    const override = agentOverrides[agentName]
-
-    if (agentName === "Sisyphus" && systemDefaultModel && !override?.model) {
-      finalConfig = {
-        ...finalConfig,
-        model: systemDefaultModel,
-      }
+      config = { ...config, prompt: config.prompt + envContext }
     }
 
     if (override) {
-      result[name] = mergeAgentConfig(finalConfig, override)
-    } else {
-      result[name] = finalConfig
+      const { model: _, ...restOverride } = override
+      config = mergeAgentConfig(config, restOverride)
     }
+
+    result[name] = config
   }
 
   return result

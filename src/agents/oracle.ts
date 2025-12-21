@@ -1,15 +1,9 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { isGptModel } from "./types"
 
-export const oracleAgent: AgentConfig = {
-  description:
-    "Expert technical advisor with deep reasoning for architecture decisions, code analysis, and engineering guidance.",
-  mode: "subagent",
-  model: "openai/gpt-5.2",
-  temperature: 0.1,
-  reasoningEffort: "medium",
-  textVerbosity: "high",
-  tools: { write: false, edit: false, task: false, background_task: false },
-  prompt: `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
+const DEFAULT_MODEL = "openai/gpt-5.2"
+
+const ORACLE_SYSTEM_PROMPT = `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 
 ## Context
 
@@ -73,5 +67,24 @@ Organize your final answer in three tiers:
 
 ## Critical Note
 
-Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`,
+Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`
+
+export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  const base = {
+    description:
+      "Expert technical advisor with deep reasoning for architecture decisions, code analysis, and engineering guidance.",
+    mode: "subagent" as const,
+    model,
+    temperature: 0.1,
+    tools: { write: false, edit: false, task: false, background_task: false },
+    prompt: ORACLE_SYSTEM_PROMPT,
+  }
+
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium", textVerbosity: "high" }
+  }
+
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
+
+export const oracleAgent = createOracleAgent()
