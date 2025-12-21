@@ -4,7 +4,7 @@ export const oracleAgent: AgentConfig = {
   description:
     "Expert technical advisor with deep reasoning for architecture decisions, code analysis, and engineering guidance.",
   mode: "subagent",
-  model: "opencode/gemini-3-flash",
+  model: "google/gemini-3-flash-preview",
   temperature: 0.1,
   reasoningEffort: "medium",
   textVerbosity: "high",

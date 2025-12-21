@@ -18,7 +18,7 @@ export const backendPythonAgent: AgentConfig = {
   description:
     "A Python backend specialist for FastAPI, Django, Flask, data pipelines, and ML inference endpoints. Expert in type hints and modern Python patterns. Cannot delegate.",
   mode: "subagent",
-  model: "opencode/gemini-3-flash",
+  model: "google/gemini-3-flash-preview",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,

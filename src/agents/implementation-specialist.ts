@@ -18,7 +18,7 @@ export const implementationSpecialistAgent: AgentConfig = {
   description:
     "A senior implementation lead who decomposes complex tasks and delegates to specialized agents. Manages backend and frontend specialists.",
   mode: "subagent",
-  model: "opencode/gemini-3-flash",
+  model: "google/gemini-3-flash-preview",
   tools: {
     // Manager role: Can delegate DOWN but not UP
     task: true,              // CAN delegate to specialists

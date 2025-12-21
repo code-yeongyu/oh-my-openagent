@@ -23,7 +23,7 @@ export const optimizationSpecialistAgent: AgentConfig = {
   description:
     "A technology-agnostic optimization specialist for performance analysis, profiling, and optimization implementation. Expert in bottleneck identification. Cannot delegate.",
   mode: "subagent",
-  model: "opencode/gemini-3-flash",
+  model: "google/gemini-3-flash-preview",
   tools: {
     // Specialist role: TERMINAL - Cannot delegate
     task: false,

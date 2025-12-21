@@ -7,10 +7,18 @@ import { getToolConfigForRole } from "../../config/tool-config"
 import { AGENT_ROLE_REGISTRY } from "../../agents"
 import { DelegationTracker } from "../../features/orchestration"
 import { setSessionAgent } from "../../features/claude-code-session-state/agent-registry"
+import {
+  coerceToArtifactResponse,
+  truncateArtifactResponse,
+  formatArtifactResponseForReturn,
+  type ArtifactTruncationConfig,
+} from "../../shared/artifact-response"
+import type { OhMyOpenCodeConfig } from "../../config/schema"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  config?: OhMyOpenCodeConfig
 ) {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -60,7 +68,7 @@ export function createCallOmoAgent(
         return result
       }
 
-      const result = await executeSync(args, toolContext, ctx)
+      const result = await executeSync(args, toolContext, ctx, config)
       delegationTracker.popDelegation()
       return result
     },
@@ -102,7 +110,8 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 async function executeSync(
   args: CallOmoAgentArgs,
   toolContext: { sessionID: string },
-  ctx: PluginInput
+  ctx: PluginInput,
+  config?: OhMyOpenCodeConfig
 ): Promise<string> {
   let sessionID: string
 
@@ -200,6 +209,31 @@ async function executeSync(
   const responseText = textParts.map((p: any) => p.text).join("\n")
 
   log(`[call_omo_agent] Got response, length: ${responseText.length}`)
+
+  const truncationEnabled = config?.governance?.artifact_truncation?.enabled !== false
+  
+  if (truncationEnabled) {
+    const truncationConfig: ArtifactTruncationConfig = {
+      maxSummaryTokenEstimate: config?.governance?.artifact_truncation?.max_summary_tokens ?? 200,
+      maxOutputChars: config?.governance?.artifact_truncation?.max_output_chars ?? 4000,
+      keepTaskMetadata: config?.governance?.artifact_truncation?.keep_task_metadata !== false,
+    }
+    
+    const artifactResponse = coerceToArtifactResponse(responseText, {
+      sessionId: sessionID,
+      fromAgent: "orchestrator",
+      toAgent: args.subagent_type,
+    })
+    
+    const truncatedResponse = truncateArtifactResponse(artifactResponse, truncationConfig)
+    
+    log(`[call_omo_agent] Applied artifact truncation, truncated: ${truncatedResponse.telemetry.truncated}`)
+    
+    return formatArtifactResponseForReturn(truncatedResponse, {
+      includeTaskMetadata: truncationConfig.keepTaskMetadata,
+      sessionId: sessionID,
+    })
+  }
 
   const output =
     responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
