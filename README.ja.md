@@ -1,3 +1,5 @@
+お知らせ: oh-my-opencodeに関するニュースは私のXアカウントで投稿していましたが、無実の罪で凍結されたため、[@justsisyphus](https://x.com/justsisyphus)が代わりに管理しています。
+
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">

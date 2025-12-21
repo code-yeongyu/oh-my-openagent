@@ -1,3 +1,5 @@
+공지: oh-my-opencode 관련 소식은 제 X 계정에서 올렸었는데, 억울하게 정지당해서 [@justsisyphus](https://x.com/justsisyphus)가 대신 관리하고 있습니다.
+
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
