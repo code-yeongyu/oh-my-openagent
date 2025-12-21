@@ -95,8 +95,7 @@ export function createBuiltinAgents(
     }
 
     if (override) {
-      const { model: _, ...restOverride } = override
-      config = mergeAgentConfig(config, restOverride)
+      config = mergeAgentConfig(config, override)
     }
 
     result[name] = config
