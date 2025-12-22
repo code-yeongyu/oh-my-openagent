@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ExperimentalConfig } from "../config/schema"
 import { createDynamicTruncator } from "../shared/dynamic-truncator"
 
 const TRUNCATABLE_TOOLS = [
@@ -17,14 +18,19 @@ const TRUNCATABLE_TOOLS = [
   "Interactive_bash",
 ]
 
-export function createToolOutputTruncatorHook(ctx: PluginInput) {
+interface ToolOutputTruncatorOptions {
+  experimental?: ExperimentalConfig
+}
+
+export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOutputTruncatorOptions) {
   const truncator = createDynamicTruncator(ctx)
+  const truncateAll = options?.experimental?.truncate_all_tool_outputs ?? false
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
     output: { title: string; output: string; metadata: unknown }
   ) => {
-    if (!TRUNCATABLE_TOOLS.includes(input.tool)) return
+    if (!truncateAll && !TRUNCATABLE_TOOLS.includes(input.tool)) return
 
     try {
       const { result, truncated } = await truncator.truncate(input.sessionID, output.output)
