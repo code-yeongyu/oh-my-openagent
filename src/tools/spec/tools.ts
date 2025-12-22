@@ -25,7 +25,10 @@ This tool creates a standardized spec folder structure for tracking feature work
 Naming convention: {ISSUE-ID}-{type}-{name-slug}
 Example: LIF-123-feat-user-authentication
 
-Types: feat, fix, chore, refactor, docs, infra`
+Types: feat, fix, chore, refactor, docs, infra
+
+Worktree support: Use 'basePath' to create spec folder in a git worktree instead of the main repo.
+Example: basePath="../myrepo-worktrees/eru/lif-123-feature" creates folder in the worktree.`
 
 /**
  * Slugify a string for use in folder names
@@ -214,11 +217,16 @@ export function createSpecFolderTool(ctx: PluginInput) {
         .enum(["feat", "fix", "chore", "refactor", "docs", "infra"] as const)
         .describe("Type of work (default: feat)")
         .optional(),
+      basePath: tool.schema
+        .string()
+        .describe("Base path for spec folder (e.g., worktree path). If not provided, uses current project directory.")
+        .optional(),
     },
     async execute(args: {
       featureName: string
       linearIssue?: string
       type?: SpecType
+      basePath?: string
     }): Promise<string> {
       const type = args.type || "feat"
       const nameSlug = slugify(args.featureName)
@@ -226,10 +234,21 @@ export function createSpecFolderTool(ctx: PluginInput) {
       log(`[create_spec_folder] Creating spec folder for: ${args.featureName}`)
 
       try {
+        // Determine base directory (worktree or main repo)
+        let baseDir: string
+        if (args.basePath) {
+          // Use provided basePath (e.g., worktree path)
+          baseDir = path.isAbsolute(args.basePath)
+            ? args.basePath
+            : path.join(ctx.directory, args.basePath)
+        } else {
+          baseDir = ctx.directory
+        }
+
         // Determine folder ID
         let folderId: string
-        const specsBase = findSpecsBaseDir(ctx.directory)
-        const specsDir = path.join(ctx.directory, specsBase)
+        const specsBase = findSpecsBaseDir(baseDir)
+        const specsDir = path.join(baseDir, specsBase)
 
         if (args.linearIssue) {
           folderId = `${args.linearIssue.toUpperCase()}-${type}-${nameSlug}`
@@ -239,7 +258,7 @@ export function createSpecFolderTool(ctx: PluginInput) {
         }
 
         const folderPath = path.join(specsBase, folderId)
-        const fullFolderPath = path.join(ctx.directory, folderPath)
+        const fullFolderPath = path.join(baseDir, folderPath)
 
         // Check if folder already exists
         if (fs.existsSync(fullFolderPath)) {
@@ -274,12 +293,15 @@ export function createSpecFolderTool(ctx: PluginInput) {
         const changelogDir = path.join(fullFolderPath, "changelog")
         fs.mkdirSync(changelogDir, { recursive: true })
 
+        const worktreeInfo = args.basePath ? ` in worktree: ${args.basePath}` : ""
         const result: CreateSpecFolderResult = {
           success: true,
           path: folderPath,
+          fullPath: fullFolderPath,
           folderId,
           createdFiles,
-          message: `Created spec folder: ${folderPath} with ${createdFiles.length} template files`,
+          basePath: args.basePath,
+          message: `Created spec folder: ${folderPath}${worktreeInfo} with ${createdFiles.length} template files`,
         }
 
         log(`[create_spec_folder] Success:`, result)

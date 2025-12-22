@@ -4,12 +4,16 @@
 export interface CreateSpecFolderResult {
   /** Whether the operation succeeded */
   success: boolean
-  /** The created folder path (relative to project root) */
+  /** The created folder path (relative to base) */
   path?: string
+  /** The absolute folder path */
+  fullPath?: string
   /** The folder ID (e.g., LIF-123-feat-user-auth) */
   folderId?: string
   /** List of created files */
   createdFiles?: string[]
+  /** Base path if worktree was used */
+  basePath?: string
   /** Human-readable success message */
   message: string
   /** Error message if failed */

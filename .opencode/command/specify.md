@@ -51,50 +51,66 @@ Given that feature description, do this:
      - Fall back to non-Linear mode (sequential numbering: `{NNN}-{type}-{slug}`)
      - Only allowed when Linear MCP is unavailable (offline mode)
 
-2. **Call create-feature.sh script**:
-   - **Linear Mode** (when Linear MCP available and issue created/selected):
+2. **Create Git Worktree from `dev` (MANDATORY)**:
+   - **Get branch name**: Use `linear_branch` tool or `issue.branchName` from step 1
+   - **Determine repo name**: Extract from current directory (e.g., `oh-my-opencode`)
+   - **Create worktree**:
      ```bash
-     .cursor/scripts/bash/create-feature.sh --json \
-       --branch-name "{issue.branchName}" \
-       --spec-dir-name "{ISSUE-ID}-{type}-{name-slug}" \
-       --issue-id "{ISSUE-ID}" \
-       --issue-type "{type}" \
-       "$ARGUMENTS"
+     # Fetch latest dev branch
+     git fetch origin dev
+     
+     # Get repo name from current directory
+     REPO_NAME=$(basename "$(pwd)")
+     
+     # Create worktree with new branch based on dev
+     # Worktree location: ../{repo-name}-worktrees/{branch-name}
+     WORKTREE_PATH="../${REPO_NAME}-worktrees/{BRANCH_NAME}"
+     mkdir -p "../${REPO_NAME}-worktrees"
+     git worktree add -b "{BRANCH_NAME}" "$WORKTREE_PATH" origin/dev
      ```
-     - **MUST** have Linear issue before calling script (from step 1)
-   - **Non-Linear Mode** (ONLY when Linear MCP unavailable - offline fallback):
-     ```bash
-     .cursor/scripts/bash/create-feature.sh --json "$ARGUMENTS" --short-name "{generated-short-name}"
-     ```
-     - **ONLY** allowed when Linear MCP is not available
-     - Sequential numbering: `{NNN}-{type}-{slug}` format
-   - Parse JSON output to get `BRANCH_NAME`, `SPEC_DIR`, `SPEC_FILE`, etc.
+   - **If worktree already exists**: 
+     - Check if branch exists: `git branch --list "{BRANCH_NAME}"`
+     - If exists, use existing worktree path
+     - Report to user: "Worktree already exists at {path}"
+   - **Store worktree path** for subsequent steps: `WORKTREE_PATH`
+   - **All subsequent file operations happen in the worktree**, not the main repo
 
-3. **Call Context Steward** (GOVERNANCE):
+3. **Create Spec Folder in Worktree** (use `create_spec_folder` tool):
+   - **Call the tool**:
+     ```
+     create_spec_folder({
+       featureName: "{feature-name}",
+       linearIssue: "{ISSUE-ID}",  // e.g., "LIF-123"
+       type: "{type}",              // e.g., "feat", "fix", "refactor"
+       basePath: "{WORKTREE_PATH}"  // e.g., "../oh-my-opencode-worktrees/eru/lif-123-feature"
+     })
+     ```
+   - **Tool returns**:
+     - `path`: Relative path (e.g., `.cursor/specs/LIF-123-feat-user-auth`)
+     - `fullPath`: Absolute path in worktree
+     - `folderId`: Folder ID (e.g., `LIF-123-feat-user-auth`)
+     - `createdFiles`: List of template files created (spec.md, plan.md, tasks.md, status.md)
+   - Set `SPEC_DIR` = `{result.fullPath}`
+   - Set `SPEC_FILE` = `{SPEC_DIR}/spec.md`
+
+4. **Call Context Steward** (GOVERNANCE):
    - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path: `SPEC_DIR` from script output
-   - Ensure path follows `.cursor/specs/{SPEC_DIR_NAME}/` structure
-
-4. **Load spec template**:
-   - Load `.cursor/templates/spec-template.md` to understand required sections
+   - Validate canonical path: `SPEC_DIR` (in worktree)
+   - Ensure path follows `{WORKTREE_PATH}/.cursor/specs/{SPEC_DIR_NAME}/` structure
 
 5. **Engage Product Strategist Agent**:
    - Read `.opencode/agent/product-strategist.md` (COMPLETE, no offset/limit)
    - Adopt Product Strategist persona
-   - Create `spec.md` at `SPEC_FILE` path (from script JSON output)
-   - **DO NOT re-create spec folder** - use `SPEC_DIR` from script
+   - **Update** `spec.md` at `SPEC_FILE` path (template already created by tool in step 3)
    - Follow Product Strategist steps exactly
-   - **NOTE**: Product Strategist will also create Mintlify docs in `docs/requirements/` (dual workflow)
+   - **NOTE**: Mintlify docs (`docs/requirements/`) created in worktree as well
 
 6. **Call Historian** (GOVERNANCE):
    - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Product Strategist work
+   - Create changelog entry for Product Strategist work (in worktree)
    - Include: mode, scope, files created, decisions made
 
-7. **Report completion**:
-   - Branch name, spec file path, readiness for next phase (`/plan` or `/clarify`)
-
-8. **Persist Workflow State** (REQUIRED):
+7. **Persist Workflow State** (REQUIRED):
    ```
    update_workflow_state({
      specPath: "{SPEC_DIR}",
@@ -104,22 +120,63 @@ Given that feature description, do this:
    ```
    This enables session continuity and resume messages.
 
+8. **Instruct User to Switch to Worktree (FINAL STEP)**:
+   - **Report completion summary**:
+     - Linear issue: `{ISSUE-ID}` with link
+     - Branch: `{BRANCH_NAME}` (based on `dev`)
+     - Worktree: `{WORKTREE_PATH}`
+     - Spec file: `{SPEC_FILE}`
+   - **Instruct user to close OpenCode and switch**:
+     ```
+     ✅ Specification complete! Your development environment is ready.
+     
+     **Next steps:**
+     1. Close this OpenCode session (Ctrl+C or type 'exit')
+     2. Run this command to switch to your new worktree:
+     
+        cd {WORKTREE_PATH} && opencode
+     
+     3. Continue with `/plan` to create the implementation plan
+     ```
+   - **CRITICAL**: Do NOT continue with `/plan` in current session
+   - User MUST switch to worktree first for proper isolation
+
 ## Linear Branch Policy
 
 **CRITICAL**: When Linear is used:
 - Git branch MUST be `issue.branchName` from Linear (exact match)
+- Branch MUST be created from `origin/dev` as base
+- Worktree MUST be created at `../{REPO_NAME}-worktrees/{BRANCH_NAME}`
 - Spec folder MUST be `{ISSUE-ID}-{type}-{name-slug}` format
 - If issue has parent, prompt user for branch strategy (see step 1)
+
+## Worktree Policy
+
+**Why worktrees?**
+- Isolated development environment per feature
+- Clean context for OpenCode (no cross-contamination)
+- Easy parallel work on multiple features
+- Simple cleanup when feature is complete
+
+**Worktree location**: `../{REPO_NAME}-worktrees/{BRANCH_NAME}`
+- Sibling to main repo, named `{repo-name}-worktrees`
+- Example: If main repo is `/code/oh-my-opencode`, worktree is `/code/oh-my-opencode-worktrees/eru/lif-123-feature-name`
+
+**Worktree cleanup** (after feature merged):
+```bash
+git worktree remove ../{REPO_NAME}-worktrees/{BRANCH_NAME}
+git branch -d {BRANCH_NAME}
+```
 
 ## Agent Integration
 
 When Product Strategist agent is invoked:
-- **DO NOT** create spec folder (already created by script)
-- **USE** `SPEC_DIR` from script JSON output
-- **RESPECT** provided canonical path
+- **DO NOT** create spec folder (already created in step 3)
+- **USE** `SPEC_DIR` in the worktree (from step 3)
+- **RESPECT** worktree path for all file operations
 - **CALL** Context Steward before writing files
 - **CALL** Historian after completing work
-- **SUPPORT** dual workflow: Creates both `.cursor/specs/` and `docs/requirements/`
+- **SUPPORT** dual workflow: Creates both `.cursor/specs/` and `docs/requirements/` in worktree
 
 ## General Guidelines
 
