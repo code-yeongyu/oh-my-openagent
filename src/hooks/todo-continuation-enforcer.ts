@@ -279,6 +279,8 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           pendingCountdowns.delete(sessionID)
           log(`[${HOOK_NAME}] Cancelled countdown on user message`, { sessionID })
         }
+        // Allow new continuation after user sends another message
+        remindedSessions.delete(sessionID)
       }
 
       if (sessionID && role === "assistant" && finish) {
