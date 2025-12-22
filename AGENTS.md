@@ -1,8 +1,74 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-15T22:57:00+09:00
-**Commit:** cea64e4
-**Branch:** master
+**Generated:** 2025-12-22
+**Project:** oh-my-opencode
+**Type:** OpenCode Plugin
+
+---
+
+## PROJECT CONTEXT AWARENESS
+
+### When to Read Project Context
+
+**ALWAYS read project context at the start of:**
+- New sessions (first action)
+- Complex tasks requiring architecture decisions
+- Implementation work spanning multiple files
+- Before making technology choices
+
+**HOW to read it:**
+```
+read_context({ section: "all" })
+```
+
+Or for specific sections:
+```
+read_context({ section: "tech_stack" })
+read_context({ section: "architecture" })
+read_context({ section: "conventions" })
+```
+
+### Project Context Location
+
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| `.opencode/project-context.yaml` | Structured project config | Programmatic access via `read_context` tool |
+| `AGENTS.md` (this file) | Quick reference | Auto-injected when reading any file |
+| `.cursor/memory/constitution.md` | Project principles | Major decisions, architecture changes |
+| `.cursor/memory/architecture.md` | System design | Implementation planning |
+| `.cursor/memory/tech-stack.md` | Technology details | Framework/library choices |
+
+### Project Context Structure
+
+```yaml
+project:
+  name: "project-name"
+  type: "web-application | api-service | cli | library"
+  
+tech_stack:
+  languages: [{ name, version, primary }]
+  frameworks: { frontend, backend, testing }
+  databases: [{ type, orm }]
+  package_manager: "bun | pnpm | npm"
+
+architecture:
+  pattern: "layered | hexagonal | clean | feature-based"
+  layers: [{ name, path, description }]
+
+conventions:
+  naming: { files, functions, classes }
+  code_style: { indent, quotes, semicolons }
+  commit_format: "conventional"
+```
+
+### Why This Matters
+
+- **Consistency**: All agents use same conventions
+- **Context**: Subagents inherit project knowledge
+- **Quality**: Decisions align with architecture
+- **Speed**: No re-discovery of project setup
+
+---
 
 ## OVERVIEW
 

@@ -21,25 +21,84 @@ This command:
 
 ---
 
+## OmO Plugin Tools Available
+
+Use these tools during initialization:
+
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| `read_context` | Read existing project context | Check for existing config |
+| `linear_branch` | Get branch naming from Linear | After Linear setup |
+| `linear_create_issue` | Create Linear project/issue | During Linear setup |
+| `create_spec_folder` | Create spec folder structure | If specs needed |
+| `glob` | Find config files | Tech detection |
+| `grep` | Search file contents | Dependency detection |
+| `lsp_workspace_symbols` | Find code patterns | Architecture detection |
+
+### Tool Usage Examples
+
+**Check for existing config:**
+```
+read_context({ section: "all" })
+```
+
+**Detect tech stack from files:**
+```
+glob({ pattern: "package.json", path: "." })
+glob({ pattern: "tsconfig.json", path: "." })
+glob({ pattern: "pyproject.toml", path: "." })
+```
+
+**Search for dependencies:**
+```
+grep({ pattern: "\"react\":", include: "package.json", path: "." })
+grep({ pattern: "fastapi", include: "pyproject.toml", path: "." })
+```
+
+**Find existing patterns:**
+```
+ast_grep_search({ pattern: "export function $NAME($$$) { $$$ }", lang: "typescript", paths: ["src/"] })
+```
+
+---
+
 ## Interactive Flow
 
 ### Step 1: Check for Existing Configuration
 
-**First**, check if `.opencode/` already exists:
+**First**, use tools to check existing state:
+
+```
+# Check for existing project context
+read_context({ section: "all" })
+
+# Check for existing config files
+glob({ pattern: ".opencode/**/*", path: "." })
+glob({ pattern: "AGENTS.md", path: "." })
+```
+
+**Display to user:**
 
 ```
 📂 Checking for existing OpenCode configuration...
 
-{If .opencode/ exists}:
-⚠️  **Existing Configuration Found**
+{If read_context returns initialized: true}:
+✅ **Existing Configuration Found**
 
-An `.opencode/` directory already exists. What would you like to do?
+Project: {context.project.name}
+Type: {context.project.type}
+Tech Stack: {context.tech_stack summary}
+Architecture: {context.architecture.pattern}
 
-- [ ] **Overwrite** - Remove existing config and start fresh
-- [ ] **Merge** - Keep existing config and update missing parts
-- [ ] **Cancel** - Exit without changes
+What would you like to do?
+1. **Update** - Keep config, update missing parts
+2. **Overwrite** - Remove existing config, start fresh
+3. **Cancel** - Exit without changes
 
 > [User selection]
+
+{If read_context returns initialized: false}:
+📝 No existing configuration found. Starting fresh setup...
 ```
 
 ### Step 2: Project Information
@@ -83,12 +142,31 @@ What type of project is this?
 
 ### Step 3: Technology Stack Detection (Existing Projects)
 
-For existing projects, scan for configuration files:
+For existing projects, use tools to scan:
 
 ```
 🔍 **Scanning project for technology stack...**
 
-Scanning for configuration files...
+# Detect config files
+glob({ pattern: "package.json", path: "." })
+glob({ pattern: "tsconfig.json", path: "." })
+glob({ pattern: "pyproject.toml", path: "." })
+glob({ pattern: "go.mod", path: "." })
+glob({ pattern: "Cargo.toml", path: "." })
+
+# If package.json found, search for frameworks
+grep({ pattern: "\"react\"", include: "package.json", path: "." })
+grep({ pattern: "\"next\"", include: "package.json", path: "." })
+grep({ pattern: "\"express\"", include: "package.json", path: "." })
+grep({ pattern: "\"hono\"", include: "package.json", path: "." })
+
+# Detect testing frameworks
+grep({ pattern: "\"vitest\"", include: "package.json", path: "." })
+grep({ pattern: "\"jest\"", include: "package.json", path: "." })
+grep({ pattern: "\"bun:test\"", include: "package.json", path: "." })
+
+# Find existing code patterns
+ast_grep_search({ pattern: "export function $NAME($$$) { $$$ }", lang: "typescript", paths: ["src/"] })
 ```
 
 **Files to Detect:**
@@ -351,20 +429,53 @@ Which layers can {layer2} import from?
 
 ### Step 6: Linear Integration Setup
 
+**Use Linear MCP tools for integration:**
+
 ```
 📋 **Linear Integration**
 
 OpenCode uses Linear for project management, issue tracking, and branch naming.
 
+# Check if Linear is available (uses Linear MCP)
+linear_list_teams()
+```
+
+**If Linear Available:**
+
+```
+🔍 **Fetching your Linear teams...**
+
+# Get available teams
+linear_list_teams()
+
+**Available Teams:**
+1. {Team Name} (KEY1)
+2. {Team Name} (KEY2)
+
+> Select team [1-n]:
+
 ---
 
-**Checking for LINEAR_API_KEY...**
+**Project Setup:**
+1. Create new Linear project for this codebase
+2. Use existing project: [show list from linear_list_projects({ team: "TEAM_ID" })]
+3. Skip project selection (use team-level tracking)
 
-{If found in environment}:
-✅ LINEAR_API_KEY found
+> [Select 1-3]
 
-{If not found}:
-⚠️  LINEAR_API_KEY not found in environment
+{If creating new project}:
+# Create Linear project
+linear_create_project({
+  name: "{project_name}",
+  team: "{team_id}",
+  description: "{project_description}"
+})
+```
+
+**If Linear NOT Available:**
+
+```
+⚠️  Linear MCP not configured or LINEAR_API_KEY not set.
 
 To set up Linear integration:
 1. Go to Linear → Settings → API → Personal API Keys
@@ -378,39 +489,10 @@ To set up Linear integration:
    $env:LINEAR_API_KEY="lin_api_..."
 
 Options:
-1. I've added the key - continue
-2. Skip Linear setup (not recommended - issues required for tracking)
+1. I've added the key - try again
+2. Skip Linear setup (tracking features limited)
 
 > [Select 1-2]
-```
-
-**If Linear Available:**
-
-```
-🔍 **Fetching your Linear teams...**
-
-**Available Teams:**
-1. {Team Name} (KEY1)
-2. {Team Name} (KEY2)
-3. {Team Name} (KEY3)
-
-> Select team [1-n]:
-
----
-
-**Project Setup:**
-1. Create new Linear project for this codebase
-2. Use existing project: [show list]
-3. Skip project selection (use team-level tracking)
-
-> [Select 1-3]
-
-{If creating new project}:
-**Project Name:** [{project_name} - default]
-> [Enter name or press enter for default]
-
-**Project Description:** 
-> [Optional description]
 ```
 
 ### Step 7: Mintlify Configuration
@@ -773,7 +855,96 @@ metadata:
 
 ### AGENTS.md Generation
 
-Use `root-AGENTS.md.template` with project-context.yaml data to generate root AGENTS.md.
+Generate root AGENTS.md with these sections:
+
+```markdown
+# PROJECT KNOWLEDGE BASE
+
+**Generated:** {ISO_date}
+**Project:** {project_name}
+**Type:** {project_type}
+
+---
+
+## PROJECT CONTEXT AWARENESS
+
+### When to Read Project Context
+
+**ALWAYS read project context at the start of:**
+- New sessions (first action)
+- Complex tasks requiring architecture decisions
+- Implementation work spanning multiple files
+- Before making technology choices
+
+**HOW to read it:**
+\`\`\`
+read_context({ section: "all" })
+\`\`\`
+
+Or for specific sections:
+\`\`\`
+read_context({ section: "tech_stack" })
+read_context({ section: "architecture" })
+read_context({ section: "conventions" })
+\`\`\`
+
+### Project Context Location
+
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| \`.opencode/project-context.yaml\` | Structured project config | Programmatic access via \`read_context\` tool |
+| \`AGENTS.md\` (this file) | Quick reference | Auto-injected when reading any file |
+
+### Project Context Structure
+
+\`\`\`yaml
+project:
+  name: "{project_name}"
+  type: "{project_type}"
+  
+tech_stack:
+  languages: [{languages}]
+  frameworks: { frontend: {frontend}, backend: {backend} }
+  package_manager: "{package_manager}"
+
+architecture:
+  pattern: "{architecture_pattern}"
+  layers: [{layers}]
+
+conventions:
+  naming: { files, functions, classes }
+  code_style: { indent, quotes, semicolons }
+\`\`\`
+
+### Why This Matters
+
+- **Consistency**: All agents use same conventions
+- **Context**: Subagents inherit project knowledge
+- **Quality**: Decisions align with architecture
+- **Speed**: No re-discovery of project setup
+
+---
+
+## OVERVIEW
+
+{project_description}
+
+## STRUCTURE
+
+{directory_structure}
+
+## CONVENTIONS
+
+{coding_conventions}
+
+## ANTI-PATTERNS
+
+{anti_patterns}
+
+## COMMANDS
+
+{available_commands}
+```
 
 For layer-specific AGENTS.md files, copy from architecture templates:
 - Read `.opencode/templates/architectures/{pattern}/{layer}-AGENTS.md`
@@ -884,4 +1055,83 @@ After generation, verify:
 - **Creates**: 5-15 files depending on architecture
 - **Modifies**: `.gitignore` (adds OpenCode ignores)
 - **Network**: Linear API (optional), no other network required
+
+---
+
+## OmO Plugin Tools Reference
+
+After initialization, these tools are available to all agents:
+
+### Project Context Tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `read_context` | Read project-context.yaml | `read_context({ section: "tech_stack" })` |
+| `create_spec_folder` | Create spec folder for features | `create_spec_folder({ featureName: "auth", type: "feat" })` |
+| `update_workflow_state` | Track workflow progress | `update_workflow_state({ specPath: "...", step: "plan" })` |
+
+### Linear Integration Tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `linear_branch` | Get branch name for issue | `linear_branch({ issueId: "ABC-123" })` |
+| `linear_update_status` | Update issue status | `linear_update_status({ issueId: "ABC-123", status: "in_progress" })` |
+| `linear_create_issue` | Create new issue | `linear_create_issue({ title: "...", team: "..." })` |
+
+### Code Navigation Tools (LSP)
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `lsp_goto_definition` | Jump to symbol definition | `lsp_goto_definition({ filePath, line, character })` |
+| `lsp_find_references` | Find all usages | `lsp_find_references({ filePath, line, character })` |
+| `lsp_workspace_symbols` | Search symbols by name | `lsp_workspace_symbols({ query: "User", filePath })` |
+| `lsp_document_symbols` | Get file structure | `lsp_document_symbols({ filePath })` |
+| `lsp_diagnostics` | Check for errors | `lsp_diagnostics({ filePath })` |
+| `lsp_rename` | Rename symbol across workspace | `lsp_rename({ filePath, line, character, newName })` |
+| `lsp_code_actions` | Get available quick fixes | `lsp_code_actions({ filePath, startLine, endLine, ... })` |
+
+### Code Search Tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `ast_grep_search` | AST-aware pattern search | `ast_grep_search({ pattern: "console.log($$$)", lang: "typescript" })` |
+| `grep` | Text pattern search | `grep({ pattern: "TODO", include: "*.ts" })` |
+| `glob` | File pattern matching | `glob({ pattern: "src/**/*.ts" })` |
+
+### Research Tools (MCP)
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `context7_get-library-docs` | Official library docs | `context7_get-library-docs({ libraryID: "/vercel/next.js" })` |
+| `grep_app_searchGitHub` | Search public GitHub repos | `grep_app_searchGitHub({ query: "useEffect cleanup" })` |
+| `websearch_exa_web_search_exa` | Web search | `websearch_exa_web_search_exa({ query: "..." })` |
+
+### Agent Delegation
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `call_omo_agent` | Delegate to specialist agent | `call_omo_agent({ subagent_type: "oracle", prompt: "...", run_in_background: false })` |
+| `background_task` | Run agent in background | `background_task({ agent: "explore", prompt: "..." })` |
+
+---
+
+## Workflow Commands
+
+After initialization, use these workflow commands:
+
+| Command | Purpose | Delegated Agent |
+|---------|---------|-----------------|
+| `/specify` | Create feature specification | product-strategist |
+| `/plan` | Create implementation plan | strategic-planner |
+| `/tasks` | Create task breakdown | task-planner |
+| `/implement` | Implement feature | implementation-specialist |
+| `/review` | Code review | oracle |
+| `/test` | Write and run tests | test-specialist |
+
+Each command:
+1. Validates prerequisites
+2. Loads project context via `read_context`
+3. Delegates to specialist agent via `call_omo_agent`
+4. Persists workflow state via `update_workflow_state`
+5. Updates Linear status via `linear_update_status`
 
