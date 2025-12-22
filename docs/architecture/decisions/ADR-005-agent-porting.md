@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Initially, specialized workflow agents (Product Strategist, Strategic Architect, Task Planner) were defined as markdown files in `.opencode/agent/`. These agents were invoked by reading their markdown content and adopting their persona. While flexible, this approach had several limitations:
+Initially, specialized workflow agents (Product Strategist, Strategic Planner, Task Planner) were defined as markdown files in `.opencode/agent/`. These agents were invoked by reading their markdown content and adopting their persona. While flexible, this approach had several limitations:
 - **Lack of Type Safety**: Agent definitions and their tool requirements were not validated at compile time.
 - **Indirect Execution**: Invoking agents required manual steps to read files and adopt personas, leading to verbose command logic.
 - **Limited Integration**: Markdown-based agents had limited access to the plugin's internal state and shared utilities.

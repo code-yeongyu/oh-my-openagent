@@ -107,7 +107,7 @@ call_omo_agent(subagent_type="product-strategist", run_in_background=false, prom
 | T4.1 | Create agent hierarchy diagram | Not Started | 45min | `docs/architecture/agent-hierarchy.md` |
 | T4.2 | Create workflow orchestration diagram | Not Started | 45min | `docs/architecture/workflow-orchestration.md` |
 | T4.3 | Create governance hooks diagram | Not Started | 45min | `docs/architecture/governance-hooks.md` |
-| T4.4 | Create ADR-005-agent-porting | Not Started | 45min | `docs/architecture/decisions/ADR-005-agent-porting.md` |
+| T4.4 | Create ADR-005-agent-porting | Completed | 45min | `docs/architecture/decisions/ADR-005-agent-porting.md` |
 
 **Checkpoint**: All mermaid diagrams render correctly.
 

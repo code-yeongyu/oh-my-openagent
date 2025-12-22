@@ -13,6 +13,7 @@ import {
 import {
   detectWorkflowCommand,
   WORKFLOW_COMMANDS,
+  checkPrerequisites,
 } from "../../src/hooks/workflow-state-enforcer"
 
 describe("Workflow Command Detection", () => {
@@ -177,5 +178,91 @@ The ${expectedAgent} agent is specialized for this workflow step.`
     expect(message).toContain("subagent_type=")
     expect(message).toContain("run_in_background=false")
     expect(message).toContain("prompt=")
+  })
+})
+
+describe("Prerequisites Validation", () => {
+  const defaultPrereqs = DEFAULT_WORKFLOW_STATE_ENFORCER_CONFIG.prerequisites
+
+  describe("commands without prerequisites", () => {
+    test("/specify should have no prerequisites", () => {
+      const result = checkPrerequisites("/specify", defaultPrereqs, "/nonexistent")
+      expect(result.valid).toBe(true)
+      expect(result.command).toBe("/specify")
+      expect(result.missingPrerequisites).toBeUndefined()
+    })
+  })
+
+  describe("commands with prerequisites", () => {
+    test("/plan should require spec.md", () => {
+      const result = checkPrerequisites("/plan", defaultPrereqs, "/nonexistent/path")
+      expect(result.valid).toBe(false)
+      expect(result.command).toBe("/plan")
+      expect(result.missingPrerequisites).toContain("spec.md")
+      expect(result.suggestion).toContain("/specify")
+    })
+
+    test("/tasks should require plan.md", () => {
+      const result = checkPrerequisites("/tasks", defaultPrereqs, "/nonexistent/path")
+      expect(result.valid).toBe(false)
+      expect(result.command).toBe("/tasks")
+      expect(result.missingPrerequisites).toContain("plan.md")
+      expect(result.suggestion).toContain("/plan")
+    })
+
+    test("/implement should require tasks.md", () => {
+      const result = checkPrerequisites("/implement", defaultPrereqs, "/nonexistent/path")
+      expect(result.valid).toBe(false)
+      expect(result.command).toBe("/implement")
+      expect(result.missingPrerequisites).toContain("tasks.md")
+      expect(result.suggestion).toContain("/tasks")
+    })
+
+    test("/review should require spec.md", () => {
+      const result = checkPrerequisites("/review", defaultPrereqs, "/nonexistent/path")
+      expect(result.valid).toBe(false)
+      expect(result.command).toBe("/review")
+      expect(result.missingPrerequisites).toContain("spec.md")
+      expect(result.suggestion).toContain("/specify")
+    })
+
+    test("/test should require spec.md", () => {
+      const result = checkPrerequisites("/test", defaultPrereqs, "/nonexistent/path")
+      expect(result.valid).toBe(false)
+      expect(result.command).toBe("/test")
+      expect(result.missingPrerequisites).toContain("spec.md")
+      expect(result.suggestion).toContain("/specify")
+    })
+  })
+
+  describe("empty prerequisites config", () => {
+    test("should return valid for any command with empty prerequisites", () => {
+      const emptyPrereqs: Record<string, string[]> = {}
+      const result = checkPrerequisites("/plan", emptyPrereqs, "/any/path")
+      expect(result.valid).toBe(true)
+    })
+
+    test("should return valid for command with empty array", () => {
+      const emptyArrayPrereqs = { "/plan": [] }
+      const result = checkPrerequisites("/plan", emptyArrayPrereqs, "/any/path")
+      expect(result.valid).toBe(true)
+    })
+  })
+
+  describe("suggestion messages", () => {
+    test("should suggest /specify before /plan", () => {
+      const result = checkPrerequisites("/plan", defaultPrereqs, "/nonexistent")
+      expect(result.suggestion).toBe("Run /specify first to create the required artifacts.")
+    })
+
+    test("should suggest /plan before /tasks", () => {
+      const result = checkPrerequisites("/tasks", defaultPrereqs, "/nonexistent")
+      expect(result.suggestion).toBe("Run /plan first to create the required artifacts.")
+    })
+
+    test("should suggest /tasks before /implement", () => {
+      const result = checkPrerequisites("/implement", defaultPrereqs, "/nonexistent")
+      expect(result.suggestion).toBe("Run /tasks first to create the required artifacts.")
+    })
   })
 })
