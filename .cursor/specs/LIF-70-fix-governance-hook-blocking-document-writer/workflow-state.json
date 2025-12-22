@@ -1,7 +1,8 @@
 {
-  "currentStep": "implement",
+  "currentStep": "review",
   "completedSteps": [
-    "specify"
+    "specify",
+    "implement"
   ],
   "artifactHashes": {
     "spec.md": "b74fd745d4f0e8f5",
@@ -10,8 +11,8 @@
     "status.md": "affd6850dead6996"
   },
   "linearIssueId": null,
-  "linearStatus": "in_progress",
+  "linearStatus": "in_review",
   "createdAt": "2025-12-21T23:26:05.874Z",
-  "updatedAt": "2025-12-21T23:56:46.428Z",
-  "lastCommand": "/implement"
+  "updatedAt": "2025-12-21T23:58:32.666Z",
+  "lastCommand": "/review"
 }

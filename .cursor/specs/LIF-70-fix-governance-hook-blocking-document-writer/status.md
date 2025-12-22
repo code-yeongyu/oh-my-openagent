@@ -5,8 +5,9 @@
 
 ## Current Status
 
-- **Phase**: Implementation Complete
+- **Phase**: In Review
 - **Progress**: 100%
+- **PR**: [#8](https://github.com/DomGrieco/oh-my-opencode/pull/8)
 - **Blockers**: None
 
 ## Implementation Summary
@@ -34,6 +35,8 @@
 ### Verification
 
 - [x] Build passes (`bun run typecheck`)
+- [x] PR created and pushed
+- [x] Linear issue updated to In Review
 - [ ] Manual test: document-writer can write .md files
 - [ ] Manual test: Non-allowed agents still blocked
 
@@ -41,10 +44,10 @@
 
 - 2025-12-21: Spec created with root cause analysis
 - 2025-12-21: Implementation complete (3 lines changed)
-- 2025-12-21: Typecheck passes
+- 2025-12-21: PR #8 created and pushed
 
 ## Next Steps
 
-1. Create PR for review
-2. Test in real scenario with document-writer agent
-3. Merge and close Linear issue
+1. Review and merge PR
+2. Manual verification
+3. Close Linear issue
