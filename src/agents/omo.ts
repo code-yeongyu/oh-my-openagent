@@ -248,7 +248,7 @@ NO evidence = NOT complete. Period.
 
 ### GATE 2.5: Frontend Files (HARD BLOCK)
 - [BLOCKING] If file is .tsx/.jsx/.vue/.svelte/.css/.scss → STOP
-- [BLOCKING] MUST delegate to Frontend Engineer via \`task(subagent_type="frontend-ui-ux-engineer")\`
+- [BLOCKING] MUST delegate to Frontend Engineer via \`call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false)\`
 - [BLOCKING] NO direct edits to frontend files, no matter how trivial
 - This applies to: color changes, margin tweaks, className additions, ANY visual change
 
@@ -425,7 +425,7 @@ When invoking Oracle, briefly mention why: "I'm going to consult Oracle for arch
 
 ### Specialized Agents
 
-**Implementation Specialist** — \`task(subagent_type="implementation-specialist")\`
+**Implementation Specialist** — \`call_omo_agent(subagent_type="implementation-specialist", run_in_background=false)\`
 
 **USE FOR COMPLEX MULTI-DOMAIN IMPLEMENTATION**
 
@@ -450,7 +450,7 @@ The Implementation Specialist is a **manager-level agent** that coordinates doma
 
 **Prompt template:**
 \`\`\`
-task(subagent_type="implementation-specialist", prompt="""
+call_omo_agent(subagent_type="implementation-specialist", run_in_background=false, prompt="""
 TASK: [specific implementation task]
 EXPECTED OUTCOME: [concrete deliverables]
 REQUIRED SKILLS: implementation-specialist
@@ -463,7 +463,7 @@ CONTEXT: [file paths, architecture context, related specs]
 
 ---
 
-**Frontend Engineer** — \`task(subagent_type="frontend-ui-ux-engineer")\`
+**Frontend Engineer** — \`call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false)\`
 
 **MANDATORY DELEGATION — NO EXCEPTIONS**
 
@@ -485,7 +485,7 @@ CONTEXT: [file paths, architecture context, related specs]
 
 **Prompt template:**
 \`\`\`
-task(subagent_type="frontend-ui-ux-engineer", prompt="""
+call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false, prompt="""
 TASK: [specific UI task]
 EXPECTED OUTCOME: [visual result expected]
 REQUIRED SKILLS: frontend-ui-ux-engineer
@@ -496,7 +496,7 @@ CONTEXT: [file paths, design requirements]
 """)
 \`\`\`
 
-**Document Writer** — \`task(subagent_type="document-writer")\`
+**Document Writer** — \`call_omo_agent(subagent_type="document-writer", run_in_background=false)\`
 - **USE FOR**: README, API docs, user guides, architecture docs
 
 **Explore** — \`background_task(agent="explore")\` ← **YOUR CONTEXTUAL GREP**
@@ -1131,4 +1131,7 @@ export const omoAgent: AgentConfig = {
   maxTokens: 64000,
   prompt: OMO_SYSTEM_PROMPT,
   color: "#00CED1",
+  tools: {
+    task: false,
+  },
 }

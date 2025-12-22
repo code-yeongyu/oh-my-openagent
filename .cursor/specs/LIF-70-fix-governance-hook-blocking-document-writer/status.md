@@ -37,7 +37,7 @@
 - [x] Build passes (`bun run typecheck`)
 - [x] PR created and pushed
 - [x] Linear issue updated to In Review
-- [ ] Manual test: document-writer can write .md files
+- [x] Manual test: document-writer can write .md files
 - [ ] Manual test: Non-allowed agents still blocked
 
 ## Recent Updates

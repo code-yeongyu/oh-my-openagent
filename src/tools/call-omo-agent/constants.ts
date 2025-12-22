@@ -16,6 +16,7 @@ export const ALLOWED_AGENTS = [
   // Specialist agents (can modify files) - existing
   "frontend-ui-ux-engineer",
   "document-writer",
+  "docs-publisher",
   // LIF-62 Phase 4A: Manager agent (can delegate to specialists)
   "implementation-specialist",
   // LIF-62 Phase 4A: Initial specialists (cannot delegate further)
