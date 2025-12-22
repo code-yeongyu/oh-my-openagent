@@ -34,6 +34,8 @@ export const ALLOWED_AGENTS = [
   "security-specialist",
   "test-specialist",
   "optimization-specialist",
+  // LIF-70: Advisor agent
+  "oracle",
 ] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.
