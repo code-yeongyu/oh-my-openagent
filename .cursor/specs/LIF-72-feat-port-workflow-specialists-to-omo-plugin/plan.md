@@ -10,6 +10,8 @@ Port 3 workflow-specific agents from legacy `.opencode/agent/*.md` markdown file
 
 > **Revision Note (2025-12-22)**: Plan updated based on code review findings - added ALLOWED_AGENTS step, consolidated hooks 4→2, adjusted time estimates to 75min/agent.
 
+> **Revision Note #2 (2025-12-22)**: Added specialist research capability (DD-4) - enable `background_task: true` for specialists to call research agents (explore, librarian, oracle).
+
 ## Technical Context
 
 | Aspect | Details |
@@ -94,14 +96,14 @@ Agent completes work
 ```typescript
 // src/agents/product-strategist.ts
 export const productStrategistAgent: AgentConfig = {
-  description: "Spec writing specialist for /specify command",
+  description: "Spec writing specialist for /specify command. Can research via explore/librarian.",
   mode: "subagent",
   model: "anthropic/claude-sonnet-4-5",
   tools: {
-    // Specialist: Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
+    // NOTE: Delegation tools (task, background_task, call_omo_agent) are 
+    // controlled by ROLE config in tool-config.ts, not here.
+    // Specialist role: task=false, call_omo_agent=false, background_task=true
+    
     // File tools: enabled for spec writing
     write: true,
     edit: true,
@@ -116,6 +118,28 @@ export const productStrategistAgent: AgentConfig = {
   prompt: `<role>...</role>`,
 }
 ```
+
+### Specialist Research Capability (DD-4)
+
+Specialists can use `background_task` to call research agents. This is configured in `tool-config.ts`:
+
+```typescript
+// src/config/tool-config.ts - UPDATED
+specialist: {
+  task: false,             // ❌ Cannot use OpenCode's built-in delegation
+  background_task: true,   // ✅ CAN fire background research tasks
+  call_omo_agent: false,   // ❌ Cannot call agents synchronously
+  // ... rest unchanged
+}
+```
+
+**Research Agent Mapping** (must be in agent prompts):
+
+| Agent | Research Agents | Example Usage |
+|-------|-----------------|---------------|
+| product-strategist | explore, librarian | `background_task(agent="explore", prompt="Find existing spec patterns...")` |
+| strategic-planner | explore, librarian, oracle | `background_task(agent="oracle", prompt="Review this architecture...")` |
+| task-planner | explore | `background_task(agent="explore", prompt="Estimate complexity of...")` |
 
 ### Role Registry Update
 
@@ -175,10 +199,11 @@ export const DEFAULT_WORKFLOW_STATE_ENFORCER_CONFIG: WorkflowStateEnforcerConfig
 
 ## Implementation Steps
 
-### Phase 1: Port Specialized Agents (4h)
+### Phase 1: Port Specialized Agents (4.5h)
 
 | Step | Task | Files | Estimate |
 |------|------|-------|----------|
+| 1.0 | **Enable specialist research** | `src/config/tool-config.ts` | 10min |
 | 1.1 | Create product-strategist.ts | `src/agents/product-strategist.ts` | 75min |
 | 1.2 | Create strategic-planner.ts | `src/agents/strategic-planner.ts` | 75min |
 | 1.3 | Create task-planner.ts | `src/agents/task-planner.ts` | 75min |
@@ -187,7 +212,9 @@ export const DEFAULT_WORKFLOW_STATE_ENFORCER_CONFIG: WorkflowStateEnforcerConfig
 | 1.6 | Update config schema | `src/config/schema.ts` | 10min |
 | 1.7 | **Add to ALLOWED_AGENTS** | `src/tools/call-omo-agent/constants.ts` | 5min |
 
-> **Critical**: Step 1.7 is REQUIRED. Without adding agents to `ALLOWED_AGENTS`, `call_omo_agent()` calls will fail at runtime.
+> **Critical Step 1.0**: Enable `background_task: true` for specialist role so all specialists can research.
+
+> **Critical Step 1.7**: Without adding agents to `ALLOWED_AGENTS`, `call_omo_agent()` calls will fail at runtime.
 
 **Agent Prompt Sources**:
 - product-strategist: Port from existing spec writing patterns
@@ -197,7 +224,9 @@ export const DEFAULT_WORKFLOW_STATE_ENFORCER_CONFIG: WorkflowStateEnforcerConfig
 **Agent Prompt Requirements** (all agents must include):
 - MUST call `update_workflow_state()` before completing
 - MUST return structured JSON response
-- MUST NOT delegate to other agents (specialist role)
+- MUST NOT delegate work to other specialists
+- MUST specify which research agents to use (see Research Agent Mapping above)
+- Research example in prompt: `Use background_task(agent="explore", prompt="...") for codebase research`
 
 ### Phase 2: Governance Enhancements (2h)
 
@@ -282,6 +311,7 @@ export const DEFAULT_WORKFLOW_STATE_ENFORCER_CONFIG: WorkflowStateEnforcerConfig
 | `src/agents/index.ts` | Exists | Add new agent exports |
 | `src/hooks/index.ts` | Exists | Add new hook exports |
 | `src/config/schema.ts` | Exists | Add new config options |
+| `src/config/tool-config.ts` | Exists | **CRITICAL**: Enable `background_task: true` for specialist |
 | `src/tools/spec/` | Exists | Uses create_spec_folder, update_workflow_state |
 | `src/tools/call-omo-agent/constants.ts` | Exists | **CRITICAL**: Add to ALLOWED_AGENTS |
 
@@ -327,14 +357,14 @@ Since no test framework exists, testing is via dogfooding:
 
 | Phase | Original | Revised | Delta |
 |-------|----------|---------|-------|
-| Phase 1: Agents | 2.5h | 4h | +1.5h (75min/agent + testing) |
+| Phase 1: Agents | 2.5h | 4.5h | +2h (75min/agent + testing + tool-config) |
 | Phase 2: Hooks | 3h | 2h | -1h (consolidated) |
 | Phase 3: Commands | 3h | 3h | - |
 | Phase 4: Docs | 3h | 3h | - |
 | Phase 5: Instructions | 1.5h | 1.5h | - |
 | Phase 6: Archive | 0.5h | 0.5h | - |
 | Phase 7: Deploy | 0.3h | 0.3h | - |
-| **Total** | **13.8h** | **14.3h** | **+0.5h** |
+| **Total** | **13.8h** | **14.8h** | **+1h** |
 
 ## Next Steps
 

@@ -82,18 +82,20 @@ So that I can understand how OmO orchestration works
 1. **product-strategist.ts**: Spec writing expertise for `/specify`
    - Focus on requirements, user stories, acceptance criteria
    - Technology-agnostic output
-   - Specialist role (cannot delegate)
+   - Specialist role (cannot delegate work, CAN research via background_task)
+   - Research agents: `explore` (patterns), `librarian` (documentation)
 
 2. **strategic-planner.ts**: Architecture planning for `/plan`
    - Technical context analysis
    - Constitution check integration
-   - Consults oracle for review
-   - Specialist role (cannot delegate)
+   - Specialist role (cannot delegate work, CAN research via background_task)
+   - Research agents: `explore` (code), `librarian` (docs), `oracle` (architecture review)
 
 3. **task-planner.ts**: Task decomposition for `/tasks`
    - Phase-based organization (Setup → Foundational → User Stories → Polish)
    - Uses Linear tools directly
-   - Specialist role (cannot delegate)
+   - Specialist role (cannot delegate work, CAN research via background_task)
+   - Research agents: `explore` (complexity estimation)
 
 #### FR-2: Governance Hooks
 1. **governance-workflow-delegation**: Detects workflow commands, suggests correct specialist if wrong agent attempts work
@@ -180,7 +182,7 @@ So that I can understand how OmO orchestration works
 ## Assumptions
 
 1. **Linear tools work well directly**: No need for a coordinator layer; agents use Linear tools directly
-2. **Specialist role is appropriate**: New agents should not delegate (terminal nodes in hierarchy)
+2. **Specialist role with research**: New agents cannot delegate work but CAN use `background_task` for research (see DD-4)
 3. **Claude Sonnet is appropriate model**: For workflow specialists, Sonnet provides good balance
 4. **Governance hooks are opt-in friendly**: Hooks warn/suggest, don't hard-block by default
 5. **Worktree workflow is adopted**: Commands assume worktree-based development
@@ -263,6 +265,40 @@ So that I can understand how OmO orchestration works
 - Avoid breaking workflows during transition
 - Guide correct behavior gradually
 - Can escalate to blocking after patterns stabilize
+
+### DD-4: Specialist Research Capability
+
+**Decision**: Enable `background_task: true` for ALL specialists (not just workflow specialists).
+
+**Context**: Specialists were originally designed as "terminal nodes" that cannot delegate. However, this prevented them from calling research agents (explore, librarian, oracle) to gather context.
+
+**Key Distinction**:
+- **Delegation** (blocked): "Do this work for me" → creates loops, unclear responsibility
+- **Research** (allowed): "Help me understand this" → gathering context to do YOUR job better
+
+**Implementation**:
+```typescript
+// src/config/tool-config.ts
+specialist: {
+  task: false,             // ❌ Cannot use OpenCode's built-in delegation
+  background_task: true,   // ✅ CAN fire background research tasks
+  call_omo_agent: false,   // ❌ Cannot call agents synchronously (prevents waiting chains)
+}
+```
+
+**Agent Prompt Requirements**: Each specialist agent prompt MUST specify which agents to use for research:
+
+| Agent | Research Agents | Purpose |
+|-------|-----------------|---------|
+| product-strategist | explore, librarian | Find existing patterns, look up documentation |
+| strategic-planner | explore, librarian, oracle | Code context, docs, architecture review |
+| task-planner | explore | Understand codebase complexity for estimates |
+
+**Rationale**:
+- All specialists benefit from research capability (not just workflow ones)
+- `background_task` is async/fire-and-forget (no waiting chains)
+- Agent prompts guide appropriate usage
+- Simpler than creating a new "workflow-specialist" role
 
 ## Open Questions
 
