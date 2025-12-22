@@ -29,6 +29,10 @@ import { securitySpecialistAgent } from "./security-specialist"
 import { testSpecialistAgent } from "./test-specialist"
 import { optimizationSpecialistAgent } from "./optimization-specialist"
 import { docsPublisherAgent } from "./docs-publisher"
+// LIF-72: Workflow Specialists
+import { productStrategistAgent } from "./product-strategist"
+import { strategicPlannerAgent } from "./strategic-planner"
+import { taskPlannerAgent } from "./task-planner"
 import { deepMerge } from "../shared"
 import { getGovernanceTemplate } from "../config/governance-template"
 
@@ -57,6 +61,10 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "test-specialist": testSpecialistAgent,
   "optimization-specialist": optimizationSpecialistAgent,
   "docs-publisher": docsPublisherAgent,
+  // LIF-72: Workflow Specialists
+  "product-strategist": productStrategistAgent,
+  "strategic-planner": strategicPlannerAgent,
+  "task-planner": taskPlannerAgent,
 }
 
 /**
@@ -95,6 +103,10 @@ const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
   "test-specialist": "full",           // Specialist - can modify files
   "optimization-specialist": "full",   // Specialist - can modify files
   "docs-publisher": "full",            // Specialist - can modify files
+  // LIF-72: Workflow Specialists
+  "product-strategist": "full",        // Specialist - can modify files
+  "strategic-planner": "full",         // Specialist - can modify files
+  "task-planner": "full",              // Specialist - can modify files
 }
 
 export function createEnvContext(directory: string): string {

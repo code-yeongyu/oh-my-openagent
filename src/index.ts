@@ -28,6 +28,7 @@ import {
   createGitSafetyValidatorHook,
   createSecurityScannerHook,
   createConflictDetectorHook,
+  createWorkflowStateEnforcerHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -342,6 +343,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
+  // LIF-72: Workflow state enforcer
+  const workflowStateEnforcer = isHookEnabled("workflow-state-enforcer")
+    ? createWorkflowStateEnforcerHook(ctx, pluginConfig.governance?.workflow_state_enforcer)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -391,6 +397,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await keywordDetector?.["chat.message"]?.(input, output);
       // Governance: Linear context injection
       await governanceLinearInjector?.["chat.message"]?.(input, output);
+      // LIF-72: Workflow state enforcement
+      await workflowStateEnforcer?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {

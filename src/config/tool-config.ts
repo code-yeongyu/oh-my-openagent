@@ -45,10 +45,11 @@ export const TOOL_CONFIG_BY_ROLE: Record<AgentRole, Record<string, boolean>> = {
   },
 
   specialist: {
-    // TERMINAL: Cannot delegate further
-    task: false,             // ❌ CANNOT delegate
-    background_task: false,  // ❌ CANNOT run background tasks
-    call_omo_agent: false,   // ❌ CANNOT call OmO
+    // TERMINAL: Cannot delegate work, but CAN research
+    // LIF-72 DD-4: Enable research capability for specialists
+    task: false,             // ❌ CANNOT delegate work
+    background_task: true,   // ✅ CAN fire background research tasks (explore, librarian, oracle)
+    call_omo_agent: false,   // ❌ CANNOT call agents synchronously (prevents waiting chains)
     // File tools: enabled with governance
     write: true,
     edit: true,
@@ -109,3 +110,24 @@ export function getToolConfigForRole(role: AgentRole): Record<string, boolean> {
 export function canDelegate(role: AgentRole): boolean {
   return role === "team-lead" || role === "manager"
 }
+
+/**
+ * Alias for getToolConfigForRole for test compatibility.
+ */
+export function getRoleDefaultTools(role: AgentRole): Record<string, boolean> {
+  return TOOL_CONFIG_BY_ROLE[role]
+}
+
+/**
+ * Check if a specific tool is allowed for a given role.
+ *
+ * @param tool - The tool name to check
+ * @param role - The agent role
+ * @returns true if the tool is explicitly enabled for the role
+ */
+export function isToolAllowedForRole(tool: string, role: AgentRole): boolean {
+  const config = TOOL_CONFIG_BY_ROLE[role]
+  return config[tool] === true
+}
+
+export type { AgentRole }

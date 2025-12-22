@@ -46,3 +46,7 @@ export type { SecurityScannerConfig, SecretMatch, ScanResult } from "./security-
 // Conflict detection (LIF-63)
 export { createConflictDetectorHook } from "./conflict-detector";
 export type { ConflictDetectorConfig, FileEditLock } from "./conflict-detector";
+
+// Workflow state enforcement (LIF-72)
+export { createWorkflowStateEnforcerHook } from "./workflow-state-enforcer";
+export type { WorkflowStateEnforcerConfig, WorkflowValidationResult } from "./workflow-state-enforcer";

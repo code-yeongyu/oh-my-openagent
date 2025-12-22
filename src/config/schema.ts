@@ -24,6 +24,9 @@ export const BuiltinAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -37,6 +40,9 @@ export const OverridableAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -70,6 +76,7 @@ export const HookNameSchema = z.enum([
   "git-safety-validator",
   "security-scanner",
   "conflict-detector",
+  "workflow-state-enforcer",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
@@ -99,6 +106,9 @@ export const AgentOverridesSchema = z.object({
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
+  "product-strategist": AgentOverrideConfigSchema.optional(),
+  "strategic-planner": AgentOverrideConfigSchema.optional(),
+  "task-planner": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
@@ -197,6 +207,23 @@ export const GovernanceDelegationComplianceSchema = z.object({
   strikes_to_block: z.number().default(3),
 })
 
+export const WorkflowStateEnforcerSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["warn", "block", "disabled"]).default("warn"),
+  workflow_agents: z.record(z.string(), z.string()).default({
+    "/specify": "product-strategist",
+    "/plan": "strategic-planner",
+    "/tasks": "task-planner",
+  }),
+  prerequisites: z.record(z.string(), z.array(z.string())).default({
+    "/plan": ["spec.md"],
+    "/tasks": ["plan.md"],
+    "/implement": ["tasks.md"],
+    "/review": ["spec.md"],
+    "/test": ["spec.md"],
+  }),
+})
+
 export const OrchestrationConfigSchema = z.object({
   max_turns: z.number().default(10),
   max_delegation_depth: z.number().default(5),
@@ -219,6 +246,7 @@ export const GovernanceConfigSchema = z.object({
   docs_blocking: GovernanceDocsBlockingSchema.optional(),
   artifact_truncation: GovernanceArtifactTruncationSchema.optional(),
   delegation_compliance: GovernanceDelegationComplianceSchema.optional(),
+  workflow_state_enforcer: WorkflowStateEnforcerSchema.optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -252,5 +280,6 @@ export type GovernanceArtifactTruncationConfig = z.infer<typeof GovernanceArtifa
 export type GovernanceDelegationComplianceConfig = z.infer<typeof GovernanceDelegationComplianceSchema>
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
 export type LinearPolicy = z.infer<typeof LinearPolicySchema>
+export type WorkflowStateEnforcerConfig = z.infer<typeof WorkflowStateEnforcerSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"
