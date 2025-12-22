@@ -14,9 +14,9 @@ graph TD
     OmO[OmO<br/>Team Lead<br/>Claude Opus 4.5]
     
     subgraph Workflow Specialists
-        PS[product-strategist<br/>Gemini Pro]
-        SP[strategic-planner<br/>GPT-5.2]
-        TP[task-planner<br/>Claude Sonnet]
+        PS[product-strategist<br/>Claude Sonnet 4.5]
+        SP[strategic-planner<br/>Claude Sonnet 4.5]
+        TP[task-planner<br/>Claude Sonnet 4.5]
     end
 
     subgraph Implementation Specialists
@@ -73,13 +73,15 @@ graph TD
 
 ## Role Classification
 
-| Role | Can Delegate | Modifies Files | Purpose | Examples |
-|------|--------------|----------------|---------|----------|
-| **team-lead** | Yes | Yes | Primary orchestrator, user interaction | OmO |
-| **manager** | Yes | Yes | Orchestrates sub-tasks and specialists | implementation-specialist |
-| **specialist** | No | Yes | Expert execution of specific domain tasks | backend-typescript, test-specialist |
-| **advisor** | No | No | High-level analysis and review | oracle |
-| **utility** | No | No | Targeted information retrieval/analysis | explore, librarian, multimodal-looker |
+| Role | Can Delegate | Can Research | Modifies Files | Purpose | Examples |
+|------|--------------|--------------|----------------|---------|----------|
+| **team-lead** | Yes | Yes | Yes | Primary orchestrator, user interaction | OmO |
+| **manager** | Yes | Yes | Yes | Orchestrates sub-tasks and specialists | implementation-specialist |
+| **specialist** | No* | Yes | Yes | Expert execution of specific domain tasks | backend-typescript, product-strategist |
+| **advisor** | No | No | No | High-level analysis and review | oracle |
+| **utility** | No | No | No | Targeted information retrieval/analysis | explore, librarian, multimodal-looker |
+
+> **Note**: While specialists cannot *delegate* (using `task()` or `call_omo_agent`), they can perform *research* by calling utility/advisor agents (explore, librarian, oracle) via `background_task`. This allows specialists to gather necessary context without full orchestration authority.
 
 ## Workflow Specialists (LIF-72)
 
@@ -87,8 +89,8 @@ Ported from markdown-based agents to built-in TypeScript agents, these specialis
 
 | Agent | Workflow Command | Model | Responsibility |
 |-------|-----------------|-------|----------------|
-| **product-strategist** | `/specify` | `gemini-3-pro` | Requirement analysis, spec creation |
-| **strategic-planner** | `/plan` | `gpt-5.2` | Architectural design, implementation plan |
+| **product-strategist** | `/specify` | `claude-sonnet-4-5` | Requirement analysis, spec creation |
+| **strategic-planner** | `/plan` | `claude-sonnet-4-5` | Architectural design, implementation plan |
 | **task-planner** | `/tasks` | `claude-sonnet-4-5` | Breaking plans into actionable tasks |
 
 ## Delegation Patterns
@@ -102,8 +104,8 @@ OmO delegates complex implementation work to the `implementation-specialist`, wh
 ### 3. Utility Backgrounding
 OmO fires `explore` or `librarian` agents as `background_task` to gather context without blocking the main workflow.
 
-### 4. Advisor Review
-OmO or `implementation-specialist` can call `oracle` for a high-level review of a proposed plan or implementation.
+### 4. Advisor Review & Research
+All specialists can call research agents (explore, librarian, oracle) via `background_task` to gather evidence or review proposals without full delegation authority (DD-4). OmO or `implementation-specialist` also use this pattern for continuous validation.
 
 ## Agent Registration
 
@@ -113,7 +115,7 @@ Agents are registered in `src/agents/index.ts` and managed via the `AgentManager
 // Example Agent Definition
 export const productStrategist: AgentDefinition = {
   name: "product-strategist",
-  model: "google/gemini-3-pro-preview",
+  model: "anthropic/claude-sonnet-4-5",
   role: "specialist",
   description: "Requirement analysis and feature specification expert",
   // ...
