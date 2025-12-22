@@ -36,6 +36,10 @@ export const ALLOWED_AGENTS = [
   "optimization-specialist",
   // LIF-70: Advisor agent
   "oracle",
+  // LIF-72: Workflow Specialists
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
 ] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.

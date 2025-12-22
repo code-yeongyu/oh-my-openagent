@@ -2,73 +2,65 @@
 
 > These rules apply to ALL agents in ALL conversations.
 
-## Agent Organization Convention
+## Agent Architecture (LIF-72)
 
-### Standard Agent Location
+### TypeScript Plugin Agents (Primary)
 
-All agents MUST be located in `.opencode/agent/` using a **flat structure**:
+Workflow specialist agents are now TypeScript agents in the oh-my-opencode plugin:
+
+| Agent | Model | Purpose | Invoked Via |
+|-------|-------|---------|-------------|
+| `product-strategist` | Claude Sonnet 4.5 | Requirements & specs | `/specify` |
+| `strategic-planner` | Claude Sonnet 4.5 | Architecture & plans | `/plan` |
+| `task-planner` | Claude Sonnet 4.5 | Task breakdown | `/tasks` |
+| `implementation-specialist` | Claude Sonnet 4.5 | Feature implementation | `/implement` |
+| `test-specialist` | Claude Sonnet 4.5 | Testing | `/test` |
+| `oracle` | GPT-5.2 | Code review, architecture | `/review` |
+
+### Agent Delegation Pattern
+
+Workflow commands delegate to agents via `call_omo_agent`:
 
 ```
-.opencode/agent/
-├── orchestrator.md           # Entry point agent
-├── context-steward.md        # Governance: path validation
-├── historian.md              # Governance: audit trail
-├── product-strategist.md     # Planning: requirements
-├── strategic-architect.md    # Planning: architecture
-├── linear-coordinator.md     # Planning: Linear integration
-├── implementation-specialist.md  # Implementation: features
-├── quick-fixer.md            # Implementation: hotfixes
-├── code-reviewer.md          # Quality: reviews
-├── test-engineer.md          # Quality: testing
-├── ... (other agents)
-└── README.md                 # Agent index
+call_omo_agent(
+  subagent_type="product-strategist",
+  run_in_background=false,
+  prompt="TASK: Create feature specification..."
+)
 ```
 
-### Agent Categories (Logical Grouping)
+**Key Points**:
+- Commands handle setup (Linear, worktree, spec folder)
+- Agents focus on their specialty (spec writing, planning, etc.)
+- Governance is automatic via hooks (no explicit agent calls)
 
-Agents are logically grouped by category for documentation purposes, but files remain in flat structure:
+### Governance Hooks (Automatic)
 
-| Category | Agents | Purpose |
-|----------|--------|---------|
-| **Governance** | context-steward, historian, agent-auditor, meta-improvement-analyst, mode-auditor | Project organization, audit trail |
-| **Planning** | product-strategist, strategic-architect, linear-coordinator | Requirements, architecture |
-| **Implementation** | implementation-specialist, quick-fixer, devops-specialist | Code, deployment |
-| **Quality** | code-reviewer, test-engineer, documentation-master, chat-auditor | Reviews, testing, docs |
-| **Specialized** | rag-architect, ml-engineer, ai-engineer-agentic, web-design-guru, project-guru, brd-creator, rule-engineer, research, agent-engineer | Domain expertise |
+These hooks run automatically—agents don't need to call them:
 
-### Agent File Structure
+| Hook | Event | Purpose |
+|------|-------|---------|
+| `governance-path-validator` | PreToolUse | Validates file paths |
+| `governance-historian` | Stop | Creates changelog entries |
+| `governance-linear-injector` | UserPromptSubmit | Injects Linear context |
+| `workflow-state-enforcer` | UserPromptSubmit | Suggests correct agent |
 
-Each agent file MUST:
-- Be a Markdown file (`.md`) with YAML frontmatter
-- Include required frontmatter fields:
-  - `description`: Brief purpose (1-2 sentences)
-  - `mode`: `all` or `subagent`
-  - `model`: Model identifier
-  - `tools`: Object with tool permissions
-- Use kebab-case naming (e.g., `context-steward.md`)
+### Archived Agent Locations
 
-### Deprecated Locations
+⚠️ **DEPRECATED** - These markdown agents are archived:
+- `.opencode/agent/*.md` → Moved to `.opencode/archive/legacy-agents/`
+- `.opencode/agent/context-steward.md` → Replaced by `governance-path-validator` hook
+- `.opencode/agent/historian.md` → Replaced by `governance-historian` hook
 
-⚠️ **DO NOT** create agents in these deprecated locations:
-- `.rulesync/subagents/` (legacy location, migrated to `.opencode/agent/`)
-- `.rulesync/rules/` (legacy rules, migrated to `.opencode/instructions/`)
-- Subdirectories like `.opencode/agent/governance/` (use flat structure)
+### Agent Categories (Reference)
 
-### Agent Discovery
-
-Agents are automatically discovered from:
-1. `.opencode/agent/*.md` (flat structure, primary location)
-2. OpenCode CLI resolves agent names directly (e.g., `context-steward` → `.opencode/agent/context-steward.md`)
-
-### Creating New Agents
-
-When creating new agents:
-1. Use kebab-case naming (e.g., `new-agent.md`)
-2. Place directly in `.opencode/agent/` (NOT in subdirectories)
-3. Copy template from `.opencode/templates/agents/agent-template.md`
-4. Update `.opencode/agent/README.md` to include new agent
-5. Update root `AGENTS.md` with agent documentation
-6. Add to appropriate logical category in this document
+| Category | Plugin Agents | Purpose |
+|----------|---------------|---------|
+| **Workflow** | product-strategist, strategic-planner, task-planner | Spec → Plan → Tasks |
+| **Implementation** | implementation-specialist, backend-*, frontend-* | Code changes |
+| **Quality** | test-specialist, oracle | Testing, review |
+| **Research** | explore, librarian | Codebase/docs research |
+| **Utility** | multimodal-looker, document-writer | Media, docs |
 
 ## Linear Integration (Mandatory)
 
