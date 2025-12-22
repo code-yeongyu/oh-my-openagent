@@ -55,8 +55,7 @@
     "hono": "^4.10.4",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
-    "yaml": "^2.8.2",
-    "zod": "^4.1.8"
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/picomatch": "^3.0.2",
