@@ -28,7 +28,7 @@ $ARGUMENTS
 ## Steps
 
 1. **Detect spec folder**:
-   - Use `get_feature_paths()` from `.cursor/scripts/bash/common.sh`
+   - Check for spec folder in `.cursor/specs/` directory
    - Or use `--spec-dir` argument if provided
    - Verify `spec.md` exists (for test scenarios)
 
@@ -37,23 +37,52 @@ $ARGUMENTS
    - Read `plan.md` for architecture (integration test boundaries)
    - Read `tasks.md` for feature scope
 
-3. **Delegate to Test Engineer Agent**:
-   - Read `.opencode/agent/test-engineer.md`
-   - Provide spec folder context
-   - Focus on: unit tests, integration tests, acceptance tests
+3. **Delegate to Test Specialist Agent**:
+   - **GOVERNANCE**: Path validation and historian handled automatically by hooks
+   - **Delegate the testing work**:
+     ```
+     call_omo_agent(
+       subagent_type="test-specialist",
+       run_in_background=false,
+       prompt="""
+       TASK: Write and run tests for feature implementation
+       
+       SPEC_DIR: {SPEC_DIR}
+       SPEC_FILE: {SPEC_DIR}/spec.md
+       PLAN_FILE: {SPEC_DIR}/plan.md
+       TASKS_FILE: {SPEC_DIR}/tasks.md
+       
+       CONTEXT:
+       - Read spec.md for acceptance criteria and user stories
+       - Read plan.md for architecture and integration boundaries
+       - Read tasks.md for feature scope
+       - Identify implementation files to test
+       
+       TEST COVERAGE:
+       1. Unit Tests - Test individual functions/components
+       2. Integration Tests - Test component interactions
+       3. Acceptance Tests - Verify spec acceptance criteria
+       
+       REQUIREMENTS:
+       - Follow project testing conventions
+       - Use existing test framework and patterns
+       - Achieve meaningful coverage (not 100% for its own sake)
+       - Test edge cases identified in spec
+       
+       DELIVERABLES:
+       - Test plan written to {SPEC_DIR}/testing/test-plan.md
+       - Test files per project conventions
+       - Test run results and coverage report
+       """
+     )
+     ```
 
 4. **Create test artifacts**:
    - Write test plan to `{SPEC_DIR}/testing/test-plan.md`
    - Generate test files per project conventions
    - Run tests and capture results
 
-5. **Call Historian** (GOVERNANCE):
-   - Create changelog entry for testing work
-
-6. **Report completion**:
-   - Test summary, coverage, pass/fail counts, next steps
-
-7. **Persist Workflow State** (REQUIRED):
+5. **Persist Workflow State** (REQUIRED):
    ```
    update_workflow_state({
      specPath: "{SPEC_DIR}",
@@ -62,3 +91,6 @@ $ARGUMENTS
    })
    ```
    This enables session continuity and resume messages.
+
+6. **Report completion**:
+   - Test summary, coverage, pass/fail counts, next steps

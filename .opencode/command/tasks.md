@@ -27,36 +27,58 @@ $ARGUMENTS
 Create a task breakdown from the implementation plan in the current spec folder.
 
 1. **Detect spec folder**:
-   - Use `get_feature_paths()` from `.cursor/scripts/bash/common.sh` to find current spec folder
+   - Check for spec folder in `.cursor/specs/` directory
    - Or use `--spec-dir` argument if provided
    - Verify `plan.md` exists in spec folder
    - Verify `spec.md` exists (required for user stories)
 
-2. **Call Context Steward** (GOVERNANCE):
-   - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path for tasks work
-   - Ensure path follows `.cursor/specs/{SPEC_DIR_NAME}/` structure
+2. **Load context**:
+   - Read `spec.md` for user stories
+   - Read `plan.md` for technical architecture
+   - Check for existing `tasks.md` (update vs create)
 
-3. **Load tasks template**:
-   - Load `.cursor/templates/tasks-template.md` to understand structure
+3. **Delegate to Task Planner Agent**:
+   - **GOVERNANCE**: Path validation and historian handled automatically by hooks
+   - **Delegate the task breakdown work**:
+     ```
+     call_omo_agent(
+       subagent_type="task-planner",
+       run_in_background=false,
+       prompt="""
+       TASK: Create task breakdown from implementation plan
+       
+       SPEC_DIR: {SPEC_DIR}
+       SPEC_FILE: {SPEC_DIR}/spec.md
+       PLAN_FILE: {SPEC_DIR}/plan.md
+       TASKS_FILE: {SPEC_DIR}/tasks.md
+       
+       CONTEXT:
+       - Read spec.md for user stories and acceptance criteria
+       - Read plan.md for technical architecture and phases
+       - Organize tasks by user story for independent testability
+       
+       REQUIREMENTS:
+       - Create phased task breakdown
+       - Phase 1: Setup (shared infrastructure)
+       - Phase 2: Foundational (blocking prerequisites)
+       - Phase 3+: User Story phases (each independently testable)
+       - Phase N: Polish & Cross-Cutting Concerns
+       - Each task should have: ID, description, estimate, dependencies
+       
+       LINEAR INTEGRATION (LOCAL-FIRST):
+       - Create tasks.md locally first
+       - ASK USER before creating issues in Linear via MCP
+       - If user approves, use Linear tools to create sub-issues
+       
+       DELIVERABLES:
+       - tasks.md with complete task breakdown
+       - Task table with ID, Task, Status, Estimate, Notes
+       - Checkpoints for each phase
+       """
+     )
+     ```
 
-4. **Engage Linear Coordinator Agent**:
-   - Read `.opencode/agent/linear-coordinator.md` (COMPLETE, no offset/limit)
-   - Adopt Linear Coordinator persona
-   - Create `tasks.md` at `{SPEC_DIR}/tasks.md`
-   - **DO NOT re-create spec folder** - use existing `SPEC_DIR`
-   - Follow Linear Coordinator steps exactly
-   - **LOCAL-FIRST**: Create tasks locally, ask user before creating Linear issues
-
-5. **Call Historian** (GOVERNANCE):
-   - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Linear Coordinator work
-   - Include: mode, scope, files created, tasks created
-
-6. **Report completion**:
-   - Tasks file path, number of tasks created, readiness for `/implement`
-
-7. **Persist Workflow State** (REQUIRED):
+4. **Persist Workflow State** (REQUIRED):
    ```
    update_workflow_state({
      specPath: "{SPEC_DIR}",
@@ -66,16 +88,18 @@ Create a task breakdown from the implementation plan in the current spec folder.
    ```
    This enables session continuity and resume messages.
 
+5. **Report completion**:
+   - Tasks file path, number of tasks created, readiness for `/implement`
+
 ## Agent Integration
 
-When Linear Coordinator agent is invoked:
+When Task Planner agent is invoked via `call_omo_agent`:
 - **DO NOT** create spec folder (already exists)
 - **USE** existing `SPEC_DIR`
 - **READ** `spec.md` for user stories (required)
 - **READ** `plan.md` for technical context (required)
 - **RESPECT** provided canonical path
-- **CALL** Context Steward before writing files
-- **CALL** Historian after completing work
+- **GOVERNANCE** is automatic (path validation, historian via hooks)
 - **LOCAL-FIRST POLICY**: Create tasks locally first, ask user before Linear writes
 
 ## Task Organization
@@ -98,11 +122,10 @@ Each user story phase should include:
 1. Create `tasks.md` locally first
 2. Optionally create Linear issues locally in `{SPEC_DIR}/linear/`
 3. **ASK USER** before creating issues in Linear via MCP
-4. If user approves, delegate to Linear Coordinator for Linear issue creation
+4. If user approves, use Linear tools to create sub-issues under parent issue
 
 ## References
 
 - Spec: `{SPEC_DIR}/spec.md`
 - Plan: `{SPEC_DIR}/plan.md` (required)
 - Template: `.cursor/templates/tasks-template.md`
-- Linear Coordinator: `.opencode/agent/linear-coordinator.md`

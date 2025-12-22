@@ -93,24 +93,42 @@ Given that feature description, do this:
    - Set `SPEC_DIR` = `{result.fullPath}`
    - Set `SPEC_FILE` = `{SPEC_DIR}/spec.md`
 
-4. **Call Context Steward** (GOVERNANCE):
-   - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path: `SPEC_DIR` (in worktree)
-   - Ensure path follows `{WORKTREE_PATH}/.cursor/specs/{SPEC_DIR_NAME}/` structure
+4. **Delegate to Product Strategist Agent**:
+   - **GOVERNANCE**: Path validation and historian handled automatically by hooks
+   - **Delegate the specification work**:
+     ```
+     call_omo_agent(
+       subagent_type="product-strategist",
+       run_in_background=false,
+       prompt="""
+       TASK: Create feature specification for: {FEATURE_DESCRIPTION}
+       
+       SPEC_DIR: {SPEC_DIR}
+       SPEC_FILE: {SPEC_FILE}
+       LINEAR_ISSUE: {ISSUE-ID}
+       WORKTREE_PATH: {WORKTREE_PATH}
+       
+       CONTEXT:
+       - Spec folder already created with template files
+       - Update spec.md at SPEC_FILE path (template already exists)
+       - Also create Mintlify docs in docs/requirements/ if applicable
+       
+       REQUIREMENTS:
+       - Focus on WHAT users need and WHY
+       - Avoid HOW to implement (no tech stack, APIs, code structure)
+       - Written for business stakeholders, not developers
+       - Make informed guesses, document assumptions
+       - Maximum 3 [NEEDS CLARIFICATION] markers
+       
+       DELIVERABLES:
+       - Updated spec.md with full specification
+       - User stories with acceptance criteria
+       - Success criteria (measurable, technology-agnostic)
+       """
+     )
+     ```
 
-5. **Engage Product Strategist Agent**:
-   - Read `.opencode/agent/product-strategist.md` (COMPLETE, no offset/limit)
-   - Adopt Product Strategist persona
-   - **Update** `spec.md` at `SPEC_FILE` path (template already created by tool in step 3)
-   - Follow Product Strategist steps exactly
-   - **NOTE**: Mintlify docs (`docs/requirements/`) created in worktree as well
-
-6. **Call Historian** (GOVERNANCE):
-   - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Product Strategist work (in worktree)
-   - Include: mode, scope, files created, decisions made
-
-7. **Persist Workflow State** (REQUIRED):
+5. **Persist Workflow State** (REQUIRED):
    ```
    update_workflow_state({
      specPath: "{SPEC_DIR}",
@@ -120,7 +138,7 @@ Given that feature description, do this:
    ```
    This enables session continuity and resume messages.
 
-8. **Instruct User to Switch to Worktree (FINAL STEP)**:
+6. **Instruct User to Switch to Worktree (FINAL STEP)**:
    - **Report completion summary**:
      - Linear issue: `{ISSUE-ID}` with link
      - Branch: `{BRANCH_NAME}` (based on `dev`)
@@ -170,12 +188,11 @@ git branch -d {BRANCH_NAME}
 
 ## Agent Integration
 
-When Product Strategist agent is invoked:
+When Product Strategist agent is invoked via `call_omo_agent`:
 - **DO NOT** create spec folder (already created in step 3)
 - **USE** `SPEC_DIR` in the worktree (from step 3)
 - **RESPECT** worktree path for all file operations
-- **CALL** Context Steward before writing files
-- **CALL** Historian after completing work
+- **GOVERNANCE** is automatic (path validation, historian via hooks)
 - **SUPPORT** dual workflow: Creates both `.cursor/specs/` and `docs/requirements/` in worktree
 
 ## General Guidelines

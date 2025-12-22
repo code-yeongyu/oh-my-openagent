@@ -28,7 +28,7 @@ $ARGUMENTS
 ## Steps
 
 1. **Detect spec folder**:
-   - Use `get_feature_paths()` from `.cursor/scripts/bash/common.sh`
+   - Check for spec folder in `.cursor/specs/` directory
    - Or use `--spec-dir` argument if provided
    - Verify `spec.md` exists (for requirements context)
 
@@ -37,22 +37,48 @@ $ARGUMENTS
    - Read `plan.md` for architecture decisions
    - Read `tasks.md` for implementation scope
 
-3. **Delegate to Code Reviewer Agent**:
-   - Read `.opencode/agent/code-reviewer.md`
-   - Provide spec folder context
-   - Focus on: requirements alignment, architecture adherence, security
+3. **Delegate to Oracle Agent for Code Review**:
+   - **GOVERNANCE**: Path validation and historian handled automatically by hooks
+   - **Delegate the review work**:
+     ```
+     call_omo_agent(
+       subagent_type="oracle",
+       run_in_background=false,
+       prompt="""
+       TASK: Comprehensive code review for feature implementation
+       
+       SPEC_DIR: {SPEC_DIR}
+       SPEC_FILE: {SPEC_DIR}/spec.md
+       PLAN_FILE: {SPEC_DIR}/plan.md
+       TASKS_FILE: {SPEC_DIR}/tasks.md
+       
+       CONTEXT:
+       - Read spec.md for requirements alignment
+       - Read plan.md for architecture adherence
+       - Read tasks.md for implementation scope
+       - Identify changed files from recent implementation
+       
+       REVIEW FOCUS:
+       1. Requirements Alignment - Does implementation satisfy spec requirements?
+       2. Architecture Adherence - Does code follow plan.md architecture?
+       3. Security - Are there security vulnerabilities?
+       4. Code Quality - Is code maintainable, readable, tested?
+       5. Performance - Are there performance concerns?
+       6. Edge Cases - Are edge cases handled?
+       
+       DELIVERABLES:
+       - Review findings written to {SPEC_DIR}/reviews/{date}-review.md
+       - Include: passed checks, issues found, recommendations
+       - Severity levels: critical, major, minor, suggestion
+       """
+     )
+     ```
 
 4. **Create review artifact**:
    - Write findings to `{SPEC_DIR}/reviews/{date}-review.md`
    - Include: passed checks, issues found, recommendations
 
-5. **Call Historian** (GOVERNANCE):
-   - Create changelog entry for review work
-
-6. **Report completion**:
-   - Review summary, issues found, readiness for `/test`
-
-7. **Persist Workflow State** (REQUIRED):
+5. **Persist Workflow State** (REQUIRED):
    ```
    update_workflow_state({
      specPath: "{SPEC_DIR}",
@@ -61,3 +87,6 @@ $ARGUMENTS
    })
    ```
    This enables session continuity and resume messages.
+
+6. **Report completion**:
+   - Review summary, issues found, readiness for `/test`
