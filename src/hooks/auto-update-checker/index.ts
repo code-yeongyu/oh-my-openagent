@@ -6,6 +6,8 @@ import { log } from "../../shared/logger"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
 import type { AutoUpdateCheckerOptions } from "./types"
 
+const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
+
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
 
@@ -133,17 +135,29 @@ async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {
 
 async function showVersionToast(ctx: PluginInput, version: string | null, message: string): Promise<void> {
   const displayVersion = version ?? "unknown"
-  await ctx.client.tui
-    .showToast({
-      body: {
-        title: `OhMyOpenCode ${displayVersion}`,
-        message,
-        variant: "info" as const,
-        duration: 5000,
-      },
-    })
-    .catch(() => {})
+  await showSpinnerToast(ctx, displayVersion, message)
   log(`[auto-update-checker] Startup toast shown: v${displayVersion}`)
+}
+
+async function showSpinnerToast(ctx: PluginInput, version: string, message: string): Promise<void> {
+  const totalDuration = 5000
+  const frameInterval = 100
+  const totalFrames = Math.floor(totalDuration / frameInterval)
+
+  for (let i = 0; i < totalFrames; i++) {
+    const spinner = SISYPHUS_SPINNER[i % SISYPHUS_SPINNER.length]
+    await ctx.client.tui
+      .showToast({
+        body: {
+          title: `${spinner} OhMyOpenCode ${version}`,
+          message,
+          variant: "info" as const,
+          duration: frameInterval + 50,
+        },
+      })
+      .catch(() => { })
+    await new Promise(resolve => setTimeout(resolve, frameInterval))
+  }
 }
 
 async function showUpdateAvailableToast(
@@ -183,16 +197,7 @@ async function showLocalDevToast(ctx: PluginInput, version: string | null, isSis
   const message = isSisyphusEnabled
     ? "Sisyphus running in local development mode."
     : "Running in local development mode. oMoMoMo..."
-  await ctx.client.tui
-    .showToast({
-      body: {
-        title: `OhMyOpenCode ${displayVersion} (dev)`,
-        message,
-        variant: "warning" as const,
-        duration: 5000,
-      },
-    })
-    .catch(() => {})
+  await showSpinnerToast(ctx, `${displayVersion} (dev)`, message)
   log(`[auto-update-checker] Local dev toast shown: v${displayVersion}`)
 }
 
