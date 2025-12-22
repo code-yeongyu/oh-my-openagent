@@ -153,12 +153,25 @@ export function createPreemptiveCompactionHook(
         .showToast({
           body: {
             title: "Compaction Complete",
-            message: "Session compacted successfully",
+            message: "Session compacted successfully. Resuming...",
             variant: "success",
             duration: 2000,
           },
         })
         .catch(() => {})
+
+      state.compactionInProgress.delete(sessionID)
+
+      setTimeout(async () => {
+        try {
+          await ctx.client.session.promptAsync({
+            path: { id: sessionID },
+            body: { parts: [{ type: "text", text: "Continue" }] },
+            query: { directory: ctx.directory },
+          })
+        } catch {}
+      }, 500)
+      return
     } catch (err) {
       log("[preemptive-compaction] compaction failed", { sessionID, error: err })
     } finally {
