@@ -20,7 +20,6 @@ import {
 import { grep } from "./grep"
 import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
-import { skill } from "./skill"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { getTmuxPath } from "./interactive-bash/utils"
@@ -64,5 +63,4 @@ export const builtinTools = {
   grep,
   glob,
   slashcommand,
-  skill,
 }
