@@ -280,7 +280,7 @@ export function evaluatePolicy(
         decision,
         matchedRule: rule,
         message: rule.require.rationale,
-        remediation: `Delegate to ${rule.require.requiredAgent} using call_omo_agent(subagent_type="${rule.require.requiredAgent}", run_in_background=false)`,
+        remediation: `Delegate to ${rule.require.requiredAgent} using call_omo_agent(subagent_type="${rule.require.requiredAgent}", run_in_background=true). Use run_in_background=false only if immediate verification needed.`,
       }
     }
   }

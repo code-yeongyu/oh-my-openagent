@@ -124,7 +124,8 @@ export function createGovernanceDocsDelegationHook(
         `Tool: ${input.tool}`,
         `Path: ${filePath}`,
         `Documentation changes require delegation to document-writer.`,
-        `Use: call_omo_agent(subagent_type="document-writer", run_in_background=false, prompt="...")`,
+        `Use: call_omo_agent(subagent_type="document-writer", run_in_background=true, prompt="...")`,
+        `(Use run_in_background=false only if you need immediate verification)`,
       ].join("\n")
 
       log(message)
@@ -133,7 +134,8 @@ export function createGovernanceDocsDelegationHook(
         throw new Error(
           `[Governance] Operation blocked: Documentation changes must be delegated to document-writer.\n` +
             `Path: ${filePath}\n` +
-            `Remediation: call_omo_agent(subagent_type="document-writer", run_in_background=false, prompt="Write/update ${filePath}")`
+            `Remediation: call_omo_agent(subagent_type="document-writer", run_in_background=true, prompt="Write/update ${filePath}")\n` +
+            `Note: Use run_in_background=false only if you need immediate verification.`
         )
       }
     },
