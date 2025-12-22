@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
 import type { PreemptiveCompactionState, TokenInfo } from "./types"
@@ -6,6 +8,10 @@ import {
   MIN_TOKENS_FOR_COMPACTION,
   COMPACTION_COOLDOWN_MS,
 } from "./constants"
+import {
+  findNearestMessageWithFields,
+  MESSAGE_STORAGE,
+} from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
 export interface SummarizeContext {
@@ -46,6 +52,20 @@ const CLAUDE_DEFAULT_CONTEXT_LIMIT = 200_000
 
 function isSupportedModel(modelID: string): boolean {
   return CLAUDE_MODEL_PATTERN.test(modelID)
+}
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
 }
 
 function createState(): PreemptiveCompactionState {
@@ -222,6 +242,21 @@ export function createPreemptiveCompactionHook(
         if (assistants.length === 0) return
 
         const lastAssistant = assistants[assistants.length - 1]
+
+        if (!lastAssistant.providerID || !lastAssistant.modelID) {
+          const messageDir = getMessageDir(sessionID)
+          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+          if (storedMessage?.model?.providerID && storedMessage?.model?.modelID) {
+            lastAssistant.providerID = storedMessage.model.providerID
+            lastAssistant.modelID = storedMessage.model.modelID
+            log("[preemptive-compaction] using stored message model info", {
+              sessionID,
+              providerID: lastAssistant.providerID,
+              modelID: lastAssistant.modelID,
+            })
+          }
+        }
+
         await checkAndTriggerCompaction(sessionID, lastAssistant)
       } catch {}
     }
