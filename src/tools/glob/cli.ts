@@ -10,6 +10,16 @@ import {
 import type { GlobOptions, GlobResult, FileMatch } from "./types"
 import { stat } from "node:fs/promises"
 
+export function normalizeGlobPattern(pattern: string): string {
+  if (pattern.includes("**")) return pattern
+  if (pattern.includes("/")) {
+    const withPrefix = pattern.startsWith("**/") ? pattern : `**/${pattern}`
+    if (pattern.endsWith("*") && !pattern.endsWith("/*")) return `${withPrefix}/**`
+    return withPrefix
+  }
+  return pattern
+}
+
 function buildRgArgs(options: GlobOptions): string[] {
   const args: string[] = [
     ...RG_FILES_FLAGS,
@@ -19,7 +29,7 @@ function buildRgArgs(options: GlobOptions): string[] {
 
   if (options.noIgnore) args.push("--no-ignore")
 
-  args.push(`--glob=${options.pattern}`)
+  args.push(`--glob=${normalizeGlobPattern(options.pattern)}`)
 
   return args
 }
