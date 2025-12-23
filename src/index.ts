@@ -29,6 +29,7 @@ import {
   createSecurityScannerHook,
   createConflictDetectorHook,
   createWorkflowStateEnforcerHook,
+  createMetaLearningExtractorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -355,6 +356,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
+  
+  const metaLearningExtractorHook = isHookEnabled("meta-learning-extractor")
+    ? createMetaLearningExtractorHook(ctx, backgroundManager, pluginConfig.meta_learning)
+    : null;
+  
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager, pluginConfig);
@@ -518,6 +524,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       // Governance: Historian and Linear injector events
       await governanceHistorian?.event(input);
       await governanceLinearInjector?.event(input);
+      await metaLearningExtractorHook?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;

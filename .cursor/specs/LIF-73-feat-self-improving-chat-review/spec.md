@@ -1,173 +1,152 @@
-# Self-Improving Chat Review System
+# Self-Improving Session Learning System
 
 **Linear Issue**: [LIF-73](https://linear.app/lifelogger/issue/LIF-73/self-improving-chat-review-system-chat-auditor-agent-context-threshold)
 **Created**: 2025-12-23
+**Updated**: 2025-12-23 (Revised: Simplified Meta-Learning Focus)
 **Status**: Ready for Planning
 
 ## Overview
 
-A self-improving system that analyzes chat conversations to identify quality patterns, improvement opportunities, and actionable feedback. The system creates a continuous feedback loop where oh-my-opencode learns from its own interactions and systematically improves through automated reviews, pattern detection, and Linear issue creation for high-priority improvements.
+A dual-system self-improving framework that separates project knowledge management from meta-level workflow improvement:
+
+### System 1: Memory Tools (~4h)
+Serena-compatible memory management tools (`memory_write`, `memory_read`, `memory_edit`, `memory_list`, `memory_delete`) built into oh-my-opencode. Works standalone without Serena MCP. Configurable storage path (default: `.cursor/memory/`), subdirectory support (`decisions/`), maintains canonical files (`constitution.md`, `architecture.md`, `tech-stack.md`, `glossary.md`).
+
+### System 2: Meta-Learning Extraction (~8h)
+Extracts insights specifically for improving **OmO orchestration, delegation, commands, and agent instructions**—not general project learnings. Uses `experimental.session.compacting` hook (fires BEFORE compaction) to capture learnings before context loss. Outputs to `context/learnings/` buffer for human review. Actionable insights become features via `/specify` workflow.
+
+**Key Discovery**: OpenCode's `experimental.session.compacting` hook fires BEFORE compaction, enabling extraction before context is lost. Total effort: ~12h (reduced from 16.5h by removing chat quality framework).
 
 ## Problem Statement
 
 ### Current State
 
-Oh-my-opencode is a sophisticated OpenCode plugin with 13 agents, 21 hooks, LSP/AST-grep tools, and MCP integrations. However, there is no mechanism to:
+Oh-my-opencode is a sophisticated OpenCode plugin with 13+ agents, 21+ hooks, LSP/AST-grep tools, and MCP integrations. Project knowledge exists in `.cursor/memory/` (constitution, architecture, tech-stack, glossary) but:
 
-- Measure conversation quality after sessions complete
-- Identify when agents use suboptimal workflows (direct tool calls instead of delegation)
-- Detect recurring anti-patterns that could be prevented with new hooks or rules
-- Distinguish one-off issues from systemic problems requiring code changes
-- Create actionable tasks from quality insights
+- **No Serena-compatible memory tools**: Requires Serena MCP for memory_write/read/edit operations
+- **Fixed Serena path**: Serena uses `.serena/memories/` (non-configurable), conflicts with `.cursor/memory/` convention
+- **No subdirectory support**: Serena stores flat files, can't organize as `decisions/ADR-*.md`
+- **Meta-learnings lost**: Insights on improving OmO orchestration, delegation, command workflows evaporate
+- **Manual improvement cycle**: Must manually identify workflow improvements and create feature specs
 
 ### Issues
 
-1. **No visibility into agent performance**: Developers cannot assess how well agents completed tasks or where improvements are needed
-2. **Lost learning opportunities**: Insights gained during complex conversations are not captured or shared across sessions
-3. **Manual pattern detection**: Recurring issues require human observation to identify and document
-4. **Reactive improvement model**: System improvements happen reactively when users notice problems, not proactively from data
-5. **Context loss on compaction**: When context windows fill up, valuable conversation history is summarized or discarded without analysis
-6. **No feedback loop**: There's no systematic way to close the improvement loop from observation → analysis → action → verification
+1. **Tool dependency**: Agents need Serena MCP installed to use memory operations
+2. **Path mismatch**: Serena's `.serena/memories/` doesn't align with `.cursor/memory/` convention used by `/update-context`
+3. **Organization limits**: Can't maintain subdirectories like `decisions/` for ADRs
+4. **Workflow improvement blind spots**: No systematic capture of what works/fails in orchestration patterns
+5. **Manual meta-learning**: Developers must remember to document delegation failures, command UX issues, agent instruction gaps
 
 ## User Stories
 
-### US-1: Automatic Review on Context Threshold
+### US-MEMORY-TOOLS: Serena-Compatible Memory Operations
 
-**As a** power user running complex multi-agent workflows,  
-**I want** conversations to be reviewed automatically when context usage approaches limits,  
-**So that** quality insights are captured before context compaction loses conversation history.
-
-**Acceptance Criteria:**
-```gherkin
-Given a chat session with context usage above the configured threshold (default 60%)
-When the session becomes idle
-Then a background review agent spawns without blocking the main conversation
-And the agent analyzes the full conversation history against the 6-point quality framework
-And a structured review is saved to {reviews_path}/{session_id}.md
-And the main conversation continues uninterrupted
-```
-
-**Business Value**: Prevents loss of quality insights when conversations grow large. Captures learning opportunities before context gets compacted.
-
----
-
-### US-2: Manual Review Trigger
-
-**As a** developer who just completed an interesting or problematic conversation,  
-**I want** to manually trigger a chat review at any time,  
-**So that** I can analyze specific conversations on demand for learning or debugging.
+**As an** agent needing persistent project knowledge,  
+**I want** memory_write/read/edit/list/delete tools built into oh-my-opencode,  
+**So that** I can manage project memory without requiring Serena MCP installation.
 
 **Acceptance Criteria:**
 ```gherkin
-Given an active or completed chat session
-When I invoke /review-chat [optional: session-id]
-Then the conversation is analyzed using the 6-point framework
-And a structured review is generated and saved
-And I receive a summary showing:
-  - Overall quality score (1-10)
-  - Count of HIGH/MEDIUM/LOW priority improvements
-  - Top 3 actionable recommendations
+Given oh-my-opencode is installed
+When an agent calls memory_write(name="architecture", content="...")
+Then the content is written to .cursor/memory/architecture.md
+And subdirectories are supported (e.g., "decisions/ADR-001")
+And the tools work identically whether Serena MCP is installed or not
 ```
 
-**Business Value**: Enables targeted learning from specific conversations. Useful for debugging why a particular task went poorly or understanding an exemplary workflow.
+**Business Value**: Removes Serena MCP dependency. Aligns storage with `/update-context` convention (`.cursor/memory/`). Enables subdirectory organization.
 
 ---
 
-### US-3: Review Deduplication and History Tracking
+### US-META-EXTRACT: Automatic Meta-Learning Extraction
 
-**As a** developer reviewing the same session multiple times,  
-**I want** reviews to update the existing file rather than create duplicates,  
-**So that** I have a single comprehensive review per session with historical context.
+**As a** developer improving oh-my-opencode workflows,  
+**I want** the system to automatically extract orchestration improvement insights,  
+**So that** I learn what delegation patterns, commands, and agent instructions need fixing.
 
 **Acceptance Criteria:**
 ```gherkin
-Given a session that has been reviewed before
-When a new review is triggered (manual or automatic)
-Then the existing review file is read
-And new findings are merged with previous findings (deduplicated by fingerprint)
-And the Review History section is appended with:
-  - Review timestamp
-  - Trigger source (manual/threshold/scheduled)
-  - New findings count
-  - Key insights summary
-And the quality score and executive summary are updated to reflect latest state
+Given a development session where OmO delegates work and uses commands
+When experimental.session.compacting fires (BEFORE compaction)
+Then the system snapshots session context synchronously
+And spawns background extraction task (non-blocking)
+And outputs meta-learning candidates to context/learnings/{session_id}.md
+And candidates focus on: delegation patterns, command UX, agent instructions, orchestration
 ```
 
-**Business Value**: Tracks how conversation quality evolves over time. Prevents duplicate findings. Shows if re-reviews after user fixes discover new issues.
+**Business Value**: Captures workflow improvement insights before context is lost. Focuses on meta-level improvements (not general project knowledge).
 
 ---
 
-### US-4: Configurable Review Storage
+### US-HUMAN-REVIEW: Human Review Workflow
 
-**As a** developer with project-specific organization preferences,  
-**I want** to configure where reviews are stored and how the system behaves,  
-**So that** reviews integrate cleanly with my project structure and workflow.
+**As a** human reviewer of meta-learning candidates,  
+**I want** to read extracted learnings and decide which become features,  
+**So that** I control what workflow improvements get implemented.
+
+**Acceptance Criteria:**
+```gherkin
+Given meta-learning candidates in context/learnings/{session_id}.md
+When I review the file manually
+Then I see insights categorized by:
+  - Agent instructions (prompt improvements)
+  - Commands (workflow UX improvements)
+  - Orchestration (delegation pattern improvements)
+  - Context handling (memory/compaction improvements)
+  - Tool usage (LSP/AST-grep efficiency)
+And I decide: ignore, note for later, or use /specify to create feature spec
+```
+
+**Business Value**: Human gate ensures only actionable improvements become work. Prevents noise and low-quality automation.
+
+---
+
+### US-CONFIG-PATHS: Configurable Memory Paths
+
+**As a** project maintainer with specific organization preferences,  
+**I want** to configure where memory files are stored,  
+**So that** the system aligns with my project structure.
 
 **Acceptance Criteria:**
 ```gherkin
 Given configuration options in oh-my-opencode.json:
-  - chat_review.enabled (default: true)
-  - chat_review.trigger_on_threshold (default: true)
-  - chat_review.threshold_percent (default: 60)
-  - chat_review.min_messages (default: 5)
-  - chat_review.reviews_path (default: ".opencode/reviews/")
-When a review is triggered
-Then the system respects these settings
-And reviews are saved to the configured path
-And the directory is created with recursive: true if it doesn't exist
-And environment variable expansion is supported: ${OPENCODE_REVIEWS_PATH}
+  - memory.root (default: ".cursor/memory/")
+  - memory.allowSubdirs (default: true)
+  - memory.registerSerenaAliases (default: false)
+When an agent calls memory_write("architecture", "content")
+Then the file is written to {memory.root}/architecture.md
+And subdirectories work: memory_write("decisions/ADR-001", "...")
 ```
 
-**Business Value**: Flexibility for different project structures. Allows teams to standardize review locations across projects.
+**Business Value**: Flexibility for different project structures. No conflicts with Serena MCP if both are installed (aliases opt-in).
 
 ---
 
-### US-5: Batch Review Processing Pipeline
+### US-EXTRACT-COMMAND: Manual Meta-Learning Extraction
 
-**As a** maintainer accumulating review data over time,  
-**I want** to batch process reviews to identify patterns and create actionable tasks,  
-**So that** systemic improvements are prioritized and tracked in Linear.
+**As a** developer finishing complex work,  
+**I want** to manually trigger meta-learning extraction,  
+**So that** I can capture insights even if automatic triggers didn't fire.
 
 **Acceptance Criteria:**
 ```gherkin
-Given multiple unprocessed review files in {reviews_path}/*.md
-When I invoke /process-reviews
-Then the system:
-  - Scans all review files not marked as processed
-  - Creates Linear issues for all HIGH priority improvements (one issue per improvement)
-  - Aggregates improvement categories across all reviews
-  - Detects patterns: if same improvement category appears in 3+ reviews, flag for automation
-  - Updates each processed review file with:
-    - processed_at: timestamp
-    - linear_issue_id: for each created issue
-    - status: processed
-And returns summary:
-  - Total reviews processed: N
-  - Linear issues created: M
-  - Patterns detected: [list of category + count]
+Given a completed session with orchestration work
+When I invoke /extract-learnings
+Then the system analyzes the session for meta-level improvements
+And outputs candidates to context/learnings/{session_id}.md
+And shows summary: "N candidates extracted, review context/learnings/"
 ```
 
-**Business Value**: Converts raw review data into actionable work items. Surfaces systemic issues that require architectural changes (new hooks, rules, tools).
-
----
-
-### US-6: System-Aware Analysis with Dynamic Research
-
-**As a** developer receiving review recommendations,  
-**I want** recommendations to be specific to oh-my-opencode's architecture,  
-**So that** I can implement suggested improvements without extensive research.
-
-**Acceptance Criteria:**
-```gherkin
-Given the chat-auditor agent analyzing a conversation
-When an improvement opportunity is identified
-Then the recommendation includes:
+**Business Value**: Manual safety net for sessions where automatic extraction didn't trigger or was disabled.
+When a learning or improvement opportunity is identified
+Then the output includes:
   - Specific file paths (e.g., "Add hook in src/hooks/auto-diagnostics/")
-  - Correct improvement category (Hook/Prompt/Rule/Tool/Workflow/Docs)
+  - Correct category (constitution/architecture/tech-stack/glossary/Hook/Prompt/Rule/Tool/Workflow/Docs)
   - Code examples or patterns from existing implementations
-  - Estimated effort (Quick/Short/Medium/Large)
+  - Evidence from the session (file excerpts, tool outputs)
+  - Estimated effort (Quick/Short/Medium/Large) for improvements
 And the agent can dynamically research the codebase using background tasks:
-  - background_task(agent="explore", prompt="Find hook patterns for X")
+  - background_task(agent="explore", prompt="Find similar patterns for X")
   - background_task(agent="librarian", prompt="Look up OpenCode event system docs")
 ```
 
@@ -175,7 +154,7 @@ And the agent can dynamically research the codebase using background tasks:
 
 ---
 
-### US-7: Privacy and Security Controls
+### US-PRIVACY: Privacy and Security Controls
 
 **As a** developer working on sensitive codebases,  
 **I want** control over what conversation data is stored and how,  
@@ -184,46 +163,45 @@ And the agent can dynamically research the codebase using background tasks:
 **Acceptance Criteria:**
 ```gherkin
 Given configuration options:
-  - chat_review.redact_secrets (default: true)
-  - chat_review.max_excerpt_length (default: 200)
-  - chat_review.store_full_transcript (default: false)
-When a review is generated
+  - context_learning.redact_secrets (default: true)
+  - context_learning.max_excerpt_length (default: 200)
+When a learning candidate or review is generated
 Then:
   - If redact_secrets=true, common secret patterns are masked ([REDACTED])
-  - Code excerpts in review are limited to max_excerpt_length characters
-  - Full conversation transcript is NOT stored unless store_full_transcript=true
+  - Code excerpts are limited to max_excerpt_length characters
   - Only summary + key excerpts + findings are persisted
-And reviews are stored locally by default (no external transmission)
+  - Full transcripts stored only when explicitly requested (--save-transcript)
+And all data is stored locally by default (no external transmission)
 ```
 
 **Business Value**: Prevents accidental secret leakage. Reduces storage footprint. Complies with security policies.
 
 ---
 
-### US-8: Performance Monitoring and Cost Control
+### US-COST-CONTROL: Performance Monitoring and Cost Control
 
-**As a** cost-conscious developer using LLM-based review,  
-**I want** visibility into review costs and control over trigger frequency,  
+**As a** cost-conscious developer using LLM-based analysis,  
+**I want** visibility into costs and control over trigger frequency,  
 **So that** I can balance insight quality with budget constraints.
 
 **Acceptance Criteria:**
 ```gherkin
 Given configuration options:
-  - chat_review.cooldown_minutes (default: 30)
-  - chat_review.max_reviews_per_session (default: 3)
-  - chat_review.max_daily_reviews (default: 20)
+  - context_learning.cooldown_minutes (default: 60)
+  - context_learning.max_learnings_per_session (default: 2)
+  - context_learning.max_daily_learnings (default: 10)
 When automatic triggers fire
 Then:
   - Cooldown is enforced: same session won't trigger within cooldown_minutes
-  - Per-session limit enforced: max_reviews_per_session applies
-  - Daily budget enforced: max_daily_reviews applies globally
-And review metadata includes:
+  - Per-session limit enforced: max_learnings_per_session applies
+  - Daily budget enforced: max_daily_learnings applies globally
+And learning candidate metadata includes:
   - input_tokens: approximate token count for analysis
   - model_cost: estimated cost in USD
-And /process-reviews shows aggregate cost metrics
+And /review-learnings shows aggregate cost metrics
 ```
 
-**Business Value**: Prevents runaway costs from aggressive auto-triggering. Provides cost visibility for budget planning.
+**Business Value**: Prevents runaway costs from aggressive auto-triggering. Provides cost visibility for budget planning. Gemini 2.5 Flash is cost-efficient ($0.30/M input) so budget impact is minimal.
 
 ---
 
@@ -231,101 +209,150 @@ And /process-reviews shows aggregate cost metrics
 
 ### Functional Requirements
 
-#### FR-1: Chat Auditor Agent
-- **Purpose**: Specialist agent that analyzes conversations and writes review files
-- **Model**: Gemini 2.5 Flash (1M context, $0.30/M input, $2.50/M output, fast latency)
-- **Role**: Specialist (can write files, subject to governance)
-- **Capabilities**:
-  - Analyzes conversations using 6-point quality framework
-  - Deep knowledge of oh-my-opencode architecture injected via prompt
-  - Can spawn background research agents (explore, librarian) for accurate recommendations
-  - Writes structured markdown reviews to disk
-  - Updates existing reviews instead of creating duplicates
-- **Input**: Serialized conversation history + metadata (session_id, context_pct, model, trigger)
-- **Output**: Structured review file with scores, findings, recommendations
-
-#### FR-2: Context-Threshold Review Hook
-- **Purpose**: Automatically triggers review when context usage is high
-- **Trigger Conditions**:
-  - Session.idle event fires
-  - Context usage ≥ threshold_percent (default 60%)
-  - Message count ≥ min_messages (default 5)
-  - Not currently in cooldown period
-- **Behavior**:
-  - Debounces triggers (wait 200ms to confirm idle, like todo-continuation-enforcer)
-  - Checks if review already in-flight for this session (dedupe)
-  - Computes context usage from `ctx.client.session.messages()` token metadata
-  - Falls back to heuristic (message length) if token metadata unavailable
-  - Spawns background agent with serialized chat + metadata
-  - Non-blocking: main conversation continues immediately
-- **State Management**:
-  - Per-session: `inFlight: boolean`, `lastReviewedHash: string`, `lastReviewTime: timestamp`
-  - Uses hash of message IDs to detect if conversation changed since last review
-
-#### FR-3: Manual Review Command
-- **Command**: `/review-chat [session-id]`
-- **Behavior**:
-  - If session-id omitted, uses current session
-  - Delegates to chat-auditor agent (synchronous execution)
-  - Waits for review completion
-  - Returns summary to user:
-    - Quality score
-    - HIGH/MEDIUM/LOW improvement counts
-    - Top 3 recommendations
-- **Options**: 
-  - `--fast`: Summary + last N turns only (faster, cheaper)
-  - `--deep`: Full transcript analysis (default)
-
-#### FR-4: Review Storage System
-- **Location**: Configurable via `chat_review.reviews_path` (default: `.opencode/reviews/`)
-- **Filename**: `{session_id}.md` (one file per session)
-- **Format**: Structured markdown with:
-  - YAML-like metadata section (session_id, timestamps, model, context_pct)
-  - Quality score (1-10)
-  - Executive summary (2-3 sentences)
-  - Actionable improvements table (HIGH/MEDIUM/LOW priority)
-  - Review history section (append-only log of each review pass)
-- **Write Strategy**:
-  - Atomic write: write to temp file, then rename
-  - Update mode: read existing → merge findings → rewrite
-  - Deduplication: fingerprint each finding by (category + issue description hash)
-
-#### FR-5: Batch Processing Pipeline
-- **Command**: `/process-reviews [options]`
-- **Options**:
-  - `--unprocessed-only`: Only process reviews without `processed_at` timestamp (default)
-  - `--all`: Reprocess all reviews
-  - `--priority <HIGH|MEDIUM|LOW>`: Filter by improvement priority
-- **Processing Steps**:
-  1. Scan review files matching criteria
-  2. Extract HIGH priority improvements
-  3. Check Linear for existing issues (dedupe by review key: `session_id + improvement hash`)
-  4. Create Linear issues with:
-     - Title: `[Review] {improvement description}`
-     - Description: Context + suggested fix + file references
-     - Label: `review-feedback`, improvement category
-     - Priority: Map HIGH→Urgent, MEDIUM→High, LOW→Normal
-  5. Aggregate patterns: count improvement categories across reviews
-  6. Flag patterns appearing in 3+ reviews for automation consideration
-  7. Update review files with `processed_at` and `linear_issue_id`
-  8. Return summary report
-
-#### FR-6: Configuration Schema
-- **New Config Section**: `chat_review`
-- **Options**:
+#### FR-1: Memory Tools (Serena-Compatible)
+- **Purpose**: Provide memory management without requiring Serena MCP installation
+- **Location**: `src/tools/memory/` (follows standard tool structure)
+- **Tool Names**:
+  | Canonical Name | Serena Alias | Function |
+  |----------------|--------------|----------|
+  | `omo_write_memory` | `write_memory`* | Write content to memory file |
+  | `omo_read_memory` | `read_memory`* | Read content from memory file |
+  | `omo_edit_memory` | `edit_memory`* | Edit content via regex/literal replace |
+  | `omo_list_memories` | `list_memories`* | List all memory files |
+  | `omo_delete_memory` | `delete_memory`* | Delete a memory file |
+  
+  *Serena aliases only registered if `memory.registerSerenaAliases: true`
+  
+- **Enhancements over Serena**:
+  - Configurable storage path (default: `.cursor/memory/`, aligns with `/update-context`)
+  - Subdirectory support (e.g., `decisions/ADR-001.md`)
+  - Optional base path override (requires `memory.allowRootOverride: true`)
+  - No conflicts if Serena MCP also installed (aliases are opt-in)
+  
+- **Configuration Schema**:
   ```typescript
   {
-    enabled: boolean;              // Default: true
-    trigger_on_threshold: boolean; // Default: true
-    threshold_percent: number;     // Default: 60 (range: 0-100)
-    min_messages: number;          // Default: 5
-    reviews_path: string;          // Default: ".opencode/reviews/"
-    redact_secrets: boolean;       // Default: true
-    max_excerpt_length: number;    // Default: 200
-    store_full_transcript: boolean;// Default: false
-    cooldown_minutes: number;      // Default: 30
-    max_reviews_per_session: number;// Default: 3
-    max_daily_reviews: number;     // Default: 20
+    memory: {
+      enabled: boolean;                   // Default: true
+      root: string;                       // Default: ".cursor/memory/"
+      allowSubdirs: boolean;              // Default: true
+      registerSerenaAliases: boolean;     // Default: false
+      allowRootOverride: boolean;         // Default: false (security)
+    }
+  }
+  ```
+  
+- **Storage**: Markdown files in configurable path
+- **Files Maintained**: `constitution.md`, `architecture.md`, `tech-stack.md`, `glossary.md`, `decisions/*.md`
+- **Security**: Path normalization, no `..` traversal, root containment checks
+
+#### FR-2: Meta-Learning Extraction Hook
+- **Purpose**: Automatically extract OmO improvement insights before context is lost
+- **Location**: `src/hooks/meta-learning-extractor/` (follows hook structure pattern)
+- **Triggers**:
+  | Trigger | Event | Purpose | Priority |
+  |---------|-------|---------|----------|
+  | Pre-compaction | `experimental.session.compacting` | Last chance before context loss | PRIMARY |
+  | Session idle | `session.idle` | After work pauses (with cooldown + delta) | SECONDARY |
+  
+- **Execution Flow**:
+  1. **Sync snapshot**: Persist transcript slice + metadata (fast, <100ms)
+  2. **Background extraction**: Spawn background agent for LLM analysis (async, non-blocking)
+  3. **Output**: Write to `context/learnings/{session_id}.md`
+  
+- **Noise Control**:
+  - Cooldown: 10-20 min per session
+  - Min delta: Require new messages since last extraction
+  - Max candidates per run: 3-5
+  - Dedup: Stable hash `(pattern_type + evidence_snippet + subsystem)`
+  
+- **State Management**:
+  - Per-session: `{ inFlight, lastExtractTime, lastMessageHash, candidateCount }`
+  - Cleanup on `session.deleted`
+
+#### FR-3: Meta-Learning Extractor Agent
+- **Purpose**: Background agent that extracts meta-level improvement insights
+- **Model**: Gemini 2.5 Flash (1M context, $0.30/M input, $2.50/M output, fast latency)
+- **Role**: Specialist (can write files to `context/learnings/`, subject to governance)
+- **Input**: Serialized conversation history + metadata (session_id, files_modified, tools_used, delegation_events)
+- **Meta-Learning Categories**:
+  | Category | What It Improves | Example |
+  |----------|------------------|---------|
+  | **Agent Instructions** | Agent prompts, roles, capabilities | "OmO should delegate frontend work earlier" |
+  | **Commands** | Slash command behavior, workflows | "/implement should check for tasks.md first" |
+  | **Orchestration** | Delegation patterns, agent selection | "Use explore agent for file discovery, not grep" |
+  | **Context Handling** | Memory management, compaction | "Extract learnings before 70% context usage" |
+  | **Tool Usage** | Tool selection, efficiency | "Use LSP instead of grep for symbol search" |
+  
+- **NOT Extracted** (project-level, goes to memory tools):
+  - Domain-specific coding patterns
+  - Business logic decisions
+  - Architecture for the USER's project
+  
+- **Output Format**: Markdown with candidates (claim, category, evidence, confidence)
+- **Human Review**: Reviewer reads → decides actionable → uses `/specify` to create feature
+
+#### FR-4: Manual Extraction Command
+- **Command**: `/extract-learnings`
+- **Location**: `.opencode/command/extract-learnings.md` (follows command pattern)
+- **Behavior**:
+  - Manually triggers meta-learning extraction
+  - Spawns background extractor agent with current session
+  - Returns: "Extraction started, results in context/learnings/{session_id}.md"
+- **Use Cases**:
+  - Safety net when automatic triggers didn't fire
+  - User wants to ensure complex work is captured
+  - Testing/debugging the extraction system
+
+#### FR-5: Learning Candidate Storage
+- **Location**: `context/learnings/` (configurable via `meta_learning.output_path`)
+- **Filename**: `{session_id}.md` (one file per session, append with timestamps if multiple extractions)
+- **Format**: Structured markdown with:
+  ```markdown
+  # Meta-Learning Candidates: {session_id}
+  
+  ## Metadata
+  - Session ID: {id}
+  - Timestamp: {iso8601}
+  - Extraction Trigger: pre-compaction | idle | manual
+  
+  ## Candidates
+  
+  ### 1. [Category] {Short Title}
+  **Insight**: {What to improve}
+  **Evidence**: {Excerpt from session showing the pattern/issue}
+  **Actionable**: {Specific change to make}
+  **Priority**: High | Medium | Low
+  ```
+  
+- **Write Strategy**: Atomic write (temp file → rename)
+- **Archive**: Human reviewer moves to `context/learnings/archive/` after processing
+
+#### FR-6: Configuration Schema
+- **Memory Tools Config**:
+  ```typescript
+  {
+    memory: {
+      enabled: boolean;                   // Default: true
+      root: string;                       // Default: ".cursor/memory/"
+      allowSubdirs: boolean;              // Default: true
+      registerSerenaAliases: boolean;     // Default: false
+      allowRootOverride: boolean;         // Default: false
+    }
+  }
+  ```
+  
+- **Meta-Learning Config**:
+  ```typescript
+  {
+    meta_learning: {
+      enabled: boolean;                   // Default: true
+      trigger_on_compact: boolean;        // Default: true
+      trigger_on_idle: boolean;           // Default: false (conservative)
+      output_path: string;                // Default: "context/learnings/"
+      cooldown_minutes: number;           // Default: 15
+      max_candidates_per_run: number;     // Default: 5
+    }
   }
   ```
 
@@ -345,22 +372,24 @@ And /process-reviews shows aggregate cost metrics
   - Background agents don't inherit context (must serialize into prompt)
   - Gemini 2.5 Flash has 1M token context window
 - **Targets**:
-  - Typical session (10KB markdown): ~2.5k tokens input, ~1k tokens output = $0.0037 per review
-  - Large session (50KB markdown): ~15k tokens input, ~3k tokens output = $0.0158 per review
+  - Typical session (10KB markdown): ~2.5k tokens input, ~1k tokens output = $0.0037 per analysis
+  - Large session (50KB markdown): ~15k tokens input, ~3k tokens output = $0.0158 per analysis
   - Maximum input: 100k tokens (reserve capacity for instructions + output)
 - **Implementation**:
-  - Default mode: summary + last N turns + key excerpts (not full transcript)
-  - Deep mode (opt-in): full transcript for comprehensive analysis
+  - Learning extraction: Focus on decision points, pattern discoveries, architectural changes (not full transcript)
+  - Chat review: Summary + dimension scores + key excerpts (full transcript opt-in via --save-transcript)
   - Adaptive truncation when approaching limits
+  - Pre-filtering via signal scoring reduces unnecessary agent spawns
 
 #### NFR-3: Reliability
-- **Requirement**: Reviews persist even if session terminates unexpectedly
+- **Requirement**: Learning candidates and reviews persist even if session terminates unexpectedly
 - **Measures**:
   - Atomic file writes (write to temp, rename)
   - Job state machine: queued → running → succeeded/failed/canceled
   - Lock files with expiry (prevent duplicate processing)
   - Retry logic with exponential backoff for transient failures
-  - Graceful degradation if Linear MCP unavailable (reviews still saved locally)
+  - Graceful degradation if Linear MCP unavailable (learnings/reviews still saved locally)
+  - Learning candidates stored immediately (buffer-first approach)
 - **Recovery**: On startup, sweep detects abandoned jobs (status=running, age>threshold) and marks them failed
 
 #### NFR-4: Privacy and Security
@@ -371,215 +400,209 @@ And /process-reviews shows aggregate cost metrics
   - Excerpt limits: Max 200 chars per code sample (configurable)
   - Local storage only by default
   - No external transmission without explicit configuration
-  - Review files stored in `.opencode/reviews/` (git-ignored by default)
+  - Context files stored in `context/` (should be git-ignored)
+  - Full transcripts only saved when explicitly requested (--save-transcript)
 
 #### NFR-5: Cost Control
-- **Requirement**: Predictable and controllable review costs
+- **Requirement**: Predictable and controllable analysis costs
 - **Measures**:
-  - Per-session cooldown: prevents rapid re-triggers
-  - Daily budget cap: configurable max reviews per day
-  - Token metering: log input/output tokens + cost per review
-  - Summary mode by default (cheaper than deep mode)
-- **Monitoring**: `/process-reviews --stats` shows aggregate cost data
+  - Pre-filtering via signal scoring: prevents unnecessary agent spawns (blocks 90-97% of sessions)
+  - Per-session cooldown: prevents rapid re-triggers (default 60 min)
+  - Daily budget cap: configurable max learnings per day (default 10)
+  - Per-session limit: max 2 learning extractions per session
+  - Token metering: log input/output tokens + cost per analysis
+  - Manual review only (no auto-trigger for chat quality reviews)
+- **Monitoring**: `/review-learnings --stats` shows aggregate cost data
+- **Cost Estimate**: At $0.30/M input, $2.50/M output, typical session analysis costs $0.0037-$0.0158
 
 #### NFR-6: Scalability
 - **Requirement**: Handle high-volume usage gracefully
 - **Targets**:
+  - Support 1000+ learning candidate files without performance degradation
   - Support 1000+ review files without performance degradation
   - Batch processing handles 100+ reviews in single run
-  - Concurrent background reviews (different sessions) supported
+  - Concurrent background learning extractions (different sessions) supported
 - **Measures**:
-  - Incremental processing (only new/changed reviews)
+  - Incremental processing (only new/changed files)
   - Index/metadata for fast filtering
   - Concurrency limits (max 2-5 concurrent Linear API calls)
   - Rate limiting respect (honor Linear API throttles)
+  - Pre-filtering reduces processing load by 90-97%
+
+#### NFR-7: Tool-Agnostic Storage
+- **Requirement**: Context storage independent of specific tools (not tied to .cursor or .serena)
+- **Measures**:
+  - All context stored in `context/` folder (configurable)
+  - Standard file formats: markdown (.md), JSONL (.jsonl)
+  - No proprietary formats or tool-specific metadata
+  - Works with any editor/IDE that can read markdown
+  - Can be version-controlled (if desired)
+  - Easy to backup, migrate, or sync across machines
 
 ---
 
-## Analysis Framework
+## File Structures
 
-The chat-auditor evaluates conversations across **6 quality dimensions**:
-
-| Dimension | Measures | Scoring Criteria |
-|-----------|----------|------------------|
-| **Task Completion** | Did the conversation achieve its primary goal? | **10**: Goal fully achieved in <3 iterations<br>**7**: Goal achieved with minor detours<br>**4**: Partial progress, unresolved issues<br>**1**: No meaningful progress |
-| **Agent Utilization** | Were appropriate specialist agents delegated to? | **10**: Optimal delegation (background tasks for research, specialists for implementation)<br>**7**: Some delegation, missed opportunities<br>**4**: Mostly direct tool calls, no delegation<br>**1**: Anti-patterns (main agent doing specialist work) |
-| **Tool Efficiency** | Were tools used effectively (LSP, AST-grep, etc.)? | **10**: LSP for navigation, AST-grep for complex patterns, minimal redundant searches<br>**7**: Some LSP usage, occasional redundancy<br>**4**: Grep-heavy, no LSP, many redundant searches<br>**1**: Blind file reads, massive tool output ignored |
-| **Workflow Adherence** | Was the /specify→/plan→/tasks→/implement workflow followed? | **10**: Proper workflow, spec-driven development<br>**7**: Partial workflow, some shortcuts<br>**4**: Ad-hoc approach, no specs<br>**1**: Chaotic, no structure |
-| **Error Handling** | Were errors handled well? Proactive diagnostics? | **10**: lsp_diagnostics before commits, graceful recovery, minimal error loops<br>**7**: Reactive diagnostics, some error loops<br>**4**: Manual error discovery, delayed fixes<br>**1**: Errors ignored or repeatedly failed |
-| **Context Management** | Was context window managed efficiently? | **10**: Aggressive background delegation, minimal context bloat<br>**7**: Some background tasks, moderate efficiency<br>**4**: Large inline outputs, poor delegation<br>**1**: Context overflow, massive tool dumps |
-
-**Overall Quality Score**: Weighted average (all dimensions equal weight), rounded to integer 1-10.
-
----
-
-## Improvement Categories
-
-Reviews classify findings into **6 actionable categories**:
-
-| Category | What It Fixes | Example Issue | Suggested Action | Implementation Path |
-|----------|---------------|---------------|------------------|---------------------|
-| **A: Hook** | Repeated manual operations that should be automated | "Agent always forgets to run lsp_diagnostics after editing files" | Create `auto-diagnostics` hook triggered on PostToolUse(Edit) | Create `src/hooks/auto-diagnostics/index.ts`, add to builtinHooks |
-| **B: Prompt** | Agent behavior misaligned with intended role | "OmO directly edits frontend code instead of delegating to frontend-ui-ux-engineer" | Update OmO agent prompt to emphasize delegation for frontend work | Edit `src/agents/omo.ts` prompt section |
-| **C: Rule** | Missing domain knowledge in instruction files | "Agent doesn't know project's authentication pattern" | Add rule to `.opencode/instructions/auth-patterns.md` | Create instruction file in project |
-| **D: Tool** | Tool output too verbose or missing functionality | "Grep returns 50k tokens of output, blows context" | Enhance grep-output-truncator with adaptive limits | Edit `src/hooks/grep-output-truncator/index.ts` |
-| **E: Workflow** | Missing command for common operation | "No way to resume implementation from existing tasks.md" | Create `/resume-implementation` command | Add command to `.opencode/command/resume-implementation.md` |
-| **F: Docs** | Missing knowledge in AGENTS.md or README | "Agent doesn't know about Mintlify deployment process" | Update project AGENTS.md with deployment section | Edit AGENTS.md in project root |
-
-**Priority Assignment**:
-- **HIGH**: Impacts correctness, security, or causes frequent failures
-- **MEDIUM**: Impacts efficiency or developer experience significantly
-- **LOW**: Minor improvements, nice-to-haves
-
----
-
-## Review File Structure
+### Learning Candidate File Structure
 
 ```markdown
-# Chat Review: {session_id}
+# Meta-Learning Candidates: {session_id}
 
 ## Metadata
 - **Session ID**: {session_id}
-- **Model**: {model_name}
-- **Context Usage**: {percentage}% ({used_tokens}/{limit_tokens})
-- **Message Count**: {count}
-- **First Reviewed**: {iso8601_timestamp}
-- **Last Updated**: {iso8601_timestamp}
-- **Review Count**: {n}
-- **Status**: draft | processed
-- **Processed At**: {iso8601_timestamp} (if processed)
+- **Timestamp**: {iso8601_timestamp}
+- **Extraction Trigger**: pre-compaction | idle | manual
+- **Files Modified**: {count} ({file_list})
+- **Delegation Events**: {count}
 
-## Quality Score: {score}/10
+## Candidates
 
-## Executive Summary
-{2-3 sentence summary of conversation topic, outcome, and key quality findings}
+### 1. [Agent Instructions] OmO should delegate frontend work earlier
 
-## Dimension Scores
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Task Completion | {1-10} | {brief justification} |
-| Agent Utilization | {1-10} | {brief justification} |
-| Tool Efficiency | {1-10} | {brief justification} |
-| Workflow Adherence | {1-10} | {brief justification} |
-| Error Handling | {1-10} | {brief justification} |
-| Context Management | {1-10} | {brief justification} |
+**Insight**: OmO attempts to edit React components directly instead of delegating to frontend-ui-ux-engineer.
 
-## Actionable Improvements
-
-### HIGH Priority
-| ID | Category | Issue | Suggested Fix | Effort | Linear Issue |
-|----|----------|-------|---------------|--------|--------------|
-| H1 | Hook | Agent forgets lsp_diagnostics | Create auto-diagnostics hook | Short | [LIF-123](#) |
-| H2 | Prompt | OmO edits directly instead of delegating | Update delegation rules in prompt | Quick | - |
-
-### MEDIUM Priority
-| ID | Category | Issue | Suggested Fix | Effort | Linear Issue |
-|----|----------|-------|---------------|--------|--------------|
-| M1 | Tool | Grep output too large | Enhance truncator with adaptive limits | Medium | - |
-
-### LOW Priority
-| ID | Category | Issue | Suggested Fix | Effort | Linear Issue |
-|----|----------|-------|---------------|--------|--------------|
-| L1 | Docs | Missing deploy process | Add section to AGENTS.md | Quick | - |
-
-## Key Excerpts
-### Example of Anti-pattern (Tool Efficiency)
+**Evidence**:
 ```
-User: Find all TypeScript files with 'export class'
-Agent: <uses grep, returns 45k tokens of output>
-Agent: <context overflow, conversation restarted>
-```
-**Better Approach**: Use `ast_grep_search(pattern="export class $NAME", lang="typescript")` for structured results.
-
-### Example of Good Pattern (Agent Utilization)
-```
-Agent: Delegating to @explore to find authentication patterns
-Agent: Delegating to @librarian to look up Linear API docs
-Agent: <processes both results in parallel, continues implementation>
+User: "Add a dark mode toggle to the settings page"
+OmO: <uses Edit tool to modify Settings.tsx directly>
+Result: Generic toggle UI, not polished
 ```
 
-## Review History
+**Actionable**: Update OmO agent prompt with BLOCKING gate: "For any UI/UX work, MUST delegate to frontend-ui-ux-engineer. Do not edit .tsx/.jsx files directly."
 
-### Review #1 - 2025-12-23T10:30:00Z
-- **Trigger**: threshold (65% context usage)
-- **New Findings**: 5 (2 HIGH, 2 MEDIUM, 1 LOW)
-- **Key Insight**: Heavy grep usage without AST-grep, context management poor
-
-### Review #2 - 2025-12-23T14:15:00Z
-- **Trigger**: manual
-- **New Findings**: 1 (1 MEDIUM)
-- **Key Insight**: User applied H1 fix, context management improved, discovered new tool efficiency issue
+**Priority**: High
 
 ---
 
-## Metadata (not visible in file, used internally)
-- **Fingerprints**: {hash_map of finding_id → content_hash for deduplication}
-- **Cost**: {input_tokens: N, output_tokens: M, estimated_usd: X}
+### 2. [Commands] /implement should check for tasks.md first
+
+**Insight**: Users invoke /implement without running /tasks first, leading to unstructured implementation.
+
+**Evidence**:
+- Session had no tasks.md in spec folder
+- Implementation proceeded ad-hoc without clear task breakdown
+- Missed several requirements from spec.md
+
+**Actionable**: Add preflight check to /implement command that validates tasks.md exists.
+
+**Priority**: Medium
+
+---
+
+### 3. [Tool Usage] Use LSP find_references instead of grep for symbol search
+
+**Insight**: Agent used grep to find usages of function `processPayment`, returned 500+ results with noise.
+
+**Evidence**:
+```
+Agent: <grep pattern="processPayment">
+Result: 45k tokens (tests, comments, docs, actual code mixed)
+Agent: <manually filters through output>
+```
+
+**Actionable**: Add to agent instructions: "For symbol search, use lsp_find_references for precise results. Grep for text/content search only."
+
+**Priority**: Low
+
+---
+
+## Extraction Notes
+- **Total Candidates**: 3
+- **Priority Breakdown**: 1 High, 1 Medium, 1 Low
+- **Cost**: 12k input tokens, 2k output tokens, $0.009
 ```
 
 ---
 
 ## Technical Constraints
 
-### 1. No Pre-Compaction Event
-**Constraint**: OpenCode fires `session.compacted` **after** compaction, not before. Cannot hook pre-compaction directly.
+### 1. Pre-Compaction Hook Available (experimental.session.compacting)
+**Discovery**: OpenCode provides `experimental.session.compacting` hook that fires **BEFORE** compaction starts.
 
-**Workaround**: Use context threshold + session.idle to approximate pre-compaction trigger. When context >60% and session goes idle, high probability compaction is imminent.
+```typescript
+"experimental.session.compacting"?: (
+  input: { sessionID: string }, 
+  output: { context: string[] }
+) => Promise<void>
+```
 
-**Implication**: Reviews may occasionally fire after compaction already happened. Accept as limitation; users can always trigger manually.
+**Trigger Strategy**:
+| Trigger | Event | Priority | Purpose |
+|---------|-------|----------|---------|
+| Pre-compaction | `experimental.session.compacting` | PRIMARY | Last chance before context loss |
+| Context threshold | 60% usage | PROACTIVE | Early extraction before pressure |
+| Session idle | `session.idle` (debounced) | PERIODIC | After work pauses |
+| Manual | `/extract-learnings` | ON-DEMAND | User-triggered |
+
+**Implication**: We can reliably extract learnings BEFORE compaction, not after. This is the ideal trigger point.
 
 ---
 
 ### 2. Background Tasks Don't Inherit Context
 **Constraint**: Background agents receive only the prompt text. No access to parent session context.
 
-**Workaround**: Serialize full conversation history into the background agent's prompt. Use structured format:
+**Workaround**: Serialize conversation history into the background agent's prompt. Use structured format:
 
 ```markdown
-TASK: Analyze this conversation for quality
+TASK: Extract learnings from this development session
 
 CONVERSATION HISTORY (serialized):
 [Message 1 - User]: {content}
 [Message 2 - Assistant]: {content}
+[Tool: edit]: {file_path}, {changes}
 ...
 
 METADATA:
 - Session ID: {id}
-- Context Usage: {pct}
-- Model: {model}
+- Files Modified: {list}
+- Tools Used: {list}
+- Signal Score: {score}
 ```
 
-**Implication**: Prompt can get large for long conversations. Use summary mode by default; deep mode opt-in.
+**Implication**: Prompt can get large for long conversations. Adaptive truncation focuses on decision points and architectural changes. Pre-filtering via signal scoring ensures only high-value sessions are processed.
 
 ---
 
 ### 3. Agent Role for File Writing
 **Constraint**: Only specialist agents can write files (subject to governance).
 
-**Design Decision**: Chat-auditor must be specialist role, not utility/advisor.
+**Design Decision**: Both context-learner and chat-auditor must be specialist role, not utility/advisor.
 
-**Implication**: Chat-auditor subject to governance-path-validator. Must ensure `.opencode/reviews/` is in allowed paths.
+**Implication**: Both agents subject to governance-path-validator. Must ensure `context/` is in allowed paths.
 
 ---
 
-### 4. Context Usage Measurement Unreliable Across Providers
-**Constraint**: Token metadata format differs across providers (Anthropic, OpenAI, Google). Some may not expose token counts.
+### 4. Signal Scoring Requires Session Metadata
+**Constraint**: Multi-signal scoring needs access to files_modified, tools_used, and conversation content.
 
 **Workaround**: 
-- Primary: Use `ctx.client.session.messages()` token metadata when available
-- Fallback: Heuristic (message length * 0.25 tokens/char)
-- Flag reviews with `context_measurement: estimated` when using fallback
+- Hook analyzes `ctx.client.session.messages()` for tool calls and file edits
+- Extracts file paths from Edit/Write tool calls
+- Scans conversation for decision language patterns
+- Computes signal score before spawning agent
 
-**Implication**: Threshold trigger may be less accurate for non-Anthropic providers. Document limitation.
+**Implication**: Signal scoring adds ~10-50ms overhead to session.idle event. Acceptable for cost savings (blocks 90-97% of agent spawns).
 
 ---
 
 ### 5. Governance Path Validator May Block Writes
-**Constraint**: Default governance rules may block writes to `.opencode/reviews/` if not in allowed paths.
+**Constraint**: Default governance rules may block writes to `context/` if not in allowed paths.
 
-**Workaround**: Explicitly add `.opencode/reviews/` to `governance.path_validation.allowed_paths` in default config.
+**Workaround**: Explicitly add `context/` to `governance.path_validation.allowed_paths` in default config.
 
-**Implication**: Initial setup must configure governance; otherwise reviews will fail silently.
+**Implication**: Initial setup must configure governance; otherwise learning extraction will fail silently.
+
+---
+
+### 6. Memory File Format Assumptions
+**Constraint**: Programmatic editing of memory files (constitution, architecture, etc.) assumes consistent markdown format.
+
+**Workaround**:
+- Use structured format for memory files (headings, lists, sections)
+- Anti-bloat guardrails detect format violations
+- Fallback: Manual editing if programmatic promotion fails
+
+**Implication**: Memory files must follow conventions. Document format in project setup.
 
 ---
 
@@ -587,25 +610,27 @@ METADATA:
 
 | Metric | Target | Measurement Method |
 |--------|--------|-------------------|
-| **Review Generation Coverage** | 95% of threshold-exceeded sessions | Count reviews / sessions where context >60% |
-| **Non-Blocking Performance** | <100ms impact on session.idle | Performance profiling of hook dispatch |
-| **Deduplication Accuracy** | 0 duplicate review files per session | File system audit: `find reviews/ -name "*.md" | sort | uniq -d` |
-| **Actionability Rate** | 80% of HIGH priority items are implementable within 1 day | Manual review sampling (N=20 reviews) |
-| **Pattern Detection Precision** | Patterns flagged in 3+ reviews represent actual systemic issues | Expert review of aggregated patterns |
-| **False Positive Rate** | <10% of improvements marked MEDIUM/LOW upon implementation | Post-implementation review |
-| **Cost Efficiency** | Average review cost <$0.01 for typical sessions | Cost tracking: `sum(review_costs) / count(reviews)` |
-| **User Satisfaction** | 4.5/5 rating on review usefulness | Survey after 2 weeks of usage |
+| **Memory Tool Compatibility** | 100% Serena API compatibility | Run Serena-based workflows, verify identical behavior |
+| **Meta-Learning Quality** | 70% of extracted candidates lead to actionable `/specify` specs | Track conversion rate over 1 month |
+| **Pre-Compaction Reliability** | 95% of compaction events trigger extraction successfully | Monitor hook execution success rate |
+| **Non-Blocking Performance** | <100ms snapshot time on pre-compaction hook | Performance profiling of hook dispatch |
+| **False Positive Rate** | <30% of extractions yield zero actionable candidates | Manual review sampling (N=30 sessions) |
+| **Cost Efficiency** | Average extraction cost <$0.02 per session | Cost tracking: `sum(costs) / count(extractions)` |
+| **Deduplication Effectiveness** | <10% duplicate candidates within 1 week | Dedup audit across time window |
+| **Tool Adoption** | Memory tools used in 50%+ of agent sessions | Track tool call frequency vs baseline |
 
 ---
 
 ## Assumptions
 
-1. **Context Threshold Approximates Pre-Compaction**: Triggering at 60% context usage will capture most conversations before critical history loss
-2. **Gemini 2.5 Flash Quality**: Gemini 2.5 Flash can accurately analyze conversations and provide actionable recommendations (verified by research showing 63.8% SWE-Bench performance)
+1. **Learning Signal Accuracy**: Multi-signal scoring can reliably distinguish learning-worthy sessions (3-10%) from routine work (90-97%)
+2. **Gemini 2.5 Flash Quality**: Gemini 2.5 Flash can accurately extract learnings and analyze conversations (verified by research showing 63.8% SWE-Bench performance)
 3. **Linear MCP Availability**: Linear MCP is configured and functional for batch processing (graceful degradation if not)
-4. **Session Idle Semantics**: `session.idle` reliably fires when agent stops responding (verified by existing hook usage in todo-continuation-enforcer)
+4. **Session Idle/Compact Semantics**: `session.idle` and `session.compacted` reliably fire at appropriate times (verified by existing hook usage)
 5. **File System Reliability**: Atomic rename operations work correctly on target platforms (macOS, Linux, Windows)
 6. **Oh-my-opencode Knowledge Stability**: Agent's baked-in knowledge of oh-my-opencode architecture remains accurate across minor version updates
+7. **Human Review Capacity**: Developers can review 1-3 learning candidates per week without overwhelming their workflow
+8. **Memory File Structure**: Existing memory files (constitution, architecture, tech-stack, glossary) follow consistent markdown format for programmatic editing
 
 ---
 
@@ -630,23 +655,26 @@ METADATA:
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| **Auto-trigger loops**: session.idle fires repeatedly, causing duplicate reviews | Medium | High | Debounce + cooldown + `inFlight` flag per session |
-| **Context measurement inaccuracy**: Heuristic-based threshold unreliable for non-Anthropic models | Medium | Medium | Flag reviews with `context_measurement: estimated`, allow manual override |
-| **Governance blocks writes**: Path validator prevents review file creation | Low | High | Add `.opencode/reviews/` to default allowed paths, clear error messages |
+| **False positive learning triggers**: Signal scoring detects "learnings" in routine sessions | Medium | Medium | Tunable threshold, veto conditions, human approval gate |
+| **False negative learning triggers**: Signal scoring misses valuable learnings | Medium | Medium | Dual trigger (idle + compacted), manual review when needed, threshold tuning |
+| **Learning candidate bloat**: Too many low-quality candidates accumulate in staging | Medium | Medium | Anti-bloat guardrails, confidence scoring, human approval gate, retention policy |
+| **Memory file corruption**: Auto-promotion introduces errors/duplicates | Low | High | Buffer-first approach, human approval, atomic writes, version control |
+| **Governance blocks writes**: Path validator prevents context file creation | Low | High | Add `context/` to default allowed paths, clear error messages |
 | **Linear API rate limiting**: Batch processing hits 429 errors | Medium | Medium | Concurrency limit (2-5 parallel), exponential backoff, retry with jitter |
-| **Secret leakage in reviews**: Conversation contains API keys that get persisted | Medium | Critical | Redaction patterns for common secrets, excerpt length limits, security audit |
-| **Cost runaway**: Aggressive auto-trigger on large sessions | Medium | Medium | Daily budget cap, per-session cooldown, cost monitoring dashboard |
-| **Race condition on review update**: Concurrent manual + auto-trigger | Low | Low | File locks with expiry, atomic writes |
-| **Background agent timeout**: Long conversations time out during analysis | Low | Medium | Timeout handling, partial review save, retry with summary mode |
+| **Secret leakage in candidates**: Conversation contains API keys that get persisted | Medium | Critical | Redaction patterns for common secrets, excerpt length limits, security audit |
+| **Cost runaway**: Aggressive auto-trigger with low signal threshold | Low | Medium | Daily budget cap, per-session cooldown, pre-filtering via signal scoring |
+| **Race condition on candidate write**: Concurrent extractions from same session | Low | Low | File locks with expiry, atomic writes, `inFlight` flag |
+| **Background agent timeout**: Long conversations time out during analysis | Low | Medium | Timeout handling, partial candidate save, adaptive truncation |
+| **Approval fatigue**: Users overwhelmed by too many candidates to review | Medium | Medium | High signal threshold (default 3/10), max 1-3 candidates/week target |
 
 ---
 
 ## Design Decisions
 
-### DD-1: Gemini 2.5 Flash for Chat Auditor
-**Decision**: Use Gemini 2.5 Flash instead of Claude or GPT.
+### DD-1: Gemini 2.5 Flash for Both Agents
+**Decision**: Use Gemini 2.5 Flash for both context-learner and chat-auditor agents.
 
-**Context**: Need a model for conversation analysis that balances cost, speed, and quality.
+**Context**: Need a model for learning extraction and conversation analysis that balances cost, speed, and quality.
 
 **Options Considered**:
 1. Claude Sonnet 4.5 (high quality, moderate cost)
@@ -657,55 +685,80 @@ METADATA:
 - Cost: $0.30/M input vs $3/M for Claude/GPT (10x cheaper)
 - Context window: 1M tokens handles even very large conversations
 - Speed: Optimized for low latency
-- Quality: 63.8% SWE-Bench Verified (sufficient for pattern detection)
+- Quality: 63.8% SWE-Bench Verified (sufficient for pattern detection and learning extraction)
 - Structured output: Native JSON schema support
+- Cost-efficient for frequent operations (learning extraction expected to trigger 1-10x/day)
 
-**Trade-off**: Slightly lower reasoning quality than Claude Opus/GPT-5.2, but acceptable for analysis task. Can always upgrade model later if quality insufficient.
+**Trade-off**: Slightly lower reasoning quality than Claude Opus/GPT-5.2, but acceptable for analysis task. Pre-filtering via signal scoring ensures only high-quality sessions trigger analysis.
 
 ---
 
-### DD-2: Session.Idle + Context Threshold (Not Real-Time)
-**Decision**: Trigger reviews on session.idle when context >60%, not in real-time during conversation.
+### DD-2: Session.Idle + Signal Scoring (Not Real-Time)
+**Decision**: Trigger learning extraction on session.idle when signal score ≥ threshold, not in real-time during conversation.
 
-**Context**: Wanted pre-compaction trigger, but no such event exists. Real-time monitoring would add overhead.
+**Context**: Wanted to capture learnings before context loss, but real-time monitoring would add overhead.
 
 **Options Considered**:
-1. Real-time monitoring: Hook every message, check context constantly
-2. Session.idle + threshold: Wait for idle, then check context usage
-3. Manual-only: No auto-trigger, users must invoke /review-chat
+1. Real-time monitoring: Hook every message, check signals constantly
+2. Session.idle + signal scoring: Wait for idle, then compute signal score
+3. Session.compacted only: Extract learnings after compaction
+4. Manual-only: No auto-trigger, users must invoke /extract-learnings
 
 **Rationale**:
 - Performance: Real-time adds latency to every message
 - Accuracy: session.idle is reliable trigger (proven by existing hooks)
-- Approximation: 60% threshold catches most conversations before compaction
+- Signal scoring: Pre-filtering prevents 90-97% of unnecessary agent spawns
+- Dual trigger: Both session.idle AND session.compacted ensure coverage
 - Existing pattern: todo-continuation-enforcer uses same approach
 
-**Trade-off**: May occasionally trigger after compaction already happened. Accept as limitation; full manual trigger available.
+**Trade-off**: May occasionally miss learnings if session ends abruptly. Dual trigger (idle + compacted) mitigates this.
 
 ---
 
-### DD-3: One Review File Per Session (Update-in-Place)
-**Decision**: Store reviews as `{session_id}.md`, update existing file on re-review.
+### DD-3: context/ Folder for Tool-Agnostic Storage
+**Decision**: Store all context in `context/` folder (not `.cursor/` or `.serena/`).
 
-**Context**: Need durable storage that tracks review history without duplication.
+**Context**: Need storage location independent of specific tools.
 
 **Options Considered**:
-1. One file per review: `{session_id}_{timestamp}.md` (every review creates new file)
-2. One file per session: `{session_id}.md` (update-in-place with history section)
-3. Database: SQLite for structured storage
+1. `.cursor/` or `.serena/`: Tool-specific locations
+2. `.opencode/`: OpenCode-specific location
+3. `context/`: Tool-agnostic, generic name
 
 **Rationale**:
-- Simplicity: Markdown files are human-readable, git-diffable, easy to backup
-- Deduplication: Prevents dozens of files for same session
-- History: Review History section tracks evolution over time
-- Tooling: No database dependencies, works anywhere
+- Tool-agnostic: Works with any editor/IDE, not tied to Cursor or Serena
+- Generic: Clear purpose without tool-specific naming
+- Standard: Common pattern in projects (like `docs/`, `tests/`)
+- Portable: Easy to backup, migrate, or version-control
+- Future-proof: Survives tool switches
 
-**Trade-off**: Concurrent review risk (mitigated with file locks). Not queryable without parsing (future: add optional SQLite index).
+**Trade-off**: New folder convention (not following existing .cursor/.serena patterns). Accept for long-term flexibility.
 
 ---
 
-### DD-4: Background Agent for All Analysis
-**Decision**: Always run chat-auditor in background, even for manual /review-chat.
+### DD-4: Buffer-First Approach for Learnings
+**Decision**: Write learning candidates to staging buffer (`context/learnings/`), require human approval before promoting to memory.
+
+**Context**: Need to prevent bloat and noise in memory files while still capturing learnings automatically.
+
+**Options Considered**:
+1. Direct write: Auto-write to memory files
+2. Buffer-first: Stage candidates, require approval
+3. High-confidence auto-promote: Auto-write candidates with confidence >0.95
+
+**Rationale**:
+- Quality control: Human review prevents noise, redundancy, and low-quality entries
+- Anti-bloat: Approval gate ensures only valuable learnings persist
+- Trust building: System earns trust by showing candidates before persistence
+- Flexibility: User can approve/reject/edit before promotion
+- Safety: Mistakes in extraction don't corrupt memory files
+
+**Trade-off**: Requires manual review step (mitigated by low candidate volume: 1-3/week). Can add auto-promote for high-confidence candidates later if desired.
+
+---
+
+### DD-5: Background Agent for All Analysis
+**Decision**: Always run context-learner and chat-auditor in background, never block main conversation.
 
 **Context**: Need to prevent main conversation blocking during analysis.
 
@@ -717,13 +770,35 @@ METADATA:
 **Rationale**:
 - Consistency: Same code path for auto + manual
 - Performance: Even manual reviews can analyze large sessions
-- User experience: Immediate feedback ("Review started..."), results arrive via notification
+- User experience: Immediate feedback ("Analysis started..."), results arrive via notification
+- Non-blocking: Main conversation continues immediately
 
-**Trade-off**: Manual reviews feel less immediate (mitigated with progress updates). Can add --sync flag if users demand synchronous mode.
+**Trade-off**: Manual reviews feel less immediate (mitigated with progress updates). Accept for consistency and performance.
 
 ---
 
-### DD-5: 6-Point Quality Framework (Not Custom Per Project)
+### DD-6: Multi-Signal Scoring for Learning Detection
+**Decision**: Use multi-signal scoring (strong/medium/weak signals + veto conditions) to pre-filter sessions before spawning agent.
+
+**Context**: Need to distinguish learning-worthy sessions (3-10%) from routine work (90-97%).
+
+**Options Considered**:
+1. Always extract: Spawn agent for every session
+2. Signal scoring: Pre-filter based on session characteristics
+3. ML-based: Train classifier on past sessions
+
+**Rationale**:
+- Cost efficiency: Pre-filtering prevents 90-97% of unnecessary agent spawns
+- Signal diversity: Multiple signals (file edits, decision language, cross-file impact) capture different learning types
+- Veto conditions: Blocks obvious non-learning sessions (single-file changes, speculation)
+- Tunable: Threshold configurable per project (default: 3/10)
+- Transparent: Signal scoring is explainable (vs. ML black box)
+
+**Trade-off**: May miss some learnings if signal scoring is too conservative. Threshold tuning required per project.
+
+---
+
+### DD-7: 6-Point Quality Framework (Not Custom Per Project)
 **Decision**: Use fixed 6 dimensions (Task Completion, Agent Utilization, Tool Efficiency, Workflow Adherence, Error Handling, Context Management), not customizable.
 
 **Context**: Need consistent scoring across reviews for pattern detection.
@@ -743,25 +818,53 @@ METADATA:
 
 ---
 
+### DD-8: Meta-Learning Focus (Not General Chat Review)
+**Decision**: Focus on meta-level improvements to OmO orchestration, not general chat quality scoring.
+
+**Context**: Original spec had 6-point chat quality framework. Revised to focus on actionable improvements to the agentic workflow itself.
+
+**Options Considered**:
+1. 6-point chat quality framework (original spec)
+2. Meta-learning focus on OmO improvement
+3. Both (quality scoring + meta-learning)
+
+**Rationale**:
+- Actionability: Meta-learnings can become feature specs via `/specify`
+- Focused scope: Improving OmO orchestration is more valuable than generic quality scores
+- Human-in-the-loop: Reviewer decides what becomes a feature
+- Reduced complexity: No need for quality framework scoring, pattern detection, Linear auto-creation
+
+**Trade-off**: No quantitative quality scoring. Accept because meta-learnings are more actionable than scores.
+
+---
+
 ## Open Questions
 
-1. **Should reviews be git-committed automatically?**
-   - **Context**: Reviews stored in `.opencode/reviews/` which is typically git-ignored
+1. **Should context/ folder be git-committed or git-ignored by default?**
+   - **Context**: Context files contain project knowledge (learnings, reviews, transcripts)
    - **Options**: 
-     - A) Always local-only (current design)
-     - B) Configurable: `chat_review.commit_to_git: boolean`
-     - C) Smart: Auto-commit if `.opencode/reviews/` not in `.gitignore`
-   - **Recommendation**: Start with A (local-only), add B if teams want to share reviews
+     - A) Git-ignored by default (local-only)
+     - B) Git-committed by default (shared knowledge)
+     - C) Configurable per subfolder (learnings committed, transcripts ignored)
+   - **Recommendation**: Start with A (git-ignored), let users opt-in to version control if desired
 
-2. **What is the retention policy for old reviews?**
-   - **Context**: Reviews accumulate over time, potentially 100s of files
+2. **Should high-confidence learnings (>0.95) be auto-promoted without human review?**
+   - **Context**: Some learnings may be obvious enough to skip approval step
+   - **Options**:
+     - A) All candidates require approval (current design)
+     - B) Auto-promote if confidence >0.95
+     - C) Configurable: `auto_promote_confidence: number` (default: 1.0, i.e., disabled)
+   - **Recommendation**: Start with A (all require approval), add B if users request it after seeing candidate quality
+
+3. **What is the retention policy for old learning candidates and reviews?**
+   - **Context**: Candidates and reviews accumulate over time, potentially 100s of files
    - **Options**:
      - A) Keep forever
-     - B) Prune after N days: `chat_review.retention_days: number`
-     - C) Archive processed reviews: move to `.opencode/reviews/archive/`
-   - **Recommendation**: Start with A (keep forever), add B if storage becomes issue
+     - B) Prune after N days: `retention_days: number`
+     - C) Archive processed items: move to `context/learnings/archive/` and `context/reviews/archive/`
+   - **Recommendation**: Start with A (keep forever), add C if storage becomes issue
 
-3. **Should pattern detection create issues automatically or require approval?**
+4. **Should pattern detection create Linear issues automatically or require approval?**
    - **Context**: When 3+ reviews flag same category, /process-reviews can auto-create "systemic issue" Linear issue
    - **Options**:
      - A) Auto-create with label `auto-detected-pattern`
@@ -769,19 +872,29 @@ METADATA:
      - C) Interactive: Prompt for confirmation per pattern
    - **Recommendation**: Start with B (dry-run by default), add --auto-create flag for CI/cron
 
+5. **Should signal scoring thresholds be adaptive based on project characteristics?**
+   - **Context**: Default threshold (3/10) may need tuning per project
+   - **Options**:
+     - A) Fixed threshold across all projects (current design)
+     - B) Adaptive: Learn optimal threshold based on approval rate
+     - C) Project-specific: Allow override in config
+   - **Recommendation**: Start with A (fixed), add C (configurable) if users request it
+
 ---
 
 ## Out of Scope
 
 The following are explicitly **not** included in this feature:
 
-1. **Real-time review during conversation**: Would impact performance; use post-session review instead
-2. **Automatic implementation of suggested improvements**: Requires human review; too risky to auto-apply code changes
-3. **Cross-project review aggregation**: Each project's reviews are independent; no global pattern detection across repos
-4. **Training/fine-tuning based on reviews**: Would require infrastructure for model customization; out of scope
-5. **A/B testing of improvements**: No framework for testing "before/after" impact of applied changes
-6. **Review of non-chat artifacts**: Only analyzes chat conversations, not code commits, PRs, or documentation directly
-7. **Multi-user collaboration on reviews**: Single-user workflow; no review sharing, commenting, or approval processes
-8. **Custom scoring algorithms**: Fixed 6-point framework; no pluggable scoring systems
-9. **Historical trend analysis**: No dashboards showing quality trends over time (future enhancement)
-10. **Integration with external analytics platforms**: Reviews stored locally; no exports to DataDog, Splunk, etc.
+1. **Chat quality framework**: No 6-point scoring (Task Completion, Agent Utilization, etc.)
+2. **Automated Linear issue creation**: No `/process-reviews` command
+3. **Pattern detection across sessions**: No aggregation or trend analysis
+4. **Full transcript storage**: No JSONL session archival
+5. **Review file structure**: No chat quality review markdown files
+6. **Automatic memory file updates**: Meta-learnings buffered for human review, not auto-applied to `.cursor/memory/`
+7. **Signal scoring system**: Simplified triggers (pre-compaction + idle), no multi-signal scoring
+8. **Project-level learning extraction**: Focus is meta-learning (OmO improvements), not project-specific patterns
+9. **Cross-project aggregation**: Each project's learnings are independent
+10. **Multi-user collaboration**: Single-user workflow
+11. **Integration with external knowledge bases**: Local storage only
+12. **Real-time extraction during conversation**: Post-session extraction only (pre-compaction/idle)

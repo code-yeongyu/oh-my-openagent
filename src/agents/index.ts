@@ -29,6 +29,8 @@ import { docsPublisherAgent } from "./docs-publisher"
 import { productStrategistAgent } from "./product-strategist"
 import { strategicPlannerAgent } from "./strategic-planner"
 import { taskPlannerAgent } from "./task-planner"
+// LIF-73: Context Learning
+import { contextLearnerAgent } from "./context-learner"
 
 export const builtinAgents: Record<string, AgentConfig> = {
   OmO: omoAgent,
@@ -60,6 +62,8 @@ export const builtinAgents: Record<string, AgentConfig> = {
   "product-strategist": productStrategistAgent,
   "strategic-planner": strategicPlannerAgent,
   "task-planner": taskPlannerAgent,
+  // LIF-73: Context Learning
+  "context-learner": contextLearnerAgent,
 }
 
 /**
@@ -110,6 +114,8 @@ export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
   librarian: "utility",
   explore: "utility",
   "multimodal-looker": "utility",
+  // LIF-73: Context Learning
+  "context-learner": "specialist",
 }
 
 export * from "./types"

@@ -35,6 +35,8 @@ export type BuiltinAgentName =
   | "product-strategist"
   | "strategic-planner"
   | "task-planner"
+  // LIF-73: Context Learning
+  | "context-learner"
 
 export type OverridableAgentName =
   | "build"

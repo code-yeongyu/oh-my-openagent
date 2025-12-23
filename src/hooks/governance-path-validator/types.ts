@@ -20,6 +20,7 @@ export const DEFAULT_PATH_VALIDATOR_CONFIG: PathValidatorConfig = {
   allowed_paths: [
     "context/specs/",
     "context/memory/",
+    "context/learnings/",
     ".cursor/specs/",
     ".cursor/memory/",
     ".opencode/",

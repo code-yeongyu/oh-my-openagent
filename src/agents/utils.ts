@@ -33,6 +33,8 @@ import { docsPublisherAgent } from "./docs-publisher"
 import { productStrategistAgent } from "./product-strategist"
 import { strategicPlannerAgent } from "./strategic-planner"
 import { taskPlannerAgent } from "./task-planner"
+// LIF-73: Context Learning
+import { contextLearnerAgent } from "./context-learner"
 import { deepMerge } from "../shared"
 import { getGovernanceTemplate } from "../config/governance-template"
 
@@ -65,6 +67,8 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   "product-strategist": productStrategistAgent,
   "strategic-planner": strategicPlannerAgent,
   "task-planner": taskPlannerAgent,
+  // LIF-73: Context Learning
+  "context-learner": contextLearnerAgent,
 }
 
 /**
@@ -107,6 +111,8 @@ const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
   "product-strategist": "full",        // Specialist - can modify files
   "strategic-planner": "full",         // Specialist - can modify files
   "task-planner": "full",              // Specialist - can modify files
+  // LIF-73: Context Learning
+  "context-learner": "none",           // Internal utility - uses memory tools
 }
 
 export function createEnvContext(directory: string): string {
