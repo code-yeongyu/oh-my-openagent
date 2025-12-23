@@ -103,9 +103,10 @@ jobs:
 
       - name: Build
         run: |
-          echo "=== Running bun build ==="
-          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
-          echo "=== bun build exit code: $? ==="
+          echo "=== Running bun build (main) ==="
+          bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi
+          echo "=== Running bun build (CLI) ==="
+          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm
           echo "=== Running tsc ==="
           tsc --emitDeclarationOnly
           echo "=== Running build:schema ==="
@@ -113,8 +114,12 @@ jobs:
       
       - name: Verify build output
         run: |
+          echo "=== dist/ contents ==="
           ls -la dist/
+          echo "=== dist/cli/ contents ==="
+          ls -la dist/cli/
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
+          test -f dist/cli/index.js || (echo "ERROR: dist/cli/index.js not found!" && exit 1)
 
       - name: Publish
         run: bun run script/publish.ts
