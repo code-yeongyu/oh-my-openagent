@@ -184,9 +184,15 @@ export function createPreemptiveCompactionHook(
 
       setTimeout(async () => {
         try {
+          const messageDir = getMessageDir(sessionID)
+          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
           await ctx.client.session.promptAsync({
             path: { id: sessionID },
-            body: { parts: [{ type: "text", text: "Continue" }] },
+            body: {
+              agent: storedMessage?.agent,
+              parts: [{ type: "text", text: "Continue" }],
+            },
             query: { directory: ctx.directory },
           })
         } catch {}
