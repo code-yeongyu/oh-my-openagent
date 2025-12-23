@@ -168,7 +168,32 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 ### For Humans
 
-Let the LLM Agent handle the grunt work. Paste this into a fresh opencode session:
+**Option 1: CLI Installer (Recommended)**
+
+The easiest way to install. Interactive prompts guide you through setup:
+
+```bash
+bunx oh-my-opencode install
+```
+
+Or use non-interactive mode for automation:
+
+```bash
+bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes
+```
+
+**CLI Options:**
+| Option | Values | Description |
+|--------|--------|-------------|
+| `--claude` | `no`, `yes`, `max20` | Claude Pro/Max subscription |
+| `--chatgpt` | `no`, `yes` | ChatGPT Plus/Pro subscription |
+| `--gemini` | `no`, `yes` | Google Gemini integration |
+| `--no-tui` | - | Non-interactive mode (requires all options) |
+| `--skip-auth` | - | Skip authentication setup hints |
+
+**Option 2: Let an LLM Agent do it**
+
+Paste this into a fresh opencode session:
 ```
 Install and configure by following the instructions here https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/README.md
 ```
