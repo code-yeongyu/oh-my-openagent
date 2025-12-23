@@ -168,30 +168,15 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 ### For Humans
 
-**Option 1: CLI Installer (Recommended)**
-
-The easiest way to install. Interactive prompts guide you through setup:
+Run the interactive installer:
 
 ```bash
 bunx oh-my-opencode install
 ```
 
-Or use non-interactive mode for automation:
+Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
-```bash
-bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes
-```
-
-**CLI Options:**
-| Option | Values | Description |
-|--------|--------|-------------|
-| `--claude` | `no`, `yes`, `max20` | Claude Pro/Max subscription |
-| `--chatgpt` | `no`, `yes` | ChatGPT Plus/Pro subscription |
-| `--gemini` | `no`, `yes` | Google Gemini integration |
-| `--no-tui` | - | Non-interactive mode (requires all options) |
-| `--skip-auth` | - | Skip authentication setup hints |
-
-**Option 2: Let an LLM Agent do it**
+**Alternative: Let an LLM Agent do it**
 
 Paste this into a fresh opencode session:
 ```
@@ -207,80 +192,25 @@ If you're an LLM Agent helping set up oh-my-opencode, Welcome! You'll now help y
 
 follow these steps:
 
-### Step 0: Ask user about the setup.
+### Step 0: Ask user about subscriptions
 
-Since OpenCode supports various models, and our plugin suggests various frontier LLMs, you must ask user the following questions.
+Ask the user these 3 questions to determine CLI options:
 
-**IMPORTANT**: Track which providers the user has. Only use `anthropic/claude-opus-4-5` as fallback when the user confirmed they have Claude. If they don't have Claude, use `opencode/big-pickle` as fallback instead.
+1. **Do you have a Claude Pro/Max Subscription?**
+   - If **yes**: **Are you on max20 (20x mode)?**
+     - **max20** → `--claude=max20`
+     - **not max20** → `--claude=yes`
+   - If **no** → `--claude=no`
 
-1. **Do you have a Claude Pro/Max Subscription?** Otherwise, we'll use 'opencode/big-pickle' (known for GLM 4.6) as a main orchestrator model (not recommended)
-   - If user said **yes**, ask follow-up: **Are you on max20 (20x mode)?**
-     - If **yes (max20)**: Add ToDo: "Setup user Claude Pro/Max Auth" — full Claude Sonnet 4.5 for librarian. **Remember: Claude is available for fallbacks.**
-     - If **no (not max20)**: Add ToDo: "Setup user Claude Pro/Max Auth", then merge the following to `~/.config/opencode/oh-my-opencode.json`. **Remember: Claude is available for fallbacks.**
-       ```json
-       {
-         "agents": {
-           "librarian": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-   - If user said **no** (no Claude subscription), merge the following to `~/.config/opencode/oh-my-opencode.json`. **Remember: Claude is NOT available — all fallbacks must use `opencode/big-pickle`.**
-     ```json
-     {
-       "agents": {
-         "Sisyphus": { "model": "opencode/big-pickle" },
-         "librarian": { "model": "opencode/big-pickle" }
-       }
-     }
-     ```
+2. **Do you have a ChatGPT Subscription?**
+   - If **yes** → `--chatgpt=yes`
+   - If **no** → `--chatgpt=no`
 
-2. **Do you have a ChatGPT Subscription?** Otherwise, we'll use a fallback model for oracle agent.
-   - If user said **yes**, add ToDo: "Setup user ChatGPT Auth"
-   - If user said **no**:
-     - **If Claude is available**: merge the following to `oh-my-opencode.json`:
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **If Claude is NOT available**: merge the following to `oh-my-opencode.json`:
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
+3. **Will you integrate Gemini models?**
+   - If **yes** → `--gemini=yes`
+   - If **no** → `--gemini=no`
 
-3. **Will you integrate Gemini models?** Otherwise, you cannot enjoy the beautiful design.
-   - If user said **yes**, add ToDo: "Setup Google OAuth"
-   - If user said **no**:
-     - **If Claude is available**: merge the following to `oh-my-opencode.json`:
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-           "document-writer": { "model": "anthropic/claude-opus-4-5" },
-           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **If Claude is NOT available**: merge the following to `oh-my-opencode.json`:
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
-           "document-writer": { "model": "opencode/big-pickle" },
-           "multimodal-looker": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-
-### Step 1: Install OpenCode, if not
-
-Run following command to verify OpenCode Installation:
+### Step 1: Install OpenCode (if not installed)
 
 ```bash
 if command -v opencode &> /dev/null; then
@@ -294,37 +224,29 @@ fi
 If OpenCode isn't installed, check the [OpenCode Installation Guide](https://opencode.ai/docs).
 Spawn a subagent to handle installation and report back - to save context.
 
-### Step 2: Configure oh-my-opencode Plugin
+### Step 2: Run the installer
 
-#### JSONC
-- If `~/.config/opencode/opencode.jsonc` exists, work in there to add `oh-my-opencode` plugin
-
-#### JSON
-- If no opencode.jsonc exists, run following command to create and register it.
+Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-mkdir -p ~/.config/opencode
-
-if [ -f ~/.config/opencode/opencode.json ]; then
-    # Existing config: add plugin using jq or python
-    if command -v jq &> /dev/null; then
-        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
-            ~/.config/opencode/opencode.json > /tmp/oc.json && \
-            mv /tmp/oc.json ~/.config/opencode/opencode.json
-    else
-        echo "Please add \"oh-my-opencode\" to the plugin array in ~/.config/opencode/opencode.json"
-    fi
-else
-    # Create new config
-    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
-fi
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
 ```
+
+**Examples:**
+- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
+- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+
+The CLI will:
+- Register the plugin in `opencode.json`
+- Configure agent models based on subscription flags
+- Show which auth steps are needed
 
 ### Step 3: Verify Setup
 
 ```bash
-opencode --version  # Should be 1.0.132 or higher
-cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array, or maybe check jsonc
+opencode --version  # Should be 1.0.150 or higher
+cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
 ```
 
 ### Step 4: Configure Authentication

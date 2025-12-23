@@ -154,76 +154,23 @@ OpenCode 가 낭만이 사라진것같은 오늘날의 시대에, 당신에게 �
 당신이 사용자의 oh-my-opencode 설정을 돕는 LLM Agent라면, 다음 단계를 따르세요. 업데이트 과정이라고 할지라도 아래의 내용을 그대로 따르세요. 단, 설치 과정에서 이미 답했을 질문은 또 하지 않습니다.
 
 
-### 0단계: 사용자에게 설정에 대해 물어보세요.
+### 0단계: 구독 정보 확인
 
-OpenCode는 다양한 모델을 지원하며, 이 플러그인은 다양한 프론티어 LLM 사용을 제안합니다. 따라서 사용자에게 다음 질문을 해야 합니다.
+사용자에게 다음 3가지 질문을 하여 CLI 옵션을 결정하세요:
 
-**중요**: 사용자가 어떤 프로바이더를 가지고 있는지 추적하세요. 사용자가 Claude가 있다고 확인한 경우에만 `anthropic/claude-opus-4-5`를 폴백으로 사용할 수 있습니다. Claude가 없다면 `opencode/big-pickle`을 폴백으로 사용해야 합니다.
+1. **Claude Pro/Max 구독이 있으신가요?**
+   - **예**: **max20 (20x 모드)를 사용하고 계신가요?**
+     - **max20** → `--claude=max20`
+     - **max20 아님** → `--claude=yes`
+   - **아니오** → `--claude=no`
 
-1. **Claude Pro/Max 구독이 있으신가요?** 그렇지 않다면 메인 오케스트레이터 모델로 'opencode/big-pickle'(GLM 4.6으로 알려짐)을 사용하게 됩니다 (권장하지 않음).
-   - 사용자가 **'예'**라고 답하면, 추가 질문: **max20 (20x 모드)를 사용하고 계신가요?**
-     - **'예' (max20)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정" — librarian에 Claude Sonnet 4.5 전체 사용. **기억: Claude를 폴백으로 사용 가능.**
-     - **'아니오' (max20 아님)**: 할 일 추가: "사용자 Claude Pro/Max 인증 설정", 그리고 `~/.config/opencode/oh-my-opencode.json`에 다음을 병합. **기억: Claude를 폴백으로 사용 가능.**
-       ```json
-       {
-         "agents": {
-           "librarian": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-   - 사용자가 **'아니오'** (Claude 구독 없음)라고 답하면, `~/.config/opencode/oh-my-opencode.json`에 다음을 저장. **기억: Claude 사용 불가 — 모든 폴백은 `opencode/big-pickle`을 사용해야 함.**
-     ```json
-     {
-       "agents": {
-         "Sisyphus": { "model": "opencode/big-pickle" },
-         "librarian": { "model": "opencode/big-pickle" }
-       }
-     }
-     ```
+2. **ChatGPT 구독이 있으신가요?**
+   - **예** → `--chatgpt=yes`
+   - **아니오** → `--chatgpt=no`
 
-2. **ChatGPT 구독이 있으신가요?** 그렇지 않다면 oracle 에이전트에 폴백 모델을 사용하게 됩니다.
-   - 사용자가 **'예'**라고 답하면, 할 일 추가: "사용자 ChatGPT 인증 설정"
-   - 사용자가 **'아니오'**라고 답하면:
-     - **Claude가 사용 가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **Claude가 사용 불가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-
-3. **Gemini 모델을 통합하시겠습니까?** 그렇지 않다면 아름다운 디자인을 즐길 수 없습니다.
-   - 사용자가 **'예'**라고 답하면, 할 일 추가: "Google OAuth 설정"
-   - 사용자가 **'아니오'**라고 답하면:
-     - **Claude가 사용 가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-           "document-writer": { "model": "anthropic/claude-opus-4-5" },
-           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **Claude가 사용 불가능한 경우**: `oh-my-opencode.json`에 다음을 병합:
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
-           "document-writer": { "model": "opencode/big-pickle" },
-           "multimodal-looker": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
+3. **Gemini 모델을 사용하시겠습니까?**
+   - **예** → `--gemini=yes`
+   - **아니오** → `--gemini=no`
 
 ### 1단계: OpenCode 설치 확인
 
@@ -238,36 +185,28 @@ fi
 
 OpenCode가 설치되어 있지 않다면, [OpenCode 설치 가이드](https://opencode.ai/docs)를 읽고, 설치를 진행하세요. 컨텍스트를 줄이기 위해 Subagent 로 호출하여 설치를 하라고 안내하고, 그 결과를 보고 받는다고 말하세요.
 
-### 2단계: oh-my-opencode 플러그인 설정
+### 2단계: 설치 프로그램 실행
 
-#### JSONC
-- `~/.config/opencode/opencode.jsonc`가 존재한다면, 그곳에 `oh-my-opencode` 플러그인을 추가하세요.
-
-#### JSON
-- opencode.jsonc가 없다면, 다음 명령어를 실행하여 생성하고 등록하세요.
+사용자의 답변을 바탕으로 적절한 플래그와 함께 CLI 설치 프로그램을 실행하세요:
 
 ```bash
-mkdir -p ~/.config/opencode
-
-if [ -f ~/.config/opencode/opencode.json ]; then
-    # 기존 설정 파일이 있는 경우: jq 또는 python으로 plugin 추가
-    if command -v jq &> /dev/null; then
-        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
-            ~/.config/opencode/opencode.json > /tmp/oc.json && \
-            mv /tmp/oc.json ~/.config/opencode/opencode.json
-    else
-        echo "~/.config/opencode/opencode.json의 plugin 배열에 \"oh-my-opencode\"를 추가하세요"
-    fi
-else
-    # 새 설정 파일 생성
-    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
-fi
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
 ```
+
+**예시:**
+- 모든 구독 + max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
+- Claude만 (max20 없음): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- 구독 없음: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+
+CLI가 수행하는 작업:
+- `opencode.json`에 플러그인 등록
+- 구독 플래그에 따라 에이전트 모델 설정
+- 필요한 인증 단계 안내
 
 ### 3단계: 설정 확인
 
 ```bash
-opencode --version  # 1.0.132 이상이어야 함
+opencode --version  # 1.0.150 이상이어야 함
 cat ~/.config/opencode/opencode.json  # plugin 배열에 "oh-my-opencode"가 있어야 함
 ```
 

@@ -163,76 +163,23 @@ Install and configure by following the instructions here https://raw.githubuserc
 
 按步骤来：
 
-### 步骤 0：摸清用户底细
+### 步骤 0：确认订阅情况
 
-OpenCode 支持各种模型，我们这个插件也建议用各种前沿 LLM。所以先问清楚。
+问用户这 3 个问题来确定 CLI 参数：
 
-**重要**：追踪用户有哪些 provider。只有用户确认有 Claude 的情况下，才能用 `anthropic/claude-opus-4-5` 做 fallback。没有 Claude 就用 `opencode/big-pickle` 做 fallback。
+1. **有 Claude Pro/Max 订阅吗？**
+   - **有**：**用的是 max20 (20x 模式) 吗？**
+     - **max20** → `--claude=max20`
+     - **不是 max20** → `--claude=yes`
+   - **没有** → `--claude=no`
 
-1. **有 Claude Pro/Max 订阅吗？** 没有的话，主编排模型只能用 'opencode/big-pickle'（也就是 GLM 4.6），这体验可不太好（不推荐）。
-   - 用户说**有**，继续问：**你用的是 max20 (20x 模式) 吗？**
-     - **是 (max20)**：加个待办："配置用户 Claude Pro/Max 认证" — librarian 用完整的 Claude Sonnet 4.5。**记住：Claude 可以做 fallback。**
-     - **不是 (没有 max20)**：加个待办："配置用户 Claude Pro/Max 认证"，然后把这个合并到 `~/.config/opencode/oh-my-opencode.json`。**记住：Claude 可以做 fallback。**
-       ```json
-       {
-         "agents": {
-           "librarian": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-   - 用户说**没有** (没有 Claude 订阅)，把这坨配置写到 `~/.config/opencode/oh-my-opencode.json`。**记住：没有 Claude — 所有 fallback 都得用 `opencode/big-pickle`。**
-     ```json
-     {
-       "agents": {
-         "Sisyphus": { "model": "opencode/big-pickle" },
-         "librarian": { "model": "opencode/big-pickle" }
-       }
-     }
-     ```
+2. **有 ChatGPT 订阅吗？**
+   - **有** → `--chatgpt=yes`
+   - **没有** → `--chatgpt=no`
 
-2. **有 ChatGPT 订阅吗？** 没有的话，oracle Agent 就用 fallback 模型了。
-   - 用户说**有**，加个待办："配置用户 ChatGPT 认证"
-   - 用户说**没有**：
-     - **有 Claude 的情况下**：把这个合并到 `oh-my-opencode.json`：
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **没有 Claude 的情况下**：把这个合并到 `oh-my-opencode.json`：
-       ```json
-       {
-         "agents": {
-           "oracle": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
-
-3. **要接 Gemini 模型吗？** 不接的话，那么漂亮的 UI 设计你就无福消受了。
-   - 用户说**要**，加个待办："配置 Google OAuth"
-   - 用户说**不要**：
-     - **有 Claude 的情况下**：把这个合并到 `oh-my-opencode.json`：
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "anthropic/claude-opus-4-5" },
-           "document-writer": { "model": "anthropic/claude-opus-4-5" },
-           "multimodal-looker": { "model": "anthropic/claude-opus-4-5" }
-         }
-       }
-       ```
-     - **没有 Claude 的情况下**：把这个合并到 `oh-my-opencode.json`：
-       ```json
-       {
-         "agents": {
-           "frontend-ui-ux-engineer": { "model": "opencode/big-pickle" },
-           "document-writer": { "model": "opencode/big-pickle" },
-           "multimodal-looker": { "model": "opencode/big-pickle" }
-         }
-       }
-       ```
+3. **要用 Gemini 模型吗？**
+   - **要** → `--gemini=yes`
+   - **不要** → `--gemini=no`
 
 ### 步骤 1：确认 OpenCode 装没装
 
@@ -249,36 +196,28 @@ fi
 
 如果没装，看 [OpenCode 安装指南](https://opencode.ai/docs)。可以生成个子 Agent 去搞定安装，完事汇报——省点上下文。
 
-### 步骤 2：配置 oh-my-opencode 插件
+### 步骤 2：跑安装程序
 
-#### JSONC
-- 如果 `~/.config/opencode/opencode.jsonc` 存在，就在里面加 `oh-my-opencode` 插件。
-
-#### JSON
-- 如果没 opencode.jsonc，跑这个命令创建并注册：
+根据用户的回答，用对应的参数运行 CLI 安装程序：
 
 ```bash
-mkdir -p ~/.config/opencode
-
-if [ -f ~/.config/opencode/opencode.json ]; then
-    # 已有配置：用 jq 或 python 加插件
-    if command -v jq &> /dev/null; then
-        jq '.plugin = ((.plugin // []) + ["oh-my-opencode"] | unique)' \
-            ~/.config/opencode/opencode.json > /tmp/oc.json && \
-            mv /tmp/oc.json ~/.config/opencode/opencode.json
-    else
-        echo "请手动在 ~/.config/opencode/opencode.json 的 plugin 数组里加上 \"oh-my-opencode\""
-    fi
-else
-    # 新建配置
-    echo '{"plugin":["oh-my-opencode"]}' > ~/.config/opencode/opencode.json
-fi
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
 ```
+
+**例子：**
+- 全套订阅 + max20：`bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
+- 只有 Claude（没 max20）：`bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- 啥订阅都没有：`bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+
+CLI 会干这些事：
+- 在 `opencode.json` 注册插件
+- 根据订阅参数配置 Agent 模型
+- 告诉你接下来要做哪些认证
 
 ### 步骤 3：验货
 
 ```bash
-opencode --version  # 得是 1.0.132 以上
+opencode --version  # 得是 1.0.150 以上
 cat ~/.config/opencode/opencode.json  # plugin 数组里得有 "oh-my-opencode"
 ```
 
