@@ -38,6 +38,8 @@ export type BuiltinAgentName =
 
 export type OverridableAgentName =
   | "build"
+  | "plan"
+  | "OmO-Plan"
   | BuiltinAgentName
 
 export type AgentName = BuiltinAgentName

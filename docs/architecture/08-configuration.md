@@ -73,12 +73,21 @@ interface OhMyOpenCodeConfig {
 
 ## Agent Configuration
 
+<Note>
+For a detailed guide on configuring specific agents, including purpose and default models, see the [Agent Configuration Guide](/docs/guides/agent-configuration.md).
+</Note>
+
 You can override the behavior of both OMO builtin agents and standard OpenCode agents (`build`, `plan`).
 
 ### Overridable Agents
-- `OmO`, `OmO-Plan` (Orchestrators)
-- `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
-- `build`, `plan` (Standard OpenCode agents)
+
+- **Core**: `OmO`, `OmO-Plan`, `oracle`, `librarian`, `explore`
+- **UI & Documentation**: `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`, `docs-publisher`
+- **Workflow**: `product-strategist`, `strategic-planner`, `task-planner`
+- **Implementation**: `implementation-specialist`, `backend-typescript`, `frontend-react`, `backend-rust`, `backend-python`, `mobile-xcode`, `mobile-react-native`
+- **AI/ML**: `ai-ml-expert`, `agent-specialist`
+- **Cross-cutting**: `security-specialist`, `test-specialist`, `optimization-specialist`
+- **Standard OpenCode**: `build`, `plan`
 
 ### Agent Override Schema
 
@@ -87,6 +96,9 @@ interface AgentOverrideConfig {
   model?: string;
   temperature?: number; // 0.0 to 2.0
   top_p?: number;       // 0.0 to 1.0
+  max_tokens?: number;  // Max tokens to generate
+  maxSteps?: number;    // Max agentic iterations
+  reasoning_effort?: "low" | "medium" | "high"; // OpenAI o1/o3
   prompt?: string;      // System prompt override
   tools?: Record<string, boolean>; // Enable/disable specific tools
   disable?: boolean;    // Disable this specific agent
@@ -94,6 +106,7 @@ interface AgentOverrideConfig {
   mode?: "subagent" | "primary" | "all";
   color?: string;       // Hex color code (e.g., "#6495ED")
   permission?: AgentPermission;
+  // .passthrough() allows any additional provider-specific parameters
 }
 ```
 

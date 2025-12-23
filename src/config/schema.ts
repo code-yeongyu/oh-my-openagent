@@ -17,16 +17,37 @@ const AgentPermissionSchema = z.object({
 })
 
 export const BuiltinAgentNameSchema = z.enum([
+  // Primary orchestrator
   "OmO",
+  // Core agents
   "oracle",
   "librarian",
   "explore",
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  // Workflow specialists (LIF-72)
   "product-strategist",
   "strategic-planner",
   "task-planner",
+  // LIF-62 Manager
+  "implementation-specialist",
+  // LIF-62 Language/Platform Specialists
+  "backend-typescript",
+  "frontend-react",
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  // LIF-62 AI/ML Specialists
+  "ai-ml-expert",
+  "agent-specialist",
+  // LIF-62 Cross-Cutting Specialists
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
+  // Documentation
+  "docs-publisher",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -43,6 +64,19 @@ export const OverridableAgentNameSchema = z.enum([
   "product-strategist",
   "strategic-planner",
   "task-planner",
+  "implementation-specialist",
+  "backend-typescript",
+  "frontend-react",
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  "ai-ml-expert",
+  "agent-specialist",
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
+  "docs-publisher",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -79,21 +113,26 @@ export const HookNameSchema = z.enum([
   "workflow-state-enforcer",
 ])
 
-export const AgentOverrideConfigSchema = z.object({
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
-  prompt: z.string().optional(),
-  tools: z.record(z.string(), z.boolean()).optional(),
-  disable: z.boolean().optional(),
-  description: z.string().optional(),
-  mode: z.enum(["subagent", "primary", "all"]).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .optional(),
-  permission: AgentPermissionSchema.optional(),
-})
+export const AgentOverrideConfigSchema = z
+  .object({
+    model: z.string().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    top_p: z.number().min(0).max(1).optional(),
+    prompt: z.string().optional(),
+    tools: z.record(z.string(), z.boolean()).optional(),
+    disable: z.boolean().optional(),
+    description: z.string().optional(),
+    mode: z.enum(["subagent", "primary", "all"]).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9A-Fa-f]{6}$/)
+      .optional(),
+    maxSteps: z.number().min(1).optional(),
+    permission: AgentPermissionSchema.optional(),
+    max_tokens: z.number().min(1).optional(),
+    reasoning_effort: z.enum(["low", "medium", "high"]).optional(),
+  })
+  .passthrough()
 
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
@@ -109,6 +148,19 @@ export const AgentOverridesSchema = z.object({
   "product-strategist": AgentOverrideConfigSchema.optional(),
   "strategic-planner": AgentOverrideConfigSchema.optional(),
   "task-planner": AgentOverrideConfigSchema.optional(),
+  "implementation-specialist": AgentOverrideConfigSchema.optional(),
+  "backend-typescript": AgentOverrideConfigSchema.optional(),
+  "frontend-react": AgentOverrideConfigSchema.optional(),
+  "backend-rust": AgentOverrideConfigSchema.optional(),
+  "backend-python": AgentOverrideConfigSchema.optional(),
+  "mobile-xcode": AgentOverrideConfigSchema.optional(),
+  "mobile-react-native": AgentOverrideConfigSchema.optional(),
+  "ai-ml-expert": AgentOverrideConfigSchema.optional(),
+  "agent-specialist": AgentOverrideConfigSchema.optional(),
+  "security-specialist": AgentOverrideConfigSchema.optional(),
+  "test-specialist": AgentOverrideConfigSchema.optional(),
+  "optimization-specialist": AgentOverrideConfigSchema.optional(),
+  "docs-publisher": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
