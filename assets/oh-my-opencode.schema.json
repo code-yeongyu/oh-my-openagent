@@ -1225,6 +1225,9 @@
           "type": "number",
           "minimum": 0.5,
           "maximum": 0.95
+        },
+        "truncate_all_tool_outputs": {
+          "type": "boolean"
         }
       }
     },
