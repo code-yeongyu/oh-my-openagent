@@ -184,7 +184,13 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
       const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
-      recordToolResult(input.sessionID, input.tool, cachedInput, (output.metadata as Record<string, unknown>) || {})
+      // Use metadata if available and non-empty, otherwise wrap output.output in a structured object
+      // This ensures plugin tools (call_omo_agent, background_task, task) that return strings
+      // get their results properly recorded in transcripts instead of empty {}
+      const metadata = output.metadata as Record<string, unknown> | undefined
+      const hasMetadata = metadata && typeof metadata === "object" && Object.keys(metadata).length > 0
+      const toolOutput = hasMetadata ? metadata : { output: output.output }
+      recordToolResult(input.sessionID, input.tool, cachedInput, toolOutput)
 
       if (!isHookDisabled(config, "PostToolUse")) {
         const postClient: PostToolUseClient = {
