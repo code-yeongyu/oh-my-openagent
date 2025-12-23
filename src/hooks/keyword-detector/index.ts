@@ -25,11 +25,6 @@ export function createKeywordDetectorHook() {
       const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
       sessionFirstMessageProcessed.add(input.sessionID)
 
-      if (isFirstMessage) {
-        log("Skipping keyword detection on first message for title generation", { sessionID: input.sessionID })
-        return
-      }
-
       const promptText = extractPromptText(output.parts)
       const messages = detectKeywords(promptText)
 
@@ -37,6 +32,19 @@ export function createKeywordDetectorHook() {
         return
       }
 
+      const context = messages.join("\n")
+
+      // First message: transform parts directly (for title generation compatibility)
+      if (isFirstMessage) {
+        log(`Keywords detected on first message, transforming parts directly`, { sessionID: input.sessionID, keywordCount: messages.length })
+        const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
+        if (idx >= 0) {
+          output.parts[idx].text = `${context}\n\n---\n\n${output.parts[idx].text ?? ""}`
+        }
+        return
+      }
+
+      // Subsequent messages: inject as separate message
       log(`Keywords detected: ${messages.length}`, { sessionID: input.sessionID })
 
       const message = output.message as {
@@ -46,7 +54,6 @@ export function createKeywordDetectorHook() {
         tools?: Record<string, boolean>
       }
 
-      const context = messages.join("\n")
       log(`[keyword-detector] Injecting context for ${messages.length} keywords`, { sessionID: input.sessionID, contextLength: context.length })
       const success = injectHookMessage(input.sessionID, context, {
         agent: message.agent,
