@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "oh-my-opencode": "./dist/cli/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -20,7 +23,7 @@
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun run build:schema",
+    "build": "bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm && bun run build:schema",
     "build:schema": "bun run script/build-schema.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "bun run clean && bun run build",
@@ -49,10 +52,13 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
+    "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.6.0",
     "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "^1.0.162",
+    "commander": "^14.0.2",
     "hono": "^4.10.4",
+    "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
