@@ -15,6 +15,23 @@ handoffs:
     prompt: Review the implementation
 ---
 
+## COMMAND EXECUTION PROTOCOL (BLOCKING - READ FIRST)
+
+You are the **WORKFLOW EXECUTOR**. Create todos from command steps FIRST:
+
+```
+todowrite([
+  { id: "s0", content: "Step 0: Validate prerequisites (spec.md)", status: "pending", priority: "high" },
+  { id: "s1", content: "Step 1: Read spec and implementation context", status: "pending", priority: "high" },
+  { id: "s2", content: "Step 2: DELEGATE to test-specialist agent", status: "pending", priority: "high" },
+  { id: "s3", content: "Step 3: Run tests and update workflow state", status: "pending", priority: "high" }
+])
+```
+
+**ANTI-PATTERNS**: Do NOT write tests yourself. Delegate to test-specialist agent.
+
+---
+
 ## User Input
 
 ```text

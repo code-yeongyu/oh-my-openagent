@@ -50,8 +50,3 @@ A comprehensive plan with:
 - Risk assessment
 - Success criteria
 - Validation steps
-
-## References
-
-- Strategic Architect: `.opencode/agent/strategic-architect.md`
-- Plan Template: `.cursor/templates/plan-template.md`

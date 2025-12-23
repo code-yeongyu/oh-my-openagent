@@ -27,6 +27,16 @@ export function createKeywordDetectorHook() {
       }
 
       const promptText = extractPromptText(output.parts)
+
+      // Don't inject mode tags when a command-instruction is present
+      // Commands have explicit workflows that shouldn't be overridden by mode tags
+      if (promptText.includes("<command-instruction>")) {
+        log("Skipping keyword injection - command-instruction detected", {
+          sessionID: input.sessionID,
+        })
+        return
+      }
+
       const messages = detectKeywords(promptText)
 
       if (messages.length === 0) {

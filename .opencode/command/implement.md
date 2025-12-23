@@ -20,6 +20,8 @@ handoffs:
     prompt: Write tests for this implementation
 ---
 
+**Create todos from steps below, execute in order. Delegate implementation to implementation-specialist agent.**
+
 ## User Input
 
 ```text

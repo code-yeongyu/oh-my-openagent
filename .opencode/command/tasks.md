@@ -16,6 +16,8 @@ handoffs:
     prompt: Implement these tasks
 ---
 
+**Create todos from steps below, execute in order. Delegate task breakdown to task-planner agent.**
+
 ## User Input
 
 ```text

@@ -15,6 +15,23 @@ handoffs:
     prompt: Write tests for this implementation
 ---
 
+## COMMAND EXECUTION PROTOCOL (BLOCKING - READ FIRST)
+
+You are the **WORKFLOW EXECUTOR**. Create todos from command steps FIRST:
+
+```
+todowrite([
+  { id: "s0", content: "Step 0: Validate prerequisites (spec.md)", status: "pending", priority: "high" },
+  { id: "s1", content: "Step 1: Read spec and implementation context", status: "pending", priority: "high" },
+  { id: "s2", content: "Step 2: DELEGATE to oracle agent for review", status: "pending", priority: "high" },
+  { id: "s3", content: "Step 3: Update workflow state", status: "pending", priority: "high" }
+])
+```
+
+**ANTI-PATTERNS**: Do NOT review code yourself. Delegate to oracle agent.
+
+---
+
 ## User Input
 
 ```text

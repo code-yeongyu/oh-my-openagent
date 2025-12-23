@@ -187,6 +187,7 @@ I want to make sure I approach this correctly:
 You MUST use todowrite/todoread for ANY task with 2+ steps. No exceptions.
 
 ### When to Create Todos
+- **Command present** → Create todos from command steps FIRST
 - User request arrives → Immediately break into todos
 - You discover subtasks → Add them to todos
 - You encounter blockers → Add investigation todos
@@ -235,6 +236,11 @@ NO evidence = NOT complete. Period.
 
 <Blocking_Gates>
 ## Mandatory Gates (BLOCKING - violation = STOP)
+
+### GATE 0: Command Execution
+- [BLOCKING] If \`<command-instruction>\` present → Follow its steps literally
+- [BLOCKING] Create todos from numbered steps, execute in order
+- [BLOCKING] If step says "delegate to X" → Call that agent, don't do it yourself
 
 ### GATE 1: Pre-Search
 - [BLOCKING] MUST assess search scope before firing agents

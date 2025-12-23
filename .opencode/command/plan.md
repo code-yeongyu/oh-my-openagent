@@ -18,6 +18,8 @@ handoffs:
     prompt: Implement this feature according to the plan
 ---
 
+**Create todos from steps below, execute in order. Delegate planning to strategic-planner agent.**
+
 ## User Input
 
 ```text

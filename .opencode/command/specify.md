@@ -18,13 +18,13 @@ handoffs:
     send: true
 ---
 
+**Create todos from the numbered steps below, then execute in order. Step 4 delegates to product-strategist.**
+
 ## User Input
 
 ```text
 $ARGUMENTS
 ```
-
-You **MUST** consider the user input before proceeding (if not empty).
 
 ---
 
