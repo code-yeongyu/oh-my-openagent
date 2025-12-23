@@ -1,7 +1,32 @@
+import { extname, basename } from "node:path"
 import { tool, type PluginInput } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared/logger"
+
+function inferMimeType(filePath: string): string {
+  const ext = extname(filePath).toLowerCase()
+  const mimeTypes: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".bmp": "image/bmp",
+    ".ico": "image/x-icon",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".html": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".ts": "text/typescript",
+  }
+  return mimeTypes[ext] || "application/octet-stream"
+}
 
 export function createLookAt(ctx: PluginInput) {
   return tool({
@@ -13,12 +38,14 @@ export function createLookAt(ctx: PluginInput) {
     async execute(args: LookAtArgs, toolContext) {
       log(`[look_at] Analyzing file: ${args.file_path}, goal: ${args.goal}`)
 
+      const mimeType = inferMimeType(args.file_path)
+      const filename = basename(args.file_path)
+
       const prompt = `Analyze this file and extract the requested information.
 
-File path: ${args.file_path}
 Goal: ${args.goal}
 
-Read the file using the Read tool, then provide ONLY the extracted information that matches the goal.
+Provide ONLY the extracted information that matches the goal.
 Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
 
@@ -38,7 +65,7 @@ If the requested information is not found, clearly state what is missing.`
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
 
-      log(`[look_at] Sending prompt to session ${sessionID}`)
+      log(`[look_at] Sending prompt with file passthrough to session ${sessionID}`)
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
@@ -47,8 +74,12 @@ If the requested information is not found, clearly state what is missing.`
             task: false,
             call_omo_agent: false,
             look_at: false,
+            read: false,
           },
-          parts: [{ type: "text", text: prompt }],
+          parts: [
+            { type: "text", text: prompt },
+            { type: "file", mime: mimeType, url: `file://${args.file_path}`, filename },
+          ],
         },
       })
 

@@ -325,12 +325,12 @@ opencode auth login
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```
 
-**可用模型名**：`google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**可用模型名**：`google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 然后认证：
 
@@ -440,7 +440,7 @@ gh repo star code-yeongyu/oh-my-opencode
 - **explore** (`opencode/grok-code`)：极速代码库扫描、模式匹配。Claude Code 用 Haiku，我们用 Grok——免费、飞快、扫文件够用了。致敬 Claude Code。
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`)：设计师出身的程序员。UI 做得那是真漂亮。Gemini 写这种创意美观的代码是一绝。
 - **document-writer** (`google/gemini-3-pro-preview`)：技术写作专家。Gemini 文笔好，写出来的东西读着顺畅。
-- **multimodal-looker** (`google/gemini-2.5-flash`)：视觉内容专家。PDF、图片、图表，看一眼就知道里头有啥。
+- **multimodal-looker** (`google/gemini-3-flash`)：视觉内容专家。PDF、图片、图表，看一眼就知道里头有啥。
 
 主 Agent 会自动调遣它们，你也可以亲自点名：
 
@@ -675,7 +675,7 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```

@@ -317,12 +317,12 @@ opencode auth login
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```
 
-**利用可能なモデル名**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**利用可能なモデル名**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 その後、認証を行います：
 
@@ -432,7 +432,7 @@ gh repo star code-yeongyu/oh-my-opencode
 - **explore** (`opencode/grok-code`): 高速なコードベース探索、ファイルパターンマッチング。Claude Code は Haiku を使用しますが、私たちは Grok を使います。現在無料であり、極めて高速で、ファイル探索タスクには十分な知能を備えているからです。Claude Code からインスピレーションを得ました。
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 開発者に転身したデザイナーという設定です。素晴らしい UI を作ります。美しく独創的な UI コードを生成することに長けた Gemini を使用します。
 - **document-writer** (`google/gemini-3-pro-preview`): テクニカルライティングの専門家という設定です。Gemini は文筆家であり、流れるような文章を書きます。
-- **multimodal-looker** (`google/gemini-2.5-flash`): 視覚コンテンツ解釈のための専門エージェント。PDF、画像、図表を分析して情報を抽出します。
+- **multimodal-looker** (`google/gemini-3-flash`): 視覚コンテンツ解釈のための専門エージェント。PDF、画像、図表を分析して情報を抽出します。
 
 メインエージェントはこれらを自動的に呼び出しますが、明示的に呼び出すことも可能です：
 
@@ -675,7 +675,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```

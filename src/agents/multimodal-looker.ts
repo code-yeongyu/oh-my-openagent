@@ -4,7 +4,7 @@ export const multimodalLookerAgent: AgentConfig = {
   description:
     "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
   mode: "subagent",
-  model: "google/gemini-2.5-flash",
+  model: "google/gemini-3-flash",
   temperature: 0.1,
   tools: { write: false, edit: false, bash: false, background_task: false },
   prompt: `You interpret media files that cannot be read as plain text.
