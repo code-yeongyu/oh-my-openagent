@@ -122,7 +122,7 @@ async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<vo
   console.log("\nCommitting and tagging...")
   await $`git config user.email "github-actions[bot]@users.noreply.github.com"`
   await $`git config user.name "github-actions[bot]"`
-  await $`git add package.json`
+  await $`git add package.json assets/oh-my-opencode.schema.json`
 
   const hasStagedChanges = await $`git diff --cached --quiet`.nothrow()
   if (hasStagedChanges.exitCode !== 0) {
