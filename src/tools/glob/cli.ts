@@ -14,9 +14,9 @@ function buildRgArgs(options: GlobOptions): string[] {
   const args: string[] = [
     ...RG_FILES_FLAGS,
     `--max-depth=${Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)}`,
+    "--hidden", // Always include hidden files - the glob pattern itself controls filtering
   ]
 
-  if (options.hidden) args.push("--hidden")
   if (options.noIgnore) args.push("--no-ignore")
 
   args.push(`--glob=${options.pattern}`)
