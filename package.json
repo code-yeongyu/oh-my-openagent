@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "OpenCode plugin - custom agents (oracle, librarian) and enhanced features",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
