@@ -5,10 +5,10 @@
  */
 
 import {
-  ANTIGRAVITY_HEADERS,
-  ANTIGRAVITY_ENDPOINT_FALLBACKS,
-  ANTIGRAVITY_API_VERSION,
-  SKIP_THOUGHT_SIGNATURE_VALIDATOR,
+    ANTIGRAVITY_API_VERSION,
+    ANTIGRAVITY_ENDPOINT_FALLBACKS,
+    ANTIGRAVITY_HEADERS,
+    SKIP_THOUGHT_SIGNATURE_VALIDATOR,
 } from "./constants"
 import type { AntigravityRequestBody } from "./types"
 
@@ -262,7 +262,7 @@ export function transformRequest(options: TransformRequestOptions): TransformedR
   } = options
 
   const effectiveModel =
-    modelName || extractModelFromBody(body) || extractModelFromUrl(url) || "gemini-3-pro-preview"
+    modelName || extractModelFromBody(body) || extractModelFromUrl(url) || "gemini-3-pro-high"
 
   const streaming = isStreamingRequest(url, body)
   const action = streaming ? "streamGenerateContent" : "generateContent"

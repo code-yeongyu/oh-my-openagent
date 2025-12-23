@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import type { ConfigMergeResult, InstallConfig, DetectedConfig } from "./types"
+import { join } from "node:path"
+import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
 
 const OPENCODE_CONFIG_DIR = join(homedir(), ".config", "opencode")
 const OPENCODE_JSON = join(OPENCODE_CONFIG_DIR, "opencode.json")
@@ -359,16 +359,46 @@ export async function runBunInstall(): Promise<boolean> {
   }
 }
 
-const ANTIGRAVITY_PROVIDER_CONFIG = {
+export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
     api: "antigravity",
+    // NOTE: opencode-antigravity-auth expects full model specs (name/limit/modalities).
+    // If these are incomplete, models may appear but fail at runtime (e.g. 404).
     models: {
-      "gemini-3-pro-high": { name: "Gemini 3 Pro (High)", thinking: true, attachment: true },
-      "gemini-3-pro-medium": { name: "Gemini 3 Pro (Medium)", thinking: true, attachment: true },
-      "gemini-3-pro-low": { name: "Gemini 3 Pro (Low)", thinking: true, attachment: true },
-      "gemini-3-flash": { name: "Gemini 3 Flash", attachment: true },
-      "gemini-3-flash-lite": { name: "Gemini 3 Flash Lite", attachment: true },
+      "gemini-3-pro-high": {
+        name: "Gemini 3 Pro High (Antigravity)",
+        thinking: true,
+        attachment: true,
+        limit: { context: 1048576, output: 65535 },
+        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+      },
+      "gemini-3-pro-medium": {
+        name: "Gemini 3 Pro Medium (Antigravity)",
+        thinking: true,
+        attachment: true,
+        limit: { context: 1048576, output: 65535 },
+        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+      },
+      "gemini-3-pro-low": {
+        name: "Gemini 3 Pro Low (Antigravity)",
+        thinking: true,
+        attachment: true,
+        limit: { context: 1048576, output: 65535 },
+        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+      },
+      "gemini-3-flash": {
+        name: "Gemini 3 Flash (Antigravity)",
+        attachment: true,
+        limit: { context: 1048576, output: 65536 },
+        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+      },
+      "gemini-3-flash-lite": {
+        name: "Gemini 3 Flash Lite (Antigravity)",
+        attachment: true,
+        limit: { context: 1048576, output: 65536 },
+        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+      },
     },
   },
 }

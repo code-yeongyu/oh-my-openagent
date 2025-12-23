@@ -438,8 +438,8 @@ To remove oh-my-opencode:
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
 - **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Uses Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
-- **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
-- **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
+- **frontend-ui-ux-engineer** (`google/gemini-3-pro-high`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
+- **document-writer** (`google/gemini-3-flash`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
 - **multimodal-looker** (`google/gemini-3-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
 
 The main agent invokes these automatically, but you can call them explicitly:
@@ -908,6 +908,29 @@ I have no affiliation with any project or model mentioned here. This is purely p
     - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*
+
+## Reviews
+
+> "If Claude Code does in 7 days what human does in 3 months, Sisyphus does in 1 hour"
+> -- B, Quant Researcher
+
+> "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day"
+> -- Jacob Ferrari, from [X](https://x.com/jacobferrari_/status/2003258761952289061)
+
+> "Hire @yeon_gyu_kim if you can convince him, this dude has revolutionized opencode."
+> -- [to Sam Altman's post](https://x.com/mysticaltech/status/2001858758608376079)
+
+> "You guys should pull this into core and recruit him. Seriously. It's really, really, really good."
+> -- Henning Kilset, from X
+
+> "ok yeah holy shit @androolloyd this thing is legit oh my opencode is sick"
+> -- z80.eth, from [X](https://x.com/0xz80/status/2001815226505924791)
+
+> "use oh-my-opencode, you will never go back"
+> -- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "Oh My Opencode is king of the hill and has no contenders"
+> -- [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
 ## Loved by professionals at
 
