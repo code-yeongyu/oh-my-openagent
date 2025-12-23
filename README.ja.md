@@ -843,6 +843,29 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
 
 *素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*
 
+## ユーザーレビュー
+
+> "人間が3ヶ月かかる仕事をClaude Codeが7日でやるなら、Sisyphusは1時間でやります"
+> -- B, Quant Researcher
+
+> "Oh My Opencodeを使って、たった1日で8000個のeslint警告を解消しました"
+> -- Jacob Ferrari, from [X](https://x.com/jacobferrari_/status/2003258761952289061)
+
+> "@yeon_gyu_kimを説得できるなら雇うべきです。彼はopencodeに革命を起こしました"
+> -- [Sam Altmanの投稿へ](https://x.com/mysticaltech/status/2001858758608376079)
+
+> "これをコアに取り入れて彼を採用すべきです。マジで。本当に、本当に、本当に良いです"
+> -- Henning Kilset, from X
+
+> "やばい、これマジで本物だ @androolloyd oh my opencode 最高すぎる"
+> -- z80.eth, from [X](https://x.com/0xz80/status/2001815226505924791)
+
+> "oh-my-opencodeを使ってください、もう戻れませんよ"
+> -- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "Oh My Opencodeは頂点に立っています、敵はいません"
+> -- [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
+
 ## こちらの企業の専門家にご愛用いただいています
 
 - [Indent](https://indentcorp.com)
