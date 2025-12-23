@@ -314,12 +314,12 @@ opencode auth login
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```
 
-**사용 가능한 모델 이름**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**사용 가능한 모델 이름**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 그 후 인증:
 
@@ -429,7 +429,7 @@ gh repo star code-yeongyu/oh-my-opencode
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): 개발자로 전향한 디자이너라는 설정을 갖고 있습니다. 멋진 UI를 만듭니다. 아름답고 창의적인 UI 코드를 생성하는 데 탁월한 Gemini를 사용합니다.
 - **document-writer** (`google/gemini-3-pro-preview`): 기술 문서 전문가라는 설정을 갖고 있습니다. Gemini 는 문학가입니다. 글을 기가막히게 씁니다.
-- **multimodal-looker** (`google/gemini-2.5-flash`): 시각적 콘텐츠 해석을 위한 전문 에이전트. PDF, 이미지, 다이어그램을 분석하여 정보를 추출합니다.
+- **multimodal-looker** (`google/gemini-3-flash`): 시각적 콘텐츠 해석을 위한 전문 에이전트. PDF, 이미지, 다이어그램을 분석하여 정보를 추출합니다.
 
 각 에이전트는 메인 에이전트가 알아서 호출하지만, 명시적으로 요청할 수도 있습니다:
 
@@ -669,7 +669,7 @@ Schema 자동 완성이 지원됩니다:
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```

@@ -87,7 +87,7 @@ oh-my-opencode/
 | explore | opencode/grok-code | Fast codebase exploration, file patterns |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, design-focused |
 | document-writer | google/gemini-3-pro-preview | Technical documentation |
-| multimodal-looker | google/gemini-2.5-flash | PDF/image/diagram analysis |
+| multimodal-looker | google/gemini-3-flash | PDF/image/diagram analysis |
 
 ## COMMANDS
 

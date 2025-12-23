@@ -346,12 +346,12 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```
 
-**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
 
 Then authenticate:
 
@@ -493,7 +493,7 @@ To remove oh-my-opencode:
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
 - **document-writer** (`google/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
-- **multimodal-looker** (`google/gemini-2.5-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
+- **multimodal-looker** (`google/gemini-3-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
 
 The main agent invokes these automatically, but you can call them explicitly:
 
@@ -733,7 +733,7 @@ When using `opencode-antigravity-auth`, disable the built-in auth and override a
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
     "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-2.5-flash" }
+    "multimodal-looker": { "model": "google/gemini-3-flash" }
   }
 }
 ```
