@@ -2,9 +2,9 @@
 >
 > Discord와 X에서 만나요!
 >
-> | [![Discord link](https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/PWpXmbhF) | [Discord 커뮤니티](https://discord.gg/PWpXmbhF)에서 기여자들과 `oh-my-opencode` 사용자들을 만나보세요. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | [Discord 커뮤니티](https://discord.gg/PWpXmbhF)에서 기여자들과 `oh-my-opencode` 사용자들을 만나보세요. |
 > | :-----| :----- |
-> | [![X link](https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black)](https://x.com/justsisyphus) | oh-my-opencode 관련 소식은 제 X 계정에서 올렸었는데, 억울하게 정지당해서 [@justsisyphus](https://x.com/justsisyphus)가 대신 소식을 전하고 있습니다. |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` 관련 소식은 제 X 계정에서 올렸었는데, 억울하게 정지당해서 <br />[@justsisyphus](https://x.com/justsisyphus)가 대신 소식을 전하고 있습니다. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 

@@ -2,9 +2,9 @@
 >
 > 来 Discord 和 X 找我们玩！
 >
-> | [![Discord link](https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/PWpXmbhF) | 加入我们的 [Discord 社区](https://discord.gg/PWpXmbhF)，和贡献者们、`oh-my-opencode` 用户们一起交流。 |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | 加入我们的 [Discord 社区](https://discord.gg/PWpXmbhF)，和贡献者们、`oh-my-opencode` 用户们一起交流。 |
 > | :-----| :----- |
-> | [![X link](https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black)](https://x.com/justsisyphus) | oh-my-opencode 的消息之前在我的 X 账号发，但账号被无辜封了，现在 [@justsisyphus](https://x.com/justsisyphus) 替我发更新。 |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` 的消息之前在我的 X 账号发，但账号被无辜封了，<br />现在 [@justsisyphus](https://x.com/justsisyphus) 替我发更新。 |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
