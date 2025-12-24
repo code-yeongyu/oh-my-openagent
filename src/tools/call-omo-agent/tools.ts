@@ -68,11 +68,150 @@ export function createCallOmoAgent(
         return result
       }
 
-      const result = await executeSync(args, toolContext, ctx, config)
+      const result = await executeSync(args, toolContext, ctx, config, backgroundManager)
       delegationTracker.popDelegation()
       return result
     },
   })
+}
+
+const SYNC_POLL_INTERVAL_MS = 1000
+const SYNC_MAX_WAIT_MS = 10 * 60 * 1000
+
+interface ToolPart {
+  type?: string
+  state?: { status?: string }
+}
+
+interface Message {
+  info?: { role?: string; time?: { completed?: number } }
+  parts?: ToolPart[]
+}
+
+/**
+ * Check if a session has running/pending tools or is actively generating.
+ * Returns true if session is still working.
+ */
+async function hasRunningTools(ctx: PluginInput, sessionID: string): Promise<boolean> {
+  try {
+    const messagesResult = await ctx.client.session.messages({ path: { id: sessionID } })
+    if (messagesResult.error || !messagesResult.data) return false
+    
+    const messages = messagesResult.data as Message[]
+    if (messages.length === 0) return false
+    
+    // Check 1: Any tool with status "pending" or "running"
+    for (const message of messages) {
+      for (const part of message.parts ?? []) {
+        if (part.type === "tool" && part.state?.status) {
+          if (part.state.status === "pending" || part.state.status === "running") {
+            log(`[call_omo_agent] Session ${sessionID} has ${part.state.status} tool`)
+            return true
+          }
+        }
+      }
+    }
+    
+    // Check 2: If last message is USER, session is working (waiting for assistant response)
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.info?.role === "user") {
+      log(`[call_omo_agent] Session ${sessionID} last message is USER - still working`)
+      return true
+    }
+    
+    // Check 3: Last assistant message still being generated (no time.completed)
+    const lastAssistant = messages.filter(m => m.info?.role === "assistant").pop()
+    if (lastAssistant && !lastAssistant.info?.time?.completed) {
+      log(`[call_omo_agent] Session ${sessionID} assistant message not completed`)
+      return true
+    }
+    
+    return false
+  } catch (error) {
+    log(`[call_omo_agent] hasRunningTools error for ${sessionID}:`, error)
+    return false
+  }
+}
+
+/**
+ * Recursively check if a session or any of its descendants have running work.
+ * This handles nested child sessions (grandchildren, etc.)
+ */
+async function hasRunningDescendants(
+  ctx: PluginInput,
+  sessionID: string,
+  depth = 0,
+  maxDepth = 5
+): Promise<boolean> {
+  if (depth > maxDepth) {
+    log(`[call_omo_agent] Max recursion depth reached for session ${sessionID}`)
+    return false
+  }
+  
+  // Check this session's tools first
+  if (await hasRunningTools(ctx, sessionID)) {
+    return true
+  }
+  
+  // Get child sessions and check recursively
+  try {
+    const childrenResult = await ctx.client.session.children({ path: { id: sessionID } })
+    if (childrenResult.error || !childrenResult.data) return false
+    
+    const children = childrenResult.data as Array<{ id: string }>
+    
+    for (const child of children) {
+      if (await hasRunningDescendants(ctx, child.id, depth + 1, maxDepth)) {
+        log(`[call_omo_agent] Descendant session ${child.id} still running (depth: ${depth + 1})`)
+        return true
+      }
+    }
+  } catch (error) {
+    log(`[call_omo_agent] Error checking children for ${sessionID}:`, error)
+  }
+  
+  return false
+}
+
+async function waitForSessionCompletion(
+  sessionID: string,
+  ctx: PluginInput,
+  backgroundManager?: BackgroundManager
+): Promise<void> {
+  const startTime = Date.now()
+  log(`[call_omo_agent] waitForSessionCompletion started for session: ${sessionID}`)
+  
+  let pollCount = 0
+  
+  while (Date.now() - startTime < SYNC_MAX_WAIT_MS) {
+    pollCount++
+    
+    // Check 1: BackgroundManager tracked tasks (immediate children only)
+    if (backgroundManager) {
+      const childTasks = backgroundManager.getTasksByParentSession(sessionID)
+      const runningChildren = childTasks.filter(t => t.status === "running")
+      
+      if (runningChildren.length > 0) {
+        log(`[call_omo_agent] Poll #${pollCount}: ${runningChildren.length} tracked child tasks running`)
+        await new Promise(resolve => setTimeout(resolve, SYNC_POLL_INTERVAL_MS))
+        continue
+      }
+    }
+    
+    // Check 2: Recursively check session and ALL descendants (handles grandchildren)
+    const hasRunning = await hasRunningDescendants(ctx, sessionID)
+    
+    if (hasRunning) {
+      log(`[call_omo_agent] Poll #${pollCount}: Session or descendants still running`)
+      await new Promise(resolve => setTimeout(resolve, SYNC_POLL_INTERVAL_MS))
+      continue
+    }
+    
+    log(`[call_omo_agent] Session ${sessionID} complete (no running work in tree)`)
+    return
+  }
+  
+  log(`[call_omo_agent] Session ${sessionID} timed out after ${SYNC_MAX_WAIT_MS}ms (${pollCount} polls)`)
 }
 
 async function executeBackground(
@@ -111,7 +250,8 @@ async function executeSync(
   args: CallOmoAgentArgs,
   toolContext: { sessionID: string },
   ctx: PluginInput,
-  config?: OhMyOpenCodeConfig
+  config?: OhMyOpenCodeConfig,
+  backgroundManager?: BackgroundManager
 ): Promise<string> {
   let sessionID: string
 
@@ -163,6 +303,9 @@ async function executeSync(
           task: toolConfig.task ?? false,
           call_omo_agent: toolConfig.call_omo_agent ?? false,
           background_task: toolConfig.background_task ?? false,
+          // Apply write/edit restrictions for advisor/utility roles
+          write: toolConfig.write ?? true,
+          edit: toolConfig.edit ?? true,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
@@ -176,7 +319,11 @@ async function executeSync(
     return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
   }
 
-  log(`[call_omo_agent] Prompt sent, fetching messages...`)
+  log(`[call_omo_agent] Prompt sent, waiting for session completion...`)
+
+  await waitForSessionCompletion(sessionID, ctx, backgroundManager)
+
+  log(`[call_omo_agent] Session complete, fetching messages...`)
 
   const messagesResult = await ctx.client.session.messages({
     path: { id: sessionID },

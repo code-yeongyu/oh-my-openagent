@@ -125,6 +125,8 @@ export class BackgroundManager {
           task: toolConfig.task ?? false,
           call_omo_agent: toolConfig.call_omo_agent ?? false,
           background_task: toolConfig.background_task ?? false,
+          write: toolConfig.write ?? true,
+          edit: toolConfig.edit ?? true,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -169,6 +171,81 @@ export class BackgroundManager {
       }
     }
     return undefined
+  }
+
+  private async hasRunningTools(sessionID: string): Promise<boolean> {
+    try {
+      const messagesResult = await this.client.session.messages({ path: { id: sessionID } })
+      if (messagesResult.error || !messagesResult.data) return false
+      
+      const messages = messagesResult.data as Array<{
+        info?: { role?: string; time?: { completed?: number } }
+        parts?: Array<{ type?: string; state?: { status?: string } }>
+      }>
+      
+      if (messages.length === 0) return false
+      
+      for (const message of messages) {
+        for (const part of message.parts ?? []) {
+          if (part.type === "tool" && part.state?.status) {
+            if (part.state.status === "pending" || part.state.status === "running") {
+              log("[background-agent] Found running tool:", { sessionID, status: part.state.status })
+              return true
+            }
+          }
+        }
+      }
+      
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage?.info?.role === "user") {
+        log("[background-agent] Last message is USER - session working:", { sessionID })
+        return true
+      }
+      
+      const lastAssistant = messages.filter(m => m.info?.role === "assistant").pop()
+      if (lastAssistant && !lastAssistant.info?.time?.completed) {
+        log("[background-agent] Assistant message not completed:", { sessionID })
+        return true
+      }
+      
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  private async hasRunningDescendants(sessionID: string, depth = 0, maxDepth = 5): Promise<boolean> {
+    if (depth > maxDepth) {
+      log("[background-agent] Max recursion depth reached:", { sessionID })
+      return false
+    }
+    
+    if (await this.hasRunningTools(sessionID)) {
+      return true
+    }
+    
+    try {
+      const childrenResult = await this.client.session.children({ path: { id: sessionID } })
+      if (childrenResult.error || !childrenResult.data) return false
+      
+      const children = childrenResult.data as Array<{ id: string }>
+      
+      for (const child of children) {
+        if (await this.hasRunningDescendants(child.id, depth + 1, maxDepth)) {
+          log("[background-agent] Descendant still running:", { childID: child.id, depth: depth + 1 })
+          return true
+        }
+      }
+    } catch (error) {
+      log("[background-agent] Error checking children:", { sessionID, error })
+    }
+    
+    return false
+  }
+
+  private async checkSessionCompletionViaMessages(sessionID: string): Promise<boolean> {
+    const hasRunning = await this.hasRunningDescendants(sessionID)
+    return !hasRunning
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
@@ -369,7 +446,22 @@ export class BackgroundManager {
         const sessionStatus = allStatuses[task.sessionID]
         
         if (!sessionStatus) {
-          log("[background-agent] Session not found in status:", task.sessionID)
+          log("[background-agent] Session not in status, checking messages:", task.sessionID)
+          
+          const completed = await this.checkSessionCompletionViaMessages(task.sessionID)
+          if (completed) {
+            const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+            if (hasIncompleteTodos) {
+              log("[background-agent] Child session has incomplete todos:", task.id)
+              continue
+            }
+            
+            task.status = "completed"
+            task.completedAt = new Date()
+            this.markForNotification(task)
+            this.notifyParentSession(task)
+            log("[background-agent] Child session completed:", task.id)
+          }
           continue
         }
 
