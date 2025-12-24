@@ -1,0 +1,280 @@
+name: Sisyphus Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Custom prompt"
+        required: false
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    # @sisyphus-dev-ai mention only (maintainers, exclude self)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.comment.body || github.event.review.body, '@sisyphus-dev-ai') &&
+       (github.event.comment.user.login || github.event.review.user.login) != 'sisyphus-dev-ai' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association))
+
+    # Minimal default GITHUB_TOKEN permissions
+    permissions:
+      contents: read
+
+    steps:
+      # Checkout with sisyphus-dev-ai's PAT
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+
+      # Git config - commits as sisyphus-dev-ai
+      - name: Configure Git as sisyphus-dev-ai
+        run: |
+          git config user.name "sisyphus-dev-ai"
+          git config user.email "sisyphus-dev-ai@users.noreply.github.com"
+
+      # gh CLI auth as sisyphus-dev-ai
+      - name: Authenticate gh CLI as sisyphus-dev-ai
+        run: |
+          echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+          gh auth status
+
+      - name: Ensure tmux is available (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          if ! command -v tmux >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends tmux
+          fi
+          tmux -V
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # Install OpenCode + oh-my-opencode + auth in single step
+      - name: Setup OpenCode with oh-my-opencode
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          # Install OpenCode (skip if cached)
+          if ! command -v opencode &>/dev/null; then
+            for i in 1 2 3; do
+              echo "Attempt $i: Installing OpenCode..."
+              curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
+              if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
+                bash /tmp/opencode-install.sh && break
+              fi
+              echo "Download corrupted, retrying in 5s..."
+              sleep 5
+            done
+          fi
+          opencode --version
+
+          bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=no --gemini=no
+
+          OPENCODE_JSON=~/.config/opencode/opencode.json
+          jq --arg baseURL "$ANTHROPIC_BASE_URL" --arg apiKey "$ANTHROPIC_API_KEY" '
+            .provider.anthropic = {
+              "name": "Anthropic",
+              "npm": "@ai-sdk/anthropic",
+              "options": {
+                "baseURL": $baseURL,
+                "apiKey": $apiKey
+              },
+              "models": {
+                "claude-opus-4-5": {
+                  "id": "claude-opus-4-5-20251101",
+                  "name": "Opus 4.5",
+                  "limit": { "context": 200000, "output": 64000 },
+                  "options": { "effort": "high" }
+                },
+                "claude-opus-4-5-high": {
+                  "id": "claude-opus-4-5-20251101",
+                  "name": "Opus 4.5 High",
+                  "limit": { "context": 200000, "output": 128000 },
+                  "options": { "effort": "high", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+                },
+                "claude-sonnet-4-5": {
+                  "id": "claude-sonnet-4-5-20250929",
+                  "name": "Sonnet 4.5",
+                  "limit": { "context": 200000, "output": 64000 }
+                },
+                "claude-sonnet-4-5-high": {
+                  "id": "claude-sonnet-4-5-20250929",
+                  "name": "Sonnet 4.5 High",
+                  "limit": { "context": 200000, "output": 128000 },
+                  "options": { "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+                },
+                "claude-haiku-4-5": {
+                  "id": "claude-haiku-4-5-20251001",
+                  "name": "Haiku 4.5",
+                  "limit": { "context": 200000, "output": 64000 }
+                }
+              }
+            }
+          ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
+
+          OMO_JSON=~/.config/opencode/oh-my-opencode.json
+          PROMPT_APPEND=$(cat << 'PROMPT_EOF'
+
+          ## GitHub Actions Environment
+
+          You are `sisyphus-dev-ai` in GitHub Actions.
+
+          ### CRITICAL: GitHub Comments = Your ONLY Output
+
+          User CANNOT see console. Post everything via `gh issue comment` or `gh pr comment`.
+
+          ### Rules
+          - EVERY response = GitHub comment
+          - Code changes = PR (never push main/master)
+          - Setup: bun install first
+          - Acknowledge immediately, report when done
+
+          ### Git Config
+          - user.name: sisyphus-dev-ai
+          - user.email: sisyphus-dev-ai@users.noreply.github.com
+          PROMPT_EOF
+          )
+          jq --arg append "$PROMPT_APPEND" '.agents.Sisyphus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+
+          mkdir -p ~/.local/share/opencode
+          echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
+          chmod 600 ~/.local/share/opencode/auth.json
+
+          cat "$OPENCODE_JSON"
+
+      # Collect context
+      - name: Collect Context
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          EVENT="${{ github.event_name }}"
+
+          if [[ "$EVENT" == "issue_comment" ]]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            COMMENT="${{ github.event.comment.body }}"
+            AUTHOR="${{ github.event.comment.user.login }}"
+            COMMENT_ID="${{ github.event.comment.id }}"
+
+            # Check if PR or Issue
+            if gh api "repos/${{ github.repository }}/issues/${ISSUE_NUM}" | jq -e '.pull_request' > /dev/null; then
+              echo "type=pr" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            else
+              echo "type=issue" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            fi
+          elif [[ "$EVENT" == "pull_request_review_comment" ]]; then
+            echo "type=pr" >> $GITHUB_OUTPUT
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            COMMENT="${{ github.event.comment.body }}"
+            AUTHOR="${{ github.event.comment.user.login }}"
+            COMMENT_ID="${{ github.event.comment.id }}"
+          elif [[ "$EVENT" == "pull_request_review" ]]; then
+            echo "type=pr" >> $GITHUB_OUTPUT
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            COMMENT="${{ github.event.review.body }}"
+            AUTHOR="${{ github.event.review.user.login }}"
+            COMMENT_ID=""
+          fi
+
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+
+      # Add :eyes: reaction (as sisyphus-dev-ai)
+      - name: Add eyes reaction
+        if: steps.context.outputs.comment_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            -X POST -f content="eyes" || true
+
+      - name: Run OpenCode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          PROMPT="
+          Your username is @sisyphus-dev-ai, mentioned by @${{ steps.context.outputs.author }} in ${{ github.repository }}.
+
+          ## Context
+          - Type: ${{ steps.context.outputs.type }}
+          - Number: #${{ steps.context.outputs.number }}
+          - Repository: ${{ github.repository }}
+          - Default Branch: ${{ github.event.repository.default_branch }}
+
+          ## User's Request
+          ${{ steps.context.outputs.comment }}
+
+          ---
+
+          First, acknowledge with \`gh issue comment ${{ steps.context.outputs.number }} --body \"👋 Hey @${{ steps.context.outputs.author }}! I'm on it...\"\`
+
+          Then write everything using the todo tools.
+          Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessivley then create a PR to \`${{ github.event.repository.default_branch }}\` branch."
+
+          opencode run "$PROMPT"
+
+      # Push changes (as sisyphus-dev-ai)
+      - name: Push changes
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add -A
+            git commit -m "chore: changes by sisyphus-dev-ai" || true
+          fi
+
+          BRANCH=$(git branch --show-current)
+          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+            git push origin "$BRANCH" || true
+          fi
+
+      # Remove :eyes:, add :+1:
+      - name: Update reaction
+        if: always() && steps.context.outputs.comment_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          # Remove eyes
+          REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
+          if [[ -n "$REACTION_ID" ]]; then
+            gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+          fi
+
+          # Add thumbs up
+          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            -X POST -f content="+1" || true
