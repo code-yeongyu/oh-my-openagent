@@ -2,9 +2,9 @@
 >
 > Connect with us on Discord and X!
 >
-> | [![Discord link](https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/PWpXmbhF) | Join our [Discord community](https://discord.gg/PWpXmbhF) to connect with contributors and fellow `oh-my-opencode`. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | Join our [Discord community](https://discord.gg/PWpXmbhF) to connect with contributors and fellow `oh-my-opencode` users. |
 > | :-----| :----- |
-> | [![X link](https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black)](https://x.com/justsisyphus) | News and updates for oh-my-opencode used to be posted on my X account. Since it was suspended mistakenly, [@justsisyphus](https://x.com/justsisyphus) now posts updates on my behalf. |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | News and updates for `oh-my-opencode` used to be posted on my X account. <br /> Since it was suspended mistakenly, [@justsisyphus](https://x.com/justsisyphus) now posts updates on my behalf. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 

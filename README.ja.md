@@ -2,9 +2,9 @@
 >
 > DiscordとXでつながりましょう！
 >
-> | [![Discord link](https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/PWpXmbhF) | [Discordコミュニティ](https://discord.gg/PWpXmbhF)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | [Discordコミュニティ](https://discord.gg/PWpXmbhF)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
 > | :-----| :----- |
-> | [![X link](https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black)](https://x.com/justsisyphus) | oh-my-opencodeに関するニュースは私のXアカウントで投稿していましたが、無実の罪で凍結されたため、[@justsisyphus](https://x.com/justsisyphus)が代わりに更新を投稿しています。 |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode`に関するニュースは私のXアカウントで投稿していましたが、無実の罪で凍結されたため、<br />[@justsisyphus](https://x.com/justsisyphus)が代わりに更新を投稿しています。 |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
