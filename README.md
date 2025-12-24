@@ -1,4 +1,10 @@
-NOTICE: News regarding oh-my-opencode used to be posted on my X account, but since it got suspended innocently, [@justsisyphus](https://x.com/justsisyphus) is now managing updates on behalf of me.
+> [!NOTE]
+>
+> Connect with us on Discord and X!
+>
+> | [![Discord link](https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/PWpXmbhF) | Join our [Discord community](https://discord.gg/PWpXmbhF) to connect with contributors and fellow `oh-my-opencode`. |
+> | :-----| :----- |
+> | [![X link](https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black)](https://x.com/justsisyphus) | News and updates for oh-my-opencode used to be posted on my X account. Since it was suspended mistakenly, [@justsisyphus](https://x.com/justsisyphus) now posts updates on my behalf. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
