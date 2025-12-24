@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
-import { subagentSessions } from "../features/claude-code-session-state"
+import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
 
 interface Todo {
   content: string
@@ -242,6 +242,10 @@ export function createSessionNotification(
       if (!sessionID) return
 
       if (subagentSessions.has(sessionID)) return
+
+      // Only trigger notifications for the main session (not subagent sessions)
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return
 
       if (notifiedSessions.has(sessionID)) return
       if (pendingTimers.has(sessionID)) return
