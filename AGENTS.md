@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-22T02:23:00+09:00
-**Commit:** aad7a72
+**Generated:** 2025-12-24T17:07:00+09:00
+**Commit:** 0172241
 **Branch:** dev
 
 ## OVERVIEW
@@ -13,14 +13,14 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker)
-│   ├── hooks/         # 21 lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
-│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
-│   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app)
-│   ├── features/      # Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
+│   ├── agents/        # AI agents (7): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker
+│   ├── hooks/         # 21 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── tools/         # LSP, AST-Grep, Grep, Glob, etc. - see src/tools/AGENTS.md
+│   ├── mcp/           # MCP servers: context7, websearch_exa, grep_app
+│   ├── features/      # Claude Code compatibility - see src/features/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   ├── auth/          # Google Antigravity OAuth
-│   ├── shared/        # Utilities (deep-merge, pattern-matcher, logger, etc.)
+│   ├── auth/          # Google Antigravity OAuth (antigravity/)
+│   ├── shared/        # Utilities: deep-merge, pattern-matcher, logger, etc.
 │   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
@@ -31,12 +31,12 @@ oh-my-opencode/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add new agent | `src/agents/` | Create .ts file, add to builtinAgents in index.ts, update types.ts |
-| Add new hook | `src/hooks/` | Create dir with createXXXHook(), export from index.ts |
-| Add new tool | `src/tools/` | Dir with index/types/constants/tools.ts, add to builtinTools |
-| Add MCP server | `src/mcp/` | Create config, add to index.ts |
-| Modify LSP behavior | `src/tools/lsp/` | client.ts for connection, tools.ts for handlers |
-| AST-Grep patterns | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi binding |
+| Add agent | `src/agents/` | Create .ts, add to builtinAgents in index.ts, update types.ts |
+| Add hook | `src/hooks/` | Create dir with createXXXHook(), export from index.ts |
+| Add tool | `src/tools/` | Dir with index/types/constants/tools.ts, add to builtinTools |
+| Add MCP | `src/mcp/` | Create config, add to index.ts |
+| LSP behavior | `src/tools/lsp/` | client.ts (connection), tools.ts (handlers) |
+| AST-Grep | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi binding |
 | Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google models |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` after changes |
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
@@ -50,98 +50,72 @@ oh-my-opencode/
 - **Build**: Dual output - `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern - `export * from "./module"` in index.ts
 - **Directory naming**: kebab-case (`ast-grep/`, `claude-code-hooks/`)
-- **Tool structure**: Each tool has index.ts, types.ts, constants.ts, tools.ts, utils.ts
+- **Tool structure**: index.ts, types.ts, constants.ts, tools.ts, utils.ts
 - **Hook pattern**: `createXXXHook(input: PluginInput)` returning event handlers
-- **Test style**: BDD comments `#given`, `#when`, `#then` (same as AAA pattern)
+- **Test style**: BDD comments `#given`, `#when`, `#then` (same as AAA)
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **npm/yarn**: Use bun exclusively
 - **@types/node**: Use bun-types
-- **Bash file operations**: Never use mkdir/touch/rm/cp/mv for file creation in code
-- **Generic AI aesthetics**: No Space Grotesk, avoid typical AI-generated UI patterns
-- **Direct bun publish**: Use GitHub Actions workflow_dispatch only (OIDC provenance)
-- **Local version bump**: Version managed by CI workflow, never modify locally
+- **Bash file ops**: Never mkdir/touch/rm/cp/mv for file creation in code
+- **Direct bun publish**: GitHub Actions workflow_dispatch only (OIDC provenance)
+- **Local version bump**: Version managed by CI workflow
+- **Year 2024**: NEVER use 2024 in code/prompts (use current year)
 - **Rush completion**: Never mark tasks complete without verification
-- **Interrupting work**: Complete tasks fully before stopping
 - **Over-exploration**: Stop searching when sufficient context found
 
 ## UNIQUE STYLES
 
-- **Platform handling**: Union type `"darwin" | "linux" | "win32" | "unsupported"`
-- **Optional props**: Extensive use of `?` for optional interface properties
+- **Platform**: Union type `"darwin" | "linux" | "win32" | "unsupported"`
+- **Optional props**: Extensive `?` for optional interface properties
 - **Flexible objects**: `Record<string, unknown>` for dynamic configs
-- **Error handling**: Consistent try/catch with async/await in all tools
-- **Agent tools restriction**: Use `tools: { include: [...] }` or `tools: { exclude: [...] }`
+- **Error handling**: Consistent try/catch with async/await
+- **Agent tools**: `tools: { include: [...] }` or `tools: { exclude: [...] }`
 - **Temperature**: Most agents use `0.1` for consistency
-- **Hook naming**: `createXXXHook` function naming convention
-- **Date references**: NEVER use 2024 in code/prompts (use current year)
+- **Hook naming**: `createXXXHook` function convention
 
 ## AGENT MODELS
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator, team leader |
-| oracle | openai/gpt-5.2 | Strategic advisor, code review, architecture |
-| librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs lookup, GitHub examples |
-| explore | opencode/grok-code | Fast codebase exploration, file patterns |
-| frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, design-focused |
-| document-writer | google/gemini-3-pro-preview | Technical documentation |
-| multimodal-looker | google/gemini-3-flash | PDF/image/diagram analysis |
+| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
+| oracle | openai/gpt-5.2 | Strategic advisor, code review |
+| librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs |
+| explore | opencode/grok-code | Fast codebase exploration |
+| frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
+| document-writer | google/gemini-3-pro-preview | Technical docs |
+| multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 
 ## COMMANDS
 
 ```bash
-# Type check
-bun run typecheck
-
-# Build (ESM + declarations + schema)
-bun run build
-
-# Clean + Build
-bun run rebuild
-
-# Build schema only
-bun run build:schema
-
-# Run tests
-bun test
+bun run typecheck      # Type check
+bun run build          # ESM + declarations + schema
+bun run rebuild        # Clean + Build
+bun run build:schema   # Schema only
+bun test               # Run tests
 ```
 
 ## DEPLOYMENT
 
 **GitHub Actions workflow_dispatch only**
 
-1. package.json version NOT modified locally (auto-bumped by workflow)
+1. Never modify package.json version locally
 2. Commit & push changes
-3. Trigger `publish` workflow manually:
-   - `bump`: major | minor | patch
-   - `version`: (optional) specific version override
+3. Trigger `publish` workflow: `gh workflow run publish -f bump=patch`
 
-```bash
-# Trigger via CLI
-gh workflow run publish -f bump=patch
-
-# Check status
-gh run list --workflow=publish
-```
-
-**Critical**:
-- Never run `bun publish` directly (OIDC provenance issue)
-- Never bump version locally
+**Critical**: Never `bun publish` directly. Never bump version locally.
 
 ## CI PIPELINE
 
-- **ci.yml**: Parallel test/typecheck jobs, build verification, auto-commit schema changes on master
-- **publish.yml**: Manual workflow_dispatch, version bump, changelog generation, OIDC npm publishing
-- Schema auto-commit prevents build drift
-- Draft release creation on dev branch
+- **ci.yml**: Parallel test/typecheck, build verification, auto-commit schema on master
+- **publish.yml**: Manual workflow_dispatch, version bump, changelog, OIDC npm publish
 
 ## NOTES
 
-- **Testing**: Bun native test framework (`bun test`), BDD-style with `#given/#when/#then` comments
-- **OpenCode version**: Requires >= 1.0.150 (earlier versions have config bugs)
-- **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
-- **Config locations**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
-- **Schema autocomplete**: Add `$schema` field in config for IDE support
-- **Trusted dependencies**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
+- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`
+- **OpenCode**: Requires >= 1.0.150
+- **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
+- **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
+- **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
