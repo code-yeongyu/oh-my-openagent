@@ -40,7 +40,7 @@
     "llm"
   ],
   "author": "YeonGyu-Kim",
-  "license": "MIT",
+  "license": "SUL-1.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/code-yeongyu/oh-my-opencode.git"
