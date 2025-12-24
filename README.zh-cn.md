@@ -39,6 +39,24 @@
 
 <!-- </CENTERED SECTION FOR GITHUB DISPLAY> -->
 
+## 用户评价
+
+> "如果 Claude Code 能在 7 天内完成人类 3 个月的工作，那么 Sisyphus 只需要 1 小时。任务完成之前它就是一直干。It is a discipline agent." — B, Quant Researcher
+
+> "只用了一天，就用 Oh My Opencode 干掉了 8000 个 eslint 警告" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
+
+> "你们应该把它合并到核心代码里并聘用他。认真的。这真的、真的、真的很好" — Henning Kilset
+
+> "如果你能说服 @yeon_gyu_kim，就雇佣他吧，这家伙彻底改变了 opencode" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
+
+> "哇靠 @androolloyd 这玩意儿是真的，oh my opencode 太强了" — [z80.eth](https://x.com/0xz80/status/2001815226505924791)
+
+> "用了 oh-my-opencode，你就回不去了" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "Oh My Opencode 独孤求败，没有对手" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
+
+---
+
 ## 目录
 
 - [Oh My OpenCode](#oh-my-opencode)
@@ -847,29 +865,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
     - 花絮：这 bug 也是靠 OhMyOpenCode 的 Librarian、Explore、Oracle 配合发现并修好的。
 
 *感谢 [@junhoyeo](https://github.com/junhoyeo) 制作了这张超帅的 hero 图。*
-
-## 用户评价
-
-> "如果 Claude Code 能在 7 天内完成人类 3 个月的工作，那么 Sisyphus 只需要 1 小时"
-> -- B, Quant Researcher
-
-> "只用了一天，就用 Oh My Opencode 干掉了 8000 个 eslint 警告"
-> -- Jacob Ferrari, from [X](https://x.com/jacobferrari_/status/2003258761952289061)
-
-> "如果你能说服 @yeon_gyu_kim，就雇佣他吧，这家伙彻底彻底改变了 opencode"
-> -- [回复 Sam Altman 的帖子](https://x.com/mysticaltech/status/2001858758608376079)
-
-> "你们应该把它合并到核心代码里并聘用他。认真的。这真的、真的、真的很好"
-> -- Henning Kilset, from X
-
-> "哇靠 @androolloyd 这玩意儿是真的，oh my opencode 太强了"
-> -- z80.eth, from [X](https://x.com/0xz80/status/2001815226505924791)
-
-> "用了 oh-my-opencode，你就回不去了"
-> -- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
-
-> "Oh My Opencode 独孤求败，没有对手"
-> -- [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
 ## 以下企业的专业人士都在用
 
