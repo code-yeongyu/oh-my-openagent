@@ -21,6 +21,8 @@ export type OverridableAgentName =
 
 export type AgentName = BuiltinAgentName
 
-export type AgentOverrideConfig = Partial<AgentConfig>
+export type AgentOverrideConfig = Partial<AgentConfig> & {
+  prompt_append?: string
+}
 
 export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>

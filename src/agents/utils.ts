@@ -66,7 +66,14 @@ function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
 ): AgentConfig {
-  return deepMerge(base, override as Partial<AgentConfig>)
+  const { prompt_append, ...rest } = override
+  const merged = deepMerge(base, rest as Partial<AgentConfig>)
+
+  if (prompt_append && merged.prompt) {
+    merged.prompt = merged.prompt + "\n" + prompt_append
+  }
+
+  return merged
 }
 
 export function createBuiltinAgents(
