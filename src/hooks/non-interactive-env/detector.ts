@@ -11,7 +11,7 @@ export function isNonInteractive(): boolean {
     return true
   }
 
-  if (!process.stdout.isTTY) {
+  if (process.stdout.isTTY !== true) {
     return true
   }
 
