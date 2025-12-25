@@ -6,11 +6,9 @@ on:
       prompt:
         description: "Custom prompt"
         required: false
+  # Only issue_comment works for fork PRs (secrets available)
+  # pull_request_review/pull_request_review_comment do NOT get secrets for fork PRs
   issue_comment:
-    types: [created]
-  pull_request_review:
-    types: [submitted]
-  pull_request_review_comment:
     types: [created]
 
 jobs:
@@ -19,9 +17,9 @@ jobs:
     # @sisyphus-dev-ai mention only (maintainers, exclude self)
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.comment.body || github.event.review.body, '@sisyphus-dev-ai') &&
-       (github.event.comment.user.login || github.event.review.user.login) != 'sisyphus-dev-ai' &&
-       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association))
+      (contains(github.event.comment.body, '@sisyphus-dev-ai') &&
+       github.event.comment.user.login != 'sisyphus-dev-ai' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
 
     # Minimal default GITHUB_TOKEN permissions
     permissions:
@@ -231,9 +229,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           EVENT_NAME: ${{ github.event_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMENT_BODY: ${{ github.event.comment.body || github.event.review.body }}
-          COMMENT_AUTHOR: ${{ github.event.comment.user.login || github.event.review.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
           COMMENT_ID_VAL: ${{ github.event.comment.id }}
           REPO: ${{ github.repository }}
         run: |
@@ -250,16 +247,6 @@ jobs:
               echo "type=issue" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             fi
-          elif [[ "$EVENT_NAME" == "pull_request_review_comment" ]]; then
-            echo "type=pr" >> $GITHUB_OUTPUT
-            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            AUTHOR="$COMMENT_AUTHOR"
-            COMMENT_ID="$COMMENT_ID_VAL"
-          elif [[ "$EVENT_NAME" == "pull_request_review" ]]; then
-            echo "type=pr" >> $GITHUB_OUTPUT
-            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            AUTHOR="$COMMENT_AUTHOR"
-            COMMENT_ID=""
           fi
 
           echo "comment<<EOF" >> $GITHUB_OUTPUT
