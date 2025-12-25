@@ -15,6 +15,12 @@ mock.module("./constants", () => ({
   PART_STORAGE: TEST_PART_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
+  SESSION_LIST_DESCRIPTION: "test",
+  SESSION_READ_DESCRIPTION: "test",
+  SESSION_SEARCH_DESCRIPTION: "test",
+  SESSION_INFO_DESCRIPTION: "test",
+  SESSION_DELETE_DESCRIPTION: "test",
+  TOOL_NAME_PREFIX: "session_",
 }))
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } = await import("./storage")
