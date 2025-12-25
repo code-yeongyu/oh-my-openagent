@@ -714,24 +714,50 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 ### Sisyphus Agent
 
-有効時（デフォルト）、Sisyphus は2つのプライマリエージェントを追加し、内蔵エージェントをサブエージェントに降格させます：
+有効時（デフォルト）、Sisyphus はオプションの特殊エージェントを備えた強力なオーケストレーターを提供します：
 
 - **Sisyphus**: プライマリオーケストレーターエージェント (Claude Opus 4.5)
-- **Planner-Sisyphus**: OpenCode の plan エージェントの全設定を実行時に継承 (description に "OhMyOpenCode version" を追加)
-- **build**: サブエージェントに降格
-- **plan**: サブエージェントに降格
+- **Builder-Sisyphus**: OhMyOpenCode 強化版のビルドエージェント（デフォルトで無効）
+- **Planner-Sisyphus**: OhMyOpenCode 強化版のプランエージェント（デフォルトで有効）
 
-Sisyphus を無効化して元の build/plan エージェントを復元するには：
+**設定オプション：**
 
 ```json
 {
-  "omo_agent": {
+  "sisyphus_agent": {
+    "disabled": false,
+    "builder_enabled": false,
+    "planner_enabled": true,
+    "replace_build": true,
+    "replace_plan": true
+  }
+}
+```
+
+**例：Builder-Sisyphus を有効化し、デフォルトのビルドモードも維持する：**
+
+```json
+{
+  "sisyphus_agent": {
+    "builder_enabled": true,
+    "replace_build": false
+  }
+}
+```
+
+これにより、Builder-Sisyphus とデフォルトのビルドエージェントの両方を同時に利用できます。
+
+**例：すべての Sisyphus オーケストレーションを無効化：**
+
+```json
+{
+  "sisyphus_agent": {
     "disabled": true
   }
 }
 ```
 
-他のエージェント同様、Sisyphus と Planner-Sisyphus もカスタマイズ可能です：
+他のエージェント同様、Sisyphus エージェントもカスタマイズ可能です：
 
 ```json
 {
@@ -740,6 +766,9 @@ Sisyphus を無効化して元の build/plan エージェントを復元する�
       "model": "anthropic/claude-sonnet-4",
       "temperature": 0.3
     },
+    "Builder-Sisyphus": {
+      "model": "anthropic/claude-opus-4"
+    },
     "Planner-Sisyphus": {
       "model": "openai/gpt-5.2"
     }
@@ -747,9 +776,13 @@ Sisyphus を無効化して元の build/plan エージェントを復元する�
 }
 ```
 
-| オプション | デフォルト | 説明 |
-|------------|------------|------|
-| `disabled` | `false` | `true` の場合、Sisyphus エージェントを無効化し、元の build/plan をプライマリとして復元します。`false` (デフォルト) の場合、Sisyphus と Planner-Sisyphus がプライマリエージェントになります。 |
+| オプション              | デフォルト | 説明                                                                                                                                                         |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `disabled`          | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
+| `builder_enabled`   | `false` | `true` の場合、Builder-Sisyphus エージェント（OhMyOpenCode 強化版ビルドモード）を有効化します。デフォルトの OpenCode ビルド体験を維持するため、デフォルトでは無効です。                        |
+| `planner_enabled`   | `true`  | `true` の場合、Planner-Sisyphus エージェント（OhMyOpenCode 強化版プランモード）を有効化します。デフォルトで有効です。                                                                   |
+| `replace_build`     | `true`  | `true` の場合、デフォルトのビルドエージェントをサブエージェントモードに降格させます。`false` に設定すると、Builder-Sisyphus とデフォルトのビルドの両方を利用できます。                                  |
+| `replace_plan`      | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
 
 ### Hooks
 

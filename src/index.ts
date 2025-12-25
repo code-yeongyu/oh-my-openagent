@@ -50,6 +50,7 @@ import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
+import { BUILD_SYSTEM_PROMPT, BUILD_PERMISSION } from "./agents/build-prompt";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -379,34 +380,60 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
 
       const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
+      const builderEnabled = pluginConfig.sisyphus_agent?.builder_enabled ?? false;
+      const plannerEnabled = pluginConfig.sisyphus_agent?.planner_enabled ?? true;
+      const replaceBuild = pluginConfig.sisyphus_agent?.replace_build ?? true;
+      const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
 
       if (isSisyphusEnabled && builtinAgents.Sisyphus) {
         // TODO: When OpenCode releases `default_agent` config option (PR #5313),
         // use `config.default_agent = "Sisyphus"` instead of demoting build/plan.
         // Tracking: https://github.com/sst/opencode/pull/5313
-        const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
-        const plannerSisyphusOverride = pluginConfig.agents?.["Planner-Sisyphus"];
-        const plannerSisyphusBase = {
-          ...planConfigWithoutName,
-          prompt: PLAN_SYSTEM_PROMPT,
-          permission: PLAN_PERMISSION,
-          description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
-          color: config.agent?.plan?.color ?? "#6495ED",
+
+        const agentConfig: Record<string, unknown> = {
+          Sisyphus: builtinAgents.Sisyphus,
         };
 
-        const plannerSisyphusConfig = plannerSisyphusOverride
-          ? { ...plannerSisyphusBase, ...plannerSisyphusOverride }
-          : plannerSisyphusBase;
+        if (builderEnabled) {
+          const { name: _buildName, ...buildConfigWithoutName } = config.agent?.build ?? {};
+          const builderSisyphusOverride = pluginConfig.agents?.["Builder-Sisyphus"];
+          const builderSisyphusBase = {
+            ...buildConfigWithoutName,
+            prompt: BUILD_SYSTEM_PROMPT,
+            permission: BUILD_PERMISSION,
+            description: `${config.agent?.build?.description ?? "Build agent"} (OhMyOpenCode version)`,
+            color: config.agent?.build?.color ?? "#32CD32",
+          };
+
+          agentConfig["Builder-Sisyphus"] = builderSisyphusOverride
+            ? { ...builderSisyphusBase, ...builderSisyphusOverride }
+            : builderSisyphusBase;
+        }
+
+        if (plannerEnabled) {
+          const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
+          const plannerSisyphusOverride = pluginConfig.agents?.["Planner-Sisyphus"];
+          const plannerSisyphusBase = {
+            ...planConfigWithoutName,
+            prompt: PLAN_SYSTEM_PROMPT,
+            permission: PLAN_PERMISSION,
+            description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
+            color: config.agent?.plan?.color ?? "#6495ED",
+          };
+
+          agentConfig["Planner-Sisyphus"] = plannerSisyphusOverride
+            ? { ...plannerSisyphusBase, ...plannerSisyphusOverride }
+            : plannerSisyphusBase;
+        }
 
         config.agent = {
-          Sisyphus: builtinAgents.Sisyphus,
-          "Planner-Sisyphus": plannerSisyphusConfig,
+          ...agentConfig,
           ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")),
           ...userAgents,
           ...projectAgents,
           ...config.agent,
-          build: { ...config.agent?.build, mode: "subagent" },
-          plan: { ...config.agent?.plan, mode: "subagent" },
+          ...(replaceBuild ? { build: { ...config.agent?.build, mode: "subagent" } } : {}),
+          ...(replacePlan ? { plan: { ...config.agent?.plan, mode: "subagent" } } : {}),
         };
       } else {
         config.agent = {

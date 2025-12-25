@@ -30,6 +30,7 @@ export const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
   "Sisyphus",
+  "Builder-Sisyphus",
   "Planner-Sisyphus",
   "oracle",
   "librarian",
@@ -86,6 +87,7 @@ export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
   Sisyphus: AgentOverrideConfigSchema.optional(),
+  "Builder-Sisyphus": AgentOverrideConfigSchema.optional(),
   "Planner-Sisyphus": AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
@@ -105,6 +107,10 @@ export const ClaudeCodeConfigSchema = z.object({
 
 export const SisyphusAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
+  builder_enabled: z.boolean().optional(),
+  planner_enabled: z.boolean().optional(),
+  replace_build: z.boolean().optional(),
+  replace_plan: z.boolean().optional(),
 })
 
 export const ExperimentalConfigSchema = z.object({
