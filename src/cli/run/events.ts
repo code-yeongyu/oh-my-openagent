@@ -35,8 +35,8 @@ export async function processEvents(
     if (ctx.abortController.signal.aborted) break
 
     try {
-      const payload = (event as { payload?: EventPayload }).payload
-      if (!payload) continue
+      const payload = event as EventPayload
+      if (!payload?.type) continue
 
       handleSessionIdle(ctx, payload, state)
       handleSessionStatus(ctx, payload, state)
