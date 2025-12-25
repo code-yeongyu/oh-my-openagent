@@ -12,8 +12,8 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
     }
 
     return true
-  } catch {
-    // API errors are transient - silently continue polling
+  } catch (err) {
+    console.error(pc.red(`[completion] API error: ${err}`))
     return false
   }
 }
