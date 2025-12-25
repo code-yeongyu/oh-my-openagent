@@ -4,6 +4,7 @@ import type {
   EventPayload,
   SessionIdleProps,
   SessionStatusProps,
+  SessionErrorProps,
   MessageUpdatedProps,
   MessagePartUpdatedProps,
   ToolExecuteProps,
@@ -12,6 +13,8 @@ import type {
 
 export interface EventState {
   mainSessionIdle: boolean
+  mainSessionError: boolean
+  lastError: string | null
   lastOutput: string
   lastPartText: string
   currentTool: string | null
@@ -20,6 +23,8 @@ export interface EventState {
 export function createEventState(): EventState {
   return {
     mainSessionIdle: false,
+    mainSessionError: false,
+    lastError: null,
     lastOutput: "",
     lastPartText: "",
     currentTool: null,
@@ -43,6 +48,7 @@ export async function processEvents(
 
       logEventVerbose(ctx, payload)
 
+      handleSessionError(ctx, payload, state)
       handleSessionIdle(ctx, payload, state)
       handleSessionStatus(ctx, payload, state)
       handleMessagePartUpdated(ctx, payload, state)
@@ -151,6 +157,23 @@ function handleSessionStatus(
   const props = payload.properties as SessionStatusProps | undefined
   if (props?.sessionID === ctx.sessionID && props?.status?.type === "busy") {
     state.mainSessionIdle = false
+  }
+}
+
+function handleSessionError(
+  ctx: RunContext,
+  payload: EventPayload,
+  state: EventState
+): void {
+  if (payload.type !== "session.error") return
+
+  const props = payload.properties as SessionErrorProps | undefined
+  if (props?.sessionID === ctx.sessionID) {
+    state.mainSessionError = true
+    state.lastError = props?.error
+      ? String(props.error instanceof Error ? props.error.message : props.error)
+      : "Unknown error"
+    console.error(pc.red(`\n[session.error] ${state.lastError}`))
   }
 }
 

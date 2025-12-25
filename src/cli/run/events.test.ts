@@ -74,6 +74,8 @@ describe("event handling", () => {
     const ctx = createMockContext("my-session")
     const state: EventState = {
       mainSessionIdle: true,
+      mainSessionError: false,
+      lastError: null,
       lastOutput: "",
       lastPartText: "",
       currentTool: null,
