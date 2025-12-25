@@ -722,26 +722,24 @@ Schema 자동 완성이 지원됩니다:
 {
   "sisyphus_agent": {
     "disabled": false,
-    "builder_enabled": false,
+    "default_builder_enabled": false,
     "planner_enabled": true,
-    "replace_build": true,
     "replace_plan": true
   }
 }
 ```
 
-**예시: Builder-Sisyphus를 활성화하면서 기본 빌드 모드도 유지하기:**
+**예시: Builder-Sisyphus 활성화하기:**
 
 ```json
 {
   "sisyphus_agent": {
-    "builder_enabled": true,
-    "replace_build": false
+    "default_builder_enabled": true
   }
 }
 ```
 
-이렇게 하면 Builder-Sisyphus와 기본 빌드 에이전트를 동시에 사용할 수 있습니다.
+이렇게 하면 Sisyphus와 함께 Builder-Sisyphus 에이전트를 활성화할 수 있습니다. Sisyphus가 활성화되면 기본 빌드 에이전트는 항상 subagent 모드로 강등됩니다.
 
 **예시: 모든 Sisyphus 오케스트레이션 비활성화:**
 
@@ -772,13 +770,12 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-| 옵션                | 기본값   | 설명                                                                                                                                                  |
-| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `disabled`          | `false` | `true`면 모든 Sisyphus 오케스트레이션을 비활성화하고 원래 build/plan을 primary로 복원합니다.                                                                       |
-| `builder_enabled`   | `false` | `true`면 Builder-Sisyphus 에이전트를 활성화합니다 (OpenCode build와 동일, SDK 제한으로 이름만 변경). 기본적으로 비활성화되어 있습니다.                                      |
-| `planner_enabled`   | `true`  | `true`면 Planner-Sisyphus 에이전트를 활성화합니다 (OpenCode plan과 동일, SDK 제한으로 이름만 변경). 기본적으로 활성화되어 있습니다.                                          |
-| `replace_build`     | `true`  | `true`면 기본 빌드 에이전트를 subagent 모드로 강등시킵니다. `false`로 설정하면 Builder-Sisyphus와 기본 빌드를 모두 사용할 수 있습니다.                                        |
-| `replace_plan`      | `true`  | `true`면 기본 플랜 에이전트를 subagent 모드로 강등시킵니다. `false`로 설정하면 Planner-Sisyphus와 기본 플랜을 모두 사용할 수 있습니다.                                        |
+| 옵션                        | 기본값   | 설명                                                                                                                                                  |
+| --------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`                  | `false` | `true`면 모든 Sisyphus 오케스트레이션을 비활성화하고 원래 build/plan을 primary로 복원합니다.                                                                       |
+| `default_builder_enabled`   | `false` | `true`면 Builder-Sisyphus 에이전트를 활성화합니다 (OpenCode build와 동일, SDK 제한으로 이름만 변경). 기본적으로 비활성화되어 있습니다.                                      |
+| `planner_enabled`           | `true`  | `true`면 Planner-Sisyphus 에이전트를 활성화합니다 (OpenCode plan과 동일, SDK 제한으로 이름만 변경). 기본적으로 활성화되어 있습니다.                                          |
+| `replace_plan`              | `true`  | `true`면 기본 플랜 에이전트를 subagent 모드로 강등시킵니다. `false`로 설정하면 Planner-Sisyphus와 기본 플랜을 모두 사용할 수 있습니다.                                        |
 
 ### Hooks
 

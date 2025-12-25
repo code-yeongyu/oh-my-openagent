@@ -1352,13 +1352,10 @@
         "disabled": {
           "type": "boolean"
         },
-        "builder_enabled": {
+        "default_builder_enabled": {
           "type": "boolean"
         },
         "planner_enabled": {
-          "type": "boolean"
-        },
-        "replace_build": {
           "type": "boolean"
         },
         "replace_plan": {
