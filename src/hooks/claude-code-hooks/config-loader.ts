@@ -9,6 +9,7 @@ export interface DisabledHooksConfig {
   PreToolUse?: string[]
   PostToolUse?: string[]
   UserPromptSubmit?: string[]
+  PreCompact?: string[]
 }
 
 export interface PluginExtendedConfig {
@@ -47,6 +48,7 @@ function mergeDisabledHooks(
     PreToolUse: override.PreToolUse ?? base.PreToolUse,
     PostToolUse: override.PostToolUse ?? base.PostToolUse,
     UserPromptSubmit: override.UserPromptSubmit ?? base.UserPromptSubmit,
+    PreCompact: override.PreCompact ?? base.PreCompact,
   }
 }
 

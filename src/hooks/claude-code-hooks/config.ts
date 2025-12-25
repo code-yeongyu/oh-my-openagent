@@ -14,6 +14,7 @@ interface RawClaudeHooksConfig {
   PostToolUse?: RawHookMatcher[]
   UserPromptSubmit?: RawHookMatcher[]
   Stop?: RawHookMatcher[]
+  PreCompact?: RawHookMatcher[]
 }
 
 function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
@@ -30,6 +31,7 @@ function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
     "PostToolUse",
     "UserPromptSubmit",
     "Stop",
+    "PreCompact",
   ]
 
   for (const eventType of eventTypes) {
@@ -66,6 +68,7 @@ function mergeHooksConfig(
     "PostToolUse",
     "UserPromptSubmit",
     "Stop",
+    "PreCompact",
   ]
   for (const eventType of eventTypes) {
     if (override[eventType]) {
