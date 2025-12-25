@@ -47,3 +47,25 @@ export interface MessageUpdatedProps {
   info?: { sessionID?: string; role?: string }
   content?: string
 }
+
+export interface MessagePartUpdatedProps {
+  info?: { sessionID?: string; role?: string }
+  part?: {
+    type?: string
+    text?: string
+    name?: string
+    input?: unknown
+  }
+}
+
+export interface ToolExecuteProps {
+  sessionID?: string
+  name?: string
+  input?: Record<string, unknown>
+}
+
+export interface ToolResultProps {
+  sessionID?: string
+  name?: string
+  output?: string
+}
