@@ -53,6 +53,8 @@
 
 > "Oh My Opencode는 독보적입니다, 경쟁자가 없습니다" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
+> "시지푸스 이름 자체가 이쁘잖아요?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
+
 ---
 
 ## 목차
