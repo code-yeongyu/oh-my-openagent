@@ -36,7 +36,12 @@ export async function processEvents(
 
     try {
       const payload = event as EventPayload
-      if (!payload?.type) continue
+      if (!payload?.type) {
+        console.error(pc.dim(`[event] no type: ${JSON.stringify(event)}`))
+        continue
+      }
+
+      console.error(pc.dim(`[event] ${payload.type}`))
 
       handleSessionIdle(ctx, payload, state)
       handleSessionStatus(ctx, payload, state)
@@ -44,7 +49,9 @@ export async function processEvents(
       handleMessageUpdated(ctx, payload, state)
       handleToolExecute(ctx, payload, state)
       handleToolResult(ctx, payload, state)
-    } catch {}
+    } catch (err) {
+      console.error(pc.red(`[event error] ${err}`))
+    }
   }
 }
 
