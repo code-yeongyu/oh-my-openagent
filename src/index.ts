@@ -50,7 +50,6 @@ import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
-import { BUILD_SYSTEM_PROMPT, BUILD_PERMISSION } from "./agents/build-prompt";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -396,18 +395,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
         if (builderEnabled) {
           const { name: _buildName, ...buildConfigWithoutName } = config.agent?.build ?? {};
-          const builderSisyphusOverride = pluginConfig.agents?.["Builder-Sisyphus"];
-          const builderSisyphusBase = {
+          const openCodeBuilderOverride = pluginConfig.agents?.["OpenCode-Builder"];
+          const openCodeBuilderBase = {
             ...buildConfigWithoutName,
-            prompt: BUILD_SYSTEM_PROMPT,
-            permission: BUILD_PERMISSION,
-            description: `${config.agent?.build?.description ?? "Build agent"} (OhMyOpenCode version)`,
-            color: config.agent?.build?.color ?? "#32CD32",
+            description: `${config.agent?.build?.description ?? "Build agent"} (OpenCode default)`,
           };
 
-          agentConfig["Builder-Sisyphus"] = builderSisyphusOverride
-            ? { ...builderSisyphusBase, ...builderSisyphusOverride }
-            : builderSisyphusBase;
+          agentConfig["OpenCode-Builder"] = openCodeBuilderOverride
+            ? { ...openCodeBuilderBase, ...openCodeBuilderOverride }
+            : openCodeBuilderBase;
         }
 
         if (plannerEnabled) {
