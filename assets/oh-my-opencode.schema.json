@@ -59,8 +59,7 @@
           "agent-usage-reminder",
           "non-interactive-env",
           "interactive-bash-session",
-          "empty-message-sanitizer",
-          "tool-call-validator"
+          "empty-message-sanitizer"
         ]
       }
     },
