@@ -109,13 +109,13 @@ jobs:
                 "claude-opus-4-5": {
                   "id": "claude-opus-4-5-20251101",
                   "name": "Opus 4.5",
-                  "limit": { "context": 200000, "output": 64000 },
+                  "limit": { "context": 190000, "output": 64000 },
                   "options": { "effort": "high" }
                 },
                 "claude-opus-4-5-high": {
                   "id": "claude-opus-4-5-20251101",
                   "name": "Opus 4.5 High",
-                  "limit": { "context": 200000, "output": 128000 },
+                  "limit": { "context": 190000, "output": 128000 },
                   "options": { "effort": "high", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
                 },
                 "claude-sonnet-4-5": {
