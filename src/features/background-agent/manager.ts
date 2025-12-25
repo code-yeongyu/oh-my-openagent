@@ -99,6 +99,7 @@ export class BackgroundManager {
         toolCalls: 0,
         lastUpdate: new Date(),
       },
+      parentModel: input.parentModel,
     }
 
     this.tasks.set(task.id, task)
@@ -322,10 +323,16 @@ export class BackgroundManager {
         const messageDir = getMessageDir(task.parentSessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
+        const modelContext = task.parentModel ?? prevMessage?.model
+        const modelField = modelContext?.providerID && modelContext?.modelID
+          ? { providerID: modelContext.providerID, modelID: modelContext.modelID }
+          : undefined
+
         await this.client.session.prompt({
           path: { id: task.parentSessionID },
           body: {
             agent: prevMessage?.agent,
+            model: modelField,
             parts: [{ type: "text", text: message }],
           },
           query: { directory: this.directory },
