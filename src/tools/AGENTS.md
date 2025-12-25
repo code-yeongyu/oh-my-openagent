@@ -23,6 +23,12 @@ tools/
 │   ├── config.ts       # Server configurations
 │   ├── tools.ts        # Tool implementations
 │   └── types.ts
+├── session-manager/    # OpenCode session file management
+│   ├── constants.ts    # Storage paths, descriptions
+│   ├── types.ts        # Session data interfaces
+│   ├── storage.ts      # File I/O operations
+│   ├── utils.ts        # Formatting, filtering
+│   └── tools.ts        # Tool implementations
 ├── slashcommand/       # Slash command execution
 └── index.ts            # builtinTools export
 ```
@@ -34,6 +40,7 @@ tools/
 | LSP | lsp_hover, lsp_goto_definition, lsp_find_references, lsp_document_symbols, lsp_workspace_symbols, lsp_diagnostics, lsp_servers, lsp_prepare_rename, lsp_rename, lsp_code_actions, lsp_code_action_resolve | IDE-like code intelligence |
 | AST | ast_grep_search, ast_grep_replace | Pattern-based code search/replace |
 | File Search | grep, glob | Content and file pattern matching |
+| Session | session_list, session_read, session_search, session_info | OpenCode session file management |
 | Background | background_task, background_output, background_cancel | Async agent orchestration |
 | Multimodal | look_at | PDF/image analysis via Gemini |
 | Terminal | interactive_bash | Tmux session control |
