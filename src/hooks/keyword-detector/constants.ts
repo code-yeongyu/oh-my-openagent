@@ -33,6 +33,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
+- **NO MockUp Work**: When user asked you to do "port A", you must "port A", fully, 100%. No Extra feature, No reduced feature, no mock data, fully working 100% port.
 - **NO Partial Completion**: Never stop at 60-80% saying "you can extend this..." - finish 100%
 - **NO Assumed Shortcuts**: Never skip requirements you deem "optional" or "can be added later"
 - **NO Premature Stopping**: Never declare done until ALL TODOs are completed and verified
