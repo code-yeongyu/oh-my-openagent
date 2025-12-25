@@ -114,7 +114,7 @@ export const ExperimentalConfigSchema = z.object({
   preemptive_compaction: z.boolean().optional(),
   /** Threshold percentage to trigger preemptive compaction (default: 0.80) */
   preemptive_compaction_threshold: z.number().min(0.5).max(0.95).optional(),
-  /** Truncate all tool outputs, not just whitelisted tools (default: false) */
+  /** Truncate all tool outputs, not just whitelisted tools (default: true) */
   truncate_all_tool_outputs: z.boolean().optional(),
 })
 
