@@ -296,7 +296,8 @@ export function createTodoContinuationEnforcer(
 
       if (sessionID && role === "assistant" && finish) {
         remindedSessions.delete(sessionID)
-        log(`[${HOOK_NAME}] Cleared reminded state on assistant finish`, { sessionID })
+        preemptivelyInjectedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Cleared reminded/preemptive state on assistant finish`, { sessionID })
 
         const isTerminalFinish = finish && !["tool-calls", "unknown"].includes(finish)
         if (isTerminalFinish && isNonInteractive()) {
