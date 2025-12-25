@@ -714,24 +714,50 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 
 ### Sisyphus Agent
 
-默认开启。Sisyphus 会加两个主 Agent，把原来的降级成小弟：
+默认开启。Sisyphus 提供一个强力的编排器，带可选的专门 Agent：
 
 - **Sisyphus**：主编排 Agent（Claude Opus 4.5）
-- **Planner-Sisyphus**：运行时继承 OpenCode plan Agent 所有设置（描述里加了"OhMyOpenCode version"）
-- **build**：降级为子 Agent
-- **plan**：降级为子 Agent
+- **Builder-Sisyphus**：OhMyOpenCode 增强版构建 Agent（默认禁用）
+- **Planner-Sisyphus**：OhMyOpenCode 增强版计划 Agent（默认启用）
 
-想禁用 Sisyphus 恢复原来的？
+**配置选项：**
 
 ```json
 {
-  "omo_agent": {
+  "sisyphus_agent": {
+    "disabled": false,
+    "builder_enabled": false,
+    "planner_enabled": true,
+    "replace_build": true,
+    "replace_plan": true
+  }
+}
+```
+
+**示例：启用 Builder-Sisyphus，同时保留默认构建模式：**
+
+```json
+{
+  "sisyphus_agent": {
+    "builder_enabled": true,
+    "replace_build": false
+  }
+}
+```
+
+这样你就能同时使用 Builder-Sisyphus 和默认构建 Agent。
+
+**示例：禁用所有 Sisyphus 编排：**
+
+```json
+{
+  "sisyphus_agent": {
     "disabled": true
   }
 }
 ```
 
-Sisyphus 和 Planner-Sisyphus 也能自定义：
+Sisyphus Agent 也能自定义：
 
 ```json
 {
@@ -740,6 +766,9 @@ Sisyphus 和 Planner-Sisyphus 也能自定义：
       "model": "anthropic/claude-sonnet-4",
       "temperature": 0.3
     },
+    "Builder-Sisyphus": {
+      "model": "anthropic/claude-opus-4"
+    },
     "Planner-Sisyphus": {
       "model": "openai/gpt-5.2"
     }
@@ -747,9 +776,13 @@ Sisyphus 和 Planner-Sisyphus 也能自定义：
 }
 ```
 
-| 选项       | 默认值  | 说明                                                                                                                                       |
-| ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `disabled` | `false` | 设为 `true` 就禁用 Sisyphus，恢复原来的 build/plan。设为 `false`（默认）就是 Sisyphus 和 Planner-Sisyphus 掌权。 |
+| 选项                | 默认值   | 说明                                                                                                                                              |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`          | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                                                              |
+| `builder_enabled`   | `false` | 设为 `true` 就启用 Builder-Sisyphus Agent（OhMyOpenCode 增强构建模式）。为了保留默认 OpenCode 构建体验，默认禁用。                                                   |
+| `planner_enabled`   | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（OhMyOpenCode 增强计划模式）。默认启用。                                                                          |
+| `replace_build`     | `true`  | 设为 `true` 就把默认构建 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Builder-Sisyphus 和默认构建。                                                        |
+| `replace_plan`      | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
 
 ### Hooks
 
