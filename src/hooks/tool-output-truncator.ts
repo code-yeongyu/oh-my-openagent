@@ -24,7 +24,7 @@ interface ToolOutputTruncatorOptions {
 
 export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOutputTruncatorOptions) {
   const truncator = createDynamicTruncator(ctx)
-  const truncateAll = options?.experimental?.truncate_all_tool_outputs ?? false
+  const truncateAll = options?.experimental?.truncate_all_tool_outputs ?? true
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },

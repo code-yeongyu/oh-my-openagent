@@ -887,6 +887,7 @@ Opt-in experimental features that may change or be removed in future versions. U
 | ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aggressive_truncation`  | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`            | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                            |
+| `truncate_all_tool_outputs` | `true` | Dynamically truncates output from all tool calls to prevent prompts from being too long. Helps manage context window usage across all tools, not just whitelisted ones. |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 
