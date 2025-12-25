@@ -39,7 +39,7 @@ describe("event handling", () => {
       properties: { sessionID: "my-session" },
     }
 
-    const events = toAsyncIterable([{ payload }])
+    const events = toAsyncIterable([payload])
     const { processEvents } = await import("./events")
 
     // #when
@@ -59,7 +59,7 @@ describe("event handling", () => {
       properties: { sessionID: "other-session" },
     }
 
-    const events = toAsyncIterable([{ payload }])
+    const events = toAsyncIterable([payload])
     const { processEvents } = await import("./events")
 
     // #when
@@ -84,7 +84,7 @@ describe("event handling", () => {
       properties: { sessionID: "my-session", status: { type: "busy" } },
     }
 
-    const events = toAsyncIterable([{ payload }])
+    const events = toAsyncIterable([payload])
     const { processEvents } = await import("./events")
 
     // #when
