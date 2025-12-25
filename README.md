@@ -794,26 +794,24 @@ When enabled (default), Sisyphus provides a powerful orchestrator with optional 
 {
   "sisyphus_agent": {
     "disabled": false,
-    "builder_enabled": false,
+    "default_builder_enabled": false,
     "planner_enabled": true,
-    "replace_build": true,
     "replace_plan": true
   }
 }
 ```
 
-**Example: Enable Builder-Sisyphus and keep default build mode:**
+**Example: Enable Builder-Sisyphus:**
 
 ```json
 {
   "sisyphus_agent": {
-    "builder_enabled": true,
-    "replace_build": false
+    "default_builder_enabled": true
   }
 }
 ```
 
-This allows you to have both Builder-Sisyphus AND the default build agent available simultaneously.
+This enables Builder-Sisyphus agent alongside Sisyphus. The default build agent is always demoted to subagent mode when Sisyphus is enabled.
 
 **Example: Disable all Sisyphus orchestration:**
 
@@ -844,13 +842,12 @@ You can also customize Sisyphus agents like other agents:
 }
 ```
 
-| Option              | Default | Description                                                                                                                                         |
-| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `disabled`          | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                                       |
-| `builder_enabled`   | `false` | When `true`, enables Builder-Sisyphus agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.                         |
-| `planner_enabled`   | `true`  | When `true`, enables Planner-Sisyphus agent (same as OpenCode plan, renamed due to SDK limitations). Enabled by default.                           |
-| `replace_build`     | `true`  | When `true`, demotes default build agent to subagent mode. Set to `false` to keep both Builder-Sisyphus and default build available.               |
-| `replace_plan`      | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Planner-Sisyphus and default plan available.                 |
+| Option                      | Default | Description                                                                                                                                         |
+| --------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`                  | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                                       |
+| `default_builder_enabled`   | `false` | When `true`, enables Builder-Sisyphus agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.                         |
+| `planner_enabled`           | `true`  | When `true`, enables Planner-Sisyphus agent (same as OpenCode plan, renamed due to SDK limitations). Enabled by default.                           |
+| `replace_plan`              | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Planner-Sisyphus and default plan available.                 |
 
 ### Hooks
 

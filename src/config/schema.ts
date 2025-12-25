@@ -108,9 +108,8 @@ export const ClaudeCodeConfigSchema = z.object({
 
 export const SisyphusAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
-  builder_enabled: z.boolean().optional(),
+  default_builder_enabled: z.boolean().optional(),
   planner_enabled: z.boolean().optional(),
-  replace_build: z.boolean().optional(),
   replace_plan: z.boolean().optional(),
 })
 

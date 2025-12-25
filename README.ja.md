@@ -728,26 +728,24 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 {
   "sisyphus_agent": {
     "disabled": false,
-    "builder_enabled": false,
+    "default_builder_enabled": false,
     "planner_enabled": true,
-    "replace_build": true,
     "replace_plan": true
   }
 }
 ```
 
-**例：Builder-Sisyphus を有効化し、デフォルトのビルドモードも維持する：**
+**例：Builder-Sisyphus を有効化：**
 
 ```json
 {
   "sisyphus_agent": {
-    "builder_enabled": true,
-    "replace_build": false
+    "default_builder_enabled": true
   }
 }
 ```
 
-これにより、Builder-Sisyphus とデフォルトのビルドエージェントの両方を同時に利用できます。
+これにより、Sisyphus と並行して Builder-Sisyphus エージェントを有効化できます。Sisyphus が有効な場合、デフォルトのビルドエージェントは常にサブエージェントモードに降格されます。
 
 **例：すべての Sisyphus オーケストレーションを無効化：**
 
@@ -778,13 +776,12 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-| オプション              | デフォルト | 説明                                                                                                                                                         |
-| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `disabled`          | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
-| `builder_enabled`   | `false` | `true` の場合、Builder-Sisyphus エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
-| `planner_enabled`   | `true`  | `true` の場合、Planner-Sisyphus エージェントを有効化します（OpenCode plan と同じ、SDK 制限により名前変更）。デフォルトで有効です。                                                       |
-| `replace_build`     | `true`  | `true` の場合、デフォルトのビルドエージェントをサブエージェントモードに降格させます。`false` に設定すると、Builder-Sisyphus とデフォルトのビルドの両方を利用できます。                                  |
-| `replace_plan`      | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
+| オプション                  | デフォルト | 説明                                                                                                                                                         |
+| --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `disabled`                  | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
+| `default_builder_enabled`   | `false` | `true` の場合、Builder-Sisyphus エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
+| `planner_enabled`           | `true`  | `true` の場合、Planner-Sisyphus エージェントを有効化します（OpenCode plan と同じ、SDK 制限により名前変更）。デフォルトで有効です。                                                       |
+| `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
 
 ### Hooks
 
