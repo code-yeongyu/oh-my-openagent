@@ -717,8 +717,8 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 默认开启。Sisyphus 提供一个强力的编排器，带可选的专门 Agent：
 
 - **Sisyphus**：主编排 Agent（Claude Opus 4.5）
-- **Builder-Sisyphus**：OhMyOpenCode 增强版构建 Agent（默认禁用）
-- **Planner-Sisyphus**：OhMyOpenCode 增强版计划 Agent（默认启用）
+- **Builder-Sisyphus**：OpenCode 默认构建 Agent（因 SDK 限制仅改名，默认禁用）
+- **Planner-Sisyphus**：OpenCode 默认计划 Agent（因 SDK 限制仅改名，默认启用）
 
 **配置选项：**
 
@@ -779,8 +779,8 @@ Sisyphus Agent 也能自定义：
 | 选项                | 默认值   | 说明                                                                                                                                              |
 | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `disabled`          | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                                                              |
-| `builder_enabled`   | `false` | 设为 `true` 就启用 Builder-Sisyphus Agent（OhMyOpenCode 增强构建模式）。为了保留默认 OpenCode 构建体验，默认禁用。                                                   |
-| `planner_enabled`   | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（OhMyOpenCode 增强计划模式）。默认启用。                                                                          |
+| `builder_enabled`   | `false` | 设为 `true` 就启用 Builder-Sisyphus Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
+| `planner_enabled`   | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（与 OpenCode plan 相同，因 SDK 限制仅改名）。默认启用。                                                             |
 | `replace_build`     | `true`  | 设为 `true` 就把默认构建 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Builder-Sisyphus 和默认构建。                                                        |
 | `replace_plan`      | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
 
