@@ -8,6 +8,7 @@ export type ClaudeHookEvent =
   | "PostToolUse"
   | "UserPromptSubmit"
   | "Stop"
+  | "PreCompact"
 
 export interface HookMatcher {
   matcher: string
@@ -24,6 +25,7 @@ export interface ClaudeHooksConfig {
   PostToolUse?: HookMatcher[]
   UserPromptSubmit?: HookMatcher[]
   Stop?: HookMatcher[]
+  PreCompact?: HookMatcher[]
 }
 
 export interface PreToolUseInput {
@@ -79,6 +81,13 @@ export interface StopInput {
   hook_event_name: "Stop"
   stop_hook_active: boolean
   todo_path?: string
+  hook_source?: HookSource
+}
+
+export interface PreCompactInput {
+  session_id: string
+  cwd: string
+  hook_event_name: "PreCompact"
   hook_source?: HookSource
 }
 
@@ -164,6 +173,16 @@ export interface StopOutput {
   stop_hook_active?: boolean
   permission_mode?: PermissionMode
   inject_prompt?: string
+}
+
+export interface PreCompactOutput extends HookCommonOutput {
+  /** Additional context to inject into compaction prompt */
+  context?: string[]
+  hookSpecificOutput?: {
+    hookEventName: "PreCompact"
+    /** Additional context strings to inject */
+    additionalContext?: string[]
+  }
 }
 
 export type ClaudeCodeContent =

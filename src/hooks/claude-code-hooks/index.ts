@@ -19,6 +19,10 @@ import {
   executeStopHooks,
   type StopContext,
 } from "./stop"
+import {
+  executePreCompactHooks,
+  type PreCompactContext,
+} from "./pre-compact"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
 import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
 import type { PluginConfig } from "./types"
@@ -31,6 +35,35 @@ const sessionInterruptState = new Map<string, { interrupted: boolean }>()
 
 export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig = {}) {
   return {
+    "experimental.session.compacting": async (
+      input: { sessionID: string },
+      output: { context: string[] }
+    ): Promise<void> => {
+      if (isHookDisabled(config, "PreCompact")) {
+        return
+      }
+
+      const claudeConfig = await loadClaudeHooksConfig()
+      const extendedConfig = await loadPluginExtendedConfig()
+
+      const preCompactCtx: PreCompactContext = {
+        sessionId: input.sessionID,
+        cwd: ctx.directory,
+      }
+
+      const result = await executePreCompactHooks(preCompactCtx, claudeConfig, extendedConfig)
+
+      if (result.context.length > 0) {
+        log("PreCompact hooks injecting context", {
+          sessionID: input.sessionID,
+          contextCount: result.context.length,
+          hookName: result.hookName,
+          elapsedMs: result.elapsedMs,
+        })
+        output.context.push(...result.context)
+      }
+    },
+
     "chat.message": async (
       input: {
         sessionID: string
