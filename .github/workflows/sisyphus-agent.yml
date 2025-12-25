@@ -338,7 +338,7 @@ jobs:
           PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
           PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
 
-          bun run dist/cli/index.js run "$PROMPT"
+          stdbuf -oL -eL bun run dist/cli/index.js run "$PROMPT"
 
       # Push changes (as sisyphus-dev-ai)
       - name: Push changes
