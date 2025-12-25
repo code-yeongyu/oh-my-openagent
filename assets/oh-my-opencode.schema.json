@@ -1257,6 +1257,7 @@
           "maximum": 0.95
         },
         "truncate_all_tool_outputs": {
+          "default": true,
           "type": "boolean"
         }
       }
