@@ -1,9 +1,26 @@
 import { tool, type PluginInput } from "@opencode-ai/plugin"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
 type OpencodeClient = PluginInput["client"]
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
+}
 
 function formatDuration(start: Date, end?: Date): string {
   const duration = (end ?? new Date()).getTime() - start.getTime()
@@ -34,12 +51,19 @@ export function createBackgroundTask(manager: BackgroundManager) {
       }
 
       try {
+        const messageDir = getMessageDir(toolContext.sessionID)
+        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
+          ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+          : undefined
+
         const task = await manager.launch({
           description: args.description,
           prompt: args.prompt,
           agent: args.agent.trim(),
           parentSessionID: toolContext.sessionID,
           parentMessageID: toolContext.messageID,
+          parentModel,
         })
 
         return `Background task launched successfully.
