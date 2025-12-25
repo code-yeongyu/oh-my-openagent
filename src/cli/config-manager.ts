@@ -362,7 +362,6 @@ export async function runBunInstall(): Promise<boolean> {
 export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
-    api: "antigravity",
     // NOTE: opencode-antigravity-auth expects full model specs (name/limit/modalities).
     // If these are incomplete, models may appear but fail at runtime (e.g. 404).
     models: {
