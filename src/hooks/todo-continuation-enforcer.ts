@@ -215,6 +215,30 @@ export function createTodoContinuationEnforcer(
           return
         }
 
+        let freshTodos: Todo[] = []
+        try {
+          log(`[${HOOK_NAME}] Re-verifying todos after countdown`, { sessionID })
+          const response = await ctx.client.session.todo({
+            path: { id: sessionID },
+          })
+          freshTodos = (response.data ?? response) as Todo[]
+          log(`[${HOOK_NAME}] Fresh todo count`, { sessionID, todosCount: freshTodos?.length ?? 0 })
+        } catch (err) {
+          log(`[${HOOK_NAME}] Failed to re-verify todos`, { sessionID, error: String(err) })
+          return
+        }
+
+        const freshIncomplete = freshTodos.filter(
+          (t) => t.status !== "completed" && t.status !== "cancelled"
+        )
+
+        if (freshIncomplete.length === 0) {
+          log(`[${HOOK_NAME}] Abort: no incomplete todos after countdown`, { sessionID, total: freshTodos.length })
+          return
+        }
+
+        log(`[${HOOK_NAME}] Confirmed incomplete todos, proceeding with injection`, { sessionID, incomplete: freshIncomplete.length, total: freshTodos.length })
+
         remindedSessions.add(sessionID)
 
         try {
@@ -237,7 +261,7 @@ export function createTodoContinuationEnforcer(
               parts: [
                 {
                   type: "text",
-                  text: `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - incomplete.length}/${todos.length} completed, ${incomplete.length} remaining]`,
+                  text: `${CONTINUATION_PROMPT}\n\n[Status: ${freshTodos.length - freshIncomplete.length}/${freshTodos.length} completed, ${freshIncomplete.length} remaining]`,
                 },
               ],
             },
