@@ -23,7 +23,6 @@ import {
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
   createEmptyMessageSanitizerHook,
-  createToolCallValidatorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -50,7 +49,6 @@ import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
-import { createToolRegistry } from "./shared/tool-registry";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
@@ -347,28 +345,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const tmuxAvailable = await getTmuxPath();
 
-  const allTools = {
-    ...builtinTools,
-    ...backgroundTools,
-    call_omo_agent: callOmoAgent,
-    look_at: lookAt,
-    ...(tmuxAvailable ? { interactive_bash } : {}),
-  };
-
-  const toolRegistry = createToolRegistry(
-    allTools,
-    {},
-    {}
-  );
-
-  const toolCallValidator = isHookEnabled("tool-call-validator")
-    ? createToolCallValidatorHook(toolRegistry)
-    : null;
-
   return {
     ...(googleAuthHooks ? { auth: googleAuthHooks.auth } : {}),
 
-    tool: allTools,
+    tool: {
+      ...builtinTools,
+      ...backgroundTools,
+      call_omo_agent: callOmoAgent,
+      look_at: lookAt,
+      ...(tmuxAvailable ? { interactive_bash } : {}),
+    },
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
@@ -381,8 +367,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await toolCallValidator?.["experimental.chat.messages.transform"]?.(input, output as any);
     },
 
     config: async (config) => {
