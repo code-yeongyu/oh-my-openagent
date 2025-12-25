@@ -69,3 +69,8 @@ export interface ToolResultProps {
   name?: string
   output?: string
 }
+
+export interface SessionErrorProps {
+  sessionID?: string
+  error?: unknown
+}

@@ -87,6 +87,16 @@ export async function run(options: RunOptions): Promise<number> {
           continue
         }
 
+        // Check if session errored - exit with failure if so
+        if (eventState.mainSessionError) {
+          console.error(pc.red(`\n\nSession ended with error: ${eventState.lastError}`))
+          console.error(pc.yellow("Check if todos were completed before the error."))
+          abortController.abort()
+          await eventProcessor.catch(() => {})
+          cleanup()
+          return 1
+        }
+
         const shouldExit = await checkCompletionConditions(ctx)
         if (shouldExit) {
           console.log(pc.green("\n\nAll tasks completed."))
