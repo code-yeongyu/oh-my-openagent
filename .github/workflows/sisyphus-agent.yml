@@ -149,8 +149,32 @@ jobs:
 
           User CANNOT see console. Post everything via `gh issue comment` or `gh pr comment`.
 
+          ### Comment Formatting (CRITICAL)
+
+          **ALWAYS use heredoc syntax for comments containing code references, backticks, or multiline content:**
+
+          ```bash
+          gh issue comment <number> --body "$(cat <<'EOF'
+          Your comment with `backticks` and code references preserved here.
+          Multiple lines work perfectly.
+          EOF
+          )"
+          ```
+
+          **NEVER use direct quotes with backticks** (shell will interpret them as command substitution):
+          ```bash
+          # WRONG - backticks disappear:
+          gh issue comment 123 --body "text with `code`"
+          
+          # CORRECT - backticks preserved:
+          gh issue comment 123 --body "$(cat <<'EOF'
+          text with `code`
+          EOF
+          )"
+          ```
+
           ### Rules
-          - EVERY response = GitHub comment
+          - EVERY response = GitHub comment (use heredoc for proper escaping)
           - Code changes = PR (never push main/master)
           - Setup: bun install first
           - Acknowledge immediately, report when done
