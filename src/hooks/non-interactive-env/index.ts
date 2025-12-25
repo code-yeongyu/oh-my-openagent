@@ -3,6 +3,7 @@ import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./consta
 import { log } from "../../shared"
 
 export * from "./constants"
+export * from "./detector"
 export * from "./types"
 
 const BANNED_COMMAND_PATTERNS = SHELL_COMMAND_PATTERNS.banned

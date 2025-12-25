@@ -6,9 +6,15 @@ import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../features/hook-message-injector"
+import type { BackgroundManager } from "../features/background-agent"
 import { log } from "../shared/logger"
+import { isNonInteractive } from "./non-interactive-env/detector"
 
 const HOOK_NAME = "todo-continuation-enforcer"
+
+export interface TodoContinuationEnforcerOptions {
+  backgroundManager?: BackgroundManager
+}
 
 export interface TodoContinuationEnforcer {
   handler: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
@@ -70,12 +76,17 @@ interface CountdownState {
   intervalId: ReturnType<typeof setInterval>
 }
 
-export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuationEnforcer {
+export function createTodoContinuationEnforcer(
+  ctx: PluginInput,
+  options: TodoContinuationEnforcerOptions = {}
+): TodoContinuationEnforcer {
+  const { backgroundManager } = options
   const remindedSessions = new Set<string>()
   const interruptedSessions = new Set<string>()
   const errorSessions = new Set<string>()
   const recoveringSessions = new Set<string>()
   const pendingCountdowns = new Map<string, CountdownState>()
+  const preemptivelyInjectedSessions = new Set<string>()
 
   const markRecovering = (sessionID: string): void => {
     recoveringSessions.add(sessionID)
@@ -269,7 +280,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       const role = info?.role as string | undefined
-      const finish = info?.finish as boolean | undefined
+      const finish = info?.finish as string | undefined
       log(`[${HOOK_NAME}] message.updated received`, { sessionID, role, finish })
       
       if (sessionID && role === "user") {
@@ -279,13 +290,74 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
           pendingCountdowns.delete(sessionID)
           log(`[${HOOK_NAME}] Cancelled countdown on user message`, { sessionID })
         }
-        // Allow new continuation after user sends another message
         remindedSessions.delete(sessionID)
+        preemptivelyInjectedSessions.delete(sessionID)
       }
 
       if (sessionID && role === "assistant" && finish) {
         remindedSessions.delete(sessionID)
         log(`[${HOOK_NAME}] Cleared reminded state on assistant finish`, { sessionID })
+
+        const isTerminalFinish = finish && !["tool-calls", "unknown"].includes(finish)
+        if (isTerminalFinish && isNonInteractive()) {
+          log(`[${HOOK_NAME}] Terminal finish in non-interactive mode`, { sessionID, finish })
+
+          const mainSessionID = getMainSessionID()
+          if (mainSessionID && sessionID !== mainSessionID) {
+            log(`[${HOOK_NAME}] Skipped preemptive: not main session`, { sessionID, mainSessionID })
+            return
+          }
+
+          if (preemptivelyInjectedSessions.has(sessionID)) {
+            log(`[${HOOK_NAME}] Skipped preemptive: already injected`, { sessionID })
+            return
+          }
+
+          if (recoveringSessions.has(sessionID) || errorSessions.has(sessionID) || interruptedSessions.has(sessionID)) {
+            log(`[${HOOK_NAME}] Skipped preemptive: session in error/recovery state`, { sessionID })
+            return
+          }
+
+          const hasRunningBgTasks = backgroundManager
+            ? backgroundManager.getTasksByParentSession(sessionID).some((t) => t.status === "running")
+            : false
+
+          let hasIncompleteTodos = false
+          try {
+            const response = await ctx.client.session.todo({ path: { id: sessionID } })
+            const todos = (response.data ?? response) as Todo[]
+            hasIncompleteTodos = todos?.some((t) => t.status !== "completed" && t.status !== "cancelled") ?? false
+          } catch {
+            log(`[${HOOK_NAME}] Failed to fetch todos for preemptive check`, { sessionID })
+          }
+
+          if (hasRunningBgTasks || hasIncompleteTodos) {
+            log(`[${HOOK_NAME}] Preemptive injection needed`, { sessionID, hasRunningBgTasks, hasIncompleteTodos })
+            preemptivelyInjectedSessions.add(sessionID)
+
+            try {
+              const messageDir = getMessageDir(sessionID)
+              const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
+              const prompt = hasRunningBgTasks
+                ? "[SYSTEM] Background tasks are still running. Wait for their completion before proceeding."
+                : CONTINUATION_PROMPT
+
+              await ctx.client.session.prompt({
+                path: { id: sessionID },
+                body: {
+                  agent: prevMessage?.agent,
+                  parts: [{ type: "text", text: prompt }],
+                },
+                query: { directory: ctx.directory },
+              })
+              log(`[${HOOK_NAME}] Preemptive injection successful`, { sessionID })
+            } catch (err) {
+              log(`[${HOOK_NAME}] Preemptive injection failed`, { sessionID, error: String(err) })
+              preemptivelyInjectedSessions.delete(sessionID)
+            }
+          }
+        }
       }
     }
 
@@ -296,6 +368,7 @@ export function createTodoContinuationEnforcer(ctx: PluginInput): TodoContinuati
         interruptedSessions.delete(sessionInfo.id)
         errorSessions.delete(sessionInfo.id)
         recoveringSessions.delete(sessionInfo.id)
+        preemptivelyInjectedSessions.delete(sessionInfo.id)
         
         const countdown = pendingCountdowns.get(sessionInfo.id)
         if (countdown) {
