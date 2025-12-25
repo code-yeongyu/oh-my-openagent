@@ -41,7 +41,7 @@ export async function processEvents(
         continue
       }
 
-      console.error(pc.dim(`[event] ${payload.type}`))
+      logEventVerbose(ctx, payload)
 
       handleSessionIdle(ctx, payload, state)
       handleSessionStatus(ctx, payload, state)
@@ -52,6 +52,79 @@ export async function processEvents(
     } catch (err) {
       console.error(pc.red(`[event error] ${err}`))
     }
+  }
+}
+
+function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
+  const props = payload.properties as Record<string, unknown> | undefined
+  const info = props?.info as Record<string, unknown> | undefined
+  const sessionID = props?.sessionID ?? info?.sessionID
+  const isMainSession = sessionID === ctx.sessionID
+  const sessionTag = isMainSession
+    ? pc.green("[MAIN]")
+    : pc.yellow(`[${String(sessionID).slice(0, 8)}]`)
+
+  switch (payload.type) {
+    case "session.idle":
+    case "session.status": {
+      const status = (props?.status as { type?: string })?.type ?? "idle"
+      console.error(pc.dim(`${sessionTag} ${payload.type}: ${status}`))
+      break
+    }
+
+    case "message.part.updated": {
+      const partProps = props as MessagePartUpdatedProps | undefined
+      const role = partProps?.info?.role ?? "unknown"
+      const part = partProps?.part
+      if (part?.type === "text" && part.text) {
+        const preview = part.text.slice(0, 100).replace(/\n/g, "\\n")
+        console.error(
+          pc.dim(`${sessionTag} message.part (${role}): "${preview}${part.text.length > 100 ? "..." : ""}"`)
+        )
+      } else if (part?.type === "tool-invocation") {
+        const toolPart = part as { toolName?: string; state?: string }
+        console.error(
+          pc.dim(`${sessionTag} message.part (tool): ${toolPart.toolName} [${toolPart.state}]`)
+        )
+      }
+      break
+    }
+
+    case "message.updated": {
+      const msgProps = props as MessageUpdatedProps | undefined
+      const role = msgProps?.info?.role ?? "unknown"
+      const content = msgProps?.content ?? ""
+      const preview = content.slice(0, 100).replace(/\n/g, "\\n")
+      console.error(
+        pc.dim(`${sessionTag} message.updated (${role}): "${preview}${content.length > 100 ? "..." : ""}"`)
+      )
+      break
+    }
+
+    case "tool.execute": {
+      const toolProps = props as ToolExecuteProps | undefined
+      const toolName = toolProps?.name ?? "unknown"
+      const input = toolProps?.input ?? {}
+      const inputStr = JSON.stringify(input).slice(0, 150)
+      console.error(
+        pc.cyan(`${sessionTag} ⚡ TOOL.EXECUTE: ${pc.bold(toolName)}`)
+      )
+      console.error(pc.dim(`   input: ${inputStr}${inputStr.length >= 150 ? "..." : ""}`))
+      break
+    }
+
+    case "tool.result": {
+      const resultProps = props as ToolResultProps | undefined
+      const output = resultProps?.output ?? ""
+      const preview = output.slice(0, 200).replace(/\n/g, "\\n")
+      console.error(
+        pc.green(`${sessionTag} ✓ TOOL.RESULT: "${preview}${output.length > 200 ? "..." : ""}"`)
+      )
+      break
+    }
+
+    default:
+      console.error(pc.dim(`${sessionTag} ${payload.type}`))
   }
 }
 
