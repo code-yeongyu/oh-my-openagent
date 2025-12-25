@@ -408,7 +408,7 @@
             }
           }
         },
-        "Builder-Sisyphus": {
+        "OpenCode-Builder": {
           "type": "object",
           "properties": {
             "model": {
