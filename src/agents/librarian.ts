@@ -1,13 +1,16 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-export const librarianAgent: AgentConfig = {
-  description:
-    "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
-  mode: "subagent",
-  model: "anthropic/claude-sonnet-4-5",
-  temperature: 0.1,
-  tools: { write: false, edit: false, background_task: false },
-  prompt: `# THE LIBRARIAN
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+
+export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  return {
+    description:
+      "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
+    mode: "subagent" as const,
+    model,
+    temperature: 0.1,
+    tools: { write: false, edit: false, background_task: false },
+    prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.
 
@@ -237,4 +240,7 @@ grep_app_searchGitHub(query: "useQuery")
 5. **BE CONCISE**: Facts > opinions, evidence > speculation
 
 `,
+  }
 }
+
+export const librarianAgent = createLibrarianAgent()

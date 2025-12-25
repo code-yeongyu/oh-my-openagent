@@ -1,13 +1,18 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-export const multimodalLookerAgent: AgentConfig = {
-  description:
-    "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
-  mode: "subagent",
-  model: "google/gemini-3-flash",
-  temperature: 0.1,
-  tools: { write: false, edit: false, bash: false, background_task: false },
-  prompt: `You interpret media files that cannot be read as plain text.
+const DEFAULT_MODEL = "google/gemini-3-flash"
+
+export function createMultimodalLookerAgent(
+  model: string = DEFAULT_MODEL
+): AgentConfig {
+  return {
+    description:
+      "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
+    mode: "subagent" as const,
+    model,
+    temperature: 0.1,
+    tools: { write: false, edit: false, bash: false, background_task: false },
+    prompt: `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.
 
@@ -39,4 +44,7 @@ Response rules:
 - Be thorough on the goal, concise on everything else
 
 Your output goes straight to the main agent for continued work.`,
+  }
 }
+
+export const multimodalLookerAgent = createMultimodalLookerAgent()

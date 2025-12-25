@@ -2,11 +2,11 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory } from "./types"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent } from "./oracle"
-import { librarianAgent } from "./librarian"
-import { exploreAgent } from "./explore"
-import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
-import { documentWriterAgent } from "./document-writer"
-import { multimodalLookerAgent } from "./multimodal-looker"
+import { createLibrarianAgent } from "./librarian"
+import { createExploreAgent } from "./explore"
+import { createFrontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
+import { createDocumentWriterAgent } from "./document-writer"
+import { createMultimodalLookerAgent } from "./multimodal-looker"
 import { deepMerge } from "../shared"
 
 type AgentSource = AgentFactory | AgentConfig
@@ -14,11 +14,11 @@ type AgentSource = AgentFactory | AgentConfig
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
   Sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
-  librarian: librarianAgent,
-  explore: exploreAgent,
-  "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
-  "document-writer": documentWriterAgent,
-  "multimodal-looker": multimodalLookerAgent,
+  librarian: createLibrarianAgent,
+  explore: createExploreAgent,
+  "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
+  "document-writer": createDocumentWriterAgent,
+  "multimodal-looker": createMultimodalLookerAgent,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {

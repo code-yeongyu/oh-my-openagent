@@ -85,6 +85,9 @@
             "prompt": {
               "type": "string"
             },
+            "prompt_append": {
+              "type": "string"
+            },
             "tools": {
               "type": "object",
               "propertyNames": {
@@ -194,6 +197,9 @@
               "maximum": 1
             },
             "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
               "type": "string"
             },
             "tools": {
@@ -307,6 +313,9 @@
             "prompt": {
               "type": "string"
             },
+            "prompt_append": {
+              "type": "string"
+            },
             "tools": {
               "type": "object",
               "propertyNames": {
@@ -416,6 +425,9 @@
               "maximum": 1
             },
             "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
               "type": "string"
             },
             "tools": {
@@ -529,6 +541,9 @@
             "prompt": {
               "type": "string"
             },
+            "prompt_append": {
+              "type": "string"
+            },
             "tools": {
               "type": "object",
               "propertyNames": {
@@ -638,6 +653,9 @@
               "maximum": 1
             },
             "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
               "type": "string"
             },
             "tools": {
@@ -751,6 +769,9 @@
             "prompt": {
               "type": "string"
             },
+            "prompt_append": {
+              "type": "string"
+            },
             "tools": {
               "type": "object",
               "propertyNames": {
@@ -860,6 +881,9 @@
               "maximum": 1
             },
             "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
               "type": "string"
             },
             "tools": {
@@ -973,6 +997,9 @@
             "prompt": {
               "type": "string"
             },
+            "prompt_append": {
+              "type": "string"
+            },
             "tools": {
               "type": "object",
               "propertyNames": {
@@ -1082,6 +1109,9 @@
               "maximum": 1
             },
             "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
               "type": "string"
             },
             "tools": {
