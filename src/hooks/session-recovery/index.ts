@@ -27,6 +27,7 @@ type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
+  | "tool_not_found"
   | null
 
 interface MessageInfo {
@@ -143,6 +144,15 @@ function detectErrorType(error: unknown): RecoveryErrorType {
     return "thinking_disabled_violation"
   }
 
+  if (
+    message.includes("tool") &&
+    (message.includes("not found") ||
+      message.includes("unknown tool") ||
+      message.includes("invalid tool"))
+  ) {
+    return "tool_not_found"
+  }
+
   return null
 }
 
@@ -241,6 +251,53 @@ async function recoverThinkingDisabledViolation(
   }
 
   return anySuccess
+}
+
+async function recoverToolNotFound(
+  client: Client,
+  sessionID: string,
+  failedAssistantMsg: MessageData,
+  error: unknown
+): Promise<boolean> {
+  const errorMsg = getErrorMessage(error)
+  const toolNameMatch = errorMsg.match(/tool[:\s]+["']?([a-z0-9_-]+)["']?/i)
+  const toolName = toolNameMatch?.[1] ?? "unknown"
+
+  let parts = failedAssistantMsg.parts || []
+  if (parts.length === 0 && failedAssistantMsg.info?.id) {
+    const storedParts = readParts(failedAssistantMsg.info.id)
+    parts = storedParts.map((p) => ({
+      type: p.type === "tool" ? "tool_use" : p.type,
+      id: "callID" in p ? (p as { callID?: string }).callID : p.id,
+      name: "tool" in p ? (p as { tool?: string }).tool : undefined,
+    }))
+  }
+
+  const invalidToolUse = parts.find(
+    (p) => p.type === "tool_use" && "name" in p && p.name === toolName
+  )
+
+  if (!invalidToolUse || !("id" in invalidToolUse)) {
+    return false
+  }
+
+  const toolResultPart = {
+    type: "tool_result" as const,
+    tool_use_id: invalidToolUse.id,
+    content: `Error: Tool '${toolName}' does not exist. The model attempted to use a tool that is not available. This may indicate the model hallucinated the tool name or the tool was recently removed.`,
+  }
+
+  try {
+    await client.session.prompt({
+      path: { id: sessionID },
+      // @ts-expect-error - SDK types may not include tool_result parts
+      body: { parts: [toolResultPart] },
+    })
+
+    return true
+  } catch {
+    return false
+  }
 }
 
 const PLACEHOLDER_TEXT = "[user interrupted]"
@@ -369,11 +426,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        tool_not_found: "Invalid Tool Recovery",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        tool_not_found: "Handling invalid tool call...",
       }
 
       await ctx.client.tui
@@ -405,6 +464,8 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
           await resumeSession(ctx.client, resumeConfig)
         }
+      } else if (errorType === "tool_not_found") {
+        success = await recoverToolNotFound(ctx.client, sessionID, failedMsg, info.error)
       }
 
       return success
