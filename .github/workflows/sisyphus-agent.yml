@@ -229,39 +229,41 @@ jobs:
         id: context
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMENT_BODY: ${{ github.event.comment.body || github.event.review.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login || github.event.review.user.login }}
+          COMMENT_ID_VAL: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
         run: |
-          EVENT="${{ github.event_name }}"
-
-          if [[ "$EVENT" == "issue_comment" ]]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-            COMMENT="${{ github.event.comment.body }}"
-            AUTHOR="${{ github.event.comment.user.login }}"
-            COMMENT_ID="${{ github.event.comment.id }}"
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            ISSUE_NUM="$ISSUE_NUMBER"
+            AUTHOR="$COMMENT_AUTHOR"
+            COMMENT_ID="$COMMENT_ID_VAL"
 
             # Check if PR or Issue
-            if gh api "repos/${{ github.repository }}/issues/${ISSUE_NUM}" | jq -e '.pull_request' > /dev/null; then
+            if gh api "repos/$REPO/issues/${ISSUE_NUM}" | jq -e '.pull_request' > /dev/null; then
               echo "type=pr" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             else
               echo "type=issue" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             fi
-          elif [[ "$EVENT" == "pull_request_review_comment" ]]; then
+          elif [[ "$EVENT_NAME" == "pull_request_review_comment" ]]; then
             echo "type=pr" >> $GITHUB_OUTPUT
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-            COMMENT="${{ github.event.comment.body }}"
-            AUTHOR="${{ github.event.comment.user.login }}"
-            COMMENT_ID="${{ github.event.comment.id }}"
-          elif [[ "$EVENT" == "pull_request_review" ]]; then
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            AUTHOR="$COMMENT_AUTHOR"
+            COMMENT_ID="$COMMENT_ID_VAL"
+          elif [[ "$EVENT_NAME" == "pull_request_review" ]]; then
             echo "type=pr" >> $GITHUB_OUTPUT
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-            COMMENT="${{ github.event.review.body }}"
-            AUTHOR="${{ github.event.review.user.login }}"
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            AUTHOR="$COMMENT_AUTHOR"
             COMMENT_ID=""
           fi
 
           echo "comment<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMENT" >> $GITHUB_OUTPUT
+          echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "author=$AUTHOR" >> $GITHUB_OUTPUT
           echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
@@ -299,27 +301,42 @@ jobs:
       - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          USER_COMMENT: ${{ steps.context.outputs.comment }}
+          COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
+          REPO_NAME: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           export PATH="$HOME/.opencode/bin:$PATH"
 
-          PROMPT="
-          Your username is @sisyphus-dev-ai, mentioned by @${{ steps.context.outputs.author }} in ${{ github.repository }}.
+          PROMPT=$(cat <<'PROMPT_EOF'
+          Your username is @sisyphus-dev-ai, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
 
           ## Context
-          - Type: ${{ steps.context.outputs.type }}
-          - Number: #${{ steps.context.outputs.number }}
-          - Repository: ${{ github.repository }}
-          - Default Branch: ${{ github.event.repository.default_branch }}
+          - Type: TYPE_PLACEHOLDER
+          - Number: #NUMBER_PLACEHOLDER
+          - Repository: REPO_PLACEHOLDER
+          - Default Branch: BRANCH_PLACEHOLDER
 
           ## User's Request
-          ${{ steps.context.outputs.comment }}
+          COMMENT_PLACEHOLDER
 
           ---
 
-          First, acknowledge with \`gh issue comment ${{ steps.context.outputs.number }} --body \"👋 Hey @${{ steps.context.outputs.author }}! I'm on it...\"\`
+          First, acknowledge with `gh issue comment NUMBER_PLACEHOLDER --body "👋 Hey @AUTHOR_PLACEHOLDER! I'm on it..."`
 
           Then write everything using the todo tools.
-          Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessivley then create a PR to \`${{ github.event.repository.default_branch }}\` branch."
+          Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessivley then create a PR to `BRANCH_PLACEHOLDER` branch.
+          PROMPT_EOF
+          )
+
+          PROMPT="${PROMPT//AUTHOR_PLACEHOLDER/$COMMENT_AUTHOR}"
+          PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
+          PROMPT="${PROMPT//TYPE_PLACEHOLDER/$CONTEXT_TYPE}"
+          PROMPT="${PROMPT//NUMBER_PLACEHOLDER/$CONTEXT_NUMBER}"
+          PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
+          PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
 
           bun run dist/cli/index.js run "$PROMPT"
 
