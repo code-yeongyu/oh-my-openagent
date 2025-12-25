@@ -21,6 +21,13 @@ import { grep } from "./grep"
 import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 
+import {
+  session_list,
+  session_read,
+  session_search,
+  session_info,
+} from "./session-manager"
+
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { getTmuxPath } from "./interactive-bash/utils"
 
@@ -63,4 +70,8 @@ export const builtinTools = {
   grep,
   glob,
   slashcommand,
+  session_list,
+  session_read,
+  session_search,
+  session_info,
 }
