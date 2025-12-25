@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 import { Command } from "commander"
 import { install } from "./install"
+import { run } from "./run"
 import type { InstallArgs } from "./types"
+import type { RunOptions } from "./run"
 
 const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
@@ -41,6 +43,33 @@ Model Providers:
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
+    process.exit(exitCode)
+  })
+
+program
+  .command("run <message>")
+  .description("Run opencode with todo/background task completion enforcement")
+  .option("-a, --agent <name>", "Agent to use (default: Sisyphus)")
+  .option("-d, --directory <path>", "Working directory")
+  .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode run "Fix the bug in index.ts"
+  $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
+  $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
+
+Unlike 'opencode run', this command waits until:
+  - All todos are completed or cancelled
+  - All child sessions (background tasks) are idle
+`)
+  .action(async (message: string, options) => {
+    const runOptions: RunOptions = {
+      message,
+      agent: options.agent,
+      directory: options.directory,
+      timeout: options.timeout,
+    }
+    const exitCode = await run(runOptions)
     process.exit(exitCode)
   })
 
