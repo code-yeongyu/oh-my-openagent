@@ -16,7 +16,7 @@ export const session_list = tool({
     from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
     to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
   },
-  execute: async (args: SessionListArgs) => {
+  execute: async (args: SessionListArgs, _context) => {
     try {
       let sessions = getAllSessions()
 
@@ -43,7 +43,7 @@ export const session_read = tool({
     include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
     limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all)"),
   },
-  execute: async (args: SessionReadArgs) => {
+  execute: async (args: SessionReadArgs, _context) => {
     try {
       if (!sessionExists(args.session_id)) {
         return `Session not found: ${args.session_id}`
@@ -72,7 +72,7 @@ export const session_search = tool({
     case_sensitive: tool.schema.boolean().optional().describe("Case-sensitive search (default: false)"),
     limit: tool.schema.number().optional().describe("Maximum number of results to return (default: 20)"),
   },
-  execute: async (args: SessionSearchArgs) => {
+  execute: async (args: SessionSearchArgs, _context) => {
     try {
       const sessions = args.session_id ? [args.session_id] : getAllSessions()
 
@@ -92,7 +92,7 @@ export const session_info = tool({
   args: {
     session_id: tool.schema.string().describe("Session ID to inspect"),
   },
-  execute: async (args: SessionInfoArgs) => {
+  execute: async (args: SessionInfoArgs, _context) => {
     try {
       const info = getSessionInfo(args.session_id)
 
