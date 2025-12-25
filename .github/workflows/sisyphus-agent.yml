@@ -243,6 +243,27 @@ jobs:
           gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
             -X POST -f content="eyes" || true
 
+      - name: Add working label
+        if: steps.context.outputs.number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh label create "sisyphus: working" \
+            --repo "${{ github.repository }}" \
+            --color "fcf2e1" \
+            --description "Sisyphus is currently working on this" \
+            --force || true
+          
+          if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+            gh pr edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          else
+            gh issue edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          fi
+
       - name: Run OpenCode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
@@ -286,19 +307,30 @@ jobs:
             git push origin "$BRANCH" || true
           fi
 
-      # Remove :eyes:, add :+1:
-      - name: Update reaction
-        if: always() && steps.context.outputs.comment_id != ''
+      - name: Update reaction and remove label
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          # Remove eyes
-          REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
-            --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
-          if [[ -n "$REACTION_ID" ]]; then
-            gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+          if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
+            REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
+            if [[ -n "$REACTION_ID" ]]; then
+              gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+            fi
+
+            gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              -X POST -f content="+1" || true
           fi
 
-          # Add thumbs up
-          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
-            -X POST -f content="+1" || true
+          if [[ -n "${{ steps.context.outputs.number }}" ]]; then
+            if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+              gh pr edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            else
+              gh issue edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            fi
+          fi
