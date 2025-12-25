@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "tsanva",
+      "id": 54318170,
+      "comment_id": 3690638858,
+      "created_at": "2025-12-25T00:15:18Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 210
+    }
+  ]
 }
