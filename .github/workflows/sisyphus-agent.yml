@@ -71,7 +71,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      # Install OpenCode + oh-my-opencode + auth in single step
+      # Build local oh-my-opencode
+      - name: Build oh-my-opencode
+        run: |
+          bun install
+          bun run build
+
+      # Install OpenCode + configure local plugin + auth in single step
       - name: Setup OpenCode with oh-my-opencode
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
@@ -89,12 +95,19 @@ jobs:
                 bash /tmp/opencode-install.sh && break
               fi
               echo "Download corrupted, retrying in 5s..."
-              sleep 5
             done
           fi
           opencode --version
 
-          bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=no --gemini=no
+          # Run local oh-my-opencode install (uses built dist)
+          bun run dist/cli/index.js install --no-tui --claude=max20 --chatgpt=no --gemini=no
+
+          # Override plugin to use local file reference
+          OPENCODE_JSON=~/.config/opencode/opencode.json
+          REPO_PATH=$(pwd)
+          jq --arg path "file://$REPO_PATH/src/index.ts" '
+            .plugin = [.plugin[] | select(. != "oh-my-opencode")] + [$path]
+          ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
 
           OPENCODE_JSON=~/.config/opencode/opencode.json
           jq --arg baseURL "$ANTHROPIC_BASE_URL" --arg apiKey "$ANTHROPIC_API_KEY" '
@@ -264,7 +277,7 @@ jobs:
               --add-label "sisyphus: working" || true
           fi
 
-      - name: Run OpenCode
+      - name: Run oh-my-opencode
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -289,7 +302,7 @@ jobs:
           Then write everything using the todo tools.
           Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessivley then create a PR to \`${{ github.event.repository.default_branch }}\` branch."
 
-          opencode run "$PROMPT"
+          bun run dist/cli/index.js run "$PROMPT"
 
       # Push changes (as sisyphus-dev-ai)
       - name: Push changes
