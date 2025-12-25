@@ -61,6 +61,8 @@ No stupid token consumption massive subagents here. No bloat tools here.
 
 > "Oh My Opencode is king of the hill and has no contenders" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
+> "Isn't the name Sisyphus itself beautiful?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
+
 ---
 
 ## Contents

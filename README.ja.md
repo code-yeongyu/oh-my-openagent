@@ -56,6 +56,8 @@
 
 > "Oh My Opencodeは頂点に立っています、敵はいません" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
+> "シジフォスという名前自体が美しいじゃないですか?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
+
 ---
 
 ## 目次

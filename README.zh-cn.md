@@ -58,6 +58,8 @@
 
 > "Oh My Opencode 独孤求败，没有对手" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
+> "西西弗斯这个名字本身不就很美吗?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
+
 ---
 
 ## 目录
