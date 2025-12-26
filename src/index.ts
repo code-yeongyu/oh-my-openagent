@@ -23,6 +23,7 @@ import {
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
   createEmptyMessageSanitizerHook,
+  createThinkingBlockValidatorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -319,6 +320,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const emptyMessageSanitizer = isHookEnabled("empty-message-sanitizer")
     ? createEmptyMessageSanitizerHook()
     : null;
+  const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
+    ? createThinkingBlockValidatorHook()
+    : null;
 
   const backgroundManager = new BackgroundManager(ctx);
 
@@ -365,6 +369,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       input: Record<string, never>,
       output: { messages: Array<{ info: unknown; parts: unknown[] }> }
     ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await thinkingBlockValidator?.["experimental.chat.messages.transform"]?.(input, output as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output as any);
     },
