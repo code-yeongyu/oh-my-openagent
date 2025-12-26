@@ -901,11 +901,15 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
   - [修复 PR](https://github.com/sst/opencode/pull/5040) 在 1.0.132 之后才合进去——请用新版本。
     - 花絮：这 bug 也是靠 OhMyOpenCode 的 Librarian、Explore、Oracle 配合发现并修好的。
 
-*感谢 [@junhoyeo](https://github.com/junhoyeo) 制作了这张超帅的 hero 图。*
-
 ## 以下企业的专业人士都在用
 
 - [Indent](https://indentcorp.com)
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+
+## 赞助者
+- **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
+  - 第一位赞助者
+
+*感谢 [@junhoyeo](https://github.com/junhoyeo) 制作了这张超帅的 hero 图。*
