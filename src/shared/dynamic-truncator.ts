@@ -112,7 +112,10 @@ export async function getContextWindowUsage(
 
     const lastAssistant = assistantMessages[assistantMessages.length - 1]
     const lastTokens = lastAssistant.tokens
-    const usedTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
+    const usedTokens =
+      (lastTokens?.input ?? 0) +
+      (lastTokens?.cache?.read ?? 0) +
+      (lastTokens?.output ?? 0)
     const remainingTokens = ANTHROPIC_ACTUAL_LIMIT - usedTokens
 
     return {
