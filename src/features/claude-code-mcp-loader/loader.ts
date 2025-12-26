@@ -1,6 +1,6 @@
 import { existsSync } from "fs"
-import { homedir } from "os"
 import { join } from "path"
+import { getClaudeConfigDir } from "../../shared"
 import type {
   ClaudeCodeMcpConfig,
   LoadedMcpServer,
@@ -16,11 +16,11 @@ interface McpConfigPath {
 }
 
 function getMcpConfigPaths(): McpConfigPath[] {
-  const home = homedir()
+  const claudeConfigDir = getClaudeConfigDir()
   const cwd = process.cwd()
 
   return [
-    { path: join(home, ".claude", ".mcp.json"), scope: "user" },
+    { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
     { path: join(cwd, ".mcp.json"), scope: "project" },
     { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
   ]

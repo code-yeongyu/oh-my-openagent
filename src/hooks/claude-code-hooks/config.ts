@@ -1,6 +1,6 @@
-import { homedir } from "os"
 import { join } from "path"
 import { existsSync } from "fs"
+import { getClaudeConfigDir } from "../../shared"
 import type { ClaudeHooksConfig, HookMatcher, HookCommand } from "./types"
 
 interface RawHookMatcher {
@@ -44,9 +44,9 @@ function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
 }
 
 export function getClaudeSettingsPaths(customPath?: string): string[] {
-  const home = homedir()
+  const claudeConfigDir = getClaudeConfigDir()
   const paths = [
-    join(home, ".claude", "settings.json"),
+    join(claudeConfigDir, "settings.json"),
     join(process.cwd(), ".claude", "settings.json"),
     join(process.cwd(), ".claude", "settings.local.json"),
   ]

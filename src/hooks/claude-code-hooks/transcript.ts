@@ -1,15 +1,12 @@
-/**
- * Transcript Manager
- * Creates and manages Claude Code compatible transcript files
- */
 import { join } from "path"
 import { mkdirSync, appendFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
-import { homedir, tmpdir } from "os"
+import { tmpdir } from "os"
 import { randomUUID } from "crypto"
 import type { TranscriptEntry } from "./types"
 import { transformToolName } from "../../shared/tool-name"
+import { getClaudeConfigDir } from "../../shared"
 
-const TRANSCRIPT_DIR = join(homedir(), ".claude", "transcripts")
+const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 
 export function getTranscriptPath(sessionId: string): string {
   return join(TRANSCRIPT_DIR, `${sessionId}.jsonl`)
