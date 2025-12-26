@@ -4,10 +4,11 @@
     "specify",
     "plan",
     "tasks",
-    "implement"
+    "implement",
+    "review"
   ],
   "artifactHashes": {
-    "spec.md": "9ea7138cf763d121",
+    "spec.md": "e41465298aff497f",
     "plan.md": "914c56511c01b981",
     "tasks.md": "cf0c877d7a503752",
     "status.md": "00acad3e96323d98"
@@ -15,6 +16,6 @@
   "linearIssueId": null,
   "linearStatus": "in_review",
   "createdAt": "2025-12-23T01:49:09.202Z",
-  "updatedAt": "2025-12-26T00:29:58.137Z",
+  "updatedAt": "2025-12-26T00:56:25.050Z",
   "lastCommand": "/review"
 }
