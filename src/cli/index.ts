@@ -2,8 +2,10 @@
 import { Command } from "commander"
 import { install } from "./install"
 import { run } from "./run"
+import { getLocalVersion } from "./get-local-version"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
+import type { GetLocalVersionOptions } from "./get-local-version/types"
 
 const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
@@ -70,6 +72,32 @@ Unlike 'opencode run', this command waits until:
       timeout: options.timeout,
     }
     const exitCode = await run(runOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("get-local-version")
+  .description("Show current installed version and check for updates")
+  .option("-d, --directory <path>", "Working directory to check config from")
+  .option("--json", "Output in JSON format for scripting")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode get-local-version
+  $ bunx oh-my-opencode get-local-version --json
+  $ bunx oh-my-opencode get-local-version --directory /path/to/project
+
+This command shows:
+  - Current installed version
+  - Latest available version on npm
+  - Whether you're up to date
+  - Special modes (local dev, pinned version)
+`)
+  .action(async (options) => {
+    const versionOptions: GetLocalVersionOptions = {
+      directory: options.directory,
+      json: options.json ?? false,
+    }
+    const exitCode = await getLocalVersion(versionOptions)
     process.exit(exitCode)
   })
 
