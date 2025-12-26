@@ -896,11 +896,15 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
   - [이를 고치는 PR 이 1.0.132 배포 이후에 병합되었으므로](https://github.com/sst/opencode/pull/5040) 이 변경사항이 포함된 최신 버전을 사용해주세요.
     - TMI: PR 도 OhMyOpenCode 의 셋업의 Librarian, Explore, Oracle 을 활용하여 우연히 발견하고 해결되었습니다.
 
-*멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo) 께 감사드립니다*
-
 ## 다음 기업의 능력있는 개인들이 사용하고 있습니다
 
 - [Indent](https://indentcorp.com)
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+
+## 스폰서
+- **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
+  - 첫 번째 스폰서
+
+*멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo) 께 감사드립니다*

@@ -902,11 +902,15 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
   - [修正 PR](https://github.com/sst/opencode/pull/5040) は 1.0.132 以降にマージされたため、新しいバージョンを使用してください。
     - 余談：この PR も、OhMyOpenCode の Librarian、Explore、Oracle セットアップを活用して偶然発見され、修正されました。
 
-*素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*
-
 ## こちらの企業の専門家にご愛用いただいています
 
 - [Indent](https://indentcorp.com)
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+
+## スポンサー
+- **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
+  - 最初のスポンサー
+
+*素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*
