@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { homedir } from "os"
 import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
+import { getClaudeConfigDir } from "../../shared"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
 
 function loadCommandsFromDir(commandsDir: string, scope: CommandScope): LoadedCommand[] {
@@ -68,7 +68,7 @@ function commandsToRecord(commands: LoadedCommand[]): Record<string, CommandDefi
 }
 
 export function loadUserCommands(): Record<string, CommandDefinition> {
-  const userCommandsDir = join(homedir(), ".claude", "commands")
+  const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const commands = loadCommandsFromDir(userCommandsDir, "user")
   return commandsToRecord(commands)
 }
@@ -80,6 +80,7 @@ export function loadProjectCommands(): Record<string, CommandDefinition> {
 }
 
 export function loadOpencodeGlobalCommands(): Record<string, CommandDefinition> {
+  const { homedir } = require("os")
   const opencodeCommandsDir = join(homedir(), ".config", "opencode", "command")
   const commands = loadCommandsFromDir(opencodeCommandsDir, "opencode")
   return commandsToRecord(commands)

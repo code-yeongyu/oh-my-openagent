@@ -1,9 +1,9 @@
 import { tool } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { homedir } from "os"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
 import { isMarkdownFile } from "../../shared/file-utils"
+import { getClaudeConfigDir } from "../../shared"
 import type { CommandScope, CommandMetadata, CommandInfo } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -50,7 +50,8 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 }
 
 function discoverCommandsSync(): CommandInfo[] {
-  const userCommandsDir = join(homedir(), ".claude", "commands")
+  const { homedir } = require("os")
+  const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
   const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
   const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
@@ -145,7 +146,7 @@ Commands are loaded from (priority order, highest wins):
 - .opencode/command/ (opencode-project - OpenCode project-specific commands)
 - ./.claude/commands/ (project - Claude Code project-specific commands)
 - ~/.config/opencode/command/ (opencode - OpenCode global commands)
-- ~/.claude/commands/ (user - Claude Code global commands)
+- $CLAUDE_CONFIG_DIR/commands/ or ~/.claude/commands/ (user - Claude Code global commands)
 
 Each command is a markdown file with:
 - YAML frontmatter: description, argument-hint, model, agent, subtask (optional)

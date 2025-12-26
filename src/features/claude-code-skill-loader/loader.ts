@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { homedir } from "os"
 import { join } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlink } from "../../shared/file-utils"
+import { getClaudeConfigDir } from "../../shared"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkillAsCommand } from "./types"
 
@@ -68,7 +68,7 @@ $ARGUMENTS
 }
 
 export function loadUserSkillsAsCommands(): Record<string, CommandDefinition> {
-  const userSkillsDir = join(homedir(), ".claude", "skills")
+  const userSkillsDir = join(getClaudeConfigDir(), "skills")
   const skills = loadSkillsFromDir(userSkillsDir, "user")
   return skills.reduce((acc, skill) => {
     acc[skill.name] = skill.definition
