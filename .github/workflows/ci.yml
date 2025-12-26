@@ -120,15 +120,19 @@ jobs:
             echo "Updating existing draft release..."
             gh release edit next \
               --title "Upcoming Changes 🍿" \
-              --notes "${{ steps.notes.outputs.notes }}" \
-              --draft
+              --notes-file - \
+              --draft <<'EOF'
+          ${{ steps.notes.outputs.notes }}
+          EOF
           else
             echo "Creating new draft release..."
             gh release create next \
               --title "Upcoming Changes 🍿" \
-              --notes "${{ steps.notes.outputs.notes }}" \
+              --notes-file - \
               --draft \
-              --target ${{ github.sha }}
+              --target ${{ github.sha }} <<'EOF'
+          ${{ steps.notes.outputs.notes }}
+          EOF
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
