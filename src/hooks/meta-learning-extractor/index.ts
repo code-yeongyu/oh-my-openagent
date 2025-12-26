@@ -47,6 +47,7 @@ export function createMetaLearningExtractorHook(
 ) {
   const config: MetaLearningExtractorConfig = { ...DEFAULT_CONFIG, ...userConfig }
   const state = createHookState()
+  const idleDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const resetDailyBudgetIfNeeded = () => {
     const today = new Date().toISOString().split("T")[0]
@@ -197,6 +198,11 @@ export function createMetaLearningExtractorHook(
       const sessionInfo = props.info as { id?: string } | undefined
       if (sessionInfo?.id) {
         state.sessions.delete(sessionInfo.id)
+        const timer = idleDebounceTimers.get(sessionInfo.id)
+        if (timer) {
+          clearTimeout(timer)
+          idleDebounceTimers.delete(sessionInfo.id)
+        }
       }
       return
     }
@@ -205,7 +211,17 @@ export function createMetaLearningExtractorHook(
       const sessionId = props.sessionID as string | undefined
       if (!sessionId) return
 
-      await triggerExtraction(sessionId, "idle")
+      const existingTimer = idleDebounceTimers.get(sessionId)
+      if (existingTimer) {
+        clearTimeout(existingTimer)
+      }
+
+      const timer = setTimeout(async () => {
+        idleDebounceTimers.delete(sessionId)
+        await triggerExtraction(sessionId, "idle")
+      }, config.idleDebounceMs)
+      
+      idleDebounceTimers.set(sessionId, timer)
       return
     }
 
@@ -307,8 +323,15 @@ INSTRUCTIONS:
    - **Scope**: [when this applies]
    - **Evidence**: [conversation excerpts]
    - **Suggested Improvement**: [actionable change]
-   - **Affected Files**: [file paths]
-   \`\`\`
+    - **Affected Files**: [file paths]
+    
+    ## Extraction Notes
+    - Total Candidates: [count]
+    - High Confidence (>0.8): [count]
+    - Medium Confidence (0.5-0.8): [count]  
+    - Low Confidence (<0.5): [count]
+    - Estimated Cost: ~$0.01 (Gemini 2.5 Flash)
+    \`\`\`
 
 Execute now. Use the memory tools to write the output file.`
 }

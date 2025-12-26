@@ -9,75 +9,75 @@
       "model": "anthropic/claude-opus-4-5"
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "anthropic/claude-opus-4-5",
       "temperature": 0.1,
       "reasoning_effort": "high"
     },
     "librarian": {
-      "model": "opencode/grok-code",
+      "model": "anthropic/claude-opus-4-5",
       "temperature": 0.1
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "anthropic/claude-opus-4-5",
       "temperature": 0.1
     },
     "frontend-ui-ux-engineer": {
-      "model": "google/gemini-3-pro-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "document-writer": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash-preview",
       "temperature": 0.1
     },
     "product-strategist": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-opus-4-5"
     },
     "strategic-planner": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-opus-4-5"
     },
     "task-planner": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-opus-4-5"
     },
     "implementation-specialist": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "backend-typescript": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "frontend-react": {
-      "model": "google/gemini-3-pro-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "backend-rust": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "backend-python": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "mobile-xcode": {
-      "model": "google/gemini-3-pro-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "mobile-react-native": {
-      "model": "google/gemini-3-pro-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "ai-ml-expert": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "agent-specialist": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "security-specialist": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "test-specialist": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "optimization-specialist": {
-      "model": "google/gemini-3-flash-preview"
+      "model": "anthropic/claude-opus-4-5"
     },
     "docs-publisher": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-opus-4-5"
     }
   }
 }

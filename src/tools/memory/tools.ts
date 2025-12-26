@@ -114,7 +114,16 @@ export const memory_edit = tool({
       let newContent: string
       
       if (args.mode === "regex") {
-        const regex = new RegExp(args.needle, "g")
+        let regex: RegExp
+        try {
+          regex = new RegExp(args.needle, "g")
+        } catch (e) {
+          const result: MemoryToolResult = { 
+            success: false, 
+            error: `Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}` 
+          }
+          return JSON.stringify(result, null, 2)
+        }
         newContent = content.replace(regex, args.replacement)
       } else {
         newContent = content.split(args.needle).join(args.replacement)

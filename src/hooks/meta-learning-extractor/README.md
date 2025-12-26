@@ -12,13 +12,13 @@ Extracts meta-learnings from sessions to enable self-improving orchestration. Mo
 
 ## Signal Scoring System
 
-The hook monitors session activity and assigns points based on conversation quality. Extraction is triggered when the total score reaches the **25 point** threshold.
+The hook monitors session activity and assigns points based on conversation quality. Extraction is triggered when the total score reaches the **3 point** threshold (configurable).
 
 | Signal Type | Points | Examples |
 |-------------|--------|----------|
-| **Strong** | +15-20 | Debugging loops, architecture discussions, multi-agent coordination |
-| **Medium** | +5-10 | Refactoring, config changes, complex tool chains |
-| **Weak** | +2-3 | File modifications, code review patterns |
+| **Strong** | +3 | Memory file edits, shared utilities, architecture changes, cross-file refactoring |
+| **Medium** | +2 | Decision language, pattern identification, cross-file impact |
+| **Weak** | +1 | New file types, config changes, dependency changes |
 
 ### Vetoes
 Extractions are automatically suppressed for:
@@ -33,6 +33,12 @@ Extractions are automatically suppressed for:
 | **Daily Budget** | $0.10 USD | Maximum daily spend across all sessions |
 | **Cooldown** | 30 minutes | Minimum time between extractions per session |
 | **Extraction Cost** | ~$0.01 | Estimated cost per analysis task |
+
+## Limitations
+
+| Limitation | Description | Workaround |
+|------------|-------------|------------|
+| **Budget Reset on Reload** | Daily budget counter resets when the plugin reloads | Budget is per-session; will be persisted in future version |
 
 ## Output
 
@@ -65,7 +71,7 @@ Configure via `oh-my-opencode.json`:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | `true` | Enable or disable the hook |
-| `signalThreshold` | `25` | Score required to trigger extraction |
+| `signalThreshold` | `3` | Score required to trigger extraction |
 | `cooldownMinutes` | `30` | Minutes to wait between extractions |
 | `dailyBudgetUsd` | `0.10` | Maximum daily spend (USD) |
 | `maxCandidatesPerSession` | `3` | Max learnings to extract per run |

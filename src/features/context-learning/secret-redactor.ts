@@ -10,7 +10,7 @@ const SECRET_PATTERNS: Array<{ pattern: RegExp; type: string }> = [
   { pattern: /-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----/g, type: "private_key" },
   { pattern: /(?:mongodb(?:\+srv)?|postgres|mysql|redis):\/\/[^\s]+/gi, type: "db_connection" },
   { pattern: /AKIA[0-9A-Z]{16}/g, type: "aws_access_key" },
-  { pattern: /[A-Za-z0-9/+=]{40}(?=\s|$)/g, type: "aws_secret_key" },
+  { pattern: /(?:aws[_-]?secret[_-]?(?:access[_-]?)?key|secret[_-]?key)\s*[:=]\s*["']?[A-Za-z0-9/+=]{40}["']?/gi, type: "aws_secret_key" },
 ]
 
 export function redactSecrets(content: string): RedactionResult {

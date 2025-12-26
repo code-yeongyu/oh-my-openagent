@@ -213,15 +213,15 @@ And /review-learnings shows aggregate cost metrics
 - **Purpose**: Provide memory management without requiring Serena MCP installation
 - **Location**: `src/tools/memory/` (follows standard tool structure)
 - **Tool Names**:
-  | Canonical Name | Serena Alias | Function |
-  |----------------|--------------|----------|
-  | `omo_write_memory` | `write_memory`* | Write content to memory file |
-  | `omo_read_memory` | `read_memory`* | Read content from memory file |
-  | `omo_edit_memory` | `edit_memory`* | Edit content via regex/literal replace |
-  | `omo_list_memories` | `list_memories`* | List all memory files |
-  | `omo_delete_memory` | `delete_memory`* | Delete a memory file |
+  | Canonical Name | Function |
+  |----------------|----------|
+  | `memory_write` | Write content to memory file |
+  | `memory_read` | Read content from memory file |
+  | `memory_edit` | Edit content via regex/literal replace |
+  | `memory_list` | List all memory files |
+  | `memory_delete` | Delete a memory file |
   
-  *Serena aliases only registered if `memory.registerSerenaAliases: true`
+  Note: Simplified naming convention for better ergonomics.
   
 - **Enhancements over Serena**:
   - Configurable storage path (default: `.cursor/memory/`, aligns with `/update-context`)
