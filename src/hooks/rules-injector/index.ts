@@ -15,6 +15,7 @@ import {
   loadInjectedRules,
   saveInjectedRules,
 } from "./storage";
+import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 
 interface ToolExecuteInput {
   tool: string;
@@ -59,6 +60,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     { contentHashes: Set<string>; realPaths: Set<string> }
   >();
   const pendingBatchFiles = new Map<string, string[]>();
+  const truncator = createDynamicTruncator(ctx);
 
   function getSessionCache(sessionID: string): {
     contentHashes: Set<string>;
@@ -76,11 +78,11 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     return resolve(ctx.directory, path);
   }
 
-  function processFilePathForInjection(
+  async function processFilePathForInjection(
     filePath: string,
     sessionID: string,
     output: ToolExecuteOutput
-  ): void {
+  ): Promise<void> {
     const resolved = resolveFilePath(filePath);
     if (!resolved) return;
 
@@ -125,7 +127,11 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     toInject.sort((a, b) => a.distance - b.distance);
 
     for (const rule of toInject) {
-      output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${rule.content}`;
+      const { result, truncated } = await truncator.truncate(sessionID, rule.content);
+      const truncationNotice = truncated
+        ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${rule.relativePath}]`
+        : "";
+      output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
     }
 
     saveInjectedRules(sessionID, cache);
@@ -167,7 +173,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     const toolName = input.tool.toLowerCase();
 
     if (TRACKED_TOOLS.includes(toolName)) {
-      processFilePathForInjection(output.title, input.sessionID, output);
+      await processFilePathForInjection(output.title, input.sessionID, output);
       return;
     }
 
@@ -175,7 +181,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
       const filePaths = pendingBatchFiles.get(input.callID);
       if (filePaths) {
         for (const filePath of filePaths) {
-          processFilePathForInjection(filePath, input.sessionID, output);
+          await processFilePathForInjection(filePath, input.sessionID, output);
         }
         pendingBatchFiles.delete(input.callID);
       }

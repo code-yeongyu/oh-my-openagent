@@ -7,6 +7,7 @@ import {
   clearInjectedPaths,
 } from "./storage";
 import { AGENTS_FILENAME } from "./constants";
+import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 
 interface ToolExecuteInput {
   tool: string;
@@ -39,6 +40,7 @@ interface EventInput {
 export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
   const sessionCaches = new Map<string, Set<string>>();
   const pendingBatchReads = new Map<string, string[]>();
+  const truncator = createDynamicTruncator(ctx);
 
   function getSessionCache(sessionID: string): Set<string> {
     if (!sessionCaches.has(sessionID)) {
@@ -73,11 +75,11 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
     return found.reverse();
   }
 
-  function processFilePathForInjection(
+  async function processFilePathForInjection(
     filePath: string,
     sessionID: string,
     output: ToolExecuteOutput,
-  ): void {
+  ): Promise<void> {
     const resolved = resolveFilePath(filePath);
     if (!resolved) return;
 
@@ -91,7 +93,11 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
 
       try {
         const content = readFileSync(agentsPath, "utf-8");
-        output.output += `\n\n[Directory Context: ${agentsPath}]\n${content}`;
+        const { result, truncated } = await truncator.truncate(sessionID, content);
+        const truncationNotice = truncated
+          ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${agentsPath}]`
+          : "";
+        output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
         cache.add(agentsDir);
       } catch {}
     }
@@ -127,7 +133,7 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
     const toolName = input.tool.toLowerCase();
 
     if (toolName === "read") {
-      processFilePathForInjection(output.title, input.sessionID, output);
+      await processFilePathForInjection(output.title, input.sessionID, output);
       return;
     }
 
@@ -135,7 +141,7 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
       const filePaths = pendingBatchReads.get(input.callID);
       if (filePaths) {
         for (const filePath of filePaths) {
-          processFilePathForInjection(filePath, input.sessionID, output);
+          await processFilePathForInjection(filePath, input.sessionID, output);
         }
         pendingBatchReads.delete(input.callID);
       }
