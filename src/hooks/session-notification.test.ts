@@ -1,16 +1,20 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import * as utils from "./session-notification-utils"
 
 describe("session-notification", () => {
   let notificationCalls: string[]
 
   function createMockPluginInput() {
     return {
-      $: async (cmd: TemplateStringsArray | string) => {
+      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
         // #given - track notification commands (osascript, notify-send, powershell)
-        const cmdStr = typeof cmd === "string" ? cmd : cmd.join("")
+        const cmdStr = typeof cmd === "string" 
+          ? cmd 
+          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
+        
         if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
           notificationCalls.push(cmdStr)
         }
@@ -26,8 +30,15 @@ describe("session-notification", () => {
   }
 
   beforeEach(() => {
-    // #given - reset state before each test
     notificationCalls = []
+    
+    spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
+    spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
+    spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
+    spyOn(utils, "getAfplayPath").mockResolvedValue("/usr/bin/afplay")
+    spyOn(utils, "getPaplayPath").mockResolvedValue("/usr/bin/paplay")
+    spyOn(utils, "getAplayPath").mockResolvedValue("/usr/bin/aplay")
+    spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
   })
 
   afterEach(() => {
