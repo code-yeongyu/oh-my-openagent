@@ -21,13 +21,28 @@ export interface PluginInstallation {
 }
 
 /**
+ * Installed plugins database v1 (legacy)
+ * plugins stored as direct objects
+ */
+export interface InstalledPluginsDatabaseV1 {
+  version: 1
+  plugins: Record<string, PluginInstallation>
+}
+
+/**
+ * Installed plugins database v2 (current)
+ * plugins stored as arrays
+ */
+export interface InstalledPluginsDatabaseV2 {
+  version: 2
+  plugins: Record<string, PluginInstallation[]>
+}
+
+/**
  * Installed plugins database structure
  * Located at ~/.claude/plugins/installed_plugins.json
  */
-export interface InstalledPluginsDatabase {
-  version: number
-  plugins: Record<string, PluginInstallation[]>
-}
+export type InstalledPluginsDatabase = InstalledPluginsDatabaseV1 | InstalledPluginsDatabaseV2
 
 /**
  * Plugin author information
