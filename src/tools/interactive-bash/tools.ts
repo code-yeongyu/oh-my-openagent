@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 import { getCachedTmuxPath } from "./utils"
 
@@ -47,7 +47,7 @@ export function tokenizeCommand(cmd: string): string[] {
   return tokens
 }
 
-export const interactive_bash = tool({
+export const interactive_bash: ToolDefinition = tool({
   description: INTERACTIVE_BASH_DESCRIPTION,
   args: {
     tmux_command: tool.schema.string().describe("The tmux command to execute (without 'tmux' prefix)"),

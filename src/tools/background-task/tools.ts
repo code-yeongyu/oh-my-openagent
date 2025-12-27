@@ -1,4 +1,4 @@
-import { tool, type PluginInput } from "@opencode-ai/plugin"
+import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
@@ -37,7 +37,7 @@ function formatDuration(start: Date, end?: Date): string {
   }
 }
 
-export function createBackgroundTask(manager: BackgroundManager) {
+export function createBackgroundTask(manager: BackgroundManager): ToolDefinition {
   return tool({
     description: BACKGROUND_TASK_DESCRIPTION,
     args: {
@@ -217,7 +217,7 @@ Session ID: ${task.sessionID}
 ${textContent || "(No text output)"}`
 }
 
-export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient) {
+export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
@@ -283,7 +283,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
   })
 }
 
-export function createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient) {
+export function createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient): ToolDefinition {
   return tool({
     description: BACKGROUND_CANCEL_DESCRIPTION,
     args: {

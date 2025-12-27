@@ -1340,6 +1340,18 @@
         },
         "hooks": {
           "type": "boolean"
+        },
+        "plugins": {
+          "type": "boolean"
+        },
+        "plugins_override": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
         }
       }
     },
