@@ -4,12 +4,18 @@ import {
   LINEAR_BRANCH_DESCRIPTION,
   LINEAR_UPDATE_STATUS_DESCRIPTION,
   LINEAR_CREATE_ISSUE_DESCRIPTION,
+  LINEAR_ARCHIVE_ISSUE_DESCRIPTION,
+  LINEAR_GET_ISSUE_DESCRIPTION,
+  LINEAR_ADD_COMMENT_DESCRIPTION,
   DEFAULT_LINEAR_TEAM,
 } from "./constants"
 import type {
   LinearBranchResult,
   LinearUpdateStatusResult,
   LinearCreateIssueResult,
+  LinearArchiveIssueResult,
+  LinearGetIssueResult,
+  LinearAddCommentResult,
   LinearIssueStatus,
 } from "./types"
 import { STATUS_TO_STATE_TYPE } from "./types"
@@ -18,6 +24,7 @@ import {
   updateIssueState,
   createComment,
   createIssue,
+  archiveIssue,
   isLinearAvailable,
 } from "./api"
 
@@ -238,12 +245,17 @@ export function createLinearCreateIssueTool(_ctx: PluginInput) {
         .array(tool.schema.string())
         .describe("Labels to apply to the issue")
         .optional(),
+      parentId: tool.schema
+        .string()
+        .describe("Parent issue ID to create this as a sub-issue (e.g., 'LIF-123')")
+        .optional(),
     },
     async execute(args: {
       title: string
       description?: string
       team?: string
       labels?: string[]
+      parentId?: string
     }): Promise<string> {
       log(`[linear_create_issue] Creating issue: ${args.title}`)
 
@@ -263,6 +275,7 @@ export function createLinearCreateIssueTool(_ctx: PluginInput) {
           description: args.description,
           teamName: args.team || DEFAULT_LINEAR_TEAM,
           labels: args.labels,
+          parentId: args.parentId,
         })
 
         if (!createResult.success || !createResult.issue) {
@@ -275,12 +288,17 @@ export function createLinearCreateIssueTool(_ctx: PluginInput) {
           return JSON.stringify(result, null, 2)
         }
 
+        const issue = createResult.issue
+        const isSubIssue = !!issue.parent
         const result: LinearCreateIssueResult = {
           success: true,
-          issueId: createResult.issue.id,
-          issueIdentifier: createResult.issue.identifier,
-          issueUrl: createResult.issue.url,
-          message: `Created issue ${createResult.issue.identifier}: ${args.title}`,
+          issueId: issue.id,
+          issueIdentifier: issue.identifier,
+          issueUrl: issue.url,
+          parentIdentifier: issue.parent?.identifier,
+          message: isSubIssue
+            ? `Created sub-issue ${issue.identifier} under ${issue.parent?.identifier}: ${args.title}`
+            : `Created issue ${issue.identifier}: ${args.title}`,
         }
 
         log(`[linear_create_issue] Success:`, result)
@@ -292,6 +310,182 @@ export function createLinearCreateIssueTool(_ctx: PluginInput) {
         const result: LinearCreateIssueResult = {
           success: false,
           message: `Failed to create issue`,
+          error: errorMessage,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+    },
+  })
+}
+
+export function createLinearArchiveIssueTool(_ctx: PluginInput) {
+  return tool({
+    description: LINEAR_ARCHIVE_ISSUE_DESCRIPTION,
+    args: {
+      issueId: tool.schema.string().describe("Linear issue ID (e.g., 'LIF-123')"),
+    },
+    async execute(args: { issueId: string }): Promise<string> {
+      log(`[linear_archive_issue] Archiving issue: ${args.issueId}`)
+
+      if (!isLinearAvailable()) {
+        const result: LinearArchiveIssueResult = {
+          success: false,
+          issueId: args.issueId,
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
+      try {
+        const archiveResult = await archiveIssue(args.issueId)
+
+        if (!archiveResult.success) {
+          log(`[linear_archive_issue] Archive error:`, archiveResult.error)
+          const result: LinearArchiveIssueResult = {
+            success: false,
+            issueId: args.issueId,
+            message: `Failed to archive issue`,
+            error: archiveResult.error,
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const result: LinearArchiveIssueResult = {
+          success: true,
+          issueId: args.issueId,
+          message: `Archived issue ${args.issueId}`,
+        }
+
+        log(`[linear_archive_issue] Success:`, result)
+        return JSON.stringify(result, null, 2)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[linear_archive_issue] Error:`, errorMessage)
+
+        const result: LinearArchiveIssueResult = {
+          success: false,
+          issueId: args.issueId,
+          message: `Failed to archive issue`,
+          error: errorMessage,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+    },
+  })
+}
+
+export function createLinearGetIssueTool(_ctx: PluginInput) {
+  return tool({
+    description: LINEAR_GET_ISSUE_DESCRIPTION,
+    args: {
+      issueId: tool.schema.string().describe("Linear issue ID (e.g., 'LIF-123')"),
+    },
+    async execute(args: { issueId: string }): Promise<string> {
+      log(`[linear_get_issue] Getting issue: ${args.issueId}`)
+
+      if (!isLinearAvailable()) {
+        const result: LinearGetIssueResult = {
+          success: false,
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
+      try {
+        const issueResult = await getIssue(args.issueId)
+
+        if (issueResult.error || !issueResult.issue) {
+          const result: LinearGetIssueResult = {
+            success: false,
+            message: `Failed to get issue`,
+            error: issueResult.error,
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const issue = issueResult.issue
+        const result: LinearGetIssueResult = {
+          success: true,
+          issue: {
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            description: issue.description,
+            url: issue.url,
+            status: issue.state.name,
+            labels: issue.labels.nodes.map((l) => l.name),
+          },
+          message: `Found issue ${issue.identifier}: ${issue.title}`,
+        }
+
+        log(`[linear_get_issue] Success:`, result)
+        return JSON.stringify(result, null, 2)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[linear_get_issue] Error:`, errorMessage)
+
+        const result: LinearGetIssueResult = {
+          success: false,
+          message: `Failed to get issue`,
+          error: errorMessage,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+    },
+  })
+}
+
+export function createLinearAddCommentTool(_ctx: PluginInput) {
+  return tool({
+    description: LINEAR_ADD_COMMENT_DESCRIPTION,
+    args: {
+      issueId: tool.schema.string().describe("Linear issue ID (e.g., 'LIF-123')"),
+      body: tool.schema.string().describe("Comment text (Markdown supported)"),
+    },
+    async execute(args: { issueId: string; body: string }): Promise<string> {
+      log(`[linear_add_comment] Adding comment to: ${args.issueId}`)
+
+      if (!isLinearAvailable()) {
+        const result: LinearAddCommentResult = {
+          success: false,
+          issueId: args.issueId,
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
+      try {
+        const commentResult = await createComment(args.issueId, args.body)
+
+        if (!commentResult.success) {
+          const result: LinearAddCommentResult = {
+            success: false,
+            issueId: args.issueId,
+            message: `Failed to add comment`,
+            error: commentResult.error,
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const result: LinearAddCommentResult = {
+          success: true,
+          issueId: args.issueId,
+          message: `Added comment to ${args.issueId}`,
+        }
+
+        log(`[linear_add_comment] Success:`, result)
+        return JSON.stringify(result, null, 2)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[linear_add_comment] Error:`, errorMessage)
+
+        const result: LinearAddCommentResult = {
+          success: false,
+          issueId: args.issueId,
+          message: `Failed to add comment`,
           error: errorMessage,
         }
         return JSON.stringify(result, null, 2)

@@ -45,6 +45,9 @@ export {
   createLinearBranchTool,
   createLinearUpdateStatusTool,
   createLinearCreateIssueTool,
+  createLinearArchiveIssueTool,
+  createLinearGetIssueTool,
+  createLinearAddCommentTool,
 } from "./linear"
 export { createReadContextTool } from "./project-context"
 export { createSpecFolderTool, updateWorkflowStateTool } from "./spec"

@@ -190,24 +190,22 @@ Tools are automatically discovered from `.opencode/tool/` directory. Each tool s
 - Return JSON-formatted results
 - Handle errors gracefully with helpful messages
 
-### Linear MCP Requirement
-The `linear-branch` and `linear-update-status` tools require the Linear MCP to be configured in `opencode.json`:
-```json
-{
-  "mcp": {
-    "linear": {
-      "type": "remote",
-      "url": "https://mcp.linear.app/mcp",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer {env:LINEAR_API_KEY}"
-      }
-    }
-  }
-}
+### Linear API Requirement
+All Linear tools require the `LINEAR_API_KEY` environment variable:
+
+```bash
+export LINEAR_API_KEY="lin_api_xxxxxxxxxxxxx"
 ```
 
-Set the `LINEAR_API_KEY` environment variable with your Linear API key.
+Get your API key from [Linear Settings > API](https://linear.app/settings/api).
+
+Available Linear tools:
+- `linear_branch` - Get branch name for issue
+- `linear_update_status` - Update issue status
+- `linear_create_issue` - Create issue (supports sub-issues via `parentId`)
+- `linear_get_issue` - Get issue details
+- `linear_add_comment` - Add comment to issue
+- `linear_archive_issue` - Archive an issue
 
 ### Project Context Requirement
 The `read-context` tool requires a `project-context.yaml` file in `.opencode/`:

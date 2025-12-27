@@ -48,6 +48,8 @@ export interface LinearCreateIssueResult {
   issueIdentifier?: string
   /** The created issue URL */
   issueUrl?: string
+  /** Parent issue identifier if created as sub-issue */
+  parentIdentifier?: string
   /** Human-readable success message */
   message: string
   /** Error message if failed */
@@ -55,8 +57,41 @@ export interface LinearCreateIssueResult {
 }
 
 /**
- * Linear issue status options
+ * Result from linear_archive_issue tool
  */
+export interface LinearArchiveIssueResult {
+  /** Whether the operation succeeded */
+  success: boolean
+  /** The issue ID that was archived */
+  issueId: string
+  /** Human-readable success message */
+  message: string
+  /** Error message if failed */
+  error?: string
+}
+
+export interface LinearGetIssueResult {
+  success: boolean
+  issue?: {
+    id: string
+    identifier: string
+    title: string
+    description?: string
+    url: string
+    status: string
+    labels: string[]
+  }
+  message: string
+  error?: string
+}
+
+export interface LinearAddCommentResult {
+  success: boolean
+  issueId: string
+  message: string
+  error?: string
+}
+
 export type LinearIssueStatus =
   | "todo"
   | "in_progress"
