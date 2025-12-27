@@ -1,6 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
+import {
+  getOsascriptPath,
+  getNotifySendPath,
+  getPowershellPath,
+  getAfplayPath,
+  getPaplayPath,
+  getAplayPath,
+  startBackgroundCheck,
+} from "./session-notification-utils"
 
 interface Todo {
   content: string
@@ -51,15 +60,25 @@ async function sendNotification(
 ): Promise<void> {
   switch (p) {
     case "darwin": {
+      const osascriptPath = await getOsascriptPath()
+      if (!osascriptPath) return
+
       const esTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      await ctx.$`osascript -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`
+      await ctx.$`${osascriptPath} -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`.catch(() => {})
       break
     }
-    case "linux":
-      await ctx.$`notify-send ${title} ${message} 2>/dev/null`.catch(() => {})
+    case "linux": {
+      const notifySendPath = await getNotifySendPath()
+      if (!notifySendPath) return
+
+      await ctx.$`${notifySendPath} ${title} ${message} 2>/dev/null`.catch(() => {})
       break
+    }
     case "win32": {
+      const powershellPath = await getPowershellPath()
+      if (!powershellPath) return
+
       const psTitle = title.replace(/'/g, "''")
       const psMessage = message.replace(/'/g, "''")
       const toastScript = `
@@ -74,7 +93,7 @@ $Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
 $Notifier.Show($Toast)
 `.trim().replace(/\n/g, "; ")
-      await ctx.$`powershell -Command ${toastScript}`.catch(() => {})
+      await ctx.$`${powershellPath} -Command ${toastScript}`.catch(() => {})
       break
     }
   }
@@ -82,17 +101,30 @@ $Notifier.Show($Toast)
 
 async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Promise<void> {
   switch (p) {
-    case "darwin":
-      ctx.$`afplay ${soundPath}`.catch(() => {})
+    case "darwin": {
+      const afplayPath = await getAfplayPath()
+      if (!afplayPath) return
+      ctx.$`${afplayPath} ${soundPath}`.catch(() => {})
       break
-    case "linux":
-      ctx.$`paplay ${soundPath} 2>/dev/null`.catch(() => {
-        ctx.$`aplay ${soundPath} 2>/dev/null`.catch(() => {})
-      })
+    }
+    case "linux": {
+      const paplayPath = await getPaplayPath()
+      if (paplayPath) {
+        ctx.$`${paplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
+      } else {
+        const aplayPath = await getAplayPath()
+        if (aplayPath) {
+          ctx.$`${aplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
+        }
+      }
       break
-    case "win32":
-      ctx.$`powershell -Command ${"(New-Object Media.SoundPlayer '" + soundPath + "').PlaySync()"}`.catch(() => {})
+    }
+    case "win32": {
+      const powershellPath = await getPowershellPath()
+      if (!powershellPath) return
+      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + soundPath + "').PlaySync()"}`.catch(() => {})
       break
+    }
   }
 }
 
@@ -113,6 +145,8 @@ export function createSessionNotification(
 ) {
   const currentPlatform = detectPlatform()
   const defaultSoundPath = getDefaultSoundPath(currentPlatform)
+
+  startBackgroundCheck(currentPlatform)
 
   const mergedConfig = {
     title: "OpenCode",
