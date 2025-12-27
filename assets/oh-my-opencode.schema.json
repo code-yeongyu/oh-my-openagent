@@ -1383,6 +1383,97 @@
         "truncate_all_tool_outputs": {
           "default": true,
           "type": "boolean"
+        },
+        "dynamic_context_pruning": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "notification": {
+              "default": "detailed",
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "detailed"
+              ]
+            },
+            "turn_protection": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "turns": {
+                  "default": 3,
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10
+                }
+              }
+            },
+            "protected_tools": {
+              "default": [
+                "task",
+                "todowrite",
+                "todoread",
+                "lsp_rename",
+                "lsp_code_action_resolve",
+                "session_read",
+                "session_write",
+                "session_search"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "strategies": {
+              "type": "object",
+              "properties": {
+                "deduplication": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "default": true,
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "supersede_writes": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "default": true,
+                      "type": "boolean"
+                    },
+                    "aggressive": {
+                      "default": false,
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "purge_errors": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "default": true,
+                      "type": "boolean"
+                    },
+                    "turns": {
+                      "default": 5,
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 20
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
