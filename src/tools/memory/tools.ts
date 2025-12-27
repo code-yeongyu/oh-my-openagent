@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin/tool"
-import { resolveMemoryPath, validateFileName, ensureDirectoryExists } from "./utils"
+import { resolveMemoryPath, validateFileName, ensureDirectoryExists, validateBasePath } from "./utils"
 import { DEFAULT_MEMORY_PATH } from "./constants"
 import { MemoryToolResult } from "./types"
 import { unlink } from "node:fs/promises"
@@ -70,6 +70,14 @@ export const memory_list = tool({
   },
   execute: async (args): Promise<string> => {
     try {
+      if (!validateBasePath(args.basePath)) {
+        const result: MemoryToolResult = { 
+          success: false, 
+          error: "Invalid basePath: must be within allowed directories (context/, .cursor/, .opencode/, .serena/, .claude/)" 
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
       const glob = new Bun.Glob("**/*.md")
       const files: string[] = []
       

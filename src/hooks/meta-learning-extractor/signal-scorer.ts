@@ -71,7 +71,8 @@ const SPECULATION_KEYWORDS = ["might", "maybe", "probably", "could be", "possibl
 export function computeSignalScore(
   messages: Array<{ role: string; content: string }>,
   filesModified: string[],
-  toolsUsed: string[]
+  toolsUsed: string[],
+  signalThreshold: number = 3
 ): SignalScoring {
   const allContent = messages.map((m) => m.content).join("\n")
 
@@ -94,8 +95,8 @@ export function computeSignalScore(
     weakSignals,
     vetoConditions,
     totalScore,
-    threshold: 3,
-    shouldTrigger: totalScore >= 3 && !hasVeto,
+    threshold: signalThreshold,
+    shouldTrigger: totalScore >= signalThreshold && !hasVeto,
   }
 }
 

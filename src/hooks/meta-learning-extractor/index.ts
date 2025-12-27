@@ -8,7 +8,7 @@ import type {
 } from "./types"
 import { DEFAULT_CONFIG } from "./types"
 import { computeSignalScore, formatSignalReport } from "./signal-scorer"
-import { redactSecrets } from "../../features/context-learning/secret-redactor"
+import { redactSecrets, redactSecretsRecursive } from "../../features/context-learning/secret-redactor"
 import { log } from "../../shared/logger"
 
 interface MessageInfo {
@@ -106,15 +106,15 @@ export function createMetaLearningExtractorHook(
       const content =
         typeof m.info.content === "string"
           ? redactSecrets(m.info.content).redacted
-          : JSON.stringify(m.info.content ?? "")
+          : JSON.stringify(redactSecretsRecursive(m.info.content) ?? "")
 
       return {
         role: m.info.role,
         content: content.slice(0, 5000),
         toolCalls: m.info.toolCalls?.map((tc) => ({
           tool: tc.tool,
-          args: tc.args,
-          result: tc.result?.slice(0, 500),
+          args: redactSecretsRecursive(tc.args) as Record<string, unknown>,
+          result: tc.result ? redactSecrets(tc.result).redacted.slice(0, 500) : undefined,
         })),
       }
     })
@@ -153,7 +153,8 @@ export function createMetaLearningExtractorHook(
     const scoring = computeSignalScore(
       serializedMessages.map((m) => ({ role: m.role, content: m.content })),
       files,
-      tools
+      tools,
+      config.signalThreshold
     )
 
     if (!scoring.shouldTrigger && trigger !== "manual") {
@@ -180,7 +181,11 @@ export function createMetaLearningExtractorHook(
         parentMessageID: messageId || `meta-learning-${Date.now()}`,
       })
 
-      log(`[meta-learning-extractor] Started extraction for session ${sessionId.slice(0, 8)}`)
+      // Increment daily spend (estimated ~$0.01 per extraction with Gemini 2.5 Flash)
+      const ESTIMATED_COST_PER_EXTRACTION = 0.01
+      state.dailySpendUsd += ESTIMATED_COST_PER_EXTRACTION
+
+      log(`[meta-learning-extractor] Started extraction for session ${sessionId.slice(0, 8)} (daily spend: $${state.dailySpendUsd.toFixed(3)})`)
     } catch (error) {
       log("[meta-learning-extractor] Failed to start extraction:", error)
       state.sessions.set(sessionId, {

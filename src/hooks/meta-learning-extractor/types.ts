@@ -6,7 +6,6 @@ import type {
 
 export type MetaLearningTrigger =
   | "pre_compaction"
-  | "context_threshold"
   | "idle"
   | "manual"
 
@@ -14,7 +13,6 @@ export interface MetaLearningExtractorConfig {
   enabled: boolean
   signalThreshold: number
   cooldownMinutes: number
-  contextThresholdPercent: number
   idleDebounceMs: number
   maxCandidatesPerSession: number
   minConfidence: number
@@ -26,7 +24,6 @@ export const DEFAULT_CONFIG: MetaLearningExtractorConfig = {
   enabled: true,
   signalThreshold: 3,
   cooldownMinutes: 30,
-  contextThresholdPercent: 60,
   idleDebounceMs: 5000,
   maxCandidatesPerSession: 3,
   minConfidence: 0.5,
