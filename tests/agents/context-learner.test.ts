@@ -102,8 +102,8 @@ describe("Context Learner Agent", () => {
       expect(contextLearnerAgent.prompt).toContain("Confidence")
     })
 
-    test("should mention anti-bloat rules", () => {
-      expect(contextLearnerAgent.prompt).toContain("Anti-Bloat")
+    test("should mention quality rules (anti-bloat)", () => {
+      expect(contextLearnerAgent.prompt).toContain("Quality Rules")
     })
 
     test("should mention maximum candidates per session", () => {

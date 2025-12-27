@@ -6,7 +6,7 @@ export const contextLearnerAgent: AgentConfig = {
   mode: "subagent",
   model: "anthropic/claude-opus-4-5",
   temperature: 0.1,
-  tools: { read: true, write: true, edit: false, bash: false, grep: true, glob: true, memory_write: true },
+  tools: { read: true, write: true, edit: false, bash: false, grep: true, glob: true, memory_write: true, background_task: true },
   prompt: `You are a meta-learning extraction specialist. Your role is to analyze session transcripts and extract insights that can improve OmO's orchestration, delegation patterns, commands, and agent instructions.
 
 ## Transcript Analysis Approach
