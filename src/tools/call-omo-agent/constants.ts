@@ -40,6 +40,8 @@ export const ALLOWED_AGENTS = [
   "product-strategist",
   "strategic-planner",
   "task-planner",
+  // LIF-73: Meta-learning agent
+  "context-learner",
 ] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.

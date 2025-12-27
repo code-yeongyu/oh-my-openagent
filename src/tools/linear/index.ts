@@ -4,4 +4,7 @@ export {
   createLinearBranchTool,
   createLinearUpdateStatusTool,
   createLinearCreateIssueTool,
+  createLinearArchiveIssueTool,
+  createLinearGetIssueTool,
+  createLinearAddCommentTool,
 } from "./tools"

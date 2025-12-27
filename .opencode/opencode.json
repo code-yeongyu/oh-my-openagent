@@ -319,7 +319,7 @@
     "opencode-skills",
     "opencode-gemini-auth",
     "opencode-openai-codex-auth",
-    "file:///Users/eru/Documents/GitHub/oh-my-opencode/src/index.ts"
+    "file:///Users/eru/Documents/GitHub/oh-my-opencode-worktrees/hello/lif-73-self-improving-chat-review-system-chat-auditor-agent-context/src/index.ts"
   ],
 
   "watcher": {
@@ -330,14 +330,6 @@
   },
 
   "mcp": {
-    "linear": {
-      "type": "remote",
-      "url": "https://mcp.linear.app/mcp",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer {env:LINEAR_API_KEY}"
-      }
-    },
     "deepwiki": {
       "type": "remote",
       "url": "https://mcp.deepwiki.com/mcp",

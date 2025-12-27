@@ -240,9 +240,10 @@ export async function createIssue(args: {
   teamId?: string
   teamName?: string
   labels?: string[]
+  parentId?: string
 }): Promise<{
   success: boolean
-  issue?: { id: string; identifier: string; url: string }
+  issue?: { id: string; identifier: string; url: string; parent?: { id: string; identifier: string } }
   error?: string
 }> {
   // If team name provided, find team ID
@@ -281,6 +282,16 @@ export async function createIssue(args: {
 
   if (!teamId) {
     return { success: false, error: "Team ID or name required" }
+  }
+
+  let resolvedParentId = args.parentId
+  const isIdentifier = args.parentId && args.parentId.length < 36
+  if (isIdentifier) {
+    const parentResult = await getIssue(args.parentId!)
+    if (parentResult.error || !parentResult.issue) {
+      return { success: false, error: `Parent issue not found: ${args.parentId}` }
+    }
+    resolvedParentId = parentResult.issue.id
   }
 
   // Find label IDs if labels provided
@@ -322,13 +333,17 @@ export async function createIssue(args: {
 
   // Create the issue
   const mutation = `
-    mutation CreateIssue($title: String!, $description: String, $teamId: String!, $labelIds: [String!]) {
-      issueCreate(input: { title: $title, description: $description, teamId: $teamId, labelIds: $labelIds }) {
+    mutation CreateIssue($title: String!, $description: String, $teamId: String!, $labelIds: [String!], $parentId: String) {
+      issueCreate(input: { title: $title, description: $description, teamId: $teamId, labelIds: $labelIds, parentId: $parentId }) {
         success
         issue {
           id
           identifier
           url
+          parent {
+            id
+            identifier
+          }
         }
       }
     }
@@ -337,13 +352,14 @@ export async function createIssue(args: {
   const result = await executeQuery<{
     issueCreate: {
       success: boolean
-      issue: { id: string; identifier: string; url: string }
+      issue: { id: string; identifier: string; url: string; parent?: { id: string; identifier: string } }
     }
   }>(mutation, {
     title: args.title,
     description: args.description,
     teamId,
     labelIds: labelIds.length > 0 ? labelIds : undefined,
+    parentId: resolvedParentId,
   })
 
   if (result.error) {
@@ -360,9 +376,28 @@ export async function createIssue(args: {
   }
 }
 
-/**
- * Check if Linear API is available
- */
+export async function archiveIssue(
+  issueId: string
+): Promise<{ success: boolean; error?: string }> {
+  const mutation = `
+    mutation ArchiveIssue($id: String!) {
+      issueArchive(id: $id) {
+        success
+      }
+    }
+  `
+
+  const result = await executeQuery<{
+    issueArchive: { success: boolean }
+  }>(mutation, { id: issueId })
+
+  if (result.error) {
+    return { success: false, error: result.error }
+  }
+
+  return { success: result.data?.issueArchive?.success ?? false }
+}
+
 export function isLinearAvailable(): boolean {
   return !!getApiKey()
 }

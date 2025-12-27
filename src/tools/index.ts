@@ -21,6 +21,7 @@ import { grep } from "./grep"
 import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 import { skill } from "./skill"
+import { memoryTools } from "./memory"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { getTmuxPath } from "./interactive-bash/utils"
@@ -44,9 +45,13 @@ export {
   createLinearBranchTool,
   createLinearUpdateStatusTool,
   createLinearCreateIssueTool,
+  createLinearArchiveIssueTool,
+  createLinearGetIssueTool,
+  createLinearAddCommentTool,
 } from "./linear"
 export { createReadContextTool } from "./project-context"
 export { createSpecFolderTool, updateWorkflowStateTool } from "./spec"
+export { createExtractLearningsTool } from "./extract-learnings"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {
@@ -74,4 +79,5 @@ export const builtinTools = {
   glob,
   slashcommand,
   skill,
+  ...memoryTools,
 }

@@ -50,3 +50,7 @@ export type { ConflictDetectorConfig, FileEditLock } from "./conflict-detector";
 // Workflow state enforcement (LIF-72)
 export { createWorkflowStateEnforcerHook } from "./workflow-state-enforcer";
 export type { WorkflowStateEnforcerConfig, WorkflowValidationResult } from "./workflow-state-enforcer";
+
+// Meta-learning extraction (LIF-73)
+export { createMetaLearningExtractorHook } from "./meta-learning-extractor";
+export type { MetaLearningExtractorConfig } from "./meta-learning-extractor";

@@ -1,0 +1,73 @@
+import type { RedactionResult } from "./types"
+
+const SECRET_PATTERNS: Array<{ pattern: RegExp; type: string }> = [
+  { pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[\w\-]{20,}["']?/gi, type: "api_key" },
+  { pattern: /(?:secret|password|passwd|pwd)\s*[:=]\s*["']?[^\s"']{8,}["']?/gi, type: "secret" },
+  { pattern: /Bearer\s+[\w\-_.~+/]+=*/gi, type: "bearer_token" },
+  { pattern: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}/g, type: "github_token" },
+  { pattern: /sk-[A-Za-z0-9]{32,}/g, type: "openai_key" },
+  { pattern: /sk-ant-[A-Za-z0-9\-_]{90,}/g, type: "anthropic_key" },
+  { pattern: /AIza[A-Za-z0-9\-_]{35}/g, type: "google_api_key" },
+  { pattern: /lin_api_[A-Za-z0-9]{40,}/g, type: "linear_api_key" },
+  { pattern: /xox[baprs]-[A-Za-z0-9\-]{10,}/g, type: "slack_token" },
+  { pattern: /-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----/g, type: "private_key" },
+  { pattern: /(?:mongodb(?:\+srv)?|postgres|mysql|redis):\/\/[^\s]+/gi, type: "db_connection" },
+  { pattern: /AKIA[0-9A-Z]{16}/g, type: "aws_access_key" },
+  { pattern: /[A-Za-z0-9/+=]{40}(?=\s|$|")/g, type: "aws_secret_key" },
+]
+
+export function redactSecrets(content: string): RedactionResult {
+  let redacted = content
+  const secretsFound: string[] = []
+
+  for (const { pattern, type } of SECRET_PATTERNS) {
+    const matches = redacted.match(pattern)
+    if (matches) {
+      for (const match of matches) {
+        if (!secretsFound.includes(type)) {
+          secretsFound.push(type)
+        }
+      }
+      redacted = redacted.replace(pattern, `[REDACTED: ${type}]`)
+    }
+  }
+
+  return {
+    redacted,
+    secretsFound: secretsFound.length,
+    secretTypes: secretsFound,
+  }
+}
+
+export function redactSecretsRecursive(value: unknown): unknown {
+  if (typeof value === "string") {
+    return redactSecrets(value).redacted
+  }
+  
+  if (Array.isArray(value)) {
+    return value.map(redactSecretsRecursive)
+  }
+  
+  if (value !== null && typeof value === "object") {
+    const result: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) {
+      result[k] = redactSecretsRecursive(v)
+    }
+    return result
+  }
+  
+  return value
+}
+
+export function truncateExcerpt(text: string, maxLength: number = 200): string {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength - 3) + "..."
+}
+
+export function sanitizeForStorage(
+  content: string,
+  maxExcerptLength: number = 200
+): string {
+  const { redacted } = redactSecrets(content)
+  return truncateExcerpt(redacted, maxExcerptLength)
+}

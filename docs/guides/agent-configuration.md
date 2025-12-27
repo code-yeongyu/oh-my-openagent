@@ -89,6 +89,7 @@ These agents power the core workflow commands like `/specify`, `/plan`, and `/ta
 | :--- | :--- | :--- |
 | `ai-ml-expert` | RAG, LLM integration, DSPy/Agno specialist. | `google/gemini-3-flash-preview` |
 | `agent-specialist` | Multi-agent system design specialist. | `google/gemini-3-flash-preview` |
+| `context-learner` | Meta-learning extraction from sessions. | `anthropic/claude-opus-4-5` |
 | `security-specialist` | Security audit and vulnerability specialist. | `google/gemini-3-flash-preview` |
 | `test-specialist` | Unit, integration, and E2E testing specialist. | `google/gemini-3-flash-preview` |
 | `optimization-specialist` | Performance profiling and tuning specialist. | `google/gemini-3-flash-preview` |

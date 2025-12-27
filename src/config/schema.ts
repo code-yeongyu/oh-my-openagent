@@ -48,6 +48,8 @@ export const BuiltinAgentNameSchema = z.enum([
   "optimization-specialist",
   // Documentation
   "docs-publisher",
+  // LIF-73 Context Learning
+  "context-learner",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -77,6 +79,7 @@ export const OverridableAgentNameSchema = z.enum([
   "test-specialist",
   "optimization-specialist",
   "docs-publisher",
+  "context-learner",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -111,6 +114,7 @@ export const HookNameSchema = z.enum([
   "security-scanner",
   "conflict-detector",
   "workflow-state-enforcer",
+  "meta-learning-extractor",
 ])
 
 export const AgentOverrideConfigSchema = z
@@ -175,6 +179,24 @@ export const OmoAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
 })
 
+// Memory Tools configuration (LIF-73)
+export const MemoryToolsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  memory_path: z.string().default("context/memory/"),
+})
+
+// Meta-Learning Extractor configuration (LIF-73)
+export const MetaLearningConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  signal_threshold: z.number().min(0).max(10).default(3),
+  cooldown_minutes: z.number().min(0).default(30),
+  context_threshold_percent: z.number().min(0).max(100).default(60),
+  max_candidates_per_session: z.number().min(1).max(10).default(3),
+  min_confidence: z.number().min(0).max(1).default(0.5),
+  max_extractions_per_day: z.number().min(1).default(10),
+  storage_path: z.string().default("context/learnings/"),
+})
+
 // Governance configuration schemas
 export const GovernancePathValidationSchema = z.object({
   enabled: z.boolean().default(true),
@@ -182,6 +204,7 @@ export const GovernancePathValidationSchema = z.object({
   allowed_paths: z.array(z.string()).default([
     "context/specs/",
     "context/memory/",
+    "context/learnings/",
     ".cursor/specs/",
     ".cursor/memory/",
     ".opencode/",
@@ -311,6 +334,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   google_auth: z.boolean().optional(),
   omo_agent: OmoAgentConfigSchema.optional(),
   governance: GovernanceConfigSchema.optional(),
+  memory_tools: MemoryToolsConfigSchema.optional(),
+  meta_learning: MetaLearningConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -333,5 +358,7 @@ export type GovernanceDelegationComplianceConfig = z.infer<typeof GovernanceDele
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
 export type LinearPolicy = z.infer<typeof LinearPolicySchema>
 export type WorkflowStateEnforcerConfig = z.infer<typeof WorkflowStateEnforcerSchema>
+export type MemoryToolsConfig = z.infer<typeof MemoryToolsConfigSchema>
+export type MetaLearningConfig = z.infer<typeof MetaLearningConfigSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"
