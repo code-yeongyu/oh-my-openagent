@@ -193,7 +193,7 @@ export const MetaLearningConfigSchema = z.object({
   context_threshold_percent: z.number().min(0).max(100).default(60),
   max_candidates_per_session: z.number().min(1).max(10).default(3),
   min_confidence: z.number().min(0).max(1).default(0.5),
-  daily_budget_usd: z.number().min(0).default(1.0),
+  max_extractions_per_day: z.number().min(1).default(10),
   storage_path: z.string().default("context/learnings/"),
 })
 

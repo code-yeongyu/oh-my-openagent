@@ -16,7 +16,7 @@ export interface MetaLearningExtractorConfig {
   idleDebounceMs: number
   maxCandidatesPerSession: number
   minConfidence: number
-  dailyBudgetUsd: number
+  maxExtractionsPerDay: number
   storagePath: string
 }
 
@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG: MetaLearningExtractorConfig = {
   idleDebounceMs: 5000,
   maxCandidatesPerSession: 3,
   minConfidence: 0.5,
-  dailyBudgetUsd: 1.0,
+  maxExtractionsPerDay: 10,
   storagePath: "context/learnings/",
 }
 
@@ -100,7 +100,7 @@ export interface ExtractionResult {
 
 export interface HookState {
   sessions: Map<string, SessionLearningState>
-  dailySpendUsd: number
+  extractionsToday: number
   lastResetDate: string
 }
 

@@ -35,7 +35,7 @@ interface EventInput {
 function createHookState(): HookState {
   return {
     sessions: new Map(),
-    dailySpendUsd: 0,
+    extractionsToday: 0,
     lastResetDate: new Date().toISOString().split("T")[0],
   }
 }
@@ -49,17 +49,17 @@ export function createMetaLearningExtractorHook(
   const state = createHookState()
   const idleDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  const resetDailyBudgetIfNeeded = () => {
+  const resetDailyCountIfNeeded = () => {
     const today = new Date().toISOString().split("T")[0]
     if (today !== state.lastResetDate) {
-      state.dailySpendUsd = 0
+      state.extractionsToday = 0
       state.lastResetDate = today
     }
   }
 
-  const canAffordExtraction = (): boolean => {
-    resetDailyBudgetIfNeeded()
-    return state.dailySpendUsd < config.dailyBudgetUsd
+  const canExtract = (): boolean => {
+    resetDailyCountIfNeeded()
+    return state.extractionsToday < config.maxExtractionsPerDay
   }
 
   const isInCooldown = (sessionId: string): boolean => {
@@ -126,8 +126,8 @@ export function createMetaLearningExtractorHook(
     messageId?: string
   ): Promise<void> => {
     if (!config.enabled) return
-    if (!canAffordExtraction()) {
-      log("[meta-learning-extractor] Daily budget exhausted, skipping extraction")
+    if (!canExtract()) {
+      log(`[meta-learning-extractor] Daily rate limit reached (${config.maxExtractionsPerDay}), skipping extraction`)
       return
     }
     if (isInCooldown(sessionId)) {
@@ -181,11 +181,9 @@ export function createMetaLearningExtractorHook(
         parentMessageID: messageId || `meta-learning-${Date.now()}`,
       })
 
-      // Increment daily spend (estimated ~$0.01 per extraction with Gemini 2.5 Flash)
-      const ESTIMATED_COST_PER_EXTRACTION = 0.01
-      state.dailySpendUsd += ESTIMATED_COST_PER_EXTRACTION
+      state.extractionsToday += 1
 
-      log(`[meta-learning-extractor] Started extraction for session ${sessionId.slice(0, 8)} (daily spend: $${state.dailySpendUsd.toFixed(3)})`)
+      log(`[meta-learning-extractor] Started extraction for session ${sessionId.slice(0, 8)} (${state.extractionsToday}/${config.maxExtractionsPerDay} today)`)
     } catch (error) {
       log("[meta-learning-extractor] Failed to start extraction:", error)
       state.sessions.set(sessionId, {

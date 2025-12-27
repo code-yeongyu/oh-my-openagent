@@ -26,19 +26,18 @@ Extractions are automatically suppressed for:
 - Short sessions (< 5 messages)
 - Pure codebase exploration without modifications
 
-## Budget & Cooldown
+## Rate Limiting & Cooldown
 
 | Control | Value | Description |
 |---------|-------|-------------|
-| **Daily Budget** | $0.10 USD | Maximum daily spend across all sessions |
+| **Daily Limit** | 10 extractions | Maximum extractions per day across all sessions |
 | **Cooldown** | 30 minutes | Minimum time between extractions per session |
-| **Extraction Cost** | ~$0.01 | Estimated cost per analysis task |
 
 ## Limitations
 
 | Limitation | Description | Workaround |
 |------------|-------------|------------|
-| **Budget Reset on Reload** | Daily budget counter resets when the plugin reloads | Budget is per-session; will be persisted in future version |
+| **Counter Reset on Reload** | Daily extraction counter resets when the plugin reloads | Counter is in-memory; will be persisted in future version |
 
 ## Output
 
@@ -73,7 +72,7 @@ Configure via `oh-my-opencode.json`:
 | `enabled` | `true` | Enable or disable the hook |
 | `signalThreshold` | `3` | Score required to trigger extraction |
 | `cooldownMinutes` | `30` | Minutes to wait between extractions |
-| `dailyBudgetUsd` | `0.10` | Maximum daily spend (USD) |
+| `maxExtractionsPerDay` | `10` | Maximum extractions per day |
 | `maxCandidatesPerSession` | `3` | Max learnings to extract per run |
 | `minConfidence` | `0.5` | Minimum confidence score for candidates |
 

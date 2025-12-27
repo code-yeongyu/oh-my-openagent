@@ -317,7 +317,7 @@ export interface ContextLearningConfig {
   maxCandidatesPerSession: number // Default: 3
   minConfidence: number // Default: 0.5
   autoPromoteThreshold: number // Default: 0.9 (auto-approve if confidence >= this)
-  dailyBudgetUsd: number // Default: 1.0
+  maxExtractionsPerDay: number // Default: 10
   storagePath: string // Default: "context/"
 }
 
