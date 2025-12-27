@@ -840,7 +840,8 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -850,6 +851,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 | `aggressive_truncation`     | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
 | `auto_resume`               | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |
 | `truncate_all_tool_outputs` | `true`  | 프롬프트가 너무 길어지는 것을 방지하기 위해 컨텍스트 윈도우 사용량에 따라 모든 도구 출력을 동적으로 잘라냅니다. 전체 도구 출력이 필요한 경우 `false`로 설정하여 비활성화하세요. |
+| `dcp_on_compaction_failure` | `false` | 활성화하면, DCP(Dynamic Context Pruning)가 compaction(요약) 실패 후에만 실행되고 compaction을 재시도합니다. DCP는 평소에는 실행되지 않습니다. 토큰 제한에 도달했을 때 더 스마트한 복구를 원하면 활성화하세요. |
 
 **경고**: 이 기능들은 실험적이며 예상치 못한 동작을 유발할 수 있습니다. 의미를 이해한 경우에만 활성화하세요.
 

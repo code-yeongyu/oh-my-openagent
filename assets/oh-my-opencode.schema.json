@@ -1486,6 +1486,9 @@
               }
             }
           }
+        },
+        "dcp_on_compaction_failure": {
+          "type": "boolean"
         }
       }
     },
