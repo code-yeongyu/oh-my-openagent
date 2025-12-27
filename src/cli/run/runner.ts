@@ -91,19 +91,15 @@ export async function run(options: RunOptions): Promise<number> {
         if (eventState.mainSessionError) {
           console.error(pc.red(`\n\nSession ended with error: ${eventState.lastError}`))
           console.error(pc.yellow("Check if todos were completed before the error."))
-          abortController.abort()
-          await eventProcessor.catch(() => {})
           cleanup()
-          return 1
+          process.exit(1)
         }
 
         const shouldExit = await checkCompletionConditions(ctx)
         if (shouldExit) {
           console.log(pc.green("\n\nAll tasks completed."))
-          abortController.abort()
-          await eventProcessor.catch(() => {})
           cleanup()
-          return 0
+          process.exit(0)
         }
       }
 

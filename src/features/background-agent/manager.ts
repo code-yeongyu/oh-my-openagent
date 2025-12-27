@@ -57,7 +57,7 @@ export class BackgroundManager {
   private notifications: Map<string, BackgroundTask[]>
   private client: OpencodeClient
   private directory: string
-  private pollingInterval?: Timer
+  private pollingInterval?: ReturnType<typeof setInterval>
 
   constructor(ctx: PluginInput) {
     this.tasks = new Map()
@@ -287,6 +287,7 @@ export class BackgroundManager {
     this.pollingInterval = setInterval(() => {
       this.pollRunningTasks()
     }, 2000)
+    this.pollingInterval.unref()
   }
 
   private stopPolling(): void {
@@ -294,6 +295,12 @@ export class BackgroundManager {
       clearInterval(this.pollingInterval)
       this.pollingInterval = undefined
     }
+  }
+
+  cleanup(): void {
+    this.stopPolling()
+    this.tasks.clear()
+    this.notifications.clear()
   }
 
   private notifyParentSession(task: BackgroundTask): void {
