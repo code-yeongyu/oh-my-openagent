@@ -31,12 +31,23 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
+## TDD (if test infrastructure exists)
+
+1. Write spec (requirements)
+2. Write tests (failing)
+3. RED: tests fail
+4. Implement minimal code
+5. GREEN: tests pass
+6. Refactor if needed (must stay green)
+7. Next feature, repeat
+
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
 - **NO MockUp Work**: When user asked you to do "port A", you must "port A", fully, 100%. No Extra feature, No reduced feature, no mock data, fully working 100% port.
 - **NO Partial Completion**: Never stop at 60-80% saying "you can extend this..." - finish 100%
 - **NO Assumed Shortcuts**: Never skip requirements you deem "optional" or "can be added later"
 - **NO Premature Stopping**: Never declare done until ALL TODOs are completed and verified
+- **NO TEST DELETION**: Never delete or skip failing tests to make the build pass. Fix the code, not the tests.
 
 THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
 
