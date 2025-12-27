@@ -846,7 +846,8 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -856,6 +857,7 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 | `aggressive_truncation`     | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                 |
 | `auto_resume`               | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                        |
 | `truncate_all_tool_outputs` | `true`     | プロンプトが長くなりすぎるのを防ぐため、コンテキストウィンドウの使用状況に基づいてすべてのツール出力を動的に切り詰めます。完全なツール出力が必要な場合は`false`に設定して無効化します。 |
+| `dcp_on_compaction_failure` | `false`    | 有効にすると、DCP（Dynamic Context Pruning）はコンパクション（要約）が失敗した後にのみ実行され、その後コンパクションを再試行します。通常時は DCP は実行されません。トークン制限に達した際によりスマートな回復が必要な場合は有効にしてください。 |
 
 **警告**：これらの機能は実験的であり、予期しない動作を引き起こす可能性があります。影響を理解した場合にのみ有効にしてください。
 

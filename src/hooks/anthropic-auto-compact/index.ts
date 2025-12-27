@@ -16,6 +16,7 @@ function createAutoCompactState(): AutoCompactState {
     retryStateBySession: new Map(),
     fallbackStateBySession: new Map(),
     truncateStateBySession: new Map(),
+    dcpStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
   }
@@ -36,6 +37,7 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
         autoCompactState.fallbackStateBySession.delete(sessionInfo.id)
         autoCompactState.truncateStateBySession.delete(sessionInfo.id)
+        autoCompactState.dcpStateBySession.delete(sessionInfo.id)
         autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
         autoCompactState.compactionInProgress.delete(sessionInfo.id)
       }
@@ -148,6 +150,6 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
   }
 }
 
-export type { AutoCompactState, FallbackState, ParsedTokenLimitError, TruncateState } from "./types"
+export type { AutoCompactState, DcpState, FallbackState, ParsedTokenLimitError, TruncateState } from "./types"
 export { parseAnthropicTokenLimitError } from "./parser"
 export { executeCompact, getLastAssistant } from "./executor"

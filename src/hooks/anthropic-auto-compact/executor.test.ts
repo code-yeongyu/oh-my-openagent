@@ -17,6 +17,7 @@ describe("executeCompact lock management", () => {
       retryStateBySession: new Map(),
       fallbackStateBySession: new Map(),
       truncateStateBySession: new Map(),
+      dcpStateBySession: new Map(),
       emptyContentAttemptBySession: new Map(),
       compactionInProgress: new Set<string>(),
     }
