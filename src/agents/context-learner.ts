@@ -4,7 +4,7 @@ export const contextLearnerAgent: AgentConfig = {
   description:
     "Extracts meta-learnings from sessions to improve OmO orchestration, delegation, commands, and agent instructions. Analyzes conversations for patterns that can improve the agentic workflow itself.",
   mode: "subagent",
-  model: "google/gemini-2.5-flash",
+  model: "anthropic/claude-opus-4-5",
   temperature: 0.1,
   tools: { write: true, edit: false, bash: false, background_task: true },
   prompt: `You are a meta-learning extraction specialist. Your role is to analyze development sessions and extract insights that can improve OmO's orchestration, delegation patterns, commands, and agent instructions.
