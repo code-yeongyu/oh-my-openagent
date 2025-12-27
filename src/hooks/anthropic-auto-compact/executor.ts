@@ -1,5 +1,6 @@
 import type {
   AutoCompactState,
+  DcpState,
   FallbackState,
   RetryState,
   TruncateState,
@@ -86,6 +87,18 @@ function getOrCreateTruncateState(
   if (!state) {
     state = { truncateAttempt: 0 };
     autoCompactState.truncateStateBySession.set(sessionID, state);
+  }
+  return state;
+}
+
+function getOrCreateDcpState(
+  autoCompactState: AutoCompactState,
+  sessionID: string,
+): DcpState {
+  let state = autoCompactState.dcpStateBySession.get(sessionID);
+  if (!state) {
+    state = { attempted: false, itemsPruned: 0 };
+    autoCompactState.dcpStateBySession.set(sessionID, state);
   }
   return state;
 }
@@ -185,6 +198,7 @@ function clearSessionState(
   autoCompactState.retryStateBySession.delete(sessionID);
   autoCompactState.fallbackStateBySession.delete(sessionID);
   autoCompactState.truncateStateBySession.delete(sessionID);
+  autoCompactState.dcpStateBySession.delete(sessionID);
   autoCompactState.emptyContentAttemptBySession.delete(sessionID);
   autoCompactState.compactionInProgress.delete(sessionID);
 }
@@ -384,40 +398,6 @@ export async function executeCompact(
       }
     }
 
-    if (experimental?.dynamic_context_pruning?.enabled) {
-      log("[auto-compact] attempting DCP before truncation", { sessionID });
-      
-      try {
-        const pruningResult = await executeDynamicContextPruning(
-          sessionID,
-          experimental.dynamic_context_pruning,
-          client
-        );
-        
-        if (pruningResult.itemsPruned > 0) {
-          log("[auto-compact] DCP successful, resuming", {
-            itemsPruned: pruningResult.itemsPruned,
-            tokensSaved: pruningResult.totalTokensSaved,
-          });
-          
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
-          return;
-        }
-      } catch (error) {
-        log("[auto-compact] DCP failed, continuing to truncation", {
-          error: String(error),
-        });
-      }
-    }
-
     let skipSummarize = false;
 
     if (truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts) {
@@ -599,6 +579,67 @@ export async function executeCompact(
             },
           })
           .catch(() => {});
+      }
+    }
+
+    // Try DCP after summarize fails - only once per compaction cycle
+    const dcpState = getOrCreateDcpState(autoCompactState, sessionID);
+    if (experimental?.dcp_on_compaction_failure && !dcpState.attempted) {
+      dcpState.attempted = true;
+      log("[auto-compact] attempting DCP after summarize failed", { sessionID });
+      
+      const dcpConfig = experimental.dynamic_context_pruning ?? {
+        enabled: true,
+        notification: "detailed" as const,
+        protected_tools: ["task", "todowrite", "todoread", "lsp_rename", "lsp_code_action_resolve"],
+      };
+      
+      try {
+        const pruningResult = await executeDynamicContextPruning(
+          sessionID,
+          dcpConfig,
+          client
+        );
+        
+        if (pruningResult.itemsPruned > 0) {
+          dcpState.itemsPruned = pruningResult.itemsPruned;
+          log("[auto-compact] DCP successful, retrying compaction", {
+            itemsPruned: pruningResult.itemsPruned,
+            tokensSaved: pruningResult.totalTokensSaved,
+          });
+          
+          await (client as Client).tui
+            .showToast({
+              body: {
+                title: "Dynamic Context Pruning",
+                message: `Pruned ${pruningResult.itemsPruned} items (~${Math.round(pruningResult.totalTokensSaved / 1000)}k tokens). Retrying compaction...`,
+                variant: "success",
+                duration: 3000,
+              },
+            })
+            .catch(() => {});
+          
+          // Reset retry state to allow compaction to retry summarize
+          retryState.attempt = 0;
+          
+          setTimeout(() => {
+            executeCompact(
+              sessionID,
+              msg,
+              autoCompactState,
+              client,
+              directory,
+              experimental,
+            );
+          }, 500);
+          return;
+        } else {
+          log("[auto-compact] DCP did not prune any items, continuing to revert", { sessionID });
+        }
+      } catch (error) {
+        log("[auto-compact] DCP failed, continuing to revert", {
+          error: String(error),
+        });
       }
     }
 

@@ -912,7 +912,8 @@ Opt-in experimental features that may change or be removed in future versions. U
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -922,6 +923,7 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                            |
 | `truncate_all_tool_outputs` | `true`  | Dynamically truncates ALL tool outputs based on context window usage to prevent prompts from becoming too long. Disable by setting to `false` if you need full tool outputs.                 |
+| `dcp_on_compaction_failure` | `false` | When enabled, Dynamic Context Pruning (DCP) runs only after compaction (summarize) fails, then retries compaction. DCP does NOT run during normal operations. Enable this for smarter recovery when hitting token limits. |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 

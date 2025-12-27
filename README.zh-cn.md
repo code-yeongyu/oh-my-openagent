@@ -846,7 +846,8 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -856,6 +857,7 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 | `aggressive_truncation`     | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
 | `auto_resume`               | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
 | `truncate_all_tool_outputs` | `true`  | 为防止提示过长，根据上下文窗口使用情况动态截断所有工具输出。如需完整工具输出，设置为 `false` 禁用此功能。                                           |
+| `dcp_on_compaction_failure` | `false` | 启用后，DCP（动态上下文剪枝）仅在压缩（摘要）失败后运行，然后重试压缩。平时 DCP 不会运行。当达到 token 限制时需要更智能的恢复请启用此选项。                   |
 
 **警告**：这些功能是实验性的，可能会导致意外行为。只有在理解其影响的情况下才启用。
 
