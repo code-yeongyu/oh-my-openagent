@@ -595,8 +595,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Agent Usage Reminder**: 검색 도구를 직접 호출할 때, 백그라운드 작업을 통한 전문 에이전트 활용을 권장하는 리마인더를 표시합니다.
 - **Anthropic Auto Compact**: Claude 모델이 토큰 제한에 도달하면 자동으로 세션을 요약하고 압축합니다. 수동 개입 없이 작업을 계속할 수 있습니다.
 - **Session Recovery**: 세션 에러(누락된 도구 결과, thinking 블록 문제, 빈 메시지 등)에서 자동 복구합니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
-- **Auto Update Checker**: oh-my-opencode의 새 버전이 출시되면 알림을 표시합니다.
-- **Startup Toast**: OhMyOpenCode 로드 시 환영 메시지를 표시합니다. 세션을 제대로 시작하기 위한 작은 "oMoMoMo".
+- **Auto Update Checker**: oh-my-opencode의 새 버전을 자동으로 확인하고 설정을 자동 업데이트할 수 있습니다. 현재 버전과 Sisyphus 상태를 표시하는 시작 토스트 알림을 표시합니다 (Sisyphus 활성화 시 "Sisyphus on steroids is steering OpenCode", 비활성화 시 "OpenCode is now on Steroids. oMoMoMoMo..."). 모든 기능을 비활성화하려면 `disabled_hooks`에 `"auto-update-checker"`를, 토스트 알림만 비활성화하려면 `"startup-toast"`를 추가하세요. [설정 > 훅](#훅) 참조.
 - **Background Notification**: 백그라운드 에이전트 작업이 완료되면 알림을 받습니다.
 - **Session Notification**: 에이전트가 대기 상태가 되면 OS 알림을 보냅니다. macOS, Linux, Windows에서 작동—에이전트가 입력을 기다릴 때 놓치지 마세요.
 - **Empty Task Response Detector**: Task 도구가 빈 응답을 반환하면 감지합니다. 이미 빈 응답이 왔는데 무한정 기다리는 상황을 방지합니다.
@@ -788,6 +787,8 @@ Schema 자동 완성이 지원됩니다:
 ```
 
 사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
+
+**`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 
 ### MCPs
 

@@ -667,8 +667,7 @@ When agents thrive, you thrive. But I want to help you directly too.
 - **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
 - **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
 - **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
-- **Auto Update Checker**: Notifies you when a new version of oh-my-opencode is available.
-- **Startup Toast**: Shows a welcome message when OhMyOpenCode loads. A little "oMoMoMo" to start your session right.
+- **Auto Update Checker**: Automatically checks for new versions of oh-my-opencode and can auto-update your configuration. Shows startup toast notifications displaying current version and Sisyphus status ("Sisyphus on steroids is steering OpenCode" when enabled, or "OpenCode is now on Steroids. oMoMoMoMo..." otherwise). Disable all features with `"auto-update-checker"` in `disabled_hooks`, or disable just toast notifications with `"startup-toast"` in `disabled_hooks`. See [Configuration > Hooks](#hooks).
 - **Background Notification**: Get notified when background agent tasks complete.
 - **Session Notification**: Sends OS notifications when agents go idle. Works on macOS, Linux, and Windows—never miss when your agent needs input.
 - **Empty Task Response Detector**: Catches when Task tool returns nothing. Warns you about potential agent failures so you don't wait forever for a response that already came back empty.
@@ -860,6 +859,8 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 ```
 
 Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
+
+**Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
 
 ### MCPs
 
