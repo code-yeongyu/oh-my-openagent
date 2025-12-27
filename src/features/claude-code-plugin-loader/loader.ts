@@ -14,6 +14,7 @@ import type { AgentFrontmatter } from "../claude-code-agent-loader/types"
 import type { ClaudeCodeMcpConfig, McpServerConfig } from "../claude-code-mcp-loader/types"
 import type {
   InstalledPluginsDatabase,
+  PluginInstallation,
   PluginManifest,
   LoadedPlugin,
   PluginLoadResult,
@@ -134,6 +135,15 @@ function isPluginEnabled(
   return true
 }
 
+function extractPluginEntries(
+  db: InstalledPluginsDatabase
+): Array<[string, PluginInstallation | undefined]> {
+  if (db.version === 1) {
+    return Object.entries(db.plugins).map(([key, installation]) => [key, installation])
+  }
+  return Object.entries(db.plugins).map(([key, installations]) => [key, installations[0]])
+}
+
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
   const db = loadInstalledPlugins()
   const settings = loadClaudeSettings()
@@ -147,15 +157,14 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
   const settingsEnabledPlugins = settings?.enabledPlugins
   const overrideEnabledPlugins = options?.enabledPluginsOverride
 
-  for (const [pluginKey, installations] of Object.entries(db.plugins)) {
-    if (!installations || installations.length === 0) continue
+  for (const [pluginKey, installation] of extractPluginEntries(db)) {
+    if (!installation) continue
 
     if (!isPluginEnabled(pluginKey, settingsEnabledPlugins, overrideEnabledPlugins)) {
       log(`Plugin disabled: ${pluginKey}`)
       continue
     }
 
-    const installation = installations[0]
     const { installPath, scope, version } = installation
 
     if (!existsSync(installPath)) {
