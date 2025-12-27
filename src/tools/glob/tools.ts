@@ -1,8 +1,8 @@
-import { tool } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
 import { formatGlobResult } from "./utils"
 
-export const glob = tool({
+export const glob: ToolDefinition = tool({
   description:
     "Fast file pattern matching tool with safety limits (60s timeout, 100 file limit). " +
     "Supports glob patterns like \"**/*.js\" or \"src/**/*.ts\". " +

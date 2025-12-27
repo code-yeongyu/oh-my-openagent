@@ -37,7 +37,7 @@ import {
   createBackgroundCancel,
 } from "./background-task"
 
-import type { PluginInput } from "@opencode-ai/plugin"
+import type { PluginInput, ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../features/background-agent"
 
 type OpencodeClient = PluginInput["client"]
@@ -45,7 +45,7 @@ type OpencodeClient = PluginInput["client"]
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 
-export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
+export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   return {
     background_task: createBackgroundTask(manager),
     background_output: createBackgroundOutput(manager, client),
@@ -53,7 +53,7 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
   }
 }
 
-export const builtinTools = {
+export const builtinTools: Record<string, ToolDefinition> = {
   lsp_hover,
   lsp_goto_definition,
   lsp_find_references,
