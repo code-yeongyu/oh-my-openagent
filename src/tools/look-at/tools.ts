@@ -1,4 +1,5 @@
 import { extname, basename } from "node:path"
+import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
@@ -78,7 +79,7 @@ If the requested information is not found, clearly state what is missing.`
           },
           parts: [
             { type: "text", text: prompt },
-            { type: "file", mime: mimeType, url: `file://${args.file_path}`, filename },
+            { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
           ],
         },
       })
