@@ -907,5 +907,6 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 ## 스폰서
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 첫 번째 스폰서
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo) 께 감사드립니다*

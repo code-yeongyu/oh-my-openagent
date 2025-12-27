@@ -912,5 +912,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 ## 赞助者
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 第一位赞助者
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *感谢 [@junhoyeo](https://github.com/junhoyeo) 制作了这张超帅的 hero 图。*
