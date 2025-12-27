@@ -129,20 +129,6 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
         const errorMsg = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
         log(`Config validation error in ${configPath}:`, result.error.issues);
         addConfigLoadError({ path: configPath, error: `Validation error: ${errorMsg}` });
-        
-        const errorList = result.error.issues
-          .map(issue => `• ${issue.path.join(".")}: ${issue.message}`)
-          .join("\n");
-        
-        ctx.client.tui.showToast({
-          body: {
-            title: "❌ OhMyOpenCode: Config Validation Failed",
-            message: `Failed to load ${configPath}\n\nValidation errors:\n${errorList}\n\nConfig will be ignored. Please fix the errors above.`,
-            variant: "error" as const,
-            duration: 10000,
-          },
-        }).catch(() => {});
-        
         return null;
       }
 
@@ -153,19 +139,6 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
     const errorMsg = err instanceof Error ? err.message : String(err);
     log(`Error loading config from ${configPath}:`, err);
     addConfigLoadError({ path: configPath, error: errorMsg });
-    
-    const hint = err instanceof SyntaxError
-      ? "\n\nHint: Check for syntax errors in your JSON file (missing commas, quotes, brackets, etc.)"
-      : "";
-    
-    ctx.client.tui.showToast({
-      body: {
-        title: "❌ OhMyOpenCode: Config Load Failed",
-        message: `Failed to load ${configPath}\n\nError: ${errorMsg}${hint}\n\nConfig will be ignored. Please fix the error above.`,
-        variant: "error" as const,
-        duration: 10000,
-      },
-    }).catch(() => {});
   }
   return null;
 }
