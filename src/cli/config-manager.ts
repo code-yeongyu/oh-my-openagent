@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { parseJsonc } from "../shared"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
 
 const OPENCODE_CONFIG_DIR = join(homedir(), ".config", "opencode")
@@ -39,80 +40,10 @@ export function detectConfigFormat(): { format: ConfigFormat; path: string } {
   return { format: "none", path: OPENCODE_JSON }
 }
 
-function stripJsoncComments(content: string): string {
-  let result = ""
-  let i = 0
-  let inString = false
-  let escape = false
-
-  while (i < content.length) {
-    const char = content[i]
-
-    if (escape) {
-      result += char
-      escape = false
-      i++
-      continue
-    }
-
-    if (char === "\\") {
-      result += char
-      escape = true
-      i++
-      continue
-    }
-
-    if (char === '"' && !inString) {
-      inString = true
-      result += char
-      i++
-      continue
-    }
-
-    if (char === '"' && inString) {
-      inString = false
-      result += char
-      i++
-      continue
-    }
-
-    if (inString) {
-      result += char
-      i++
-      continue
-    }
-
-    // Outside string - check for comments
-    if (char === "/" && content[i + 1] === "/") {
-      // Line comment - skip to end of line
-      while (i < content.length && content[i] !== "\n") {
-        i++
-      }
-      continue
-    }
-
-    if (char === "/" && content[i + 1] === "*") {
-      // Block comment - skip to */
-      i += 2
-      while (i < content.length - 1 && !(content[i] === "*" && content[i + 1] === "/")) {
-        i++
-      }
-      i += 2
-      continue
-    }
-
-    result += char
-    i++
-  }
-
-  return result.replace(/,(\s*[}\]])/g, "$1")
-}
-
 function parseConfig(path: string, isJsonc: boolean): OpenCodeConfig | null {
   try {
     const content = readFileSync(path, "utf-8")
-    const cleaned = isJsonc ? stripJsoncComments(content) : content
-    return JSON.parse(cleaned) as OpenCodeConfig
+    return parseJsonc<OpenCodeConfig>(content)
   } catch {
     return null
   }
@@ -252,8 +183,7 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
 
     if (existsSync(OMO_CONFIG)) {
       const content = readFileSync(OMO_CONFIG, "utf-8")
-      const cleaned = stripJsoncComments(content)
-      const existing = JSON.parse(cleaned) as Record<string, unknown>
+      const existing = parseJsonc<Record<string, unknown>>(content)
       delete existing.agents
       const merged = deepMerge(existing, newConfig)
       writeFileSync(OMO_CONFIG, JSON.stringify(merged, null, 2) + "\n")
@@ -484,7 +414,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   try {
     const content = readFileSync(OMO_CONFIG, "utf-8")
-    const omoConfig = JSON.parse(stripJsoncComments(content)) as OmoConfigData
+    const omoConfig = parseJsonc<OmoConfigData>(content)
 
     const agents = omoConfig.agents ?? {}
 
