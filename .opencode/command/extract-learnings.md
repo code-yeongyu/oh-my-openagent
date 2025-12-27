@@ -1,71 +1,56 @@
 ---
 description: Manually trigger meta-learning extraction from current session
-agent: context-learner
-subtask: true
+argument-hint: "[transcript_path]"
 ---
 
-# Extract Learnings Command
+# Extract Learnings
 
-Analyzes the current session for opportunities to improve OmO orchestration, delegation patterns, and tool usage.
+Analyze a session for meta-learning opportunities to improve OmO orchestration.
 
-## What This Does
+## Step 1: Get Transcript
 
-1. Computes signal score from session activity
-2. Serializes conversation context (with secrets redacted)
-3. Delegates to `context-learner` agent for analysis
-4. Outputs meta-learning candidates to `context/learnings/`
-
-## Meta-Learning Categories
-
-| Category | What It Improves | Example Finding |
-|----------|------------------|-----------------|
-| `agent_instructions` | Agent prompts, roles, capabilities | "OmO should delegate frontend work earlier" |
-| `commands` | Slash command behavior, workflows | "/implement should check for tasks.md first" |
-| `orchestration` | Delegation patterns, agent selection | "Use explore agent for file discovery" |
-| `context_handling` | Memory management, compaction | "Extract learnings before 70% context" |
-| `tool_usage` | Tool selection, efficiency | "Use LSP instead of grep for symbols" |
-
-## Output Format
-
-Creates `context/learnings/{session_id}_{date}.md` with:
-
-```markdown
-# Meta-Learning Candidates
-
-## Metadata
-- Session: abc12345
-- Trigger: manual
-- Signal Score: 7/10
-
-## Candidates
-
-### 1. [Title]
-- **Category**: orchestration
-- **Claim**: [What should change in OmO]
-- **Confidence**: 0.85
-- **Scope**: [When this applies]
-- **Evidence**: [Conversation excerpts]
-- **Suggested Improvement**: [Actionable change]
-- **Affected Files**: [File paths]
-```
-
-## Usage
+Use `extract_learnings` tool to capture or validate the transcript:
 
 ```
-/extract-learnings
+# Capture current session (default)
+extract_learnings()
+
+# Use existing transcript file
+extract_learnings({ transcript_path: "context/transcripts/ses_abc123.jsonl" })
 ```
 
-No arguments needed - analyzes current session automatically.
+## Step 2: Analyze with Context-Learner
 
-## Quality Guidelines
+After getting the transcript path, delegate analysis to context-learner:
 
-- Maximum 3 candidates per extraction
-- Minimum confidence threshold: 0.5
-- Evidence-based only, no speculation
-- Specific improvements, not vague suggestions
+```
+background_task({
+  agent: "context-learner",
+  description: "Analyze session for meta-learnings",
+  prompt: `TASK: Extract meta-learnings from transcript.
 
-## Next Steps
+TRANSCRIPT: {transcript_path}
+LINES: {line_count}
 
-After extraction:
-1. Run `/review-learnings` to approve/reject candidates
-2. Approved candidates can be turned into feature specs via `/specify`
+Analyze iteratively using grep/read tools:
+1. grep for "error|fail|retry" to find problems
+2. grep for "call_omo_agent|background_task" for delegation patterns
+3. read specific sections with offset/limit
+
+Write findings to: context/learnings/{session_id}_{date}.md
+
+Categories: agent_instructions, commands, orchestration, context_handling, tool_usage
+Max 3 candidates, min 0.5 confidence, evidence required.`
+})
+```
+
+## User Arguments
+
+If user provided a transcript path: `$ARGUMENTS`
+
+Use that path with `extract_learnings({ transcript_path: "..." })` instead of capturing.
+
+## Execute Now
+
+1. Call `extract_learnings` (with user's transcript_path if provided)
+2. On success, call `background_task` with context-learner using the returned transcript_path

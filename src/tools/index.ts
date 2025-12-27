@@ -51,6 +51,7 @@ export {
 } from "./linear"
 export { createReadContextTool } from "./project-context"
 export { createSpecFolderTool, updateWorkflowStateTool } from "./spec"
+export { createExtractLearningsTool } from "./extract-learnings"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {

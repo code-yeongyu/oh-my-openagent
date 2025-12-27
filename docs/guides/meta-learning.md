@@ -81,10 +81,11 @@ Manually trigger meta-learning extraction from the current session.
 ```
 
 **What it does**:
-1. Computes signal score from session activity
-2. Serializes conversation context (secrets automatically redacted)
-3. Delegates to `context-learner` agent for analysis
-4. Outputs candidates to `context/learnings/`
+1. Calls `extract_learnings` tool to capture/validate transcript (secrets auto-redacted)
+2. Writes transcript to `context/transcripts/{session_id}.jsonl`
+3. Delegates to `context-learner` agent via `background_task` for iterative analysis
+4. Agent uses grep/read to analyze large transcripts without context overflow
+5. Outputs candidates to `context/learnings/`
 
 **Use when**:
 - You've completed a valuable task and want to capture insights
