@@ -432,9 +432,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
 
       if (isSisyphusEnabled && builtinAgents.Sisyphus) {
-        // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // use `config.default_agent = "Sisyphus"` instead of demoting build/plan.
-        // Tracking: https://github.com/sst/opencode/pull/5313
+        // Set Sisyphus as default agent (feature added in OpenCode PR #5843)
+        (config as { default_agent?: string }).default_agent = "Sisyphus";
 
         const agentConfig: Record<string, unknown> = {
           Sisyphus: builtinAgents.Sisyphus,
