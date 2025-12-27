@@ -606,8 +606,7 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 - **Agent 使用提醒**：你自己搜东西的时候，弹窗提醒你"这种事让后台专业 Agent 干更好"。
 - **Anthropic 自动压缩**：Claude Token 爆了？自动总结压缩会话——不用你操心。
 - **会话恢复**：工具没结果？Thinking 卡住？消息是空的？自动恢复。会话崩不了，崩了也能救回来。
-- **自动更新检查**：oh-my-opencode 更新了会告诉你。
-- **启动提示**：加载时来句"oMoMoMo"，开启元气满满的一次会话。
+- **自动更新检查**：自动检查 oh-my-opencode 新版本并可自动更新配置。显示启动提示通知，展示当前版本和 Sisyphus 状态（Sisyphus 启用时显示「Sisyphus on steroids is steering OpenCode」，禁用时显示「OpenCode is now on Steroids. oMoMoMoMo...」）。要禁用全部功能，在 `disabled_hooks` 中添加 `"auto-update-checker"`；只禁用提示通知，添加 `"startup-toast"`。详见 [配置 > Hooks](#hooks)。
 - **后台通知**：后台 Agent 活儿干完了告诉你。
 - **会话通知**：Agent 没事干了发系统通知。macOS、Linux、Windows 通吃——别让 Agent 等你。
 - **空 Task 响应检测**：Task 工具回了个寂寞？立马报警，别傻傻等一个永远不会来的响应。
@@ -794,6 +793,8 @@ Sisyphus Agent 也能自定义：
 ```
 
 可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-auto-compact`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`
+
+**关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 
 ### MCPs
 
