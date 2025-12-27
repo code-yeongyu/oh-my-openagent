@@ -696,6 +696,36 @@ Schema autocomplete supported:
 }
 ```
 
+### JSONC Support
+
+The `oh-my-opencode` configuration file supports JSONC (JSON with Comments):
+- Line comments: `// comment`
+- Block comments: `/* comment */`
+- Trailing commas: `{ "key": "value", }`
+
+When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc` takes priority.
+
+**Example with comments:**
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // Enable Google Gemini via Antigravity OAuth
+  "google_auth": false,
+  
+  /* Agent overrides - customize models for specific tasks */
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2"  // GPT for strategic reasoning
+    },
+    "explore": {
+      "model": "opencode/grok-code"  // Free & fast for exploration
+    },
+  },
+}
+```
+
 ### Google Auth
 
 **Recommended**: Use the external [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).

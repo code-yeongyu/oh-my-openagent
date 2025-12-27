@@ -47,7 +47,7 @@ import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, 
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
+import { log, deepMerge, getUserConfigDir, addConfigLoadError, parseJsonc, detectConfigFile } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
@@ -119,7 +119,7 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
-      const rawConfig = JSON.parse(content);
+      const rawConfig = parseJsonc<Record<string, unknown>>(content);
 
       migrateConfigFile(configPath, rawConfig);
 
@@ -201,19 +201,15 @@ function mergeConfigs(
 }
 
 function loadPluginConfig(directory: string, ctx: any): OhMyOpenCodeConfig {
-  // User-level config path (OS-specific)
-  const userConfigPath = path.join(
-    getUserConfigDir(),
-    "opencode",
-    "oh-my-opencode.json"
-  );
+  // User-level config path (OS-specific) - prefer .jsonc over .json
+  const userBasePath = path.join(getUserConfigDir(), "opencode", "oh-my-opencode");
+  const userDetected = detectConfigFile(userBasePath);
+  const userConfigPath = userDetected.format !== "none" ? userDetected.path : userBasePath + ".json";
 
-  // Project-level config path
-  const projectConfigPath = path.join(
-    directory,
-    ".opencode",
-    "oh-my-opencode.json"
-  );
+  // Project-level config path - prefer .jsonc over .json
+  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
+  const projectDetected = detectConfigFile(projectBasePath);
+  const projectConfigPath = projectDetected.format !== "none" ? projectDetected.path : projectBasePath + ".json";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig = loadConfigFromPath(userConfigPath, ctx) ?? {};
