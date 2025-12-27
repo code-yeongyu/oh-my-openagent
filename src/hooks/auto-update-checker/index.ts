@@ -34,12 +34,12 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
 
       hasChecked = true
 
-      setTimeout(() => {
+      setTimeout(async () => {
         const cachedVersion = getCachedVersion()
         const localDevVersion = getLocalDevVersion(ctx.directory)
         const displayVersion = localDevVersion ?? cachedVersion
 
-        showConfigErrorsIfAny(ctx).catch(() => {})
+        await showConfigErrorsIfAny(ctx)
 
         if (localDevVersion) {
           if (showStartupToast) {
