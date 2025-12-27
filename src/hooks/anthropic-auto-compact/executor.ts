@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import type { ExperimentalConfig } from "../../config";
 import { FALLBACK_CONFIG, RETRY_CONFIG, TRUNCATE_CONFIG } from "./types";
+import { executeDynamicContextPruning } from "./pruning-executor";
 import {
   findLargestToolResult,
   truncateToolResult,
@@ -380,6 +381,40 @@ export async function executeCompact(
             },
           })
           .catch(() => {});
+      }
+    }
+
+    if (experimental?.dynamic_context_pruning?.enabled) {
+      log("[auto-compact] attempting DCP before truncation", { sessionID });
+      
+      try {
+        const pruningResult = await executeDynamicContextPruning(
+          sessionID,
+          experimental.dynamic_context_pruning,
+          client
+        );
+        
+        if (pruningResult.itemsPruned > 0) {
+          log("[auto-compact] DCP successful, resuming", {
+            itemsPruned: pruningResult.itemsPruned,
+            tokensSaved: pruningResult.totalTokensSaved,
+          });
+          
+          setTimeout(async () => {
+            try {
+              await (client as Client).session.prompt_async({
+                path: { sessionID },
+                body: { parts: [{ type: "text", text: "Continue" }] },
+                query: { directory },
+              });
+            } catch {}
+          }, 500);
+          return;
+        }
+      } catch (error) {
+        log("[auto-compact] DCP failed, continuing to truncation", {
+          error: String(error),
+        });
       }
     }
 
