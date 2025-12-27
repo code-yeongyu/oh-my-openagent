@@ -913,5 +913,6 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
 ## スポンサー
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 最初のスポンサー
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*

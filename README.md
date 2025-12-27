@@ -979,5 +979,6 @@ I have no affiliation with any project or model mentioned here. This is purely p
 ## Sponsors
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - The first sponsor
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*
