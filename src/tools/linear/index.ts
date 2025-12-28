@@ -7,4 +7,5 @@ export {
   createLinearArchiveIssueTool,
   createLinearGetIssueTool,
   createLinearAddCommentTool,
+  createLinearUpdateIssueTool,
 } from "./tools"

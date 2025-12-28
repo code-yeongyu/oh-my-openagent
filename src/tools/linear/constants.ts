@@ -59,3 +59,48 @@ export const DEFAULT_LINEAR_TEAM = "Lifelogger"
  * Default team prefix for issue identifiers
  */
 export const DEFAULT_TEAM_PREFIX = "LIF"
+
+/**
+ * Map string priority names to numeric values for Linear API
+ */
+export const PRIORITY_MAP: Record<string, number> = {
+  none: 0,
+  urgent: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+}
+
+/**
+ * Map numeric priority to human-readable labels
+ */
+export const PRIORITY_LABELS: Record<number, string> = {
+  0: "No priority",
+  1: "Urgent",
+  2: "High",
+  3: "Medium",
+  4: "Low",
+}
+
+/**
+ * Description for linear_update_issue tool
+ */
+export const LINEAR_UPDATE_ISSUE_DESCRIPTION = `Comprehensively update a Linear issue's fields.
+
+Use this to update any combination of:
+- title: New issue title
+- description: New description (Markdown supported)
+- priority: 0-4 or "urgent"/"high"/"medium"/"low"/"none"
+- estimate: Story point estimate (number)
+- dueDate: "YYYY-MM-DD" or null to clear
+- assigneeId: User UUID or null to unassign
+- labels: { add?: [...], remove?: [...], set?: [...] } (mutually exclusive)
+
+Only provided fields are modified (partial update semantics).
+
+Returns:
+- changes: Array of { field, from, to } showing what changed
+- currentState: Full issue state after update
+- message: Human-readable summary
+
+Note: For status changes, use linear_update_status instead.`
