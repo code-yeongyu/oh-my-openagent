@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-AI agent definitions for multi-model orchestration. 7 specialized agents: Sisyphus (orchestrator), oracle (strategy), librarian (research), explore (grep), frontend-ui-ux-engineer, document-writer, multimodal-looker.
+AI agent definitions for multi-model orchestration. 8 specialized agents: Sisyphus (orchestrator), oracle (strategy), librarian (research), explore (grep), frontend-ui-ux-engineer, document-writer, multimodal-looker, code-reviewer.
 
 ## STRUCTURE
 
@@ -15,6 +15,7 @@ agents/
 ├── frontend-ui-ux-engineer.ts  # UI generation (Gemini 3 Pro)
 ├── document-writer.ts       # Technical docs (Gemini 3 Flash)
 ├── multimodal-looker.ts     # PDF/image analysis (Gemini 3 Flash)
+├── code-reviewer.ts         # Code Reviewer (Claude Sonnet 4.5)
 ├── build-prompt.ts          # Shared build agent prompt
 ├── plan-prompt.ts           # Shared plan agent prompt
 ├── types.ts                 # AgentModelConfig interface
@@ -33,6 +34,7 @@ agents/
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | UI/UX code generation |
 | document-writer | google/gemini-3-pro-preview | - | Technical writing |
 | multimodal-looker | google/gemini-3-flash | - | PDF/image analysis |
+| code-reviewer | anthropic/claude-sonnet-4-5 | - | Code review and quality assurance |
 
 ## HOW TO ADD AN AGENT
 
