@@ -28,6 +28,13 @@ interface Todo {
   id: string
 }
 
+interface SessionState {
+  lastErrorAt?: number
+  countdownTimer?: ReturnType<typeof setTimeout>
+  countdownInterval?: ReturnType<typeof setInterval>
+  isRecovering?: boolean
+}
+
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
@@ -38,29 +45,7 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
-const MIN_INJECTION_INTERVAL_MS = 10_000
-
-// ============================================================================
-// STATE MACHINE TYPES
-// ============================================================================
-
-type SessionMode =
-  | "idle"           // Observed idle, no countdown started yet
-  | "countingDown"   // Waiting N seconds before injecting
-  | "injecting"      // Currently calling session.prompt
-  | "recovering"     // Session recovery in progress (external control)
-  | "errorBypass"    // Bypass mode after session.error/interrupt
-
-interface SessionState {
-  version: number                          // Monotonic generation token - increment to invalidate pending callbacks
-  mode: SessionMode
-  timer?: ReturnType<typeof setTimeout>    // Pending countdown timer
-  lastAttemptedAt?: number                 // Timestamp of last injection attempt (throttle all attempts)
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+const ERROR_COOLDOWN_MS = 3_000
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -76,20 +61,24 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-function detectInterrupt(error: unknown): boolean {
+function isAbortError(error: unknown): boolean {
   if (!error) return false
+  
   if (typeof error === "object") {
     const errObj = error as Record<string, unknown>
     const name = errObj.name as string | undefined
     const message = (errObj.message as string | undefined)?.toLowerCase() ?? ""
+    
     if (name === "MessageAbortedError" || name === "AbortError") return true
     if (name === "DOMException" && message.includes("abort")) return true
     if (message.includes("aborted") || message.includes("cancelled") || message.includes("interrupted")) return true
   }
+  
   if (typeof error === "string") {
     const lower = error.toLowerCase()
     return lower.includes("abort") || lower.includes("cancel") || lower.includes("interrupt")
   }
+  
   return false
 }
 
@@ -97,90 +86,55 @@ function getIncompleteCount(todos: Todo[]): number {
   return todos.filter(t => t.status !== "completed" && t.status !== "cancelled").length
 }
 
-// ============================================================================
-// MAIN IMPLEMENTATION
-// ============================================================================
-
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
 ): TodoContinuationEnforcer {
   const { backgroundManager } = options
-  
-  // Single source of truth: per-session state machine
   const sessions = new Map<string, SessionState>()
 
-  // ============================================================================
-  // STATE HELPERS
-  // ============================================================================
-
-  function getOrCreateState(sessionID: string): SessionState {
+  function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
     if (!state) {
-      state = { version: 0, mode: "idle" }
+      state = {}
       sessions.set(sessionID, state)
     }
     return state
   }
 
-  function clearTimer(state: SessionState): void {
-    if (state.timer) {
-      clearTimeout(state.timer)
-      state.timer = undefined
-    }
-  }
-
-  /**
-   * Invalidate any pending or in-flight operation by incrementing version.
-   * ALWAYS bumps version regardless of current mode to prevent last-mile races.
-   */
-  function invalidate(sessionID: string, reason: string): void {
+  function cancelCountdown(sessionID: string): void {
     const state = sessions.get(sessionID)
     if (!state) return
-
-    // Skip if in recovery mode (external control)
-    if (state.mode === "recovering") return
-
-    state.version++
-    clearTimer(state)
     
-    if (state.mode !== "idle" && state.mode !== "errorBypass") {
-      log(`[${HOOK_NAME}] Invalidated`, { sessionID, reason, prevMode: state.mode, newVersion: state.version })
-      state.mode = "idle"
+    if (state.countdownTimer) {
+      clearTimeout(state.countdownTimer)
+      state.countdownTimer = undefined
+    }
+    if (state.countdownInterval) {
+      clearInterval(state.countdownInterval)
+      state.countdownInterval = undefined
     }
   }
 
-  /**
-   * Check if this is the main session (not a subagent session).
-   */
-  function isMainSession(sessionID: string): boolean {
-    const mainSessionID = getMainSessionID()
-    // If no main session is set, allow all. If set, only allow main.
-    return !mainSessionID || sessionID === mainSessionID
+  function cleanup(sessionID: string): void {
+    cancelCountdown(sessionID)
+    sessions.delete(sessionID)
   }
 
-  // ============================================================================
-  // EXTERNAL API
-  // ============================================================================
-
   const markRecovering = (sessionID: string): void => {
-    const state = getOrCreateState(sessionID)
-    invalidate(sessionID, "entering recovery mode")
-    state.mode = "recovering"
+    const state = getState(sessionID)
+    state.isRecovering = true
+    cancelCountdown(sessionID)
     log(`[${HOOK_NAME}] Session marked as recovering`, { sessionID })
   }
 
   const markRecoveryComplete = (sessionID: string): void => {
     const state = sessions.get(sessionID)
-    if (state && state.mode === "recovering") {
-      state.mode = "idle"
+    if (state) {
+      state.isRecovering = false
       log(`[${HOOK_NAME}] Session recovery complete`, { sessionID })
     }
   }
-
-  // ============================================================================
-  // TOAST HELPER
-  // ============================================================================
 
   async function showCountdownToast(seconds: number, incompleteCount: number): Promise<void> {
     await ctx.client.tui.showToast({
@@ -193,126 +147,65 @@ export function createTodoContinuationEnforcer(
     }).catch(() => {})
   }
 
-  // ============================================================================
-  // CORE INJECTION LOGIC
-  // ============================================================================
-
-  async function executeInjection(sessionID: string, capturedVersion: number): Promise<void> {
+  async function injectContinuation(sessionID: string, incompleteCount: number, total: number): Promise<void> {
     const state = sessions.get(sessionID)
-    if (!state) return
-
-    // Version check: if version changed since we started, abort
-    if (state.version !== capturedVersion) {
-      log(`[${HOOK_NAME}] Injection aborted: version mismatch`, { 
-        sessionID, capturedVersion, currentVersion: state.version 
-      })
+    
+    if (state?.isRecovering) {
+      log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
       return
     }
 
-    // Mode check: must still be in countingDown mode
-    if (state.mode !== "countingDown") {
-      log(`[${HOOK_NAME}] Injection aborted: mode changed`, { 
-        sessionID, mode: state.mode 
-      })
+    if (state?.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
+      log(`[${HOOK_NAME}] Skipped injection: recent error`, { sessionID })
       return
     }
 
-    // Throttle check: minimum interval between injection attempts
-    if (state.lastAttemptedAt) {
-      const elapsed = Date.now() - state.lastAttemptedAt
-      if (elapsed < MIN_INJECTION_INTERVAL_MS) {
-        log(`[${HOOK_NAME}] Injection throttled: too soon since last injection`, { 
-          sessionID, elapsedMs: elapsed, minIntervalMs: MIN_INJECTION_INTERVAL_MS 
-        })
-        state.mode = "idle"
-        return
-      }
+    const hasRunningBgTasks = backgroundManager
+      ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
+      : false
+
+    if (hasRunningBgTasks) {
+      log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
+      return
     }
 
-    state.mode = "injecting"
-
-    // Re-verify todos (CRITICAL: always re-check before injecting)
     let todos: Todo[] = []
     try {
       const response = await ctx.client.session.todo({ path: { id: sessionID } })
       todos = (response.data ?? response) as Todo[]
     } catch (err) {
-      log(`[${HOOK_NAME}] Failed to fetch todos for injection`, { sessionID, error: String(err) })
-      state.mode = "idle"
+      log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(err) })
       return
     }
 
-    // Version check again after async operation
-    if (state.version !== capturedVersion) {
-      log(`[${HOOK_NAME}] Injection aborted after todo fetch: version mismatch`, { sessionID })
-      state.mode = "idle"
+    const freshIncompleteCount = getIncompleteCount(todos)
+    if (freshIncompleteCount === 0) {
+      log(`[${HOOK_NAME}] Skipped injection: no incomplete todos`, { sessionID })
       return
     }
 
-    const incompleteCount = getIncompleteCount(todos)
-    if (incompleteCount === 0) {
-      log(`[${HOOK_NAME}] No incomplete todos at injection time`, { sessionID, total: todos.length })
-      state.mode = "idle"
-      return
-    }
-
-    // Skip entirely if background tasks are running (no false positives)
-    const hasRunningBgTasks = backgroundManager
-      ? backgroundManager.getTasksByParentSession(sessionID).some((t) => t.status === "running")
-      : false
-
-    if (hasRunningBgTasks) {
-      log(`[${HOOK_NAME}] Skipped: background tasks still running`, { sessionID })
-      state.mode = "idle"
-      return
-    }
-
-    // Get previous message agent info
     const messageDir = getMessageDir(sessionID)
     const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
-    // Check write permission
-    const agentHasWritePermission = !prevMessage?.tools || 
+    const hasWritePermission = !prevMessage?.tools || 
       (prevMessage.tools.write !== false && prevMessage.tools.edit !== false)
     
-    if (!agentHasWritePermission) {
-      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, {
-        sessionID, agent: prevMessage?.agent, tools: prevMessage?.tools
-      })
-      state.mode = "idle"
+    if (!hasWritePermission) {
+      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
       return
     }
 
-    // Plan mode agents only analyze and plan, not implement - skip todo continuation
     const agentName = prevMessage?.agent?.toLowerCase() ?? ""
-    const isPlanModeAgent = agentName === "plan" || agentName === "planner-sisyphus"
-    if (isPlanModeAgent) {
-      log(`[${HOOK_NAME}] Skipped: plan mode agent detected`, {
-        sessionID, agent: prevMessage?.agent
-      })
-      state.mode = "idle"
+    if (agentName === "plan" || agentName === "planner-sisyphus") {
+      log(`[${HOOK_NAME}] Skipped: plan mode agent`, { sessionID, agent: prevMessage?.agent })
       return
     }
 
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - incompleteCount}/${todos.length} completed, ${incompleteCount} remaining]`
-
-    // Final version check right before API call (last-mile race mitigation)
-    if (state.version !== capturedVersion) {
-      log(`[${HOOK_NAME}] Injection aborted: version changed before API call`, { sessionID })
-      state.mode = "idle"
-      return
-    }
-
-    // Set lastAttemptedAt BEFORE calling API (throttle attempts, not just successes)
-    state.lastAttemptedAt = Date.now()
+    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
     try {
-      log(`[${HOOK_NAME}] Injecting continuation prompt`, { 
-        sessionID, 
-        agent: prevMessage?.agent,
-        incompleteCount
-      })
-
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, incompleteCount: freshIncompleteCount })
+      
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
@@ -321,235 +214,153 @@ export function createTodoContinuationEnforcer(
         },
         query: { directory: ctx.directory },
       })
-
-      log(`[${HOOK_NAME}] Continuation prompt injected successfully`, { sessionID })
+      
+      log(`[${HOOK_NAME}] Injection successful`, { sessionID })
     } catch (err) {
-      log(`[${HOOK_NAME}] Prompt injection failed`, { sessionID, error: String(err) })
+      log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(err) })
     }
-
-    state.mode = "idle"
   }
 
-  // ============================================================================
-  // COUNTDOWN STARTER
-  // ============================================================================
+  function startCountdown(sessionID: string, incompleteCount: number, total: number): void {
+    const state = getState(sessionID)
+    cancelCountdown(sessionID)
 
-  function startCountdown(sessionID: string, incompleteCount: number): void {
-    const state = getOrCreateState(sessionID)
-
-    // Cancel any existing countdown
-    invalidate(sessionID, "starting new countdown")
-
-    // Increment version for this new countdown
-    state.version++
-    state.mode = "countingDown"
-    const capturedVersion = state.version
-
-    log(`[${HOOK_NAME}] Starting countdown`, { 
-      sessionID, 
-      seconds: COUNTDOWN_SECONDS, 
-      version: capturedVersion,
-      incompleteCount
-    })
-
-    // Show initial toast
-    showCountdownToast(COUNTDOWN_SECONDS, incompleteCount)
-
-    // Show countdown toasts
     let secondsRemaining = COUNTDOWN_SECONDS
-    const toastInterval = setInterval(() => {
-      // Check if countdown was cancelled
-      if (state.version !== capturedVersion) {
-        clearInterval(toastInterval)
-        return
-      }
+    showCountdownToast(secondsRemaining, incompleteCount)
+
+    state.countdownInterval = setInterval(() => {
       secondsRemaining--
       if (secondsRemaining > 0) {
         showCountdownToast(secondsRemaining, incompleteCount)
       }
     }, 1000)
 
-    // Schedule the injection
-    state.timer = setTimeout(() => {
-      clearInterval(toastInterval)
-      clearTimer(state)
-      executeInjection(sessionID, capturedVersion)
+    state.countdownTimer = setTimeout(() => {
+      cancelCountdown(sessionID)
+      injectContinuation(sessionID, incompleteCount, total)
     }, COUNTDOWN_SECONDS * 1000)
-  }
 
-  // ============================================================================
-  // EVENT HANDLER
-  // ============================================================================
+    log(`[${HOOK_NAME}] Countdown started`, { sessionID, seconds: COUNTDOWN_SECONDS, incompleteCount })
+  }
 
   const handler = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
 
-    // -------------------------------------------------------------------------
-    // SESSION.ERROR - Enter error bypass mode
-    // -------------------------------------------------------------------------
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const isInterrupt = detectInterrupt(props?.error)
-      const state = getOrCreateState(sessionID)
+      const state = getState(sessionID)
+      state.lastErrorAt = Date.now()
+      cancelCountdown(sessionID)
       
-      invalidate(sessionID, isInterrupt ? "user interrupt" : "session error")
-      state.mode = "errorBypass"
-      
-      log(`[${HOOK_NAME}] session.error received`, { sessionID, isInterrupt, error: props?.error })
+      log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort: isAbortError(props?.error) })
       return
     }
 
-    // -------------------------------------------------------------------------
-    // SESSION.IDLE - Main trigger for todo continuation
-    // -------------------------------------------------------------------------
     if (event.type === "session.idle") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      log(`[${HOOK_NAME}] session.idle received`, { sessionID })
+      log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-      // Skip if not main session
-      if (!isMainSession(sessionID)) {
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) {
         log(`[${HOOK_NAME}] Skipped: not main session`, { sessionID })
         return
       }
 
-      const state = getOrCreateState(sessionID)
+      const state = getState(sessionID)
 
-      // Skip if in recovery mode
-      if (state.mode === "recovering") {
-        log(`[${HOOK_NAME}] Skipped: session in recovery mode`, { sessionID })
+      if (state.isRecovering) {
+        log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
         return
       }
 
-      // Skip if in error bypass mode (DO NOT clear - wait for user message)
-      if (state.mode === "errorBypass") {
-        log(`[${HOOK_NAME}] Skipped: error bypass (awaiting user message to resume)`, { sessionID })
+      if (state.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
+        log(`[${HOOK_NAME}] Skipped: recent error (cooldown)`, { sessionID })
         return
       }
 
-      // Skip if already counting down or injecting
-      if (state.mode === "countingDown" || state.mode === "injecting") {
-        log(`[${HOOK_NAME}] Skipped: already ${state.mode}`, { sessionID })
+      const hasRunningBgTasks = backgroundManager
+        ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
+        : false
+
+      if (hasRunningBgTasks) {
+        log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
         return
       }
 
-      // Fetch todos
       let todos: Todo[] = []
       try {
         const response = await ctx.client.session.todo({ path: { id: sessionID } })
         todos = (response.data ?? response) as Todo[]
       } catch (err) {
-        log(`[${HOOK_NAME}] Todo API error`, { sessionID, error: String(err) })
+        log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(err) })
         return
       }
 
       if (!todos || todos.length === 0) {
-        log(`[${HOOK_NAME}] No todos found`, { sessionID })
+        log(`[${HOOK_NAME}] No todos`, { sessionID })
         return
       }
 
       const incompleteCount = getIncompleteCount(todos)
       if (incompleteCount === 0) {
-        log(`[${HOOK_NAME}] All todos completed`, { sessionID, total: todos.length })
+        log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
         return
       }
 
-      // Skip if background tasks are running (avoid toast spam with no injection)
-      const hasRunningBgTasks = backgroundManager
-        ? backgroundManager.getTasksByParentSession(sessionID).some((t) => t.status === "running")
-        : false
-
-      if (hasRunningBgTasks) {
-        log(`[${HOOK_NAME}] Skipped: background tasks still running`, { sessionID })
-        return
-      }
-
-      log(`[${HOOK_NAME}] Found incomplete todos`, { 
-        sessionID, 
-        incomplete: incompleteCount, 
-        total: todos.length 
-      })
-
-      startCountdown(sessionID, incompleteCount)
+      startCountdown(sessionID, incompleteCount, todos.length)
       return
     }
 
-    // -------------------------------------------------------------------------
-    // MESSAGE.UPDATED - Cancel countdown on activity
-    // -------------------------------------------------------------------------
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       const role = info?.role as string | undefined
-      const finish = info?.finish as string | undefined
 
       if (!sessionID) return
 
-      // User message: Always cancel countdown and clear errorBypass
       if (role === "user") {
         const state = sessions.get(sessionID)
-        if (state?.mode === "errorBypass") {
-          state.mode = "idle"
-          log(`[${HOOK_NAME}] User message cleared errorBypass mode`, { sessionID })
+        if (state) {
+          state.lastErrorAt = undefined
         }
-        invalidate(sessionID, "user message received")
-        return
+        cancelCountdown(sessionID)
+        log(`[${HOOK_NAME}] User message: cleared error state`, { sessionID })
       }
 
-      // Assistant message WITHOUT finish: Agent is working, cancel countdown
-      if (role === "assistant" && !finish) {
-        invalidate(sessionID, "assistant is working (streaming)")
-        return
-      }
-
-      // Assistant message WITH finish: Agent finished a turn (let session.idle handle it)
-      if (role === "assistant" && finish) {
-        log(`[${HOOK_NAME}] Assistant turn finished`, { sessionID, finish })
-        return
+      if (role === "assistant") {
+        cancelCountdown(sessionID)
       }
       return
     }
 
-    // -------------------------------------------------------------------------
-    // MESSAGE.PART.UPDATED - Cancel countdown on streaming activity
-    // -------------------------------------------------------------------------
     if (event.type === "message.part.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
-        invalidate(sessionID, "assistant streaming")
+        cancelCountdown(sessionID)
       }
       return
     }
 
-    // -------------------------------------------------------------------------
-    // TOOL EVENTS - Cancel countdown when tools are executing
-    // -------------------------------------------------------------------------
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
-        invalidate(sessionID, `tool execution (${event.type})`)
+        cancelCountdown(sessionID)
       }
       return
     }
 
-    // -------------------------------------------------------------------------
-    // SESSION.DELETED - Cleanup
-    // -------------------------------------------------------------------------
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
-        const state = sessions.get(sessionInfo.id)
-        if (state) {
-          clearTimer(state)
-        }
-        sessions.delete(sessionInfo.id)
-        log(`[${HOOK_NAME}] Session deleted, state cleaned up`, { sessionID: sessionInfo.id })
+        cleanup(sessionInfo.id)
+        log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
       }
       return
     }
