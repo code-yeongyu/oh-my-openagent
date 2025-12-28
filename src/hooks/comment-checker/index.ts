@@ -1,5 +1,6 @@
 import type { PendingCall } from "./types"
 import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
+import type { CommentCheckerConfig } from "../../config/schema"
 
 import * as fs from "fs"
 import { existsSync } from "fs"
@@ -32,8 +33,8 @@ function cleanupOldPendingCalls(): void {
 
 setInterval(cleanupOldPendingCalls, 10_000)
 
-export function createCommentCheckerHooks() {
-  debugLog("createCommentCheckerHooks called")
+export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
+  debugLog("createCommentCheckerHooks called", { config })
   
   // Start background CLI initialization (may trigger lazy download)
   startBackgroundInit()
@@ -123,7 +124,7 @@ export function createCommentCheckerHooks() {
         
         // CLI mode only
         debugLog("using CLI:", cliPath)
-        await processWithCli(input, pendingCall, output, cliPath)
+        await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt)
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
@@ -135,7 +136,8 @@ async function processWithCli(
   input: { tool: string; sessionID: string; callID: string },
   pendingCall: PendingCall,
   output: { output: string },
-  cliPath: string
+  cliPath: string,
+  customPrompt?: string
 ): Promise<void> {
   debugLog("using CLI mode with path:", cliPath)
   
@@ -154,7 +156,7 @@ async function processWithCli(
     },
   }
   
-  const result = await runCommentChecker(hookInput, cliPath)
+  const result = await runCommentChecker(hookInput, cliPath, customPrompt)
   
   if (result.hasComments && result.message) {
     debugLog("CLI detected comments, appending message")
