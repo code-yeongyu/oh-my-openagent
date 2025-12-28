@@ -67,6 +67,10 @@ export const HookNameSchema = z.enum([
   "thinking-block-validator",
 ])
 
+export const BuiltinCommandNameSchema = z.enum([
+  "init-deep",
+])
+
 export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
@@ -176,6 +180,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_mcps: z.array(McpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
+  disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
@@ -190,6 +195,7 @@ export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
+export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>
 export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
 export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
