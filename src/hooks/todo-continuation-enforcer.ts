@@ -272,8 +272,19 @@ export function createTodoContinuationEnforcer(
       (prevMessage.tools.write !== false && prevMessage.tools.edit !== false)
     
     if (!agentHasWritePermission) {
-      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { 
-        sessionID, agent: prevMessage?.agent, tools: prevMessage?.tools 
+      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, {
+        sessionID, agent: prevMessage?.agent, tools: prevMessage?.tools
+      })
+      state.mode = "idle"
+      return
+    }
+
+    // Plan mode agents only analyze and plan, not implement - skip todo continuation
+    const agentName = prevMessage?.agent?.toLowerCase() ?? ""
+    const isPlanModeAgent = agentName === "plan" || agentName === "planner-sisyphus"
+    if (isPlanModeAgent) {
+      log(`[${HOOK_NAME}] Skipped: plan mode agent detected`, {
+        sessionID, agent: prevMessage?.agent
       })
       state.mode = "idle"
       return
