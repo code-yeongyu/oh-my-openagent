@@ -255,7 +255,7 @@ export function createTodoContinuationEnforcer(
 
           // Skip for plan mode agents - they only plan, not implement
           const agentName = prevMessage?.agent?.toLowerCase() ?? ""
-          const isPlanModeAgent = agentName === "plan" || agentName.includes("planner")
+          const isPlanModeAgent = agentName === "plan" || agentName === "planner-sisyphus"
           if (isPlanModeAgent) {
             log(`[${HOOK_NAME}] Skipped: plan mode agent detected`, { sessionID, agent: prevMessage?.agent })
             remindedSessions.delete(sessionID)
@@ -372,6 +372,15 @@ export function createTodoContinuationEnforcer(
             try {
               const messageDir = getMessageDir(sessionID)
               const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
+              // Skip for plan mode agents - they only plan, not implement
+              const agentName = prevMessage?.agent?.toLowerCase() ?? ""
+              const isPlanModeAgent = agentName === "plan" || agentName === "planner-sisyphus"
+              if (isPlanModeAgent) {
+                log(`[${HOOK_NAME}] Skipped preemptive: plan mode agent detected`, { sessionID, agent: prevMessage?.agent })
+                preemptivelyInjectedSessions.delete(sessionID)
+                return
+              }
 
               const prompt = hasRunningBgTasks
                 ? "[SYSTEM] Background tasks are still running. Wait for their completion before proceeding."
