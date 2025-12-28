@@ -64,6 +64,15 @@
         ]
       }
     },
+    "disabled_commands": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "init-deep"
+        ]
+      }
+    },
     "agents": {
       "type": "object",
       "properties": {
