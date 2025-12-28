@@ -387,6 +387,39 @@ gh repo star code-yeongyu/oh-my-opencode
 </details>
 
 
+## 언인스톨
+
+oh-my-opencode를 제거하려면:
+
+1. **OpenCode 설정에서 플러그인 제거**
+
+   `~/.config/opencode/opencode.json` (또는 `opencode.jsonc`)를 편집하여 `plugin` 배열에서 `"oh-my-opencode"`를 제거합니다:
+
+   ```bash
+   # jq 사용 예시
+   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+       ~/.config/opencode/opencode.json > /tmp/oc.json && \
+       mv /tmp/oc.json ~/.config/opencode/opencode.json
+   ```
+
+2. **설정 파일 삭제 (선택 사항)**
+
+   ```bash
+   # 사용자 설정 삭제
+   rm -f ~/.config/opencode/oh-my-opencode.json
+
+   # 프로젝트 설정 삭제 (존재하는 경우)
+   rm -f .opencode/oh-my-opencode.json
+   ```
+
+3. **제거 확인**
+
+   ```bash
+   opencode --version
+   # 플러그인이 더 이상 로드되지 않아야 합니다
+   ```
+
+
 ## 기능
 
 ### Agents: 당신의 새로운 팀원들
@@ -450,6 +483,18 @@ Syntax Highlighting, Autocomplete, Refactoring, Navigation, Analysis, 그리고 
 - **lsp_code_action_resolve**: 코드 액션 적용
 - **ast_grep_search**: AST 인식 코드 패턴 검색 (25개 언어)
 - **ast_grep_replace**: AST 인식 코드 교체
+- **call_omo_agent**: 전문 explore/librarian 에이전트를 생성합니다. 비동기 실행을 위한 `run_in_background` 파라미터를 지원합니다.
+
+#### 세션 관리 (Session Management)
+
+OpenCode 세션 히스토리를 탐색하고 검색하기 위한 도구들입니다:
+
+- **session_list**: 날짜 및 개수 제한 필터링을 포함한 모든 OpenCode 세션 목록 조회
+- **session_read**: 특정 세션의 메시지 및 히스토리 읽기
+- **session_search**: 세션 메시지 전체 텍스트 검색
+- **session_info**: 세션에 대한 메타데이터 및 통계 정보 조회
+
+이 도구들을 통해 에이전트는 이전 대화를 참조하고 세션 간의 연속성을 유지할 수 있습니다.
 
 #### Context is all you need.
 - **Directory AGENTS.md / README.md Injector**: 파일을 읽을 때 `AGENTS.md`, `README.md` 내용을 자동으로 주입합니다. 파일 디렉토리부터 프로젝트 루트까지 탐색하며, 경로 상의 **모든** `AGENTS.md` 파일을 수집합니다. 중첩된 디렉토리별 지침을 지원합니다:
@@ -602,6 +647,10 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Empty Message Sanitizer**: 빈 채팅 메시지로 인한 API 오류를 방지합니다. 전송 전 메시지 내용을 자동으로 정리합니다.
 - **Grep Output Truncator**: grep은 산더미 같은 텍스트를 반환할 수 있습니다. 남은 컨텍스트 윈도우에 따라 동적으로 출력을 축소합니다—50% 여유 공간 유지, 최대 50k 토큰.
 - **Tool Output Truncator**: 같은 아이디어, 더 넓은 범위. Grep, Glob, LSP 도구, AST-grep의 출력을 축소합니다. 한 번의 장황한 검색이 전체 컨텍스트를 잡아먹는 것을 방지합니다.
+- **선제적 압축 (Preemptive Compaction)**: 세션 토큰 한계에 도달하기 전에 선제적으로 세션을 압축합니다. 문제가 발생하기 전에 미리 실행됩니다.
+- **압축 컨텍스트 주입기 (Compaction Context Injector)**: 세션 압축 중에 중요한 컨텍스트(AGENTS.md, 현재 디렉토리 정보 등)를 유지하여 중요한 상태를 잃지 않도록 합니다.
+- **사고 블록 검증기 (Thinking Block Validator)**: 사고(thinking) 블록의 형식이 올바른지 검증하여 잘못된 형식으로 인한 API 오류를 방지합니다.
+- **Claude Code 훅 (Claude Code Hooks)**: Claude Code의 settings.json에 설정된 훅을 실행합니다. PreToolUse/PostToolUse/UserPromptSubmit/Stop 이벤트를 지원하는 호환성 레이어입니다.
 
 ## 설정
 
@@ -613,7 +662,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 | 플랫폼 | 사용자 설정 경로 |
 |--------|------------------|
-| **Windows** | `~/.config/opencode/oh-my-opencode.json` (우선) 또는 `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (권장) 또는 `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 Schema 자동 완성이 지원됩니다:
@@ -621,6 +670,36 @@ Schema 자동 완성이 지원됩니다:
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
+}
+```
+
+### JSONC 지원
+
+`oh-my-opencode` 설정 파일은 JSONC(주석이 포함된 JSON)를 지원합니다:
+- 한 줄 주석: `// 주석`
+- 블록 주석: `/* 주석 */`
+- 후행 콤마(Trailing commas): `{ "key": "value", }`
+
+`oh-my-opencode.jsonc`와 `oh-my-opencode.json` 파일이 모두 존재할 경우, `.jsonc` 파일이 우선순위를 갖습니다.
+
+**주석이 포함된 예시:**
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // Antigravity OAuth를 통해 Google Gemini 활성화
+  "google_auth": false,
+  
+  /* 에이전트 오버라이드 - 특정 작업에 대한 모델 커스터마이징 */
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2"  // 전략적 추론을 위한 GPT
+    },
+    "explore": {
+      "model": "opencode/grok-code"  // 탐색을 위한 빠르고 무료인 모델
+    },
+  },
 }
 ```
 
@@ -786,7 +865,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
 
 **`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 
