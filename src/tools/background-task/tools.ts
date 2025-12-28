@@ -1,75 +1,103 @@
-import { tool, type PluginInput } from "@opencode-ai/plugin"
-import { existsSync, readdirSync, mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
-import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs } from "./types"
-import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
-import { getOpenCodeStorageDir } from "../../shared/data-path"
+import { tool, type PluginInput } from "@opencode-ai/plugin";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import type {
+	BackgroundManager,
+	BackgroundTask,
+} from "../../features/background-agent";
+import type {
+	BackgroundTaskArgs,
+	BackgroundOutputArgs,
+	BackgroundCancelArgs,
+} from "./types";
+import {
+	BACKGROUND_TASK_DESCRIPTION,
+	BACKGROUND_OUTPUT_DESCRIPTION,
+	BACKGROUND_CANCEL_DESCRIPTION,
+} from "./constants";
+import {
+	findNearestMessageWithFields,
+	MESSAGE_STORAGE,
+} from "../../features/hook-message-injector";
+import {
+	INLINE_OUTPUT_MAX_CHARS,
+	saveOutputToFile,
+	truncateText,
+} from "../../shared/task-output";
 
-const INLINE_OUTPUT_MAX_CHARS = 15000
-
-type OpencodeClient = PluginInput["client"]
+type OpencodeClient = PluginInput["client"];
 
 function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
+	if (!existsSync(MESSAGE_STORAGE)) return null;
 
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
+	const directPath = join(MESSAGE_STORAGE, sessionID);
+	if (existsSync(directPath)) return directPath;
 
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
+	for (const dir of readdirSync(MESSAGE_STORAGE)) {
+		const sessionPath = join(MESSAGE_STORAGE, dir, sessionID);
+		if (existsSync(sessionPath)) return sessionPath;
+	}
 
-  return null
+	return null;
 }
 
 function formatDuration(start: Date, end?: Date): string {
-  const duration = (end ?? new Date()).getTime() - start.getTime()
-  const seconds = Math.floor(duration / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
+	const duration = (end ?? new Date()).getTime() - start.getTime();
+	const seconds = Math.floor(duration / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(minutes / 60);
 
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m ${seconds % 60}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`
-  } else {
-    return `${seconds}s`
-  }
+	if (hours > 0) {
+		return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+	} else if (minutes > 0) {
+		return `${minutes}m ${seconds % 60}s`;
+	} else {
+		return `${seconds}s`;
+	}
 }
 
 export function createBackgroundTask(manager: BackgroundManager) {
-  return tool({
-    description: BACKGROUND_TASK_DESCRIPTION,
-    args: {
-      description: tool.schema.string().describe("Short task description (shown in status)"),
-      prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      agent: tool.schema.string().describe("Agent type to use (any registered agent)"),
-    },
-    async execute(args: BackgroundTaskArgs, toolContext) {
-      if (!args.agent || args.agent.trim() === "") {
-        return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
-      }
+	return tool({
+		description: BACKGROUND_TASK_DESCRIPTION,
+		args: {
+			description: tool.schema
+				.string()
+				.describe("Short task description (shown in status)"),
+			prompt: tool.schema
+				.string()
+				.describe("Full detailed prompt for the agent"),
+			agent: tool.schema
+				.string()
+				.describe("Agent type to use (any registered agent)"),
+		},
+		async execute(args: BackgroundTaskArgs, toolContext) {
+			if (!args.agent || args.agent.trim() === "") {
+				return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`;
+			}
 
-      try {
-        const messageDir = getMessageDir(toolContext.sessionID)
-        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-        const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-          ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
-          : undefined
+			try {
+				const messageDir = getMessageDir(toolContext.sessionID);
+				const prevMessage = messageDir
+					? findNearestMessageWithFields(messageDir)
+					: null;
+				const parentModel =
+					prevMessage?.model?.providerID && prevMessage?.model?.modelID
+						? {
+								providerID: prevMessage.model.providerID,
+								modelID: prevMessage.model.modelID,
+							}
+						: undefined;
 
-        const task = await manager.launch({
-          description: args.description,
-          prompt: args.prompt,
-          agent: args.agent.trim(),
-          parentSessionID: toolContext.sessionID,
-          parentMessageID: toolContext.messageID,
-          parentModel,
-        })
+				const task = await manager.launch({
+					description: args.description,
+					prompt: args.prompt,
+					agent: args.agent.trim(),
+					parentSessionID: toolContext.sessionID,
+					parentMessageID: toolContext.messageID,
+					parentModel,
+				});
 
-        return `Background task launched successfully.
+				return `Background task launched successfully.
 
 Task ID: ${task.id}
 Session ID: ${task.sessionID}
@@ -80,77 +108,55 @@ Status: ${task.status}
 The system will notify you when the task completes.
 Use \`background_output\` tool with task_id="${task.id}" to check progress:
 - block=false (default): Check status immediately - returns full status info
-- block=true: Wait for completion (rarely needed since system notifies)`
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return `❌ Failed to launch background task: ${message}`
-      }
-    },
-  })
+- block=true: Wait for completion (rarely needed since system notifies)`;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				return `❌ Failed to launch background task: ${message}`;
+			}
+		},
+	});
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-function getTaskOutputsDir(): string {
-  const dir = join(getOpenCodeStorageDir(), "task-outputs")
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  return dir
-}
-
-function saveOutputToFile(taskId: string, content: string): string {
-  const outputDir = getTaskOutputsDir()
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-  const filename = `background-task_${taskId}_${timestamp}.md`
-  const filePath = join(outputDir, filename)
-  writeFileSync(filePath, content, "utf-8")
-  return filePath
-}
-
-function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength) + "..."
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function formatTaskStatus(task: BackgroundTask): string {
-  const duration = formatDuration(task.startedAt, task.completedAt)
-  const promptPreview = truncateText(task.prompt, 500)
-  
-  let progressSection = ""
-  if (task.progress?.lastTool) {
-    progressSection = `\n| Last tool | ${task.progress.lastTool} |`
-  }
+	const duration = formatDuration(task.startedAt, task.completedAt);
+	const promptPreview = truncateText(task.prompt, 500);
 
-  let lastMessageSection = ""
-  if (task.progress?.lastMessage) {
-    const truncated = truncateText(task.progress.lastMessage, 500)
-    const messageTime = task.progress.lastMessageAt 
-      ? task.progress.lastMessageAt.toISOString()
-      : "N/A"
-    lastMessageSection = `
+	let progressSection = "";
+	if (task.progress?.lastTool) {
+		progressSection = `\n| Last tool | ${task.progress.lastTool} |`;
+	}
+
+	let lastMessageSection = "";
+	if (task.progress?.lastMessage) {
+		const truncated = truncateText(task.progress.lastMessage, 500);
+		const messageTime = task.progress.lastMessageAt
+			? task.progress.lastMessageAt.toISOString()
+			: "N/A";
+		lastMessageSection = `
 
 ## Last Message (${messageTime})
 
 \`\`\`
 ${truncated}
-\`\`\``
-  }
+\`\`\``;
+	}
 
-  let statusNote = ""
-  if (task.status === "running") {
-    statusNote = `
+	let statusNote = "";
+	if (task.status === "running") {
+		statusNote = `
 
-> **Note**: No need to wait explicitly - the system will notify you when this task completes.`
-  } else if (task.status === "error") {
-    statusNote = `
+> **Note**: No need to wait explicitly - the system will notify you when this task completes.`;
+	} else if (task.status === "error") {
+		statusNote = `
 
-> **Failed**: The task encountered an error. Check the last message for details.`
-  }
+> **Failed**: The task encountered an error. Check the last message for details.`;
+	}
 
-  return `# Task Status
+	return `# Task Status
 
 | Field | Value |
 |-------|-------|
@@ -165,44 +171,30 @@ ${statusNote}
 
 \`\`\`
 ${promptPreview}
-\`\`\`${lastMessageSection}`
+\`\`\`${lastMessageSection}`;
 }
 
-async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
-  const messagesResult = await client.session.messages({
-    path: { id: task.sessionID },
-  })
+async function formatTaskResult(
+	task: BackgroundTask,
+	client: OpencodeClient,
+): Promise<string> {
+	const messagesResult = await client.session.messages({
+		path: { id: task.sessionID },
+	});
 
-  if (messagesResult.error) {
-    return `Error fetching messages: ${messagesResult.error}`
-  }
+	if (messagesResult.error) {
+		return `Error fetching messages: ${messagesResult.error}`;
+	}
 
-  // Handle both SDK response structures: direct array or wrapped in .data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
-    info?: { role?: string }
-    parts?: Array<{ type?: string; text?: string }>
-  }>
+	// Handle both SDK response structures: direct array or wrapped in .data
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
+		info?: { role?: string };
+		parts?: Array<{ type?: string; text?: string }>;
+	}>;
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return `Task Result
-
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
-Session ID: ${task.sessionID}
-
----
-
-(No messages found)`
-  }
-
-  const assistantMessages = messages.filter(
-    (m) => m.info?.role === "assistant"
-  )
-
-  if (assistantMessages.length === 0) {
-    return `Task Result
+	if (!Array.isArray(messages) || messages.length === 0) {
+		return `Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -211,24 +203,40 @@ Session ID: ${task.sessionID}
 
 ---
 
-(No assistant response found)`
-  }
+(No messages found)`;
+	}
 
-  const lastMessage = assistantMessages[assistantMessages.length - 1]
-  const textParts = lastMessage?.parts?.filter(
-    (p) => p.type === "text"
-  ) ?? []
-  const textContent = textParts
-    .map((p) => p.text ?? "")
-    .filter((text) => text.length > 0)
-    .join("\n")
+	const assistantMessages = messages.filter(
+		(m) => m.info?.role === "assistant",
+	);
 
-  const duration = formatDuration(task.startedAt, task.completedAt)
+	if (assistantMessages.length === 0) {
+		return `Task Result
 
-  if (textContent.length > INLINE_OUTPUT_MAX_CHARS) {
-    const filePath = saveOutputToFile(task.id, textContent)
-    const preview = truncateText(textContent, 2000)
-    return `Task Result (Large Output)
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Session ID: ${task.sessionID}
+
+---
+
+(No assistant response found)`;
+	}
+
+	const lastMessage = assistantMessages[assistantMessages.length - 1];
+	const textParts = lastMessage?.parts?.filter((p) => p.type === "text") ?? [];
+	const textContent = textParts
+		.map((p) => p.text ?? "")
+		.filter((text) => text.length > 0)
+		.join("\n");
+
+	const duration = formatDuration(task.startedAt, task.completedAt);
+
+	if (textContent.length > INLINE_OUTPUT_MAX_CHARS) {
+		const filePath = saveOutputToFile("background-task", task.id, textContent);
+		if (filePath) {
+			const preview = truncateText(textContent, 2000);
+			return `Task Result (Large Output)
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -239,10 +247,11 @@ Session ID: ${task.sessionID}
 
 ## Preview (first 2000 chars)
 
-${preview}`
-  }
+${preview}`;
+		}
+	}
 
-  return `Task Result
+	return `Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -251,142 +260,169 @@ Session ID: ${task.sessionID}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}`;
 }
 
-export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient) {
-  return tool({
-    description: BACKGROUND_OUTPUT_DESCRIPTION,
-    args: {
-      task_id: tool.schema.string().describe("Task ID to get output from"),
-      block: tool.schema.boolean().optional().describe("Wait for completion (default: false). System notifies when done, so blocking is rarely needed."),
-      timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
-    },
-    async execute(args: BackgroundOutputArgs) {
-      try {
-        const task = manager.getTask(args.task_id)
-        if (!task) {
-          return `Task not found: ${args.task_id}`
-        }
+export function createBackgroundOutput(
+	manager: BackgroundManager,
+	client: OpencodeClient,
+) {
+	return tool({
+		description: BACKGROUND_OUTPUT_DESCRIPTION,
+		args: {
+			task_id: tool.schema.string().describe("Task ID to get output from"),
+			block: tool.schema
+				.boolean()
+				.optional()
+				.describe(
+					"Wait for completion (default: false). System notifies when done, so blocking is rarely needed.",
+				),
+			timeout: tool.schema
+				.number()
+				.optional()
+				.describe("Max wait time in ms (default: 60000, max: 600000)"),
+		},
+		async execute(args: BackgroundOutputArgs) {
+			try {
+				const task = manager.getTask(args.task_id);
+				if (!task) {
+					return `Task not found: ${args.task_id}`;
+				}
 
-        const shouldBlock = args.block === true
-        const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
+				const shouldBlock = args.block === true;
+				const timeoutMs = Math.min(args.timeout ?? 60000, 600000);
 
-        // Already completed: return result immediately (regardless of block flag)
-        if (task.status === "completed") {
-          return await formatTaskResult(task, client)
-        }
+				// Already completed: return result immediately (regardless of block flag)
+				if (task.status === "completed") {
+					return await formatTaskResult(task, client);
+				}
 
-        // Error or cancelled: return status immediately
-        if (task.status === "error" || task.status === "cancelled") {
-          return formatTaskStatus(task)
-        }
+				// Error or cancelled: return status immediately
+				if (task.status === "error" || task.status === "cancelled") {
+					return formatTaskStatus(task);
+				}
 
-        // Non-blocking and still running: return status
-        if (!shouldBlock) {
-          return formatTaskStatus(task)
-        }
+				// Non-blocking and still running: return status
+				if (!shouldBlock) {
+					return formatTaskStatus(task);
+				}
 
-        // Blocking: poll until completion or timeout
-        const startTime = Date.now()
+				// Blocking: poll until completion or timeout
+				const startTime = Date.now();
 
-        while (Date.now() - startTime < timeoutMs) {
-          await delay(1000)
+				while (Date.now() - startTime < timeoutMs) {
+					await delay(1000);
 
-          const currentTask = manager.getTask(args.task_id)
-          if (!currentTask) {
-            return `Task was deleted: ${args.task_id}`
-          }
+					const currentTask = manager.getTask(args.task_id);
+					if (!currentTask) {
+						return `Task was deleted: ${args.task_id}`;
+					}
 
-          if (currentTask.status === "completed") {
-            return await formatTaskResult(currentTask, client)
-          }
+					if (currentTask.status === "completed") {
+						return await formatTaskResult(currentTask, client);
+					}
 
-          if (currentTask.status === "error" || currentTask.status === "cancelled") {
-            return formatTaskStatus(currentTask)
-          }
-        }
+					if (
+						currentTask.status === "error" ||
+						currentTask.status === "cancelled"
+					) {
+						return formatTaskStatus(currentTask);
+					}
+				}
 
-        // Timeout exceeded: return current status
-        const finalTask = manager.getTask(args.task_id)
-        if (!finalTask) {
-          return `Task was deleted: ${args.task_id}`
-        }
-        return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask)}`
-      } catch (error) {
-        return `Error getting output: ${error instanceof Error ? error.message : String(error)}`
-      }
-    },
-  })
+				// Timeout exceeded: return current status
+				const finalTask = manager.getTask(args.task_id);
+				if (!finalTask) {
+					return `Task was deleted: ${args.task_id}`;
+				}
+				return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask)}`;
+			} catch (error) {
+				return `Error getting output: ${error instanceof Error ? error.message : String(error)}`;
+			}
+		},
+	});
 }
 
-export function createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient) {
-  return tool({
-    description: BACKGROUND_CANCEL_DESCRIPTION,
-    args: {
-      taskId: tool.schema.string().optional().describe("Task ID to cancel (required if all=false)"),
-      all: tool.schema.boolean().optional().describe("Cancel all running background tasks (default: false)"),
-    },
-    async execute(args: BackgroundCancelArgs, toolContext) {
-      try {
-        const cancelAll = args.all === true
+export function createBackgroundCancel(
+	manager: BackgroundManager,
+	client: OpencodeClient,
+) {
+	return tool({
+		description: BACKGROUND_CANCEL_DESCRIPTION,
+		args: {
+			taskId: tool.schema
+				.string()
+				.optional()
+				.describe("Task ID to cancel (required if all=false)"),
+			all: tool.schema
+				.boolean()
+				.optional()
+				.describe("Cancel all running background tasks (default: false)"),
+		},
+		async execute(args: BackgroundCancelArgs, toolContext) {
+			try {
+				const cancelAll = args.all === true;
 
-        if (!cancelAll && !args.taskId) {
-          return `❌ Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
-        }
+				if (!cancelAll && !args.taskId) {
+					return `❌ Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`;
+				}
 
-        if (cancelAll) {
-          const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
-          const runningTasks = tasks.filter(t => t.status === "running")
+				if (cancelAll) {
+					const tasks = manager.getAllDescendantTasks(toolContext.sessionID);
+					const runningTasks = tasks.filter((t) => t.status === "running");
 
-          if (runningTasks.length === 0) {
-            return `✅ No running background tasks to cancel.`
-          }
+					if (runningTasks.length === 0) {
+						return `✅ No running background tasks to cancel.`;
+					}
 
-          const results: string[] = []
-          for (const task of runningTasks) {
-            client.session.abort({
-              path: { id: task.sessionID },
-            }).catch(() => {})
+					const results: string[] = [];
+					for (const task of runningTasks) {
+						client.session
+							.abort({
+								path: { id: task.sessionID },
+							})
+							.catch(() => {});
 
-            task.status = "cancelled"
-            task.completedAt = new Date()
-            results.push(`- ${task.id}: ${task.description}`)
-          }
+						task.status = "cancelled";
+						task.completedAt = new Date();
+						results.push(`- ${task.id}: ${task.description}`);
+					}
 
-          return `✅ Cancelled ${runningTasks.length} background task(s):
+					return `✅ Cancelled ${runningTasks.length} background task(s):
 
-${results.join("\n")}`
-        }
+${results.join("\n")}`;
+				}
 
-        const task = manager.getTask(args.taskId!)
-        if (!task) {
-          return `❌ Task not found: ${args.taskId}`
-        }
+				const task = manager.getTask(args.taskId!);
+				if (!task) {
+					return `❌ Task not found: ${args.taskId}`;
+				}
 
-        if (task.status !== "running") {
-          return `❌ Cannot cancel task: current status is "${task.status}".
-Only running tasks can be cancelled.`
-        }
+				if (task.status !== "running") {
+					return `❌ Cannot cancel task: current status is "${task.status}".
+Only running tasks can be cancelled.`;
+				}
 
-        // Fire-and-forget: abort 요청을 보내고 await 하지 않음
-        // await 하면 메인 세션까지 abort 되는 문제 발생
-        client.session.abort({
-          path: { id: task.sessionID },
-        }).catch(() => {})
+				// Fire-and-forget: abort 요청을 보내고 await 하지 않음
+				// await 하면 메인 세션까지 abort 되는 문제 발생
+				client.session
+					.abort({
+						path: { id: task.sessionID },
+					})
+					.catch(() => {});
 
-        task.status = "cancelled"
-        task.completedAt = new Date()
+				task.status = "cancelled";
+				task.completedAt = new Date();
 
-        return `✅ Task cancelled successfully
+				return `✅ Task cancelled successfully
 
 Task ID: ${task.id}
 Description: ${task.description}
 Session ID: ${task.sessionID}
-Status: ${task.status}`
-      } catch (error) {
-        return `❌ Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
-      }
-    },
-  })
+Status: ${task.status}`;
+			} catch (error) {
+				return `❌ Error cancelling task: ${error instanceof Error ? error.message : String(error)}`;
+			}
+		},
+	});
 }
