@@ -20,3 +20,16 @@ export {
   getCommitFiles,
   enrichCommitsWithFiles,
 } from "./git-adapter"
+export {
+  prepareAnalysisPackets,
+  parseAIResponse,
+  createFallbackAnalysis,
+  suggestPriority,
+} from "./analysis"
+export type { AnalysisPacket } from "./analysis"
+export {
+  groupCommitsByScope,
+  generateRecommendations,
+  generateMarkdownReport,
+} from "./report"
+export type { CommitGroup } from "./report"

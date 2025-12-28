@@ -1,9 +1,22 @@
 import { tool, type PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { SYNC_FORK_DESCRIPTION, DEFAULT_LIMIT, MAX_LIMIT } from "./constants"
-import { getOrCreateState, atomicWriteState, deleteState, getNewCommits } from "./state"
+import {
+  getOrCreateState,
+  atomicWriteState,
+  deleteState,
+  getNewCommits,
+  markCommitAsReviewed,
+  updateLastReviewed,
+} from "./state"
 import { runPreflight, getUpstreamCommits, enrichCommitsWithFiles } from "./git-adapter"
-import type { SyncForkArgs, SyncForkResult, ParsedCommit } from "./types"
+import { prepareAnalysisPackets, suggestPriority } from "./analysis"
+import {
+  groupCommitsByScope,
+  generateRecommendations,
+  generateMarkdownReport,
+} from "./report"
+import type { SyncForkArgs, SyncForkResult, ParsedCommit, Priority } from "./types"
 
 export function createSyncForkTool(_ctx: PluginInput) {
   return tool({
@@ -42,6 +55,15 @@ export function createSyncForkTool(_ctx: PluginInput) {
       log(`[sync_fork] Starting with args: ${JSON.stringify(args)}`)
 
       const result = await executeSyncFork(args)
+
+      if (args.output === "json") {
+        return JSON.stringify(result, null, 2)
+      }
+
+      if (result.success && result.markdownReport) {
+        return result.markdownReport
+      }
+
       return JSON.stringify(result, null, 2)
     },
   })
@@ -97,28 +119,56 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
       log(`[sync_fork] Filtered to ${filteredCommits.length} ${args.filter} commits`)
     }
 
+    if (filteredCommits.length === 0) {
+      return {
+        success: true,
+        summary: {
+          total: allCommits.length,
+          new: 0,
+          byPriority: {},
+          byType: countByType(allCommits),
+        },
+        markdownReport: generateNoNewCommitsReport(context, warnings, args.filter),
+        nextSteps: [],
+      }
+    }
+
     await enrichCommitsWithFiles(context.repoRoot, filteredCommits)
 
-    const byType = countByType(filteredCommits)
+    const groups = groupCommitsByScope(filteredCommits)
+    log(`[sync_fork] Grouped into ${groups.length} groups`)
 
-    const report = generateBasicReport(context, filteredCommits, warnings)
+    const recommendations = generateRecommendations(groups)
+    log(`[sync_fork] Generated ${recommendations.length} recommendations`)
+
+    for (const commit of filteredCommits) {
+      const priority = suggestPriority(commit)
+      markCommitAsReviewed(state, commit.sha, priority)
+    }
+
+    if (filteredCommits.length > 0) {
+      updateLastReviewed(state, filteredCommits[filteredCommits.length - 1].sha)
+    }
 
     state.upstream.lastFetchedAt = new Date().toISOString()
     await atomicWriteState(state)
+
+    const byPriority = countByPriority(recommendations)
+    const byType = countByType(filteredCommits)
+
+    const markdownReport = generateMarkdownReport(context, recommendations, warnings)
 
     return {
       success: true,
       summary: {
         total: allCommits.length,
-        new: newCommits.length,
-        byPriority: {},
+        new: filteredCommits.length,
+        byPriority,
         byType,
       },
-      markdownReport: report,
-      nextSteps: [
-        "Phase 3-4 TODO: AI analysis will be added to provide priority recommendations",
-        "Phase 5 TODO: Execution phase will handle cherry-pick and PR creation",
-      ],
+      recommendations,
+      markdownReport,
+      nextSteps: generateNextSteps(recommendations),
     }
   } catch (e) {
     log(`[sync_fork] Error: ${e}`)
@@ -137,10 +187,20 @@ function countByType(commits: ParsedCommit[]): Record<string, number> {
   return counts
 }
 
-function generateBasicReport(
+function countByPriority(
+  recommendations: { priority: Priority }[]
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const r of recommendations) {
+    counts[r.priority] = (counts[r.priority] || 0) + 1
+  }
+  return counts
+}
+
+function generateNoNewCommitsReport(
   context: { upstreamRemote: string; upstreamBranch: string; mergeBase: string },
-  commits: ParsedCommit[],
-  warnings: string[]
+  warnings: string[],
+  filter?: string
 ): string {
   const lines: string[] = [
     "# Fork Sync Report",
@@ -148,39 +208,47 @@ function generateBasicReport(
     "## Context",
     `- **Upstream**: ${context.upstreamRemote}/${context.upstreamBranch}`,
     `- **Merge Base**: ${context.mergeBase.slice(0, 7)}`,
-    `- **Commits Found**: ${commits.length}`,
     "",
   ]
 
   if (warnings.length > 0) {
     lines.push("## Warnings", "")
     for (const w of warnings) {
-      lines.push(`- ${w}`)
+      lines.push(`- ⚠️ ${w}`)
     }
     lines.push("")
   }
 
-  if (commits.length === 0) {
-    lines.push("**No new commits to sync.**")
-    return lines.join("\n")
+  if (filter && filter !== "all") {
+    lines.push(`**No new ${filter} commits to sync.**`)
+  } else {
+    lines.push("**All commits have been reviewed. No new commits to sync.**")
   }
-
-  lines.push("## Commits", "")
-  lines.push("| SHA | Type | Subject |")
-  lines.push("|-----|------|---------|")
-
-  for (const c of commits.slice(0, 20)) {
-    const subject = c.subject.length > 60 ? c.subject.slice(0, 57) + "..." : c.subject
-    lines.push(`| ${c.shortSha} | ${c.type} | ${subject} |`)
-  }
-
-  if (commits.length > 20) {
-    lines.push(`| ... | ... | *(${commits.length - 20} more commits)* |`)
-  }
-
-  lines.push("")
-  lines.push("---")
-  lines.push("*AI analysis phase not yet implemented*")
 
   return lines.join("\n")
+}
+
+function generateNextSteps(
+  recommendations: { priority: Priority; suggestedIssueTitle: string }[]
+): string[] {
+  const steps: string[] = []
+
+  const p0Count = recommendations.filter((r) => r.priority === "P0").length
+  const p1Count = recommendations.filter((r) => r.priority === "P1").length
+
+  if (p0Count > 0) {
+    steps.push(`🔴 ${p0Count} CRITICAL (P0) recommendations require immediate attention`)
+  }
+
+  if (p1Count > 0) {
+    steps.push(`🟠 ${p1Count} HIGH (P1) recommendations should be synced soon`)
+  }
+
+  if (recommendations.length > 0) {
+    steps.push("Review the recommendations and approve which commits to sync")
+    steps.push("Use linear_create_issue to create tracking issues for approved syncs")
+    steps.push("Execute cherry-pick commands to sync approved commits")
+  }
+
+  return steps
 }
