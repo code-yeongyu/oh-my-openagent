@@ -137,7 +137,7 @@ The main configuration file includes:
 
 #### Linear
 
-The Linear MCP server is configured for project management integration. Requires `LINEAR_API_KEY` environment variable:
+Linear integration uses built-in linear tools. Requires `LINEAR_API_KEY` environment variable:
 
 ```bash
 export LINEAR_API_KEY="your-api-key-here"
