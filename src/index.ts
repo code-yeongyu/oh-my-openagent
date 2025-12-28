@@ -32,6 +32,7 @@ import {
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
 } from "./features/claude-code-command-loader";
+import { loadBuiltinCommands } from "./features/builtin-commands";
 
 import {
   loadUserAgents,
@@ -167,6 +168,12 @@ function mergeConfigs(
       ...new Set([
         ...(base.disabled_hooks ?? []),
         ...(override.disabled_hooks ?? []),
+      ]),
+    ],
+    disabled_commands: [
+      ...new Set([
+        ...(base.disabled_commands ?? []),
+        ...(override.disabled_commands ?? []),
       ]),
     ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
@@ -510,12 +517,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         ...pluginComponents.mcpServers,
       };
 
+      const builtinCommands = loadBuiltinCommands(pluginConfig.disabled_commands);
       const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
       const opencodeGlobalCommands = loadOpencodeGlobalCommands();
       const systemCommands = config.command ?? {};
       const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
       const opencodeProjectCommands = loadOpencodeProjectCommands();
       config.command = {
+        ...builtinCommands,
         ...userCommands,
         ...opencodeGlobalCommands,
         ...systemCommands,
@@ -632,6 +641,7 @@ export type {
   AgentOverrides,
   McpName,
   HookName,
+  BuiltinCommandName,
 } from "./config";
 
 // NOTE: Do NOT export functions from main index.ts!
