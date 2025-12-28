@@ -735,7 +735,7 @@ Disable governance hooks via `disabled_hooks`:
 }
 ```
 
-**Note**: Governance tools require the Linear MCP to be configured in your `opencode.json` for Linear-related features.
+**Note**: Governance tools require the `LINEAR_API_KEY` environment variable to be set for Linear-related features.
 
 
 ## Author's Note
