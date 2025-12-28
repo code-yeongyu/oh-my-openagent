@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { xdgData } from "xdg-basedir";
+import { getOpenCodeStorageDir } from "../../shared/data-path";
 
-export const OPENCODE_STORAGE = join(xdgData ?? "", "opencode", "storage");
+export const OPENCODE_STORAGE = getOpenCodeStorageDir();
 export const AGENT_USAGE_REMINDER_STORAGE = join(
   OPENCODE_STORAGE,
   "agent-usage-reminder",
