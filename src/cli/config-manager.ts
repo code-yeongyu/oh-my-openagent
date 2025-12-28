@@ -10,6 +10,8 @@ const OPENCODE_JSONC = join(OPENCODE_CONFIG_DIR, "opencode.jsonc")
 const OPENCODE_PACKAGE_JSON = join(OPENCODE_CONFIG_DIR, "package.json")
 const OMO_CONFIG = join(OPENCODE_CONFIG_DIR, "oh-my-opencode.json")
 
+const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
+
 const CHATGPT_HOTFIX_REPO = "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
 
 export async function fetchLatestVersion(packageName: string): Promise<string | null> {
@@ -204,22 +206,35 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
   }
 }
 
-export async function isOpenCodeInstalled(): Promise<boolean> {
-  try {
-    const proc = Bun.spawn(["opencode", "--version"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    await proc.exited
-    return proc.exitCode === 0
-  } catch {
-    return false
+async function findOpenCodeBinary(): Promise<string | null> {
+  for (const binary of OPENCODE_BINARIES) {
+    try {
+      const proc = Bun.spawn([binary, "--version"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await proc.exited
+      if (proc.exitCode === 0) {
+        return binary
+      }
+    } catch {
+      continue
+    }
   }
+  return null
+}
+
+export async function isOpenCodeInstalled(): Promise<boolean> {
+  const binary = await findOpenCodeBinary()
+  return binary !== null
 }
 
 export async function getOpenCodeVersion(): Promise<string | null> {
+  const binary = await findOpenCodeBinary()
+  if (!binary) return null
+
   try {
-    const proc = Bun.spawn(["opencode", "--version"], {
+    const proc = Bun.spawn([binary, "--version"], {
       stdout: "pipe",
       stderr: "pipe",
     })
