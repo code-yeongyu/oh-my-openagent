@@ -2,7 +2,9 @@
 
 **Linear Issue**: [LIF-74](https://linear.app/lifelogger/issue/LIF-74/sync-fork-command-recurring-workflow-for-upstream-synchronization)
 **Created**: 2025-12-28
+**Updated**: 2025-12-28
 **Author**: Strategic Planner (OmO)
+**Status**: Implementation Complete → Review Fixes Required
 
 ## Summary
 
@@ -660,6 +662,102 @@ EOF
 | AI analysis timeout | background_task timeout | Fall back to type-based priority |
 | Corrupted state file | JSON.parse fails | Start fresh with warning |
 
+### Phase 7: Review Fixes (3h)
+
+Implementation review completed with verdict **APPROVE_WITH_CHANGES**. The following fixes are required.
+
+#### Critical Issues (Must Fix)
+
+| Step | Task | Files | Estimate | Impact |
+|------|------|-------|----------|--------|
+| 7.1 | **C1: Register tool in main plugin** | `src/index.ts` | 30min | Tool won't work at all |
+
+**C1 Fix Details**:
+```typescript
+// 1. Add import in src/index.ts
+import { createSyncForkTool } from "./tools"
+
+// 2. Instantiate in OhMyOpenCodePlugin function
+const syncFork = createSyncForkTool(ctx)
+
+// 3. Add to tool section in return object
+tool: {
+  // ... existing tools
+  sync_fork: syncFork,
+}
+```
+
+**Verification**: Run `/sync-fork --help` and confirm tool is available.
+
+#### Major Issues (Should Fix)
+
+| Step | Task | Files | Estimate | Impact |
+|------|------|-------|----------|--------|
+| 7.2 | **M1: Support array filter option** | `types.ts`, `tools.ts` | 1.5h | Users can't multi-filter |
+| 7.3 | **M2: Document AI analysis as Phase 2** | `README.md`, `tools.ts` | 30min | Clarify current behavior |
+| 7.4 | **M3: Implement Linear integration** | `execution.ts` | 1h | Manual Linear issue creation |
+
+**M1 Fix Details**:
+- `types.ts:182`: Change `filter?: "all" | "fix" | "perf" | "security" | "feat"` to `filter?: CommitType[] | "all"`
+- `tools.ts:27`: Update Zod schema to accept comma-separated string or array
+- `tools.ts` filtering logic: Update to check against array of types
+
+**M2 Decision**:
+- Current implementation uses heuristic-based priorities (`suggestPriority()`)
+- `prepareAnalysisPackets()` and `parseAIResponse()` are scaffolded for future
+- Document as "AI analysis integration planned for Phase 2"
+- Add comment in `tools.ts:147` explaining current state
+
+**M3 Fix Details**:
+```typescript
+// In execution.ts executeSync() function
+// After successful PR creation:
+for (const rec of recommendations.filter(r => ["P0", "P1"].includes(r.priority))) {
+  await linear_create_issue({
+    title: rec.suggestedIssueTitle,
+    description: rec.suggestedIssueDescription,
+    labels: rec.suggestedLabels,
+  })
+}
+```
+
+#### Minor Issues (Nice to Fix)
+
+| Step | Task | Files | Estimate | Impact |
+|------|------|-------|----------|--------|
+| 7.5 | **m1: Fix inconsistent log prefix** | Multiple | 15min | UX polish |
+| 7.6 | **m2: Use heredoc for PR body** | `execution.ts:205-211` | 15min | Edge case robustness |
+| 7.7 | **m3: Add JSDoc to public functions** | All modules | 30min | Documentation |
+
+**m1 Fix Details**:
+- Standardize all log prefixes to `[sync-fork]` (kebab-case, matches directory name)
+- Files to check: `tools.ts`, `git-adapter.ts`, `execution.ts`, `state.ts`
+
+**m2 Fix Details**:
+```typescript
+// Replace inline escaping with heredoc pattern
+const body = `$(cat <<'EOF'
+${prBody}
+EOF
+)`
+```
+
+**Phase 7 Deliverables**:
+- [ ] C1: Tool registered and callable via `/sync-fork`
+- [ ] M1: `--filter fix,security` works correctly
+- [ ] M2: Documentation clarifies heuristic vs AI analysis
+- [ ] M3: P0/P1 recommendations auto-create Linear issues
+- [ ] m1: Consistent `[sync-fork]` log prefix
+- [ ] m2: PR body uses heredoc escaping
+- [ ] m3: JSDoc on public API functions
+
+**Verification Steps**:
+1. `bun run typecheck` passes
+2. `/sync-fork --dry-run` shows analysis
+3. `/sync-fork --filter fix,security` filters correctly
+4. PR creation with special characters in body works
+5. Linear issues created for P0/P1 recommendations
+
 ## Dependencies
 
 ### Internal (This Repo)
@@ -725,22 +823,62 @@ EOF
 
 ## Time Summary
 
-| Phase | Estimate | Notes |
-|-------|----------|-------|
-| Phase 1: Foundation | 2h | Types, state, git-adapter |
-| Phase 2: Discovery & Parsing | 1.5h | Git log parsing, commit filtering |
-| Phase 3: AI Analysis | 2h | Agent orchestration, context building |
-| Phase 4: Recommendations | 1.5h | Grouping, report generation |
-| Phase 5: Execution | 2h | Cherry-pick, PR, Linear integration |
-| Phase 6: Edge Cases | 1h | Error handling, polish |
-| **Total** | **~10h** | |
+| Phase | Estimate | Status | Notes |
+|-------|----------|--------|-------|
+| Phase 1: Foundation | 2h | ✅ Complete | Types, state, git-adapter |
+| Phase 2: Discovery & Parsing | 1.5h | ✅ Complete | Git log parsing, commit filtering |
+| Phase 3: AI Analysis | 2h | ✅ Complete | Agent orchestration, context building |
+| Phase 4: Recommendations | 1.5h | ✅ Complete | Grouping, report generation |
+| Phase 5: Execution | 2h | ✅ Complete | Cherry-pick, PR, Linear integration |
+| Phase 6: Edge Cases | 1h | ✅ Complete | Error handling, polish |
+| Phase 7: Review Fixes | 3h | 🔲 Pending | Critical + major issue fixes |
+| **Total** | **~13h** | | Original: 10h + Review fixes: 3h |
+
+### Phase 7 Breakdown
+
+| Issue | Severity | Estimate | Priority |
+|-------|----------|----------|----------|
+| C1: Tool registration | Critical | 30min | Must fix - tool broken without this |
+| M1: Array filter | Major | 1.5h | Should fix - spec compliance |
+| M2: Document AI status | Major | 30min | Should fix - user clarity |
+| M3: Linear integration | Major | 1h | Should fix - spec compliance |
+| m1-m3: Polish | Minor | 30min | Nice to have |
 
 ## Next Steps
 
-After plan approval:
-1. Run `/tasks` to create detailed task breakdown
-2. Run `/implement` to start Phase 1
-3. Dogfood on oh-my-opencode upstream sync
+### Immediate (Phase 7 - Review Fixes)
+
+**⚠️ CRITICAL**: C1 must be fixed before the tool can be used at all.
+
+1. **Fix C1** (30min): Register `sync_fork` tool in `src/index.ts`
+   - Import `createSyncForkTool`
+   - Instantiate and add to tool object
+   - Verify: `/sync-fork --help` works
+
+2. **Fix M1-M3** (3h total): Address major spec compliance issues
+   - M1: Array filter support (`--filter fix,security`)
+   - M2: Document heuristic vs AI analysis status
+   - M3: Add Linear issue creation for P0/P1
+
+3. **Fix m1-m3** (30min): Polish and documentation
+   - Standardize log prefix
+   - Heredoc for PR body
+   - JSDoc on public functions
+
+### Post-Review Fixes
+
+4. **Verification**: Full integration testing
+   - Run `/sync-fork --dry-run` on oh-my-opencode upstream
+   - Verify all flags work as documented
+   - Confirm Linear integration creates issues
+
+5. **Update Linear**: Mark LIF-74 as "Done" after verification
+
+### Future Considerations
+
+- **Phase 2 AI Integration**: Full `background_task` AI analysis (currently scaffolded)
+- **Caching**: Skip upstream fetch if < 5 min old
+- **Progress indicator**: For large commit sets (50+)
 
 ---
 
