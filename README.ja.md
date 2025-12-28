@@ -390,6 +390,39 @@ gh repo star code-yeongyu/oh-my-opencode
 </details>
 
 
+## アンインストール
+
+oh-my-opencode を削除するには：
+
+1. **OpenCode 設定からプラグインを削除**
+
+   `~/.config/opencode/opencode.json` (または `opencode.jsonc`) を編集し、`plugin` 配列から `"oh-my-opencode"` を削除します：
+
+   ```bash
+   # jq を使用する例
+   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+       ~/.config/opencode/opencode.json > /tmp/oc.json && \
+       mv /tmp/oc.json ~/.config/opencode/opencode.json
+   ```
+
+2. **設定ファイルの削除 (オプション)**
+
+   ```bash
+   # ユーザー設定を削除
+   rm -f ~/.config/opencode/oh-my-opencode.json
+
+   # プロジェクト設定を削除 (存在する場合)
+   rm -f .opencode/oh-my-opencode.json
+   ```
+
+3. **削除の確認**
+
+   ```bash
+   opencode --version
+   # プラグインがロードされなくなっているはずです
+   ```
+
+
 ## 機能
 
 ### Agents: あなたの新しいチームメイト
@@ -456,6 +489,19 @@ Ask @explore for the policy on this feature
 - **lsp_code_action_resolve**: コードアクションを適用
 - **ast_grep_search**: AST 認識コードパターン検索 (25言語対応)
 - **ast_grep_replace**: AST 認識コード置換
+
+#### セッション管理
+
+OpenCode セッション履歴をナビゲートおよび検索するためのツール：
+
+- **session_list**: 日付およびリミットでフィルタリングしながらすべての OpenCode セッションを一覧表示
+- **session_read**: 特定のセッションからメッセージと履歴を読み取る
+- **session_search**: セッションメッセージ全体を全文検索
+- **session_info**: セッションに関するメタデータと統計情報を取得
+
+これらのツールにより、エージェントは以前の会話を参照し、セッション間の継続性を維持できます。
+
+- **call_omo_agent**: 専門的な explore/librarian エージェントを起動。非同期実行のための `run_in_background` パラメータをサポート。
 
 #### Context Is All You Need
 - **Directory AGENTS.md / README.md Injector**: ファイルを読み込む際、`AGENTS.md` と `README.md` の内容を自動的に注入します。ファイルディレクトリからプロジェクトルートまで遡り、パス上の **すべて** の `AGENTS.md` ファイルを収集します。ネストされたディレクトリごとの指示をサポートします：
@@ -619,7 +665,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 | プラットフォーム | ユーザー設定パス |
 |------------------|------------------|
-| **Windows** | `~/.config/opencode/oh-my-opencode.json` (優先) または `%APPDATA%\opencode\oh-my-opencode.json` (フォールバック) |
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (推奨) または `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 スキーマ自動補完がサポートされています：
@@ -627,6 +673,36 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
+}
+```
+
+### JSONC のサポート
+
+`oh-my-opencode` 設定ファイルは JSONC (コメント付き JSON) をサポートしています：
+- 行コメント: `// コメント`
+- ブロックコメント: `/* コメント */`
+- 末尾のカンマ: `{ "key": "value", }`
+
+`oh-my-opencode.jsonc` と `oh-my-opencode.json` の両方が存在する場合、`.jsonc` が優先されます。
+
+**コメント付きの例：**
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // Antigravity OAuth 経由で Google Gemini を有効にする
+  "google_auth": false,
+  
+  /* エージェントのオーバーライド - 特定のタスクに合わせてモデルをカスタマイズ */
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2"  // 戦略的な推論のための GPT
+    },
+    "explore": {
+      "model": "opencode/grok-code"  // 探索のための高速かつ無料のモデル
+    },
+  },
 }
 ```
 
@@ -792,7 +868,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
+利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
 
 **`auto-update-checker`と`startup-toast`について**: `startup-toast` フックは `auto-update-checker` のサブ機能です。アップデートチェックは有効なまま起動トースト通知のみを無効化するには、`disabled_hooks` に `"startup-toast"` を追加してください。すべてのアップデートチェック機能（トーストを含む）を無効化するには、`"auto-update-checker"` を追加してください。
 

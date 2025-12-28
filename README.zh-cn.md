@@ -398,6 +398,39 @@ gh repo star code-yeongyu/oh-my-opencode
 </details>
 
 
+## 卸载
+
+要移除 oh-my-opencode：
+
+1. **从 OpenCode 配置中移除插件**
+
+   编辑 `~/.config/opencode/opencode.json` (或 `opencode.jsonc`)，从 `plugin` 数组中移除 `"oh-my-opencode"`：
+
+   ```bash
+   # 使用 jq 的示例
+   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+       ~/.config/opencode/opencode.json > /tmp/oc.json && \
+       mv /tmp/oc.json ~/.config/opencode/opencode.json
+   ```
+
+2. **删除配置文件 (可选)**
+
+   ```bash
+   # 删除用户配置
+   rm -f ~/.config/opencode/oh-my-opencode.json
+
+   # 删除项目配置 (如果存在)
+   rm -f .opencode/oh-my-opencode.json
+   ```
+
+3. **确认移除**
+
+   ```bash
+   opencode --version
+   # 插件不应再被加载
+   ```
+
+
 ## 功能
 
 ### Agents：你的神队友
@@ -461,6 +494,18 @@ OhMyOpenCode 让这些成为可能。
 - **lsp_code_action_resolve**：应用代码操作
 - **ast_grep_search**：AST 感知代码搜索（支持 25 种语言）
 - **ast_grep_replace**：AST 感知代码替换
+- **call_omo_agent**: 产生专门的 explore/librarian Agent。支持用于异步执行的 `run_in_background` 参数。
+
+#### 会话管理 (Session Management)
+
+用于导航和搜索 OpenCode 会话历史的工具：
+
+- **session_list**: 列出所有 OpenCode 会话，支持按日期和数量限制进行过滤
+- **session_read**: 读取特定会话的消息和历史记录
+- **session_search**: 在会话消息中进行全文搜索
+- **session_info**: 获取有关会话的元数据和统计信息
+
+这些工具使 Agent 能够引用之前的对话并保持跨会话的连续性。
 
 #### 上下文就是一切 (Context is all you need)
 - **Directory AGENTS.md / README.md 注入器**：读文件时自动把 `AGENTS.md` 和 `README.md` 塞进去。从当前目录一路往上找，路径上**所有** `AGENTS.md` 全都带上。支持嵌套指令：
@@ -620,13 +665,48 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 
 配置文件（优先级从高到低）：
 1. `.opencode/oh-my-opencode.json`（项目级）
-2. `~/.config/opencode/oh-my-opencode.json`（用户级）
+2. 用户配置（按平台）：
+
+| 平台 | 用户配置路径 |
+|----------|------------------|
+| **Windows** | `~/.config/opencode/oh-my-opencode.json` (首选) 或 `%APPDATA%\opencode\oh-my-opencode.json` (备选) |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
 
 支持 Schema 自动补全：
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
+}
+```
+
+### JSONC 支持
+
+`oh-my-opencode` 配置文件支持 JSONC（带注释的 JSON）：
+- 行注释：`// 注释`
+- 块注释：`/* 注释 */`
+- 尾随逗号：`{ "key": "value", }`
+
+当 `oh-my-opencode.jsonc` 和 `oh-my-opencode.json` 文件同时存在时，`.jsonc` 优先。
+
+**带注释的示例：**
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // 通过 Antigravity OAuth 启用 Google Gemini
+  "google_auth": false,
+  
+  /* Agent 覆盖 - 为特定任务自定义模型 */
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2"  // 用于战略推理的 GPT
+    },
+    "explore": {
+      "model": "opencode/grok-code"  // 快速且免费的搜索模型
+    },
+  },
 }
 ```
 
@@ -792,7 +872,7 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-auto-compact`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`
+可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-auto-compact`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`
 
 **关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 

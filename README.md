@@ -406,6 +406,31 @@ else
     echo "OpenCode not found. Please install from https://opencode.ai/docs"
 fi
 ```
+- **lsp_hover**: Type info, docs, signatures at position
+- **lsp_goto_definition**: Jump to symbol definition
+- **lsp_find_references**: Find all usages across workspace
+- **lsp_document_symbols**: Get file symbol outline
+- **lsp_workspace_symbols**: Search symbols by name across project
+- **lsp_diagnostics**: Get errors/warnings before build
+- **lsp_servers**: List available LSP servers
+- **lsp_prepare_rename**: Validate rename operation
+- **lsp_rename**: Rename symbol across workspace
+- **lsp_code_actions**: Get available quick fixes/refactorings
+- **lsp_code_action_resolve**: Apply code action
+- **ast_grep_search**: AST-aware code pattern search (25 languages)
+- **ast_grep_replace**: AST-aware code replacement
+- **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
+
+#### Session Management
+
+Tools to navigate and search your OpenCode session history:
+
+- **session_list**: List all OpenCode sessions with filtering by date and limit
+- **session_read**: Read messages and history from a specific session
+- **session_search**: Full-text search across session messages
+- **session_info**: Get metadata and statistics about a session
+
+These tools enable agents to reference previous conversations and maintain continuity across sessions.
 
 #### Step 3: Run the Installer
 
@@ -497,6 +522,29 @@ Say to user: **Congratulations! 🎉** You've successfully set up Oh My OpenCode
 </details>
 
 ---
+- **Keyword Detector**: Automatically detects keywords in your prompts and activates specialized modes:
+  - `ultrawork` / `ulw`: Maximum performance mode with parallel agent orchestration
+  - `search` / `find` / `찾아` / `検索`: Maximized search effort with parallel explore and librarian agents
+  - `analyze` / `investigate` / `분석` / `調査`: Deep analysis mode with multi-phase expert consultation
+- **Todo Continuation Enforcer**: Makes agents finish all TODOs before stopping. Kills the chronic LLM habit of quitting halfway.
+- **Comment Checker**: LLMs love comments. Too many comments. This reminds them to cut the noise. Smartly ignores valid patterns (BDD, directives, docstrings) and demands justification for the rest. Clean code wins.
+- **Think Mode**: Auto-detects when extended thinking is needed and switches modes. Catches phrases like "think deeply" or "ultrathink" and dynamically adjusts model settings for maximum reasoning.
+- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/).
+  - At 70%+ usage, reminds agents there's still headroom—prevents rushed, sloppy work.
+- **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
+- **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
+- **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
+- **Auto Update Checker**: Automatically checks for new versions of oh-my-opencode and can auto-update your configuration. Shows startup toast notifications displaying current version and Sisyphus status ("Sisyphus on steroids is steering OpenCode" when enabled, or "OpenCode is now on Steroids. oMoMoMoMo..." otherwise). Disable all features with `"auto-update-checker"` in `disabled_hooks`, or disable just toast notifications with `"startup-toast"` in `disabled_hooks`. See [Configuration > Hooks](#hooks).
+- **Background Notification**: Get notified when background agent tasks complete.
+- **Session Notification**: Sends OS notifications when agents go idle. Works on macOS, Linux, and Windows—never miss when your agent needs input.
+- **Empty Task Response Detector**: Catches when Task tool returns nothing. Warns you about potential agent failures so you don't wait forever for a response that already came back empty.
+- **Empty Message Sanitizer**: Prevents API errors from empty chat messages by automatically sanitizing message content before sending.
+- **Grep Output Truncator**: Grep can return mountains of text. This dynamically truncates output based on your remaining context window—keeps 50% headroom, caps at 50k tokens.
+- **Tool Output Truncator**: Same idea, broader scope. Truncates output from Grep, Glob, LSP tools, and AST-grep. Prevents one verbose search from eating your entire context.
+- **Preemptive Compaction**: Compacts session proactively before hitting hard token limits. Runs before you get into trouble.
+- **Compaction Context Injector**: Preserves critical context (AGENTS.md, current directory info) during session compaction so you don't lose important state.
+- **Thinking Block Validator**: Validates thinking blocks to ensure proper formatting and prevent API errors from malformed thinking content.
+- **Claude Code Hooks**: Executes hooks from Claude Code's settings.json - this is the compatibility layer that runs PreToolUse/PostToolUse/UserPromptSubmit/Stop hooks.
 
 ## ⚙️ Configuration
 
@@ -677,6 +725,7 @@ Disable specific built-in hooks:
 ```
 
 **Available hooks:**
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
 
 `todo-continuation-enforcer` · `context-window-monitor` · `session-recovery` · `session-notification` · `comment-checker` · `grep-output-truncator` · `tool-output-truncator` · `directory-agents-injector` · `directory-readme-injector` · `empty-task-response-detector` · `think-mode` · `anthropic-auto-compact` · `rules-injector` · `background-notification` · `auto-update-checker` · `startup-toast` · `keyword-detector` · `agent-usage-reminder` · `non-interactive-env` · `interactive-bash-session` · `empty-message-sanitizer`
 
