@@ -1,12 +1,14 @@
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 import { getSessionInfo, readSessionMessages } from "./storage"
 
-export function formatSessionList(sessionIDs: string[]): string {
+export async function formatSessionList(sessionIDs: string[]): Promise<string> {
   if (sessionIDs.length === 0) {
     return "No sessions found."
   }
 
-  const infos = sessionIDs.map((id) => getSessionInfo(id)).filter((info): info is SessionInfo => info !== null)
+  const infos = (await Promise.all(sessionIDs.map((id) => getSessionInfo(id)))).filter(
+    (info): info is SessionInfo => info !== null
+  )
 
   if (infos.length === 0) {
     return "No valid sessions found."
@@ -39,7 +41,11 @@ export function formatSessionList(sessionIDs: string[]): string {
   return [formatRow(headers), separator, ...rows.map(formatRow)].join("\n")
 }
 
-export function formatSessionMessages(messages: SessionMessage[], includeTodos?: boolean, todos?: Array<{id: string; content: string; status: string}>): string {
+export function formatSessionMessages(
+  messages: SessionMessage[],
+  includeTodos?: boolean,
+  todos?: Array<{ id: string; content: string; status: string }>
+): string {
   if (messages.length === 0) {
     return "No messages found in this session."
   }
@@ -116,32 +122,46 @@ export function formatSearchResults(results: SearchResult[]): string {
   return lines.join("\n")
 }
 
-export function filterSessionsByDate(sessionIDs: string[], fromDate?: string, toDate?: string): string[] {
+export async function filterSessionsByDate(
+  sessionIDs: string[],
+  fromDate?: string,
+  toDate?: string
+): Promise<string[]> {
   if (!fromDate && !toDate) return sessionIDs
 
   const from = fromDate ? new Date(fromDate) : null
   const to = toDate ? new Date(toDate) : null
 
-  return sessionIDs.filter((id) => {
-    const info = getSessionInfo(id)
-    if (!info || !info.last_message) return false
+  const results: string[] = []
+  for (const id of sessionIDs) {
+    const info = await getSessionInfo(id)
+    if (!info || !info.last_message) continue
 
-    if (from && info.last_message < from) return false
-    if (to && info.last_message > to) return false
+    if (from && info.last_message < from) continue
+    if (to && info.last_message > to) continue
 
-    return true
-  })
+    results.push(id)
+  }
+
+  return results
 }
 
-export function searchInSession(sessionID: string, query: string, caseSensitive = false): SearchResult[] {
-  const messages = readSessionMessages(sessionID)
+export async function searchInSession(
+  sessionID: string,
+  query: string,
+  caseSensitive = false,
+  maxResults?: number
+): Promise<SearchResult[]> {
+  const messages = await readSessionMessages(sessionID)
   const results: SearchResult[] = []
 
   const searchQuery = caseSensitive ? query : query.toLowerCase()
 
   for (const msg of messages) {
+    if (maxResults && results.length >= maxResults) break
+
     let matchCount = 0
-    let excerpts: string[] = []
+    const excerpts: string[] = []
 
     for (const part of msg.parts) {
       if (part.type === "text" && part.text) {
