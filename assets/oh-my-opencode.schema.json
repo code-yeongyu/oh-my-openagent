@@ -71,7 +71,6 @@
         "type": "string",
         "enum": [
           "init-deep",
-          "feature-dev",
           "review-pr"
         ]
       }
