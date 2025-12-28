@@ -465,8 +465,8 @@ To remove oh-my-opencode:
 
 - **Sisyphus** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Uses Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
-- **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
+- **librarian** (`anthropic/claude-sonnet-4-5` or `google/gemini-3-flash`): Multi-repo analysis, doc lookup, implementation examples. Uses Gemini 3 Flash when Antigravity auth is configured, otherwise Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
+- **explore** (`opencode/grok-code`, `google/gemini-3-flash`, or `anthropic/claude-haiku-4-5`): Fast codebase exploration and pattern matching. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code.
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-high`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
 - **document-writer** (`google/gemini-3-flash`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
 - **multimodal-looker** (`google/gemini-3-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.

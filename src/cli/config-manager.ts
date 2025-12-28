@@ -146,9 +146,16 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
 
   if (!installConfig.hasClaude) {
     agents["Sisyphus"] = { model: "opencode/big-pickle" }
+  }
+
+  if (installConfig.hasGemini) {
+    agents["librarian"] = { model: "google/gemini-3-flash" }
+    agents["explore"] = { model: "google/gemini-3-flash" }
+  } else if (installConfig.hasClaude && installConfig.isMax20) {
+    agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
+  } else {
     agents["librarian"] = { model: "opencode/big-pickle" }
-  } else if (!installConfig.isMax20) {
-    agents["librarian"] = { model: "opencode/big-pickle" }
+    agents["explore"] = { model: "opencode/big-pickle" }
   }
 
   if (!installConfig.hasChatGPT) {
