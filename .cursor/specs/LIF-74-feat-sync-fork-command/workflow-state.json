@@ -1,10 +1,11 @@
 {
-  "currentStep": "implement",
+  "currentStep": "review",
   "completedSteps": [
     "specify",
     "plan",
     "tasks",
-    "review"
+    "review",
+    "implement"
   ],
   "artifactHashes": {
     "spec.md": "b38ef1293992cd59",
@@ -15,6 +16,6 @@
   "linearIssueId": null,
   "linearStatus": "in_review",
   "createdAt": "2025-12-23T05:16:04.949Z",
-  "updatedAt": "2025-12-28T19:02:18.034Z",
-  "lastCommand": "/implement"
+  "updatedAt": "2025-12-28T20:07:13.300Z",
+  "lastCommand": "/review"
 }
