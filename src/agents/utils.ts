@@ -7,6 +7,7 @@ import { createExploreAgent } from "./explore"
 import { createFrontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { createDocumentWriterAgent } from "./document-writer"
 import { createMultimodalLookerAgent } from "./multimodal-looker"
+import { createCodeReviewerAgent } from "./code-reviewer"
 import { deepMerge } from "../shared"
 
 type AgentSource = AgentFactory | AgentConfig
@@ -19,6 +20,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+  "code-reviewer": createCodeReviewerAgent,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {

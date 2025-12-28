@@ -14,6 +14,7 @@ export type BuiltinAgentName =
   | "frontend-ui-ux-engineer"
   | "document-writer"
   | "multimodal-looker"
+  | "code-reviewer"
 
 export type OverridableAgentName =
   | "build"
