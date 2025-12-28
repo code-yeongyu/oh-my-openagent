@@ -6,8 +6,25 @@ import {
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
 import { getAllSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
-import { filterSessionsByDate, formatSessionInfo, formatSessionList, formatSessionMessages, formatSearchResults, searchInSession } from "./utils"
-import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs } from "./types"
+import {
+  filterSessionsByDate,
+  formatSessionInfo,
+  formatSessionList,
+  formatSessionMessages,
+  formatSearchResults,
+  searchInSession,
+} from "./utils"
+import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+
+const SEARCH_TIMEOUT_MS = 60_000
+const MAX_SESSIONS_TO_SCAN = 50
+
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms)),
+  ])
+}
 
 export const session_list: ToolDefinition = tool({
   description: SESSION_LIST_DESCRIPTION,
@@ -18,17 +35,17 @@ export const session_list: ToolDefinition = tool({
   },
   execute: async (args: SessionListArgs, _context) => {
     try {
-      let sessions = getAllSessions()
+      let sessions = await getAllSessions()
 
       if (args.from_date || args.to_date) {
-        sessions = filterSessionsByDate(sessions, args.from_date, args.to_date)
+        sessions = await filterSessionsByDate(sessions, args.from_date, args.to_date)
       }
 
       if (args.limit && args.limit > 0) {
         sessions = sessions.slice(0, args.limit)
       }
 
-      return formatSessionList(sessions)
+      return await formatSessionList(sessions)
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
@@ -49,13 +66,13 @@ export const session_read: ToolDefinition = tool({
         return `Session not found: ${args.session_id}`
       }
 
-      let messages = readSessionMessages(args.session_id)
+      let messages = await readSessionMessages(args.session_id)
 
       if (args.limit && args.limit > 0) {
         messages = messages.slice(0, args.limit)
       }
 
-      const todos = args.include_todos ? readSessionTodos(args.session_id) : undefined
+      const todos = args.include_todos ? await readSessionTodos(args.session_id) : undefined
 
       return formatSessionMessages(messages, args.include_todos, todos)
     } catch (e) {
@@ -74,13 +91,31 @@ export const session_search: ToolDefinition = tool({
   },
   execute: async (args: SessionSearchArgs, _context) => {
     try {
-      const sessions = args.session_id ? [args.session_id] : getAllSessions()
+      const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
 
-      const allResults = sessions.flatMap((sid) => searchInSession(sid, args.query, args.case_sensitive))
+      const searchOperation = async (): Promise<SearchResult[]> => {
+        if (args.session_id) {
+          return searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
+        }
 
-      const limited = args.limit && args.limit > 0 ? allResults.slice(0, args.limit) : allResults.slice(0, 20)
+        const allSessions = await getAllSessions()
+        const sessionsToScan = allSessions.slice(0, MAX_SESSIONS_TO_SCAN)
 
-      return formatSearchResults(limited)
+        const allResults: SearchResult[] = []
+        for (const sid of sessionsToScan) {
+          if (allResults.length >= resultLimit) break
+
+          const remaining = resultLimit - allResults.length
+          const sessionResults = await searchInSession(sid, args.query, args.case_sensitive, remaining)
+          allResults.push(...sessionResults)
+        }
+
+        return allResults.slice(0, resultLimit)
+      }
+
+      const results = await withTimeout(searchOperation(), SEARCH_TIMEOUT_MS, "Search")
+
+      return formatSearchResults(results)
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
@@ -94,7 +129,7 @@ export const session_info: ToolDefinition = tool({
   },
   execute: async (args: SessionInfoArgs, _context) => {
     try {
-      const info = getSessionInfo(args.session_id)
+      const info = await getSessionInfo(args.session_id)
 
       if (!info) {
         return `Session not found: ${args.session_id}`

@@ -23,7 +23,8 @@ mock.module("./constants", () => ({
   TOOL_NAME_PREFIX: "session_",
 }))
 
-const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } = await import("./storage")
+const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
+  await import("./storage")
 
 describe("session-manager storage", () => {
   beforeEach(() => {
@@ -43,48 +44,61 @@ describe("session-manager storage", () => {
     }
   })
 
-  test("getAllSessions returns empty array when no sessions exist", () => {
-    const sessions = getAllSessions()
-    
+  test("getAllSessions returns empty array when no sessions exist", async () => {
+    // #when
+    const sessions = await getAllSessions()
+
+    // #then
     expect(Array.isArray(sessions)).toBe(true)
     expect(sessions).toEqual([])
   })
 
   test("getMessageDir finds session in direct path", () => {
+    // #given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001", role: "user" }))
 
+    // #when
     const result = getMessageDir(sessionID)
-    
+
+    // #then
     expect(result).toBe(sessionPath)
   })
 
   test("sessionExists returns false for non-existent session", () => {
+    // #when
     const exists = sessionExists("ses_nonexistent")
-    
+
+    // #then
     expect(exists).toBe(false)
   })
 
   test("sessionExists returns true for existing session", () => {
+    // #given
     const sessionID = "ses_exists"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001" }))
 
+    // #when
     const exists = sessionExists(sessionID)
-    
+
+    // #then
     expect(exists).toBe(true)
   })
 
-  test("readSessionMessages returns empty array for non-existent session", () => {
-    const messages = readSessionMessages("ses_nonexistent")
-    
+  test("readSessionMessages returns empty array for non-existent session", async () => {
+    // #when
+    const messages = await readSessionMessages("ses_nonexistent")
+
+    // #then
     expect(messages).toEqual([])
   })
 
-  test("readSessionMessages sorts messages by timestamp", () => {
+  test("readSessionMessages sorts messages by timestamp", async () => {
+    // #given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
@@ -98,26 +112,33 @@ describe("session-manager storage", () => {
       JSON.stringify({ id: "msg_001", role: "user", time: { created: 1000 } })
     )
 
-    const messages = readSessionMessages(sessionID)
-    
+    // #when
+    const messages = await readSessionMessages(sessionID)
+
+    // #then
     expect(messages.length).toBe(2)
     expect(messages[0].id).toBe("msg_001")
     expect(messages[1].id).toBe("msg_002")
   })
 
-  test("readSessionTodos returns empty array when no todos exist", () => {
-    const todos = readSessionTodos("ses_nonexistent")
-    
+  test("readSessionTodos returns empty array when no todos exist", async () => {
+    // #when
+    const todos = await readSessionTodos("ses_nonexistent")
+
+    // #then
     expect(todos).toEqual([])
   })
 
-  test("getSessionInfo returns null for non-existent session", () => {
-    const info = getSessionInfo("ses_nonexistent")
-    
+  test("getSessionInfo returns null for non-existent session", async () => {
+    // #when
+    const info = await getSessionInfo("ses_nonexistent")
+
+    // #then
     expect(info).toBeNull()
   })
 
-  test("getSessionInfo aggregates session metadata correctly", () => {
+  test("getSessionInfo aggregates session metadata correctly", async () => {
+    // #given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
@@ -142,8 +163,10 @@ describe("session-manager storage", () => {
       })
     )
 
-    const info = getSessionInfo(sessionID)
-    
+    // #when
+    const info = await getSessionInfo(sessionID)
+
+    // #then
     expect(info).not.toBeNull()
     expect(info?.id).toBe(sessionID)
     expect(info?.message_count).toBe(2)
