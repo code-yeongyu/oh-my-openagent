@@ -401,3 +401,263 @@ export async function archiveIssue(
 export function isLinearAvailable(): boolean {
   return !!getApiKey()
 }
+
+/**
+ * Extended issue type with team and full state for update operations
+ */
+export interface LinearIssueWithTeam extends LinearIssue {
+  priority: number
+  priorityLabel: string
+  estimate?: number
+  dueDate?: string
+  assignee?: {
+    id: string
+    name: string
+    email: string
+  }
+  team: {
+    id: string
+    labels: {
+      nodes: Array<{ id: string; name: string }>
+    }
+  }
+}
+
+/**
+ * Fetch issue with team context for label resolution and change tracking
+ */
+export async function getIssueWithTeam(
+  issueId: string
+): Promise<{ issue?: LinearIssueWithTeam; error?: string }> {
+  const query = `
+    query GetIssueWithTeam($id: String!) {
+      issue(id: $id) {
+        id
+        identifier
+        title
+        description
+        branchName
+        url
+        priority
+        priorityLabel
+        estimate
+        dueDate
+        state {
+          id
+          name
+          type
+        }
+        parent {
+          id
+          identifier
+        }
+        assignee {
+          id
+          name
+          email
+        }
+        labels {
+          nodes {
+            id
+            name
+          }
+        }
+        team {
+          id
+          labels {
+            nodes {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  `
+
+  const result = await executeQuery<{ issue: LinearIssueWithTeam }>(query, { id: issueId })
+  if (result.error) {
+    return { error: result.error }
+  }
+  return { issue: result.data?.issue }
+}
+
+/**
+ * Resolve label names to UUIDs using team and workspace labels
+ */
+export async function resolveLabelNames(
+  teamId: string,
+  labelNames: string[]
+): Promise<{ resolved: string[]; notFound: string[] }> {
+  const labelsQuery = `
+    query GetLabels($teamId: String!) {
+      team(id: $teamId) {
+        labels {
+          nodes {
+            id
+            name
+          }
+        }
+      }
+      issueLabels {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  `
+
+  const result = await executeQuery<{
+    team: { labels: { nodes: Array<{ id: string; name: string }> } }
+    issueLabels: { nodes: Array<{ id: string; name: string }> }
+  }>(labelsQuery, { teamId })
+
+  if (result.error || !result.data) {
+    return { resolved: [], notFound: labelNames }
+  }
+
+  const allLabels = [
+    ...(result.data.team?.labels?.nodes || []),
+    ...(result.data.issueLabels?.nodes || []),
+  ]
+
+  const resolved: string[] = []
+  const notFound: string[] = []
+
+  for (const name of labelNames) {
+    const label = allLabels.find((l) => l.name.toLowerCase() === name.toLowerCase())
+    if (label) {
+      resolved.push(label.id)
+    } else {
+      notFound.push(name)
+    }
+  }
+
+  return { resolved, notFound }
+}
+
+/**
+ * Update issue fields via GraphQL mutation
+ */
+export async function updateIssue(args: {
+  issueId: string
+  title?: string
+  description?: string
+  priority?: number
+  estimate?: number
+  dueDate?: string | null
+  assigneeId?: string | null
+  labelIds?: string[]
+  addedLabelIds?: string[]
+  removedLabelIds?: string[]
+}): Promise<{
+  success: boolean
+  issue?: LinearIssueWithTeam
+  error?: string
+}> {
+  const mutation = `
+    mutation UpdateIssue(
+      $id: String!
+      $title: String
+      $description: String
+      $priority: Int
+      $estimate: Int
+      $dueDate: TimelessDate
+      $assigneeId: String
+      $labelIds: [String!]
+      $addedLabelIds: [String!]
+      $removedLabelIds: [String!]
+    ) {
+      issueUpdate(
+        id: $id
+        input: {
+          title: $title
+          description: $description
+          priority: $priority
+          estimate: $estimate
+          dueDate: $dueDate
+          assigneeId: $assigneeId
+          labelIds: $labelIds
+          addedLabelIds: $addedLabelIds
+          removedLabelIds: $removedLabelIds
+        }
+      ) {
+        success
+        issue {
+          id
+          identifier
+          title
+          description
+          branchName
+          url
+          priority
+          priorityLabel
+          estimate
+          dueDate
+          state {
+            id
+            name
+            type
+          }
+          parent {
+            id
+            identifier
+          }
+          assignee {
+            id
+            name
+            email
+          }
+          labels {
+            nodes {
+              id
+              name
+            }
+          }
+          team {
+            id
+            labels {
+              nodes {
+                id
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  `
+
+  const variables: Record<string, unknown> = { id: args.issueId }
+
+  if (args.title !== undefined) variables.title = args.title
+  if (args.description !== undefined) variables.description = args.description
+  if (args.priority !== undefined) variables.priority = args.priority
+  if (args.estimate !== undefined) variables.estimate = args.estimate
+  if (args.dueDate !== undefined) variables.dueDate = args.dueDate
+  if (args.assigneeId !== undefined) variables.assigneeId = args.assigneeId
+  if (args.labelIds !== undefined) variables.labelIds = args.labelIds
+  if (args.addedLabelIds !== undefined) variables.addedLabelIds = args.addedLabelIds
+  if (args.removedLabelIds !== undefined) variables.removedLabelIds = args.removedLabelIds
+
+  const result = await executeQuery<{
+    issueUpdate: {
+      success: boolean
+      issue: LinearIssueWithTeam
+    }
+  }>(mutation, variables)
+
+  if (result.error) {
+    return { success: false, error: result.error }
+  }
+
+  if (!result.data?.issueUpdate?.success) {
+    return { success: false, error: "Failed to update issue" }
+  }
+
+  return {
+    success: true,
+    issue: result.data.issueUpdate.issue,
+  }
+}

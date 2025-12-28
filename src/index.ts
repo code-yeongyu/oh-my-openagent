@@ -68,6 +68,7 @@ import {
   createLinearArchiveIssueTool,
   createLinearGetIssueTool,
   createLinearAddCommentTool,
+  createLinearUpdateIssueTool,
   createReadContextTool,
   createSpecFolderTool,
   updateWorkflowStateTool,
@@ -379,6 +380,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const linearArchiveIssue = createLinearArchiveIssueTool(ctx);
   const linearGetIssue = createLinearGetIssueTool(ctx);
   const linearAddComment = createLinearAddCommentTool(ctx);
+  const linearUpdateIssue = createLinearUpdateIssueTool(ctx);
   const readContext = createReadContextTool(ctx);
   const createSpecFolder = createSpecFolderTool(ctx);
   const updateWorkflowState = updateWorkflowStateTool(ctx);
@@ -408,6 +410,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       linear_archive_issue: linearArchiveIssue,
       linear_get_issue: linearGetIssue,
       linear_add_comment: linearAddComment,
+      linear_update_issue: linearUpdateIssue,
       read_context: readContext,
       create_spec_folder: createSpecFolder,
       update_workflow_state: updateWorkflowState,

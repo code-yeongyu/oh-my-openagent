@@ -7,7 +7,10 @@ import {
   LINEAR_ARCHIVE_ISSUE_DESCRIPTION,
   LINEAR_GET_ISSUE_DESCRIPTION,
   LINEAR_ADD_COMMENT_DESCRIPTION,
+  LINEAR_UPDATE_ISSUE_DESCRIPTION,
   DEFAULT_LINEAR_TEAM,
+  PRIORITY_MAP,
+  PRIORITY_LABELS,
 } from "./constants"
 import type {
   LinearBranchResult,
@@ -17,6 +20,12 @@ import type {
   LinearGetIssueResult,
   LinearAddCommentResult,
   LinearIssueStatus,
+  LinearPriority,
+  LinearLabelOperations,
+  LinearUpdateIssueInput,
+  LinearFieldChange,
+  LinearUpdateIssueResult,
+  LinearIssueState,
 } from "./types"
 import { STATUS_TO_STATE_TYPE } from "./types"
 import {
@@ -26,6 +35,10 @@ import {
   createIssue,
   archiveIssue,
   isLinearAvailable,
+  getIssueWithTeam,
+  resolveLabelNames,
+  updateIssue,
+  type LinearIssueWithTeam,
 } from "./api"
 
 /**
@@ -486,6 +499,308 @@ export function createLinearAddCommentTool(_ctx: PluginInput) {
           success: false,
           issueId: args.issueId,
           message: `Failed to add comment`,
+          error: errorMessage,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+    },
+  })
+}
+
+export function validateLabelOperations(labels: LinearLabelOperations): { valid: boolean; error?: string } {
+  const hasAdd = labels.add && labels.add.length > 0
+  const hasRemove = labels.remove && labels.remove.length > 0
+  const hasSet = labels.set !== undefined
+
+  if (hasSet && (hasAdd || hasRemove)) {
+    return {
+      valid: false,
+      error: "Cannot combine 'set' with 'add' or 'remove'. Use 'set' alone to replace all labels, or use 'add'/'remove' together for incremental changes.",
+    }
+  }
+
+  return { valid: true }
+}
+
+export function normalizePriority(priority: LinearPriority): number {
+  if (typeof priority === "number") {
+    return Math.max(0, Math.min(4, priority))
+  }
+  return PRIORITY_MAP[priority.toLowerCase()] ?? 0
+}
+
+export function buildChangesArray(
+  before: LinearIssueWithTeam,
+  after: LinearIssueWithTeam,
+  input: LinearUpdateIssueInput
+): LinearFieldChange[] {
+  const changes: LinearFieldChange[] = []
+
+  if (input.title !== undefined && before.title !== after.title) {
+    changes.push({ field: "title", from: before.title, to: after.title })
+  }
+
+  if (input.description !== undefined && before.description !== after.description) {
+    changes.push({ field: "description", from: before.description ?? null, to: after.description ?? null })
+  }
+
+  if (input.priority !== undefined && before.priority !== after.priority) {
+    changes.push({
+      field: "priority",
+      from: `${before.priority} (${before.priorityLabel})`,
+      to: `${after.priority} (${after.priorityLabel})`,
+    })
+  }
+
+  if (input.estimate !== undefined && before.estimate !== after.estimate) {
+    changes.push({ field: "estimate", from: before.estimate ?? null, to: after.estimate ?? null })
+  }
+
+  if (input.dueDate !== undefined && before.dueDate !== after.dueDate) {
+    changes.push({ field: "dueDate", from: before.dueDate ?? null, to: after.dueDate ?? null })
+  }
+
+  if (input.assigneeId !== undefined) {
+    const beforeAssignee = before.assignee?.id ?? null
+    const afterAssignee = after.assignee?.id ?? null
+    if (beforeAssignee !== afterAssignee) {
+      changes.push({
+        field: "assignee",
+        from: before.assignee ? `${before.assignee.name} (${before.assignee.email})` : null,
+        to: after.assignee ? `${after.assignee.name} (${after.assignee.email})` : null,
+      })
+    }
+  }
+
+  if (input.labels !== undefined) {
+    const beforeLabels = before.labels.nodes.map((l) => l.name).sort()
+    const afterLabels = after.labels.nodes.map((l) => l.name).sort()
+    if (JSON.stringify(beforeLabels) !== JSON.stringify(afterLabels)) {
+      changes.push({ field: "labels", from: beforeLabels, to: afterLabels })
+    }
+  }
+
+  return changes
+}
+
+export function buildCurrentState(issue: LinearIssueWithTeam): LinearIssueState {
+  return {
+    id: issue.id,
+    identifier: issue.identifier,
+    title: issue.title,
+    description: issue.description,
+    priority: issue.priority,
+    priorityLabel: issue.priorityLabel,
+    estimate: issue.estimate,
+    dueDate: issue.dueDate,
+    assignee: issue.assignee,
+    labels: issue.labels.nodes.map((l) => l.name),
+    url: issue.url,
+  }
+}
+
+export function createLinearUpdateIssueTool(_ctx: PluginInput) {
+  return tool({
+    description: LINEAR_UPDATE_ISSUE_DESCRIPTION,
+    args: {
+      issueId: tool.schema.string().describe("Linear issue ID (e.g., 'LIF-123' or UUID)"),
+      title: tool.schema.string().describe("New issue title").optional(),
+      description: tool.schema.string().describe("New description (Markdown supported)").optional(),
+      priority: tool.schema
+        .union([
+          tool.schema.number().describe("Priority as number (0-4)"),
+          tool.schema.enum(["urgent", "high", "medium", "low", "none"] as const),
+        ])
+        .describe("Priority: 0-4 or 'urgent'/'high'/'medium'/'low'/'none'")
+        .optional(),
+      estimate: tool.schema.number().describe("Story point estimate").optional(),
+      dueDate: tool.schema
+        .union([tool.schema.string(), tool.schema.null()])
+        .describe("Due date (YYYY-MM-DD) or null to clear")
+        .optional(),
+      assigneeId: tool.schema
+        .union([tool.schema.string(), tool.schema.null()])
+        .describe("Assignee user UUID or null to unassign")
+        .optional(),
+      labels: tool.schema
+        .object({
+          add: tool.schema.array(tool.schema.string()).describe("Labels to add").optional(),
+          remove: tool.schema.array(tool.schema.string()).describe("Labels to remove").optional(),
+          set: tool.schema.array(tool.schema.string()).describe("Replace all labels with this set").optional(),
+        })
+        .describe("Label operations (add/remove can be combined, set is exclusive)")
+        .optional(),
+    },
+    async execute(args: LinearUpdateIssueInput): Promise<string> {
+      log(`[linear_update_issue] Updating issue: ${args.issueId}`)
+
+      if (!isLinearAvailable()) {
+        const result: LinearUpdateIssueResult = {
+          success: false,
+          issueIdentifier: args.issueId,
+          issueUrl: "",
+          changes: [],
+          message: "LINEAR_API_KEY environment variable not set",
+          error: "LINEAR_API_KEY not set",
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
+      const validationErrors: string[] = []
+
+      if (args.labels) {
+        const labelValidation = validateLabelOperations(args.labels)
+        if (!labelValidation.valid) {
+          validationErrors.push(labelValidation.error!)
+        }
+      }
+
+      if (args.dueDate && args.dueDate !== null) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+        if (!dateRegex.test(args.dueDate)) {
+          validationErrors.push(`Invalid date format: '${args.dueDate}'. Expected YYYY-MM-DD.`)
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        const result: LinearUpdateIssueResult = {
+          success: false,
+          issueIdentifier: args.issueId,
+          issueUrl: "",
+          changes: [],
+          message: "Validation failed",
+          validationErrors,
+        }
+        return JSON.stringify(result, null, 2)
+      }
+
+      try {
+        const beforeResult = await getIssueWithTeam(args.issueId)
+        if (beforeResult.error || !beforeResult.issue) {
+          const result: LinearUpdateIssueResult = {
+            success: false,
+            issueIdentifier: args.issueId,
+            issueUrl: "",
+            changes: [],
+            message: "Failed to fetch issue",
+            error: beforeResult.error || "Issue not found",
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const beforeIssue = beforeResult.issue
+        const teamId = beforeIssue.team.id
+
+        let addedLabelIds: string[] | undefined
+        let removedLabelIds: string[] | undefined
+        let labelIds: string[] | undefined
+
+        if (args.labels) {
+          if (args.labels.set !== undefined) {
+            const resolution = await resolveLabelNames(teamId, args.labels.set)
+            if (resolution.notFound.length > 0) {
+              const result: LinearUpdateIssueResult = {
+                success: false,
+                issueIdentifier: beforeIssue.identifier,
+                issueUrl: beforeIssue.url,
+                changes: [],
+                message: "Some labels not found",
+                error: `Labels not found: ${resolution.notFound.join(", ")}`,
+              }
+              return JSON.stringify(result, null, 2)
+            }
+            labelIds = resolution.resolved
+          } else {
+            if (args.labels.add && args.labels.add.length > 0) {
+              const resolution = await resolveLabelNames(teamId, args.labels.add)
+              if (resolution.notFound.length > 0) {
+                const result: LinearUpdateIssueResult = {
+                  success: false,
+                  issueIdentifier: beforeIssue.identifier,
+                  issueUrl: beforeIssue.url,
+                  changes: [],
+                  message: "Some labels not found",
+                  error: `Labels not found: ${resolution.notFound.join(", ")}`,
+                }
+                return JSON.stringify(result, null, 2)
+              }
+              addedLabelIds = resolution.resolved
+            }
+
+            if (args.labels.remove && args.labels.remove.length > 0) {
+              const resolution = await resolveLabelNames(teamId, args.labels.remove)
+              if (resolution.notFound.length > 0) {
+                const result: LinearUpdateIssueResult = {
+                  success: false,
+                  issueIdentifier: beforeIssue.identifier,
+                  issueUrl: beforeIssue.url,
+                  changes: [],
+                  message: "Some labels not found",
+                  error: `Labels not found: ${resolution.notFound.join(", ")}`,
+                }
+                return JSON.stringify(result, null, 2)
+              }
+              removedLabelIds = resolution.resolved
+            }
+          }
+        }
+
+        const updateResult = await updateIssue({
+          issueId: beforeIssue.id,
+          title: args.title,
+          description: args.description,
+          priority: args.priority !== undefined ? normalizePriority(args.priority) : undefined,
+          estimate: args.estimate,
+          dueDate: args.dueDate,
+          assigneeId: args.assigneeId,
+          labelIds,
+          addedLabelIds,
+          removedLabelIds,
+        })
+
+        if (!updateResult.success || !updateResult.issue) {
+          const result: LinearUpdateIssueResult = {
+            success: false,
+            issueIdentifier: beforeIssue.identifier,
+            issueUrl: beforeIssue.url,
+            changes: [],
+            message: "Failed to update issue",
+            error: updateResult.error,
+          }
+          return JSON.stringify(result, null, 2)
+        }
+
+        const afterIssue = updateResult.issue
+        const changes = buildChangesArray(beforeIssue, afterIssue, args)
+        const currentState = buildCurrentState(afterIssue)
+
+        const changedFields = changes.map((c) => c.field).join(", ")
+        const message =
+          changes.length > 0
+            ? `Updated ${afterIssue.identifier}: ${changedFields}`
+            : `No changes made to ${afterIssue.identifier}`
+
+        const result: LinearUpdateIssueResult = {
+          success: true,
+          issueIdentifier: afterIssue.identifier,
+          issueUrl: afterIssue.url,
+          changes,
+          currentState,
+          message,
+        }
+
+        log(`[linear_update_issue] Success:`, result)
+        return JSON.stringify(result, null, 2)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[linear_update_issue] Error:`, errorMessage)
+
+        const result: LinearUpdateIssueResult = {
+          success: false,
+          issueIdentifier: args.issueId,
+          issueUrl: "",
+          changes: [],
+          message: "Failed to update issue",
           error: errorMessage,
         }
         return JSON.stringify(result, null, 2)
