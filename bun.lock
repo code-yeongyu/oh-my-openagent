@@ -8,7 +8,7 @@
         "@ast-grep/cli": "^0.40.0",
         "@ast-grep/napi": "^0.40.0",
         "@clack/prompts": "^0.11.0",
-        "@code-yeongyu/comment-checker": "^0.6.0",
+        "@code-yeongyu/comment-checker": "^0.6.1",
         "@openauthjs/openauth": "^0.4.3",
         "@opencode-ai/plugin": "^1.0.162",
         "@opencode-ai/sdk": "^1.0.162",
@@ -73,7 +73,7 @@
 
     "@clack/prompts": ["@clack/prompts@0.11.0", "", { "dependencies": { "@clack/core": "0.5.0", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-pMN5FcrEw9hUkZA4f+zLlzivQSeQf5dRGJjSUbvVYDLvpKCdQx5OaknvKzgbtXOizhP+SJJJjqEbOe55uKKfAw=="],
 
-    "@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.6.0", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-VtDPrhbUJcb5BIS18VMcY/N/xSLbMr6dpU9MO1NYQyEDhI4pSIx07K4gOlCutG/nHVCjO+HEarn8rttODP+5UA=="],
+    "@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.6.1", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "comment-checker": "bin/comment-checker" } }, "sha512-BBremX+Y5aW8sTzlhHrLsKParupYkPOVUYmq9STrlWvBvfAme6w5IWuZCLl6nHIQScRDdvGdrAjPycJC86EZFA=="],
 
     "@openauthjs/openauth": ["@openauthjs/openauth@0.4.3", "", { "dependencies": { "@standard-schema/spec": "1.0.0-beta.3", "aws4fetch": "1.0.20", "jose": "5.9.6" }, "peerDependencies": { "arctic": "^2.2.2", "hono": "^4.0.0" } }, "sha512-RlnjqvHzqcbFVymEwhlUEuac4utA5h4nhSK/i2szZuQmxTIqbGUxZ+nM+avM+VV4Ing+/ZaNLKILoXS3yrkOOw=="],
 
