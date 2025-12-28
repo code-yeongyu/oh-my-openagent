@@ -190,15 +190,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -313,15 +304,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -436,15 +418,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -559,15 +532,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -682,15 +646,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -805,15 +760,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -928,15 +874,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -1051,15 +988,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -1174,15 +1102,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -1297,15 +1216,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },
@@ -1420,15 +1330,6 @@
                   ]
                 }
               }
-            },
-            "code_reviewer_mode": {
-              "type": "string",
-              "enum": [
-                "general",
-                "silent_failure_hunter",
-                "type_design_analyzer",
-                "pr_test_analyzer"
-              ]
             }
           }
         },

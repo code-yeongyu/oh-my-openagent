@@ -1,5 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory } from "./types"
+import type {
+  BuiltinAgentName,
+  AgentOverrides,
+  AgentFactory,
+  BaseAgentOverrideConfig,
+  CodeReviewerOverrideConfig,
+} from "./types"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent } from "./oracle"
 import { createLibrarianAgent } from "./librarian"
@@ -68,9 +74,16 @@ Here is some useful information about the environment you are running in:
 </env>`
 }
 
+function isCodeReviewerOverride(
+  agentName: string,
+  override: BaseAgentOverrideConfig | CodeReviewerOverrideConfig
+): override is CodeReviewerOverrideConfig {
+  return agentName === "code-reviewer" && "code_reviewer_mode" in override
+}
+
 function mergeAgentConfig(
   base: AgentConfig,
-  override: AgentOverrideConfig
+  override: BaseAgentOverrideConfig
 ): AgentConfig {
   const { prompt_append, ...rest } = override
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
@@ -101,7 +114,7 @@ export function createBuiltinAgents(
     const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
 
     const factoryOptions: Record<string, unknown> = {}
-    if (agentName === "code-reviewer" && override?.code_reviewer_mode) {
+    if (override && isCodeReviewerOverride(agentName, override)) {
       factoryOptions.persona = override.code_reviewer_mode
     }
 
@@ -111,7 +124,6 @@ export function createBuiltinAgents(
       config = mergeAgentConfig(config, override)
     }
 
-    // Inject environment context AFTER all overrides to ensure it's always present
     if (["Sisyphus", "librarian", "code-reviewer", "explore"].includes(agentName) && directory && config.prompt) {
       const envContext = createEnvContext(directory)
       config = { ...config, prompt: config.prompt + envContext }

@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { BaseAgentOptions } from "./types"
 
 const DEFAULT_MODEL = "opencode/grok-code"
 
@@ -342,7 +343,7 @@ export const CODE_REVIEWER_PROMPTS: Record<CodeReviewerMode, string> = {
   pr_test_analyzer: CODE_REVIEWER_PR_TEST_ANALYZER_PROMPT,
 }
 
-export interface CodeReviewerOptions {
+export interface CodeReviewerOptions extends BaseAgentOptions {
   persona?: CodeReviewerMode
 }
 

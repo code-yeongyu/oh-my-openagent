@@ -78,7 +78,7 @@ export const BuiltinCommandNameSchema = z.enum([
 
 export const CodeReviewerModeSchema = z.enum(CODE_REVIEWER_MODES)
 
-export const AgentOverrideConfigSchema = z.object({
+const BaseAgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
@@ -93,22 +93,27 @@ export const AgentOverrideConfigSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
   permission: AgentPermissionSchema.optional(),
+})
+
+const CodeReviewerOverrideConfigSchema = BaseAgentOverrideConfigSchema.extend({
   code_reviewer_mode: CodeReviewerModeSchema.optional(),
 })
 
+export const AgentOverrideConfigSchema = BaseAgentOverrideConfigSchema
+
 export const AgentOverridesSchema = z.object({
-  build: AgentOverrideConfigSchema.optional(),
-  plan: AgentOverrideConfigSchema.optional(),
-  Sisyphus: AgentOverrideConfigSchema.optional(),
-  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  "Planner-Sisyphus": AgentOverrideConfigSchema.optional(),
-  oracle: AgentOverrideConfigSchema.optional(),
-  librarian: AgentOverrideConfigSchema.optional(),
-  explore: AgentOverrideConfigSchema.optional(),
-  "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
-  "document-writer": AgentOverrideConfigSchema.optional(),
-  "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  "code-reviewer": AgentOverrideConfigSchema.optional(),
+  build: BaseAgentOverrideConfigSchema.optional(),
+  plan: BaseAgentOverrideConfigSchema.optional(),
+  Sisyphus: BaseAgentOverrideConfigSchema.optional(),
+  "OpenCode-Builder": BaseAgentOverrideConfigSchema.optional(),
+  "Planner-Sisyphus": BaseAgentOverrideConfigSchema.optional(),
+  oracle: BaseAgentOverrideConfigSchema.optional(),
+  librarian: BaseAgentOverrideConfigSchema.optional(),
+  explore: BaseAgentOverrideConfigSchema.optional(),
+  "frontend-ui-ux-engineer": BaseAgentOverrideConfigSchema.optional(),
+  "document-writer": BaseAgentOverrideConfigSchema.optional(),
+  "multimodal-looker": BaseAgentOverrideConfigSchema.optional(),
+  "code-reviewer": CodeReviewerOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
