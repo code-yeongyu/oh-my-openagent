@@ -253,6 +253,15 @@ export function createTodoContinuationEnforcer(
             return
           }
 
+          // Skip for plan mode agents - they only plan, not implement
+          const agentName = prevMessage?.agent?.toLowerCase() ?? ""
+          const isPlanModeAgent = agentName === "plan" || agentName.includes("planner")
+          if (isPlanModeAgent) {
+            log(`[${HOOK_NAME}] Skipped: plan mode agent detected`, { sessionID, agent: prevMessage?.agent })
+            remindedSessions.delete(sessionID)
+            return
+          }
+
           log(`[${HOOK_NAME}] Injecting continuation prompt`, { sessionID, agent: prevMessage?.agent })
           await ctx.client.session.prompt({
             path: { id: sessionID },
