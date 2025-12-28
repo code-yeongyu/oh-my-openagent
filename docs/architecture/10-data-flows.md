@@ -150,7 +150,7 @@ flowchart TD
     
     subgraph Linear Injector
         A --> C{Contains LIF-XXX?}
-        C -->|Yes| D[Fetch via Linear MCP]
+        C -->|Yes| D[Fetch via Linear API]
         D --> E[Inject <linear_context>]
     end
     

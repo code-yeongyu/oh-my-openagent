@@ -211,7 +211,7 @@ OMO loads assets from Claude Code directories:
 1. Install the plugin via OpenCode
 2. Create `~/.config/opencode/oh-my-opencode.json` for global settings
 3. Create `.opencode/oh-my-opencode.json` for project-specific settings
-4. Configure Linear MCP if using governance features
+4. Set `LINEAR_API_KEY` environment variable if using governance features
 
 ## Further Reading
 

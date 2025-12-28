@@ -162,7 +162,7 @@ To automatically detect Linear issue references in chat messages and inject deta
 
 ### Workflow
 1. **Detection**: Scans incoming chat messages for patterns matching `{TEAM_PREFIX}-\d+`.
-2. **Fetching**: Uses the Linear MCP to fetch detailed issue metadata (title, status, description, branch name, labels).
+2. **Fetching**: Uses the Linear API (via built-in linear tools) to fetch detailed issue metadata (title, status, description, branch name, labels).
 3. **Injection**: Injects a formatted `<linear_context>` block into the agent's prompt before they respond.
 4. **Caching**: Stores issue data in a session-local cache to prevent redundant API calls within the same session.
 
@@ -221,7 +221,7 @@ flowchart TD
 - **Tool Lifecycle**: Governance hooks tap into `tool.execute.before` and `tool.execute.after` to enforce rules and track results.
 - **Chat Lifecycle**: The Linear Injector uses `chat.message` to provide proactive context.
 - **Event System**: The system relies on `session.created`, `session.updated`, and `session.deleted` events to manage stateful tracking (Historian and Linear Cache).
-- **MCP**: Linear integration depends on a configured Linear MCP server for data retrieval and updates.
+- **Linear API**: Linear integration depends on the `LINEAR_API_KEY` environment variable and uses built-in linear tools for data retrieval and updates.
 
 ## Integration with LIF-57 Enhancements
 The Governance System is a core component of the LIF-57 enhancements, which focus on:

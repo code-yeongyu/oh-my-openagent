@@ -62,7 +62,7 @@ Response to User
 ### Integration Points
 
 - **OpenCode Core**: Via `@opencode-ai/plugin` SDK
-- **Linear**: Via Linear MCP for project management
+- **Linear**: Via built-in linear tools (LINEAR_API_KEY required)
 - **Context7**: Via MCP for library documentation
 - **Websearch**: Via Exa MCP for web search
 - **Grep.app**: Via MCP for code search

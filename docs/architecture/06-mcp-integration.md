@@ -5,7 +5,7 @@ description: "Architecture and configuration of the Model Context Protocol (MCP)
 
 # MCP Integration
 
-The OhMyOpenCode (OMO) plugin leverages the **Model Context Protocol (MCP)** to integrate with external services and tools. This system allows OMO agents to access real-time information, search the web, and interact with third-party APIs like Linear.
+The OhMyOpenCode (OMO) plugin leverages the **Model Context Protocol (MCP)** to integrate with external services and tools. This system allows OMO agents to access real-time documentation, search the web, and find code examples across public repositories.
 
 ## Overview
 
@@ -56,7 +56,7 @@ OMO supports environment variable expansion within MCP configuration files. This
 Example:
 ```json
 "env": {
-  "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+  "MY_API_KEY": "${MY_API_KEY}"
 }
 ```
 
@@ -88,11 +88,11 @@ Used for connecting to hosted MCP endpoints.
 ```json
 {
   "mcpServers": {
-    "linear": {
+    "my-remote-service": {
       "type": "http",
-      "url": "https://mcp.linear.app/mcp",
+      "url": "https://mcp.example.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${LINEAR_API_KEY}"
+        "Authorization": "Bearer ${MY_API_KEY}"
       }
     }
   }
@@ -117,22 +117,3 @@ The `transformMcpServer` utility handles the conversion:
 
 ### Librarian Agent
 The `librarian` agent is the primary consumer of the research-oriented MCPs (`context7`, `websearch_exa`, `grep_app`). It uses these to provide accurate technical information and code examples.
-
-### Governance Tools
-Governance tools like `linear_branch` and `linear_update_status` rely on a configured `linear` MCP server to interact with the Linear API.
-
-```typescript
-// Example of a tool calling an MCP server
-const mcpResult = await ctx.client.mcp.call({
-  server: "linear",
-  method: "tools/call",
-  params: {
-    name: "linear_get_issue",
-    arguments: { id: args.issueId },
-  },
-});
-```
-
-<Note>
-The `linear` MCP server is not builtin and must be configured in a `.mcp.json` file with a valid `LINEAR_API_KEY`.
-</Note>
