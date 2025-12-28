@@ -319,7 +319,7 @@
     "opencode-skills",
     "opencode-gemini-auth",
     "opencode-openai-codex-auth",
-    "file:///Users/eru/Documents/GitHub/oh-my-opencode-worktrees/hello/lif-73-self-improving-chat-review-system-chat-auditor-agent-context/src/index.ts"
+    "../src/index.ts"
   ],
 
   "watcher": {
