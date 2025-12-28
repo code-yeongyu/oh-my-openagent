@@ -72,7 +72,6 @@ export const HookNameSchema = z.enum([
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
-  "feature-dev",
   "review-pr",
 ])
 

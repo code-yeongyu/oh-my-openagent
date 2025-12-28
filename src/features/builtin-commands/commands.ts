@@ -1,7 +1,6 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
-import { FEATURE_DEV_TEMPLATE } from "./templates/feature-dev"
 import { REVIEW_PR_TEMPLATE } from "./templates/review-pr"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
@@ -15,17 +14,6 @@ ${INIT_DEEP_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[--create-new] [--max-depth=N]",
-  },
-  "feature-dev": {
-    description: "(builtin) Iterative Feature Development Workflow (Explore -> Design -> Implement -> Review)",
-    template: `<command-instruction>
-${FEATURE_DEV_TEMPLATE}
-</command-instruction>
-
-<user-request>
-$ARGUMENTS
-</user-request>`,
-    argumentHint: "<feature-description>",
   },
   "review-pr": {
     description: "(builtin) Code review using specialized code-reviewer agent",
