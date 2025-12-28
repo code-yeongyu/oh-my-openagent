@@ -5,6 +5,7 @@ export {
   McpNameSchema,
   AgentNameSchema,
   HookNameSchema,
+  BuiltinCommandNameSchema,
   SisyphusAgentConfigSchema,
   ExperimentalConfigSchema,
 } from "./schema"
@@ -16,6 +17,7 @@ export type {
   McpName,
   AgentName,
   HookName,
+  BuiltinCommandName,
   SisyphusAgentConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
