@@ -424,10 +424,9 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      // Skip if in error bypass mode (clear it for next time)
+      // Skip if in error bypass mode (DO NOT clear - wait for user message)
       if (state.mode === "errorBypass") {
-        state.mode = "idle"
-        log(`[${HOOK_NAME}] Skipped: error bypass (cleared for next idle)`, { sessionID })
+        log(`[${HOOK_NAME}] Skipped: error bypass (awaiting user message to resume)`, { sessionID })
         return
       }
 
@@ -489,8 +488,13 @@ export function createTodoContinuationEnforcer(
 
       if (!sessionID) return
 
-      // User message: Always cancel countdown
+      // User message: Always cancel countdown and clear errorBypass
       if (role === "user") {
+        const state = sessions.get(sessionID)
+        if (state?.mode === "errorBypass") {
+          state.mode = "idle"
+          log(`[${HOOK_NAME}] User message cleared errorBypass mode`, { sessionID })
+        }
         invalidate(sessionID, "user message received")
         return
       }
