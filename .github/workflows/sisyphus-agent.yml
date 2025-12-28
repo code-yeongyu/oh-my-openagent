@@ -86,14 +86,19 @@ jobs:
 
           # Install OpenCode (skip if cached)
           if ! command -v opencode &>/dev/null; then
-            for i in 1 2 3; do
-              echo "Attempt $i: Installing OpenCode..."
-              curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
-              if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
-                bash /tmp/opencode-install.sh && break
+            echo "Installing OpenCode..."
+            curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
+            
+            # Try default installer first, fallback to pinned version if it fails
+            if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
+              if ! bash /tmp/opencode-install.sh 2>&1; then
+                echo "Default installer failed, trying with pinned version..."
+                bash /tmp/opencode-install.sh --version 1.0.204
               fi
-              echo "Download corrupted, retrying in 5s..."
-            done
+            else
+              echo "Download corrupted, trying direct install with pinned version..."
+              bash <(curl -fsSL https://opencode.ai/install) --version 1.0.204
+            fi
           fi
           opencode --version
 
