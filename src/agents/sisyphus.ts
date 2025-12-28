@@ -526,12 +526,11 @@ If the user's approach seems problematic:
 `
 
 export function createSisyphusAgent(model: string = DEFAULT_MODEL): AgentConfig {
-  const base = {
+  const base: AgentConfig = {
     description:
       "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
     mode: "primary" as const,
     model,
-    maxTokens: 64000,
     prompt: SISYPHUS_SYSTEM_PROMPT,
     color: "#00CED1",
   }
@@ -540,7 +539,9 @@ export function createSisyphusAgent(model: string = DEFAULT_MODEL): AgentConfig 
     return { ...base, reasoningEffort: "medium" }
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  // Don't set thinking/maxTokens here - let OpenCode handle based on runtime model
+  // This prevents issues when -m flag overrides model at runtime
+  return base
 }
 
 export const sisyphusAgent = createSisyphusAgent()

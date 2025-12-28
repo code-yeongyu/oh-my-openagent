@@ -6,6 +6,18 @@ export function isGptModel(model: string): boolean {
   return model.startsWith("openai/") || model.startsWith("github-copilot/gpt-")
 }
 
+const THINKING_CAPABLE_PROVIDERS = new Set([
+  "anthropic",
+  "google",
+  "google-vertex",
+  "amazon-bedrock",
+])
+
+export function isThinkingCapableProvider(model: string): boolean {
+  const provider = model.split("/")[0]
+  return THINKING_CAPABLE_PROVIDERS.has(provider)
+}
+
 export type BuiltinAgentName =
   | "Sisyphus"
   | "oracle"

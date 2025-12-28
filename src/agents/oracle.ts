@@ -84,7 +84,8 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     return { ...base, reasoningEffort: "medium", textVerbosity: "high" }
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  // Don't set thinking here - let OpenCode handle based on runtime model
+  return base
 }
 
 export const oracleAgent = createOracleAgent()

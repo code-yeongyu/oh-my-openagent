@@ -444,12 +444,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             : plannerSisyphusBase;
         }
 
-        // Filter out build/plan from config.agent - they'll be re-added as subagents if replaced
-        const filteredConfigAgents = config.agent ? 
+        // Filter out build/plan/Sisyphus from config.agent - we provide our own
+        const filteredConfigAgents = config.agent ?
           Object.fromEntries(
             Object.entries(config.agent).filter(([key]) => {
               if (key === "build") return false;
               if (key === "plan" && replacePlan) return false;
+              if (key === "Sisyphus") return false;  // Always use our Sisyphus
               return true;
             })
           ) : {};
