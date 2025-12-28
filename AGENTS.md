@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-24T17:07:00+09:00
-**Commit:** 0172241
+**Generated:** 2025-12-28T17:15:00+09:00
+**Commit:** f5b74d5
 **Branch:** dev
 
 ## OVERVIEW
