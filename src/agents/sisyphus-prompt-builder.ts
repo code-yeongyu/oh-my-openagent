@@ -6,6 +6,51 @@ export interface AvailableAgent {
   metadata: AgentPromptMetadata
 }
 
+export interface AvailableTool {
+  name: string
+  category: "lsp" | "ast" | "search" | "session" | "command" | "other"
+}
+
+export function categorizeTools(toolNames: string[]): AvailableTool[] {
+  return toolNames.map((name) => {
+    let category: AvailableTool["category"] = "other"
+    if (name.startsWith("lsp_")) {
+      category = "lsp"
+    } else if (name.startsWith("ast_grep")) {
+      category = "ast"
+    } else if (name === "grep" || name === "glob") {
+      category = "search"
+    } else if (name.startsWith("session_")) {
+      category = "session"
+    } else if (name === "slashcommand") {
+      category = "command"
+    }
+    return { name, category }
+  })
+}
+
+function formatToolsForPrompt(tools: AvailableTool[]): string {
+  const lspTools = tools.filter((t) => t.category === "lsp")
+  const astTools = tools.filter((t) => t.category === "ast")
+  const searchTools = tools.filter((t) => t.category === "search")
+
+  const parts: string[] = []
+
+  if (searchTools.length > 0) {
+    parts.push(...searchTools.map((t) => `\`${t.name}\``))
+  }
+
+  if (lspTools.length > 0) {
+    parts.push("`lsp_*`")
+  }
+
+  if (astTools.length > 0) {
+    parts.push("`ast_grep`")
+  }
+
+  return parts.join(", ")
+}
+
 export function buildKeyTriggersSection(agents: AvailableAgent[]): string {
   const keyTriggers = agents
     .filter((a) => a.metadata.keyTrigger)
@@ -19,14 +64,18 @@ ${keyTriggers.join("\n")}
 - **"Look into" + "create PR"** → Not just research. Full implementation cycle expected.`
 }
 
-export function buildToolSelectionTable(agents: AvailableAgent[]): string {
+export function buildToolSelectionTable(agents: AvailableAgent[], tools: AvailableTool[] = []): string {
   const rows: string[] = [
     "### Tool Selection:",
     "",
     "| Tool | Cost | When to Use |",
     "|------|------|-------------|",
-    "| `grep`, `glob`, `lsp_*`, `ast_grep` | FREE | Not Complex, Scope Clear, No Implicit Assumptions |",
   ]
+
+  if (tools.length > 0) {
+    const toolsDisplay = formatToolsForPrompt(tools)
+    rows.push(`| ${toolsDisplay} | FREE | Not Complex, Scope Clear, No Implicit Assumptions |`)
+  }
 
   const costOrder = { FREE: 0, CHEAP: 1, EXPENSIVE: 2 }
   const sortedAgents = [...agents]

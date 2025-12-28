@@ -389,6 +389,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         pluginConfig.agents,
         ctx.directory,
         config.model,
+        Object.keys(builtinTools),
       );
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};

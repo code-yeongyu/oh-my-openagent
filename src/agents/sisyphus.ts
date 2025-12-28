@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { AvailableAgent } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableTool } from "./sisyphus-prompt-builder"
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -11,6 +11,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  categorizeTools,
 } from "./sisyphus-prompt-builder"
 
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
@@ -374,9 +375,9 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 
 `
 
-function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[]): string {
+function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], availableTools: AvailableTool[] = []): string {
   const keyTriggers = buildKeyTriggersSection(availableAgents)
-  const toolSelection = buildToolSelectionTable(availableAgents)
+  const toolSelection = buildToolSelectionTable(availableAgents, availableTools)
   const exploreSection = buildExploreSection(availableAgents)
   const librarianSection = buildLibrarianSection(availableAgents)
   const frontendSection = buildFrontendSection(availableAgents)
@@ -454,11 +455,13 @@ function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[]): string {
 
 export function createSisyphusAgent(
   model: string = DEFAULT_MODEL,
-  availableAgents?: AvailableAgent[]
+  availableAgents?: AvailableAgent[],
+  availableToolNames?: string[]
 ): AgentConfig {
+  const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents)
-    : buildDynamicSisyphusPrompt([])
+    ? buildDynamicSisyphusPrompt(availableAgents, tools)
+    : buildDynamicSisyphusPrompt([], tools)
 
   const base = {
     description:
