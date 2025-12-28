@@ -162,8 +162,8 @@ export const ExperimentalConfigSchema = z.object({
   truncate_all_tool_outputs: z.boolean().default(true),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
-  /** Run DCP only when compaction (summarize) fails, then retry compaction (default: false) */
-  dcp_on_compaction_failure: z.boolean().optional(),
+  /** Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded (default: false) */
+  dcp_for_compaction: z.boolean().optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
