@@ -150,6 +150,7 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
 
   if (installConfig.hasGemini) {
     agents["librarian"] = { model: "google/gemini-3-flash" }
+    agents["explore"] = { model: "google/gemini-3-flash" }
   } else if (!installConfig.hasClaude || !installConfig.isMax20) {
     agents["librarian"] = { model: "opencode/big-pickle" }
   }
