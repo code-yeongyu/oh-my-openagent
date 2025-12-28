@@ -4,6 +4,14 @@ import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 
+type ToolContextWithMetadata = {
+  sessionID: string
+  messageID: string
+  agent: string
+  abort: AbortSignal
+  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
+}
+
 export function createCallOmoAgent(
   ctx: PluginInput,
   backgroundManager: BackgroundManager
@@ -27,6 +35,7 @@ export function createCallOmoAgent(
       session_id: tool.schema.string().describe("Existing Task session to continue").optional(),
     },
     async execute(args: CallOmoAgentArgs, toolContext) {
+      const toolCtx = toolContext as ToolContextWithMetadata
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
       if (!ALLOWED_AGENTS.includes(args.subagent_type as typeof ALLOWED_AGENTS[number])) {
@@ -37,17 +46,17 @@ export function createCallOmoAgent(
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolContext, backgroundManager)
+        return await executeBackground(args, toolCtx, backgroundManager)
       }
 
-      return await executeSync(args, toolContext, ctx)
+      return await executeSync(args, toolCtx, ctx)
     },
   })
 }
 
 async function executeBackground(
   args: CallOmoAgentArgs,
-  toolContext: { sessionID: string; messageID: string },
+  toolContext: ToolContextWithMetadata,
   manager: BackgroundManager
 ): Promise<string> {
   try {
@@ -57,6 +66,11 @@ async function executeBackground(
       agent: args.subagent_type,
       parentSessionID: toolContext.sessionID,
       parentMessageID: toolContext.messageID,
+    })
+
+    toolContext.metadata?.({
+      title: args.description,
+      metadata: { sessionId: task.sessionID },
     })
 
     return `Background agent task launched successfully.
@@ -79,7 +93,7 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 
 async function executeSync(
   args: CallOmoAgentArgs,
-  toolContext: { sessionID: string },
+  toolContext: ToolContextWithMetadata,
   ctx: PluginInput
 ): Promise<string> {
   let sessionID: string
@@ -111,6 +125,11 @@ async function executeSync(
     sessionID = createResult.data.id
     log(`[call_omo_agent] Created session: ${sessionID}`)
   }
+
+  toolContext.metadata?.({
+    title: args.description,
+    metadata: { sessionId: sessionID },
+  })
 
   log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
