@@ -10,23 +10,40 @@ import {
   updateLastReviewed,
 } from "./state"
 import { runPreflight, getUpstreamCommits, enrichCommitsWithFiles } from "./git-adapter"
-import { prepareAnalysisPackets, suggestPriority } from "./analysis"
+import { suggestPriority } from "./analysis"
 import {
   groupCommitsByScope,
   generateRecommendations,
   generateMarkdownReport,
 } from "./report"
-import { generateScaffoldCommands } from "./execution"
+import { generateScaffoldCommands, prepareLinearIssues } from "./execution"
 import type { SyncForkArgs, SyncForkResult, ParsedCommit, Priority } from "./types"
 
+/*
+ * AI Analysis Integration (Phase 2 - Not Yet Implemented)
+ * --------------------------------------------------------
+ * The `prepareAnalysisPackets` and `parseAIResponse` functions in analysis.ts
+ * are scaffolded for future AI-driven analysis using background_task(agent="explore").
+ *
+ * Current implementation uses `suggestPriority()` which provides heuristic-based
+ * priorities based on commit type, file patterns, and security keywords.
+ *
+ * TODO: Integrate AI analysis when background_task is available in tool context.
+ * See: analysis.ts for the scaffolded AI prompt templates and response parsing.
+ */
+
+/**
+ * Creates the sync_fork tool for analyzing and syncing upstream changes.
+ * Returns a tool that can be registered with the OpenCode plugin system.
+ */
 export function createSyncForkTool(_ctx: PluginInput) {
   return tool({
     description: SYNC_FORK_DESCRIPTION,
     args: {
       filter: tool.schema
-        .enum(["all", "fix", "perf", "security", "feat"])
+        .string()
         .optional()
-        .describe("Filter commits by type (default: all)"),
+        .describe("Filter commits by type(s): all, fix, perf, security, feat (comma-separated, default: all)"),
       since: tool.schema
         .string()
         .optional()
@@ -53,7 +70,7 @@ export function createSyncForkTool(_ctx: PluginInput) {
         .describe("Analyze only, don't execute anything"),
     },
     async execute(args: SyncForkArgs): Promise<string> {
-      log(`[sync_fork] Starting with args: ${JSON.stringify(args)}`)
+      log(`[sync-fork] Starting with args: ${JSON.stringify(args)}`)
 
       const result = await executeSyncFork(args)
 
@@ -79,7 +96,7 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
   try {
     if (args.resetState) {
       const deleted = await deleteState()
-      log(`[sync_fork] State reset: ${deleted ? "deleted" : "no state file found"}`)
+      log(`[sync-fork] State reset: ${deleted ? "deleted" : "no state file found"}`)
     }
 
     const preflight = await runPreflight()
@@ -93,12 +110,12 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
     }
 
     const { context, warnings } = preflight
-    log(`[sync_fork] Preflight passed. Repo: ${context.repoRoot}`)
-    log(`[sync_fork] Merge base: ${context.mergeBase}`)
+    log(`[sync-fork] Preflight passed. Repo: ${context.repoRoot}`)
+    log(`[sync-fork] Merge base: ${context.mergeBase}`)
 
     const limit = Math.min(args.limit || DEFAULT_LIMIT, MAX_LIMIT)
     const allCommits = await getUpstreamCommits(context, args.since, limit)
-    log(`[sync_fork] Found ${allCommits.length} upstream commits`)
+    log(`[sync-fork] Found ${allCommits.length} upstream commits`)
 
     if (allCommits.length === 0) {
       return {
@@ -117,12 +134,13 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
     const state = getOrCreateState()
     const newCommitShas = getNewCommits(state, allCommits.map((c) => c.sha))
     const newCommits = allCommits.filter((c) => newCommitShas.includes(c.sha))
-    log(`[sync_fork] ${newCommits.length} new commits (${allCommits.length - newCommits.length} already reviewed)`)
+    log(`[sync-fork] ${newCommits.length} new commits (${allCommits.length - newCommits.length} already reviewed)`)
 
     let filteredCommits = newCommits
     if (args.filter && args.filter !== "all") {
-      filteredCommits = newCommits.filter((c) => c.type === args.filter)
-      log(`[sync_fork] Filtered to ${filteredCommits.length} ${args.filter} commits`)
+      const filterTypes = args.filter.split(",").map((t) => t.trim().toLowerCase())
+      filteredCommits = newCommits.filter((c) => filterTypes.includes(c.type))
+      log(`[sync-fork] Filtered to ${filteredCommits.length} commits (types: ${filterTypes.join(", ")})`)
     }
 
     if (filteredCommits.length === 0) {
@@ -142,10 +160,10 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
     await enrichCommitsWithFiles(context.repoRoot, filteredCommits)
 
     const groups = groupCommitsByScope(filteredCommits)
-    log(`[sync_fork] Grouped into ${groups.length} groups`)
+    log(`[sync-fork] Grouped into ${groups.length} groups`)
 
     const recommendations = generateRecommendations(groups)
-    log(`[sync_fork] Generated ${recommendations.length} recommendations`)
+    log(`[sync-fork] Generated ${recommendations.length} recommendations`)
 
     if (!args.dryRun) {
       for (const commit of filteredCommits) {
@@ -160,13 +178,14 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
       state.upstream.lastFetchedAt = new Date().toISOString()
       await atomicWriteState(state)
     } else {
-      log(`[sync_fork] Dry run - skipping state updates`)
+      log(`[sync-fork] Dry run - skipping state updates`)
     }
 
     const byPriority = countByPriority(recommendations)
     const byType = countByType(filteredCommits)
 
     const markdownReport = generateMarkdownReport(context, recommendations, warnings)
+    const linearIssuesData = prepareLinearIssues(recommendations)
 
     return {
       success: true,
@@ -179,9 +198,10 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
       recommendations,
       markdownReport,
       nextSteps: generateNextSteps(recommendations),
+      linearIssuesData,
     }
   } catch (e) {
-    log(`[sync_fork] Error: ${e}`)
+    log(`[sync-fork] Error: ${e}`)
     return {
       success: false,
       error: String(e),

@@ -18,7 +18,7 @@ The following table outlines the primary dependencies between core components:
 | **session-recovery** | `ctx.client`, `MESSAGE_STORAGE` | `todo-continuation-enforcer` (state sync) |
 | **governance-historian** | `ctx.directory`, `fs`, `MESSAGE_STORAGE` | Triggered by `tool.execute.after` |
 | **governance-path-validator** | `ctx.directory` | Triggered by `tool.execute.before` |
-| **governance-linear-injector** | `Linear API`, `injectHookMessage` | Triggered by `chat.message` and `event` |
+| **governance-linear-injector** | `Linear MCP`, `injectHookMessage` | Triggered by `chat.message` and `event` |
 | **rules-injector** | `MESSAGE_STORAGE`, `ctx.directory` | Triggered by `tool.execute.after` |
 | **directory-agents-injector** | `MESSAGE_STORAGE`, `ctx.directory` | Triggered by `tool.execute.after` |
 
@@ -47,8 +47,8 @@ Agents are configured with specific toolsets, often restricting powerful tools f
 Components that rely on External Model Context Protocol (MCP) servers:
 
 - **librarian agent**: Depends on `context7` (docs), `websearch_exa` (search), and `grep_app` (code search).
-- **governance-linear-injector**: Uses built-in linear tools to fetch issue context and inject it into the chat.
-- **Linear tools**: `linear_branch`, `linear_update_status`, and `linear_create_issue` all require the `LINEAR_API_KEY` environment variable to be set.
+- **governance-linear-injector**: Depends on the `Linear MCP` to fetch issue context and inject it into the chat.
+- **Linear tools**: `linear_branch`, `linear_update_status`, and `linear_create_issue` all require the `Linear MCP` to be configured and enabled.
 
 ## 5. Shared State Dependencies
 
@@ -141,7 +141,7 @@ graph TD
     end
     
     subgraph External
-        L[Linear API]
+        L[Linear MCP]
         M[context7 MCP]
         N[MESSAGE_STORAGE]
     end

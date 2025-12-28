@@ -5,6 +5,7 @@ import type {
   SyncForkState,
   ParsedCommit,
   GitContext,
+  LinearIssueData,
 } from "./types"
 import { atomicWriteState, markCommitAsSynced } from "./state"
 
@@ -40,6 +41,7 @@ async function gh(args: string, cwd: string): Promise<{ success: boolean; output
   }
 }
 
+/** Creates a new sync branch for cherry-picking upstream commits. */
 export async function createSyncBranch(
   repoRoot: string,
   baseBranch?: string
@@ -72,6 +74,7 @@ export async function createSyncBranch(
   return { success: true, branchName }
 }
 
+/** Cherry-picks commits from upstream, handling conflicts gracefully. */
 export async function cherryPickCommits(
   repoRoot: string,
   commits: ParsedCommit[]
@@ -115,6 +118,7 @@ export async function cherryPickCommits(
   }
 }
 
+/** Pushes the sync branch to origin with upstream tracking. */
 export async function pushBranch(
   repoRoot: string,
   branchName: string
@@ -129,6 +133,7 @@ export async function pushBranch(
   return { success: true }
 }
 
+/** Creates a GitHub PR using gh CLI with heredoc for safe body escaping. */
 export async function createPullRequest(
   repoRoot: string,
   recommendations: SyncRecommendation[],
@@ -139,10 +144,13 @@ export async function createPullRequest(
 
   log(`[sync-fork] Creating PR: ${title}`)
 
-  const result = await gh(
-    `pr create --title "${title}" --body "${escapeForShell(body)}"`,
-    repoRoot
-  )
+  const escapedTitle = escapeForShell(title)
+  const ghCommand = `pr create --title "${escapedTitle}" --body "$(cat <<'SYNCFORK_EOF'
+${body}
+SYNCFORK_EOF
+)"`
+
+  const result = await gh(ghCommand, repoRoot)
 
   if (!result.success) {
     return { success: false, error: result.output }
@@ -154,6 +162,20 @@ export async function createPullRequest(
   const number = numberMatch ? numberMatch[1] : undefined
 
   return { success: true, url, number }
+}
+
+/** Extracts P0/P1 recommendations as Linear issue data for OmO to create. */
+export function prepareLinearIssues(
+  recommendations: SyncRecommendation[]
+): LinearIssueData[] {
+  return recommendations
+    .filter((r) => r.priority === "P0" || r.priority === "P1")
+    .map((r) => ({
+      title: r.suggestedIssueTitle,
+      description: r.suggestedIssueDescription,
+      labels: r.suggestedLabels,
+      priority: r.priority,
+    }))
 }
 
 function generatePRTitle(recommendations: SyncRecommendation[]): string {
@@ -210,6 +232,7 @@ function escapeForShell(str: string): string {
     .replace(/`/g, "\\`")
 }
 
+/** Executes the full sync workflow: branch, cherry-pick, push, PR, state update. */
 export async function executeSync(
   context: GitContext,
   state: SyncForkState,
@@ -285,6 +308,7 @@ export async function executeSync(
   }
 }
 
+/** Generates a bash script with cherry-pick commands for manual execution. */
 export function generateScaffoldCommands(
   recommendations: SyncRecommendation[]
 ): string {

@@ -115,7 +115,7 @@ context/specs/, context/memory/
 
 **Mechanism**:
 - Scans chat messages for `{TEAM_PREFIX}-\d+` patterns
-- Fetches issue details via Linear API
+- Fetches issue details via Linear MCP
 - Injects `<linear_context>` block into prompt
 - Caches issues per session to avoid redundant API calls
 

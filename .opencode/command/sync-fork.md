@@ -80,3 +80,7 @@ State is saved to `.opencode/state/sync-fork.json`:
 - Git CLI installed
 - `gh` CLI installed (for PR creation)
 - Upstream remote configured: `git remote add upstream <URL>`
+
+## Current Limitations
+
+**AI Analysis (Phase 2)**: The tool currently uses heuristic-based priority classification based on commit type, file patterns, and security keywords. Full AI-driven analysis using background agents is scaffolded but not yet integrated. See `analysis.ts` for the prepared AI prompt templates.

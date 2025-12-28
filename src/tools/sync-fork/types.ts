@@ -174,12 +174,15 @@ export interface SyncRecommendation {
 
 /* --- Tool Arguments & Result --- */
 
+/** Valid filter types for commit filtering */
+export type FilterType = "fix" | "perf" | "security" | "feat"
+
 /**
  * Arguments for the sync_fork tool
  */
 export interface SyncForkArgs {
-  /** Filter commits by type */
-  filter?: "all" | "fix" | "perf" | "security" | "feat"
+  /** Filter commits by type(s) - can be comma-separated string or "all" */
+  filter?: string
 
   /** Only commits since date (ISO-8601) */
   since?: string
@@ -201,6 +204,16 @@ export interface SyncForkArgs {
 }
 
 /**
+ * Data for creating Linear issues from recommendations
+ */
+export interface LinearIssueData {
+  title: string
+  description: string
+  labels: string[]
+  priority: string
+}
+
+/**
  * Result from the sync_fork tool
  */
 export interface SyncForkResult {
@@ -209,7 +222,7 @@ export interface SyncForkResult {
   /** Summary statistics */
   summary?: {
     total: number
-    new: number // Commits not in state file
+    new: number
     byPriority: Record<string, number>
     byType: Record<string, number>
   }
@@ -225,6 +238,9 @@ export interface SyncForkResult {
 
   /** Suggestions for next steps */
   nextSteps?: string[]
+
+  /** Linear issues data for P0/P1 recommendations */
+  linearIssuesData?: LinearIssueData[]
 }
 
 /* --- Git Context Types --- */
