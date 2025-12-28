@@ -100,8 +100,6 @@ export function setSgCliPath(path: string): void {
   resolvedCliPath = path
 }
 
-export const SG_CLI_PATH = getSgCliPath()
-
 // CLI supported languages (25 total)
 export const CLI_LANGUAGES = [
   "bash",
@@ -184,21 +182,20 @@ export interface EnvironmentCheckResult {
  * Call this at startup to provide early feedback about missing dependencies.
  */
 export function checkEnvironment(): EnvironmentCheckResult {
+  const cliPath = getSgCliPath()
   const result: EnvironmentCheckResult = {
     cli: {
       available: false,
-      path: SG_CLI_PATH,
+      path: cliPath,
     },
     napi: {
       available: false,
     },
   }
 
-  // Check CLI availability
-  if (existsSync(SG_CLI_PATH)) {
+  if (existsSync(cliPath)) {
     result.cli.available = true
-  } else if (SG_CLI_PATH === "sg") {
-    // Fallback path - try which/where to find in PATH
+  } else if (cliPath === "sg") {
     try {
       const { spawnSync } = require("child_process")
       const whichResult = spawnSync(process.platform === "win32" ? "where" : "which", ["sg"], {
@@ -213,7 +210,7 @@ export function checkEnvironment(): EnvironmentCheckResult {
       result.cli.error = "Failed to check sg availability"
     }
   } else {
-    result.cli.error = `Binary not found: ${SG_CLI_PATH}`
+    result.cli.error = `Binary not found: ${cliPath}`
   }
 
   // Check NAPI availability
