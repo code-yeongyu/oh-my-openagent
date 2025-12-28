@@ -595,8 +595,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Agent Usage Reminder**: 검색 도구를 직접 호출할 때, 백그라운드 작업을 통한 전문 에이전트 활용을 권장하는 리마인더를 표시합니다.
 - **Anthropic Auto Compact**: Claude 모델이 토큰 제한에 도달하면 자동으로 세션을 요약하고 압축합니다. 수동 개입 없이 작업을 계속할 수 있습니다.
 - **Session Recovery**: 세션 에러(누락된 도구 결과, thinking 블록 문제, 빈 메시지 등)에서 자동 복구합니다. 돌다가 세션이 망가지지 않습니다. 망가져도 복구됩니다.
-- **Auto Update Checker**: oh-my-opencode의 새 버전이 출시되면 알림을 표시합니다.
-- **Startup Toast**: OhMyOpenCode 로드 시 환영 메시지를 표시합니다. 세션을 제대로 시작하기 위한 작은 "oMoMoMo".
+- **Auto Update Checker**: oh-my-opencode의 새 버전을 자동으로 확인하고 설정을 자동 업데이트할 수 있습니다. 현재 버전과 Sisyphus 상태를 표시하는 시작 토스트 알림을 표시합니다 (Sisyphus 활성화 시 "Sisyphus on steroids is steering OpenCode", 비활성화 시 "OpenCode is now on Steroids. oMoMoMoMo..."). 모든 기능을 비활성화하려면 `disabled_hooks`에 `"auto-update-checker"`를, 토스트 알림만 비활성화하려면 `"startup-toast"`를 추가하세요. [설정 > 훅](#훅) 참조.
 - **Background Notification**: 백그라운드 에이전트 작업이 완료되면 알림을 받습니다.
 - **Session Notification**: 에이전트가 대기 상태가 되면 OS 알림을 보냅니다. macOS, Linux, Windows에서 작동—에이전트가 입력을 기다릴 때 놓치지 마세요.
 - **Empty Task Response Detector**: Task 도구가 빈 응답을 반환하면 감지합니다. 이미 빈 응답이 왔는데 무한정 기다리는 상황을 방지합니다.
@@ -789,6 +788,8 @@ Schema 자동 완성이 지원됩니다:
 
 사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
 
+**`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
+
 ### MCPs
 
 기본적으로 Context7, Exa, grep.app MCP 를 지원합니다.
@@ -839,7 +840,8 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -849,6 +851,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 | `aggressive_truncation`     | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
 | `auto_resume`               | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |
 | `truncate_all_tool_outputs` | `true`  | 프롬프트가 너무 길어지는 것을 방지하기 위해 컨텍스트 윈도우 사용량에 따라 모든 도구 출력을 동적으로 잘라냅니다. 전체 도구 출력이 필요한 경우 `false`로 설정하여 비활성화하세요. |
+| `dcp_for_compaction`        | `false` | 활성화하면, 토큰 제한 에러 발생 시 DCP(Dynamic Context Pruning)가 가장 먼저 실행되고, 그 다음 compaction이 실행됩니다. DCP가 불필요한 컨텍스트를 정리한 후 바로 compaction이 진행됩니다. 토큰 제한에 도달했을 때 더 스마트한 복구를 원하면 활성화하세요. |
 
 **경고**: 이 기능들은 실험적이며 예상치 못한 동작을 유발할 수 있습니다. 의미를 이해한 경우에만 활성화하세요.
 
@@ -906,5 +909,6 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 ## 스폰서
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 첫 번째 스폰서
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo) 께 감사드립니다*

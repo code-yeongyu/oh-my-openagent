@@ -32,15 +32,13 @@ import {
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
 } from "./features/claude-code-command-loader";
-import {
-  loadUserSkillsAsCommands,
-  loadProjectSkillsAsCommands,
-} from "./features/claude-code-skill-loader";
+
 import {
   loadUserAgents,
   loadProjectAgents,
 } from "./features/claude-code-agent-loader";
 import { loadMcpConfigs } from "./features/claude-code-mcp-loader";
+import { loadAllPluginComponents } from "./features/claude-code-plugin-loader";
 import {
   setMainSession,
   getMainSessionID,
@@ -49,7 +47,7 @@ import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, 
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge, getUserConfigDir, addConfigLoadError } from "./shared";
+import { log, deepMerge, getUserConfigDir, addConfigLoadError, parseJsonc, detectConfigFile } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import * as fs from "fs";
 import * as path from "path";
@@ -121,7 +119,7 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
-      const rawConfig = JSON.parse(content);
+      const rawConfig = parseJsonc<Record<string, unknown>>(content);
 
       migrateConfigFile(configPath, rawConfig);
 
@@ -131,20 +129,6 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
         const errorMsg = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
         log(`Config validation error in ${configPath}:`, result.error.issues);
         addConfigLoadError({ path: configPath, error: `Validation error: ${errorMsg}` });
-        
-        const errorList = result.error.issues
-          .map(issue => `• ${issue.path.join(".")}: ${issue.message}`)
-          .join("\n");
-        
-        ctx.client.tui.showToast({
-          body: {
-            title: "❌ OhMyOpenCode: Config Validation Failed",
-            message: `Failed to load ${configPath}\n\nValidation errors:\n${errorList}\n\nConfig will be ignored. Please fix the errors above.`,
-            variant: "error" as const,
-            duration: 10000,
-          },
-        }).catch(() => {});
-        
         return null;
       }
 
@@ -155,19 +139,6 @@ function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | 
     const errorMsg = err instanceof Error ? err.message : String(err);
     log(`Error loading config from ${configPath}:`, err);
     addConfigLoadError({ path: configPath, error: errorMsg });
-    
-    const hint = err instanceof SyntaxError
-      ? "\n\nHint: Check for syntax errors in your JSON file (missing commas, quotes, brackets, etc.)"
-      : "";
-    
-    ctx.client.tui.showToast({
-      body: {
-        title: "❌ OhMyOpenCode: Config Load Failed",
-        message: `Failed to load ${configPath}\n\nError: ${errorMsg}${hint}\n\nConfig will be ignored. Please fix the error above.`,
-        variant: "error" as const,
-        duration: 10000,
-      },
-    }).catch(() => {});
   }
   return null;
 }
@@ -203,19 +174,15 @@ function mergeConfigs(
 }
 
 function loadPluginConfig(directory: string, ctx: any): OhMyOpenCodeConfig {
-  // User-level config path (OS-specific)
-  const userConfigPath = path.join(
-    getUserConfigDir(),
-    "opencode",
-    "oh-my-opencode.json"
-  );
+  // User-level config path (OS-specific) - prefer .jsonc over .json
+  const userBasePath = path.join(getUserConfigDir(), "opencode", "oh-my-opencode");
+  const userDetected = detectConfigFile(userBasePath);
+  const userConfigPath = userDetected.format !== "none" ? userDetected.path : userBasePath + ".json";
 
-  // Project-level config path
-  const projectConfigPath = path.join(
-    directory,
-    ".opencode",
-    "oh-my-opencode.json"
-  );
+  // Project-level config path - prefer .jsonc over .json
+  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
+  const projectDetected = detectConfigFile(projectBasePath);
+  const projectConfigPath = projectDetected.format !== "none" ? projectDetected.path : projectBasePath + ".json";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig = loadConfigFromPath(userConfigPath, ctx) ?? {};
@@ -401,6 +368,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       }
 
+      const pluginComponents = (pluginConfig.claude_code?.plugins ?? true)
+        ? await loadAllPluginComponents({
+            enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+          })
+        : { commands: {}, skills: {}, agents: {}, mcpServers: {}, hooksConfigs: [], plugins: [], errors: [] };
+
+      if (pluginComponents.plugins.length > 0) {
+        log(`Loaded ${pluginComponents.plugins.length} Claude Code plugins`, {
+          plugins: pluginComponents.plugins.map(p => `${p.name}@${p.version}`),
+        });
+      }
+
+      if (pluginComponents.errors.length > 0) {
+        log(`Plugin load errors`, { errors: pluginComponents.errors });
+      }
+
       const builtinAgents = createBuiltinAgents(
         pluginConfig.disabled_agents,
         pluginConfig.agents,
@@ -410,6 +393,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
+      const pluginAgents = pluginComponents.agents;
 
       const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
       const builderEnabled = pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
@@ -417,9 +401,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
 
       if (isSisyphusEnabled && builtinAgents.Sisyphus) {
-        // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // use `config.default_agent = "Sisyphus"` instead of demoting build/plan.
-        // Tracking: https://github.com/sst/opencode/pull/5313
+        // Set Sisyphus as default agent (feature added in OpenCode PR #5843)
+        (config as { default_agent?: string }).default_agent = "Sisyphus";
 
         const agentConfig: Record<string, unknown> = {
           Sisyphus: builtinAgents.Sisyphus,
@@ -469,6 +452,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")),
           ...userAgents,
           ...projectAgents,
+          ...pluginAgents,
           ...filteredConfigAgents,  // Filtered config agents (excludes build/plan if replaced)
           // Demote build/plan to subagent mode when replaced
           build: { ...config.agent?.build, mode: "subagent" },
@@ -479,6 +463,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           ...builtinAgents,
           ...userAgents,
           ...projectAgents,
+          ...pluginAgents,
           ...config.agent,
         };
       }
@@ -517,10 +502,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
         ? await loadMcpConfigs()
         : { servers: {} };
+
       config.mcp = {
         ...config.mcp,
         ...createBuiltinMcps(pluginConfig.disabled_mcps),
         ...mcpResult.servers,
+        ...pluginComponents.mcpServers,
       };
 
       const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
@@ -528,17 +515,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const systemCommands = config.command ?? {};
       const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
       const opencodeProjectCommands = loadOpencodeProjectCommands();
-      const userSkills = (pluginConfig.claude_code?.skills ?? true) ? loadUserSkillsAsCommands() : {};
-      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands() : {};
-
       config.command = {
         ...userCommands,
-        ...userSkills,
         ...opencodeGlobalCommands,
         ...systemCommands,
         ...projectCommands,
-        ...projectSkills,
         ...opencodeProjectCommands,
+        ...pluginComponents.commands,
       };
     },
 

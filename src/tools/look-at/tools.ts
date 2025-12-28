@@ -1,5 +1,6 @@
 import { extname, basename } from "node:path"
-import { tool, type PluginInput } from "@opencode-ai/plugin"
+import { pathToFileURL } from "node:url"
+import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared/logger"
@@ -28,7 +29,7 @@ function inferMimeType(filePath: string): string {
   return mimeTypes[ext] || "application/octet-stream"
 }
 
-export function createLookAt(ctx: PluginInput) {
+export function createLookAt(ctx: PluginInput): ToolDefinition {
   return tool({
     description: LOOK_AT_DESCRIPTION,
     args: {
@@ -78,7 +79,7 @@ If the requested information is not found, clearly state what is missing.`
           },
           parts: [
             { type: "text", text: prompt },
-            { type: "file", mime: mimeType, url: `file://${args.file_path}`, filename },
+            { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
           ],
         },
       })

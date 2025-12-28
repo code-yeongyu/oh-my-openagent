@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
@@ -127,7 +127,7 @@ function formatCommandList(commands: CommandInfo[]): string {
   return lines.join("\n")
 }
 
-export const slashcommand = tool({
+export const slashcommand: ToolDefinition = tool({
   description: `Execute a slash command within the main conversation.
 
 When you use this tool, the slash command gets expanded to a full prompt that provides detailed instructions on how to complete the task.

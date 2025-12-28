@@ -26,6 +26,7 @@ const TOKEN_LIMIT_KEYWORDS = [
   "context length",
   "too many tokens",
   "non-empty content",
+  "invalid_request_error",
 ]
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
@@ -114,9 +115,10 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
   if (typeof responseBody === "string") {
     try {
       const jsonPatterns = [
-        /data:\s*(\{[\s\S]*?\})\s*$/m,
-        /(\{"type"\s*:\s*"error"[\s\S]*?\})/,
-        /(\{[\s\S]*?"error"[\s\S]*?\})/,
+        // Greedy match to last } for nested JSON
+        /data:\s*(\{[\s\S]*\})\s*$/m,
+        /(\{"type"\s*:\s*"error"[\s\S]*\})/,
+        /(\{[\s\S]*"error"[\s\S]*\})/,
       ]
 
       for (const pattern of jsonPatterns) {

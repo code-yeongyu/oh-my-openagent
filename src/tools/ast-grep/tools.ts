@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./utils"
@@ -32,7 +32,7 @@ function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
   return null
 }
 
-export const ast_grep_search = tool({
+export const ast_grep_search: ToolDefinition = tool({
   description:
     "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
     "Use meta-variables: $VAR (single node), $$$ (multiple nodes). " +
@@ -75,7 +75,7 @@ export const ast_grep_search = tool({
   },
 })
 
-export const ast_grep_replace = tool({
+export const ast_grep_replace: ToolDefinition = tool({
   description:
     "Replace code patterns across filesystem with AST-aware rewriting. " +
     "Dry-run by default. Use meta-variables in rewrite to preserve matched content. " +

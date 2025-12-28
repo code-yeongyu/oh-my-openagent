@@ -667,8 +667,7 @@ When agents thrive, you thrive. But I want to help you directly too.
 - **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
 - **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
 - **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
-- **Auto Update Checker**: Notifies you when a new version of oh-my-opencode is available.
-- **Startup Toast**: Shows a welcome message when OhMyOpenCode loads. A little "oMoMoMo" to start your session right.
+- **Auto Update Checker**: Automatically checks for new versions of oh-my-opencode and can auto-update your configuration. Shows startup toast notifications displaying current version and Sisyphus status ("Sisyphus on steroids is steering OpenCode" when enabled, or "OpenCode is now on Steroids. oMoMoMoMo..." otherwise). Disable all features with `"auto-update-checker"` in `disabled_hooks`, or disable just toast notifications with `"startup-toast"` in `disabled_hooks`. See [Configuration > Hooks](#hooks).
 - **Background Notification**: Get notified when background agent tasks complete.
 - **Session Notification**: Sends OS notifications when agents go idle. Works on macOS, Linux, and Windows—never miss when your agent needs input.
 - **Empty Task Response Detector**: Catches when Task tool returns nothing. Warns you about potential agent failures so you don't wait forever for a response that already came back empty.
@@ -694,6 +693,36 @@ Schema autocomplete supported:
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
+}
+```
+
+### JSONC Support
+
+The `oh-my-opencode` configuration file supports JSONC (JSON with Comments):
+- Line comments: `// comment`
+- Block comments: `/* comment */`
+- Trailing commas: `{ "key": "value", }`
+
+When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc` takes priority.
+
+**Example with comments:**
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // Enable Google Gemini via Antigravity OAuth
+  "google_auth": false,
+  
+  /* Agent overrides - customize models for specific tasks */
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2"  // GPT for strategic reasoning
+    },
+    "explore": {
+      "model": "opencode/grok-code"  // Free & fast for exploration
+    },
+  },
 }
 ```
 
@@ -861,6 +890,8 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 
 Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`
 
+**Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
+
 ### MCPs
 
 Context7, Exa, and grep.app MCP enabled by default.
@@ -911,7 +942,8 @@ Opt-in experimental features that may change or be removed in future versions. U
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false
+    "truncate_all_tool_outputs": false,
+    "dcp_on_compaction_failure": true
   }
 }
 ```
@@ -921,6 +953,7 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                            |
 | `truncate_all_tool_outputs` | `true`  | Dynamically truncates ALL tool outputs based on context window usage to prevent prompts from becoming too long. Disable by setting to `false` if you need full tool outputs.                 |
+| `dcp_for_compaction`        | `false` | When enabled, Dynamic Context Pruning (DCP) runs FIRST when token limit errors occur, before attempting compaction. DCP prunes redundant context, then compaction runs immediately. Enable this for smarter recovery when hitting token limits. |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 
@@ -978,5 +1011,6 @@ I have no affiliation with any project or model mentioned here. This is purely p
 ## Sponsors
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - The first sponsor
+- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*
