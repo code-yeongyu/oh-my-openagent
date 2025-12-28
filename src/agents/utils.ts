@@ -24,11 +24,6 @@ import { deepMerge } from "../shared"
 
 type AgentSource = AgentFactory | AgentConfig
 
-interface AgentSourceWithMetadata {
-  source: AgentSource
-  metadata: AgentPromptMetadata
-}
-
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
   Sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
@@ -107,7 +102,8 @@ export function createBuiltinAgents(
   disabledAgents: BuiltinAgentName[] = [],
   agentOverrides: AgentOverrides = {},
   directory?: string,
-  systemDefaultModel?: string
+  systemDefaultModel?: string,
+  availableToolNames?: string[]
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
@@ -143,7 +139,7 @@ export function createBuiltinAgents(
 
     let config: AgentConfig
     if (agentName === "Sisyphus") {
-      config = createSisyphusAgent(model, availableAgents)
+      config = createSisyphusAgent(model, availableAgents, availableToolNames)
     } else {
       config = buildAgent(source, model)
     }
