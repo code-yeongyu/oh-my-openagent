@@ -42,8 +42,13 @@ export function createEmptyMessageSanitizerHook(): MessagesTransformHook {
     "experimental.chat.messages.transform": async (_input, output) => {
       const { messages } = output
 
-      for (const message of messages) {
-        if (message.info.role === "user") continue
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i]
+        const isLastMessage = i === messages.length - 1
+        const isAssistant = message.info.role === "assistant"
+        
+        // Skip final assistant message (allowed to be empty per API spec)
+        if (isLastMessage && isAssistant) continue
 
         const parts = message.parts
 
