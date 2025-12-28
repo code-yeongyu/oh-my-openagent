@@ -27,6 +27,7 @@ hooks/
 ├── rules-injector/             # Conditional rules from .claude/rules/
 ├── session-recovery/           # Recover from session errors
 ├── think-mode/                 # Auto-detect thinking triggers
+├── thinking-block-validator/   # Validate thinking blocks in messages
 ├── context-window-monitor.ts   # Monitor context usage (standalone)
 ├── empty-task-response-detector.ts
 ├── session-notification.ts     # OS notify on idle (standalone)

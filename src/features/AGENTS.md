@@ -12,10 +12,12 @@ features/
 │   ├── manager.ts              # Task lifecycle, notifications
 │   ├── manager.test.ts
 │   └── types.ts
+├── builtin-commands/           # Built-in slash command definitions
 ├── claude-code-agent-loader/   # Load agents from ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # Load commands from ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # Load MCPs from .mcp.json
 │   └── env-expander.ts         # ${VAR} expansion
+├── claude-code-plugin-loader/  # Load external plugins from installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
 ├── claude-code-skill-loader/   # Load skills from ~/.claude/skills/*/SKILL.md
 └── hook-message-injector/      # Inject messages into conversation
