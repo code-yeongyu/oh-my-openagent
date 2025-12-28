@@ -316,9 +316,6 @@
   "tools": {},
 
   "plugin": [
-    "opencode-skills",
-    "opencode-gemini-auth",
-    "opencode-openai-codex-auth",
     "../src/index.ts"
   ],
 
@@ -329,30 +326,6 @@
     ]
   },
 
-  "mcp": {
-    "deepwiki": {
-      "type": "remote",
-      "url": "https://mcp.deepwiki.com/mcp",
-      "enabled": true
-    },
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
-      },
-      "enabled": true
-    }
-  },
-
-  "lsp": {},
-
-  "instructions": [
-    ".opencode/instructions/governance.md",
-    ".opencode/instructions/custom-tools.md",
-    ".opencode/instructions/deepwiki-integration.md",
-    ".opencode/instructions/simplicity-first.md",
-    ".opencode/instructions/concision.md"
-  ]
+  "lsp": {}
 }
 
