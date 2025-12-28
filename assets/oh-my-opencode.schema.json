@@ -1487,7 +1487,7 @@
             }
           }
         },
-        "dcp_on_compaction_failure": {
+        "dcp_for_compaction": {
           "type": "boolean"
         }
       }
