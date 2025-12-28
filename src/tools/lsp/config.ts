@@ -1,16 +1,8 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { BUILTIN_SERVERS, EXT_TO_LANG } from "./constants"
-
-export interface ResolvedServer {
-  id: string
-  command: string[]
-  extensions: string[]
-  priority: number
-  env?: Record<string, string>
-  initialization?: Record<string, unknown>
-}
+import { BUILTIN_SERVERS, EXT_TO_LANG, LSP_INSTALL_HINTS } from "./constants"
+import type { ResolvedServer, ServerLookupResult } from "./types"
 
 interface LspEntry {
   disabled?: boolean
@@ -120,23 +112,47 @@ function getMergedServers(): ServerWithSource[] {
   })
 }
 
-export function findServerForExtension(ext: string): ResolvedServer | null {
+export function findServerForExtension(ext: string): ServerLookupResult {
   const servers = getMergedServers()
 
   for (const server of servers) {
     if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
       return {
-        id: server.id,
-        command: server.command,
-        extensions: server.extensions,
-        priority: server.priority,
-        env: server.env,
-        initialization: server.initialization,
+        status: "found",
+        server: {
+          id: server.id,
+          command: server.command,
+          extensions: server.extensions,
+          priority: server.priority,
+          env: server.env,
+          initialization: server.initialization,
+        },
       }
     }
   }
 
-  return null
+  for (const server of servers) {
+    if (server.extensions.includes(ext)) {
+      const installHint =
+        LSP_INSTALL_HINTS[server.id] || `Install '${server.command[0]}' and ensure it's in your PATH`
+      return {
+        status: "not_installed",
+        server: {
+          id: server.id,
+          command: server.command,
+          extensions: server.extensions,
+        },
+        installHint,
+      }
+    }
+  }
+
+  const availableServers = [...new Set(servers.map((s) => s.id))]
+  return {
+    status: "not_configured",
+    extension: ext,
+    availableServers,
+  }
 }
 
 export function getLanguageId(ext: string): string {
