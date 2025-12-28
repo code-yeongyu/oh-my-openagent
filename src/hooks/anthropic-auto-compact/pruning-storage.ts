@@ -3,13 +3,7 @@ import { join } from "node:path"
 import type { PruningState } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
 import { log } from "../../shared/logger"
-
-const MESSAGE_STORAGE = join(
-  process.env.HOME || process.env.USERPROFILE || "",
-  ".config",
-  "opencode",
-  "sessions"
-)
+import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
