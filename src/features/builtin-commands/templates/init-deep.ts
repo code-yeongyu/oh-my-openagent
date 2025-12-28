@@ -18,6 +18,7 @@ Generate comprehensive AGENTS.md files across project hierarchy. Combines root-l
 - **Predict-then-Compare**: Predict standard → find actual → document ONLY deviations
 - **Hierarchy Aware**: Parent covers general, children cover specific
 - **No Redundancy**: Child AGENTS.md NEVER repeats parent content
+- **LSP-First**: Use LSP tools for accurate code intelligence when available (semantic > text search)
 
 ---
 
@@ -80,6 +81,53 @@ background_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makef
 background_task(agent="explore", prompt="Test patterns: FIND pytest.ini, jest.config, test structure → REPORT unique testing conventions")
 \`\`\`
 
+### Code Intelligence Analysis (LSP tools - run in parallel)
+
+LSP provides semantic understanding beyond text search. Use for accurate code mapping.
+
+\`\`\`
+# Step 1: Check LSP availability
+lsp_servers()  # Verify language server is available
+
+# Step 2: Analyze entry point files (run in parallel)
+# Find entry points first, then analyze each with lsp_document_symbols
+lsp_document_symbols(filePath="src/index.ts")      # Main entry
+lsp_document_symbols(filePath="src/main.py")       # Python entry
+lsp_document_symbols(filePath="cmd/main.go")       # Go entry
+
+# Step 3: Discover key symbols across workspace (run in parallel)
+lsp_workspace_symbols(filePath=".", query="class")      # All classes
+lsp_workspace_symbols(filePath=".", query="interface")  # All interfaces
+lsp_workspace_symbols(filePath=".", query="function")   # Top-level functions
+lsp_workspace_symbols(filePath=".", query="type")       # Type definitions
+
+# Step 4: Analyze symbol centrality (for top 5-10 key symbols)
+# High reference count = central/important concept
+lsp_find_references(filePath="src/index.ts", line=X, character=Y)  # Main export
+\`\`\`
+
+#### LSP Analysis Output Format
+
+\`\`\`
+CODE_INTELLIGENCE = {
+  entry_points: [
+    { file: "src/index.ts", exports: ["Plugin", "createHook"], symbol_count: 12 }
+  ],
+  key_symbols: [
+    { name: "Plugin", type: "class", file: "src/index.ts", refs: 45, role: "Central orchestrator" },
+    { name: "createHook", type: "function", file: "src/utils.ts", refs: 23, role: "Hook factory" }
+  ],
+  module_boundaries: [
+    { dir: "src/hooks", exports: 21, imports_from: ["shared/"] },
+    { dir: "src/tools", exports: 15, imports_from: ["shared/", "hooks/"] }
+  ]
+}
+\`\`\`
+
+<critical>
+**LSP Fallback**: If LSP unavailable (no server installed), skip this section and rely on explore agents + AST-grep patterns.
+</critical>
+
 </parallel-tasks>
 
 **Collect all results. Mark "p1-analysis" as completed.**
@@ -92,13 +140,35 @@ background_task(agent="explore", prompt="Test patterns: FIND pytest.ini, jest.co
 
 ### Scoring Matrix
 
-| Factor | Weight | Threshold |
-|--------|--------|-----------|
-| File count | 3x | >20 files = high |
-| Subdirectory count | 2x | >5 subdirs = high |
-| Code file ratio | 2x | >70% code = high |
-| Unique patterns | 1x | Has own config |
-| Module boundary | 2x | Has __init__.py/index.ts |
+| Factor | Weight | Threshold | Source |
+|--------|--------|-----------|--------|
+| File count | 3x | >20 files = high | bash |
+| Subdirectory count | 2x | >5 subdirs = high | bash |
+| Code file ratio | 2x | >70% code = high | bash |
+| Unique patterns | 1x | Has own config | explore |
+| Module boundary | 2x | Has __init__.py/index.ts | bash |
+| **Symbol density** | 2x | >30 symbols = high | LSP |
+| **Export count** | 2x | >10 exports = high | LSP |
+| **Reference centrality** | 3x | Symbols with >20 refs | LSP |
+
+<lsp-scoring>
+**LSP-Enhanced Scoring** (if available):
+
+\`\`\`
+For each directory in candidates:
+  symbols = lsp_document_symbols(dir/index.ts or dir/__init__.py)
+  
+  symbol_score = len(symbols) > 30 ? 6 : len(symbols) > 15 ? 3 : 0
+  export_score = count(exported symbols) > 10 ? 4 : 0
+  
+  # Check if this module is central (many things depend on it)
+  for each exported symbol:
+    refs = lsp_find_references(symbol)
+    if refs > 20: centrality_score += 3
+  
+  total_score += symbol_score + export_score + centrality_score
+\`\`\`
+</lsp-scoring>
 
 ### Decision Rules
 
@@ -155,6 +225,28 @@ Root AGENTS.md gets **full treatment** with Predict-then-Compare synthesis.
 | Task | Location | Notes |
 |------|----------|-------|
 | Add feature X | \\\`src/x/\\\` | {pattern hint} |
+
+## CODE MAP
+
+{Generated from LSP analysis - shows key symbols and their relationships}
+
+| Symbol | Type | Location | Refs | Role |
+|--------|------|----------|------|------|
+| {MainClass} | Class | \\\`src/index.ts\\\` | {N} | {Central orchestrator} |
+| {createX} | Function | \\\`src/utils.ts\\\` | {N} | {Factory pattern} |
+| {Config} | Interface | \\\`src/types.ts\\\` | {N} | {Configuration contract} |
+
+### Module Dependencies
+
+\\\`\\\`\\\`
+{entry} ──imports──> {core/}
+   │                    │
+   └──imports──> {utils/} <──imports── {features/}
+\\\`\\\`\\\`
+
+<code-map-note>
+**Skip CODE MAP if**: LSP unavailable OR project too small (<10 files) OR no clear module boundaries.
+</code-map-note>
 
 ## CONVENTIONS
 
@@ -296,4 +388,7 @@ Hierarchy:
 - **Generic content**: Remove anything that applies to ALL projects
 - **Sequential execution**: MUST use parallel agents
 - **Deep nesting**: Rarely need AGENTS.md at depth 4+
-- **Verbose style**: "This directory contains..." → just list it`
+- **Verbose style**: "This directory contains..." → just list it
+- **Ignoring LSP**: If LSP available, USE IT - semantic analysis > text grep
+- **LSP without fallback**: Always have explore agent backup if LSP unavailable
+- **Over-referencing**: Don't trace refs for EVERY symbol - focus on exports only`
