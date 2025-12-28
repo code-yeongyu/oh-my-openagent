@@ -1,8 +1,3 @@
-/**
- * Antigravity token management utilities.
- * Handles token expiration checking, refresh, and storage format parsing.
- */
-
 import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_CLIENT_SECRET,
@@ -13,33 +8,86 @@ import type {
   AntigravityRefreshParts,
   AntigravityTokenExchangeResult,
   AntigravityTokens,
+  OAuthErrorPayload,
+  ParsedOAuthError,
 } from "./types"
 
-/**
- * Check if the access token is expired.
- * Includes a 60-second safety buffer to refresh before actual expiration.
- *
- * @param tokens - The Antigravity tokens to check
- * @returns true if the token is expired or will expire within the buffer period
- */
-export function isTokenExpired(tokens: AntigravityTokens): boolean {
-  // Calculate when the token expires (timestamp + expires_in in ms)
-  // timestamp is in milliseconds, expires_in is in seconds
-  const expirationTime = tokens.timestamp + tokens.expires_in * 1000
+export class AntigravityTokenRefreshError extends Error {
+  code?: string
+  description?: string
+  status: number
+  statusText: string
+  responseBody?: string
 
-  // Check if current time is past (expiration - buffer)
+  constructor(options: {
+    message: string
+    code?: string
+    description?: string
+    status: number
+    statusText: string
+    responseBody?: string
+  }) {
+    super(options.message)
+    this.name = "AntigravityTokenRefreshError"
+    this.code = options.code
+    this.description = options.description
+    this.status = options.status
+    this.statusText = options.statusText
+    this.responseBody = options.responseBody
+  }
+
+  get isInvalidGrant(): boolean {
+    return this.code === "invalid_grant"
+  }
+
+  get isNetworkError(): boolean {
+    return this.status === 0
+  }
+}
+
+function parseOAuthErrorPayload(text: string | undefined): ParsedOAuthError {
+  if (!text) {
+    return {}
+  }
+
+  try {
+    const payload = JSON.parse(text) as OAuthErrorPayload
+    let code: string | undefined
+
+    if (typeof payload.error === "string") {
+      code = payload.error
+    } else if (payload.error && typeof payload.error === "object") {
+      code = payload.error.status ?? payload.error.code
+    }
+
+    return {
+      code,
+      description: payload.error_description,
+    }
+  } catch {
+    return { description: text }
+  }
+}
+
+export function isTokenExpired(tokens: AntigravityTokens): boolean {
+  const expirationTime = tokens.timestamp + tokens.expires_in * 1000
   return Date.now() >= expirationTime - ANTIGRAVITY_TOKEN_REFRESH_BUFFER_MS
 }
 
-/**
- * Refresh an access token using a refresh token.
- * Exchanges the refresh token for a new access token via Google's OAuth endpoint.
- *
- * @param refreshToken - The refresh token to use
- * @param clientId - Optional custom client ID (defaults to ANTIGRAVITY_CLIENT_ID)
- * @param clientSecret - Optional custom client secret (defaults to ANTIGRAVITY_CLIENT_SECRET)
- * @returns Token exchange result with new access token, or throws on error
- */
+const MAX_REFRESH_RETRIES = 3
+const INITIAL_RETRY_DELAY_MS = 1000
+
+function calculateRetryDelay(attempt: number): number {
+  return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt), 10000)
+}
+
+function isRetryableError(status: number): boolean {
+  if (status === 0) return true
+  if (status === 429) return true
+  if (status >= 500 && status < 600) return true
+  return false
+}
+
 export async function refreshAccessToken(
   refreshToken: string,
   clientId: string = ANTIGRAVITY_CLIENT_ID,
@@ -52,35 +100,81 @@ export async function refreshAccessToken(
     client_secret: clientSecret,
   })
 
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params,
+  let lastError: AntigravityTokenRefreshError | undefined
+
+  for (let attempt = 0; attempt <= MAX_REFRESH_RETRIES; attempt++) {
+    try {
+      const response = await fetch(GOOGLE_TOKEN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params,
+      })
+
+      if (response.ok) {
+        const data = (await response.json()) as {
+          access_token: string
+          refresh_token?: string
+          expires_in: number
+          token_type: string
+        }
+
+        return {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || refreshToken,
+          expires_in: data.expires_in,
+          token_type: data.token_type,
+        }
+      }
+
+      const responseBody = await response.text().catch(() => undefined)
+      const parsed = parseOAuthErrorPayload(responseBody)
+
+      lastError = new AntigravityTokenRefreshError({
+        message: parsed.description || `Token refresh failed: ${response.status} ${response.statusText}`,
+        code: parsed.code,
+        description: parsed.description,
+        status: response.status,
+        statusText: response.statusText,
+        responseBody,
+      })
+
+      if (parsed.code === "invalid_grant") {
+        throw lastError
+      }
+
+      if (!isRetryableError(response.status)) {
+        throw lastError
+      }
+
+      if (attempt < MAX_REFRESH_RETRIES) {
+        const delay = calculateRetryDelay(attempt)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    } catch (error) {
+      if (error instanceof AntigravityTokenRefreshError) {
+        throw error
+      }
+
+      lastError = new AntigravityTokenRefreshError({
+        message: error instanceof Error ? error.message : "Network error during token refresh",
+        status: 0,
+        statusText: "Network Error",
+      })
+
+      if (attempt < MAX_REFRESH_RETRIES) {
+        const delay = calculateRetryDelay(attempt)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+  }
+
+  throw lastError || new AntigravityTokenRefreshError({
+    message: "Token refresh failed after all retries",
+    status: 0,
+    statusText: "Max Retries Exceeded",
   })
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error")
-    throw new Error(
-      `Token refresh failed: ${response.status} ${response.statusText} - ${errorText}`
-    )
-  }
-
-  const data = (await response.json()) as {
-    access_token: string
-    refresh_token?: string
-    expires_in: number
-    token_type: string
-  }
-
-  return {
-    access_token: data.access_token,
-    // Google may return a new refresh token, fall back to the original
-    refresh_token: data.refresh_token || refreshToken,
-    expires_in: data.expires_in,
-    token_type: data.token_type,
-  }
 }
 
 /**

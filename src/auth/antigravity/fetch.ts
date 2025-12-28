@@ -17,16 +17,15 @@
  * Debug logging available via ANTIGRAVITY_DEBUG=1 environment variable.
  */
 
-import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_DEFAULT_PROJECT_ID } from "./constants"
-import { fetchProjectContext, clearProjectContextCache } from "./project"
-import { isTokenExpired, refreshAccessToken, parseStoredToken, formatTokenForStorage } from "./token"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "./constants"
+import { fetchProjectContext, clearProjectContextCache, invalidateProjectContextByRefreshToken } from "./project"
+import { isTokenExpired, refreshAccessToken, parseStoredToken, formatTokenForStorage, AntigravityTokenRefreshError } from "./token"
 import { transformRequest } from "./request"
 import { convertRequestBody, hasOpenAIMessages } from "./message-converter"
 import {
   transformResponse,
   transformStreamingResponse,
   isStreamingResponse,
-  extractSignatureFromSsePayload,
 } from "./response"
 import { normalizeToolsForGemini, type OpenAITool } from "./tools"
 import { extractThinkingBlocks, shouldIncludeThinking, transformResponseThinking } from "./thinking"
@@ -391,7 +390,6 @@ export function createAntigravityFetch(
       try {
         const newTokens = await refreshAccessToken(refreshParts.refreshToken, clientId, clientSecret)
 
-        // Update cached tokens
         cachedTokens = {
           type: "antigravity",
           access_token: newTokens.access_token,
@@ -400,10 +398,8 @@ export function createAntigravityFetch(
           timestamp: Date.now(),
         }
 
-        // Clear project context cache on token refresh
         clearProjectContextCache()
 
-        // Format and save new tokens
         const formattedRefresh = formatTokenForStorage(
           newTokens.refresh_token,
           refreshParts.projectId || "",
@@ -418,6 +414,16 @@ export function createAntigravityFetch(
 
         debugLog("Token refreshed successfully")
       } catch (error) {
+        if (error instanceof AntigravityTokenRefreshError) {
+          if (error.isInvalidGrant) {
+            debugLog(`[REFRESH] Token revoked (invalid_grant), clearing caches`)
+            invalidateProjectContextByRefreshToken(refreshParts.refreshToken)
+            clearProjectContextCache()
+          }
+          throw new Error(
+            `Antigravity: Token refresh failed: ${error.description || error.message}${error.code ? ` (${error.code})` : ""}`
+          )
+        }
         throw new Error(
           `Antigravity: Token refresh failed: ${error instanceof Error ? error.message : "Unknown error"}`
         )
@@ -535,11 +541,33 @@ export function createAntigravityFetch(
             debugLog("[401] Token refreshed, retrying request...")
             return executeWithEndpoints()
           } catch (refreshError) {
+            if (refreshError instanceof AntigravityTokenRefreshError) {
+              if (refreshError.isInvalidGrant) {
+                debugLog(`[401] Token revoked (invalid_grant), clearing caches`)
+                invalidateProjectContextByRefreshToken(refreshParts.refreshToken)
+                clearProjectContextCache()
+              }
+              debugLog(`[401] Token refresh failed: ${refreshError.description || refreshError.message}`)
+              return new Response(
+                JSON.stringify({
+                  error: {
+                    message: refreshError.description || refreshError.message,
+                    type: refreshError.isInvalidGrant ? "token_revoked" : "unauthorized",
+                    code: refreshError.code || "token_refresh_failed",
+                  },
+                }),
+                {
+                  status: 401,
+                  statusText: "Unauthorized",
+                  headers: { "Content-Type": "application/json" },
+                }
+              )
+            }
             debugLog(`[401] Token refresh failed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`)
             return new Response(
               JSON.stringify({
                 error: {
-                  message: `Token refresh failed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+                  message: refreshError instanceof Error ? refreshError.message : "Unknown error",
                   type: "unauthorized",
                   code: "token_refresh_failed",
                 },
