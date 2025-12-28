@@ -404,8 +404,8 @@ gh repo star code-yeongyu/oh-my-opencode
 
 - **Sisyphus** (`anthropic/claude-opus-4-5`)：**默认 Agent。** OpenCode 专属的强力 AI 编排器。指挥专业子 Agent 搞定复杂任务。主打后台任务委派和 Todo 驱动。用 Claude Opus 4.5 加上扩展思考（32k token 预算），智商拉满。
 - **oracle** (`openai/gpt-5.2`)：架构师、代码审查员、战略家。GPT-5.2 的逻辑推理和深度分析能力不是盖的。致敬 AmpCode。
-- **librarian** (`anthropic/claude-sonnet-4-5`)：多仓库分析、查文档、找示例。Claude Sonnet 4.5 深入理解代码库，GitHub 调研，给出的答案都有据可查。致敬 AmpCode。
-- **explore** (`opencode/grok-code`)：极速代码库扫描、模式匹配。Claude Code 用 Haiku，我们用 Grok——免费、飞快、扫文件够用了。致敬 Claude Code。
+- **librarian** (`anthropic/claude-sonnet-4-5` 或 `google/gemini-3-flash`)：多仓库分析、查文档、找示例。配置 Antigravity 认证时使用 Gemini 3 Flash，否则使用 Claude Sonnet 4.5 深入理解代码库，GitHub 调研，给出的答案都有据可查。致敬 AmpCode。
+- **explore** (`opencode/grok-code`、`google/gemini-3-flash` 或 `anthropic/claude-haiku-4-5`)：极速代码库扫描、模式匹配。配置 Antigravity 认证时使用 Gemini 3 Flash，Claude max20 可用时使用 Haiku，否则用 Grok。致敬 Claude Code。
 - **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`)：设计师出身的程序员。UI 做得那是真漂亮。Gemini 写这种创意美观的代码是一绝。
 - **document-writer** (`google/gemini-3-pro-preview`)：技术写作专家。Gemini 文笔好，写出来的东西读着顺畅。
 - **multimodal-looker** (`google/gemini-3-flash`)：视觉内容专家。PDF、图片、图表，看一眼就知道里头有啥。
