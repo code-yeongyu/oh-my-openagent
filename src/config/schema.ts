@@ -69,6 +69,7 @@ export const HookNameSchema = z.enum([
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "feature-dev",
 ])
 
 export const AgentOverrideConfigSchema = z.object({

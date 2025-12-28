@@ -69,7 +69,8 @@
       "items": {
         "type": "string",
         "enum": [
-          "init-deep"
+          "init-deep",
+          "feature-dev"
         ]
       }
     },
