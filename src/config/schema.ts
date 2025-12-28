@@ -115,6 +115,11 @@ export const SisyphusAgentConfigSchema = z.object({
   replace_plan: z.boolean().optional(),
 })
 
+export const CommentCheckerConfigSchema = z.object({
+  /** Custom prompt to replace the default warning message. Use {{comments}} placeholder for detected comments XML. */
+  custom_prompt: z.string().optional(),
+})
+
 export const DynamicContextPruningConfigSchema = z.object({
   /** Enable dynamic context pruning (default: false) */
   enabled: z.boolean().default(false),
@@ -175,6 +180,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
+  comment_checker: CommentCheckerConfigSchema.optional(),
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
 })
@@ -185,6 +191,7 @@ export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
 export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
+export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
 export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningConfigSchema>
 

@@ -51,14 +51,15 @@ function isExtendedThinkingModel(modelID: string): boolean {
 }
 
 /**
- * Check if a message has tool parts (tool_use)
+ * Check if a message has any content parts (tool_use, text, or other non-thinking content)
  */
-function hasToolParts(parts: Part[]): boolean {
+function hasContentParts(parts: Part[]): boolean {
   if (!parts || parts.length === 0) return false
 
   return parts.some((part: Part) => {
     const type = part.type as string
-    return type === "tool" || type === "tool_use"
+    // Include tool parts and text parts (anything that's not thinking/reasoning)
+    return type === "tool" || type === "tool_use" || type === "text"
   })
 }
 
@@ -154,8 +155,8 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         // Only check assistant messages
         if (msg.info.role !== "assistant") continue
 
-        // Check if message has tool parts but doesn't start with thinking
-        if (hasToolParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
+        // Check if message has content parts but doesn't start with thinking
+        if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
           // Find thinking content from previous turns
           const previousThinking = findPreviousThinkingContent(messages, i)
 

@@ -142,8 +142,9 @@ export interface CheckResult {
  * Run comment-checker CLI with given input.
  * @param input Hook input to check
  * @param cliPath Optional explicit path to CLI binary
+ * @param customPrompt Optional custom prompt to replace default warning message
  */
-export async function runCommentChecker(input: HookInput, cliPath?: string): Promise<CheckResult> {
+export async function runCommentChecker(input: HookInput, cliPath?: string, customPrompt?: string): Promise<CheckResult> {
   const binaryPath = cliPath ?? resolvedCliPath ?? COMMENT_CHECKER_CLI_PATH
   
   if (!binaryPath) {
@@ -160,7 +161,12 @@ export async function runCommentChecker(input: HookInput, cliPath?: string): Pro
   debugLog("running comment-checker with input:", jsonInput.substring(0, 200))
 
   try {
-    const proc = spawn([binaryPath], {
+    const args = [binaryPath]
+    if (customPrompt) {
+      args.push("--prompt", customPrompt)
+    }
+    
+    const proc = spawn(args, {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
