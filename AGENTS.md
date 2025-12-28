@@ -13,7 +13,7 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (7): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker
+│   ├── agents/        # AI agents (8): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker, code-reviewer
 │   ├── hooks/         # 21 lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # LSP, AST-Grep, Grep, Glob, etc. - see src/tools/AGENTS.md
 │   ├── mcp/           # MCP servers: context7, websearch_exa, grep_app
@@ -86,6 +86,7 @@ oh-my-opencode/
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
 | document-writer | google/gemini-3-pro-preview | Technical docs |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
+| code-reviewer | opencode/grok-code | Code review with specialized personas |
 
 ## COMMANDS
 

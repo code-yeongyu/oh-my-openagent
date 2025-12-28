@@ -27,8 +27,12 @@ function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
 }
 
-function buildAgent(source: AgentSource, model?: string): AgentConfig {
-  return isFactory(source) ? source(model) : source
+function buildAgent(
+  source: AgentSource,
+  model?: string,
+  options?: Record<string, unknown>
+): AgentConfig {
+  return isFactory(source) ? source(model, options) : source
 }
 
 export function createEnvContext(directory: string): string {
@@ -96,15 +100,21 @@ export function createBuiltinAgents(
     const override = agentOverrides[agentName]
     const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
 
-    let config = buildAgent(source, model)
-
-    if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
-      const envContext = createEnvContext(directory)
-      config = { ...config, prompt: config.prompt + envContext }
+    const factoryOptions: Record<string, unknown> = {}
+    if (agentName === "code-reviewer" && override?.code_reviewer_mode) {
+      factoryOptions.persona = override.code_reviewer_mode
     }
+
+    let config = buildAgent(source, model, factoryOptions)
 
     if (override) {
       config = mergeAgentConfig(config, override)
+    }
+
+    // Inject environment context AFTER all overrides to ensure it's always present
+    if (["Sisyphus", "librarian", "code-reviewer", "explore"].includes(agentName) && directory && config.prompt) {
+      const envContext = createEnvContext(directory)
+      config = { ...config, prompt: config.prompt + envContext }
     }
 
     result[name] = config

@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { createBuiltinAgents } from "./utils"
+import { CODE_REVIEWER_PROMPTS } from "./code-reviewer"
 
 describe("createBuiltinAgents with model overrides", () => {
   test("Sisyphus with default model has thinking config", () => {
@@ -83,5 +84,73 @@ describe("createBuiltinAgents with model overrides", () => {
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
     expect(agents.Sisyphus.temperature).toBe(0.5)
+  })
+})
+
+describe("createBuiltinAgents with code-reviewer overrides", () => {
+  test("code-reviewer with code_reviewer_mode override uses correct prompt", () => {
+    // #given
+    const overrides = {
+      "code-reviewer": { code_reviewer_mode: "silent_failure_hunter" as const },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents["code-reviewer"].prompt).toBe(CODE_REVIEWER_PROMPTS.silent_failure_hunter)
+  })
+
+  test("code-reviewer with invalid mode in config falls back to general", () => {
+    // #given
+    const overrides = {
+      "code-reviewer": { code_reviewer_mode: "invalid_mode" as any },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents["code-reviewer"].prompt).toBe(CODE_REVIEWER_PROMPTS.general)
+  })
+
+  test("code-reviewer receives environment context when directory is provided", () => {
+    // #given
+    const directory = "/test/project"
+
+    // #when
+    const agents = createBuiltinAgents([], {}, directory)
+
+    // #then
+    expect(agents["code-reviewer"].prompt).toContain("Working directory:")
+    expect(agents["code-reviewer"].prompt).toContain(directory)
+  })
+
+  test("explore receives environment context when directory is provided", () => {
+    // #given
+    const directory = "/test/project"
+
+    // #when
+    const agents = createBuiltinAgents([], {}, directory)
+
+    // #then
+    expect(agents.explore.prompt).toContain("Working directory:")
+    expect(agents.explore.prompt).toContain(directory)
+  })
+
+  test("environment context is preserved after prompt override", () => {
+    // #given
+    const directory = "/test/project"
+    const overrides = {
+      "code-reviewer": { prompt: "Custom prompt for review." },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides, directory)
+
+    // #then - context should be appended AFTER override
+    expect(agents["code-reviewer"].prompt).toContain("Custom prompt for review.")
+    expect(agents["code-reviewer"].prompt).toContain("Working directory:")
+    expect(agents["code-reviewer"].prompt).toContain(directory)
   })
 })

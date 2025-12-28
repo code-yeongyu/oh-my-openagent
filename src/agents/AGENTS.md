@@ -15,7 +15,7 @@ agents/
 ├── frontend-ui-ux-engineer.ts  # UI generation (Gemini 3 Pro)
 ├── document-writer.ts       # Technical docs (Gemini 3 Flash)
 ├── multimodal-looker.ts     # PDF/image analysis (Gemini 3 Flash)
-├── code-reviewer.ts         # Code Reviewer (Claude Sonnet 4.5)
+├── code-reviewer.ts         # Code Reviewer (Grok Code)
 ├── build-prompt.ts          # Shared build agent prompt
 ├── plan-prompt.ts           # Shared plan agent prompt
 ├── types.ts                 # AgentModelConfig interface
@@ -34,7 +34,7 @@ agents/
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | UI/UX code generation |
 | document-writer | google/gemini-3-pro-preview | - | Technical writing |
 | multimodal-looker | google/gemini-3-flash | - | PDF/image analysis |
-| code-reviewer | anthropic/claude-sonnet-4-5 | - | Code review and quality assurance |
+| code-reviewer | opencode/grok-code | - | Code review with specialized personas |
 
 ## HOW TO ADD AN AGENT
 

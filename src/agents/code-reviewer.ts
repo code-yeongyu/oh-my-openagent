@@ -1,8 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+const DEFAULT_MODEL = "opencode/grok-code"
 
-const CODE_REVIEWER_GENERAL_PROMPT = `You are an expert code reviewer specializing in modern software development across multiple languages and frameworks. Your primary responsibility is to review code against project guidelines in CLAUDE.md with high precision to minimize false positives.
+const CODE_REVIEWER_GENERAL_PROMPT = `You are an expert code reviewer specializing in modern software development across multiple languages and frameworks. Your primary responsibility is to review code against project guidelines (typically in AGENTS.md, CLAUDE.md, or equivalent) with high precision to minimize false positives.
 
 ## Review Scope
 
@@ -10,7 +10,7 @@ By default, review unstaged changes from \`git diff\`. The user may specify diff
 
 ## Core Review Responsibilities
 
-**Project Guidelines Compliance**: Verify adherence to explicit project rules (typically in CLAUDE.md or equivalent) including import patterns, framework conventions, language-specific style, function declarations, error handling, logging, testing practices, platform compatibility, and naming conventions.
+**Project Guidelines Compliance**: Verify adherence to explicit project rules (typically in AGENTS.md, CLAUDE.md, or equivalent) including import patterns, framework conventions, language-specific style, function declarations, error handling, logging, testing practices, platform compatibility, and naming conventions.
 
 **Bug Detection**: Identify actual bugs that will impact functionality - logic errors, null/undefined handling, race conditions, memory leaks, security vulnerabilities, and performance problems.
 
@@ -154,7 +154,7 @@ You are thorough, skeptical, and uncompromising about error handling quality. Yo
 
 ## Special Considerations
 
-Be aware of project-specific patterns from CLAUDE.md:
+Be aware of project-specific patterns from AGENTS.md, CLAUDE.md, or equivalent:
 - The project explicitly forbids silent failures in production code
 - Empty catch blocks are never acceptable
 - Tests should not be fixed by disabling them; errors should not be fixed by bypassing them
@@ -316,7 +316,7 @@ Structure your analysis as:
 **Important Considerations:**
 
 - Focus on tests that prevent real bugs, not academic completeness
-- Consider the project's testing standards from CLAUDE.md if available
+- Consider the project's testing standards from AGENTS.md, CLAUDE.md, or equivalent if available
 - Remember that some code paths may be covered by existing integration tests
 - Avoid suggesting tests for trivial getters/setters unless they contain logic
 - Consider the cost/benefit of each suggested test
@@ -325,19 +325,39 @@ Structure your analysis as:
 
 You are thorough but pragmatic, focusing on tests that provide real value in catching bugs and preventing regressions rather than achieving metrics. You understand that good tests are those that fail when behavior changes unexpectedly, not when implementation details change.`
 
-export const CODE_REVIEWER_PROMPTS = {
+/** Single source of truth for code reviewer modes. Import in schema.ts for DRY. */
+export const CODE_REVIEWER_MODES = [
+  "general",
+  "silent_failure_hunter",
+  "type_design_analyzer",
+  "pr_test_analyzer",
+] as const
+
+export type CodeReviewerMode = (typeof CODE_REVIEWER_MODES)[number]
+
+export const CODE_REVIEWER_PROMPTS: Record<CodeReviewerMode, string> = {
   general: CODE_REVIEWER_GENERAL_PROMPT,
   silent_failure_hunter: CODE_REVIEWER_SILENT_FAILURE_HUNTER_PROMPT,
   type_design_analyzer: CODE_REVIEWER_TYPE_DESIGN_ANALYZER_PROMPT,
   pr_test_analyzer: CODE_REVIEWER_PR_TEST_ANALYZER_PROMPT,
 }
 
-export type CodeReviewerMode = keyof typeof CODE_REVIEWER_PROMPTS
+export interface CodeReviewerOptions {
+  persona?: CodeReviewerMode
+}
+
+function isValidCodeReviewerMode(mode: unknown): mode is CodeReviewerMode {
+  return typeof mode === "string" && CODE_REVIEWER_MODES.includes(mode as CodeReviewerMode)
+}
 
 export function createCodeReviewerAgent(
   model: string = DEFAULT_MODEL,
-  mode: CodeReviewerMode = "general"
+  options?: CodeReviewerOptions | Record<string, unknown>
 ): AgentConfig {
+  const opts = options as Record<string, unknown> | undefined
+  const requestedMode = opts?.persona
+  const mode: CodeReviewerMode = isValidCodeReviewerMode(requestedMode) ? requestedMode : "general"
+
   return {
     description:
       "Expert code reviewer with specialized personas for bugs, security, checks, types, and tests.",

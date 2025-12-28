@@ -20,4 +20,5 @@ export const builtinAgents: Record<string, AgentConfig> = {
 }
 
 export * from "./types"
+export * from "./code-reviewer"
 export { createBuiltinAgents } from "./utils"

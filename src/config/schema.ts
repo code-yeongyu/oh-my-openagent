@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { McpNameSchema } from "../mcp/types"
+import { CODE_REVIEWER_MODES } from "../agents/code-reviewer"
 
 const PermissionValue = z.enum(["ask", "allow", "deny"])
 
@@ -24,6 +25,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "code-reviewer",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -38,6 +40,7 @@ export const OverridableAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "code-reviewer",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -70,7 +73,10 @@ export const HookNameSchema = z.enum([
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
   "feature-dev",
+  "review-pr",
 ])
+
+export const CodeReviewerModeSchema = z.enum(CODE_REVIEWER_MODES)
 
 export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
@@ -87,6 +93,7 @@ export const AgentOverrideConfigSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
   permission: AgentPermissionSchema.optional(),
+  code_reviewer_mode: CodeReviewerModeSchema.optional(),
 })
 
 export const AgentOverridesSchema = z.object({
@@ -101,6 +108,7 @@ export const AgentOverridesSchema = z.object({
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
+  "code-reviewer": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
@@ -201,5 +209,6 @@ export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
 export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
 export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningConfigSchema>
+export type CodeReviewerMode = z.infer<typeof CodeReviewerModeSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"
