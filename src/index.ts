@@ -384,12 +384,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         log(`Plugin load errors`, { errors: pluginComponents.errors });
       }
 
-      const builtinAgents = createBuiltinAgents(
-        pluginConfig.disabled_agents,
-        pluginConfig.agents,
-        ctx.directory,
-        config.model,
-      );
+      const builtinAgents = createBuiltinAgents({
+        disabledAgents: pluginConfig.disabled_agents,
+        agentOverrides: pluginConfig.agents,
+        directory: ctx.directory,
+        systemDefaultModel: config.model,
+        googleAuthEnabled: pluginConfig.google_auth !== false,
+      });
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};

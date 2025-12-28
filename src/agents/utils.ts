@@ -76,12 +76,24 @@ function mergeAgentConfig(
   return merged
 }
 
-export function createBuiltinAgents(
-  disabledAgents: BuiltinAgentName[] = [],
-  agentOverrides: AgentOverrides = {},
-  directory?: string,
+export interface CreateBuiltinAgentsOptions {
+  disabledAgents?: BuiltinAgentName[]
+  agentOverrides?: AgentOverrides
+  directory?: string
   systemDefaultModel?: string
+  googleAuthEnabled?: boolean
+}
+
+export function createBuiltinAgents(
+  options: CreateBuiltinAgentsOptions = {}
 ): Record<string, AgentConfig> {
+  const {
+    disabledAgents = [],
+    agentOverrides = {},
+    directory,
+    systemDefaultModel,
+    googleAuthEnabled = false,
+  } = options
   const result: Record<string, AgentConfig> = {}
 
   for (const [name, source] of Object.entries(agentSources)) {
@@ -92,7 +104,20 @@ export function createBuiltinAgents(
     }
 
     const override = agentOverrides[agentName]
-    const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
+    
+    // Model selection priority:
+    // 1. Explicit user override from config
+    // 2. For librarian: gemini-3-flash if google auth enabled
+    // 3. For Sisyphus: system default model
+    // 4. Agent's default model
+    let model: string | undefined = override?.model
+    if (!model) {
+      if (agentName === "librarian" && googleAuthEnabled) {
+        model = "google/gemini-3-flash"
+      } else if (agentName === "Sisyphus") {
+        model = systemDefaultModel
+      }
+    }
 
     let config = buildAgent(source, model)
 

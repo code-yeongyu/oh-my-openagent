@@ -21,7 +21,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents({ agentOverrides: overrides })
 
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
@@ -34,7 +34,7 @@ describe("createBuiltinAgents with model overrides", () => {
     const systemDefaultModel = "openai/gpt-5.2"
 
     // #when
-    const agents = createBuiltinAgents([], {}, undefined, systemDefaultModel)
+    const agents = createBuiltinAgents({ systemDefaultModel })
 
     // #then
     expect(agents.Sisyphus.model).toBe("openai/gpt-5.2")
@@ -62,7 +62,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents({ agentOverrides: overrides })
 
     // #then
     expect(agents.oracle.model).toBe("anthropic/claude-sonnet-4")
@@ -78,10 +78,48 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents({ agentOverrides: overrides })
 
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
     expect(agents.Sisyphus.temperature).toBe(0.5)
+  })
+})
+
+describe("librarian model fallback logic", () => {
+  test("librarian uses gemini-3-flash when googleAuthEnabled is true", () => {
+    // #given
+    const googleAuthEnabled = true
+
+    // #when
+    const agents = createBuiltinAgents({ googleAuthEnabled })
+
+    // #then
+    expect(agents.librarian.model).toBe("google/gemini-3-flash")
+  })
+
+  test("librarian uses default sonnet when googleAuthEnabled is false", () => {
+    // #given
+    const googleAuthEnabled = false
+
+    // #when
+    const agents = createBuiltinAgents({ googleAuthEnabled })
+
+    // #then
+    expect(agents.librarian.model).toBe("anthropic/claude-sonnet-4-5")
+  })
+
+  test("librarian uses explicit override even when googleAuthEnabled is true", () => {
+    // #given
+    const googleAuthEnabled = true
+    const overrides = {
+      librarian: { model: "opencode/big-pickle" },
+    }
+
+    // #when
+    const agents = createBuiltinAgents({ googleAuthEnabled, agentOverrides: overrides })
+
+    // #then
+    expect(agents.librarian.model).toBe("opencode/big-pickle")
   })
 })
