@@ -325,6 +325,7 @@ export class BackgroundManager {
 
     log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
 
+    const taskId = task.id
     setTimeout(async () => {
       try {
         const messageDir = getMessageDir(task.parentSessionID)
@@ -344,10 +345,13 @@ export class BackgroundManager {
           },
           query: { directory: this.directory },
         })
-        this.clearNotificationsForTask(task.id)
+        this.clearNotificationsForTask(taskId)
         log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
       } catch (error) {
         log("[background-agent] prompt failed:", String(error))
+      } finally {
+        this.tasks.delete(taskId)
+        log("[background-agent] Removed completed task from memory:", taskId)
       }
     }, 200)
   }
