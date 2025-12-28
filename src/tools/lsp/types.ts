@@ -135,3 +135,23 @@ export interface CodeAction {
   command?: Command
   data?: unknown
 }
+
+export interface ServerLookupInfo {
+  id: string
+  command: string[]
+  extensions: string[]
+}
+
+export type ServerLookupResult =
+  | { status: "found"; server: ResolvedServer }
+  | { status: "not_configured"; extension: string; availableServers: string[] }
+  | { status: "not_installed"; server: ServerLookupInfo; installHint: string }
+
+export interface ResolvedServer {
+  id: string
+  command: string[]
+  extensions: string[]
+  priority: number
+  env?: Record<string, string>
+  initialization?: Record<string, unknown>
+}

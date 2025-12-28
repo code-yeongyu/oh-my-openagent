@@ -1,9 +1,8 @@
 import { spawn, type Subprocess } from "bun"
 import { readFileSync } from "fs"
 import { extname, resolve } from "path"
-import type { ResolvedServer } from "./config"
 import { getLanguageId } from "./config"
-import type { Diagnostic } from "./types"
+import type { Diagnostic, ResolvedServer } from "./types"
 
 interface ManagedClient {
   client: LSPClient

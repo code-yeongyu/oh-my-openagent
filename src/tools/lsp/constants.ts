@@ -40,6 +40,37 @@ export const DEFAULT_MAX_REFERENCES = 200
 export const DEFAULT_MAX_SYMBOLS = 200
 export const DEFAULT_MAX_DIAGNOSTICS = 200
 
+export const LSP_INSTALL_HINTS: Record<string, string> = {
+  typescript: "npm install -g typescript-language-server typescript",
+  deno: "Install Deno from https://deno.land",
+  vue: "npm install -g @vue/language-server",
+  eslint: "npm install -g vscode-langservers-extracted",
+  oxlint: "npm install -g oxlint",
+  biome: "npm install -g @biomejs/biome",
+  gopls: "go install golang.org/x/tools/gopls@latest",
+  "ruby-lsp": "gem install ruby-lsp",
+  basedpyright: "pip install basedpyright",
+  pyright: "pip install pyright",
+  ty: "pip install ty",
+  ruff: "pip install ruff",
+  "elixir-ls": "See https://github.com/elixir-lsp/elixir-ls",
+  zls: "See https://github.com/zigtools/zls",
+  csharp: "dotnet tool install -g csharp-ls",
+  fsharp: "dotnet tool install -g fsautocomplete",
+  "sourcekit-lsp": "Included with Xcode or Swift toolchain",
+  rust: "rustup component add rust-analyzer",
+  clangd: "See https://clangd.llvm.org/installation",
+  svelte: "npm install -g svelte-language-server",
+  astro: "npm install -g @astrojs/language-server",
+  "bash-ls": "npm install -g bash-language-server",
+  jdtls: "See https://github.com/eclipse-jdtls/eclipse.jdt.ls",
+  "yaml-ls": "npm install -g yaml-language-server",
+  "lua-ls": "See https://github.com/LuaLS/lua-language-server",
+  php: "npm install -g intelephense",
+  dart: "Included with Dart SDK",
+  "terraform-ls": "See https://github.com/hashicorp/terraform-ls",
+}
+
 // Synced with OpenCode's server.ts
 // https://github.com/sst/opencode/blob/main/packages/opencode/src/lsp/server.ts
 export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
