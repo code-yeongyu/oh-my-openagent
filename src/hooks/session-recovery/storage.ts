@@ -135,7 +135,16 @@ export function findEmptyMessageByIndex(sessionID: string, targetIndex: number):
   const messages = readMessages(sessionID)
 
   // API index may differ from storage index due to system messages
-  const indicesToTry = [targetIndex, targetIndex - 1, targetIndex - 2]
+  const indicesToTry = [
+    targetIndex,
+    targetIndex - 1,
+    targetIndex + 1,
+    targetIndex - 2,
+    targetIndex + 2,
+    targetIndex - 3,
+    targetIndex - 4,
+    targetIndex - 5,
+  ]
 
   for (const idx of indicesToTry) {
     if (idx < 0 || idx >= messages.length) continue
