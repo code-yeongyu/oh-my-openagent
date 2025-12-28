@@ -37,6 +37,14 @@ function formatDuration(start: Date, end?: Date): string {
   }
 }
 
+type ToolContextWithMetadata = {
+  sessionID: string
+  messageID: string
+  agent: string
+  abort: AbortSignal
+  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
+}
+
 export function createBackgroundTask(manager: BackgroundManager): ToolDefinition {
   return tool({
     description: BACKGROUND_TASK_DESCRIPTION,
@@ -46,12 +54,14 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
       agent: tool.schema.string().describe("Agent type to use (any registered agent)"),
     },
     async execute(args: BackgroundTaskArgs, toolContext) {
+      const ctx = toolContext as ToolContextWithMetadata
+
       if (!args.agent || args.agent.trim() === "") {
         return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
       }
 
       try {
-        const messageDir = getMessageDir(toolContext.sessionID)
+        const messageDir = getMessageDir(ctx.sessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
         const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
           ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
@@ -61,9 +71,14 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           description: args.description,
           prompt: args.prompt,
           agent: args.agent.trim(),
-          parentSessionID: toolContext.sessionID,
-          parentMessageID: toolContext.messageID,
+          parentSessionID: ctx.sessionID,
+          parentMessageID: ctx.messageID,
           parentModel,
+        })
+
+        ctx.metadata?.({
+          title: args.description,
+          metadata: { sessionId: task.sessionID },
         })
 
         return `Background task launched successfully.
