@@ -3,19 +3,13 @@ import { join } from "node:path"
 import type { PruningState, ErroredToolCall } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
 import { log } from "../../shared/logger"
+import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
 export interface PurgeErrorsConfig {
   enabled: boolean
   turns: number
   protectedTools?: string[]
 }
-
-const MESSAGE_STORAGE = join(
-  process.env.HOME || process.env.USERPROFILE || "",
-  ".config",
-  "opencode",
-  "sessions"
-)
 
 interface ToolPart {
   type: string
