@@ -16,6 +16,7 @@ import {
   generateRecommendations,
   generateMarkdownReport,
 } from "./report"
+import { generateScaffoldCommands } from "./execution"
 import type { SyncForkArgs, SyncForkResult, ParsedCommit, Priority } from "./types"
 
 export function createSyncForkTool(_ctx: PluginInput) {
@@ -55,6 +56,11 @@ export function createSyncForkTool(_ctx: PluginInput) {
       log(`[sync_fork] Starting with args: ${JSON.stringify(args)}`)
 
       const result = await executeSyncFork(args)
+
+      if (args.scaffold && result.success && result.recommendations) {
+        const script = generateScaffoldCommands(result.recommendations)
+        return `# Scaffold Script\n\n\`\`\`bash\n${script}\n\`\`\`\n\n${result.markdownReport || ""}`
+      }
 
       if (args.output === "json") {
         return JSON.stringify(result, null, 2)
@@ -141,17 +147,21 @@ async function executeSyncFork(args: SyncForkArgs): Promise<SyncForkResult> {
     const recommendations = generateRecommendations(groups)
     log(`[sync_fork] Generated ${recommendations.length} recommendations`)
 
-    for (const commit of filteredCommits) {
-      const priority = suggestPriority(commit)
-      markCommitAsReviewed(state, commit.sha, priority)
-    }
+    if (!args.dryRun) {
+      for (const commit of filteredCommits) {
+        const priority = suggestPriority(commit)
+        markCommitAsReviewed(state, commit.sha, priority)
+      }
 
-    if (filteredCommits.length > 0) {
-      updateLastReviewed(state, filteredCommits[filteredCommits.length - 1].sha)
-    }
+      if (filteredCommits.length > 0) {
+        updateLastReviewed(state, filteredCommits[filteredCommits.length - 1].sha)
+      }
 
-    state.upstream.lastFetchedAt = new Date().toISOString()
-    await atomicWriteState(state)
+      state.upstream.lastFetchedAt = new Date().toISOString()
+      await atomicWriteState(state)
+    } else {
+      log(`[sync_fork] Dry run - skipping state updates`)
+    }
 
     const byPriority = countByPriority(recommendations)
     const byType = countByType(filteredCommits)
