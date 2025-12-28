@@ -267,3 +267,8 @@ export function clearProjectContextCache(accessToken?: string): void {
     projectContextCache.clear()
   }
 }
+
+export function invalidateProjectContextByRefreshToken(_refreshToken: string): void {
+  projectContextCache.clear()
+  debugLog(`[invalidateProjectContextByRefreshToken] Cleared all project context cache due to refresh token invalidation`)
+}

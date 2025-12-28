@@ -194,3 +194,20 @@ export interface AntigravityRefreshParts {
   projectId?: string
   managedProjectId?: string
 }
+
+/**
+ * OAuth error payload from Google
+ * Google returns errors in multiple formats, this handles all of them
+ */
+export interface OAuthErrorPayload {
+  error?: string | { status?: string; code?: string; message?: string }
+  error_description?: string
+}
+
+/**
+ * Parsed OAuth error with normalized fields
+ */
+export interface ParsedOAuthError {
+  code?: string
+  description?: string
+}
