@@ -1375,6 +1375,14 @@
         }
       }
     },
+    "comment_checker": {
+      "type": "object",
+      "properties": {
+        "custom_prompt": {
+          "type": "string"
+        }
+      }
+    },
     "experimental": {
       "type": "object",
       "properties": {
