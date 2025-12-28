@@ -1,15 +1,33 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory } from "./types"
+import type {
+  BuiltinAgentName,
+  AgentOverrideConfig,
+  AgentOverrides,
+  AgentFactory,
+  AgentPromptMetadata,
+} from "./types"
 import { createSisyphusAgent } from "./sisyphus"
-import { createOracleAgent } from "./oracle"
-import { createLibrarianAgent } from "./librarian"
-import { createExploreAgent } from "./explore"
-import { createFrontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
-import { createDocumentWriterAgent } from "./document-writer"
-import { createMultimodalLookerAgent } from "./multimodal-looker"
+import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
+import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
+import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
+import {
+  createFrontendUiUxEngineerAgent,
+  FRONTEND_PROMPT_METADATA,
+} from "./frontend-ui-ux-engineer"
+import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
+import {
+  createMultimodalLookerAgent,
+  MULTIMODAL_LOOKER_PROMPT_METADATA,
+} from "./multimodal-looker"
+import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
 
 type AgentSource = AgentFactory | AgentConfig
+
+interface AgentSourceWithMetadata {
+  source: AgentSource
+  metadata: AgentPromptMetadata
+}
 
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
   Sisyphus: createSisyphusAgent,
@@ -19,6 +37,15 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+}
+
+const agentMetadata: Record<Exclude<BuiltinAgentName, "Sisyphus">, AgentPromptMetadata> = {
+  oracle: ORACLE_PROMPT_METADATA,
+  librarian: LIBRARIAN_PROMPT_METADATA,
+  explore: EXPLORE_PROMPT_METADATA,
+  "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
+  "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
+  "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {
@@ -84,6 +111,26 @@ export function createBuiltinAgents(
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
 
+  const availableAgents: AvailableAgent[] = []
+  for (const [name, source] of Object.entries(agentSources)) {
+    const agentName = name as BuiltinAgentName
+
+    if (agentName === "Sisyphus") continue
+    if (disabledAgents.includes(agentName)) continue
+
+    const metadata = agentMetadata[agentName as Exclude<BuiltinAgentName, "Sisyphus">]
+    if (!metadata) continue
+
+    const override = agentOverrides[agentName]
+    const config = buildAgent(source, override?.model)
+
+    availableAgents.push({
+      name: agentName,
+      description: config.description || "",
+      metadata,
+    })
+  }
+
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
@@ -94,7 +141,12 @@ export function createBuiltinAgents(
     const override = agentOverrides[agentName]
     const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
 
-    let config = buildAgent(source, model)
+    let config: AgentConfig
+    if (agentName === "Sisyphus") {
+      config = createSisyphusAgent(model, availableAgents)
+    } else {
+      config = buildAgent(source, model)
+    }
 
     if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
       const envContext = createEnvContext(directory)
