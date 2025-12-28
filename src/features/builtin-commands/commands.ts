@@ -2,7 +2,7 @@ import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { FEATURE_DEV_TEMPLATE } from "./templates/feature-dev"
-import { REVIEW_TEMPLATE } from "./templates/review"
+import { REVIEW_PR_TEMPLATE } from "./templates/review-pr"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -27,10 +27,10 @@ $ARGUMENTS
 </user-request>`,
     argumentHint: "<feature-description>",
   },
-  "review": {
-    description: "(builtin) Code review using the specialized code-reviewer agent",
+  "review-pr": {
+    description: "(builtin) Code review using specialized code-reviewer agent",
     template: `<command-instruction>
-${REVIEW_TEMPLATE}
+${REVIEW_PR_TEMPLATE}
 </command-instruction>
 
 <user-request>
