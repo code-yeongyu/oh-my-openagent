@@ -32,9 +32,9 @@ describe("code-reviewer agent", () => {
     })
 
     // #given each available mode
-    // #when creating agent with that mode via persona option
+    // #when creating agent with that mode via code_reviewer_mode option
     // #then should use corresponding prompt
-    it("uses correct prompt for each mode via persona option", () => {
+    it("uses correct prompt for each mode via code_reviewer_mode option", () => {
       const modes: CodeReviewerMode[] = [
         "general",
         "silent_failure_hunter",
@@ -43,20 +43,20 @@ describe("code-reviewer agent", () => {
       ]
 
       for (const mode of modes) {
-        const agent = createCodeReviewerAgent(undefined, { persona: mode })
+        const agent = createCodeReviewerAgent(undefined, { code_reviewer_mode: mode })
         expect(agent.prompt).toBe(CODE_REVIEWER_PROMPTS[mode])
       }
     })
 
-    // #given invalid persona string
-    // #when creating agent with invalid persona
+    // #given invalid code_reviewer_mode string
+    // #when creating agent with invalid code_reviewer_mode
     // #then should fall back to general prompt
-    it("falls back to general prompt when invalid persona is provided", () => {
-      const agent = createCodeReviewerAgent(undefined, { persona: "invalid_mode" as any })
+    it("falls back to general prompt when invalid code_reviewer_mode is provided", () => {
+      const agent = createCodeReviewerAgent(undefined, { code_reviewer_mode: "invalid_mode" as any })
       expect(agent.prompt).toBe(CODE_REVIEWER_PROMPTS.general)
     })
 
-    // #given undefined persona and mode
+    // #given undefined code_reviewer_mode
     // #when creating agent with empty options
     // #then should use general prompt
     it("uses general prompt when options are empty", () => {
@@ -81,10 +81,10 @@ describe("code-reviewer agent", () => {
     // #given custom model and mode
     // #when creating agent with both parameters
     // #then should use both custom values
-    it("accepts both custom model and persona", () => {
+    it("accepts both custom model and code_reviewer_mode", () => {
       const agent = createCodeReviewerAgent(
         "google/gemini-pro",
-        { persona: "silent_failure_hunter" }
+        { code_reviewer_mode: "silent_failure_hunter" }
       )
 
       expect(agent.model).toBe("google/gemini-pro")

@@ -344,7 +344,7 @@ export const CODE_REVIEWER_PROMPTS: Record<CodeReviewerMode, string> = {
 }
 
 export interface CodeReviewerOptions extends BaseAgentOptions {
-  persona?: CodeReviewerMode
+  code_reviewer_mode?: CodeReviewerMode
 }
 
 function isValidCodeReviewerMode(mode: unknown): mode is CodeReviewerMode {
@@ -356,7 +356,12 @@ export function createCodeReviewerAgent(
   options?: CodeReviewerOptions | Record<string, unknown>
 ): AgentConfig {
   const opts = options as Record<string, unknown> | undefined
-  const requestedMode = opts?.persona
+  const requestedMode = opts?.code_reviewer_mode
+  
+  if (requestedMode && !isValidCodeReviewerMode(requestedMode)) {
+    console.warn(`[oh-my-opencode] Invalid code-reviewer mode "${requestedMode}". Valid modes: ${CODE_REVIEWER_MODES.join(", ")}. Falling back to "general".`)
+  }
+  
   const mode: CodeReviewerMode = isValidCodeReviewerMode(requestedMode) ? requestedMode : "general"
 
   return {

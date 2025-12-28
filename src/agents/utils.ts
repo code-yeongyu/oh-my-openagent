@@ -88,8 +88,8 @@ function mergeAgentConfig(
   const { prompt_append, ...rest } = override
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
-  if (prompt_append && merged.prompt) {
-    merged.prompt = merged.prompt + "\n" + prompt_append
+  if (prompt_append) {
+    merged.prompt = (merged.prompt ?? "") + "\n" + prompt_append
   }
 
   return merged
@@ -110,26 +110,30 @@ export function createBuiltinAgents(
       continue
     }
 
-    const override = agentOverrides[agentName]
-    const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
+    try {
+      const override = agentOverrides[agentName]
+      const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
 
-    const factoryOptions: Record<string, unknown> = {}
-    if (override && isCodeReviewerOverride(agentName, override)) {
-      factoryOptions.persona = override.code_reviewer_mode
+      const factoryOptions: Record<string, unknown> = {}
+      if (override && isCodeReviewerOverride(agentName, override)) {
+        factoryOptions.code_reviewer_mode = override.code_reviewer_mode
+      }
+
+      let config = buildAgent(source, model, factoryOptions)
+
+      if (override) {
+        config = mergeAgentConfig(config, override)
+      }
+
+      if (["Sisyphus", "librarian", "code-reviewer", "explore"].includes(agentName) && directory && config.prompt) {
+        const envContext = createEnvContext(directory)
+        config = { ...config, prompt: config.prompt + envContext }
+      }
+
+      result[name] = config
+    } catch (error) {
+      console.error(`[oh-my-opencode] Failed to initialize agent "${name}":`, error)
     }
-
-    let config = buildAgent(source, model, factoryOptions)
-
-    if (override) {
-      config = mergeAgentConfig(config, override)
-    }
-
-    if (["Sisyphus", "librarian", "code-reviewer", "explore"].includes(agentName) && directory && config.prompt) {
-      const envContext = createEnvContext(directory)
-      config = { ...config, prompt: config.prompt + envContext }
-    }
-
-    result[name] = config
   }
 
   return result
