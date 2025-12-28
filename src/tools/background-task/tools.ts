@@ -236,6 +236,7 @@ Session ID: ${task.sessionID}
 		const filePath = saveOutputToFile("background-task", task.id, textContent);
 		if (filePath) {
 			const preview = truncateText(textContent, 2000);
+			const charCount = textContent.length.toLocaleString();
 			return `Task Result (Large Output)
 
 Task ID: ${task.id}
@@ -243,7 +244,15 @@ Description: ${task.description}
 Duration: ${duration}
 Session ID: ${task.sessionID}
 
-**Output saved to file**: ${filePath}
+**Output exceeds inline limit** (${charCount} characters). Full output saved to:
+${filePath}
+
+Use the Read tool with offset and limit parameters to read specific portions, or the Grep tool to search for specific content.
+
+**REQUIREMENTS FOR SUMMARIZATION/ANALYSIS/REVIEW:**
+- You MUST read the content from the file at ${filePath} in sequential chunks until 100% of the content has been read.
+- If you receive truncation warnings when reading, reduce the chunk size until you have read 100% without truncation.
+- Before producing ANY summary or analysis, you MUST explicitly state what portion of the content you have read.
 
 ## Preview (first 2000 chars)
 
