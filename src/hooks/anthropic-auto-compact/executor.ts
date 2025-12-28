@@ -21,6 +21,8 @@ import {
 } from "../session-recovery/storage";
 import { log } from "../../shared/logger";
 
+const PLACEHOLDER_TEXT = "[user interrupted]";
+
 type Client = {
   session: {
     messages: (opts: {
@@ -101,6 +103,36 @@ function getOrCreateDcpState(
     autoCompactState.dcpStateBySession.set(sessionID, state);
   }
   return state;
+}
+
+function sanitizeEmptyMessagesBeforeSummarize(sessionID: string): number {
+  const emptyMessageIds = findEmptyMessages(sessionID);
+  if (emptyMessageIds.length === 0) {
+    return 0;
+  }
+
+  let fixedCount = 0;
+  for (const messageID of emptyMessageIds) {
+    const replaced = replaceEmptyTextParts(messageID, PLACEHOLDER_TEXT);
+    if (replaced) {
+      fixedCount++;
+    } else {
+      const injected = injectTextPart(sessionID, messageID, PLACEHOLDER_TEXT);
+      if (injected) {
+        fixedCount++;
+      }
+    }
+  }
+
+  if (fixedCount > 0) {
+    log("[auto-compact] pre-summarize sanitization fixed empty messages", {
+      sessionID,
+      fixedCount,
+      totalEmpty: emptyMessageIds.length,
+    });
+  }
+
+  return fixedCount;
 }
 
 async function getLastMessagePair(
@@ -379,6 +411,8 @@ export async function executeCompact(
 
           if (providerID && modelID) {
             try {
+              sanitizeEmptyMessagesBeforeSummarize(sessionID);
+
               await (client as Client).tui
                 .showToast({
                   body: {
@@ -619,6 +653,8 @@ export async function executeCompact(
 
       if (providerID && modelID) {
         try {
+          sanitizeEmptyMessagesBeforeSummarize(sessionID);
+
           await (client as Client).tui
             .showToast({
               body: {
