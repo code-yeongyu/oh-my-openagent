@@ -33,3 +33,12 @@ export {
   generateMarkdownReport,
 } from "./report"
 export type { CommitGroup } from "./report"
+export {
+  createSyncBranch,
+  cherryPickCommits,
+  pushBranch,
+  createPullRequest,
+  executeSync,
+  generateScaffoldCommands,
+} from "./execution"
+export type { ExecutionResult } from "./execution"
