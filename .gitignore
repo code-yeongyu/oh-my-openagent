@@ -40,7 +40,8 @@ oauth-success.html
 .opencode/node_modules/
 
 # Context learning data (LIF-73)
-context/
+# Track learnings, ignore large ephemeral transcripts
+context/transcripts/
 
 # One-off scripts
 fix_frontmatter.py
