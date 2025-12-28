@@ -233,7 +233,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const commentChecker = isHookEnabled("comment-checker")
-    ? createCommentCheckerHooks()
+    ? createCommentCheckerHooks(pluginConfig.comment_checker)
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
     ? createToolOutputTruncatorHook(ctx, { experimental: pluginConfig.experimental })
