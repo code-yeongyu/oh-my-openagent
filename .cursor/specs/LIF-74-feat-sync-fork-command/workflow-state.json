@@ -1,5 +1,5 @@
 {
-  "currentStep": "review",
+  "currentStep": "test",
   "completedSteps": [
     "specify",
     "plan",
@@ -16,6 +16,6 @@
   "linearIssueId": null,
   "linearStatus": "in_review",
   "createdAt": "2025-12-23T05:16:04.949Z",
-  "updatedAt": "2025-12-28T20:07:13.300Z",
-  "lastCommand": "/review"
+  "updatedAt": "2025-12-28T22:37:55.963Z",
+  "lastCommand": "/test"
 }
