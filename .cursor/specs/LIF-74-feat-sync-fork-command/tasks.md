@@ -1,211 +1,201 @@
 # Sync Fork Command - Task Breakdown
 
 **Linear Issue**: [LIF-74](https://linear.app/lifelogger/issue/LIF-74/sync-fork-command-recurring-workflow-for-upstream-synchronization)
-**Created**: 2025-12-24
-**Updated**: 2025-12-24 (revised for agent-consumable output)
-**Total Estimate**: 15h (includes ~20% verification buffer)
+**Created**: 2025-12-28
+**Updated**: 2025-12-28 (aligned with AI-agent-driven plan)
+**Total Estimate**: ~10h
 
 ## Vision
 
-This command is the **intake funnel for automated fork maintenance**:
 ```
-/sync-fork → OmO parses JSON → Creates Linear issues → /specify → /plan → /implement
+/sync-fork → AI Analysis → Recommendations → Cherry-pick → PR → Linear Issues
 ```
 
 Each recommendation = one spec unit = one Linear issue = one development cycle.
 
-## Phase 1: Foundation / Setup (2h 55m)
+---
 
-**Goal**: Establish tool skeleton, strict boundaries, safe Git preflight.
+## Phase 1: Foundation (2h)
 
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T1.1 | Create `src/tools/sync-fork/` directory + empty files | Not Started | 15m | - | Files: `index.ts`, `types.ts`, `constants.ts`, `tools.ts`, `git-adapter.ts`, `commit-parser.ts`, `risk-scorer.ts`, `priority-scorer.ts`, `report-generator.ts`, `utils.ts` |
-| T1.2 | Define core domain interfaces in `types.ts` | Not Started | 40m | T1.1 | Align with `plan.md` (GitContext, ParsedCommit, ScoredCommit, DirectoryHeat, SyncForkArgs/Result) |
-| T1.3 | Define defaults/patterns in `constants.ts` | Not Started | 25m | T1.1 | `SECURITY_KEYWORDS`, risk config, priority weights, thresholds |
-| T1.4 | Implement `GitAdapter` repo discovery + worktree-safe repoRoot | Not Started | 25m | T1.1 | Must work when `.git` is a file (worktrees); always run git with `cwd=repoRoot` |
-| T1.5 | Implement `GitAdapter` preflight safety gates | Not Started | 45m | T1.2,T1.4 | Detect: missing upstream, detached HEAD, dirty working tree. Default: analysis OK; scaffold/script blocked if unsafe |
-| T1.6 | Implement upstream branch resolution | Not Started | 25m | T1.5 | Prefer `refs/remotes/upstream/HEAD` → fallback `main` → `master` → else error listing upstream branches |
-| T1.7 | Implement tool skeleton in `tools.ts` + barrel exports in `index.ts` | Not Started | 25m | T1.2,T1.3,T1.5 | Tool args schema + success/error envelope; no side effects outside GitAdapter |
-| T1.8 | Register tool export + plugin registration | Not Started | 35m | T1.7 | Update `src/tools/index.ts` + `src/index.ts` to register `sync_fork` |
+**Goal**: Establish tool skeleton, types, state management, git-adapter.
 
-**Checkpoint**:
-- `bun run typecheck` passes
-- Tool registers without runtime errors
-- Preflight errors include actionable suggestions
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T1.1 | Create `src/tools/sync-fork/` directory + empty files | Not Started | 10m | index.ts, types.ts, constants.ts, tools.ts, state.ts, git-adapter.ts, analysis.ts, report.ts, execution.ts |
+| T1.2 | Define TypeScript interfaces in `types.ts` | Not Started | 30m | SyncForkState, ParsedCommit, AIAnalysisResult, SyncRecommendation, SyncForkArgs/Result |
+| T1.3 | Implement constants and risk hints in `constants.ts` | Not Started | 15m | FILE_RISK_HINTS, SECURITY_KEYWORDS, defaults |
+| T1.4 | Implement state file management in `state.ts` | Not Started | 30m | atomicWriteState, readState, atomic writes with temp file |
+| T1.5 | Create git-adapter with preflight in `git-adapter.ts` | Not Started | 25m | validateUpstream, fetch, getMergeBase, worktree-safe repoRoot |
+| T1.6 | Write tool skeleton and registration in `tools.ts`, `index.ts` | Not Started | 10m | Tool args schema, export, register in src/tools/index.ts |
+
+**Deliverables**:
+- Tool directory with all files
+- Complete TypeScript type definitions
+- State file read/write with atomic updates
+- GitAdapter validates upstream, fetches, calculates merge-base
+
+**Verification**:
+```bash
+bun run typecheck
+```
 
 ---
 
-## Phase 2: Core Analysis (CommitCollector + Parser) (3h 05m)
+## Phase 2: Discovery & Parsing (1.5h)
 
-**Goal**: Collect upstream-only commits + metadata robustly and efficiently (avoid per-commit spawns).
+**Goal**: Collect upstream-only commits + metadata robustly.
 
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T2.1 | Decide and implement robust `git log` format (delimiter-safe) | Not Started | 45m | T1.4,T1.6 | Prefer `git log -z` or `%x1f/%x1e` delimiters to avoid newline ambiguity; document parsing contract |
-| T2.2 | Implement upstream-only commit collection (headers-only pass) | Not Started | 30m | T2.1 | Apply `--since` + internal clamp on `--limit` early (cheap pass) |
-| T2.3 | Implement conventional commit parsing | Not Started | 45m | T1.2 | Regex parser; handle `type(scope)!:` + `BREAKING CHANGE:` footers; fallback to `other` |
-| T2.4 | Implement security detection heuristics | Not Started | 30m | T1.3,T2.3 | Keyword scoring + high-confidence path weighting; label commit type as `security` when confidence high |
-| T2.5 | Implement commit type classification + merge detection | Not Started | 35m | T2.2,T2.3,T2.4 | Detect merges via parents (`%P`); default: mark merges `REVIEW` and exclude from scaffold unless `--include-merges` (optional future) |
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T2.1 | Implement git log parsing in `git-adapter.ts` | Not Started | 30m | Use delimiter-safe format (%x1f/%x1e), parse into ParsedCommit[] |
+| T2.2 | Create conventional commit parser in `git-adapter.ts` | Not Started | 25m | Regex for type(scope)!:, BREAKING CHANGE footers, fallback to "other" |
+| T2.3 | Add security keyword detection in `git-adapter.ts` | Not Started | 15m | CVE, vulnerability, exploit, auth bypass, injection, etc. |
+| T2.4 | Filter commits by state (skip already reviewed) in `tools.ts` | Not Started | 20m | Check state.commits[sha].status, only return pending/new |
 
-**Checkpoint**:
-- `/sync-fork --filter security` returns only security-labeled commits
-- Parsing handles subjects with colons/spaces/newlines safely (no record desync)
-- Total git invocations stays bounded (target ≤ 5 per run)
-
----
-
-## Phase 3: Basic Report (1h 45m)
-
-**Goal**: Produce readable report + machine JSON output.
-
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T3.1 | Implement ReportGenerator base | Not Started | 25m | T2.5 | Inputs: context + commits; outputs: markdown + JSON |
-| T3.2 | Implement markdown report format (grouped by type) | Not Started | 50m | T3.1 | Include: merge-base, counts, warnings (shallow/detached/dirty), top recommendations |
-| T3.3 | Implement JSON output format | Not Started | 10m | T3.1 | Shape matches `SyncForkResult` |
-| T3.4 | Wire `--output` handling in tool | Not Started | 20m | T3.2,T3.3 | `report|json|markdown` |
-
-**Checkpoint**:
-- `/sync-fork --output json` returns valid JSON
-- `/sync-fork --output markdown` is readable and stable across runs
+**Deliverables**:
+- Parse git log into ParsedCommit[]
+- Filter out commits already in state file
+- Conventional commit type detection
+- Security commits auto-flagged
 
 ---
 
-## Phase 4: Risk Assessment (2h 25m)
+## Phase 3: AI Analysis Integration (2h)
 
-**Goal**: Classify file risk, build heatmap, estimate conflict likelihood (offline).
+**Goal**: Orchestrate AI agents for commit analysis with fork context.
 
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T4.1 | Implement file risk classification | Not Started | 40m | T1.3 | Map file paths → `HIGH|MEDIUM|LOW` with reason/points |
-| T4.2 | Implement commit file change extraction (batched where possible) | Not Started | 45m | T2.1,T2.2 | Avoid `git show` per commit for large N; consider second batched pass; support `R/C` safely |
-| T4.3 | Build directory heatmap | Not Started | 30m | T4.1,T4.2 | Aggregate risk + file counts by directory |
-| T4.4 | Estimate conflict probability | Not Started | 30m | T4.2 | Heuristics: path overlap vs fork diff, churn if `--numstat` available, scatter factor; normalize 0..1 |
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T3.1 | Create analysis orchestrator in `analysis.ts` | Not Started | 40m | analyzeCommitWithAI function, background_task(agent="explore") |
+| T3.2 | Build fork context for AI in `analysis.ts` | Not Started | 30m | Read our versions of changed files, get fork customizations |
+| T3.3 | Parse AI responses in `analysis.ts` | Not Started | 25m | JSON parsing with fallbacks for malformed responses |
+| T3.4 | Handle analysis failures gracefully in `analysis.ts` | Not Started | 25m | Timeout handling, fallback to type-based priority |
 
-**Checkpoint**:
-- Report includes heatmap section
-- High-risk paths (e.g. `src/index.ts`, `src/config/schema.ts`) flagged as HIGH
-- ConflictProb stable and bounded (0..1)
+**AI Analysis Prompt Template**:
+```
+UPSTREAM CHANGE:
+- Commit: {sha}
+- Message: {message}
+- Files changed: {files}
+- Diff: {diff}
 
----
+FORK CONTEXT:
+- Our version of changed files: {fork_files}
 
-## Phase 5: Priority Classification (1h 15m)
+EVALUATE:
+1. Does this fix a bug we might have?
+2. Does this add functionality we'd benefit from?
+3. Does this conflict with our customizations?
+4. What's the risk level of integrating this?
 
-**Goal**: Categorize commits by priority (P0-P3) using simple rules, not complex formulas.
+OUTPUT (JSON):
+{
+  "priority": "P0|P1|P2|P3|Skip",
+  "reasoning": "2-3 sentences",
+  "conflictLikelihood": "likely|possible|unlikely",
+  "action": "sync_immediately|queue_for_batch|skip"
+}
+```
 
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T5.1 | Implement categorical priority classification | Not Started | 30m | T2.5,T4.1 | P0=security, P1=fix+risk, P2=perf, P3=rest |
-| T5.2 | Implement effort estimation | Not Started | 20m | T4.2 | trivial/small/medium/large based on file count + risk |
-| T5.3 | Implement conflict likelihood heuristic | Not Started | 25m | T4.4 | likely/possible/unlikely based on path overlap |
-
-**Checkpoint**:
-- Security commits always P0
-- Priority is deterministic (same input → same output)
-- No complex scoring formulas
-
----
-
-## Phase 6: Spec Unit Grouping (1h 30m)
-
-**Goal**: Group commits into "spec units" — each group becomes one Linear issue.
-
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T6.1 | Implement explicit marker detection | Not Started | 30m | T2.3 | PR refs (`#123`), issue refs (`ABC-123`), fixup/squash |
-| T6.2 | Implement scope-based grouping | Not Started | 35m | T4.2,T6.1 | Same conventional scope within 10 commits |
-| T6.3 | Generate deterministic group IDs | Not Started | 25m | T6.2 | Stable IDs for repeat runs |
-
-**Grouping Principle**: Each group should be independently cherry-pickable and spec-worthy.
-
-**Checkpoint**:
-- Each group is a valid "spec unit" for Linear issue creation
-- Repeat runs produce same groups
+**Deliverables**:
+- Parallel AI analysis via background_task
+- Fork context generation
+- Robust JSON parsing with fallbacks
 
 ---
 
-## Phase 7: Recommendation Generation (1h)
+## Phase 4: Recommendations & Report (1.5h)
 
 **Goal**: Generate SyncRecommendation objects with Linear-ready fields.
 
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T7.1 | Generate `SyncRecommendation` objects | Not Started | 25m | T5.3,T6.3 | suggestedIssueTitle, suggestedIssueDescription, cherryPickCommand |
-| T7.2 | Generate Linear-ready issue descriptions | Not Started | 20m | T7.1 | Markdown with context, commits, risk summary |
-| T7.3 | Add suggested labels based on priority/type | Not Started | 15m | T7.1 | ["sync-upstream", "P0", "security"] etc. |
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T4.1 | Group commits by PR/scope in `report.ts` | Not Started | 30m | Detect PR refs (#123), scope-based grouping |
+| T4.2 | Generate SyncRecommendation objects in `report.ts` | Not Started | 25m | suggestedIssueTitle, suggestedIssueDescription, cherryPickCommand |
+| T4.3 | Create markdown report format in `report.ts` | Not Started | 20m | Grouped by priority (P0 → P3 → Skip), AI reasoning included |
+| T4.4 | Generate Linear-ready issue descriptions in `report.ts` | Not Started | 25m | Markdown with context, commits, risk summary, suggested labels |
 
-**Each recommendation is a complete "spec unit"**: OmO can directly call `linear_create_issue` with output.
-
-**Checkpoint**:
-- JSON output contains recommendations with all required fields
-- OmO can create Linear issues without additional processing
-
----
-
-## Phase 8: Polish & Cross-Cutting Concerns (4h 10m)
-
-**Goal**: Harden edge cases, add command file, verification + perf guardrails.
-
-| ID | Task | Status | Estimate | Dependencies | Notes |
-|----|------|--------|----------|--------------|-------|
-| T8.1 | Add `--since` and `--limit` support end-to-end | Not Started | 25m | T2.2,T3.4 | `since` parsing best-effort; document accepted formats; internal clamp on limit |
-| T8.2 | Offline/degraded mode behavior for `fetch` failures | Not Started | 30m | T1.5,T1.6 | If fetch fails, continue with existing refs (warn) unless required refs missing; consider `--no-fetch` flag [ ? ] |
-| T8.3 | Shallow clone handling + remediation text | Not Started | 15m | T1.5 | Warn + suggest `git fetch --unshallow` / `--depth` |
-| T8.4 | Command markdown `.opencode/command/sync-fork.md` | Not Started | 20m | T3.4,T7.1 | Frontmatter: `category: git`, `description`, `argument-hint`; include `$ARGUMENTS` and examples |
-| T8.5 | Perf guardrails + “large limit degrade” rules | Not Started | 45m | T2.1,T4.2 | Define: when to skip file analysis/heatmap/groups for huge N; keep runtime bounded |
-| T8.6 | Manual E2E dogfood in this repo | Not Started | 45m | T8.1,T8.2,T8.4 | Run against real upstream; validate readability + actionable errors |
-| T8.7 | Unit tests: commit parser + security detection [ ? ] | Not Started | 45m | T2.3,T2.4 | Repo has `bun:test` tests, but LSP shows missing `bun:test` types; may require TS config tweak |
-| T8.8 | Unit tests: risk/priority scoring stability [ ? ] | Not Started | 55m | T4.4,T5.3 | Table-driven tests for deterministic ordering/threshold behavior |
-| T8.9 | Unit tests: git output parsers (mocked strings) [ ? ] | Not Started | 30m | T2.1,T4.2 | No real git needed; parser-only |
-
-**Checkpoint**:
-- Edge cases: no-upstream, detached HEAD, dirty tree, shallow clone handled cleanly
-- `bun run typecheck` passes
-- If tests enabled, `bun test` passes
-- Command discovered by slashcommand loader
+**Deliverables**:
+- Recommendations grouped by priority
+- Linear-ready issue titles and descriptions
+- Human-readable markdown report
 
 ---
 
-## Dependency Graph (Overview)
+## Phase 5: Execution Phase (2h)
 
-- Foundation: `T1.*`
-- Commit analysis: `T1.* → T2.*`
-- Reporting: `T2.* → T3.*`
-- Risk: `T2.* + T1.3 → T4.*`
-- Priority: `T4.* + T2.5 → T5.*`
-- Grouping: `T4.2 + T2.3 → T6.*`
-- Scaffold: `T1.5 + T5.4 + T6.3 → T7.*`
-- Polish/tests/perf: `T1–T7 → T8.*`
+**Goal**: Cherry-pick, push, PR creation, Linear integration.
+
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T5.1 | Implement cherry-pick execution in `execution.ts` | Not Started | 30m | git cherry-pick -x {sha}, handle conflicts gracefully |
+| T5.2 | Implement branch creation in `execution.ts` | Not Started | 15m | git checkout -b sync/upstream-{date} |
+| T5.3 | Implement push and PR creation in `execution.ts` | Not Started | 30m | git push -u origin, gh pr create with summary |
+| T5.4 | Integrate Linear issue creation in `execution.ts` | Not Started | 25m | Call linear_create_issue for P0/P1 recommendations |
+| T5.5 | Update state file after execution in `execution.ts` | Not Started | 20m | Mark commits as synced, update lastReviewedCommit |
+
+**Deliverables**:
+- Cherry-pick execution with conflict handling
+- PR creation with comprehensive summary
+- Linear issue creation for P0/P1
+- State file updated after sync
+
+---
+
+## Phase 6: Edge Cases & Polish (1h)
+
+**Goal**: Handle edge cases, add command file, verification.
+
+| ID | Task | Status | Estimate | Notes |
+|----|------|--------|----------|-------|
+| T6.1 | Handle missing upstream remote | Not Started | 10m | Clear error with `git remote add upstream <URL>` suggestion |
+| T6.2 | Handle shallow clone warning | Not Started | 10m | Warn + suggest `git fetch --unshallow` |
+| T6.3 | Implement --reset-state flag | Not Started | 10m | Delete state file and start fresh |
+| T6.4 | Implement --dry-run flag | Not Started | 10m | Analyze only, don't execute anything |
+| T6.5 | Update slash command file | Not Started | 10m | .opencode/command/sync-fork.md with examples |
+| T6.6 | Integration testing (dogfood) | Not Started | 10m | Run against real upstream |
+
+**Deliverables**:
+- Edge cases handled cleanly
+- All flags implemented
+- Command discoverable via slashcommand loader
+
+---
 
 ## Summary
 
 | Phase | Tasks | Estimate | Status |
 |-------|-------|----------|--------|
-| Phase 1: Foundation / Setup | 8 | 2h 55m | Not Started |
-| Phase 2: Core Analysis | 5 | 3h 05m | Not Started |
-| Phase 3: Basic Report | 4 | 1h 45m | Not Started |
-| Phase 4: Risk Assessment | 4 | 2h 25m | Not Started |
-| Phase 5: Priority Classification | 3 | 1h 15m | Not Started |
-| Phase 6: Spec Unit Grouping | 3 | 1h 30m | Not Started |
-| Phase 7: Recommendation Generation | 3 | 1h | Not Started |
-| Phase 8: Polish & Cross-Cutting | 9 | 4h 10m | Not Started |
-| **Total** | **39** | **~18h** | - |
+| Phase 1: Foundation | 6 | 2h | Not Started |
+| Phase 2: Discovery & Parsing | 4 | 1.5h | Not Started |
+| Phase 3: AI Analysis Integration | 4 | 2h | Not Started |
+| Phase 4: Recommendations & Report | 4 | 1.5h | Not Started |
+| Phase 5: Execution Phase | 5 | 2h | Not Started |
+| Phase 6: Edge Cases & Polish | 6 | 1h | Not Started |
+| **Total** | **29** | **~10h** | - |
 
-**Key Change**: Output is agent-consumable JSON for OmO to create Linear issues.
+---
 
 ## Recommended Execution Order
 
-1. **T1.1–T1.8** (tool wired + safety preflight)
-2. **T2.1–T2.5** (collection + parsing + filters)
-3. **T3.1–T3.4** (JSON output usable early for OmO testing)
-4. **T4.1–T4.4** then **T5.1–T5.3** (risk + priority classification)
-5. **T6.1–T6.3** then **T7.1–T7.3** (spec units + recommendations)
-6. **T8.1–T8.9** (edge cases + perf + tests)
+1. **T1.1–T1.6** (tool wired + state + git-adapter)
+2. **T2.1–T2.4** (collection + parsing + filters)
+3. **T3.1–T3.4** (AI analysis integration)
+4. **T4.1–T4.4** (recommendations + report)
+5. **T5.1–T5.5** (execution phase)
+6. **T6.1–T6.6** (edge cases + polish)
 
-## Notes
+---
 
-- **Agent-Consumable Output**: Primary output is JSON that OmO can directly use to create Linear issues
-- Offline constraint interpreted as "no external APIs/deps"; `git fetch` may still require network
-- Performance risk: avoid per-commit `git show` spawns at large N; prioritize batched log formats
-- Each recommendation = one spec unit = one Linear issue = one `/specify` run
+## Key Design Decisions (from Spec)
+
+- **DD-1**: AI agents evaluate commits (not scoring formulas)
+- **DD-2**: State tracking is P0 (required, not optional)
+- **DD-3**: Humans review at PR stage (not individual commits)
+- **DD-4**: No offline mode (git fetch requires network anyway)
+
+## Linear Integration
+
+- Each P0/P1 recommendation auto-creates a Linear issue
+- Labels: `sync-upstream`, priority label (`P0`, `P1`, `P2`)
+- Links to upstream commit(s) and cherry-pick command
