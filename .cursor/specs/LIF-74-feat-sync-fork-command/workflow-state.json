@@ -1,0 +1,21 @@
+{
+  "currentStep": "test",
+  "completedSteps": [
+    "specify",
+    "plan",
+    "tasks",
+    "review",
+    "implement"
+  ],
+  "artifactHashes": {
+    "spec.md": "b38ef1293992cd59",
+    "plan.md": "0790c039d32ff84d",
+    "tasks.md": "ed36b43bddb2896b",
+    "status.md": "affe65b8df0ef9d8"
+  },
+  "linearIssueId": null,
+  "linearStatus": "in_review",
+  "createdAt": "2025-12-23T05:16:04.949Z",
+  "updatedAt": "2025-12-28T22:37:55.963Z",
+  "lastCommand": "/test"
+}

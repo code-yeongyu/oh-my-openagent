@@ -52,6 +52,7 @@ export {
 export { createReadContextTool } from "./project-context"
 export { createSpecFolderTool, updateWorkflowStateTool } from "./spec"
 export { createExtractLearningsTool } from "./extract-learnings"
+export { createSyncForkTool } from "./sync-fork"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient) {
   return {

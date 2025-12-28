@@ -72,6 +72,8 @@ import {
   createSpecFolderTool,
   updateWorkflowStateTool,
   createExtractLearningsTool,
+  // Sync fork tool
+  createSyncForkTool,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
@@ -383,6 +385,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const extractLearnings = createExtractLearningsTool(ctx, {
     transcriptPath: pluginConfig.meta_learning?.storage_path?.replace(/learnings\/?$/, "transcripts") ?? "context/transcripts",
   });
+  const syncFork = createSyncForkTool(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -409,6 +412,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       create_spec_folder: createSpecFolder,
       update_workflow_state: updateWorkflowState,
       extract_learnings: extractLearnings,
+      sync_fork: syncFork,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
