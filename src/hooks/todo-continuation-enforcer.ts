@@ -55,7 +55,7 @@ interface SessionState {
   version: number                          // Monotonic generation token - increment to invalidate pending callbacks
   mode: SessionMode
   timer?: ReturnType<typeof setTimeout>    // Pending countdown timer
-  lastInjectedAt?: number                  // Timestamp of last injection (anti-spam)
+  lastAttemptedAt?: number                 // Timestamp of last injection attempt (throttle all attempts)
 }
 
 // ============================================================================
@@ -131,18 +131,22 @@ export function createTodoContinuationEnforcer(
   }
 
   /**
-   * Cancel any pending countdown by incrementing version and clearing timer.
-   * This invalidates any async callbacks that were started with the old version.
+   * Invalidate any pending or in-flight operation by incrementing version.
+   * ALWAYS bumps version regardless of current mode to prevent last-mile races.
    */
-  function cancelCountdown(sessionID: string, reason: string): void {
+  function invalidate(sessionID: string, reason: string): void {
     const state = sessions.get(sessionID)
     if (!state) return
 
-    if (state.mode === "countingDown" || state.timer) {
-      state.version++
-      clearTimer(state)
+    // Skip if in recovery mode (external control)
+    if (state.mode === "recovering") return
+
+    state.version++
+    clearTimer(state)
+    
+    if (state.mode !== "idle" && state.mode !== "errorBypass") {
+      log(`[${HOOK_NAME}] Invalidated`, { sessionID, reason, prevMode: state.mode, newVersion: state.version })
       state.mode = "idle"
-      log(`[${HOOK_NAME}] Countdown cancelled`, { sessionID, reason, newVersion: state.version })
     }
   }
 
@@ -161,7 +165,7 @@ export function createTodoContinuationEnforcer(
 
   const markRecovering = (sessionID: string): void => {
     const state = getOrCreateState(sessionID)
-    cancelCountdown(sessionID, "entering recovery mode")
+    invalidate(sessionID, "entering recovery mode")
     state.mode = "recovering"
     log(`[${HOOK_NAME}] Session marked as recovering`, { sessionID })
   }
@@ -213,9 +217,9 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    // Throttle check: minimum interval between injections
-    if (state.lastInjectedAt) {
-      const elapsed = Date.now() - state.lastInjectedAt
+    // Throttle check: minimum interval between injection attempts
+    if (state.lastAttemptedAt) {
+      const elapsed = Date.now() - state.lastAttemptedAt
       if (elapsed < MIN_INJECTION_INTERVAL_MS) {
         log(`[${HOOK_NAME}] Injection throttled: too soon since last injection`, { 
           sessionID, elapsedMs: elapsed, minIntervalMs: MIN_INJECTION_INTERVAL_MS 
@@ -299,6 +303,9 @@ export function createTodoContinuationEnforcer(
       return
     }
 
+    // Set lastAttemptedAt BEFORE calling API (throttle attempts, not just successes)
+    state.lastAttemptedAt = Date.now()
+
     try {
       log(`[${HOOK_NAME}] Injecting continuation prompt`, { 
         sessionID, 
@@ -315,7 +322,6 @@ export function createTodoContinuationEnforcer(
         query: { directory: ctx.directory },
       })
 
-      state.lastInjectedAt = Date.now()
       log(`[${HOOK_NAME}] Continuation prompt injected successfully`, { sessionID })
     } catch (err) {
       log(`[${HOOK_NAME}] Prompt injection failed`, { sessionID, error: String(err) })
@@ -332,7 +338,7 @@ export function createTodoContinuationEnforcer(
     const state = getOrCreateState(sessionID)
 
     // Cancel any existing countdown
-    cancelCountdown(sessionID, "starting new countdown")
+    invalidate(sessionID, "starting new countdown")
 
     // Increment version for this new countdown
     state.version++
@@ -388,7 +394,7 @@ export function createTodoContinuationEnforcer(
       const isInterrupt = detectInterrupt(props?.error)
       const state = getOrCreateState(sessionID)
       
-      cancelCountdown(sessionID, isInterrupt ? "user interrupt" : "session error")
+      invalidate(sessionID, isInterrupt ? "user interrupt" : "session error")
       state.mode = "errorBypass"
       
       log(`[${HOOK_NAME}] session.error received`, { sessionID, isInterrupt, error: props?.error })
@@ -452,13 +458,22 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Skip if background tasks are running (avoid toast spam with no injection)
+      const hasRunningBgTasks = backgroundManager
+        ? backgroundManager.getTasksByParentSession(sessionID).some((t) => t.status === "running")
+        : false
+
+      if (hasRunningBgTasks) {
+        log(`[${HOOK_NAME}] Skipped: background tasks still running`, { sessionID })
+        return
+      }
+
       log(`[${HOOK_NAME}] Found incomplete todos`, { 
         sessionID, 
         incomplete: incompleteCount, 
         total: todos.length 
       })
 
-      // Start countdown
       startCountdown(sessionID, incompleteCount)
       return
     }
@@ -476,13 +491,13 @@ export function createTodoContinuationEnforcer(
 
       // User message: Always cancel countdown
       if (role === "user") {
-        cancelCountdown(sessionID, "user message received")
+        invalidate(sessionID, "user message received")
         return
       }
 
       // Assistant message WITHOUT finish: Agent is working, cancel countdown
       if (role === "assistant" && !finish) {
-        cancelCountdown(sessionID, "assistant is working (streaming)")
+        invalidate(sessionID, "assistant is working (streaming)")
         return
       }
 
@@ -503,7 +518,7 @@ export function createTodoContinuationEnforcer(
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
-        cancelCountdown(sessionID, "assistant streaming")
+        invalidate(sessionID, "assistant streaming")
       }
       return
     }
@@ -514,7 +529,7 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
-        cancelCountdown(sessionID, `tool execution (${event.type})`)
+        invalidate(sessionID, `tool execution (${event.type})`)
       }
       return
     }
