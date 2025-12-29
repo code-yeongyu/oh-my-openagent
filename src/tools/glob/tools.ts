@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
+import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGlobResult } from "./utils"
 
 export const glob: ToolDefinition = tool({
@@ -21,12 +22,16 @@ export const glob: ToolDefinition = tool({
   },
   execute: async (args) => {
     try {
+      const cli = await resolveGrepCliWithAutoInstall()
       const paths = args.path ? [args.path] : undefined
 
-      const result = await runRgFiles({
-        pattern: args.pattern,
-        paths,
-      })
+      const result = await runRgFiles(
+        {
+          pattern: args.pattern,
+          paths,
+        },
+        cli
+      )
 
       return formatGlobResult(result)
     } catch (e) {
