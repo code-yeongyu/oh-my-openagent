@@ -920,7 +920,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
     "aggressive_truncation": true,
     "auto_resume": true,
     "truncate_all_tool_outputs": false,
-    "dcp_on_compaction_failure": true
+    "dcp_for_compaction": true
   }
 }
 ```
