@@ -927,7 +927,7 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
     "aggressive_truncation": true,
     "auto_resume": true,
     "truncate_all_tool_outputs": false,
-    "dcp_on_compaction_failure": true
+    "dcp_for_compaction": true
   }
 }
 ```

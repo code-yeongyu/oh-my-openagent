@@ -923,7 +923,7 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
     "aggressive_truncation": true,
     "auto_resume": true,
     "truncate_all_tool_outputs": false,
-    "dcp_on_compaction_failure": true
+    "dcp_for_compaction": true
   }
 }
 ```
