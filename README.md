@@ -959,7 +959,7 @@ Opt-in experimental features that may change or be removed in future versions. U
     "aggressive_truncation": true,
     "auto_resume": true,
     "truncate_all_tool_outputs": false,
-    "dcp_on_compaction_failure": true
+    "dcp_for_compaction": true
   }
 }
 ```
