@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 
 import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
-import { setMainSession } from "../features/claude-code-session-state"
+import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import type { BackgroundManager } from "../features/background-agent"
 
 describe("todo-continuation-enforcer", () => {
@@ -51,10 +51,12 @@ describe("todo-continuation-enforcer", () => {
     promptCalls = []
     toastCalls = []
     setMainSession(undefined)
+    subagentSessions.clear()
   })
 
   afterEach(() => {
     setMainSession(undefined)
+    subagentSessions.clear()
   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
@@ -141,6 +143,25 @@ describe("todo-continuation-enforcer", () => {
 
     // #then - no continuation injected
     expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should inject for background task session (subagent)", async () => {
+    // #given - main session set, background task session registered
+    setMainSession("main-session")
+    const bgTaskSession = "bg-task-session"
+    subagentSessions.add(bgTaskSession)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - background task session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID: bgTaskSession } },
+    })
+
+    // #then - continuation injected for background task session
+    await new Promise(r => setTimeout(r, 2500))
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].sessionID).toBe(bgTaskSession)
   })
 
   test("should skip injection after recent error", async () => {
