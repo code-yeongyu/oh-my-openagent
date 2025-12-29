@@ -7,11 +7,20 @@ description: "User guide for using the spec-driven workflow system in OhMyOpenCo
 
 ## Overview
 
-OhMyOpenCode provides six workflow commands that guide you through feature development from specification to testing. The workflow system enforces prerequisites, tracks your progress, and helps you resume work after interruptions.
+OhMyOpenCode provides six core workflow commands that guide you through feature development from specification to testing, plus five extended commands for analysis, scope management, and continuous improvement. The workflow system enforces prerequisites, tracks your progress, and helps you resume work after interruptions.
 
-**Workflow Steps**:
+**Core Workflow Steps**:
 ```
 /specify → /plan → /tasks → /implement → /review → /test
+```
+
+**Extended Commands**:
+```
+/analyze           - Analyze feature artifacts for issues and improvements
+/apply-analysis    - Apply analysis findings to spec documents
+/scope-extend      - Create sub-issue from parent issue
+/extract-learnings - Extract meta-learning from session
+/review-learnings  - Review and approve learning candidates
 ```
 
 ## Quick Start
@@ -122,6 +131,228 @@ Fixes:
 **Output**:
 - Test files
 - `testing/test-plan.md` - Test strategy
+
+---
+
+## Extended Workflow Commands
+
+Beyond the core 6-step workflow, OhMyOpenCode provides additional commands for analysis, scope management, and continuous improvement.
+
+### 1. Analyze Feature Artifacts
+
+```
+/analyze
+```
+
+**What it does**:
+- Detects current spec folder automatically
+- Analyzes spec.md, plan.md, tasks.md, and implementation
+- Creates comprehensive analysis report
+- Identifies issues, gaps, and improvement opportunities
+
+**Output**:
+- `{SPEC_DIR}/analysis/analysis-{DATE}.md` - Detailed analysis report
+
+**Analysis Categories**:
+- **Specification**: Requirements completeness, success criteria, scope clarity
+- **Plan**: Architecture decisions, technical approach, implementation steps
+- **Tasks**: Organization, estimates, dependencies
+- **Implementation**: Code quality, security, best practices compliance
+
+**Example**:
+```
+/analyze
+
+# Analysis Report Generated
+📁 Spec: .cursor/specs/LIF-123-feat-user-auth
+📊 Report: analysis/analysis-2025-12-28.md
+
+Found 3 issues:
+  ❌ plan.md not started (template only)
+  ⚠️ Missing test scenarios for acceptance criteria
+  ✅ Specification quality: Excellent (9/10)
+```
+
+---
+
+### 2. Apply Analysis Findings
+
+```
+/apply-analysis
+```
+
+**What it does**:
+- Parses /analyze output and creates ChangeSet
+- Applies changes optimistically to spec documents
+- Spawns 3 parallel validators (code refs, coherence, conflicts)
+- Reconciles changes: CONFIRM (all pass), ROLLBACK (critical fail), FLAG (non-critical fail)
+- Bounded retry (max 2 rounds) to prevent infinite loops
+
+**Output**:
+- Updated spec artifacts (spec.md, plan.md, tasks.md)
+- `validation-ledger.json` - Change tracking and validation results
+
+**Example**:
+```
+/apply-analysis
+
+# Applying Analysis Findings
+📋 ChangeSet: 5 changes identified
+  - Update spec.md: Add missing acceptance criteria
+  - Update plan.md: Clarify architecture decision
+  - Update tasks.md: Add test task estimates
+
+🔍 Validation (parallel):
+  ✅ Code references valid
+  ✅ Document coherence maintained
+  ⚠️ Minor conflict detected in tasks.md
+
+📝 Reconciliation: FLAG (non-critical)
+  Action: Changes applied with warning flag
+```
+
+---
+
+### 3. Extend Scope (Create Sub-Issue)
+
+```
+/scope-extend {PARENT-ISSUE-ID} {feature description}
+```
+
+**What it does**:
+- Handles "enhancement discovered during review" scenario
+- Creates child Linear issue linked to parent
+- Creates child worktree branching from parent branch (not dev)
+- Creates spec folder in child worktree with parent context pre-populated
+- Establishes proper branch hierarchy: parent → child
+
+**Output**:
+- New Linear issue (child)
+- New git worktree with child branch
+- New spec folder with inherited context
+
+**Example**:
+```
+/scope-extend LIF-123 Add OAuth2 provider support
+
+# Creating Sub-Issue
+📋 Parent: LIF-123 (User Authentication)
+📝 Child: LIF-124 (Add OAuth2 provider support)
+
+🌿 Branch hierarchy:
+  main → eru/lif-123-user-auth → eru/lif-124-oauth2-provider
+
+📁 Spec folder: ../worktrees/lif-124/specs/LIF-124-feat-oauth2-provider/
+  - spec.md (with parent context)
+  - plan.md (template)
+  - tasks.md (template)
+```
+
+**Important**: Child branch is based on parent branch, not main. This ensures proper merge flow when completing child work before parent is merged.
+
+---
+
+### 4. Extract Session Learnings
+
+```
+/extract-learnings [transcript_path]
+```
+
+**What it does**:
+- Manually triggers meta-learning extraction from current session
+- Captures full session transcript (survives compaction)
+- Delegates to context-learner agent in background
+- Analyzes patterns, errors, retries, and workflow improvements
+- Writes findings to context/learnings/
+
+**Output**:
+- `context/transcripts/{session_id}.jsonl` - Session transcript
+- `context/learnings/{session_id}_{date}.md` - Extracted insights
+
+**Learning Categories**:
+- `agent_instructions` - Improvements to agent prompts
+- `commands` - Command workflow optimizations
+- `orchestration` - Multi-agent coordination patterns
+- `context_handling` - Context window management
+- `tool_usage` - Tool effectiveness and patterns
+
+**Example**:
+```
+/extract-learnings
+
+# Meta-Learning Extraction
+📝 Capturing session transcript...
+🤖 Spawning context-learner agent (background)
+
+✅ Transcript saved: context/transcripts/sess_abc123.jsonl
+⏳ Analysis in progress (background task)
+
+# Later, when complete:
+✅ Learnings extracted: context/learnings/sess_abc123_2025-12-28.md
+
+Found 3 improvement candidates:
+  - agent_instructions: Add error handling reminder to OmO prompt
+  - orchestration: Prefer parallel background tasks over sequential
+  - tool_usage: Grep pattern optimization for faster searches
+```
+
+---
+
+### 5. Review Learning Candidates
+
+```
+/review-learnings [--category <type>] [--min-confidence <0-1>]
+```
+
+**What it does**:
+- Scans context/learnings/*.md for pending candidates
+- Presents each candidate with evidence and confidence score
+- Interactive review: Approve, Reject, Skip, Quit
+- Approved candidates can be implemented directly or become /specify specs
+
+**Arguments**:
+- `--category` - Filter by category (agent_instructions, commands, orchestration, context_handling, tool_usage)
+- `--min-confidence` - Only show candidates above threshold (0.0-1.0)
+
+**Output**:
+- Updated learning files with approval status
+- Optional: New spec folders for approved candidates
+
+**Example**:
+```
+/review-learnings --category agent_instructions --min-confidence 0.7
+
+# Learning Candidates (2 found)
+
+## Candidate 1/2
+Category: agent_instructions
+Confidence: 0.85
+
+**Finding**: OmO agent frequently retries failed delegations without checking error type
+
+**Evidence**:
+- Session sess_abc123: 3 retries on network timeout
+- Session sess_def456: 2 retries on authentication failure
+
+**Suggested Improvement**:
+Add to OmO prompt: "Before retrying failed delegation, check error type. 
+Network errors: retry. Auth errors: escalate to user."
+
+Actions: [A]pprove, [R]eject, [S]kip, [Q]uit? 
+
+> A
+
+✅ Approved: Will update .opencode/agents/omo.ts prompt
+
+## Candidate 2/2
+...
+```
+
+**Workflow Integration**:
+Approved learnings can be:
+1. **Implemented immediately** - Direct code/prompt changes
+2. **Converted to specs** - Run /specify for complex changes
+3. **Documented** - Added to project memory/constitution
 
 ---
 
@@ -504,8 +735,13 @@ The workflow system provides:
 - ✅ **Continuity**: Resume work after interruptions
 - ✅ **Tracking**: Automatic state persistence
 - ✅ **Integration**: Syncs with Linear issues
+- ✅ **Analysis**: Detect issues and improvements in artifacts
+- ✅ **Meta-Learning**: Continuous improvement from session insights
+- ✅ **Scope Management**: Handle enhancements discovered during work
 
-Start with `/specify`, follow the workflow, and let the system guide you through feature development!
+**Core Workflow**: Start with `/specify`, follow the 6-step workflow, and let the system guide you through feature development.
+
+**Extended Workflow**: Use `/analyze` to review artifacts, `/scope-extend` for new sub-features, and `/extract-learnings` + `/review-learnings` for continuous improvement.
 
 ## Further Reading
 
