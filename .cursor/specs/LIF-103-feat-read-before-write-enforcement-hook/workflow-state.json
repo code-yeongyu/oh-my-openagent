@@ -1,0 +1,21 @@
+{
+  "currentStep": "test",
+  "completedSteps": [
+    "specify",
+    "plan",
+    "tasks",
+    "implement",
+    "review"
+  ],
+  "artifactHashes": {
+    "spec.md": "1b6ffc5f51e1c272",
+    "plan.md": "b76d4990c13a2518",
+    "tasks.md": "d37ff7fdf86c3b9f",
+    "status.md": "ce8de23e606bd80d"
+  },
+  "linearIssueId": "LIF-103",
+  "linearStatus": "in_review",
+  "createdAt": "2025-12-28T20:32:21.513Z",
+  "updatedAt": "2025-12-29T22:52:00.820Z",
+  "lastCommand": "/test"
+}

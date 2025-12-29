@@ -115,6 +115,7 @@ export const HookNameSchema = z.enum([
   "conflict-detector",
   "workflow-state-enforcer",
   "meta-learning-extractor",
+  "read-before-write",
 ])
 
 export const AgentOverrideConfigSchema = z
@@ -269,6 +270,27 @@ export const GovernanceDocsBlockingSchema = z.object({
   mode: z.enum(["warn", "block", "disabled"]).default("block"),
 })
 
+export const GovernanceReadBeforeWriteSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["block", "warn", "disabled"]).default("block"),
+  exempt_tools: z.array(z.string()).default([
+    "lsp_rename",
+    "lsp_code_action_resolve",
+    "ast_grep_replace",
+    "memory_write",
+    "memory_edit",
+    "memory_delete",
+    "create_spec_folder",
+    "update_workflow_state",
+  ]),
+  exempt_paths: z.array(z.string()).default([
+    "dist/**",
+    "build/**",
+    "node_modules/**",
+    ".git/**",
+  ]),
+})
+
 export const GovernanceArtifactTruncationSchema = z.object({
   enabled: z.boolean().default(true),
   max_summary_tokens: z.number().default(200),
@@ -322,6 +344,7 @@ export const GovernanceConfigSchema = z.object({
   artifact_truncation: GovernanceArtifactTruncationSchema.optional(),
   delegation_compliance: GovernanceDelegationComplianceSchema.optional(),
   workflow_state_enforcer: WorkflowStateEnforcerSchema.optional(),
+  read_before_write: GovernanceReadBeforeWriteSchema.optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -360,5 +383,6 @@ export type LinearPolicy = z.infer<typeof LinearPolicySchema>
 export type WorkflowStateEnforcerConfig = z.infer<typeof WorkflowStateEnforcerSchema>
 export type MemoryToolsConfig = z.infer<typeof MemoryToolsConfigSchema>
 export type MetaLearningConfig = z.infer<typeof MetaLearningConfigSchema>
+export type GovernanceReadBeforeWriteConfig = z.infer<typeof GovernanceReadBeforeWriteSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"
