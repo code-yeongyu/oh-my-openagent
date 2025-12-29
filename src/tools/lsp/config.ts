@@ -163,6 +163,12 @@ export function isServerInstalled(command: string[]): boolean {
   if (command.length === 0) return false
 
   const cmd = command[0]
+
+  // Support absolute paths (e.g., C:\Users\...\server.exe or /usr/local/bin/server)
+  if (cmd.includes("/") || cmd.includes("\\")) {
+    if (existsSync(cmd)) return true
+  }
+
   const isWindows = process.platform === "win32"
   const ext = isWindows ? ".exe" : ""
 
@@ -190,6 +196,11 @@ export function isServerInstalled(command: string[]): boolean {
     if (existsSync(p)) {
       return true
     }
+  }
+
+  // Runtime wrappers (bun/node) are always available in oh-my-opencode context
+  if (cmd === "bun" || cmd === "node") {
+    return true
   }
 
   return false
