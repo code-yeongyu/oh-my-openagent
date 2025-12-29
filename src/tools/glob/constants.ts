@@ -1,4 +1,4 @@
-export { resolveGrepCli, type GrepBackend } from "../grep/constants"
+export { resolveGrepCli, resolveGrepCliWithAutoInstall, type GrepBackend } from "../grep/constants"
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const DEFAULT_LIMIT = 100
