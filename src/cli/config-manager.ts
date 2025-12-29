@@ -10,6 +10,8 @@ const OPENCODE_JSONC = join(OPENCODE_CONFIG_DIR, "opencode.jsonc")
 const OPENCODE_PACKAGE_JSON = join(OPENCODE_CONFIG_DIR, "package.json")
 const OMO_CONFIG = join(OPENCODE_CONFIG_DIR, "oh-my-opencode.json")
 
+const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
+
 const CHATGPT_HOTFIX_REPO = "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
 
 export async function fetchLatestVersion(packageName: string): Promise<string | null> {
@@ -204,31 +206,38 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
   }
 }
 
-export async function isOpenCodeInstalled(): Promise<boolean> {
-  try {
-    const proc = Bun.spawn(["opencode", "--version"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    await proc.exited
-    return proc.exitCode === 0
-  } catch {
-    return false
+interface OpenCodeBinaryResult {
+  binary: string
+  version: string
+}
+
+async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | null> {
+  for (const binary of OPENCODE_BINARIES) {
+    try {
+      const proc = Bun.spawn([binary, "--version"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const output = await new Response(proc.stdout).text()
+      await proc.exited
+      if (proc.exitCode === 0) {
+        return { binary, version: output.trim() }
+      }
+    } catch {
+      continue
+    }
   }
+  return null
+}
+
+export async function isOpenCodeInstalled(): Promise<boolean> {
+  const result = await findOpenCodeBinaryWithVersion()
+  return result !== null
 }
 
 export async function getOpenCodeVersion(): Promise<string | null> {
-  try {
-    const proc = Bun.spawn(["opencode", "--version"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    return proc.exitCode === 0 ? output.trim() : null
-  } catch {
-    return null
-  }
+  const result = await findOpenCodeBinaryWithVersion()
+  return result?.version ?? null
 }
 
 export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMergeResult> {
