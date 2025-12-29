@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getMainSessionID } from "../features/claude-code-session-state"
+import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
@@ -265,8 +265,11 @@ export function createTodoContinuationEnforcer(
       log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
       const mainSessionID = getMainSessionID()
-      if (mainSessionID && sessionID !== mainSessionID) {
-        log(`[${HOOK_NAME}] Skipped: not main session`, { sessionID })
+      const isMainSession = sessionID === mainSessionID
+      const isBackgroundTaskSession = subagentSessions.has(sessionID)
+      
+      if (mainSessionID && !isMainSession && !isBackgroundTaskSession) {
+        log(`[${HOOK_NAME}] Skipped: not main or background task session`, { sessionID })
         return
       }
 
