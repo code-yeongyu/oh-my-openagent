@@ -206,16 +206,22 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
   }
 }
 
-async function findOpenCodeBinary(): Promise<string | null> {
+interface OpenCodeBinaryResult {
+  binary: string
+  version: string
+}
+
+async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | null> {
   for (const binary of OPENCODE_BINARIES) {
     try {
       const proc = Bun.spawn([binary, "--version"], {
         stdout: "pipe",
         stderr: "pipe",
       })
+      const output = await new Response(proc.stdout).text()
       await proc.exited
       if (proc.exitCode === 0) {
-        return binary
+        return { binary, version: output.trim() }
       }
     } catch {
       continue
@@ -225,25 +231,13 @@ async function findOpenCodeBinary(): Promise<string | null> {
 }
 
 export async function isOpenCodeInstalled(): Promise<boolean> {
-  const binary = await findOpenCodeBinary()
-  return binary !== null
+  const result = await findOpenCodeBinaryWithVersion()
+  return result !== null
 }
 
 export async function getOpenCodeVersion(): Promise<string | null> {
-  const binary = await findOpenCodeBinary()
-  if (!binary) return null
-
-  try {
-    const proc = Bun.spawn([binary, "--version"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    return proc.exitCode === 0 ? output.trim() : null
-  } catch {
-    return null
-  }
+  const result = await findOpenCodeBinaryWithVersion()
+  return result?.version ?? null
 }
 
 export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMergeResult> {
