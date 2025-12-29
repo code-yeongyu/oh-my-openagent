@@ -19,7 +19,7 @@ features/
 │   └── env-expander.ts         # ${VAR} expansion
 ├── claude-code-plugin-loader/  # Load external plugins from installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
-├── claude-code-skill-loader/   # Load skills from ~/.claude/skills/*/SKILL.md
+├── opencode-skill-loader/      # Load skills from OpenCode and Claude paths
 └── hook-message-injector/      # Inject messages into conversation
 ```
 
@@ -30,7 +30,7 @@ Each loader reads from multiple directories (highest priority first):
 | Loader | Priority Order |
 |--------|---------------|
 | Commands | `.opencode/command/` > `~/.config/opencode/command/` > `.claude/commands/` > `~/.claude/commands/` |
-| Skills | `.claude/skills/` > `~/.claude/skills/` |
+| Skills | `.opencode/skill/` > `~/.config/opencode/skill/` > `.claude/skills/` > `~/.claude/skills/` |
 | Agents | `.claude/agents/` > `~/.claude/agents/` |
 | MCPs | `.claude/.mcp.json` > `.mcp.json` > `~/.claude/.mcp.json` |
 
