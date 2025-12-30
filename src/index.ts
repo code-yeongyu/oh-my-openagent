@@ -274,7 +274,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
-    ? createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental })
+    ? createAnthropicContextWindowLimitRecoveryHook(ctx, {
+        experimental: pluginConfig.experimental,
+        dcpForCompaction: isHookEnabled("dcp-for-compaction"),
+      })
     : null;
   const compactionContextInjector = createCompactionContextInjector();
   const preemptiveCompaction = createPreemptiveCompactionHook(ctx, {

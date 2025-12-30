@@ -151,6 +151,7 @@ describe("executeCompact lock management", () => {
       truncate_all_tool_outputs: false,
       aggressive_truncation: true,
     }
+    const dcpForCompaction = true
 
     // #when: Execute compaction with experimental flag
     await executeCompact(
@@ -160,6 +161,7 @@ describe("executeCompact lock management", () => {
       mockClient,
       directory,
       experimental,
+      dcpForCompaction,
     )
 
     // #then: Lock should be cleared even on early return
