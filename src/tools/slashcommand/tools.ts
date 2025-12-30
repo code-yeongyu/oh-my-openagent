@@ -124,8 +124,8 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
-  const commandDir = dirname(cmd.path)
-  const withFileRefs = await resolveFileReferencesInText(cmd.content, commandDir)
+  const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
+  const withFileRefs = await resolveFileReferencesInText(cmd.content || "", commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   sections.push(resolvedContent.trim())
 
