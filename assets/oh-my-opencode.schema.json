@@ -1513,6 +1513,125 @@
     "auto_update": {
       "type": "boolean"
     },
+    "skills": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "template": {
+                        "type": "string"
+                      },
+                      "from": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "agent": {
+                        "type": "string"
+                      },
+                      "subtask": {
+                        "type": "boolean"
+                      },
+                      "argument-hint": {
+                        "type": "string"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "compatibility": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "allowed-tools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "disable": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "recursive": {
+                            "type": "boolean"
+                          },
+                          "glob": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "enable": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "disable": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
     "ralph_loop": {
       "type": "object",
       "properties": {
