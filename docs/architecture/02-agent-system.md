@@ -262,6 +262,24 @@ Analyzes non-text files like PDFs, images, and diagrams.
 | test-specialist | Claude Sonnet | Unit/integration/e2e testing |
 | optimization-specialist | Claude Sonnet | Performance profiling |
 
+### Workflow Specialists (LIF-72)
+
+| Specialist | Model | Domain |
+|------------|-------|--------|
+| product-strategist | Claude Sonnet | Feature specification, requirements |
+| strategic-planner | Claude Sonnet | Implementation planning, architecture |
+| task-planner | Claude Sonnet | Task breakdown, effort estimation |
+
+These specialists power the workflow commands (`/specify`, `/plan`, `/tasks`) and are invoked automatically when users run those commands.
+
+### Meta-Learning (LIF-73)
+
+| Specialist | Model | Domain |
+|------------|-------|--------|
+| context-learner | Claude Opus | Session analysis, pattern extraction |
+
+The context-learner analyzes session transcripts to extract insights for improving OmO orchestration, delegation patterns, and agent instructions.
+
 ## Agent Infrastructure
 
 ### Creation & Governance Injection
