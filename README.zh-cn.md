@@ -872,7 +872,7 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-auto-compact`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`
+可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`
 
 **关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 

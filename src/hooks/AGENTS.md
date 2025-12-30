@@ -9,7 +9,7 @@ Lifecycle hooks that intercept/modify agent behavior. Inject context, enforce ru
 ```
 hooks/
 ├── agent-usage-reminder/       # Remind to use specialized agents
-├── anthropic-auto-compact/     # Auto-compact Claude at token limit
+├── anthropic-context-window-limit-recovery/     # Auto-compact Claude at token limit
 ├── auto-update-checker/        # Version update notifications
 ├── background-notification/    # OS notify on background task complete
 ├── claude-code-hooks/          # Claude Code settings.json integration
@@ -40,7 +40,7 @@ hooks/
 | Category | Hooks | Purpose |
 |----------|-------|---------|
 | Context Injection | directory-agents-injector, directory-readme-injector, rules-injector, compaction-context-injector | Auto-inject relevant context |
-| Session Management | session-recovery, anthropic-auto-compact, preemptive-compaction, empty-message-sanitizer | Handle session lifecycle |
+| Session Management | session-recovery, anthropic-context-window-limit-recovery, preemptive-compaction, empty-message-sanitizer | Handle session lifecycle |
 | Output Control | comment-checker, tool-output-truncator | Control agent output quality |
 | Notifications | session-notification, background-notification, auto-update-checker | OS/user notifications |
 | Behavior Enforcement | todo-continuation-enforcer, keyword-detector, think-mode, agent-usage-reminder | Enforce agent behavior |
