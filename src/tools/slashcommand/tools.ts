@@ -4,6 +4,7 @@ import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
+import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import type { CommandScope, CommandMetadata, CommandInfo } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -64,8 +65,30 @@ function discoverCommandsSync(): CommandInfo[] {
   return [...opencodeProjectCommands, ...projectCommands, ...opencodeGlobalCommands, ...userCommands]
 }
 
+function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
+  return {
+    name: skill.name,
+    path: skill.path,
+    metadata: {
+      name: skill.name,
+      description: skill.definition.description || "",
+      argumentHint: skill.definition.argumentHint,
+      model: skill.definition.model,
+      agent: skill.definition.agent,
+      subtask: skill.definition.subtask,
+    },
+    content: skill.definition.template,
+    scope: skill.scope,
+  }
+}
+
 const availableCommands = discoverCommandsSync()
-const commandListForDescription = availableCommands
+const availableSkills = discoverAllSkills()
+const availableItems = [
+  ...availableCommands,
+  ...availableSkills.map(skillToCommandInfo),
+]
+const commandListForDescription = availableItems
   .map((cmd) => {
     const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
     return `- /${cmd.name}${hint}: ${cmd.metadata.description} (${cmd.scope})`
@@ -109,21 +132,21 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   return sections.join("\n")
 }
 
-function formatCommandList(commands: CommandInfo[]): string {
-  if (commands.length === 0) {
-    return "No commands found."
+function formatCommandList(items: CommandInfo[]): string {
+  if (items.length === 0) {
+    return "No commands or skills found."
   }
 
-  const lines = ["# Available Commands\n"]
+  const lines = ["# Available Commands & Skills\n"]
 
-  for (const cmd of commands) {
+  for (const cmd of items) {
     const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
     lines.push(
       `- **/${cmd.name}${hint}**: ${cmd.metadata.description || "(no description)"} (${cmd.scope})`
     )
   }
 
-  lines.push(`\n**Total**: ${commands.length} commands`)
+  lines.push(`\n**Total**: ${items.length} items`)
   return lines.join("\n")
 }
 
@@ -148,7 +171,13 @@ Commands are loaded from (priority order, highest wins):
 - ~/.config/opencode/command/ (opencode - OpenCode global commands)
 - $CLAUDE_CONFIG_DIR/commands/ or ~/.claude/commands/ (user - Claude Code global commands)
 
-Each command is a markdown file with:
+Skills are loaded from (priority order, highest wins):
+- .opencode/skill/ (opencode-project - OpenCode project-specific skills)
+- ./.claude/skills/ (project - Claude Code project-specific skills)
+- ~/.config/opencode/skill/ (opencode - OpenCode global skills)
+- $CLAUDE_CONFIG_DIR/skills/ or ~/.claude/skills/ (user - Claude Code global skills)
+
+Each command/skill is a markdown file with:
 - YAML frontmatter: description, argument-hint, model, agent, subtask (optional)
 - Markdown body: The command instructions/prompt
 - File references: @path/to/file (relative to command file location)
@@ -167,14 +196,19 @@ ${commandListForDescription}`,
 
   async execute(args) {
     const commands = discoverCommandsSync()
+    const skills = discoverAllSkills()
+    const allItems = [
+      ...commands,
+      ...skills.map(skillToCommandInfo),
+    ]
 
     if (!args.command) {
-      return formatCommandList(commands) + "\n\nProvide a command name to execute."
+      return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."
     }
 
     const cmdName = args.command.replace(/^\//, "")
 
-    const exactMatch = commands.find(
+    const exactMatch = allItems.find(
       (cmd) => cmd.name.toLowerCase() === cmdName.toLowerCase()
     )
 
@@ -182,7 +216,7 @@ ${commandListForDescription}`,
       return await formatLoadedCommand(exactMatch)
     }
 
-    const partialMatches = commands.filter((cmd) =>
+    const partialMatches = allItems.filter((cmd) =>
       cmd.name.toLowerCase().includes(cmdName.toLowerCase())
     )
 
@@ -190,14 +224,14 @@ ${commandListForDescription}`,
       const matchList = partialMatches.map((cmd) => `/${cmd.name}`).join(", ")
       return (
         `No exact match for "/${cmdName}". Did you mean: ${matchList}?\n\n` +
-        formatCommandList(commands)
+        formatCommandList(allItems)
       )
     }
 
     return (
-      `Command "/${cmdName}" not found.\n\n` +
-      formatCommandList(commands) +
-      "\n\nTry a different command name."
+      `Command or skill "/${cmdName}" not found.\n\n` +
+      formatCommandList(allItems) +
+      "\n\nTry a different name."
     )
   },
 })
