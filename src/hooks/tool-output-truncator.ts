@@ -14,6 +14,10 @@ const TRUNCATABLE_TOOLS = [
   "ast_grep_search",
   "interactive_bash",
   "Interactive_bash",
+  // DeepWiki MCP tools - can return very large documentation content
+  "deepwiki_read_wiki_structure",
+  "deepwiki_read_wiki_contents",
+  "deepwiki_ask_question",
 ]
 
 export function createToolOutputTruncatorHook(ctx: PluginInput) {
