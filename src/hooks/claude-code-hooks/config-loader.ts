@@ -5,6 +5,7 @@ import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
 
 export interface DisabledHooksConfig {
+  SessionStart?: string[]
   Stop?: string[]
   PreToolUse?: string[]
   PostToolUse?: string[]
@@ -44,6 +45,7 @@ function mergeDisabledHooks(
   if (!base) return override
 
   return {
+    SessionStart: override.SessionStart ?? base.SessionStart,
     Stop: override.Stop ?? base.Stop,
     PreToolUse: override.PreToolUse ?? base.PreToolUse,
     PostToolUse: override.PostToolUse ?? base.PostToolUse,

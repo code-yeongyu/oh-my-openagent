@@ -23,6 +23,10 @@ import {
   executePreCompactHooks,
   type PreCompactContext,
 } from "./pre-compact"
+import {
+  executeSessionStartHooks,
+  type SessionStartContext,
+} from "./session-start"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
 import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
 import type { PluginConfig } from "./types"
@@ -288,6 +292,48 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
     event: async (input: { event: { type: string; properties?: unknown } }) => {
       const { event } = input
+
+      if (event.type === "session.created") {
+        const props = event.properties as { info?: { id?: string; directory?: string } } | undefined
+        const sessionID = props?.info?.id
+        const directory = props?.info?.directory ?? ctx.directory
+
+        if (!sessionID) return
+
+        if (isHookDisabled(config, "SessionStart")) {
+          return
+        }
+
+        const claudeConfig = await loadClaudeHooksConfig()
+        const extendedConfig = await loadPluginExtendedConfig()
+
+        const sessionStartCtx: SessionStartContext = {
+          sessionId: sessionID,
+          cwd: directory,
+        }
+
+        const result = await executeSessionStartHooks(sessionStartCtx, claudeConfig, extendedConfig)
+
+        if (result.context.length > 0) {
+          const hookContent = result.context.join("\n\n")
+          log("SessionStart hooks injecting context", {
+            sessionID,
+            contextCount: result.context.length,
+            hookName: result.hookName,
+            elapsedMs: result.elapsedMs,
+          })
+
+          const success = injectHookMessage(sessionID, hookContent, {
+            path: { cwd: directory, root: "/" },
+          })
+
+          log(success ? "SessionStart hook message injected" : "SessionStart injection failed", {
+            sessionID,
+          })
+        }
+
+        return
+      }
 
       if (event.type === "session.error") {
         const props = event.properties as Record<string, unknown> | undefined

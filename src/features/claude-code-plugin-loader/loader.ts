@@ -40,7 +40,7 @@ function getInstalledPluginsPath(): string {
 }
 
 function resolvePluginPath(path: string, pluginRoot: string): string {
-  return path.replace(CLAUDE_PLUGIN_ROOT_VAR, pluginRoot)
+  return path.replaceAll(CLAUDE_PLUGIN_ROOT_VAR, pluginRoot)
 }
 
 function resolvePluginPaths<T>(obj: T, pluginRoot: string): T {
