@@ -337,6 +337,7 @@ export async function executeCompact(
   client: any,
   directory: string,
   experimental?: ExperimentalConfig,
+  dcpForCompaction?: boolean,
 ): Promise<void> {
   if (autoCompactState.compactionInProgress.has(sessionID)) {
     await (client as Client).tui
@@ -358,10 +359,10 @@ export async function executeCompact(
     const errorData = autoCompactState.errorDataBySession.get(sessionID);
     const truncateState = getOrCreateTruncateState(autoCompactState, sessionID);
 
-    // DCP FIRST - run before any other recovery attempts when token limit exceeded
+    // DCP FIRST - run before any other recovery attempts when token limit exceeded (controlled by dcp-for-compaction hook)
     const dcpState = getOrCreateDcpState(autoCompactState, sessionID);
     if (
-      experimental?.dcp_for_compaction &&
+      dcpForCompaction !== false &&
       !dcpState.attempted &&
       errorData?.currentTokens &&
       errorData?.maxTokens &&
@@ -374,7 +375,7 @@ export async function executeCompact(
         maxTokens: errorData.maxTokens,
       });
 
-      const dcpConfig = experimental.dynamic_context_pruning ?? {
+      const dcpConfig = experimental?.dynamic_context_pruning ?? {
         enabled: true,
         notification: "detailed" as const,
         protected_tools: ["task", "todowrite", "todoread", "lsp_rename", "lsp_code_action_resolve"],
@@ -618,6 +619,7 @@ export async function executeCompact(
               client,
               directory,
               experimental,
+              dcpForCompaction,
             );
           }, 500);
           return;
@@ -696,6 +698,7 @@ export async function executeCompact(
               client,
               directory,
               experimental,
+              dcpForCompaction,
             );
           }, cappedDelay);
           return;

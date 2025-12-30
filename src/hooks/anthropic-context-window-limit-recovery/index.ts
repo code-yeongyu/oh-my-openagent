@@ -7,6 +7,7 @@ import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
+  dcpForCompaction?: boolean
 }
 
 function createRecoveryState(): AutoCompactState {
@@ -25,6 +26,7 @@ function createRecoveryState(): AutoCompactState {
 export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, options?: AnthropicContextWindowLimitRecoveryOptions) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
+  const dcpForCompaction = options?.dcpForCompaction
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -81,7 +83,8 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
             autoCompactState,
             ctx.client,
             ctx.directory,
-            experimental
+            experimental,
+            dcpForCompaction
           )
         }, 300)
       }
@@ -140,7 +143,8 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState,
         ctx.client,
         ctx.directory,
-        experimental
+        experimental,
+        dcpForCompaction
       )
     }
   }

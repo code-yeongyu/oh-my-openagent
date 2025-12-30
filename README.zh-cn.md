@@ -878,7 +878,7 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`、`ralph-loop`
+可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`、`ralph-loop`、`dcp-for-compaction`
 
 **关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 
@@ -932,8 +932,7 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false,
-    "dcp_for_compaction": true
+    "truncate_all_tool_outputs": false
   }
 }
 ```
@@ -943,7 +942,8 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 | `aggressive_truncation`     | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
 | `auto_resume`               | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
 | `truncate_all_tool_outputs` | `true`  | 为防止提示过长，根据上下文窗口使用情况动态截断所有工具输出。如需完整工具输出，设置为 `false` 禁用此功能。                                           |
-| `dcp_for_compaction`        | `false` | 启用后，当发生 token 限制错误时，DCP（动态上下文剪枝）首先运行，然后立即执行压缩。DCP 清理不必要的上下文后，压缩立即进行。当达到 token 限制时需要更智能的恢复请启用此选项。 |
+
+**注意**: `dcp-for-compaction`（压缩用动态上下文剪枝）现在作为 hook 管理。默认启用，可通过 `disabled_hooks: ["dcp-for-compaction"]` 禁用。
 
 **警告**：这些功能是实验性的，可能会导致意外行为。只有在理解其影响的情况下才启用。
 
