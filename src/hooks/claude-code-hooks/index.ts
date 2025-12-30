@@ -27,15 +27,30 @@ import {
   executeSessionStartHooks,
   type SessionStartContext,
 } from "./session-start"
+import {
+  executeSessionEndHooks,
+  type SessionEndContext,
+} from "./session-end"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
-import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
+import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage, recordAssistantMessage } from "./transcript"
 import type { PluginConfig } from "./types"
 import { log, isHookDisabled } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
+import {
+  updateSessionActivity,
+  markSessionIdle,
+  markSummaryGenerated,
+  markSessionCompleted,
+  scheduleStopHook,
+  cancelPendingStopHook,
+  markActivitySinceIdle,
+} from "./session-state"
 
 const sessionFirstMessageProcessed = new Set<string>()
 const sessionErrorState = new Map<string, { hasError: boolean; errorMessage?: string }>()
 const sessionInterruptState = new Map<string, { interrupted: boolean }>()
+// Track recorded assistant text parts to avoid duplicates (keyed by sessionID:partID)
+const recordedAssistantParts = new Set<string>()
 
 export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig = {}) {
   return {
@@ -93,6 +108,9 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
       const prompt = textParts.map((p) => p.text ?? "").join("\n")
 
       recordUserMessage(input.sessionID, prompt)
+      updateSessionActivity(input.sessionID, "chat.message", { cwd: ctx.directory })
+      markActivitySinceIdle(input.sessionID)
+      cancelPendingStopHook(input.sessionID)
 
       const messageParts: MessagePart[] = textParts.map((p) => ({
         type: p.type as "text",
@@ -229,6 +247,10 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
       const toolOutput = hasMetadata ? metadata : { output: output.output }
       recordToolResult(input.sessionID, input.tool, cachedInput, toolOutput)
 
+      updateSessionActivity(input.sessionID, "tool.execute.after", { cwd: ctx.directory })
+      markActivitySinceIdle(input.sessionID)
+      cancelPendingStopHook(input.sessionID)
+
       if (!isHookDisabled(config, "PostToolUse")) {
         const postClient: PostToolUseClient = {
           session: {
@@ -300,6 +322,8 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
         if (!sessionID) return
 
+        updateSessionActivity(sessionID, "session.created", { cwd: directory })
+
         if (isHookDisabled(config, "SessionStart")) {
           return
         }
@@ -349,12 +373,70 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
       if (event.type === "session.deleted") {
         const props = event.properties as Record<string, unknown> | undefined
-        const sessionInfo = props?.info as { id?: string } | undefined
-        if (sessionInfo?.id) {
-          sessionErrorState.delete(sessionInfo.id)
-          sessionInterruptState.delete(sessionInfo.id)
-          sessionFirstMessageProcessed.delete(sessionInfo.id)
+        const sessionInfo = props?.info as { id?: string; directory?: string } | undefined
+        const sessionID = sessionInfo?.id
+        const directory = sessionInfo?.directory ?? ctx.directory
+
+        if (sessionID) {
+          if (!isHookDisabled(config, "SessionEnd")) {
+            const claudeConfig = await loadClaudeHooksConfig()
+            const extendedConfig = await loadPluginExtendedConfig()
+
+            const sessionEndCtx: SessionEndContext = {
+              sessionId: sessionID,
+              cwd: directory,
+            }
+
+            const result = await executeSessionEndHooks(sessionEndCtx, claudeConfig, extendedConfig)
+
+            if (result.hookName) {
+              log("SessionEnd hook executed", {
+                sessionID,
+                hookName: result.hookName,
+                elapsedMs: result.elapsedMs,
+              })
+            }
+          }
+
+          cancelPendingStopHook(sessionID)
+          markSessionCompleted(sessionID)
+          sessionErrorState.delete(sessionID)
+          sessionInterruptState.delete(sessionID)
+          sessionFirstMessageProcessed.delete(sessionID)
+          for (const key of recordedAssistantParts) {
+            if (key.startsWith(`${sessionID}:`)) {
+              recordedAssistantParts.delete(key)
+            }
+          }
         }
+        return
+      }
+
+      if (event.type === "message.part.updated") {
+        const props = event.properties as Record<string, unknown> | undefined
+        const info = props?.info as { sessionID?: string; role?: string } | undefined
+        const part = props?.part as {
+          id?: string
+          type?: string
+          text?: string
+          time?: { end?: number }
+        } | undefined
+
+        const sessionID = info?.sessionID
+        const role = info?.role
+        const partId = part?.id
+
+        if (!sessionID || role !== "assistant") return
+        if (part?.type !== "text" || !part.text) return
+        if (!part.time?.end) return
+
+        const key = `${sessionID}:${partId ?? part.text.slice(0, 50)}`
+        if (recordedAssistantParts.has(key)) return
+
+        recordedAssistantParts.add(key)
+        recordAssistantMessage(sessionID, part.text)
+        updateSessionActivity(sessionID, "message.part.updated", { cwd: ctx.directory })
+
         return
       }
 
@@ -364,30 +446,39 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
         if (!sessionID) return
 
-        const claudeConfig = await loadClaudeHooksConfig()
-        const extendedConfig = await loadPluginExtendedConfig()
+        markSessionIdle(sessionID)
 
-        const errorStateBefore = sessionErrorState.get(sessionID)
-        const endedWithErrorBefore = errorStateBefore?.hasError === true
-        const interruptStateBefore = sessionInterruptState.get(sessionID)
-        const interruptedBefore = interruptStateBefore?.interrupted === true
+        if (isHookDisabled(config, "Stop")) {
+          return
+        }
 
-        let parentSessionId: string | undefined
-        try {
-          const sessionInfo = await ctx.client.session.get({
-            path: { id: sessionID },
-          })
-          parentSessionId = sessionInfo.data?.parentID
-        } catch {}
+        scheduleStopHook(sessionID, async () => {
+          const claudeConfig = await loadClaudeHooksConfig()
+          const extendedConfig = await loadPluginExtendedConfig()
 
-        if (!isHookDisabled(config, "Stop")) {
+          const errorStateBefore = sessionErrorState.get(sessionID)
+          const endedWithErrorBefore = errorStateBefore?.hasError === true
+          const interruptStateBefore = sessionInterruptState.get(sessionID)
+          const interruptedBefore = interruptStateBefore?.interrupted === true
+
+          let parentSessionId: string | undefined
+          try {
+            const sessionInfo = await ctx.client.session.get({
+              path: { id: sessionID },
+            })
+            parentSessionId = sessionInfo.data?.parentID
+          } catch {}
+
           const stopCtx: StopContext = {
             sessionId: sessionID,
             parentSessionId,
             cwd: ctx.directory,
+            transcriptPath: getTranscriptPath(sessionID),
           }
 
           const stopResult = await executeStopHooks(stopCtx, claudeConfig, extendedConfig)
+
+          markSummaryGenerated(sessionID)
 
           const errorStateAfter = sessionErrorState.get(sessionID)
           const endedWithErrorAfter = errorStateAfter?.hasError === true
@@ -412,10 +503,10 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
           } else if (stopResult.block) {
             log("Stop hook returned block", { sessionID, reason: stopResult.reason })
           }
-        }
 
-        sessionErrorState.delete(sessionID)
-        sessionInterruptState.delete(sessionID)
+          sessionErrorState.delete(sessionID)
+          sessionInterruptState.delete(sessionID)
+        })
       }
     },
   }

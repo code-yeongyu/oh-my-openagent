@@ -60,22 +60,35 @@ export function recordUserMessage(
   sessionId: string,
   content: string
 ): void {
-  appendTranscriptEntry(sessionId, {
+  // Claude Code compatible format: { type: "user", message: { role: "user", content: "..." } }
+  const entry = {
     type: "user",
-    timestamp: new Date().toISOString(),
-    content,
-  })
+    message: {
+      role: "user",
+      content,
+    },
+  }
+  ensureTranscriptDir()
+  const path = getTranscriptPath(sessionId)
+  const line = JSON.stringify(entry) + "\n"
+  appendFileSync(path, line)
 }
 
 export function recordAssistantMessage(
   sessionId: string,
   content: string
 ): void {
-  appendTranscriptEntry(sessionId, {
+  const entry = {
     type: "assistant",
-    timestamp: new Date().toISOString(),
-    content,
-  })
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: content }],
+    },
+  }
+  ensureTranscriptDir()
+  const path = getTranscriptPath(sessionId)
+  const line = JSON.stringify(entry) + "\n"
+  appendFileSync(path, line)
 }
 
 // ============================================================================
