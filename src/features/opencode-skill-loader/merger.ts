@@ -212,7 +212,7 @@ export function mergeSkills(
       const existing = skillMap.get(name)
       if (existing && !entry.template && !entry.from) {
         skillMap.set(name, mergeSkillDefinitions(existing, entry))
-      } else if (loaded) {
+      } else {
         skillMap.set(name, loaded)
       }
     }
