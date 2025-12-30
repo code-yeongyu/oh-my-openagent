@@ -865,7 +865,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-auto-compact`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
 
 **`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 

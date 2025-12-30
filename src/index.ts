@@ -12,7 +12,7 @@ import {
   createEmptyTaskResponseDetectorHook,
   createThinkModeHook,
   createClaudeCodeHooksHook,
-  createAnthropicAutoCompactHook,
+  createAnthropicContextWindowLimitRecoveryHook,
   createPreemptiveCompactionHook,
   createCompactionContextInjector,
   createRulesInjectorHook,
@@ -266,8 +266,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
-  const anthropicAutoCompact = isHookEnabled("anthropic-auto-compact")
-    ? createAnthropicAutoCompactHook(ctx, { experimental: pluginConfig.experimental })
+  const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
+    ? createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental })
     : null;
   const compactionContextInjector = createCompactionContextInjector();
   const preemptiveCompaction = createPreemptiveCompactionHook(ctx, {
@@ -566,7 +566,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.event(input);
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
-      await anthropicAutoCompact?.event(input);
+      await anthropicContextWindowLimitRecovery?.event(input);
       await preemptiveCompaction?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
