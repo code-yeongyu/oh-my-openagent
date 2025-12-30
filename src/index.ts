@@ -24,6 +24,7 @@ import {
   createInteractiveBashSessionHook,
   createEmptyMessageSanitizerHook,
   createThinkingBlockValidatorHook,
+  createRalphLoopHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -310,6 +311,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createThinkingBlockValidatorHook()
     : null;
 
+  const ralphLoop = isHookEnabled("ralph-loop")
+    ? createRalphLoopHook(ctx, { config: pluginConfig.ralph_loop })
+    : null;
+
   const backgroundManager = new BackgroundManager(ctx);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -584,6 +589,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await preemptiveCompaction?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
+      await ralphLoop?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
