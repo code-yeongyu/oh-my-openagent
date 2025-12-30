@@ -1,0 +1,20 @@
+import type { CommandDefinition } from "../claude-code-command-loader/types"
+
+export type SkillScope = "user" | "project" | "opencode" | "opencode-project"
+
+export interface SkillMetadata {
+  name?: string
+  description?: string
+  model?: string
+  "argument-hint"?: string
+  agent?: string
+  subtask?: boolean
+}
+
+export interface LoadedSkill {
+  name: string
+  path: string
+  resolvedPath: string
+  definition: CommandDefinition
+  scope: SkillScope
+}
