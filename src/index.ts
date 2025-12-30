@@ -366,6 +366,39 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
+
+      if (ralphLoop) {
+        const parts = (output as { parts?: Array<{ type: string; text?: string }> }).parts;
+        const promptText = parts
+          ?.filter((p) => p.type === "text" && p.text)
+          .map((p) => p.text)
+          .join("\n")
+          .trim() || "";
+
+        const isRalphLoopTemplate = promptText.includes("You are starting a Ralph Loop") && 
+          promptText.includes("<user-task>");
+        const isCancelRalphTemplate = promptText.includes("Cancel the currently active Ralph Loop");
+
+        if (isRalphLoopTemplate) {
+          const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i);
+          const rawTask = taskMatch?.[1]?.trim() || "";
+          
+          const quotedMatch = rawTask.match(/^["'](.+?)["']/);
+          const prompt = quotedMatch?.[1] || rawTask.split(/\s+--/)[0]?.trim() || "Complete the task as instructed";
+
+          const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i);
+          const promiseMatch = rawTask.match(/--completion-promise=["']?([^"'\s]+)["']?/i);
+
+          log("[ralph-loop] Starting loop from chat.message", { sessionID: input.sessionID, prompt });
+          ralphLoop.startLoop(input.sessionID, prompt, {
+            maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
+            completionPromise: promiseMatch?.[1],
+          });
+        } else if (isCancelRalphTemplate) {
+          log("[ralph-loop] Cancelling loop from chat.message", { sessionID: input.sessionID });
+          ralphLoop.cancelLoop(input.sessionID);
+        }
+      }
     },
 
     "experimental.chat.messages.transform": async (
@@ -655,6 +688,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           background_task: false,
           ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
         };
+      }
+
+      if (ralphLoop && input.tool === "slashcommand") {
+        const args = output.args as { command?: string } | undefined;
+        const command = args?.command?.replace(/^\//, "").toLowerCase();
+        const sessionID = input.sessionID || getMainSessionID();
+
+        if (command === "ralph-loop" && sessionID) {
+          const rawArgs = args?.command?.replace(/^\/?(ralph-loop)\s*/i, "") || "";
+          const taskMatch = rawArgs.match(/^["'](.+?)["']/);
+          const prompt = taskMatch?.[1] || rawArgs.split(/\s+--/)[0]?.trim() || "Complete the task as instructed";
+
+          const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i);
+          const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i);
+
+          ralphLoop.startLoop(sessionID, prompt, {
+            maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
+            completionPromise: promiseMatch?.[1],
+          });
+        } else if (command === "cancel-ralph" && sessionID) {
+          ralphLoop.cancelLoop(sessionID);
+        }
       }
     },
 
