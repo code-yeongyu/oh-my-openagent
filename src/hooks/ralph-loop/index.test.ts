@@ -329,17 +329,19 @@ describe("ralph-loop", () => {
 
     test("should detect completion promise and stop loop", async () => {
       // #given - active loop with transcript containing completion
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
       writeFileSync(transcriptPath, JSON.stringify({ content: "Task done <promise>COMPLETE</promise>" }))
 
-      // #when - session goes idle with transcript
+      // #when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
         event: {
           type: "session.idle",
-          properties: { sessionID: "session-123", transcriptPath },
+          properties: { sessionID: "session-123" },
         },
       })
 
