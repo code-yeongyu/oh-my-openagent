@@ -874,7 +874,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `dcp-for-compaction`
+利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
 
 **`auto-update-checker`と`startup-toast`について**: `startup-toast` フックは `auto-update-checker` のサブ機能です。アップデートチェックは有効なまま起動トースト通知のみを無効化するには、`disabled_hooks` に `"startup-toast"` を追加してください。すべてのアップデートチェック機能（トーストを含む）を無効化するには、`"auto-update-checker"` を追加してください。
 
@@ -938,8 +938,7 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 | `aggressive_truncation`     | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                 |
 | `auto_resume`               | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                        |
 | `truncate_all_tool_outputs` | `true`     | プロンプトが長くなりすぎるのを防ぐため、コンテキストウィンドウの使用状況に基づいてすべてのツール出力を動的に切り詰めます。完全なツール出力が必要な場合は`false`に設定して無効化します。 |
-
-**注意**: `dcp-for-compaction`（コンパクション用動的コンテキスト整理）はフックとして管理されるようになりました。デフォルトで有効で、`disabled_hooks: ["dcp-for-compaction"]`で無効化できます。
+| `dcp_for_compaction`        | `false`    | コンパクション用DCP（動的コンテキスト整理）を有効化 - トークン制限超過時に最初に実行されます。コンパクション前に重複したツール呼び出しと古いツール出力を整理します。                |
 
 **警告**：これらの機能は実験的であり、予期しない動作を引き起こす可能性があります。影響を理解した場合にのみ有効にしてください。
 
