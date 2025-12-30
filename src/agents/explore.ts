@@ -1,6 +1,27 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "opencode/grok-code"
+
+export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "exploration",
+  cost: "FREE",
+  promptAlias: "Explore",
+  keyTrigger: "2+ modules involved → fire `explore` background",
+  triggers: [
+    { domain: "Explore", trigger: "Find existing codebase structure, patterns and styles" },
+  ],
+  useWhen: [
+    "Multiple search angles needed",
+    "Unfamiliar module structure",
+    "Cross-layer pattern discovery",
+  ],
+  avoidWhen: [
+    "You know exactly what to search",
+    "Single keyword/pattern suffices",
+    "Known file location",
+  ],
+}
 
 export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
   return {

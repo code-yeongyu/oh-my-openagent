@@ -1,7 +1,34 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 
 const DEFAULT_MODEL = "openai/gpt-5.2"
+
+export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "advisor",
+  cost: "EXPENSIVE",
+  promptAlias: "Oracle",
+  triggers: [
+    { domain: "Architecture decisions", trigger: "Multi-system tradeoffs, unfamiliar patterns" },
+    { domain: "Self-review", trigger: "After completing significant implementation" },
+    { domain: "Hard debugging", trigger: "After 2+ failed fix attempts" },
+  ],
+  useWhen: [
+    "Complex architecture design",
+    "After completing significant work",
+    "2+ failed fix attempts",
+    "Unfamiliar code patterns",
+    "Security/performance concerns",
+    "Multi-system tradeoffs",
+  ],
+  avoidWhen: [
+    "Simple file operations (use direct tools)",
+    "First attempt at any fix (try yourself first)",
+    "Questions answerable from code you've read",
+    "Trivial decisions (variable names, formatting)",
+    "Things you can infer from existing code patterns",
+  ],
+}
 
 const ORACLE_SYSTEM_PROMPT = `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 

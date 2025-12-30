@@ -1,6 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
+
+export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "utility",
+  cost: "CHEAP",
+  promptAlias: "Multimodal Looker",
+  triggers: [],
+}
 
 export function createMultimodalLookerAgent(
   model: string = DEFAULT_MODEL
