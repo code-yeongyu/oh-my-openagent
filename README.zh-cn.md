@@ -639,6 +639,12 @@ Oh My OpenCode 会扫这些地方：
 
 Agent 爽了，你自然也爽。但我还想直接让你爽。
 
+- **Ralph 循环**：干到完事才停的自参照开发循环。灵感来自 Anthropic 的 Ralph Wiggum 插件。**支持所有编程语言。**
+  - `/ralph-loop "搞个 REST API"` 开始，Agent 就一直干
+  - 检测到 `<promise>DONE</promise>` 就算完事
+  - 没输出完成标记就停了？自动续上
+  - 停止条件：检测到完成、达到最大迭代（默认 100 次）、或 `/cancel-ralph`
+  - `oh-my-opencode.json` 配置：`{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
 - **关键词检测器**：看到关键词自动切模式：
   - `ultrawork` / `ulw`：并行 Agent 编排，火力全开
   - `search` / `find` / `찾아` / `検索`：explore/librarian 并行搜索，掘地三尺
@@ -872,7 +878,7 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`
+可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`preemptive-compaction`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`、`ralph-loop`
 
 **关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 
