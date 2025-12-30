@@ -13,4 +13,6 @@ export const BLOCKED_TMUX_SUBCOMMANDS = [
 
 export const INTERACTIVE_BASH_DESCRIPTION = `Execute tmux commands. Use "omo-{name}" session pattern.
 
+For: server processes, long-running tasks, background jobs, interactive CLI tools.
+
 Blocked (use bash instead): capture-pane, save-buffer, show-buffer, pipe-pane.`
