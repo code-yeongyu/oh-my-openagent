@@ -246,7 +246,7 @@ $ARGUMENTS
 
         const formattedDescription = `(plugin: ${plugin.name}) ${data.description || ""}`
 
-        commands[namespacedName] = {
+        const definition = {
           name: namespacedName,
           description: formattedDescription,
           template: wrappedTemplate,
@@ -255,6 +255,8 @@ $ARGUMENTS
           subtask: data.subtask,
           argumentHint: data["argument-hint"],
         }
+        const { name: _name, argumentHint: _argumentHint, ...openCodeCompatible } = definition
+        commands[namespacedName] = openCodeCompatible as CommandDefinition
 
         log(`Loaded plugin command: ${namespacedName}`, { path: commandPath })
       } catch (error) {
@@ -306,12 +308,14 @@ ${body.trim()}
 $ARGUMENTS
 </user-request>`
 
-        skills[namespacedName] = {
+        const definition = {
           name: namespacedName,
           description: formattedDescription,
           template: wrappedTemplate,
           model: sanitizeModelField(data.model),
         }
+        const { name: _name, ...openCodeCompatible } = definition
+        skills[namespacedName] = openCodeCompatible as CommandDefinition
 
         log(`Loaded plugin skill: ${namespacedName}`, { path: resolvedPath })
       } catch (error) {

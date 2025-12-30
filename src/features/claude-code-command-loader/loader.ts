@@ -62,7 +62,8 @@ $ARGUMENTS
 function commandsToRecord(commands: LoadedCommand[]): Record<string, CommandDefinition> {
   const result: Record<string, CommandDefinition> = {}
   for (const cmd of commands) {
-    result[cmd.name] = cmd.definition
+    const { name: _name, argumentHint: _argumentHint, ...openCodeCompatible } = cmd.definition
+    result[cmd.name] = openCodeCompatible as CommandDefinition
   }
   return result
 }
