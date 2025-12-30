@@ -49,7 +49,6 @@ export const HookNameSchema = z.enum([
   "session-notification",
   "comment-checker",
   "grep-output-truncator",
-  "tool-output-truncator",
   "directory-agents-injector",
   "directory-readme-injector",
   "empty-task-response-detector",
@@ -164,12 +163,14 @@ export const DynamicContextPruningConfigSchema = z.object({
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
-  /** Enable preemptive compaction at threshold (default: true) */
+  /** Enable tool output truncator - dynamically truncates tool outputs based on context window (default: false) */
+  tool_output_truncator: z.boolean().optional(),
+  /** Enable preemptive compaction at threshold (default: false) */
   preemptive_compaction: z.boolean().optional(),
   /** Threshold percentage to trigger preemptive compaction (default: 0.80) */
   preemptive_compaction_threshold: z.number().min(0.5).max(0.95).optional(),
-  /** Truncate all tool outputs, not just whitelisted tools (default: true) */
-  truncate_all_tool_outputs: z.boolean().default(true),
+  /** Truncate all tool outputs, not just whitelisted tools (default: false, only applies when tool_output_truncator is enabled) */
+  truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded (default: false) */

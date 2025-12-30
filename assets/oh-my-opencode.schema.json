@@ -45,7 +45,6 @@
           "session-notification",
           "comment-checker",
           "grep-output-truncator",
-          "tool-output-truncator",
           "directory-agents-injector",
           "directory-readme-injector",
           "empty-task-response-detector",
@@ -1402,6 +1401,9 @@
         "auto_resume": {
           "type": "boolean"
         },
+        "tool_output_truncator": {
+          "type": "boolean"
+        },
         "preemptive_compaction": {
           "type": "boolean"
         },
@@ -1411,7 +1413,6 @@
           "maximum": 0.95
         },
         "truncate_all_tool_outputs": {
-          "default": true,
           "type": "boolean"
         },
         "dynamic_context_pruning": {
