@@ -29,7 +29,7 @@
 function normalizeModelID(modelID: string): string {
   // Replace dots with hyphens when followed by a digit
   // This handles version numbers like 4.5 → 4-5, 5.2 → 5-2
-  return modelID.replace(/\.(\d)/g, "-$1")
+  return modelID.replace(/\.(\d+)/g, "-$1")
 }
 
 /**
