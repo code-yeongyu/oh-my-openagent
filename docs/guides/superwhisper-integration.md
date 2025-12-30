@@ -24,7 +24,7 @@ This guide explains how to set up SuperWhisper for voice-driven development with
 
 Download from [superwhisper.com](https://superwhisper.com) (macOS, Windows, iOS)
 
-### 2. Generate Your Mode
+### 2. Generate and Install Your Mode
 
 Run in OpenCode:
 
@@ -32,18 +32,25 @@ Run in OpenCode:
 /superwhisper-mode create opencode-developer
 ```
 
-This generates a custom SuperWhisper mode optimized for your project.
+This generates a custom SuperWhisper mode optimized for your project and installs it directly to your SuperWhisper directory (`~/Documents/superwhisper/modes/`). No manual import needed!
 
-### 3. Import the Mode
+The command automatically:
+- Detects your project type and tech stack
+- Generates context-aware mode instructions
+- Creates project-specific examples
+- Installs to SuperWhisper device
+- Registers the mode in settings
 
-1. Open SuperWhisper settings
-2. Go to **Modes**
-3. Click **Import Mode**
-4. Select the generated JSON file from `.opencode/templates/superwhisper/`
+### 3. Activate Your Mode
+
+1. Open SuperWhisper
+2. Go to Settings → Modes
+3. Your new mode should appear in the list (e.g., "OpenCode - oh-my-opencode")
+4. Select it to make it active
 
 ### 4. Configure Context Awareness
 
-Enable all three context types in the mode settings:
+Enable all three context types in the mode settings (these are enabled by default in generated modes):
 
 | Setting | Enable | Purpose |
 |---------|--------|---------|
@@ -126,28 +133,206 @@ The mode recognizes these keywords and maps them to commands:
 
 This naturally triggers the specify → plan → tasks → implement workflow.
 
-## Advanced Configuration
+## Managing Modes with /superwhisper-mode
 
-### Custom Instructions
+The `/superwhisper-mode` command provides complete device management for SuperWhisper custom modes. All operations work directly with your local SuperWhisper installation.
 
-Customize the mode's AI instructions for your project:
+### SuperWhisper Directory Structure
+
+```
+~/Documents/superwhisper/
+├── modes/                    # Mode JSON files
+│   ├── custom-ABCD.json     # Custom modes (4-char random key)
+│   ├── default.json         # Built-in default mode
+│   └── meeting.json         # Built-in meeting mode
+└── settings/
+    └── settings.json        # Contains modeKeys array (active modes)
+```
+
+### Available Operations
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `list` | List all modes on device | `/superwhisper-mode list` |
+| `create [name]` | Create and install new mode | `/superwhisper-mode create planning-mode` |
+| `update [name]` | Update existing mode | `/superwhisper-mode update opencode-developer` |
+| `delete [name]` | Remove mode from device | `/superwhisper-mode delete test-mode` |
+| `export [name]` | Export mode to project | `/superwhisper-mode export opencode-developer` |
+| `import` | Import mode from project | `/superwhisper-mode import` |
+
+### list - List All Modes
+
+Lists all SuperWhisper modes currently installed on your device.
+
+```
+/superwhisper-mode list
+```
+
+**Output:**
+```
+SuperWhisper Modes on Device:
+─────────────────────────────
+  custom-PSJF    Planning Mode
+  custom-NBTW    OpenCode Developer
+  default        Default
+  meeting        Meeting Notes
+─────────────────────────────
+Total: 4 modes
+```
+
+### create - Create and Install Mode
+
+Creates a new mode optimized for your project and installs it directly to SuperWhisper.
+
+```
+/superwhisper-mode create opencode-developer
+```
+
+The command automatically:
+1. Reads project context (tech stack, frameworks, structure)
+2. Discovers available slash commands
+3. Generates a unique mode key (e.g., `custom-XKCD`)
+4. Creates mode JSON with project-specific settings
+5. Writes to `~/Documents/superwhisper/modes/{key}.json`
+6. Updates `settings.json` to register the mode
+
+**SuperWhisper Mode JSON Format:**
 
 ```json
 {
-  "instructions": "<role>...</role>\n<context>\nProject: [YOUR_PROJECT]\nTech Stack: [YOUR_STACK]\n</context>\n..."
+  "key": "custom-XKCD",
+  "name": "OpenCode - ProjectName",
+  "description": "Project description",
+  "type": "custom",
+  "version": 1,
+  
+  "languageModelEnabled": true,
+  "languageModelID": "sw-claude-4p5-sonnet",
+  
+  "contextFromActiveApplication": true,
+  "contextFromSelection": true,
+  "contextFromClipboard": true,
+  "contextTemplate": "Use the context below to inform your response.\n\nContext: ",
+  
+  "activationApps": ["Terminal", "VS Code", "Cursor", "Zed"],
+  "activationSites": [],
+  
+  "prompt": "ROLE: You are an AI post-processor...",
+  "promptExamples": [
+    {
+      "id": "uuid-1",
+      "input": "specify a new feature for user login",
+      "output": "/specify Add user authentication feature"
+    }
+  ],
+  
+  "voiceModelID": "nvidia_parakeet-v2_476MB",
+  "language": "en",
+  "realtimeOutput": false,
+  "adjustOutputVolume": true
+}
+```
+
+**Key Fields:**
+
+| Field | Purpose |
+|-------|---------|
+| `key` | Unique identifier (e.g., `custom-ABCD`) |
+| `name` | Display name in SuperWhisper UI |
+| `prompt` | AI instructions for transforming voice input |
+| `promptExamples` | Training examples for intent detection |
+| `contextFrom*` | Enable context sources (app, selection, clipboard) |
+| `activationApps` | Apps that auto-activate this mode |
+| `languageModelID` | AI model for post-processing |
+
+### update - Update Existing Mode
+
+Updates an existing mode with new settings or examples.
+
+```
+/superwhisper-mode update opencode-developer
+```
+
+You can update:
+- Custom instructions (the `prompt` field)
+- Training examples (`promptExamples`)
+- Auto-activation apps (`activationApps`)
+- Mode name
+
+The command finds the mode by name, reads the current JSON, applies your requested changes, and writes it back.
+
+### delete - Remove Mode
+
+Removes a mode from your SuperWhisper installation.
+
+```
+/superwhisper-mode delete test-mode
+```
+
+This operation:
+1. Removes the mode key from `settings.json`
+2. Deletes the mode file from `~/Documents/superwhisper/modes/`
+
+**Warning:** Built-in modes (default, meeting) cannot be deleted.
+
+### export - Export to Project
+
+Exports a mode from your device to the project repository for sharing.
+
+```
+/superwhisper-mode export opencode-developer
+```
+
+Copies the mode from `~/Documents/superwhisper/modes/{key}.json` to `.opencode/templates/superwhisper/{mode-name}.json`. This allows you to:
+- Version control your custom modes
+- Share modes with team members
+- Transfer modes between machines
+
+### import - Import from Project
+
+Imports a mode from project templates to your device.
+
+```
+/superwhisper-mode import
+```
+
+The command:
+1. Lists available mode templates in `.opencode/templates/superwhisper/`
+2. Lets you select which to import
+3. Generates a new unique key (if needed)
+4. Installs to your SuperWhisper directory
+5. Registers in settings
+
+## Advanced Configuration
+
+### Custom Instructions (Manual Editing)
+
+For advanced customization, you can manually edit mode files in `~/Documents/superwhisper/modes/`. However, we recommend using `/superwhisper-mode update` for safer modifications.
+
+Example prompt structure:
+
+```json
+{
+  "prompt": "ROLE: You are an AI post-processor for voice-to-text.\n\nCONTEXT:\n- Project: [YOUR_PROJECT]\n- Tech Stack: [YOUR_STACK]\n\nPROCESSING RULES:\n1. Intent detection\n2. Command mapping\n3. Speech cleanup\n..."
 }
 ```
 
 ### Project-Specific Examples
 
-Add examples that match your domain:
+The `/superwhisper-mode create` command automatically generates examples based on your project type. For React projects:
 
 ```json
 {
-  "examples": [
+  "promptExamples": [
     {
-      "input": "add a new GraphQL resolver for users",
-      "output": "Create a new GraphQL resolver for the users query. Include pagination, filtering, and proper error handling."
+      "id": "uuid-1",
+      "input": "create a new component for the header",
+      "output": "Create a Header component in src/components/Header.tsx with proper TypeScript types."
+    },
+    {
+      "id": "uuid-2", 
+      "input": "add a use state hook for loading",
+      "output": "Add a useState hook to track loading state: const [isLoading, setIsLoading] = useState(false)"
     }
   ]
 }
@@ -155,16 +340,16 @@ Add examples that match your domain:
 
 ### Auto-Activation
 
-Configure which apps trigger this mode:
+Control which applications automatically activate your mode:
 
 ```json
 {
-  "autoActivation": {
-    "applications": ["Terminal", "VS Code", "Cursor"],
-    "urls": []
-  }
+  "activationApps": ["Terminal", "iTerm2", "Warp", "VS Code", "Cursor", "Zed"],
+  "activationSites": []
 }
 ```
+
+When you focus one of these apps, SuperWhisper automatically switches to this mode.
 
 ## Workflow Examples
 
