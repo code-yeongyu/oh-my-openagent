@@ -79,15 +79,11 @@ function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
     }
 
     case "message.part.updated": {
+      // Skip verbose logging for partial message updates
+      // Only log tool invocation state changes, not text streaming
       const partProps = props as MessagePartUpdatedProps | undefined
-      const role = partProps?.info?.role ?? "unknown"
       const part = partProps?.part
-      if (part?.type === "text" && part.text) {
-        const preview = part.text.slice(0, 100).replace(/\n/g, "\\n")
-        console.error(
-          pc.dim(`${sessionTag} message.part (${role}): "${preview}${part.text.length > 100 ? "..." : ""}"`)
-        )
-      } else if (part?.type === "tool-invocation") {
+      if (part?.type === "tool-invocation") {
         const toolPart = part as { toolName?: string; state?: string }
         console.error(
           pc.dim(`${sessionTag} message.part (tool): ${toolPart.toolName} [${toolPart.state}]`)
