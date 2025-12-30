@@ -19,20 +19,35 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
 
   try {
     const content = readFileSync(filePath, "utf-8")
-    const { data, body } = parseFrontmatter<Partial<RalphLoopState> & Record<string, unknown>>(content)
+    const { data, body } = parseFrontmatter<Record<string, unknown>>(content)
 
-    if (typeof data.active !== "boolean" || typeof data.iteration !== "number") {
+    const active = data.active
+    const iteration = data.iteration
+    
+    if (active === undefined || iteration === undefined) {
       return null
     }
 
+    const isActive = active === true || active === "true"
+    const iterationNum = typeof iteration === "number" ? iteration : Number(iteration)
+    
+    if (isNaN(iterationNum)) {
+      return null
+    }
+
+    const stripQuotes = (val: unknown): string => {
+      const str = String(val ?? "")
+      return str.replace(/^["']|["']$/g, "")
+    }
+
     return {
-      active: data.active,
-      iteration: Number(data.iteration),
+      active: isActive,
+      iteration: iterationNum,
       max_iterations: Number(data.max_iterations) || DEFAULT_MAX_ITERATIONS,
-      completion_promise: String(data.completion_promise || DEFAULT_COMPLETION_PROMISE).replace(/^["']|["']$/g, ""),
-      started_at: String(data.started_at || new Date().toISOString()).replace(/^["']|["']$/g, ""),
+      completion_promise: stripQuotes(data.completion_promise) || DEFAULT_COMPLETION_PROMISE,
+      started_at: stripQuotes(data.started_at) || new Date().toISOString(),
       prompt: body.trim(),
-      session_id: data.session_id ? String(data.session_id).replace(/^["']|["']$/g, "") : undefined,
+      session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
     }
   } catch {
     return null
