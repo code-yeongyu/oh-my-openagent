@@ -8,6 +8,7 @@ import {
   DEFAULT_COMPLETION_PROMISE,
 } from "./constants"
 import type { RalphLoopState, RalphLoopOptions } from "./types"
+import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
 
 export * from "./types"
 export * from "./constants"
@@ -48,6 +49,7 @@ export function createRalphLoopHook(
   const sessions = new Map<string, SessionState>()
   const config = options?.config
   const stateDir = config?.state_dir
+  const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -149,7 +151,8 @@ export function createRalphLoopHook(
         return
       }
 
-      const transcriptPath = props?.transcriptPath as string | undefined
+      // Generate transcript path from sessionID - OpenCode doesn't pass it in event properties
+      const transcriptPath = getTranscriptPath(sessionID)
 
       if (detectCompletionPromise(transcriptPath, state.completion_promise)) {
         log(`[${HOOK_NAME}] Completion detected!`, {
