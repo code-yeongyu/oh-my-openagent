@@ -65,6 +65,7 @@ export const HookNameSchema = z.enum([
   "interactive-bash-session",
   "empty-message-sanitizer",
   "thinking-block-validator",
+  "ralph-loop",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -175,6 +176,15 @@ export const ExperimentalConfigSchema = z.object({
   dcp_for_compaction: z.boolean().optional(),
 })
 
+export const RalphLoopConfigSchema = z.object({
+  /** Enable ralph loop functionality (default: false - opt-in feature) */
+  enabled: z.boolean().default(false),
+  /** Default max iterations if not specified in command (default: 100) */
+  default_max_iterations: z.number().min(1).max(1000).default(100),
+  /** Custom state file directory relative to project root (default: .opencode/) */
+  state_dir: z.string().optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
@@ -188,6 +198,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   comment_checker: CommentCheckerConfigSchema.optional(),
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
+  ralph_loop: RalphLoopConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -200,5 +211,6 @@ export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
 export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
 export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningConfigSchema>
+export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"
