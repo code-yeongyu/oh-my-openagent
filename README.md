@@ -910,7 +910,7 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `dcp-for-compaction`
 
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
 
@@ -964,8 +964,7 @@ Opt-in experimental features that may change or be removed in future versions. U
   "experimental": {
     "aggressive_truncation": true,
     "auto_resume": true,
-    "truncate_all_tool_outputs": false,
-    "dcp_for_compaction": true
+    "truncate_all_tool_outputs": false
   }
 }
 ```
@@ -975,7 +974,8 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                            |
 | `truncate_all_tool_outputs` | `true`  | Dynamically truncates ALL tool outputs based on context window usage to prevent prompts from becoming too long. Disable by setting to `false` if you need full tool outputs.                 |
-| `dcp_for_compaction`        | `false` | When enabled, Dynamic Context Pruning (DCP) runs FIRST when token limit errors occur, before attempting compaction. DCP prunes redundant context, then compaction runs immediately. Enable this for smarter recovery when hitting token limits. |
+
+**Note**: `dcp-for-compaction` (Dynamic Context Pruning for compaction) is now a hook, not an experimental feature. It's enabled by default and can be disabled via `disabled_hooks: ["dcp-for-compaction"]`.
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 
