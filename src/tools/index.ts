@@ -29,6 +29,7 @@ import {
 } from "./session-manager"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
+export { createSkillTool } from "./skill"
 export { getTmuxPath } from "./interactive-bash/utils"
 
 import {
