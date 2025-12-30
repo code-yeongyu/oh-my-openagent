@@ -224,3 +224,23 @@ export function getSkillByName(name: string, options: DiscoverSkillsOptions = {}
   const skills = discoverSkills(options)
   return skills.find(s => s.name === name)
 }
+
+export function discoverUserClaudeSkills(): LoadedSkill[] {
+  const userSkillsDir = join(getClaudeConfigDir(), "skills")
+  return loadSkillsFromDir(userSkillsDir, "user")
+}
+
+export function discoverProjectClaudeSkills(): LoadedSkill[] {
+  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+  return loadSkillsFromDir(projectSkillsDir, "project")
+}
+
+export function discoverOpencodeGlobalSkills(): LoadedSkill[] {
+  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
+  return loadSkillsFromDir(opencodeSkillsDir, "opencode")
+}
+
+export function discoverOpencodeProjectSkills(): LoadedSkill[] {
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  return loadSkillsFromDir(opencodeProjectDir, "opencode-project")
+}
