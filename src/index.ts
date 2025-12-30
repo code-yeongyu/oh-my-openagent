@@ -85,6 +85,12 @@ const AGENT_NAME_MAP: Record<string, string> = {
   "multimodal-looker": "multimodal-looker",
 };
 
+// Migration map: old hook names → new hook names (for backward compatibility)
+const HOOK_NAME_MAP: Record<string, string> = {
+  // Legacy names (backward compatibility)
+  "anthropic-auto-compact": "anthropic-context-window-limit-recovery",
+};
+
 function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
   const migrated: Record<string, unknown> = {};
   let changed = false;
@@ -95,6 +101,21 @@ function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<
       changed = true;
     }
     migrated[newKey] = value;
+  }
+
+  return { migrated, changed };
+}
+
+function migrateHookNames(hooks: string[]): { migrated: string[]; changed: boolean } {
+  const migrated: string[] = [];
+  let changed = false;
+
+  for (const hook of hooks) {
+    const newHook = HOOK_NAME_MAP[hook] ?? hook;
+    if (newHook !== hook) {
+      changed = true;
+    }
+    migrated.push(newHook);
   }
 
   return { migrated, changed };
@@ -117,10 +138,18 @@ function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown
     needsWrite = true;
   }
 
+  if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {
+    const { migrated, changed } = migrateHookNames(rawConfig.disabled_hooks as string[]);
+    if (changed) {
+      rawConfig.disabled_hooks = migrated;
+      needsWrite = true;
+    }
+  }
+
   if (needsWrite) {
     try {
       fs.writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n", "utf-8");
-      log(`Migrated config file: ${configPath} (OmO → Sisyphus)`);
+      log(`Migrated config file: ${configPath}`);
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err);
     }
