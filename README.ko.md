@@ -871,7 +871,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `dcp-for-compaction`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
 
 **`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 
@@ -935,8 +935,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 | `aggressive_truncation`     | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
 | `auto_resume`               | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |
 | `truncate_all_tool_outputs` | `true`  | 프롬프트가 너무 길어지는 것을 방지하기 위해 컨텍스트 윈도우 사용량에 따라 모든 도구 출력을 동적으로 잘라냅니다. 전체 도구 출력이 필요한 경우 `false`로 설정하여 비활성화하세요. |
-
-**참고**: `dcp-for-compaction` (컴팩션용 동적 컨텍스트 정리)은 이제 훅으로 관리됩니다. 기본으로 활성화되어 있으며, `disabled_hooks: ["dcp-for-compaction"]`으로 비활성화할 수 있습니다.
+| `dcp_for_compaction`        | `false` | 컴팩션용 DCP(동적 컨텍스트 정리) 활성화 - 토큰 제한 초과 시 먼저 실행됩니다. 컴팩션 전에 중복 도구 호출과 오래된 도구 출력을 정리합니다.                                  |
 
 **경고**: 이 기능들은 실험적이며 예상치 못한 동작을 유발할 수 있습니다. 의미를 이해한 경우에만 활성화하세요.
 
