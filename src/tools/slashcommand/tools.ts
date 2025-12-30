@@ -124,8 +124,8 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
-  const commandDir = dirname(cmd.path)
-  const withFileRefs = await resolveFileReferencesInText(cmd.content, commandDir)
+  const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
+  const withFileRefs = await resolveFileReferencesInText(cmd.content || "", commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   sections.push(resolvedContent.trim())
 
@@ -151,40 +151,14 @@ function formatCommandList(items: CommandInfo[]): string {
 }
 
 export const slashcommand: ToolDefinition = tool({
-  description: `Execute a slash command within the main conversation.
+  description: `Load a skill to get detailed instructions for a specific task.
 
-When you use this tool, the slash command gets expanded to a full prompt that provides detailed instructions on how to complete the task.
+Skills provide specialized knowledge and step-by-step guidance.
+Use this when a task matches an available skill's description.
 
-How slash commands work:
-- Invoke commands using this tool with the command name (without arguments)
-- The command's prompt will expand and provide detailed instructions
-- Arguments from user input should be passed separately
-
-Important:
-- Only use commands listed in Available Commands below
-- Do not invoke a command that is already running
-- **CRITICAL**: When user's message starts with '/' (e.g., "/commit", "/plan"), you MUST immediately invoke this tool with that command. Do NOT attempt to handle the command manually.
-
-Commands are loaded from (priority order, highest wins):
-- .opencode/command/ (opencode-project - OpenCode project-specific commands)
-- ./.claude/commands/ (project - Claude Code project-specific commands)
-- ~/.config/opencode/command/ (opencode - OpenCode global commands)
-- $CLAUDE_CONFIG_DIR/commands/ or ~/.claude/commands/ (user - Claude Code global commands)
-
-Skills are loaded from (priority order, highest wins):
-- .opencode/skill/ (opencode-project - OpenCode project-specific skills)
-- ./.claude/skills/ (project - Claude Code project-specific skills)
-- ~/.config/opencode/skill/ (opencode - OpenCode global skills)
-- $CLAUDE_CONFIG_DIR/skills/ or ~/.claude/skills/ (user - Claude Code global skills)
-
-Each command/skill is a markdown file with:
-- YAML frontmatter: description, argument-hint, model, agent, subtask (optional)
-- Markdown body: The command instructions/prompt
-- File references: @path/to/file (relative to command file location)
-- Shell injection: \`!\`command\`\` (executes and injects output)
-
-Available Commands:
-${commandListForDescription}`,
+<available_skills>
+${commandListForDescription}
+</available_skills>`,
 
   args: {
     command: tool.schema
