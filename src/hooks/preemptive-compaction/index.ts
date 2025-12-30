@@ -82,7 +82,7 @@ export function createPreemptiveCompactionHook(
   const experimental = options?.experimental
   const onBeforeSummarize = options?.onBeforeSummarize
   const getModelLimit = options?.getModelLimit
-  const enabled = experimental?.preemptive_compaction !== false
+  const enabled = experimental?.preemptive_compaction === true
   const threshold = experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD
 
   if (!enabled) {
