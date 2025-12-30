@@ -1,6 +1,24 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+
+export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "exploration",
+  cost: "CHEAP",
+  promptAlias: "Librarian",
+  keyTrigger: "External library/source mentioned → fire `librarian` background",
+  triggers: [
+    { domain: "Librarian", trigger: "Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)" },
+  ],
+  useWhen: [
+    "How do I use [library]?",
+    "What's the best practice for [framework feature]?",
+    "Why does [external dependency] behave this way?",
+    "Find examples of [library] usage",
+    "Working with unfamiliar npm/pip/cargo packages",
+  ],
+}
 
 export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig {
   return {

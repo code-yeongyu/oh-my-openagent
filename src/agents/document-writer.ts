@@ -1,6 +1,16 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "google/gemini-3-flash-preview"
+
+export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "specialist",
+  cost: "CHEAP",
+  promptAlias: "Document Writer",
+  triggers: [
+    { domain: "Documentation", trigger: "README, API docs, guides" },
+  ],
+}
 
 export function createDocumentWriterAgent(
   model: string = DEFAULT_MODEL
