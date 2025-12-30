@@ -16,6 +16,11 @@ import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
  * @param defaultName - Fallback name if not specified in frontmatter
  * @param scope - Source scope for priority ordering
  */
+function parseAllowedTools(allowedTools: string | undefined): string[] | undefined {
+  if (!allowedTools) return undefined
+  return allowedTools.split(/\s+/).filter(Boolean)
+}
+
 function loadSkillFromPath(
   skillPath: string,
   resolvedPath: string,
@@ -58,6 +63,10 @@ $ARGUMENTS
       resolvedPath,
       definition,
       scope,
+      license: data.license,
+      compatibility: data.compatibility,
+      metadata: data.metadata,
+      allowedTools: parseAllowedTools(data["allowed-tools"]),
     }
   } catch {
     return null
@@ -176,4 +185,42 @@ export function discoverAllSkills(): LoadedSkill[] {
   const userSkills = loadSkillsFromDir(userDir, "user")
 
   return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+}
+
+export interface DiscoverSkillsOptions {
+  includeClaudeCodePaths?: boolean
+}
+
+/**
+ * Discover skills with optional filtering.
+ * When includeClaudeCodePaths is false, only loads from OpenCode paths.
+ */
+export function discoverSkills(options: DiscoverSkillsOptions = {}): LoadedSkill[] {
+  const { includeClaudeCodePaths = true } = options
+
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "skill")
+
+  const opencodeProjectSkills = loadSkillsFromDir(opencodeProjectDir, "opencode-project")
+  const opencodeGlobalSkills = loadSkillsFromDir(opencodeGlobalDir, "opencode")
+
+  if (!includeClaudeCodePaths) {
+    return [...opencodeProjectSkills, ...opencodeGlobalSkills]
+  }
+
+  const projectDir = join(process.cwd(), ".claude", "skills")
+  const userDir = join(getClaudeConfigDir(), "skills")
+
+  const projectSkills = loadSkillsFromDir(projectDir, "project")
+  const userSkills = loadSkillsFromDir(userDir, "user")
+
+  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+}
+
+/**
+ * Get a skill by name from all available sources.
+ */
+export function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): LoadedSkill | undefined {
+  const skills = discoverSkills(options)
+  return skills.find(s => s.name === name)
 }

@@ -9,6 +9,10 @@ export interface SkillMetadata {
   "argument-hint"?: string
   agent?: string
   subtask?: boolean
+  license?: string
+  compatibility?: string
+  metadata?: Record<string, string>
+  "allowed-tools"?: string
 }
 
 export interface LoadedSkill {
@@ -17,4 +21,8 @@ export interface LoadedSkill {
   resolvedPath: string
   definition: CommandDefinition
   scope: SkillScope
+  license?: string
+  compatibility?: string
+  metadata?: Record<string, string>
+  allowedTools?: string[]
 }
