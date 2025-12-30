@@ -61,8 +61,7 @@
           "interactive-bash-session",
           "empty-message-sanitizer",
           "thinking-block-validator",
-          "ralph-loop",
-          "dcp-for-compaction"
+          "ralph-loop"
         ]
       }
     },
@@ -1505,6 +1504,9 @@
               }
             }
           }
+        },
+        "dcp_for_compaction": {
+          "type": "boolean"
         }
       }
     },
