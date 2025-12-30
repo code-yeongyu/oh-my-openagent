@@ -635,6 +635,12 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 エージェントが活躍すれば、あなたも幸せになります。ですが、私はあなた自身も助けたいのです。
 
+- **Ralph Loop**: タスクが完了するまで実行し続ける自己参照型開発ループ。Anthropic の Ralph Wiggum プラグインにインスパイアされています。**すべてのプログラミング言語をサポート。**
+  - `/ralph-loop "REST API を構築"` で開始するとエージェントが継続的に作業します
+  - `<promise>DONE</promise>` の出力で完了を検知
+  - 完了プロミスなしで停止すると自動再開
+  - 終了条件: 完了検知、最大反復回数到達（デフォルト 100）、または `/cancel-ralph`
+  - `oh-my-opencode.json` で設定: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
 - **Keyword Detector**: プロンプト内のキーワードを自動検知して専門モードを有効化します：
   - `ultrawork` / `ulw`: 並列エージェントオーケストレーションによる最大パフォーマンスモード
   - `search` / `find` / `찾아` / `検索`: 並列 explore/librarian エージェントによる検索最大化
@@ -868,7 +874,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
+利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
 
 **`auto-update-checker`と`startup-toast`について**: `startup-toast` フックは `auto-update-checker` のサブ機能です。アップデートチェックは有効なまま起動トースト通知のみを無効化するには、`disabled_hooks` に `"startup-toast"` を追加してください。すべてのアップデートチェック機能（トーストを含む）を無効化するには、`"auto-update-checker"` を追加してください。
 

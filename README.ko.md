@@ -628,6 +628,12 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 
 에이전트들이 행복해지면, 당신이 제일 행복해집니다, 그렇지만 저는 당신도 돕고싶습니다.
 
+- **Ralph Loop**: 작업이 완료될 때까지 계속 실행되는 자기 참조 개발 루프. Anthropic의 Ralph Wiggum 플러그인에서 영감을 받았습니다. **모든 프로그래밍 언어 지원.**
+  - `/ralph-loop "REST API 구축"`으로 시작하면 에이전트가 지속적으로 작업합니다
+  - `<promise>DONE</promise>` 출력 시 완료로 감지
+  - 완료 프라미스 없이 멈추면 자동 재시작
+  - 종료 조건: 완료 감지, 최대 반복 도달 (기본 100회), 또는 `/cancel-ralph`
+  - `oh-my-opencode.json`에서 설정: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
 - **Keyword Detector**: 프롬프트의 키워드를 자동 감지하여 전문 모드를 활성화합니다:
   - `ultrawork` / `ulw`: 병렬 에이전트 오케스트레이션으로 최대 성능 모드
   - `search` / `find` / `찾아` / `検索`: 병렬 explore/librarian 에이전트로 검색 극대화
@@ -865,7 +871,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `preemptive-compaction`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
 
 **`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 
