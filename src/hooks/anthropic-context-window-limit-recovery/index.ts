@@ -5,11 +5,11 @@ import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { log } from "../../shared/logger"
 
-export interface AnthropicAutoCompactOptions {
+export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
 }
 
-function createAutoCompactState(): AutoCompactState {
+function createRecoveryState(): AutoCompactState {
   return {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
@@ -22,8 +22,8 @@ function createAutoCompactState(): AutoCompactState {
   }
 }
 
-export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: AnthropicAutoCompactOptions) {
-  const autoCompactState = createAutoCompactState()
+export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, options?: AnthropicContextWindowLimitRecoveryOptions) {
+  const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
