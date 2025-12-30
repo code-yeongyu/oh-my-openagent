@@ -8,6 +8,7 @@ export {
   BuiltinCommandNameSchema,
   SisyphusAgentConfigSchema,
   ExperimentalConfigSchema,
+  RalphLoopConfigSchema,
 } from "./schema"
 
 export type {
@@ -21,4 +22,5 @@ export type {
   SisyphusAgentConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
+  RalphLoopConfig,
 } from "./schema"
