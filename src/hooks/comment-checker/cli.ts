@@ -23,6 +23,19 @@ function getBinaryName(): string {
 function findCommentCheckerPathSync(): string | null {
   const binaryName = getBinaryName()
 
+  // Check cached binary first (safest path - no module resolution needed)
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath) {
+    debugLog("found binary in cache:", cachedPath)
+    return cachedPath
+  }
+
+  // Guard against undefined import.meta.url (can happen on Windows during plugin loading)
+  if (!import.meta.url) {
+    debugLog("import.meta.url is undefined, skipping package resolution")
+    return null
+  }
+
   try {
     const require = createRequire(import.meta.url)
     const cliPkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
@@ -33,14 +46,8 @@ function findCommentCheckerPathSync(): string | null {
       debugLog("found binary in main package:", binaryPath)
       return binaryPath
     }
-  } catch {
-    debugLog("main package not installed")
-  }
-
-  const cachedPath = getCachedBinaryPath()
-  if (cachedPath) {
-    debugLog("found binary in cache:", cachedPath)
-    return cachedPath
+  } catch (err) {
+    debugLog("main package not installed or resolution failed:", err)
   }
 
   debugLog("no binary found in known locations")
