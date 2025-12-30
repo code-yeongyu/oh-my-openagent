@@ -38,7 +38,13 @@ import {
   loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  discoverUserClaudeSkills,
+  discoverProjectClaudeSkills,
+  discoverOpencodeGlobalSkills,
+  discoverOpencodeProjectSkills,
+  mergeSkills,
 } from "./features/opencode-skill-loader";
+import { createBuiltinSkills } from "./features/builtin-skills";
 
 import {
   loadUserAgents,
@@ -322,9 +328,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
-  const skillTool = createSkillTool({
-    opencodeOnly: pluginConfig.claude_code?.skills === false,
-  });
+  const builtinSkills = createBuiltinSkills();
+  const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
+  const mergedSkills = mergeSkills(
+    builtinSkills,
+    pluginConfig.skills,
+    includeClaudeSkills ? discoverUserClaudeSkills() : [],
+    discoverOpencodeGlobalSkills(),
+    includeClaudeSkills ? discoverProjectClaudeSkills() : [],
+    discoverOpencodeProjectSkills(),
+  );
+  const skillTool = createSkillTool({ skills: mergedSkills });
 
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
