@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { parseJsonc } from "../shared"
@@ -13,6 +13,49 @@ const OMO_CONFIG = join(OPENCODE_CONFIG_DIR, "oh-my-opencode.json")
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
 
 const CHATGPT_HOTFIX_REPO = "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
+
+const BUN_INSTALL_TIMEOUT_SECONDS = 60
+const BUN_INSTALL_TIMEOUT_MS = BUN_INSTALL_TIMEOUT_SECONDS * 1000
+
+interface NodeError extends Error {
+  code?: string
+}
+
+function isPermissionError(err: unknown): boolean {
+  const nodeErr = err as NodeError
+  return nodeErr?.code === "EACCES" || nodeErr?.code === "EPERM"
+}
+
+function isFileNotFoundError(err: unknown): boolean {
+  const nodeErr = err as NodeError
+  return nodeErr?.code === "ENOENT"
+}
+
+function formatErrorWithSuggestion(err: unknown, context: string): string {
+  if (isPermissionError(err)) {
+    return `Permission denied: Cannot ${context}. Try running with elevated permissions or check file ownership.`
+  }
+
+  if (isFileNotFoundError(err)) {
+    return `File not found while trying to ${context}. The file may have been deleted or moved.`
+  }
+
+  if (err instanceof SyntaxError) {
+    return `JSON syntax error while trying to ${context}: ${err.message}. Check for missing commas, brackets, or invalid characters.`
+  }
+
+  const message = err instanceof Error ? err.message : String(err)
+
+  if (message.includes("ENOSPC")) {
+    return `Disk full: Cannot ${context}. Free up disk space and try again.`
+  }
+
+  if (message.includes("EROFS")) {
+    return `Read-only filesystem: Cannot ${context}. Check if the filesystem is mounted read-only.`
+  }
+
+  return `Failed to ${context}: ${message}`
+}
 
 export async function fetchLatestVersion(packageName: string): Promise<string | null> {
   try {
@@ -42,12 +85,46 @@ export function detectConfigFormat(): { format: ConfigFormat; path: string } {
   return { format: "none", path: OPENCODE_JSON }
 }
 
-function parseConfig(path: string, isJsonc: boolean): OpenCodeConfig | null {
+interface ParseConfigResult {
+  config: OpenCodeConfig | null
+  error?: string
+}
+
+function isEmptyOrWhitespace(content: string): boolean {
+  return content.trim().length === 0
+}
+
+function parseConfig(path: string, _isJsonc: boolean): OpenCodeConfig | null {
+  const result = parseConfigWithError(path)
+  return result.config
+}
+
+function parseConfigWithError(path: string): ParseConfigResult {
   try {
+    const stat = statSync(path)
+    if (stat.size === 0) {
+      return { config: null, error: `Config file is empty: ${path}. Delete it or add valid JSON content.` }
+    }
+
     const content = readFileSync(path, "utf-8")
-    return parseJsonc<OpenCodeConfig>(content)
-  } catch {
-    return null
+
+    if (isEmptyOrWhitespace(content)) {
+      return { config: null, error: `Config file contains only whitespace: ${path}. Delete it or add valid JSON content.` }
+    }
+
+    const config = parseJsonc<OpenCodeConfig>(content)
+
+    if (config === null || config === undefined) {
+      return { config: null, error: `Config file parsed to null/undefined: ${path}. Ensure it contains valid JSON.` }
+    }
+
+    if (typeof config !== "object" || Array.isArray(config)) {
+      return { config: null, error: `Config file must contain a JSON object, not ${Array.isArray(config) ? "an array" : typeof config}: ${path}` }
+    }
+
+    return { config }
+  } catch (err) {
+    return { config: null, error: formatErrorWithSuggestion(err, `parse config file ${path}`) }
   }
 }
 
@@ -58,7 +135,11 @@ function ensureConfigDir(): void {
 }
 
 export function addPluginToOpenCodeConfig(): ConfigMergeResult {
-  ensureConfigDir()
+  try {
+    ensureConfigDir()
+  } catch (err) {
+    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+  }
 
   const { format, path } = detectConfigFormat()
   const pluginName = "oh-my-opencode"
@@ -70,11 +151,12 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
       return { success: true, configPath: path }
     }
 
-    const config = parseConfig(path, format === "jsonc")
-    if (!config) {
-      return { success: false, configPath: path, error: "Failed to parse config" }
+    const parseResult = parseConfigWithError(path)
+    if (!parseResult.config) {
+      return { success: false, configPath: path, error: parseResult.error ?? "Failed to parse config file" }
     }
 
+    const config = parseResult.config
     const plugins = config.plugin ?? []
     if (plugins.some((p) => p.startsWith(pluginName))) {
       return { success: true, configPath: path }
@@ -104,7 +186,7 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
 
     return { success: true, configPath: path }
   } catch (err) {
-    return { success: false, configPath: path, error: String(err) }
+    return { success: false, configPath: path, error: formatErrorWithSuggestion(err, "update opencode config") }
   }
 }
 
@@ -185,24 +267,48 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
 }
 
 export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
-  ensureConfigDir()
+  try {
+    ensureConfigDir()
+  } catch (err) {
+    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+  }
 
   try {
     const newConfig = generateOmoConfig(installConfig)
 
     if (existsSync(OMO_CONFIG)) {
-      const content = readFileSync(OMO_CONFIG, "utf-8")
-      const existing = parseJsonc<Record<string, unknown>>(content)
-      delete existing.agents
-      const merged = deepMerge(existing, newConfig)
-      writeFileSync(OMO_CONFIG, JSON.stringify(merged, null, 2) + "\n")
+      try {
+        const stat = statSync(OMO_CONFIG)
+        const content = readFileSync(OMO_CONFIG, "utf-8")
+
+        if (stat.size === 0 || isEmptyOrWhitespace(content)) {
+          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: OMO_CONFIG }
+        }
+
+        const existing = parseJsonc<Record<string, unknown>>(content)
+        if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: OMO_CONFIG }
+        }
+
+        delete existing.agents
+        const merged = deepMerge(existing, newConfig)
+        writeFileSync(OMO_CONFIG, JSON.stringify(merged, null, 2) + "\n")
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) {
+          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: OMO_CONFIG }
+        }
+        throw parseErr
+      }
     } else {
       writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
     }
 
     return { success: true, configPath: OMO_CONFIG }
   } catch (err) {
-    return { success: false, configPath: OMO_CONFIG, error: String(err) }
+    return { success: false, configPath: OMO_CONFIG, error: formatErrorWithSuggestion(err, "write oh-my-opencode config") }
   }
 }
 
@@ -241,11 +347,25 @@ export async function getOpenCodeVersion(): Promise<string | null> {
 }
 
 export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMergeResult> {
-  ensureConfigDir()
+  try {
+    ensureConfigDir()
+  } catch (err) {
+    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+  }
+
   const { format, path } = detectConfigFormat()
 
   try {
-    const existingConfig = format !== "none" ? parseConfig(path, format === "jsonc") : null
+    let existingConfig: OpenCodeConfig | null = null
+    if (format !== "none") {
+      const parseResult = parseConfigWithError(path)
+      if (parseResult.error && !parseResult.config) {
+        existingConfig = {}
+      } else {
+        existingConfig = parseResult.config
+      }
+    }
+
     const plugins: string[] = existingConfig?.plugin ?? []
 
     if (config.hasGemini) {
@@ -266,18 +386,37 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
     writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
     return { success: true, configPath: path }
   } catch (err) {
-    return { success: false, configPath: path, error: String(err) }
+    return { success: false, configPath: path, error: formatErrorWithSuggestion(err, "add auth plugins to config") }
   }
 }
 
 export function setupChatGPTHotfix(): ConfigMergeResult {
-  ensureConfigDir()
+  try {
+    ensureConfigDir()
+  } catch (err) {
+    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+  }
 
   try {
     let packageJson: Record<string, unknown> = {}
     if (existsSync(OPENCODE_PACKAGE_JSON)) {
-      const content = readFileSync(OPENCODE_PACKAGE_JSON, "utf-8")
-      packageJson = JSON.parse(content)
+      try {
+        const stat = statSync(OPENCODE_PACKAGE_JSON)
+        const content = readFileSync(OPENCODE_PACKAGE_JSON, "utf-8")
+
+        if (stat.size > 0 && !isEmptyOrWhitespace(content)) {
+          packageJson = JSON.parse(content)
+          if (typeof packageJson !== "object" || packageJson === null || Array.isArray(packageJson)) {
+            packageJson = {}
+          }
+        }
+      } catch (parseErr) {
+        if (parseErr instanceof SyntaxError) {
+          packageJson = {}
+        } else {
+          throw parseErr
+        }
+      }
     }
 
     const deps = (packageJson.dependencies ?? {}) as Record<string, string>
@@ -287,21 +426,65 @@ export function setupChatGPTHotfix(): ConfigMergeResult {
     writeFileSync(OPENCODE_PACKAGE_JSON, JSON.stringify(packageJson, null, 2) + "\n")
     return { success: true, configPath: OPENCODE_PACKAGE_JSON }
   } catch (err) {
-    return { success: false, configPath: OPENCODE_PACKAGE_JSON, error: String(err) }
+    return { success: false, configPath: OPENCODE_PACKAGE_JSON, error: formatErrorWithSuggestion(err, "setup ChatGPT hotfix in package.json") }
   }
 }
 
+export interface BunInstallResult {
+  success: boolean
+  timedOut?: boolean
+  error?: string
+}
+
 export async function runBunInstall(): Promise<boolean> {
+  const result = await runBunInstallWithDetails()
+  return result.success
+}
+
+export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   try {
     const proc = Bun.spawn(["bun", "install"], {
       cwd: OPENCODE_CONFIG_DIR,
       stdout: "pipe",
       stderr: "pipe",
     })
-    await proc.exited
-    return proc.exitCode === 0
-  } catch {
-    return false
+
+    const timeoutPromise = new Promise<"timeout">((resolve) =>
+      setTimeout(() => resolve("timeout"), BUN_INSTALL_TIMEOUT_MS)
+    )
+
+    const exitPromise = proc.exited.then(() => "completed" as const)
+
+    const result = await Promise.race([exitPromise, timeoutPromise])
+
+    if (result === "timeout") {
+      try {
+        proc.kill()
+      } catch {
+        /* intentionally empty - process may have already exited */
+      }
+      return {
+        success: false,
+        timedOut: true,
+        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ~/.config/opencode && bun i`,
+      }
+    }
+
+    if (proc.exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text()
+      return {
+        success: false,
+        error: stderr.trim() || `bun install failed with exit code ${proc.exitCode}`,
+      }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return {
+      success: false,
+      error: `bun install failed: ${message}. Is bun installed? Try: curl -fsSL https://bun.sh/install | bash`,
+    }
   }
 }
 
@@ -362,11 +545,25 @@ const CODEX_PROVIDER_CONFIG = {
 }
 
 export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
-  ensureConfigDir()
+  try {
+    ensureConfigDir()
+  } catch (err) {
+    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+  }
+
   const { format, path } = detectConfigFormat()
 
   try {
-    const existingConfig = format !== "none" ? parseConfig(path, format === "jsonc") : null
+    let existingConfig: OpenCodeConfig | null = null
+    if (format !== "none") {
+      const parseResult = parseConfigWithError(path)
+      if (parseResult.error && !parseResult.config) {
+        existingConfig = {}
+      } else {
+        existingConfig = parseResult.config
+      }
+    }
+
     const newConfig = { ...(existingConfig ?? {}) }
 
     const providers = (newConfig.provider ?? {}) as Record<string, unknown>
@@ -386,7 +583,7 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
     writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
     return { success: true, configPath: path }
   } catch (err) {
-    return { success: false, configPath: path, error: String(err) }
+    return { success: false, configPath: path, error: formatErrorWithSuggestion(err, "add provider config") }
   }
 }
 
@@ -409,11 +606,12 @@ export function detectCurrentConfig(): DetectedConfig {
     return result
   }
 
-  const openCodeConfig = parseConfig(path, format === "jsonc")
-  if (!openCodeConfig) {
+  const parseResult = parseConfigWithError(path)
+  if (!parseResult.config) {
     return result
   }
 
+  const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
   result.isInstalled = plugins.some((p) => p.startsWith("oh-my-opencode"))
 
@@ -429,8 +627,20 @@ export function detectCurrentConfig(): DetectedConfig {
   }
 
   try {
+    const stat = statSync(OMO_CONFIG)
+    if (stat.size === 0) {
+      return result
+    }
+
     const content = readFileSync(OMO_CONFIG, "utf-8")
+    if (isEmptyOrWhitespace(content)) {
+      return result
+    }
+
     const omoConfig = parseJsonc<OmoConfigData>(content)
+    if (!omoConfig || typeof omoConfig !== "object") {
+      return result
+    }
 
     const agents = omoConfig.agents ?? {}
 
@@ -452,7 +662,7 @@ export function detectCurrentConfig(): DetectedConfig {
       result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
     }
   } catch {
-    /* intentionally empty - malformed config returns defaults */
+    /* intentionally empty - malformed omo config returns defaults from opencode config detection */
   }
 
   return result
