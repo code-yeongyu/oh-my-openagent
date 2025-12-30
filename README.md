@@ -491,6 +491,8 @@ Schema autocomplete supported:
 }
 ```
 
+> **Complete Reference**: For documentation of ALL configuration options including governance, memory tools, and meta-learning, see [docs/reference/configuration.md](docs/reference/configuration.md).
+
 ### Google Auth
 
 Enable built-in Antigravity OAuth for Google Gemini models:

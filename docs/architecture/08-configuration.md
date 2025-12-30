@@ -177,9 +177,76 @@ interface GovernanceConfig {
     enabled?: boolean;  // default: true
     team_prefix?: string; // default: "LIF"
     cache_issues?: boolean; // default: true
+    policy?: "off" | "optional" | "required"; // default: "optional"
+  };
+  hook_health?: {
+    enabled?: boolean;  // default: true
+    circuit_breaker_threshold?: number; // default: 3
+    slow_hook_threshold_ms?: number; // default: 1000
+    metrics_retention_count?: number; // default: 100
+    enable_metrics?: boolean; // default: true
+    log_warnings?: boolean; // default: true
+  };
+  git_safety?: {
+    enabled?: boolean;  // default: true
+    protected_branches?: string[]; // default: ["main", "master", "production", "prod"]
+    block_force_operations?: boolean; // default: true
+    warn_on_destructive?: boolean; // default: true
+    allow_list_patterns?: string[]; // default: []
+  };
+  security_scanner?: {
+    enabled?: boolean;  // default: true
+    scan_on_write?: boolean; // default: true
+    scan_on_edit?: boolean; // default: true
+    mask_in_output?: boolean; // default: true
+    allow_list_patterns?: string[]; // default: []
+  };
+  conflict_detector?: {
+    enabled?: boolean;  // default: true
+    lock_timeout_ms?: number; // default: 60000
+    warn_on_conflict?: boolean; // default: true
+    block_on_conflict?: boolean; // default: false
+  };
+  orchestration?: {
+    max_turns?: number; // default: 10
+    max_delegation_depth?: number; // default: 5
+    detect_loops?: boolean; // default: true
+    warn_on_deep_chain?: boolean; // default: true
+    retry_max_attempts?: number; // default: 3
+    retry_initial_delay_ms?: number; // default: 1000
+    retry_max_delay_ms?: number; // default: 30000
+  };
+  docs_blocking?: {
+    enabled?: boolean;  // default: true
+    mode?: "warn" | "block" | "disabled"; // default: "block"
+  };
+  artifact_truncation?: {
+    enabled?: boolean;  // default: true
+    max_summary_tokens?: number; // default: 200
+    max_output_chars?: number; // default: 4000
+    keep_task_metadata?: boolean; // default: true
+  };
+  delegation_compliance?: {
+    enabled?: boolean;  // default: false
+    track_violations?: boolean; // default: true
+    strikes_to_block?: number; // default: 3
+  };
+  workflow_state_enforcer?: {
+    enabled?: boolean;  // default: true
+    mode?: "warn" | "block" | "disabled"; // default: "warn"
+    workflow_agents?: Record<string, string>; // default: {"/specify": "product-strategist", ...}
+    prerequisites?: Record<string, string[]>; // default: {"/plan": ["spec.md"], ...}
+  };
+  read_before_write?: {
+    enabled?: boolean;  // default: true
+    mode?: "block" | "warn" | "disabled"; // default: "block"
+    exempt_tools?: string[]; // default: ["lsp_rename", "ast_grep_replace", ...]
+    exempt_paths?: string[]; // default: ["dist/**", "build/**", ...]
   };
 }
 ```
+
+**Note**: For complete details on all governance options, see [Configuration Reference](../reference/configuration.md#governance-configuration).
 
 ---
 

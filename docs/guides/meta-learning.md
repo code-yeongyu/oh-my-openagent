@@ -15,10 +15,8 @@ The meta-learning extractor is enabled by default. Verify or configure in `oh-my
 
 ```json
 {
-  "hooks": {
-    "meta-learning-extractor": {
-      "enabled": true
-    }
+  "meta_learning": {
+    "enabled": true
   }
 }
 ```
@@ -245,35 +243,38 @@ Configure in `oh-my-opencode.json`:
 
 ```json
 {
-  "hooks": {
-    "meta-learning-extractor": {
-      "enabled": true,
-      "signalThreshold": 3,
-      "cooldownMinutes": 30,
-      "dailyBudgetUsd": 0.10,
-      "maxCandidatesPerSession": 3,
-      "minConfidence": 0.5
-    }
+  "meta_learning": {
+    "enabled": true,
+    "signal_threshold": 3,
+    "cooldown_minutes": 30,
+    "context_threshold_percent": 60,
+    "max_candidates_per_session": 3,
+    "min_confidence": 0.5,
+    "max_extractions_per_day": 10,
+    "storage_path": "context/learnings/"
   }
 }
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `true` | Enable or disable the hook |
-| `signalThreshold` | `3` | Score required to trigger extraction |
-| `cooldownMinutes` | `30` | Minutes to wait between extractions per session |
-| `dailyBudgetUsd` | `0.10` | Maximum daily spend (USD) on extractions |
-| `maxCandidatesPerSession` | `3` | Max learnings to extract per run |
-| `minConfidence` | `0.5` | Minimum confidence score for candidates |
+| `enabled` | `true` | Enable or disable the meta-learning system |
+| `signal_threshold` | `3` | Score required to trigger extraction (0-10) |
+| `cooldown_minutes` | `30` | Minutes to wait between extractions per session |
+| `context_threshold_percent` | `60` | Context usage % to trigger extraction (0-100) |
+| `max_candidates_per_session` | `3` | Max learnings to extract per run (1-10) |
+| `min_confidence` | `0.5` | Minimum confidence score for candidates (0-1) |
+| `max_extractions_per_day` | `10` | Maximum extractions per day (budget control) |
+| `storage_path` | `"context/learnings/"` | Directory for learning output |
 
 ### Budget & Cooldown
 
 | Control | Default | Description |
 |---------|---------|-------------|
-| Daily Budget | $0.10 USD | Maximum daily spend across all sessions |
+| Daily Budget | 10 extractions | Maximum extractions per day across all sessions |
 | Cooldown | 30 minutes | Minimum time between extractions per session |
-| Extraction Cost | ~$0.05 | Estimated cost per analysis (Claude Opus 4.5) |
+| Context Threshold | 60% | Triggers extraction when context usage exceeds this % |
+| Extraction Cost | ~$0.05 | Estimated cost per analysis (Gemini Flash 2.5) |
 
 ---
 
@@ -353,9 +354,9 @@ After implementing an approved learning:
 ### Budget exhausted too quickly
 
 **Adjust**:
-- Increase `dailyBudgetUsd` if needed
-- Increase `cooldownMinutes` to reduce frequency
-- Increase `signalThreshold` to be more selective
+- Increase `max_extractions_per_day` if needed
+- Increase `cooldown_minutes` to reduce frequency
+- Increase `signal_threshold` to be more selective
 
 ---
 
@@ -363,7 +364,7 @@ After implementing an approved learning:
 
 | Limitation | Description | Workaround |
 |------------|-------------|------------|
-| Budget Reset on Reload | Daily budget counter resets when plugin reloads | Budget is per-session; will be persisted in future version |
+| Budget Reset on Reload | Daily extraction counter resets when plugin reloads | Counter is per-session; will be persisted in future version |
 | Secret Redaction | Some patterns may not be caught | Review output files for sensitive data |
 
 ---
