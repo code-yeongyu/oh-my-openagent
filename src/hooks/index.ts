@@ -54,3 +54,7 @@ export type { WorkflowStateEnforcerConfig, WorkflowValidationResult } from "./wo
 // Meta-learning extraction (LIF-73)
 export { createMetaLearningExtractorHook } from "./meta-learning-extractor";
 export type { MetaLearningExtractorConfig } from "./meta-learning-extractor";
+
+// Read-before-write enforcement (LIF-103)
+export { createReadBeforeWriteHook } from "./read-before-write";
+export type { ReadBeforeWriteConfig } from "./read-before-write";

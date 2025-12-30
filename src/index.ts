@@ -30,6 +30,7 @@ import {
   createConflictDetectorHook,
   createWorkflowStateEnforcerHook,
   createMetaLearningExtractorHook,
+  createReadBeforeWriteHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -356,6 +357,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createWorkflowStateEnforcerHook(ctx, pluginConfig.governance?.workflow_state_enforcer)
     : null;
 
+  // LIF-103: Read-before-write enforcement
+  const readBeforeWrite = isHookEnabled("read-before-write")
+    ? createReadBeforeWriteHook(ctx, pluginConfig.governance?.read_before_write)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -546,6 +552,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await governanceHistorian?.event(input);
       await governanceLinearInjector?.event(input);
       await metaLearningExtractorHook?.event(input);
+      await readBeforeWrite?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -672,6 +679,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await securityScanner?.["tool.execute.before"](input, output);
       await governancePathValidator?.["tool.execute.before"](input, output);
       await governanceDocsDelegation?.["tool.execute.before"](input, output);
+      // LIF-103: Read-before-write enforcement (tracks reads AND enforces on writes)
+      await readBeforeWrite?.["tool.execute.before"](input, output);
       
       // Lock acquisition (run AFTER all validation hooks to prevent lock leaks)
       await conflictDetector?.["tool.execute.before"](input, output);
