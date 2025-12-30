@@ -878,7 +878,7 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`、`ralph-loop`
+可关的 hook：`todo-continuation-enforcer`、`context-window-monitor`、`session-recovery`、`session-notification`、`comment-checker`、`grep-output-truncator`、`tool-output-truncator`、`directory-agents-injector`、`directory-readme-injector`、`empty-task-response-detector`、`think-mode`、`anthropic-context-window-limit-recovery`、`rules-injector`、`background-notification`、`auto-update-checker`、`startup-toast`、`keyword-detector`、`agent-usage-reminder`、`non-interactive-env`、`interactive-bash-session`、`empty-message-sanitizer`、`compaction-context-injector`、`thinking-block-validator`、`claude-code-hooks`、`ralph-loop`
 
 **关于 `auto-update-checker` 和 `startup-toast`**: `startup-toast` hook 是 `auto-update-checker` 的子功能。若想保持更新检查但只禁用启动提示通知，在 `disabled_hooks` 中添加 `"startup-toast"`。若要禁用所有更新检查功能（包括提示），添加 `"auto-update-checker"`。
 
@@ -930,7 +930,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 ```json
 {
   "experimental": {
-    "tool_output_truncator": true,
     "preemptive_compaction": true,
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
@@ -941,10 +940,9 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 
 | 选项                              | 默认值  | 说明                                                                                                                                           |
 | --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tool_output_truncator`           | `false` | 根据上下文窗口使用情况动态截断工具输出（Grep、Glob、LSP、AST-grep 等）。防止提示过长。                                                              |
 | `preemptive_compaction`           | `false` | 在达到 token 限制之前主动压缩会话。默认在上下文窗口使用率达到 80% 时运行。                                                                          |
 | `preemptive_compaction_threshold` | `0.80`  | 触发预先压缩的阈值比例（0.5-0.95）。仅在 `preemptive_compaction` 启用时生效。                                                                       |
-| `truncate_all_tool_outputs`       | `false` | 当 `tool_output_truncator` 启用时，截断所有工具输出，而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。                                             |
+| `truncate_all_tool_outputs`       | `false` | 截断所有工具输出，而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。Tool output truncator 默认启用 - 使用 `disabled_hooks` 禁用。                    |
 | `aggressive_truncation`           | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
 | `auto_resume`                     | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
 | `dcp_for_compaction`              | `false` | 启用压缩用 DCP（动态上下文剪枝）- 在超出 token 限制时首先执行。在压缩前清理重复的工具调用和旧的工具输出。                                            |
