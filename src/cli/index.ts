@@ -3,9 +3,11 @@ import { Command } from "commander"
 import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
+import { doctor } from "./doctor"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
+import type { DoctorOptions } from "./doctor"
 
 const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
@@ -98,6 +100,37 @@ This command shows:
       json: options.json ?? false,
     }
     const exitCode = await getLocalVersion(versionOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("doctor")
+  .description("Check oh-my-opencode installation health and diagnose issues")
+  .option("--verbose", "Show detailed diagnostic information")
+  .option("--json", "Output results in JSON format")
+  .option("--category <category>", "Run only specific category")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode doctor
+  $ bunx oh-my-opencode doctor --verbose
+  $ bunx oh-my-opencode doctor --json
+  $ bunx oh-my-opencode doctor --category authentication
+
+Categories:
+  installation     Check OpenCode and plugin installation
+  configuration    Validate configuration files
+  authentication   Check auth provider status
+  dependencies     Check external dependencies
+  tools            Check LSP and MCP servers
+  updates          Check for version updates
+`)
+  .action(async (options) => {
+    const doctorOptions: DoctorOptions = {
+      verbose: options.verbose ?? false,
+      json: options.json ?? false,
+      category: options.category,
+    }
+    const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)
   })
 
