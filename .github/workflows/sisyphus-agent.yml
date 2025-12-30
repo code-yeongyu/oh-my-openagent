@@ -316,10 +316,9 @@ jobs:
 
           ---
 
-          First, acknowledge with `gh issue comment NUMBER_PLACEHOLDER --body "👋 Hey @AUTHOR_PLACEHOLDER! I'm on it..."`
-
-          Then write everything using the todo tools.
+          Write everything using the todo tools.
           Then investigate and satisfy the request. Only if user requested to you to work explicitely, then use plan agent to plan, todo obsessivley then create a PR to `BRANCH_PLACEHOLDER` branch.
+          When done, report the result to the issue/PR with `gh issue comment NUMBER_PLACEHOLDER` or `gh pr comment NUMBER_PLACEHOLDER`.
           PROMPT_EOF
           )
 
