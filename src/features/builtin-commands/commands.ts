@@ -1,6 +1,7 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
+import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -13,6 +14,23 @@ ${INIT_DEEP_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[--create-new] [--max-depth=N]",
+  },
+  "ralph-loop": {
+    description: "(builtin) Start self-referential development loop until completion",
+    template: `<command-instruction>
+${RALPH_LOOP_TEMPLATE}
+</command-instruction>
+
+<user-task>
+$ARGUMENTS
+</user-task>`,
+    argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+  },
+  "cancel-ralph": {
+    description: "(builtin) Cancel active Ralph Loop",
+    template: `<command-instruction>
+${CANCEL_RALPH_TEMPLATE}
+</command-instruction>`,
   },
 }
 

@@ -60,7 +60,8 @@
           "non-interactive-env",
           "interactive-bash-session",
           "empty-message-sanitizer",
-          "thinking-block-validator"
+          "thinking-block-validator",
+          "ralph-loop"
         ]
       }
     },
@@ -1511,6 +1512,24 @@
     },
     "auto_update": {
       "type": "boolean"
+    },
+    "ralph_loop": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "default_max_iterations": {
+          "default": 100,
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "state_dir": {
+          "type": "string"
+        }
+      }
     }
   }
 }

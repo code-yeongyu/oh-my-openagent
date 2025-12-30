@@ -22,3 +22,4 @@ export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 export { createEmptyMessageSanitizerHook } from "./empty-message-sanitizer";
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
