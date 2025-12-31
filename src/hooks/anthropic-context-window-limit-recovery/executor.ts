@@ -1,12 +1,11 @@
 import type {
   AutoCompactState,
   DcpState,
-  FallbackState,
   RetryState,
   TruncateState,
 } from "./types";
 import type { ExperimentalConfig } from "../../config";
-import { FALLBACK_CONFIG, RETRY_CONFIG, TRUNCATE_CONFIG } from "./types";
+import { RETRY_CONFIG, TRUNCATE_CONFIG } from "./types";
 import { executeDynamicContextPruning } from "./pruning-executor";
 import {
   findLargestToolResult,
@@ -69,17 +68,7 @@ function getOrCreateRetryState(
   return state;
 }
 
-function getOrCreateFallbackState(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): FallbackState {
-  let state = autoCompactState.fallbackStateBySession.get(sessionID);
-  if (!state) {
-    state = { revertAttempt: 0 };
-    autoCompactState.fallbackStateBySession.set(sessionID, state);
-  }
-  return state;
-}
+
 
 function getOrCreateTruncateState(
   autoCompactState: AutoCompactState,
@@ -135,58 +124,6 @@ function sanitizeEmptyMessagesBeforeSummarize(sessionID: string): number {
   return fixedCount;
 }
 
-async function getLastMessagePair(
-  sessionID: string,
-  client: Client,
-  directory: string,
-): Promise<{ userMessageID: string; assistantMessageID?: string } | null> {
-  try {
-    const resp = await client.session.messages({
-      path: { id: sessionID },
-      query: { directory },
-    });
-
-    const data = (resp as { data?: unknown[] }).data;
-    if (
-      !Array.isArray(data) ||
-      data.length < FALLBACK_CONFIG.minMessagesRequired
-    ) {
-      return null;
-    }
-
-    const reversed = [...data].reverse();
-
-    const lastAssistant = reversed.find((m) => {
-      const msg = m as Record<string, unknown>;
-      const info = msg.info as Record<string, unknown> | undefined;
-      return info?.role === "assistant";
-    });
-
-    const lastUser = reversed.find((m) => {
-      const msg = m as Record<string, unknown>;
-      const info = msg.info as Record<string, unknown> | undefined;
-      return info?.role === "user";
-    });
-
-    if (!lastUser) return null;
-    const userInfo = (lastUser as { info?: Record<string, unknown> }).info;
-    const userMessageID = userInfo?.id as string | undefined;
-    if (!userMessageID) return null;
-
-    let assistantMessageID: string | undefined;
-    if (lastAssistant) {
-      const assistantInfo = (
-        lastAssistant as { info?: Record<string, unknown> }
-      ).info;
-      assistantMessageID = assistantInfo?.id as string | undefined;
-    }
-
-    return { userMessageID, assistantMessageID };
-  } catch {
-    return null;
-  }
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
@@ -228,7 +165,6 @@ function clearSessionState(
   autoCompactState.pendingCompact.delete(sessionID);
   autoCompactState.errorDataBySession.delete(sessionID);
   autoCompactState.retryStateBySession.delete(sessionID);
-  autoCompactState.fallbackStateBySession.delete(sessionID);
   autoCompactState.truncateStateBySession.delete(sessionID);
   autoCompactState.dcpStateBySession.delete(sessionID);
   autoCompactState.emptyContentAttemptBySession.delete(sessionID);
@@ -642,7 +578,6 @@ export async function executeCompact(
 
     if (Date.now() - retryState.lastAttemptTime > 300000) {
       retryState.attempt = 0;
-      autoCompactState.fallbackStateBySession.delete(sessionID);
       autoCompactState.truncateStateBySession.delete(sessionID);
     }
 
@@ -708,75 +643,7 @@ export async function executeCompact(
           .showToast({
             body: {
               title: "Summarize Skipped",
-              message: "Missing providerID or modelID. Skipping to revert...",
-              variant: "warning",
-              duration: 3000,
-            },
-          })
-          .catch(() => {});
-      }
-    }
-
-    const fallbackState = getOrCreateFallbackState(autoCompactState, sessionID);
-
-    if (fallbackState.revertAttempt < FALLBACK_CONFIG.maxRevertAttempts) {
-      const pair = await getLastMessagePair(
-        sessionID,
-        client as Client,
-        directory,
-      );
-
-      if (pair) {
-        try {
-          await (client as Client).tui
-            .showToast({
-              body: {
-                title: "Emergency Recovery",
-                message: "Removing last message pair...",
-                variant: "warning",
-                duration: 3000,
-              },
-            })
-            .catch(() => {});
-
-          if (pair.assistantMessageID) {
-            await (client as Client).session.revert({
-              path: { id: sessionID },
-              body: { messageID: pair.assistantMessageID },
-              query: { directory },
-            });
-          }
-
-          await (client as Client).session.revert({
-            path: { id: sessionID },
-            body: { messageID: pair.userMessageID },
-            query: { directory },
-          });
-
-          fallbackState.revertAttempt++;
-          fallbackState.lastRevertedMessageID = pair.userMessageID;
-
-          // Clear all state after successful revert - don't recurse
-          clearSessionState(autoCompactState, sessionID);
-
-          // Send "Continue" prompt to resume session
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
-          return;
-        } catch {}
-      } else {
-        await (client as Client).tui
-          .showToast({
-            body: {
-              title: "Revert Skipped",
-              message: "Could not find last message pair to revert.",
+              message: "Missing providerID or modelID.",
               variant: "warning",
               duration: 3000,
             },
