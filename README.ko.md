@@ -653,7 +653,7 @@ Oh My OpenCode는 다음 위치의 훅을 읽고 실행합니다:
 - **Empty Message Sanitizer**: 빈 채팅 메시지로 인한 API 오류를 방지합니다. 전송 전 메시지 내용을 자동으로 정리합니다.
 - **Grep Output Truncator**: grep은 산더미 같은 텍스트를 반환할 수 있습니다. 남은 컨텍스트 윈도우에 따라 동적으로 출력을 축소합니다—50% 여유 공간 유지, 최대 50k 토큰.
 - **Tool Output Truncator**: 같은 아이디어, 더 넓은 범위. Grep, Glob, LSP 도구, AST-grep의 출력을 축소합니다. 한 번의 장황한 검색이 전체 컨텍스트를 잡아먹는 것을 방지합니다.
-- **선제적 압축 (Preemptive Compaction)**: 세션 토큰 한계에 도달하기 전에 선제적으로 세션을 압축합니다. 문제가 발생하기 전에 미리 실행됩니다.
+- **선제적 압축 (Preemptive Compaction)**: 세션 토큰 한계에 도달하기 전에 선제적으로 세션을 압축합니다. 컨텍스트 윈도우 사용량 85%에서 실행됩니다. **기본적으로 활성화됨.** `disabled_hooks: ["preemptive-compaction"]`으로 비활성화 가능.
 - **압축 컨텍스트 주입기 (Compaction Context Injector)**: 세션 압축 중에 중요한 컨텍스트(AGENTS.md, 현재 디렉토리 정보 등)를 유지하여 중요한 상태를 잃지 않도록 합니다.
 - **사고 블록 검증기 (Thinking Block Validator)**: 사고(thinking) 블록의 형식이 올바른지 검증하여 잘못된 형식으로 인한 API 오류를 방지합니다.
 - **Claude Code 훅 (Claude Code Hooks)**: Claude Code의 settings.json에 설정된 훅을 실행합니다. PreToolUse/PostToolUse/UserPromptSubmit/Stop 이벤트를 지원하는 호환성 레이어입니다.
@@ -871,7 +871,7 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
+사용 가능한 훅: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`
 
 **`auto-update-checker`와 `startup-toast`에 대한 참고사항**: `startup-toast` 훅은 `auto-update-checker`의 하위 기능입니다. 업데이트 확인은 유지하면서 시작 토스트 알림만 비활성화하려면 `disabled_hooks`에 `"startup-toast"`를 추가하세요. 모든 업데이트 확인 기능(토스트 포함)을 비활성화하려면 `"auto-update-checker"`를 추가하세요.
 
@@ -923,7 +923,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 ```json
 {
   "experimental": {
-    "preemptive_compaction": true,
+    "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true
@@ -933,8 +933,7 @@ OpenCode 에서 지원하는 모든 LSP 구성 및 커스텀 설정 (opencode.js
 
 | 옵션                              | 기본값  | 설명                                                                                                                                                              |
 | --------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction`           | `false` | 토큰 제한에 도달하기 전에 세션을 미리 컴팩션합니다. 기본적으로 컨텍스트 윈도우 사용량이 80%일 때 실행됩니다.                                                              |
-| `preemptive_compaction_threshold` | `0.80`  | 선제적 컴팩션을 트리거할 임계값 비율(0.5-0.95). `preemptive_compaction`이 활성화된 경우에만 적용됩니다.                                                                |
+| `preemptive_compaction_threshold` | `0.85`  | 선제적 컴팩션을 트리거할 임계값 비율(0.5-0.95). `preemptive-compaction` 훅은 기본적으로 활성화되어 있으며, 이 옵션으로 임계값을 커스터마이즈할 수 있습니다.                 |
 | `truncate_all_tool_outputs`       | `false` | 화이트리스트 도구(Grep, Glob, LSP, AST-grep)만이 아닌 모든 도구 출력을 잘라냅니다. Tool output truncator는 기본적으로 활성화됩니다 - `disabled_hooks`로 비활성화 가능합니다. |
 | `aggressive_truncation`           | `false` | 토큰 제한을 초과하면 도구 출력을 공격적으로 잘라내어 제한 내에 맞춥니다. 기본 truncation보다 더 공격적입니다. 부족하면 요약/복구로 fallback합니다.                      |
 | `auto_resume`                     | `false` | thinking block 에러나 thinking disabled violation으로부터 성공적으로 복구한 후 자동으로 세션을 재개합니다. 마지막 사용자 메시지를 추출하여 계속합니다.                |

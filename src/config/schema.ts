@@ -66,6 +66,9 @@ export const HookNameSchema = z.enum([
   "empty-message-sanitizer",
   "thinking-block-validator",
   "ralph-loop",
+  "preemptive-compaction",
+  "compaction-context-injector",
+  "claude-code-hooks",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
