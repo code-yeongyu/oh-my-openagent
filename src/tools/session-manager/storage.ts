@@ -1,8 +1,49 @@
 import { existsSync, readdirSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { MESSAGE_STORAGE, PART_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
-import type { SessionMessage, SessionInfo, TodoItem } from "./types"
+import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
+import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
+
+export interface GetMainSessionsOptions {
+  directory?: string
+}
+
+export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
+  if (!existsSync(SESSION_STORAGE)) return []
+
+  const sessions: SessionMetadata[] = []
+
+  try {
+    const projectDirs = await readdir(SESSION_STORAGE, { withFileTypes: true })
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue
+
+      const projectPath = join(SESSION_STORAGE, projectDir.name)
+      const sessionFiles = await readdir(projectPath)
+
+      for (const file of sessionFiles) {
+        if (!file.endsWith(".json")) continue
+
+        try {
+          const content = await readFile(join(projectPath, file), "utf-8")
+          const meta = JSON.parse(content) as SessionMetadata
+
+          if (meta.parentID) continue
+
+          if (options.directory && meta.directory !== options.directory) continue
+
+          sessions.push(meta)
+        } catch {
+          continue
+        }
+      }
+    }
+  } catch {
+    return []
+  }
+
+  return sessions.sort((a, b) => b.time.updated - a.time.updated)
+}
 
 export async function getAllSessions(): Promise<string[]> {
   if (!existsSync(MESSAGE_STORAGE)) return []
