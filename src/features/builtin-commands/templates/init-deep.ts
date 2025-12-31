@@ -46,11 +46,40 @@ TodoWrite([
 
 **Mark "p1-analysis" as in_progress.**
 
-Launch **ALL tasks simultaneously**:
+<critical>
+**EXECUTION PATTERN**: Fire background agents FIRST (non-blocking), then main session builds codemap understanding using LSP tools in parallel. This maximizes throughput—agents discover while you analyze.
+</critical>
 
-<parallel-tasks>
+---
 
-### Structural Analysis (bash - run in parallel)
+### Step 1: Fire Background Explore Agents (IMMEDIATELY)
+
+Fire ALL background tasks at once. They run asynchronously—don't wait for results yet.
+
+\`\`\`
+// Fire immediately - these run in parallel, non-blocking
+background_task(agent="explore", prompt="Project structure: PREDICT standard {lang} patterns → FIND package.json/pyproject.toml/go.mod → REPORT deviations only")
+
+background_task(agent="explore", prompt="Entry points: PREDICT typical (main.py, index.ts) → FIND actual → REPORT non-standard organization")
+
+background_task(agent="explore", prompt="Conventions: FIND .cursor/rules, .cursorrules, eslintrc, pyproject.toml → REPORT project-specific rules DIFFERENT from defaults")
+
+background_task(agent="explore", prompt="Anti-patterns: FIND comments with 'DO NOT', 'NEVER', 'ALWAYS', 'LEGACY', 'DEPRECATED' → REPORT forbidden patterns")
+
+background_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile, justfile → REPORT non-standard build/deploy patterns")
+
+background_task(agent="explore", prompt="Test patterns: FIND pytest.ini, jest.config, test structure → REPORT unique testing conventions")
+\`\`\`
+
+---
+
+### Step 2: Main Session Codemap Understanding (while background runs)
+
+While background agents discover patterns, main session builds codemap understanding using direct tools.
+
+<parallel-tools>
+
+#### Structural Analysis (bash)
 \`\`\`bash
 # Task A: Directory depth analysis
 find . -type d -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/__pycache__/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
@@ -65,48 +94,33 @@ find . -type f \\( -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js"
 find . -type f \\( -name "AGENTS.md" -o -name "CLAUDE.md" \\) -not -path '*/node_modules/*' 2>/dev/null
 \`\`\`
 
-### Context Gathering (Explore agents - background_task in parallel)
+#### LSP Codemap Analysis (main session - semantic understanding)
+
+LSP provides semantic understanding beyond text search. Build the codemap while background agents run.
 
 \`\`\`
-background_task(agent="explore", prompt="Project structure: PREDICT standard {lang} patterns → FIND package.json/pyproject.toml/go.mod → REPORT deviations only")
-
-background_task(agent="explore", prompt="Entry points: PREDICT typical (main.py, index.ts) → FIND actual → REPORT non-standard organization")
-
-background_task(agent="explore", prompt="Conventions: FIND .cursor/rules, .cursorrules, eslintrc, pyproject.toml → REPORT project-specific rules DIFFERENT from defaults")
-
-background_task(agent="explore", prompt="Anti-patterns: FIND comments with 'DO NOT', 'NEVER', 'ALWAYS', 'LEGACY', 'DEPRECATED' → REPORT forbidden patterns")
-
-background_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile, justfile → REPORT non-standard build/deploy patterns")
-
-background_task(agent="explore", prompt="Test patterns: FIND pytest.ini, jest.config, test structure → REPORT unique testing conventions")
-\`\`\`
-
-### Code Intelligence Analysis (LSP tools - run in parallel)
-
-LSP provides semantic understanding beyond text search. Use for accurate code mapping.
-
-\`\`\`
-# Step 1: Check LSP availability
+# Check LSP availability first
 lsp_servers()  # Verify language server is available
 
-# Step 2: Analyze entry point files (run in parallel)
-# Find entry points first, then analyze each with lsp_document_symbols
+# Analyze entry point files (run in parallel)
 lsp_document_symbols(filePath="src/index.ts")      # Main entry
 lsp_document_symbols(filePath="src/main.py")       # Python entry
 lsp_document_symbols(filePath="cmd/main.go")       # Go entry
 
-# Step 3: Discover key symbols across workspace (run in parallel)
+# Discover key symbols across workspace (run in parallel)
 lsp_workspace_symbols(filePath=".", query="class")      # All classes
 lsp_workspace_symbols(filePath=".", query="interface")  # All interfaces
 lsp_workspace_symbols(filePath=".", query="function")   # Top-level functions
 lsp_workspace_symbols(filePath=".", query="type")       # Type definitions
 
-# Step 4: Analyze symbol centrality (for top 5-10 key symbols)
+# Analyze symbol centrality (for top 5-10 key symbols)
 # High reference count = central/important concept
 lsp_find_references(filePath="src/index.ts", line=X, character=Y)  # Main export
 \`\`\`
 
-#### LSP Analysis Output Format
+</parallel-tools>
+
+#### Codemap Output Format
 
 \`\`\`
 CODE_INTELLIGENCE = {
@@ -125,12 +139,21 @@ CODE_INTELLIGENCE = {
 \`\`\`
 
 <critical>
-**LSP Fallback**: If LSP unavailable (no server installed), skip this section and rely on explore agents + AST-grep patterns.
+**LSP Fallback**: If LSP unavailable (no server installed), skip LSP section and rely on explore agents + AST-grep patterns.
 </critical>
 
-</parallel-tasks>
+---
 
-**Collect all results. Mark "p1-analysis" as completed.**
+### Step 3: Collect Background Results
+
+After main session analysis complete, collect background agent results:
+
+\`\`\`
+// Collect all background_task results
+// background_output(task_id="...") for each fired task
+\`\`\`
+
+**Merge bash + LSP + background agent findings. Mark "p1-analysis" as completed.**
 
 ---
 
