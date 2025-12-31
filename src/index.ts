@@ -279,12 +279,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         dcpForCompaction: pluginConfig.experimental?.dcp_for_compaction,
       })
     : null;
-  const compactionContextInjector = createCompactionContextInjector();
-  const preemptiveCompaction = createPreemptiveCompactionHook(ctx, {
-    experimental: pluginConfig.experimental,
-    onBeforeSummarize: compactionContextInjector,
-    getModelLimit,
-  });
+  const compactionContextInjector = isHookEnabled("compaction-context-injector")
+    ? createCompactionContextInjector()
+    : undefined;
+  const preemptiveCompaction = isHookEnabled("preemptive-compaction")
+    ? createPreemptiveCompactionHook(ctx, {
+        experimental: pluginConfig.experimental,
+        onBeforeSummarize: compactionContextInjector,
+        getModelLimit,
+      })
+    : null;
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
     : null;

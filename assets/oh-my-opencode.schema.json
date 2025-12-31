@@ -61,7 +61,10 @@
           "interactive-bash-session",
           "empty-message-sanitizer",
           "thinking-block-validator",
-          "ralph-loop"
+          "ralph-loop",
+          "preemptive-compaction",
+          "compaction-context-injector",
+          "claude-code-hooks"
         ]
       }
     },
