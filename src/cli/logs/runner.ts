@@ -144,6 +144,8 @@ async function followLogs(logPath: string, options: LogsOptions): Promise<number
   return new Promise<number>((resolve) => {
     const cleanup = () => {
       clearInterval(intervalId)
+      process.off("SIGINT", cleanup)
+      process.off("SIGTERM", cleanup)
       console.log("")
       console.log(formatSuccess("Stopped following logs"))
       resolve(0)
