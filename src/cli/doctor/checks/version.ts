@@ -1,76 +1,11 @@
-import { existsSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
-import { join } from "node:path"
 import type { CheckResult, CheckDefinition, VersionCheckInfo } from "../types"
-import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import { parseJsonc } from "../../../shared"
-
-const OPENCODE_CONFIG_DIR = join(homedir(), ".config", "opencode")
-const OPENCODE_PACKAGE_JSON = join(OPENCODE_CONFIG_DIR, "package.json")
-const OPENCODE_JSON = join(OPENCODE_CONFIG_DIR, "opencode.json")
-const OPENCODE_JSONC = join(OPENCODE_CONFIG_DIR, "opencode.jsonc")
-
-async function fetchLatestVersion(): Promise<string | null> {
-  try {
-    const res = await fetch(`https://registry.npmjs.org/${PACKAGE_NAME}/latest`, {
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return null
-    const data = (await res.json()) as { version: string }
-    return data.version
-  } catch {
-    return null
-  }
-}
-
-function getCurrentVersion(): {
-  version: string | null
-  isLocalDev: boolean
-  isPinned: boolean
-  pinnedVersion: string | null
-} {
-  const configPath = existsSync(OPENCODE_JSONC) ? OPENCODE_JSONC : OPENCODE_JSON
-
-  if (!existsSync(configPath)) {
-    return { version: null, isLocalDev: false, isPinned: false, pinnedVersion: null }
-  }
-
-  try {
-    const content = readFileSync(configPath, "utf-8")
-    const config = parseJsonc<{ plugin?: string[] }>(content)
-    const plugins = config.plugin ?? []
-
-    for (const plugin of plugins) {
-      if (plugin.startsWith("file:") && plugin.includes(PACKAGE_NAME)) {
-        return { version: "local-dev", isLocalDev: true, isPinned: false, pinnedVersion: null }
-      }
-      if (plugin.startsWith(`${PACKAGE_NAME}@`)) {
-        const pinnedVersion = plugin.split("@")[1]
-        return { version: pinnedVersion, isLocalDev: false, isPinned: true, pinnedVersion }
-      }
-      if (plugin === PACKAGE_NAME) {
-        if (existsSync(OPENCODE_PACKAGE_JSON)) {
-          try {
-            const pkgContent = readFileSync(OPENCODE_PACKAGE_JSON, "utf-8")
-            const pkg = JSON.parse(pkgContent) as { dependencies?: Record<string, string> }
-            const depVersion = pkg.dependencies?.[PACKAGE_NAME]
-            if (depVersion) {
-              const cleanVersion = depVersion.replace(/^[\^~]/, "")
-              return { version: cleanVersion, isLocalDev: false, isPinned: false, pinnedVersion: null }
-            }
-          } catch {
-            // intentionally empty - parse errors ignored
-          }
-        }
-        return { version: null, isLocalDev: false, isPinned: false, pinnedVersion: null }
-      }
-    }
-
-    return { version: null, isLocalDev: false, isPinned: false, pinnedVersion: null }
-  } catch {
-    return { version: null, isLocalDev: false, isPinned: false, pinnedVersion: null }
-  }
-}
+import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import {
+  getCachedVersion,
+  getLatestVersion,
+  isLocalDevMode,
+  findPluginEntry,
+} from "../../../hooks/auto-update-checker/checker"
 
 function compareVersions(current: string, latest: string): boolean {
   const parseVersion = (v: string): number[] => {
@@ -91,22 +26,43 @@ function compareVersions(current: string, latest: string): boolean {
 }
 
 export async function getVersionInfo(): Promise<VersionCheckInfo> {
-  const current = getCurrentVersion()
-  const latestVersion = await fetchLatestVersion()
+  const cwd = process.cwd()
+
+  if (isLocalDevMode(cwd)) {
+    return {
+      currentVersion: "local-dev",
+      latestVersion: null,
+      isUpToDate: true,
+      isLocalDev: true,
+      isPinned: false,
+    }
+  }
+
+  const pluginInfo = findPluginEntry(cwd)
+  if (pluginInfo?.isPinned) {
+    return {
+      currentVersion: pluginInfo.pinnedVersion,
+      latestVersion: null,
+      isUpToDate: true,
+      isLocalDev: false,
+      isPinned: true,
+    }
+  }
+
+  const currentVersion = getCachedVersion()
+  const latestVersion = await getLatestVersion()
 
   const isUpToDate =
-    current.isLocalDev ||
-    current.isPinned ||
-    !current.version ||
+    !currentVersion ||
     !latestVersion ||
-    compareVersions(current.version, latestVersion)
+    compareVersions(currentVersion, latestVersion)
 
   return {
-    currentVersion: current.version,
+    currentVersion,
     latestVersion,
     isUpToDate,
-    isLocalDev: current.isLocalDev,
-    isPinned: current.isPinned,
+    isLocalDev: false,
+    isPinned: false,
   }
 }
 
