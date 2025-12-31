@@ -22,21 +22,13 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
 - **PARALLEL**: Fire independent agent calls simultaneously via background_task - NEVER wait sequentially.
 - **BACKGROUND FIRST**: Use background_task for exploration/research agents (10+ concurrent if needed).
-- **LSP IN MAIN SESSION**: While background agents explore, use LSP tools directly to build codemap understanding.
 - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
 - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
-2. **PARALLEL PHASE** (fire simultaneously, don't wait):
-   - Spawn exploration/librarian agents via background_task (10+ concurrent if needed)
-   - **MAIN SESSION**: Use LSP tools to build codemap:
-     - \`lsp_document_symbols\`: Get file outlines for key files
-     - \`lsp_workspace_symbols\`: Search symbols across project
-     - \`lsp_goto_definition\`: Trace code flow
-     - \`lsp_find_references\`: Map usage patterns
-     - \`lsp_hover\`: Get type info and signatures
-3. Use Plan agent with gathered context (background results + LSP insights) for detailed work breakdown
+2. Spawn exploration/librarian agents via background_task in PARALLEL (10+ if needed)
+3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
 ## TDD (if test infrastructure exists)
