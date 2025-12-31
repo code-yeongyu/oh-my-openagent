@@ -2,6 +2,9 @@
 >
 > *"I aim to spark a software revolution by creating a world where agent-generated code is indistinguishable from human code, yet capable of achieving vastly more. I have poured my personal time, passion, and funds into this journey, and I will continue to do so."*
 >
+> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
+> > **The Orchestrator is coming. This Week. [Get notified on X](https://x.com/justsisyphus/status/2006250634354548963)**
+>
 > Be with us!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | Join our [Discord community](https://discord.gg/PWpXmbhF) to connect with contributors and fellow `oh-my-opencode` users. |
