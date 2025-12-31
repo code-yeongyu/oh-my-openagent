@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 const TEST_DIR = join(tmpdir(), "omo-test-session-manager")
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
+const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 
@@ -13,6 +14,7 @@ mock.module("./constants", () => ({
   OPENCODE_STORAGE: TEST_DIR,
   MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
   PART_STORAGE: TEST_PART_STORAGE,
+  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
   SESSION_LIST_DESCRIPTION: "test",
@@ -26,6 +28,8 @@ mock.module("./constants", () => ({
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
+const storage = await import("./storage")
+
 describe("session-manager storage", () => {
   beforeEach(() => {
     if (existsSync(TEST_DIR)) {
@@ -34,6 +38,7 @@ describe("session-manager storage", () => {
     mkdirSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
     mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
     mkdirSync(TEST_TODO_DIR, { recursive: true })
     mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
   })
@@ -172,5 +177,139 @@ describe("session-manager storage", () => {
     expect(info?.message_count).toBe(2)
     expect(info?.agents_used).toContain("build")
     expect(info?.agents_used).toContain("oracle")
+  })
+})
+
+describe("session-manager storage - getMainSessions", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+    mkdirSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
+    mkdirSync(TEST_TODO_DIR, { recursive: true })
+    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+  })
+
+  function createSessionMetadata(
+    projectID: string,
+    sessionID: string,
+    opts: { parentID?: string; directory: string; updated: number }
+  ) {
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(
+      join(projectDir, `${sessionID}.json`),
+      JSON.stringify({
+        id: sessionID,
+        projectID,
+        directory: opts.directory,
+        parentID: opts.parentID,
+        time: { created: opts.updated - 1000, updated: opts.updated },
+      })
+    )
+  }
+
+  function createMessageForSession(sessionID: string, msgID: string, created: number) {
+    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
+    mkdirSync(sessionPath, { recursive: true })
+    writeFileSync(
+      join(sessionPath, `${msgID}.json`),
+      JSON.stringify({ id: msgID, role: "user", time: { created } })
+    )
+  }
+
+  test("getMainSessions returns only sessions without parentID", async () => {
+    // #given
+    const projectID = "proj_abc123"
+    const now = Date.now()
+
+    createSessionMetadata(projectID, "ses_main1", { directory: "/test/path", updated: now })
+    createSessionMetadata(projectID, "ses_main2", { directory: "/test/path", updated: now - 1000 })
+    createSessionMetadata(projectID, "ses_child1", { directory: "/test/path", updated: now, parentID: "ses_main1" })
+
+    createMessageForSession("ses_main1", "msg_001", now)
+    createMessageForSession("ses_main2", "msg_001", now - 1000)
+    createMessageForSession("ses_child1", "msg_001", now)
+
+    // #when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    // #then
+    expect(sessions.length).toBe(2)
+    expect(sessions.map((s) => s.id)).not.toContain("ses_child1")
+  })
+
+  test("getMainSessions sorts by time.updated descending (most recent first)", async () => {
+    // #given
+    const projectID = "proj_abc123"
+    const now = Date.now()
+
+    createSessionMetadata(projectID, "ses_old", { directory: "/test/path", updated: now - 5000 })
+    createSessionMetadata(projectID, "ses_mid", { directory: "/test/path", updated: now - 2000 })
+    createSessionMetadata(projectID, "ses_new", { directory: "/test/path", updated: now })
+
+    createMessageForSession("ses_old", "msg_001", now - 5000)
+    createMessageForSession("ses_mid", "msg_001", now - 2000)
+    createMessageForSession("ses_new", "msg_001", now)
+
+    // #when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    // #then
+    expect(sessions.length).toBe(3)
+    expect(sessions[0].id).toBe("ses_new")
+    expect(sessions[1].id).toBe("ses_mid")
+    expect(sessions[2].id).toBe("ses_old")
+  })
+
+  test("getMainSessions filters by directory (project path)", async () => {
+    // #given
+    const projectA = "proj_aaa"
+    const projectB = "proj_bbb"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_projA", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_projB", { directory: "/path/to/projectB", updated: now })
+
+    createMessageForSession("ses_projA", "msg_001", now)
+    createMessageForSession("ses_projB", "msg_001", now)
+
+    // #when
+    const sessionsA = await storage.getMainSessions({ directory: "/path/to/projectA" })
+    const sessionsB = await storage.getMainSessions({ directory: "/path/to/projectB" })
+
+    // #then
+    expect(sessionsA.length).toBe(1)
+    expect(sessionsA[0].id).toBe("ses_projA")
+    expect(sessionsB.length).toBe(1)
+    expect(sessionsB[0].id).toBe("ses_projB")
+  })
+
+  test("getMainSessions returns all main sessions when directory is not specified", async () => {
+    // #given
+    const projectA = "proj_aaa"
+    const projectB = "proj_bbb"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_projA", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_projB", { directory: "/path/to/projectB", updated: now - 1000 })
+
+    createMessageForSession("ses_projA", "msg_001", now)
+    createMessageForSession("ses_projB", "msg_001", now - 1000)
+
+    // #when
+    const sessions = await storage.getMainSessions({})
+
+    // #then
+    expect(sessions.length).toBe(2)
   })
 })

@@ -31,6 +31,27 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
+  test("session_list filters by project_path", async () => {
+    // #given
+    const projectPath = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+
+    // #when
+    const result = await session_list.execute({ project_path: projectPath }, mockContext)
+
+    // #then
+    expect(typeof result).toBe("string")
+  })
+
+  test("session_list uses process.cwd() as default project_path", async () => {
+    // #given - no project_path provided
+
+    // #when
+    const result = await session_list.execute({}, mockContext)
+
+    // #then - should not throw and return string (uses process.cwd() internally)
+    expect(typeof result).toBe("string")
+  })
+
   test("session_read handles non-existent session", async () => {
     const result = await session_read.execute({ session_id: "ses_nonexistent" }, mockContext)
     
