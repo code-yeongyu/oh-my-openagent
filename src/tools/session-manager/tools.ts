@@ -5,7 +5,7 @@ import {
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -32,20 +32,23 @@ export const session_list: ToolDefinition = tool({
     limit: tool.schema.number().optional().describe("Maximum number of sessions to return"),
     from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
     to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
+    project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
   },
   execute: async (args: SessionListArgs, _context) => {
     try {
-      let sessions = await getAllSessions()
+      const directory = args.project_path ?? process.cwd()
+      let sessions = await getMainSessions({ directory })
+      let sessionIDs = sessions.map((s) => s.id)
 
       if (args.from_date || args.to_date) {
-        sessions = await filterSessionsByDate(sessions, args.from_date, args.to_date)
+        sessionIDs = await filterSessionsByDate(sessionIDs, args.from_date, args.to_date)
       }
 
       if (args.limit && args.limit > 0) {
-        sessions = sessions.slice(0, args.limit)
+        sessionIDs = sessionIDs.slice(0, args.limit)
       }
 
-      return await formatSessionList(sessions)
+      return await formatSessionList(sessionIDs)
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
