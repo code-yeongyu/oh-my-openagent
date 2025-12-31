@@ -4,10 +4,12 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { logs } from "./logs"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import type { LogsOptions } from "./logs"
 
 const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
@@ -131,6 +133,44 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("logs")
+  .description("View and manage oh-my-opencode logs")
+  .option("-n, --lines <count>", "Number of lines to show (default: 50)", parseInt)
+  .option("-f, --follow", "Follow logs in real-time (tail -f style)")
+  .option("--level <level>", "Filter by level: all, info, warn, error")
+  .option("--json", "Output in JSON format")
+  .option("--clear", "Clear the log file")
+  .option("--path", "Show log file path")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode logs
+  $ bunx oh-my-opencode logs -n 100
+  $ bunx oh-my-opencode logs -f
+  $ bunx oh-my-opencode logs --level error
+  $ bunx oh-my-opencode logs --json
+  $ bunx oh-my-opencode logs --clear
+  $ bunx oh-my-opencode logs --path
+
+Log Levels:
+  all       Show all log entries (default)
+  info      Show info and above
+  warn      Show warnings and errors
+  error     Show errors only
+`)
+  .action(async (options) => {
+    const logsOptions: LogsOptions = {
+      lines: options.lines ?? 50,
+      follow: options.follow ?? false,
+      level: options.level ?? "all",
+      json: options.json ?? false,
+      clear: options.clear ?? false,
+      path: options.path ?? false,
+    }
+    const exitCode = await logs(logsOptions)
     process.exit(exitCode)
   })
 
