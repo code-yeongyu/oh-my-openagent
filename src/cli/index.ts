@@ -163,7 +163,7 @@ Log Levels:
 `)
   .action(async (options) => {
     const logsOptions: LogsOptions = {
-      lines: options.lines ?? 50,
+      lines: Number.isNaN(options.lines) ? 50 : (options.lines ?? 50),
       follow: options.follow ?? false,
       level: options.level ?? "all",
       json: options.json ?? false,

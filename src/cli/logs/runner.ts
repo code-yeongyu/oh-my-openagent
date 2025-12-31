@@ -140,20 +140,18 @@ async function followLogs(logPath: string, options: LogsOptions): Promise<number
   // Set up polling interval
   const intervalId = setInterval(poll, FOLLOW_POLL_INTERVAL)
 
-  // Handle Ctrl+C gracefully
-  const cleanup = () => {
-    clearInterval(intervalId)
-    console.log("")
-    console.log(formatSuccess("Stopped following logs"))
-    process.exit(0)
-  }
+  // Keep process alive until signal received
+  return new Promise<number>((resolve) => {
+    const cleanup = () => {
+      clearInterval(intervalId)
+      console.log("")
+      console.log(formatSuccess("Stopped following logs"))
+      resolve(0)
+    }
 
-  process.on("SIGINT", cleanup)
-  process.on("SIGTERM", cleanup)
-
-  // Keep process alive
-  await new Promise(() => {})
-  return 0
+    process.on("SIGINT", cleanup)
+    process.on("SIGTERM", cleanup)
+  })
 }
 
 /**

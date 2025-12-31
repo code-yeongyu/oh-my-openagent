@@ -1,4 +1,4 @@
-import type { LogEntry, LogLevel } from "./types"
+import type { LogEntry, LogLevel, LogLevelFilter } from "./types"
 import { ERROR_KEYWORDS, WARN_KEYWORDS } from "./constants"
 
 /**
@@ -129,13 +129,12 @@ export function parseLogFile(content: string): LogEntry[] {
 /**
  * Filter entries by log level
  */
-export function filterByLevel(entries: LogEntry[], level: LogLevel): LogEntry[] {
+export function filterByLevel(entries: LogEntry[], level: LogLevelFilter): LogEntry[] {
   if (level === "all") {
     return entries
   }
 
   const levelPriority: Record<LogLevel, number> = {
-    all: 0,
     info: 1,
     warn: 2,
     error: 3,

@@ -1,7 +1,12 @@
 /**
- * Log level types for filtering
+ * Log level for individual entries
  */
-export type LogLevel = "all" | "info" | "warn" | "error"
+export type LogLevel = "info" | "warn" | "error"
+
+/**
+ * Log level filter (includes "all" for no filtering)
+ */
+export type LogLevelFilter = "all" | LogLevel
 
 /**
  * Options for the logs command
@@ -12,7 +17,7 @@ export interface LogsOptions {
   /** Follow logs in real-time (tail -f style) */
   follow?: boolean
   /** Filter by log level */
-  level?: LogLevel
+  level?: LogLevelFilter
   /** Output in JSON format */
   json?: boolean
   /** Clear the log file */

@@ -1,5 +1,5 @@
 import pc from "picocolors"
-import type { LogEntry, LogLevel } from "./types"
+import type { LogEntry, LogLevel, LogLevelFilter } from "./types"
 import { LOG_SYMBOLS, LOG_COLORS } from "./constants"
 
 /**
@@ -102,7 +102,7 @@ export function formatFollowStatus(path: string): string {
 /**
  * Format log level for help text
  */
-export function formatLevelHelp(level: LogLevel): string {
+export function formatLevelHelp(level: LogLevelFilter): string {
   const symbol = LOG_SYMBOLS[level]
   const color = LOG_COLORS[level]
   return `${symbol} ${color(level)}`
@@ -119,8 +119,10 @@ export function formatEmptyLogs(): string {
  * Format log count summary
  */
 export function formatLogCount(count: number, total: number): string {
+  const entryWord = count === 1 ? "entry" : "entries"
+  const totalWord = total === 1 ? "entry" : "entries"
   if (count === total) {
-    return pc.dim(`Showing all ${count} entries`)
+    return pc.dim(`Showing all ${count} ${entryWord}`)
   }
-  return pc.dim(`Showing last ${count} of ${total} entries`)
+  return pc.dim(`Showing last ${count} ${entryWord} of ${total} ${totalWord}`)
 }
