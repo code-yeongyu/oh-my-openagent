@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-28T19:26:00+09:00
-**Commit:** 122e918
+**Generated:** 2025-12-31T14:05:00+09:00
+**Commit:** 502e9f5
 **Branch:** dev
 
 ## OVERVIEW
@@ -20,7 +20,8 @@ oh-my-opencode/
 │   ├── features/      # Claude Code compatibility - see src/features/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
 │   ├── auth/          # Google Antigravity OAuth (antigravity/)
-│   ├── shared/        # Utilities: deep-merge, pattern-matcher, logger, etc.
+│   ├── shared/        # Utilities: deep-merge, pattern-matcher, logger, etc. - see src/shared/AGENTS.md
+│   ├── cli/           # CLI installer, doctor, run - see src/cli/AGENTS.md
 │   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
@@ -34,7 +35,7 @@ oh-my-opencode/
 | Add agent | `src/agents/` | Create .ts, add to builtinAgents in index.ts, update types.ts |
 | Add hook | `src/hooks/` | Create dir with createXXXHook(), export from index.ts |
 | Add tool | `src/tools/` | Dir with index/types/constants/tools.ts, add to builtinTools |
-| Add MCP | `src/mcp/` | Create config, add to index.ts |
+| Add MCP | `src/mcp/` | Create config, add to index.ts and types.ts |
 | LSP behavior | `src/tools/lsp/` | client.ts (connection), tools.ts (handlers) |
 | AST-Grep | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi binding |
 | Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google models |
@@ -42,6 +43,9 @@ oh-my-opencode/
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
 | Background agents | `src/features/background-agent/` | manager.ts for task management |
 | Interactive terminal | `src/tools/interactive-bash/` | tmux session management |
+| CLI installer | `src/cli/install.ts` | Interactive TUI installation |
+| Doctor checks | `src/cli/doctor/checks/` | Health checks for environment |
+| Shared utilities | `src/shared/` | Cross-cutting utilities |
 
 ## CONVENTIONS
 
@@ -64,6 +68,8 @@ oh-my-opencode/
 - **Year 2024**: NEVER use 2024 in code/prompts (use current year)
 - **Rush completion**: Never mark tasks complete without verification
 - **Over-exploration**: Stop searching when sufficient context found
+- **High temperature**: Don't use >0.3 for code-related agents
+- **Broad tool access**: Prefer explicit `include` over unrestricted access
 
 ## UNIQUE STYLES
 
@@ -109,8 +115,19 @@ bun test               # Run tests
 
 ## CI PIPELINE
 
-- **ci.yml**: Parallel test/typecheck, build verification, auto-commit schema on master
+- **ci.yml**: Parallel test/typecheck, build verification, auto-commit schema on master, rolling `next` draft release
 - **publish.yml**: Manual workflow_dispatch, version bump, changelog, OIDC npm publish
+- **sisyphus-agent.yml**: Agent-in-CI for automated issue handling via `@sisyphus-dev-ai` mentions
+
+## COMPLEXITY HOTSPOTS
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `src/index.ts` | 690 | Main plugin orchestration, all hook/tool initialization |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 670 | Session compaction, multi-stage recovery pipeline |
+| `src/cli/config-manager.ts` | 669 | JSONC parsing, environment detection, installation |
+| `src/auth/antigravity/fetch.ts` | 621 | Token refresh, URL rewriting, endpoint fallbacks |
+| `src/tools/lsp/client.ts` | 611 | LSP protocol, stdin/stdout buffering, JSON-RPC |
 
 ## NOTES
 
@@ -119,3 +136,4 @@ bun test               # Run tests
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
+- **JSONC support**: Config files support comments (`// comment`, `/* block */`) and trailing commas
