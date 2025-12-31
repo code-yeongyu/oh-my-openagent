@@ -660,6 +660,10 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 - **Empty Message Sanitizer**: 空のチャットメッセージによるAPIエラーを防止します。送信前にメッセージ内容を自動的にサニタイズします。
 - **Grep Output Truncator**: grep は山のようなテキストを返すことがあります。残りのコンテキストウィンドウに応じて動的に出力を切り詰めます—50% の余裕を維持し、最大 50k トークンに制限します。
 - **Tool Output Truncator**: 同じ考え方をより広範囲に適用します。Grep、Glob、LSP ツール、AST-grep の出力を切り詰めます。一度の冗長な検索がコンテキスト全体を食いつぶすのを防ぎます。
+- **Preemptive Compaction**: トークン制限に達する前にセッションを事前にコンパクションします。コンテキストウィンドウ使用率85%で実行されます。**デフォルトで有効。** `disabled_hooks: ["preemptive-compaction"]`で無効化できます。
+- **Compaction Context Injector**: セッションコンパクション中に重要なコンテキスト（AGENTS.md、現在のディレクトリ情報）を保持し、重要な状態を失わないようにします。
+- **Thinking Block Validator**: thinking ブロックを検証し、適切なフォーマットを確保し、不正な thinking コンテンツによる API エラーを防ぎます。
+- **Claude Code Hooks**: Claude Code の settings.json からフックを実行します - これは PreToolUse/PostToolUse/UserPromptSubmit/Stop フックを実行する互換性レイヤーです。
 
 ## 設定
 
@@ -874,7 +878,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`
+利用可能なフック：`todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `empty-message-sanitizer`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`
 
 **`auto-update-checker`と`startup-toast`について**: `startup-toast` フックは `auto-update-checker` のサブ機能です。アップデートチェックは有効なまま起動トースト通知のみを無効化するには、`disabled_hooks` に `"startup-toast"` を追加してください。すべてのアップデートチェック機能（トーストを含む）を無効化するには、`"auto-update-checker"` を追加してください。
 
@@ -926,7 +930,7 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 ```json
 {
   "experimental": {
-    "preemptive_compaction": true,
+    "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true
@@ -936,8 +940,7 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 
 | オプション                        | デフォルト | 説明                                                                                                                                                                   |
 | --------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction`           | `false`    | トークン制限に達する前にセッションを事前にコンパクションします。デフォルトでコンテキストウィンドウ使用率80%で実行されます。                                                   |
-| `preemptive_compaction_threshold` | `0.80`     | プリエンプティブコンパクションをトリガーする閾値（0.5-0.95）。`preemptive_compaction`が有効な場合のみ適用されます。                                                          |
+| `preemptive_compaction_threshold` | `0.85`     | プリエンプティブコンパクションをトリガーする閾値（0.5-0.95）。`preemptive-compaction` フックはデフォルトで有効です。このオプションで閾値をカスタマイズできます。                 |
 | `truncate_all_tool_outputs`       | `false`    | ホワイトリストのツール（Grep、Glob、LSP、AST-grep）だけでなく、すべてのツール出力を切り詰めます。Tool output truncator はデフォルトで有効です - `disabled_hooks`で無効化できます。 |
 | `aggressive_truncation`           | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                 |
 | `auto_resume`                     | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                        |
