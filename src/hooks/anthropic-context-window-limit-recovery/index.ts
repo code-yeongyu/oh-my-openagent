@@ -15,7 +15,6 @@ function createRecoveryState(): AutoCompactState {
     pendingCompact: new Set<string>(),
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
-    fallbackStateBySession: new Map(),
     truncateStateBySession: new Map(),
     dcpStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
@@ -37,7 +36,6 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState.pendingCompact.delete(sessionInfo.id)
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
-        autoCompactState.fallbackStateBySession.delete(sessionInfo.id)
         autoCompactState.truncateStateBySession.delete(sessionInfo.id)
         autoCompactState.dcpStateBySession.delete(sessionInfo.id)
         autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
@@ -154,6 +152,6 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
   }
 }
 
-export type { AutoCompactState, DcpState, FallbackState, ParsedTokenLimitError, TruncateState } from "./types"
+export type { AutoCompactState, DcpState, ParsedTokenLimitError, TruncateState } from "./types"
 export { parseAnthropicTokenLimitError } from "./parser"
 export { executeCompact, getLastAssistant } from "./executor"

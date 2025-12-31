@@ -15,7 +15,6 @@ describe("executeCompact lock management", () => {
       pendingCompact: new Set<string>(),
       errorDataBySession: new Map(),
       retryStateBySession: new Map(),
-      fallbackStateBySession: new Map(),
       truncateStateBySession: new Map(),
       dcpStateBySession: new Map(),
       emptyContentAttemptBySession: new Map(),
@@ -65,38 +64,6 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // #then: Lock should still be cleared despite exception
-    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
-  })
-
-  test("clears lock when revert throws exception", async () => {
-    // #given: Force revert path by exhausting retry attempts and making revert fail
-    mockClient.session.revert = mock(() =>
-      Promise.reject(new Error("Revert failed")),
-    )
-    mockClient.session.messages = mock(() =>
-      Promise.resolve({
-        data: [
-          { info: { id: "msg1", role: "user" } },
-          { info: { id: "msg2", role: "assistant" } },
-        ],
-      }),
-    )
-
-    // Exhaust retry attempts
-    autoCompactState.retryStateBySession.set(sessionID, {
-      attempt: 5,
-      lastAttemptTime: Date.now(),
-    })
-    autoCompactState.errorDataBySession.set(sessionID, {
-      errorType: "token_limit",
-      currentTokens: 100000,
-      maxTokens: 200000,
-    })
-
-    // #when: Execute compaction
-    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
-
-    // #then: Lock cleared even though revert failed
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
@@ -194,9 +161,6 @@ describe("executeCompact lock management", () => {
     autoCompactState.retryStateBySession.set(sessionID, {
       attempt: 5,
       lastAttemptTime: Date.now(),
-    })
-    autoCompactState.fallbackStateBySession.set(sessionID, {
-      revertAttempt: 5,
     })
     autoCompactState.truncateStateBySession.set(sessionID, {
       truncateAttempt: 5,

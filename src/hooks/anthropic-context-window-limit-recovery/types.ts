@@ -13,11 +13,6 @@ export interface RetryState {
   lastAttemptTime: number
 }
 
-export interface FallbackState {
-  revertAttempt: number
-  lastRevertedMessageID?: string
-}
-
 export interface TruncateState {
   truncateAttempt: number
   lastTruncatedPartId?: string
@@ -32,7 +27,6 @@ export interface AutoCompactState {
   pendingCompact: Set<string>
   errorDataBySession: Map<string, ParsedTokenLimitError>
   retryStateBySession: Map<string, RetryState>
-  fallbackStateBySession: Map<string, FallbackState>
   truncateStateBySession: Map<string, TruncateState>
   dcpStateBySession: Map<string, DcpState>
   emptyContentAttemptBySession: Map<string, number>
@@ -44,11 +38,6 @@ export const RETRY_CONFIG = {
   initialDelayMs: 2000,
   backoffFactor: 2,
   maxDelayMs: 30000,
-} as const
-
-export const FALLBACK_CONFIG = {
-  maxRevertAttempts: 3,
-  minMessagesRequired: 2,
 } as const
 
 export const TRUNCATE_CONFIG = {

@@ -49,11 +49,30 @@ export interface SearchResult {
   timestamp?: number
 }
 
+export interface SessionMetadata {
+  id: string
+  version?: string
+  projectID: string
+  directory: string
+  title?: string
+  parentID?: string
+  time: {
+    created: number
+    updated: number
+  }
+  summary?: {
+    additions: number
+    deletions: number
+    files: number
+  }
+}
+
 export interface SessionListArgs {
   limit?: number
   offset?: number
   from_date?: string
   to_date?: string
+  project_path?: string
 }
 
 export interface SessionReadArgs {
