@@ -14,6 +14,11 @@ import { subagentSessions } from "../claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
+// Grace period to prevent race condition between promptAsync (fire-and-forget)
+// and session.idle detection. New sessions start as "idle" and may trigger
+// premature completion before the prompt is actually processed by the server.
+const STARTUP_GRACE_PERIOD_MS = 5000
+
 interface MessagePartInfo {
   sessionID?: string
   type?: string
@@ -190,6 +195,15 @@ export class BackgroundManager {
     }
   }
 
+  private hasReceivedActivity(task: BackgroundTask): boolean {
+    return (task.progress?.toolCalls ?? 0) > 0 || !!task.progress?.lastMessage
+  }
+
+  private isWithinGracePeriod(task: BackgroundTask): boolean {
+    const elapsed = Date.now() - task.startedAt.getTime()
+    return elapsed < STARTUP_GRACE_PERIOD_MS
+  }
+
   handleEvent(event: Event): void {
     const props = event.properties
 
@@ -221,6 +235,11 @@ export class BackgroundManager {
 
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
+
+      if (!this.hasReceivedActivity(task) && this.isWithinGracePeriod(task)) {
+        log("[background-agent] Task within grace period, ignoring idle event:", task.id)
+        return
+      }
 
       this.checkSessionTodos(sessionID).then((hasIncompleteTodos) => {
         if (hasIncompleteTodos) {
@@ -393,6 +412,11 @@ export class BackgroundManager {
         }
 
         if (sessionStatus.type === "idle") {
+          if (!this.hasReceivedActivity(task) && this.isWithinGracePeriod(task)) {
+            log("[background-agent] Task within grace period, skipping idle completion:", task.id)
+            continue
+          }
+
           const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
           if (hasIncompleteTodos) {
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
