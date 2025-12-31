@@ -82,10 +82,12 @@ export function createPreemptiveCompactionHook(
   const experimental = options?.experimental
   const onBeforeSummarize = options?.onBeforeSummarize
   const getModelLimit = options?.getModelLimit
-  const enabled = experimental?.preemptive_compaction === true
+  // Preemptive compaction is now enabled by default.
+  // Backward compatibility: explicit false in experimental config disables the hook.
+  const explicitlyDisabled = experimental?.preemptive_compaction === false
   const threshold = experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD
 
-  if (!enabled) {
+  if (explicitlyDisabled) {
     return { event: async () => {} }
   }
 
