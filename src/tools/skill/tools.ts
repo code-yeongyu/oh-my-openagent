@@ -84,7 +84,20 @@ async function formatMcpCapabilities(
       ])
 
       if (tools.length > 0) {
-        sections.push(`**Tools**: ${tools.map((t: Tool) => t.name).join(", ")}`)
+        sections.push("**Tools:**")
+        sections.push("")
+        for (const t of tools as Tool[]) {
+          sections.push(`#### \`${t.name}\``)
+          if (t.description) {
+            sections.push(t.description)
+          }
+          sections.push("")
+          sections.push("**inputSchema:**")
+          sections.push("```json")
+          sections.push(JSON.stringify(t.inputSchema, null, 2))
+          sections.push("```")
+          sections.push("")
+        }
       }
       if (resources.length > 0) {
         sections.push(`**Resources**: ${resources.map((r: Resource) => r.uri).join(", ")}`)
