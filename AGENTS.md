@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-31T14:05:00+09:00
-**Commit:** 502e9f5
+**Generated:** 2026-01-01T21:15:00+09:00
+**Commit:** 490c0b6
 **Branch:** dev
 
 ## OVERVIEW
@@ -14,12 +14,12 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 oh-my-opencode/
 ├── src/
 │   ├── agents/        # AI agents (7): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker
-│   ├── hooks/         # 21 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── hooks/         # 22 lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # LSP, AST-Grep, Grep, Glob, etc. - see src/tools/AGENTS.md
 │   ├── mcp/           # MCP servers: context7, websearch_exa, grep_app
 │   ├── features/      # Claude Code compatibility - see src/features/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   ├── auth/          # Google Antigravity OAuth (antigravity/)
+│   ├── auth/          # Google Antigravity OAuth - see src/auth/AGENTS.md
 │   ├── shared/        # Utilities: deep-merge, pattern-matcher, logger, etc. - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor, run - see src/cli/AGENTS.md
 │   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
@@ -38,7 +38,7 @@ oh-my-opencode/
 | Add MCP | `src/mcp/` | Create config, add to index.ts and types.ts |
 | LSP behavior | `src/tools/lsp/` | client.ts (connection), tools.ts (handlers) |
 | AST-Grep | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi binding |
-| Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google models |
+| Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google/Gemini models |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` after changes |
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
 | Background agents | `src/features/background-agent/` | manager.ts for task management |
@@ -46,6 +46,8 @@ oh-my-opencode/
 | CLI installer | `src/cli/install.ts` | Interactive TUI installation |
 | Doctor checks | `src/cli/doctor/checks/` | Health checks for environment |
 | Shared utilities | `src/shared/` | Cross-cutting utilities |
+| Slash commands | `src/hooks/auto-slash-command/` | Auto-detect and execute `/command` patterns |
+| Ralph Loop | `src/hooks/ralph-loop/` | Self-referential dev loop until completion |
 
 ## CONVENTIONS
 
@@ -70,6 +72,8 @@ oh-my-opencode/
 - **Over-exploration**: Stop searching when sufficient context found
 - **High temperature**: Don't use >0.3 for code-related agents
 - **Broad tool access**: Prefer explicit `include` over unrestricted access
+- **Sequential agent calls**: Use `background_task` for parallel execution
+- **Heavy PreToolUse logic**: Slows every tool call
 
 ## UNIQUE STYLES
 
@@ -80,6 +84,7 @@ oh-my-opencode/
 - **Agent tools**: `tools: { include: [...] }` or `tools: { exclude: [...] }`
 - **Temperature**: Most agents use `0.1` for consistency
 - **Hook naming**: `createXXXHook` function convention
+- **Factory pattern**: Components created via `createXXX()` functions
 
 ## AGENT MODELS
 
@@ -123,11 +128,12 @@ bun test               # Run tests
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/index.ts` | 690 | Main plugin orchestration, all hook/tool initialization |
-| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 670 | Session compaction, multi-stage recovery pipeline |
-| `src/cli/config-manager.ts` | 669 | JSONC parsing, environment detection, installation |
-| `src/auth/antigravity/fetch.ts` | 621 | Token refresh, URL rewriting, endpoint fallbacks |
-| `src/tools/lsp/client.ts` | 611 | LSP protocol, stdin/stdout buffering, JSON-RPC |
+| `src/index.ts` | 697 | Main plugin orchestration, all hook/tool initialization |
+| `src/cli/config-manager.ts` | 670 | JSONC parsing, environment detection, installation |
+| `src/auth/antigravity/fetch.ts` | 622 | Token refresh, URL rewriting, endpoint fallbacks |
+| `src/tools/lsp/client.ts` | 612 | LSP protocol, stdin/stdout buffering, JSON-RPC |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 555 | Session compaction, multi-stage recovery pipeline |
+| `src/agents/sisyphus.ts` | 505 | Orchestrator prompt, delegation strategies |
 
 ## NOTES
 
@@ -137,3 +143,4 @@ bun test               # Run tests
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
 - **JSONC support**: Config files support comments (`// comment`, `/* block */`) and trailing commas
+- **Claude Code Compat**: Full compatibility layer for settings.json hooks, commands, skills, agents, MCPs
