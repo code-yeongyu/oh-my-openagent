@@ -152,6 +152,12 @@ Hand this doc to an agent and let them set it up.
   - Ask why it's good, why it's not just another boilerplate setup, what actually gets better.
   - If you're an LLM agent, explain to the user what becomes possible right now with this project.
 
+### 🪄 The Magic Word: `ultrawork`
+
+**Don't want to read all this? Just include `ultrawork` (or `ulw`) in your prompt.**
+
+That's it. All the features we provide will work like magic—parallel agents, background tasks, deep exploration, and relentless execution until completion. The agent figures out the rest automatically.
+
 ### For Those Who Want to Read: Meet Sisyphus
 
 ![Meet Sisyphus](.github/assets/sisyphus.png)
@@ -581,6 +587,26 @@ Instead of the agent reading massive files and bloating context, it internally l
 #### I Removed Their Blockers
 - Replaces built-in grep and glob tools. Default implementation has no timeout—can hang forever.
 
+#### Skill-Embedded MCP Support
+
+Skills can now bring their own MCP servers. Define MCP configurations directly in skill frontmatter or via `mcp.json` files:
+
+```yaml
+---
+description: Browser automation skill
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@anthropic-ai/mcp-playwright"]
+---
+```
+
+When you load a skill with embedded MCP, its tools become available automatically. The `skill_mcp` tool lets you invoke these MCP operations with full schema discovery.
+
+**Built-in Skills:**
+- **playwright**: Browser automation, web scraping, testing, and screenshots out of the box
+
+Disable built-in skills via `disabled_skills: ["playwright"]` in your config.
 
 ### Goodbye Claude Code. Hello Oh My OpenCode.
 
