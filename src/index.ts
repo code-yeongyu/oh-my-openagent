@@ -489,6 +489,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       config.tools = {
         ...config.tools,
+        "grep_app_*": false, // Disable grep_app tools globally to reduce token usage (only librarian needs them)
       };
 
       if (config.agent.explore) {
@@ -501,6 +502,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         config.agent.librarian.tools = {
           ...config.agent.librarian.tools,
           call_omo_agent: false,
+          "grep_app_*": true,
         };
       }
       if (config.agent["multimodal-looker"]) {
