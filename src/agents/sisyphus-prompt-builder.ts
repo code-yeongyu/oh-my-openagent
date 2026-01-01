@@ -11,6 +11,12 @@ export interface AvailableTool {
   category: "lsp" | "ast" | "search" | "session" | "command" | "other"
 }
 
+export interface AvailableSkill {
+  name: string
+  description: string
+  location: "user" | "project" | "plugin"
+}
+
 export function categorizeTools(toolNames: string[]): AvailableTool[] {
   return toolNames.map((name) => {
     let category: AvailableTool["category"] = "other"
@@ -51,26 +57,72 @@ function formatToolsForPrompt(tools: AvailableTool[]): string {
   return parts.join(", ")
 }
 
-export function buildKeyTriggersSection(agents: AvailableAgent[]): string {
+export function buildKeyTriggersSection(agents: AvailableAgent[], skills: AvailableSkill[] = []): string {
   const keyTriggers = agents
     .filter((a) => a.metadata.keyTrigger)
     .map((a) => `- ${a.metadata.keyTrigger}`)
 
-  if (keyTriggers.length === 0) return ""
+  const skillTriggers = skills
+    .filter((s) => s.description)
+    .map((s) => `- **Skill \`${s.name}\`**: ${extractTriggerFromDescription(s.description)}`)
+
+  const allTriggers = [...keyTriggers, ...skillTriggers]
+
+  if (allTriggers.length === 0) return ""
 
   return `### Key Triggers (check BEFORE classification):
-${keyTriggers.join("\n")}
+
+**BLOCKING: Check skills FIRST before any action.**
+If a skill matches, invoke it IMMEDIATELY via \`skill\` tool.
+
+${allTriggers.join("\n")}
 - **GitHub mention (@mention in issue/PR)** → This is a WORK REQUEST. Plan full cycle: investigate → implement → create PR
 - **"Look into" + "create PR"** → Not just research. Full implementation cycle expected.`
 }
 
-export function buildToolSelectionTable(agents: AvailableAgent[], tools: AvailableTool[] = []): string {
+function extractTriggerFromDescription(description: string): string {
+  const triggerMatch = description.match(/Trigger[s]?[:\s]+([^.]+)/i)
+  if (triggerMatch) return triggerMatch[1].trim()
+
+  const activateMatch = description.match(/Activate when[:\s]+([^.]+)/i)
+  if (activateMatch) return activateMatch[1].trim()
+
+  const useWhenMatch = description.match(/Use (?:this )?when[:\s]+([^.]+)/i)
+  if (useWhenMatch) return useWhenMatch[1].trim()
+
+  return description.split(".")[0] || description
+}
+
+export function buildToolSelectionTable(
+  agents: AvailableAgent[],
+  tools: AvailableTool[] = [],
+  skills: AvailableSkill[] = []
+): string {
   const rows: string[] = [
-    "### Tool Selection:",
+    "### Tool & Skill Selection:",
     "",
-    "| Tool | Cost | When to Use |",
-    "|------|------|-------------|",
+    "**Priority Order**: Skills → Direct Tools → Agents",
+    "",
   ]
+
+  // Skills section (highest priority)
+  if (skills.length > 0) {
+    rows.push("#### Skills (INVOKE FIRST if matching)")
+    rows.push("")
+    rows.push("| Skill | When to Use |")
+    rows.push("|-------|-------------|")
+    for (const skill of skills) {
+      const shortDesc = extractTriggerFromDescription(skill.description)
+      rows.push(`| \`${skill.name}\` | ${shortDesc} |`)
+    }
+    rows.push("")
+  }
+
+  // Tools and Agents table
+  rows.push("#### Tools & Agents")
+  rows.push("")
+  rows.push("| Resource | Cost | When to Use |")
+  rows.push("|----------|------|-------------|")
 
   if (tools.length > 0) {
     const toolsDisplay = formatToolsForPrompt(tools)
@@ -88,7 +140,7 @@ export function buildToolSelectionTable(agents: AvailableAgent[], tools: Availab
   }
 
   rows.push("")
-  rows.push("**Default flow**: explore/librarian (background) + tools → oracle (if required)")
+  rows.push("**Default flow**: skill (if match) → explore/librarian (background) + tools → oracle (if required)")
 
   return rows.join("\n")
 }

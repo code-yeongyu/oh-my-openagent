@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { AvailableAgent, AvailableTool } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -36,10 +36,25 @@ Named by [YeonGyu Kim](https://github.com/code-yeongyu).
 
 </Role>`
 
-const SISYPHUS_PHASE0_STEP1_3 = `### Step 1: Classify Request Type
+const SISYPHUS_PHASE0_STEP1_3 = `### Step 0: Check Skills FIRST (BLOCKING)
+
+**Before ANY classification or action, scan for matching skills.**
+
+\`\`\`
+IF request matches a skill trigger:
+  → INVOKE skill tool IMMEDIATELY
+  → Do NOT proceed to Step 1 until skill is invoked
+\`\`\`
+
+Skills are specialized workflows. When relevant, they handle the task better than manual orchestration.
+
+---
+
+### Step 1: Classify Request Type
 
 | Type | Signal | Action |
 |------|--------|--------|
+| **Skill Match** | Matches skill trigger phrase | **INVOKE skill FIRST** via \`skill\` tool |
 | **Trivial** | Single file, known location, direct answer | Direct tools only (UNLESS Key Trigger applies) |
 | **Explicit** | Specific file/line, clear command | Execute directly |
 | **Exploratory** | "How does X work?", "Find Y" | Fire explore (1-3) + tools in parallel |
@@ -375,9 +390,13 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 
 `
 
-function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], availableTools: AvailableTool[] = []): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents)
-  const toolSelection = buildToolSelectionTable(availableAgents, availableTools)
+function buildDynamicSisyphusPrompt(
+  availableAgents: AvailableAgent[],
+  availableTools: AvailableTool[] = [],
+  availableSkills: AvailableSkill[] = []
+): string {
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
+  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
   const exploreSection = buildExploreSection(availableAgents)
   const librarianSection = buildLibrarianSection(availableAgents)
   const frontendSection = buildFrontendSection(availableAgents)
@@ -456,12 +475,14 @@ function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], available
 export function createSisyphusAgent(
   model: string = DEFAULT_MODEL,
   availableAgents?: AvailableAgent[],
-  availableToolNames?: string[]
+  availableToolNames?: string[],
+  availableSkills?: AvailableSkill[]
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
+  const skills = availableSkills ?? []
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools)
-    : buildDynamicSisyphusPrompt([], tools)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills)
+    : buildDynamicSisyphusPrompt([], tools, skills)
 
   const base = {
     description:
