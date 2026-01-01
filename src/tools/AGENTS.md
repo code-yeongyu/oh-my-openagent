@@ -29,6 +29,8 @@ tools/
 │   ├── storage.ts      # File I/O operations
 │   ├── utils.ts        # Formatting, filtering
 │   └── tools.ts        # Tool implementations
+├── skill/              # Skill loading and execution
+├── skill-mcp/          # Skill-embedded MCP invocation
 ├── slashcommand/       # Slash command execution
 └── index.ts            # builtinTools export
 ```
@@ -45,6 +47,7 @@ tools/
 | Multimodal | look_at | PDF/image analysis via Gemini |
 | Terminal | interactive_bash | Tmux session control |
 | Commands | slashcommand | Execute slash commands |
+| Skills | skill, skill_mcp | Load skills, invoke skill-embedded MCPs |
 | Agents | call_omo_agent | Spawn explore/librarian |
 
 ## HOW TO ADD A TOOL

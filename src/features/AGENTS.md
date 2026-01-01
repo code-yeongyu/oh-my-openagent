@@ -13,6 +13,8 @@ features/
 │   ├── manager.test.ts
 │   └── types.ts
 ├── builtin-commands/           # Built-in slash command definitions
+├── builtin-skills/             # Built-in skills (playwright, etc.)
+│   └── */SKILL.md              # Each skill in own directory
 ├── claude-code-agent-loader/   # Load agents from ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # Load commands from ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # Load MCPs from .mcp.json
@@ -20,6 +22,9 @@ features/
 ├── claude-code-plugin-loader/  # Load external plugins from installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
 ├── opencode-skill-loader/      # Load skills from OpenCode and Claude paths
+├── skill-mcp-manager/          # MCP servers embedded in skills
+│   ├── manager.ts              # Lazy-loading MCP client lifecycle
+│   └── types.ts
 └── hook-message-injector/      # Inject messages into conversation
 ```
 
@@ -71,6 +76,19 @@ Disable features in `oh-my-opencode.json`:
 - **Purpose**: Inject system messages into conversation at specific points
 - **Timing**: PreToolUse, PostToolUse, UserPromptSubmit, Stop
 - **Format**: Returns `{ messages: [{ role: "user", content: "..." }] }`
+
+## SKILL MCP MANAGER
+
+- **Purpose**: Manage MCP servers embedded in skill YAML frontmatter
+- **Lifecycle**: Lazy client loading, session-scoped cleanup
+- **Config**: `mcp` field in skill's YAML frontmatter defines server config
+- **Tool**: `skill_mcp` exposes MCP capabilities (tools, resources, prompts)
+
+## BUILTIN SKILLS
+
+- **Location**: `src/features/builtin-skills/*/SKILL.md`
+- **Available**: `playwright` (browser automation)
+- **Disable**: `disabled_skills: ["playwright"]` in config
 
 ## ANTI-PATTERNS (FEATURES)
 
