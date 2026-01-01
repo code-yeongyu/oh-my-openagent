@@ -158,27 +158,7 @@ export async function getLastAssistant(
   }
 }
 
-async function getLastMessageId(
-  sessionID: string,
-  client: Client,
-  directory: string,
-): Promise<string | null> {
-  try {
-    const resp = await client.session.messages({
-      path: { id: sessionID },
-      query: { directory },
-    });
 
-    const data = (resp as { data?: unknown[] }).data;
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    const lastMsg = data[data.length - 1] as Record<string, unknown>;
-    const info = lastMsg.info as Record<string, unknown> | undefined;
-    return (info?.id as string) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function clearSessionState(
   autoCompactState: AutoCompactState,
@@ -421,95 +401,21 @@ export async function executeCompact(
 
         log("[auto-compact] aggressive truncation completed", aggressiveResult);
 
-        if (aggressiveResult.sufficient) {
-          clearSessionState(autoCompactState, sessionID);
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
-          return;
-        }
-      } else {
-        log("[auto-compact] no tool outputs found to truncate", { sessionID });
-      }
-
-      // PHASE 2.5: Revert fallback - if still over limit, remove last message
-      log("[auto-compact] PHASE 2.5: revert fallback - still over limit after truncation", {
-        sessionID,
-        currentTokens: errorData.currentTokens,
-        maxTokens: errorData.maxTokens,
-      });
-
-      const lastMessageId = await getLastMessageId(
-        sessionID,
-        client as Client,
-        directory,
-      );
-
-      if (lastMessageId) {
-        try {
-          await (client as Client).session.revert({
-            path: { id: sessionID },
-            body: { messageID: lastMessageId },
-            query: { directory },
-          });
-
-          await (client as Client).tui
-            .showToast({
-              body: {
-                title: "Message Reverted",
-                message: "Removed last message to reduce context. Retrying...",
-                variant: "warning",
-                duration: 3000,
-              },
-            })
-            .catch(() => {});
-
-          clearSessionState(autoCompactState, sessionID);
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
-          return;
-        } catch (revertError) {
-          log("[auto-compact] revert failed", { error: String(revertError) });
-        }
+        clearSessionState(autoCompactState, sessionID);
+        setTimeout(async () => {
+          try {
+            await (client as Client).session.prompt_async({
+              path: { sessionID },
+              body: { parts: [{ type: "text", text: "Continue" }] },
+              query: { directory },
+            });
+          } catch {}
+        }, 500);
+        return;
       }
     }
 
-    // PHASE 3: Summarize - only when under limit (otherwise it will also fail)
-    if (isOverLimit) {
-      log("[auto-compact] skipping summarize - still over token limit", {
-        sessionID,
-        currentTokens: errorData?.currentTokens,
-        maxTokens: errorData?.maxTokens,
-      });
-
-      clearSessionState(autoCompactState, sessionID);
-
-      await (client as Client).tui
-        .showToast({
-          body: {
-            title: "Recovery Failed",
-            message: `Still over token limit (${errorData?.currentTokens}/${errorData?.maxTokens}). Please start a new session or manually compact.`,
-            variant: "error",
-            duration: 10000,
-          },
-        })
-        .catch(() => {});
-      return;
-    }
-
+    // PHASE 3: Summarize - fallback when no tool outputs to truncate
     const retryState = getOrCreateRetryState(autoCompactState, sessionID);
 
     if (errorData?.errorType?.includes("non-empty content")) {
