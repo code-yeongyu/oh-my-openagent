@@ -130,8 +130,10 @@ export function calculateDistance(
       return 9999;
     }
 
-    const ruleParts = ruleRel ? ruleRel.split("/") : [];
-    const currentParts = currentRel ? currentRel.split("/") : [];
+    // Split by both forward and back slashes for cross-platform compatibility
+    // path.relative() returns OS-native separators (backslashes on Windows)
+    const ruleParts = ruleRel ? ruleRel.split(/[/\\]/) : [];
+    const currentParts = currentRel ? currentRel.split(/[/\\]/) : [];
 
     // Find common prefix length
     let common = 0;
