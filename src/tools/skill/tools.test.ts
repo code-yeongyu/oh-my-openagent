@@ -1,14 +1,23 @@
 import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
+import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
 
+const originalReadFileSync = fs.readFileSync.bind(fs)
+
 mock.module("node:fs", () => ({
-  readFileSync: () => `---
+  ...fs,
+  readFileSync: (path: string, encoding?: string) => {
+    if (typeof path === "string" && path.includes("/skills/")) {
+      return `---
 description: Test skill description
 ---
-Test skill body content`,
+Test skill body content`
+    }
+    return originalReadFileSync(path, encoding as BufferEncoding)
+  },
 }))
 
 function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown>): LoadedSkill {
