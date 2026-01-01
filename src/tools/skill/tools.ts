@@ -5,6 +5,8 @@ import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants
 import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
 import { discoverSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import { parseFrontmatter } from "../../shared/frontmatter"
+import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
+import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 
 function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
@@ -49,6 +51,64 @@ function extractSkillBody(skill: LoadedSkill): string {
   return templateMatch ? templateMatch[1].trim() : skill.definition.template || ""
 }
 
+async function formatMcpCapabilities(
+  skill: LoadedSkill,
+  manager: SkillMcpManager,
+  sessionID: string
+): Promise<string | null> {
+  if (!skill.mcpConfig || Object.keys(skill.mcpConfig).length === 0) {
+    return null
+  }
+
+  const sections: string[] = ["", "## Available MCP Servers", ""]
+
+  for (const [serverName, config] of Object.entries(skill.mcpConfig)) {
+    const info: SkillMcpClientInfo = {
+      serverName,
+      skillName: skill.name,
+      sessionID,
+    }
+    const context: SkillMcpServerContext = {
+      config,
+      skillName: skill.name,
+    }
+
+    sections.push(`### ${serverName}`)
+    sections.push("")
+
+    try {
+      const [tools, resources, prompts] = await Promise.all([
+        manager.listTools(info, context).catch(() => []),
+        manager.listResources(info, context).catch(() => []),
+        manager.listPrompts(info, context).catch(() => []),
+      ])
+
+      if (tools.length > 0) {
+        sections.push(`**Tools**: ${tools.map((t: Tool) => t.name).join(", ")}`)
+      }
+      if (resources.length > 0) {
+        sections.push(`**Resources**: ${resources.map((r: Resource) => r.uri).join(", ")}`)
+      }
+      if (prompts.length > 0) {
+        sections.push(`**Prompts**: ${prompts.map((p: Prompt) => p.name).join(", ")}`)
+      }
+
+      if (tools.length === 0 && resources.length === 0 && prompts.length === 0) {
+        sections.push("*No capabilities discovered*")
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      sections.push(`*Failed to connect: ${errorMessage.split("\n")[0]}*`)
+    }
+
+    sections.push("")
+    sections.push(`Use \`skill_mcp\` tool with \`mcp_name="${serverName}"\` to invoke.`)
+    sections.push("")
+  }
+
+  return sections.join("\n")
+}
+
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   const skills = options.skills ?? discoverSkills({ includeClaudeCodePaths: !options.opencodeOnly })
   const skillInfos = skills.map(loadedSkillToInfo)
@@ -75,13 +135,26 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       const body = extractSkillBody(skill)
       const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
 
-      return [
+      const output = [
         `## Skill: ${skill.name}`,
         "",
         `**Base directory**: ${dir}`,
         "",
         body,
-      ].join("\n")
+      ]
+
+      if (options.mcpManager && options.getSessionID && skill.mcpConfig) {
+        const mcpInfo = await formatMcpCapabilities(
+          skill,
+          options.mcpManager,
+          options.getSessionID()
+        )
+        if (mcpInfo) {
+          output.push(mcpInfo)
+        }
+      }
+
+      return output.join("\n")
     },
   })
 }
