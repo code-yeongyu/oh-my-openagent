@@ -231,7 +231,11 @@ fi
 
 ```bash
 bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+# 如果 bunx 不好使就换 npx
+npx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
 ```
+
+> **Ubuntu/Debian 用户注意**：如果你是用 Snap 装的 Bun (`/snap/bin/bun`)，由于 Snap 的沙箱机制，`bunx` 会报 "script not found" 错误。要么改用 `npx`，要么用官方脚本重装 Bun：`curl -fsSL https://bun.sh/install | bash`
 
 **例子：**
 - 全套订阅 + max20：`bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
