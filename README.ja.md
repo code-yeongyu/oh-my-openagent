@@ -759,7 +759,19 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-各エージェントでサポートされるオプション：`model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`。
+各エージェントでサポートされるオプション：`model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`。
+
+`prompt_append` を使用すると、デフォルトのシステムプロンプトを置き換えずに追加の指示を付け加えられます：
+
+```json
+{
+  "agents": {
+    "librarian": {
+      "prompt_append": "Emacs Lisp のドキュメント検索には常に elisp-dev-mcp を使用してください。"
+    }
+  }
+}
+```
 
 `Sisyphus` (メインオーケストレーター) と `build` (デフォルトエージェント) も同じオプションで設定をオーバーライドできます。
 

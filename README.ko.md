@@ -752,7 +752,19 @@ Schema 자동 완성이 지원됩니다:
 }
 ```
 
-각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+각 에이전트에서 지원하는 옵션: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+
+`prompt_append`를 사용하면 기본 시스템 프롬프트를 대체하지 않고 추가 지시사항을 덧붙일 수 있습니다:
+
+```json
+{
+  "agents": {
+    "librarian": {
+      "prompt_append": "Emacs Lisp 문서 조회 시 항상 elisp-dev-mcp를 사용하세요."
+    }
+  }
+}
+```
 
 `Sisyphus` (메인 오케스트레이터)와 `build` (기본 에이전트)도 동일한 옵션으로 설정을 오버라이드할 수 있습니다.
 
