@@ -64,7 +64,8 @@
           "ralph-loop",
           "preemptive-compaction",
           "compaction-context-injector",
-          "claude-code-hooks"
+          "claude-code-hooks",
+          "auto-slash-command"
         ]
       }
     },
