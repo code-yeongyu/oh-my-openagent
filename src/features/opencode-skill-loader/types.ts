@@ -1,4 +1,5 @@
 import type { CommandDefinition } from "../claude-code-command-loader/types"
+import type { SkillMcpConfig } from "../skill-mcp-manager/types"
 
 export type SkillScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project"
 
@@ -13,6 +14,7 @@ export interface SkillMetadata {
   compatibility?: string
   metadata?: Record<string, string>
   "allowed-tools"?: string
+  mcp?: SkillMcpConfig
 }
 
 export interface LoadedSkill {
@@ -25,4 +27,5 @@ export interface LoadedSkill {
   compatibility?: string
   metadata?: Record<string, string>
   allowedTools?: string[]
+  mcpConfig?: SkillMcpConfig
 }
