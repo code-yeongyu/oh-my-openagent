@@ -4,6 +4,11 @@ import {
   INLINE_CODE_PATTERN,
 } from "./constants"
 
+export interface DetectedKeyword {
+  type: "ultrawork" | "search" | "analyze"
+  message: string
+}
+
 export function removeCodeBlocks(text: string): string {
   return text.replace(CODE_BLOCK_PATTERN, "").replace(INLINE_CODE_PATTERN, "")
 }
@@ -13,6 +18,19 @@ export function detectKeywords(text: string): string[] {
   return KEYWORD_DETECTORS.filter(({ pattern }) =>
     pattern.test(textWithoutCode)
   ).map(({ message }) => message)
+}
+
+export function detectKeywordsWithType(text: string): DetectedKeyword[] {
+  const textWithoutCode = removeCodeBlocks(text)
+  return KEYWORD_DETECTORS.filter(({ pattern }) =>
+    pattern.test(textWithoutCode)
+  ).map(({ message }, index) => {
+    const types: Array<"ultrawork" | "search" | "analyze"> = ["ultrawork", "search", "analyze"]
+    return {
+      type: types[index],
+      message,
+    }
+  })
 }
 
 export function extractPromptText(
