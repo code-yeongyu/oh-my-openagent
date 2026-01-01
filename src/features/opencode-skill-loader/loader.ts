@@ -10,7 +10,7 @@ import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
 
-function parseSkillMcpConfig(content: string): SkillMcpConfig | undefined {
+function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!frontmatterMatch) return undefined
 
@@ -18,6 +18,34 @@ function parseSkillMcpConfig(content: string): SkillMcpConfig | undefined {
     const parsed = yaml.load(frontmatterMatch[1]) as Record<string, unknown>
     if (parsed && typeof parsed === "object" && "mcp" in parsed && parsed.mcp) {
       return parsed.mcp as SkillMcpConfig
+    }
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+function loadMcpJsonFromDir(skillDir: string): SkillMcpConfig | undefined {
+  const mcpJsonPath = join(skillDir, "mcp.json")
+  if (!existsSync(mcpJsonPath)) return undefined
+
+  try {
+    const content = readFileSync(mcpJsonPath, "utf-8")
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    
+    // AmpCode format: { "mcpServers": { "name": { ... } } }
+    if (parsed && typeof parsed === "object" && "mcpServers" in parsed && parsed.mcpServers) {
+      return parsed.mcpServers as SkillMcpConfig
+    }
+    
+    // Also support direct format: { "name": { command: ..., args: ... } }
+    if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
+      const hasCommandField = Object.values(parsed).some(
+        (v) => v && typeof v === "object" && "command" in (v as Record<string, unknown>)
+      )
+      if (hasCommandField) {
+        return parsed as SkillMcpConfig
+      }
     }
   } catch {
     return undefined
@@ -39,7 +67,9 @@ function loadSkillFromPath(
   try {
     const content = readFileSync(skillPath, "utf-8")
     const { data, body } = parseFrontmatter<SkillMetadata>(content)
-    const mcpConfig = parseSkillMcpConfig(content)
+    const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
+    const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
+    const mcpConfig = mcpJsonMcp || frontmatterMcp
 
     const skillName = data.name || defaultName
     const originalDescription = data.description || ""
