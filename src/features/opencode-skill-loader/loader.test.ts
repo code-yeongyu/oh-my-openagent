@@ -6,11 +6,14 @@ import { tmpdir } from "os"
 const TEST_DIR = join(tmpdir(), "skill-loader-test-" + Date.now())
 const SKILLS_DIR = join(TEST_DIR, ".opencode", "skill")
 
-function createTestSkill(name: string, content: string): string {
+function createTestSkill(name: string, content: string, mcpJson?: object): string {
   const skillDir = join(SKILLS_DIR, name)
   mkdirSync(skillDir, { recursive: true })
   const skillPath = join(skillDir, "SKILL.md")
   writeFileSync(skillPath, content)
+  if (mcpJson) {
+    writeFileSync(join(skillDir, "mcp.json"), JSON.stringify(mcpJson, null, 2))
+  }
   return skillDir
 }
 
@@ -152,6 +155,116 @@ Skill body.
         // #then - should still load skill but without MCP config
         expect(skill).toBeDefined()
         expect(skill?.mcpConfig).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
+
+  describe("mcp.json file loading (AmpCode compat)", () => {
+    it("loads MCP config from mcp.json with mcpServers format", async () => {
+      // #given
+      const skillContent = `---
+name: ampcode-skill
+description: Skill with mcp.json
+---
+Skill body.
+`
+      const mcpJson = {
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest"]
+          }
+        }
+      }
+      createTestSkill("ampcode-skill", skillContent, mcpJson)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "ampcode-skill")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.mcpConfig).toBeDefined()
+        expect(skill?.mcpConfig?.playwright).toBeDefined()
+        expect(skill?.mcpConfig?.playwright?.command).toBe("npx")
+        expect(skill?.mcpConfig?.playwright?.args).toEqual(["@playwright/mcp@latest"])
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("mcp.json takes priority over YAML frontmatter", async () => {
+      // #given
+      const skillContent = `---
+name: priority-skill
+mcp:
+  from-yaml:
+    command: yaml-cmd
+    args: [yaml-arg]
+---
+Skill body.
+`
+      const mcpJson = {
+        mcpServers: {
+          "from-json": {
+            command: "json-cmd",
+            args: ["json-arg"]
+          }
+        }
+      }
+      createTestSkill("priority-skill", skillContent, mcpJson)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "priority-skill")
+
+        // #then - mcp.json should take priority
+        expect(skill?.mcpConfig?.["from-json"]).toBeDefined()
+        expect(skill?.mcpConfig?.["from-yaml"]).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("supports direct format without mcpServers wrapper", async () => {
+      // #given
+      const skillContent = `---
+name: direct-format
+---
+Skill body.
+`
+      const mcpJson = {
+        sqlite: {
+          command: "uvx",
+          args: ["mcp-server-sqlite"]
+        }
+      }
+      createTestSkill("direct-format", skillContent, mcpJson)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "direct-format")
+
+        // #then
+        expect(skill?.mcpConfig?.sqlite).toBeDefined()
+        expect(skill?.mcpConfig?.sqlite?.command).toBe("uvx")
       } finally {
         process.chdir(originalCwd)
       }
