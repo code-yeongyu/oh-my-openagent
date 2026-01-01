@@ -58,8 +58,9 @@ import {
   setMainSession,
   getMainSessionID,
 } from "./features/claude-code-session-state";
-import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, createSkillTool, interactive_bash, getTmuxPath } from "./tools";
+import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, createSkillTool, createSkillMcpTool, interactive_bash, getTmuxPath } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
+import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge, getUserConfigDir, addConfigLoadError, parseJsonc, detectConfigFile, migrateConfigFile } from "./shared";
@@ -292,7 +293,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     includeClaudeSkills ? discoverProjectClaudeSkills() : [],
     discoverOpencodeProjectSkills(),
   );
-  const skillTool = createSkillTool({ skills: mergedSkills });
+  const skillMcpManager = new SkillMcpManager();
+  const getSessionIDForMcp = () => getMainSessionID() || "";
+  const skillTool = createSkillTool({
+    skills: mergedSkills,
+    mcpManager: skillMcpManager,
+    getSessionID: getSessionIDForMcp,
+  });
+  const skillMcpTool = createSkillMcpTool({
+    manager: skillMcpManager,
+    getLoadedSkills: () => mergedSkills,
+    getSessionID: getSessionIDForMcp,
+  });
 
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -309,6 +321,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
       skill: skillTool,
+      skill_mcp: skillMcpTool,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
@@ -592,6 +605,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const sessionInfo = props?.info as { id?: string } | undefined;
         if (sessionInfo?.id === getMainSessionID()) {
           setMainSession(undefined);
+        }
+        if (sessionInfo?.id) {
+          await skillMcpManager.disconnectSession(sessionInfo.id);
         }
       }
 
