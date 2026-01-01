@@ -794,7 +794,19 @@ Override built-in agent settings:
 }
 ```
 
-Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+
+Use `prompt_append` to add extra instructions without replacing the default system prompt:
+
+```json
+{
+  "agents": {
+    "librarian": {
+      "prompt_append": "Always use the elisp-dev-mcp for Emacs Lisp documentation lookups."
+    }
+  }
+}
+```
 
 You can also override settings for `Sisyphus` (the main orchestrator) and `build` (the default agent) using the same options.
 

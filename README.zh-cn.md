@@ -763,7 +763,19 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 }
 ```
 
-每个 Agent 能改这些：`model`、`temperature`、`top_p`、`prompt`、`tools`、`disable`、`description`、`mode`、`color`、`permission`。
+每个 Agent 能改这些：`model`、`temperature`、`top_p`、`prompt`、`prompt_append`、`tools`、`disable`、`description`、`mode`、`color`、`permission`。
+
+用 `prompt_append` 可以在默认系统提示后面追加额外指令，不用替换整个提示：
+
+```json
+{
+  "agents": {
+    "librarian": {
+      "prompt_append": "查 Emacs Lisp 文档时用 elisp-dev-mcp。"
+    }
+  }
+}
+```
 
 `Sisyphus`（主编排器）和 `build`（默认 Agent）也能改。
 
