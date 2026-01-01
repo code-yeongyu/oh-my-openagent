@@ -204,7 +204,11 @@ Run the interactive installer:
 
 ```bash
 bunx oh-my-opencode install
+# or use npx if bunx doesn't work
+npx oh-my-opencode install
 ```
+
+> **Note for Ubuntu/Debian users**: If you installed Bun via Snap (`/snap/bin/bun`), `bunx` will fail with "script not found" due to Snap's sandboxing. Either use `npx` instead, or reinstall Bun via the official installer: `curl -fsSL https://bun.sh/install | bash`
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
