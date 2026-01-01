@@ -331,6 +331,17 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
   console.log(`  Run ${color.cyan("opencode")} to start!`)
   console.log()
+
+  printBox(
+    `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
+    `All features work like magic—parallel agents, background tasks,\n` +
+    `deep exploration, and relentless execution until completion.`,
+    "🪄 The Magic Word"
+  )
+
+  console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
+  console.log(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
+  console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
@@ -449,6 +460,16 @@ export async function install(args: InstallArgs): Promise<number> {
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
+
+  p.note(
+    `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
+    `All features work like magic—parallel agents, background tasks,\n` +
+    `deep exploration, and relentless execution until completion.`,
+    "🪄 The Magic Word"
+  )
+
+  p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
+  p.log.message(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
