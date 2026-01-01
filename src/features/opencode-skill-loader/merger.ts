@@ -21,7 +21,7 @@ const SCOPE_PRIORITY: Record<SkillScope, number> = {
 function builtinToLoaded(builtin: BuiltinSkill): LoadedSkill {
   const definition: CommandDefinition = {
     name: builtin.name,
-    description: `(builtin - Skill) ${builtin.description}`,
+    description: `(opencode - Skill) ${builtin.description}`,
     template: builtin.template,
     model: builtin.model,
     agent: builtin.agent,
@@ -37,6 +37,7 @@ function builtinToLoaded(builtin: BuiltinSkill): LoadedSkill {
     compatibility: builtin.compatibility,
     metadata: builtin.metadata as Record<string, string> | undefined,
     allowedTools: builtin.allowedTools,
+    mcpConfig: builtin.mcpConfig,
   }
 }
 

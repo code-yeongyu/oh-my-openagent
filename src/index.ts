@@ -128,6 +128,12 @@ function mergeConfigs(
         ...(override.disabled_commands ?? []),
       ]),
     ],
+    disabled_skills: [
+      ...new Set([
+        ...(base.disabled_skills ?? []),
+        ...(override.disabled_skills ?? []),
+      ]),
+    ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }
@@ -283,7 +289,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
-  const builtinSkills = createBuiltinSkills();
+  const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
+  const builtinSkills = createBuiltinSkills().filter(
+    (skill) => !disabledSkills.has(skill.name as any)
+  );
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
   const mergedSkills = mergeSkills(
     builtinSkills,

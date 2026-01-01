@@ -1,3 +1,5 @@
+import type { SkillMcpConfig } from "../skill-mcp-manager/types"
+
 export interface BuiltinSkill {
   name: string
   description: string
@@ -10,4 +12,5 @@ export interface BuiltinSkill {
   model?: string
   subtask?: boolean
   argumentHint?: string
+  mcpConfig?: SkillMcpConfig
 }
