@@ -1,33 +1,16 @@
-import { describe, expect, it, beforeEach, mock } from "bun:test"
+import { describe, expect, it, beforeEach, mock, spyOn } from "bun:test"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
 } from "./types"
 
-const logMock = mock(() => {})
+// Import real shared module to avoid mock leaking to other test files
+import * as shared from "../../shared"
 
-mock.module("../../shared", () => ({
-  log: logMock,
-  parseFrontmatter: (content: string) => ({ data: {}, body: content }),
-  resolveCommandsInText: async (text: string) => text,
-  resolveFileReferencesInText: async (text: string) => text,
-  sanitizeModelField: (model: unknown) => model,
-  getClaudeConfigDir: () => "/mock/.claude",
-}))
+// Spy on log instead of mocking the entire module
+const logMock = spyOn(shared, "log").mockImplementation(() => {})
 
-mock.module("../../shared/file-utils", () => ({
-  isMarkdownFile: () => false,
-}))
 
-mock.module("../../features/opencode-skill-loader", () => ({
-  discoverAllSkills: () => [],
-}))
-
-mock.module("fs", () => ({
-  existsSync: () => false,
-  readdirSync: () => [],
-  readFileSync: () => "",
-}))
 
 const { createAutoSlashCommandHook } = await import("./index")
 

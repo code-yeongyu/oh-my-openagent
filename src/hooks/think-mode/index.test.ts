@@ -1,11 +1,5 @@
-import { describe, expect, it, beforeEach, mock } from "bun:test"
+import { describe, expect, it, beforeEach } from "bun:test"
 import type { ThinkModeInput } from "./types"
-
-const logMock = mock(() => {})
-
-mock.module("../../shared", () => ({
-  log: logMock,
-}))
 
 const { createThinkModeHook, clearThinkModeState } = await import("./index")
 
