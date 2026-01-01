@@ -77,6 +77,116 @@ Disable features in `oh-my-opencode.json`:
 - **Timing**: PreToolUse, PostToolUse, UserPromptSubmit, Stop
 - **Format**: Returns `{ messages: [{ role: "user", content: "..." }] }`
 
+## MCP LOADER (claude-code-mcp-loader)
+
+Loads MCP server configs from `.mcp.json` files. Full Claude Code compatibility.
+
+### File Locations (Priority Order)
+
+| Path | Scope | Description |
+|------|-------|-------------|
+| `~/.claude/.mcp.json` | user | User-global MCP servers |
+| `./.mcp.json` | project | Project-specific MCP servers |
+| `./.claude/.mcp.json` | local | Local overrides (git-ignored) |
+
+### .mcp.json Format
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "type": "stdio|http|sse",
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-server-example"],
+      "env": {
+        "API_KEY": "${MY_API_KEY}"
+      },
+      "disabled": false
+    }
+  }
+}
+```
+
+### Server Types
+
+| Type | Required Fields | Description |
+|------|-----------------|-------------|
+| `stdio` (default) | `command`, `args?`, `env?` | Local subprocess MCP |
+| `http` | `url`, `headers?` | HTTP-based remote MCP |
+| `sse` | `url`, `headers?` | SSE-based remote MCP |
+
+### Environment Variable Expansion
+
+Supports `${VAR}` syntax in all string fields:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["${HOME}/mcp-server/index.js"],
+      "env": {
+        "API_KEY": "${MY_API_KEY}",
+        "DEBUG": "${DEBUG:-false}"
+      }
+    }
+  }
+}
+```
+
+### Examples
+
+**stdio (Local subprocess)**:
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-server-filesystem", "/path/to/dir"]
+    }
+  }
+}
+```
+
+**http (Remote)**:
+```json
+{
+  "mcpServers": {
+    "remote-api": {
+      "type": "http",
+      "url": "https://mcp.example.com/api",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**Disable a server**:
+```json
+{
+  "mcpServers": {
+    "expensive-server": {
+      "command": "...",
+      "disabled": true
+    }
+  }
+}
+```
+
+### Transformation
+
+Claude Code format → OpenCode format:
+
+| Claude Code | OpenCode |
+|-------------|----------|
+| `type: "stdio"` | `type: "local"` |
+| `type: "http\|sse"` | `type: "remote"` |
+| `command` + `args` | `command: [cmd, ...args]` |
+| `env` | `environment` |
+| `headers` | `headers` |
+
 ## SKILL MCP MANAGER
 
 - **Purpose**: Manage MCP servers embedded in skill YAML frontmatter
