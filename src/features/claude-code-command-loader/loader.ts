@@ -1,24 +1,59 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
+import { existsSync, readdirSync, readFileSync, realpathSync, type Dirent } from "fs"
 import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
+import { log } from "../../shared/logger"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
 
-function loadCommandsFromDir(commandsDir: string, scope: CommandScope): LoadedCommand[] {
+function loadCommandsFromDir(
+  commandsDir: string,
+  scope: CommandScope,
+  visited: Set<string> = new Set(),
+  prefix: string = ""
+): LoadedCommand[] {
   if (!existsSync(commandsDir)) {
     return []
   }
 
-  const entries = readdirSync(commandsDir, { withFileTypes: true })
+  let realPath: string
+  try {
+    realPath = realpathSync(commandsDir)
+  } catch (error) {
+    log(`Failed to resolve command directory: ${commandsDir}`, error)
+    return []
+  }
+
+  if (visited.has(realPath)) {
+    return []
+  }
+  visited.add(realPath)
+
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(commandsDir, { withFileTypes: true })
+  } catch (error) {
+    log(`Failed to read command directory: ${commandsDir}`, error)
+    return []
+  }
+
   const commands: LoadedCommand[] = []
 
   for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith(".")) continue
+      const subDirPath = join(commandsDir, entry.name)
+      const subPrefix = prefix ? `${prefix}:${entry.name}` : entry.name
+      commands.push(...loadCommandsFromDir(subDirPath, scope, visited, subPrefix))
+      continue
+    }
+
     if (!isMarkdownFile(entry)) continue
 
     const commandPath = join(commandsDir, entry.name)
-    const commandName = basename(entry.name, ".md")
+    const baseCommandName = basename(entry.name, ".md")
+    const commandName = prefix ? `${prefix}:${baseCommandName}` : baseCommandName
 
     try {
       const content = readFileSync(commandPath, "utf-8")
@@ -51,7 +86,8 @@ $ARGUMENTS
         definition,
         scope,
       })
-    } catch {
+    } catch (error) {
+      log(`Failed to parse command: ${commandPath}`, error)
       continue
     }
   }
