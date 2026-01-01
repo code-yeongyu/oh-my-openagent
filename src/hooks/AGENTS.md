@@ -10,6 +10,7 @@ Lifecycle hooks that intercept/modify agent behavior. Inject context, enforce ru
 hooks/
 ├── agent-usage-reminder/       # Remind to use specialized agents
 ├── anthropic-context-window-limit-recovery/     # Auto-compact Claude at token limit
+├── auto-slash-command/         # Auto-detect and execute /command patterns
 ├── auto-update-checker/        # Version update notifications
 ├── background-notification/    # OS notify on background task complete
 ├── claude-code-hooks/          # Claude Code settings.json integration
@@ -24,6 +25,7 @@ hooks/
 ├── keyword-detector/           # Detect ultrawork/search keywords
 ├── non-interactive-env/        # CI/headless environment handling
 ├── preemptive-compaction/      # Pre-emptive session compaction
+├── ralph-loop/                 # Self-referential dev loop until completion
 ├── rules-injector/             # Conditional rules from .claude/rules/
 ├── session-recovery/           # Recover from session errors
 ├── think-mode/                 # Auto-detect thinking triggers
