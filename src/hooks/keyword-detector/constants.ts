@@ -4,7 +4,7 @@ export const INLINE_CODE_PATTERN = /`[^`]+`/g
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string }> = [
   // ULTRAWORK: ulw, ultrawork
   {
-    pattern: /\b(ultrawork|ulw)\b/i,
+    pattern: /(ultrawork|ulw)/i,
     message: `<ultrawork-mode>
 [CODE RED] Maximum precision required. Ultrathink before acting.
 
