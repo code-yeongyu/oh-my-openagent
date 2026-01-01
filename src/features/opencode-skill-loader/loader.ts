@@ -1,21 +1,30 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
 import { homedir } from "os"
+import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlink, isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
+import type { SkillMcpConfig } from "../skill-mcp-manager/types"
 
-/**
- * Load a skill from a markdown file path.
- * 
- * @param skillPath - Path to the skill file (SKILL.md or {name}.md)
- * @param resolvedPath - Directory for file reference resolution (@path references)
- * @param defaultName - Fallback name if not specified in frontmatter
- * @param scope - Source scope for priority ordering
- */
+function parseSkillMcpConfig(content: string): SkillMcpConfig | undefined {
+  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  if (!frontmatterMatch) return undefined
+
+  try {
+    const parsed = yaml.load(frontmatterMatch[1]) as Record<string, unknown>
+    if (parsed && typeof parsed === "object" && "mcp" in parsed && parsed.mcp) {
+      return parsed.mcp as SkillMcpConfig
+    }
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
 function parseAllowedTools(allowedTools: string | undefined): string[] | undefined {
   if (!allowedTools) return undefined
   return allowedTools.split(/\s+/).filter(Boolean)
@@ -30,6 +39,7 @@ function loadSkillFromPath(
   try {
     const content = readFileSync(skillPath, "utf-8")
     const { data, body } = parseFrontmatter<SkillMetadata>(content)
+    const mcpConfig = parseSkillMcpConfig(content)
 
     const skillName = data.name || defaultName
     const originalDescription = data.description || ""
@@ -67,6 +77,7 @@ $ARGUMENTS
       compatibility: data.compatibility,
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
+      mcpConfig,
     }
   } catch {
     return null
