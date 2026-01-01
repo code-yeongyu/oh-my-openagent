@@ -29,17 +29,16 @@ function buildAgent(source: AgentSource, model?: string): AgentConfig {
   return isFactory(source) ? source(model) : source
 }
 
-export function createEnvContext(directory: string): string {
+/**
+ * Creates OmO-specific environment context (time, timezone, locale).
+ * Note: Working directory, platform, and date are already provided by OpenCode's system.ts,
+ * so we only include fields that OpenCode doesn't provide to avoid duplication.
+ * See: https://github.com/code-yeongyu/oh-my-opencode/issues/379
+ */
+export function createEnvContext(): string {
   const now = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
-
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
 
   const timeStr = now.toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -48,18 +47,12 @@ export function createEnvContext(directory: string): string {
     hour12: true,
   })
 
-  const platform = process.platform as "darwin" | "linux" | "win32" | string
-
   return `
-Here is some useful information about the environment you are running in:
-<env>
-  Working directory: ${directory}
-  Platform: ${platform}
-  Today's date: ${dateStr} (NOT 2024, NEVEREVER 2024)
+<omo-env>
   Current time: ${timeStr}
   Timezone: ${timezone}
   Locale: ${locale}
-</env>`
+</omo-env>`
 }
 
 function mergeAgentConfig(
@@ -97,7 +90,7 @@ export function createBuiltinAgents(
     let config = buildAgent(source, model)
 
     if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
-      const envContext = createEnvContext(directory)
+      const envContext = createEnvContext()
       config = { ...config, prompt: config.prompt + envContext }
     }
 
