@@ -22,15 +22,14 @@ export function detectKeywords(text: string): string[] {
 
 export function detectKeywordsWithType(text: string): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
-  return KEYWORD_DETECTORS.filter(({ pattern }) =>
-    pattern.test(textWithoutCode)
-  ).map(({ message }, index) => {
-    const types: Array<"ultrawork" | "search" | "analyze"> = ["ultrawork", "search", "analyze"]
-    return {
-      type: types[index],
-      message,
-    }
-  })
+  const types: Array<"ultrawork" | "search" | "analyze"> = ["ultrawork", "search", "analyze"]
+  return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
+    matches: pattern.test(textWithoutCode),
+    type: types[index],
+    message,
+  }))
+    .filter((result) => result.matches)
+    .map(({ type, message }) => ({ type, message }))
 }
 
 export function extractPromptText(

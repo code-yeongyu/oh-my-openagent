@@ -47,7 +47,7 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
             variant: "success" as const,
             duration: 3000,
           },
-        }).catch(() => {})
+        }).catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
       }
 
       const context = messages.join("\n")
