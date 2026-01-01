@@ -44,5 +44,5 @@ export const TRUNCATE_CONFIG = {
   maxTruncateAttempts: 20,
   minOutputSizeToTruncate: 500,
   targetTokenRatio: 0.5,
-  charsPerToken: 4,
+  charsPerToken: 2,
 } as const
