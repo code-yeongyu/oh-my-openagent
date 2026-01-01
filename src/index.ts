@@ -237,7 +237,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
-    ? createKeywordDetectorHook()
+    ? createKeywordDetectorHook(ctx)
     : null;
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)

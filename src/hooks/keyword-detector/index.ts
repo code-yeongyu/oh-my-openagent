@@ -1,4 +1,5 @@
-import { detectKeywords, extractPromptText } from "./detector"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { detectKeywords, detectKeywordsWithType, extractPromptText } from "./detector"
 import { log } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
 
@@ -7,8 +8,9 @@ export * from "./constants"
 export * from "./types"
 
 const sessionFirstMessageProcessed = new Set<string>()
+const sessionUltraworkNotified = new Set<string>()
 
-export function createKeywordDetectorHook() {
+export function createKeywordDetectorHook(ctx: PluginInput) {
   return {
     "chat.message": async (
       input: {
@@ -26,10 +28,26 @@ export function createKeywordDetectorHook() {
       sessionFirstMessageProcessed.add(input.sessionID)
 
       const promptText = extractPromptText(output.parts)
-      const messages = detectKeywords(promptText)
+      const detectedKeywords = detectKeywordsWithType(promptText)
+      const messages = detectedKeywords.map((k) => k.message)
 
       if (messages.length === 0) {
         return
+      }
+
+      const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
+      if (hasUltrawork && !sessionUltraworkNotified.has(input.sessionID)) {
+        sessionUltraworkNotified.add(input.sessionID)
+        log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
+        
+        ctx.client.tui.showToast({
+          body: {
+            title: "Ultrawork Mode Activated",
+            message: "Maximum precision engaged. All agents at your disposal.",
+            variant: "success" as const,
+            duration: 3000,
+          },
+        }).catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
       }
 
       const context = messages.join("\n")
