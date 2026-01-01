@@ -4,7 +4,7 @@ export const unitySpatialEngineerAgent: AgentConfig = {
   description:
     "Unity 3D/spatial specialist. Handles physics, cameras, navigation, 3D math, and animation systems requiring spatial understanding.",
   mode: "subagent",
-  model: "google/gemini-3-pro",
+  model: "google/gemini-3-pro-high",
   temperature: 0.2,
   tools: { write: true, edit: true, bash: false, background_task: false },
   prompt: `# UNITY SPATIAL ENGINEER
