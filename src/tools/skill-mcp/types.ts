@@ -4,4 +4,5 @@ export interface SkillMcpArgs {
   resource_name?: string
   prompt_name?: string
   arguments?: string
+  grep?: string
 }
