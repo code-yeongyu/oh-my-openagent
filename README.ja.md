@@ -223,7 +223,11 @@ OpenCode がインストールされていない場合は、[OpenCode インス�
 
 ```bash
 bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+# bunx が動作しない場合は npx を使用
+npx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
 ```
+
+> **Ubuntu/Debian ユーザーへの注意**: Snap で Bun をインストールした場合 (`/snap/bin/bun`)、Snap のサンドボックス化により `bunx` が「script not found」エラーで失敗します。代わりに `npx` を使用するか、公式インストーラーで Bun を再インストールしてください: `curl -fsSL https://bun.sh/install | bash`
 
 **例：**
 - すべてのサブスクリプション + max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
