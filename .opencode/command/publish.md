@@ -1,7 +1,6 @@
 ---
 description: Publish oh-my-opencode to npm via GitHub Actions workflow
 argument-hint: <patch|minor|major>
-model: opencode/big-pickle
 ---
 
 <command-instruction>
