@@ -295,17 +295,16 @@ export async function executeCompact(
     const errorData = autoCompactState.errorDataBySession.get(sessionID);
     const truncateState = getOrCreateTruncateState(autoCompactState, sessionID);
 
-    // DCP FIRST - run before any other recovery attempts when token limit exceeded (controlled by dcp-for-compaction hook)
-    const dcpState = getOrCreateDcpState(autoCompactState, sessionID);
-    if (
-      dcpForCompaction !== false &&
-      !dcpState.attempted &&
+    const isOverLimit =
       errorData?.currentTokens &&
       errorData?.maxTokens &&
-      errorData.currentTokens > errorData.maxTokens
-    ) {
+      errorData.currentTokens > errorData.maxTokens;
+
+    // PHASE 1: DCP (Dynamic Context Pruning) - prune duplicate tool calls first
+    const dcpState = getOrCreateDcpState(autoCompactState, sessionID);
+    if (dcpForCompaction !== false && !dcpState.attempted && isOverLimit) {
       dcpState.attempted = true;
-      log("[auto-compact] DCP triggered FIRST on token limit error", {
+      log("[auto-compact] PHASE 1: DCP triggered on token limit error", {
         sessionID,
         currentTokens: errorData.currentTokens,
         maxTokens: errorData.maxTokens,
@@ -314,19 +313,25 @@ export async function executeCompact(
       const dcpConfig = experimental?.dynamic_context_pruning ?? {
         enabled: true,
         notification: "detailed" as const,
-        protected_tools: ["task", "todowrite", "todoread", "lsp_rename", "lsp_code_action_resolve"],
+        protected_tools: [
+          "task",
+          "todowrite",
+          "todoread",
+          "lsp_rename",
+          "lsp_code_action_resolve",
+        ],
       };
 
       try {
         const pruningResult = await executeDynamicContextPruning(
           sessionID,
           dcpConfig,
-          client
+          client,
         );
 
         if (pruningResult.itemsPruned > 0) {
           dcpState.itemsPruned = pruningResult.itemsPruned;
-          log("[auto-compact] DCP successful, proceeding to compaction", {
+          log("[auto-compact] DCP successful, proceeding to truncation", {
             itemsPruned: pruningResult.itemsPruned,
             tokensSaved: pruningResult.totalTokensSaved,
           });
@@ -335,56 +340,13 @@ export async function executeCompact(
             .showToast({
               body: {
                 title: "Dynamic Context Pruning",
-                message: `Pruned ${pruningResult.itemsPruned} items (~${Math.round(pruningResult.totalTokensSaved / 1000)}k tokens). Running compaction...`,
+                message: `Pruned ${pruningResult.itemsPruned} items (~${Math.round(pruningResult.totalTokensSaved / 1000)}k tokens). Proceeding to truncation...`,
                 variant: "success",
                 duration: 3000,
               },
             })
             .catch(() => {});
-
-          // After DCP, immediately try summarize
-          const providerID = msg.providerID as string | undefined;
-          const modelID = msg.modelID as string | undefined;
-
-          if (providerID && modelID) {
-            try {
-              sanitizeEmptyMessagesBeforeSummarize(sessionID);
-
-              await (client as Client).tui
-                .showToast({
-                  body: {
-                    title: "Auto Compact",
-                    message: "Summarizing session after DCP...",
-                    variant: "warning",
-                    duration: 3000,
-                  },
-                })
-                .catch(() => {});
-
-              await (client as Client).session.summarize({
-                path: { id: sessionID },
-                body: { providerID, modelID },
-                query: { directory },
-              });
-
-              clearSessionState(autoCompactState, sessionID);
-
-              setTimeout(async () => {
-                try {
-                  await (client as Client).session.prompt_async({
-                    path: { sessionID },
-                    body: { parts: [{ type: "text", text: "Continue" }] },
-                    query: { directory },
-                  });
-                } catch {}
-              }, 500);
-              return;
-            } catch (summarizeError) {
-              log("[auto-compact] summarize after DCP failed, continuing recovery", {
-                error: String(summarizeError),
-              });
-            }
-          }
+          // Continue to PHASE 2 (truncation) instead of summarizing immediately
         } else {
           log("[auto-compact] DCP did not prune any items", { sessionID });
         }
@@ -393,14 +355,12 @@ export async function executeCompact(
       }
     }
 
+    // PHASE 2: Aggressive Truncation - always try when over limit (not experimental-only)
     if (
-      experimental?.aggressive_truncation &&
-      errorData?.currentTokens &&
-      errorData?.maxTokens &&
-      errorData.currentTokens > errorData.maxTokens &&
+      isOverLimit &&
       truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts
     ) {
-      log("[auto-compact] aggressive truncation triggered (experimental)", {
+      log("[auto-compact] PHASE 2: aggressive truncation triggered", {
         currentTokens: errorData.currentTokens,
         maxTokens: errorData.maxTokens,
         targetRatio: TRUNCATE_CONFIG.targetTokenRatio,
@@ -422,16 +382,16 @@ export async function executeCompact(
           .join(", ");
         const statusMsg = aggressiveResult.sufficient
           ? `Truncated ${aggressiveResult.truncatedCount} outputs (${formatBytes(aggressiveResult.totalBytesRemoved)})`
-          : `Truncated ${aggressiveResult.truncatedCount} outputs (${formatBytes(aggressiveResult.totalBytesRemoved)}) but need ${formatBytes(aggressiveResult.targetBytesToRemove)}. Falling back to summarize/revert...`;
+          : `Truncated ${aggressiveResult.truncatedCount} outputs (${formatBytes(aggressiveResult.totalBytesRemoved)}) - continuing to summarize...`;
 
         await (client as Client).tui
           .showToast({
             body: {
               title: aggressiveResult.sufficient
-                ? "Aggressive Truncation"
+                ? "Truncation Complete"
                 : "Partial Truncation",
               message: `${statusMsg}: ${toolNames}`,
-              variant: "warning",
+              variant: aggressiveResult.sufficient ? "success" : "warning",
               duration: 4000,
             },
           })
@@ -439,7 +399,9 @@ export async function executeCompact(
 
         log("[auto-compact] aggressive truncation completed", aggressiveResult);
 
+        // If truncation was sufficient, try to continue without summarize
         if (aggressiveResult.sufficient) {
+          clearSessionState(autoCompactState, sessionID);
           setTimeout(async () => {
             try {
               await (client as Client).session.prompt_async({
@@ -451,86 +413,13 @@ export async function executeCompact(
           }, 500);
           return;
         }
+        // If not sufficient, fall through to PHASE 3 (summarize)
       } else {
-        await (client as Client).tui
-          .showToast({
-            body: {
-              title: "Truncation Skipped",
-              message: "No tool outputs found to truncate.",
-              variant: "warning",
-              duration: 3000,
-            },
-          })
-          .catch(() => {});
+        log("[auto-compact] no tool outputs found to truncate", { sessionID });
       }
     }
 
-    let skipSummarize = false;
-
-    if (truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts) {
-      const largest = findLargestToolResult(sessionID);
-
-      if (
-        largest &&
-        largest.outputSize >= TRUNCATE_CONFIG.minOutputSizeToTruncate
-      ) {
-        const result = truncateToolResult(largest.partPath);
-
-        if (result.success) {
-          truncateState.truncateAttempt++;
-          truncateState.lastTruncatedPartId = largest.partId;
-
-          await (client as Client).tui
-            .showToast({
-              body: {
-                title: "Truncating Large Output",
-                message: `Truncated ${result.toolName} (${formatBytes(result.originalSize ?? 0)}). Retrying...`,
-                variant: "warning",
-                duration: 3000,
-              },
-            })
-            .catch(() => {});
-
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
-          return;
-        }
-      } else if (
-        errorData?.currentTokens &&
-        errorData?.maxTokens &&
-        errorData.currentTokens > errorData.maxTokens
-      ) {
-        skipSummarize = true;
-        await (client as Client).tui
-          .showToast({
-            body: {
-              title: "Summarize Skipped",
-              message: `Over token limit (${errorData.currentTokens}/${errorData.maxTokens}) with nothing to truncate. Going to revert...`,
-              variant: "warning",
-              duration: 3000,
-            },
-          })
-          .catch(() => {});
-      } else if (!errorData?.currentTokens) {
-        await (client as Client).tui
-          .showToast({
-            body: {
-              title: "Truncation Skipped",
-              message: "No large tool outputs found.",
-              variant: "warning",
-              duration: 3000,
-            },
-          })
-          .catch(() => {});
-      }
-    }
+    // PHASE 3: Summarize - last resort after DCP and truncation
 
     const retryState = getOrCreateRetryState(autoCompactState, sessionID);
 
@@ -581,7 +470,7 @@ export async function executeCompact(
       autoCompactState.truncateStateBySession.delete(sessionID);
     }
 
-    if (!skipSummarize && retryState.attempt < RETRY_CONFIG.maxAttempts) {
+    if (retryState.attempt < RETRY_CONFIG.maxAttempts) {
       retryState.attempt++;
       retryState.lastAttemptTime = Date.now();
 
