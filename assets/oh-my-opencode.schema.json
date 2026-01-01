@@ -34,6 +34,15 @@
         ]
       }
     },
+    "disabled_skills": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "playwright"
+        ]
+      }
+    },
     "disabled_hooks": {
       "type": "array",
       "items": {

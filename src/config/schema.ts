@@ -26,6 +26,10 @@ export const BuiltinAgentNameSchema = z.enum([
   "multimodal-looker",
 ])
 
+export const BuiltinSkillNameSchema = z.enum([
+  "playwright",
+])
+
 export const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
@@ -231,6 +235,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(McpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
+  disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
@@ -250,6 +255,7 @@ export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
 export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>
+export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>
 export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
 export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

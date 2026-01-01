@@ -846,6 +846,22 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 
 Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
 
+### Built-in Skills
+
+Oh My OpenCode includes built-in skills that provide additional capabilities:
+
+- **playwright**: Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions.
+
+Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+```json
+{
+  "disabled_skills": ["playwright"]
+}
+```
+
+Available built-in skills: `playwright`
+
 ### Sisyphus Agent
 
 When enabled (default), Sisyphus provides a powerful orchestrator with optional specialized agents:
