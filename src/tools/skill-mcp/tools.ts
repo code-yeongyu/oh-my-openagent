@@ -87,6 +87,20 @@ function parseArguments(argsJson: string | undefined): Record<string, unknown> {
   }
 }
 
+export function applyGrepFilter(output: string, pattern: string | undefined): string {
+  if (!pattern) return output
+  try {
+    const regex = new RegExp(pattern, "i")
+    const lines = output.split("\n")
+    const filtered = lines.filter(line => regex.test(line))
+    return filtered.length > 0 
+      ? filtered.join("\n") 
+      : `[grep] No lines matched pattern: ${pattern}`
+  } catch {
+    return output
+  }
+}
+
 export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition {
   const { manager, getLoadedSkills, getSessionID } = options
 
@@ -98,6 +112,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       resource_name: tool.schema.string().optional().describe("MCP resource URI to read"),
       prompt_name: tool.schema.string().optional().describe("MCP prompt to get"),
       arguments: tool.schema.string().optional().describe("JSON string of arguments"),
+      grep: tool.schema.string().optional().describe("Regex pattern to filter output lines (only matching lines returned)"),
     },
     async execute(args: SkillMcpArgs) {
       const operation = validateOperationParams(args)
@@ -126,14 +141,17 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
 
       const parsedArgs = parseArguments(args.arguments)
 
+      let output: string
       switch (operation.type) {
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs)
-          return JSON.stringify(result, null, 2)
+          output = JSON.stringify(result, null, 2)
+          break
         }
         case "resource": {
           const result = await manager.readResource(info, context, operation.name)
-          return JSON.stringify(result, null, 2)
+          output = JSON.stringify(result, null, 2)
+          break
         }
         case "prompt": {
           const stringArgs: Record<string, string> = {}
@@ -141,9 +159,11 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
             stringArgs[key] = String(value)
           }
           const result = await manager.getPrompt(info, context, operation.name, stringArgs)
-          return JSON.stringify(result, null, 2)
+          output = JSON.stringify(result, null, 2)
+          break
         }
       }
+      return applyGrepFilter(output, args.grep)
     },
   })
 }
