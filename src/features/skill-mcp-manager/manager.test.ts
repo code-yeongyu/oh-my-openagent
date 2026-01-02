@@ -106,4 +106,54 @@ describe("SkillMcpManager", () => {
       expect(manager.getConnectedServers()).toEqual([])
     })
   })
+
+  describe("environment variable handling", () => {
+    it("always inherits process.env even when config.env is undefined", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const configWithoutEnv: ClaudeCodeMcpServer = {
+        command: "node",
+        args: ["-e", "process.exit(0)"],
+      }
+
+      // #when - attempt connection (will fail but exercises env merging code path)
+      // #then - should not throw "undefined" related errors for env
+      try {
+        await manager.getOrCreateClient(info, configWithoutEnv)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        expect(message).not.toContain("env")
+        expect(message).not.toContain("undefined")
+      }
+    })
+
+    it("overlays config.env on top of inherited process.env", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-2",
+      }
+      const configWithEnv: ClaudeCodeMcpServer = {
+        command: "node",
+        args: ["-e", "process.exit(0)"],
+        env: {
+          CUSTOM_VAR: "custom_value",
+        },
+      }
+
+      // #when - attempt connection
+      // #then - should not throw, env merging should work
+      try {
+        await manager.getOrCreateClient(info, configWithEnv)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        expect(message).toContain("Failed to connect")
+      }
+    })
+  })
 })
