@@ -134,7 +134,7 @@ Skill with env vars.
     })
 
     it("handles malformed YAML gracefully", async () => {
-      // #given
+      // #given - malformed YAML causes entire frontmatter to fail parsing
       const skillContent = `---
 name: bad-yaml
 mcp: [this is not valid yaml for mcp
@@ -150,9 +150,9 @@ Skill body.
 
       try {
         const skills = discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "bad-yaml")
+        // #then - when YAML fails, skill uses directory name as fallback
+        const skill = skills.find(s => s.name === "bad-yaml-skill")
 
-        // #then - should still load skill but without MCP config
         expect(skill).toBeDefined()
         expect(skill?.mcpConfig).toBeUndefined()
       } finally {
