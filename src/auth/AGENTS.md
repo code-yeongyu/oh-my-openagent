@@ -2,56 +2,56 @@
 
 ## OVERVIEW
 
-Google Antigravity OAuth implementation for Gemini models. Token management, fetch interception, thinking block extraction, and response transformation.
+Google Antigravity OAuth for Gemini models. Token management, fetch interception, thinking block extraction.
 
 ## STRUCTURE
 
 ```
 auth/
 └── antigravity/
-    ├── plugin.ts         # Main plugin export, hooks registration
+    ├── plugin.ts         # Main export, hooks registration
     ├── oauth.ts          # OAuth flow, token acquisition
     ├── token.ts          # Token storage, refresh logic
-    ├── fetch.ts          # Fetch interceptor (622 lines) - URL rewriting, retry
-    ├── response.ts       # Response transformation, streaming
-    ├── thinking.ts       # Thinking block extraction/transformation
-    ├── thought-signature-store.ts  # Signature caching for thinking blocks
-    ├── message-converter.ts        # Message format conversion
-    ├── request.ts        # Request building, headers
+    ├── fetch.ts          # Fetch interceptor (621 lines)
+    ├── response.ts       # Response transformation (598 lines)
+    ├── thinking.ts       # Thinking block extraction (571 lines)
+    ├── thought-signature-store.ts  # Signature caching
+    ├── message-converter.ts        # Format conversion
+    ├── request.ts        # Request building
     ├── project.ts        # Project ID management
-    ├── tools.ts          # Tool registration for OAuth
+    ├── tools.ts          # OAuth tool registration
     ├── constants.ts      # API endpoints, model mappings
-    └── types.ts          # TypeScript interfaces
+    └── types.ts
 ```
 
 ## KEY COMPONENTS
 
 | File | Purpose |
 |------|---------|
-| `fetch.ts` | Core interceptor - rewrites URLs, manages tokens, handles retries |
-| `thinking.ts` | Extracts `<antThinking>` blocks, transforms for OpenCode compatibility |
-| `response.ts` | Handles streaming responses, SSE parsing |
-| `oauth.ts` | Browser-based OAuth flow for Google accounts |
-| `token.ts` | Token persistence, expiry checking, refresh |
+| fetch.ts | URL rewriting, token injection, retries |
+| thinking.ts | Extract `<antThinking>` blocks |
+| response.ts | Streaming SSE parsing |
+| oauth.ts | Browser-based OAuth flow |
+| token.ts | Token persistence, expiry |
 
 ## HOW IT WORKS
 
-1. **Intercept**: `fetch.ts` intercepts requests to Anthropic/Google endpoints
-2. **Rewrite**: URLs rewritten to Antigravity proxy endpoints
-3. **Auth**: Bearer token injected from stored OAuth credentials
-4. **Response**: Streaming responses parsed, thinking blocks extracted
-5. **Transform**: Response format normalized for OpenCode consumption
+1. **Intercept**: fetch.ts intercepts Anthropic/Google requests
+2. **Rewrite**: URLs → Antigravity proxy endpoints
+3. **Auth**: Bearer token from stored OAuth credentials
+4. **Response**: Streaming parsed, thinking blocks extracted
+5. **Transform**: Normalized for OpenCode
 
-## ANTI-PATTERNS (AUTH)
+## FEATURES
 
-- **Direct API calls**: Always go through fetch interceptor
-- **Storing tokens in code**: Use `token.ts` storage layer
-- **Ignoring refresh**: Check token expiry before requests
-- **Blocking on OAuth**: OAuth flow is async, never block main thread
+- Multi-account (up to 10 Google accounts)
+- Auto-fallback on rate limit
+- Thinking blocks preserved
+- Antigravity proxy for AI Studio access
 
-## NOTES
+## ANTI-PATTERNS
 
-- **Multi-account**: Supports up to 10 Google accounts for load balancing
-- **Fallback**: On rate limit, automatically switches to next available account
-- **Thinking blocks**: Preserved and transformed for extended thinking features
-- **Proxy**: Uses Antigravity proxy for Google AI Studio access
+- Direct API calls (use fetch interceptor)
+- Tokens in code (use token.ts storage)
+- Ignoring refresh (check expiry first)
+- Blocking on OAuth (always async)
