@@ -39,7 +39,7 @@ type Client = {
       query: { directory: string };
     }) => Promise<unknown>;
     prompt_async: (opts: {
-      path: { sessionID: string };
+      path: { id: string };
       body: { parts: Array<{ type: string; text: string }> };
       query: { directory: string };
     }) => Promise<unknown>;
@@ -408,7 +408,7 @@ export async function executeCompact(
           setTimeout(async () => {
             try {
               await (client as Client).session.prompt_async({
-                path: { sessionID },
+                path: { id: sessionID },
                 body: { parts: [{ type: "text", text: "Continue" }] },
                 query: { directory },
               });
@@ -506,7 +506,7 @@ export async function executeCompact(
           setTimeout(async () => {
             try {
               await (client as Client).session.prompt_async({
-                path: { sessionID },
+                path: { id: sessionID },
                 body: { parts: [{ type: "text", text: "Continue" }] },
                 query: { directory },
               });
