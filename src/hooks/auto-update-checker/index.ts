@@ -4,6 +4,7 @@ import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
+import { runBunInstall } from "../../cli/config-manager"
 import type { AutoUpdateCheckerOptions } from "./types"
 
 const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
@@ -100,16 +101,34 @@ async function runBackgroundUpdateCheck(
 
   if (pluginInfo.isPinned) {
     const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
-    if (updated) {
-      invalidatePackage(PACKAGE_NAME)
-      await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
-      log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
-    } else {
+    if (!updated) {
       await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      log("[auto-update-checker] Failed to update pinned version in config")
+      return
     }
+    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
+  }
+
+  invalidatePackage(PACKAGE_NAME)
+
+  const installSuccess = await runBunInstallSafe()
+  
+  if (installSuccess) {
+    await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
+    log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
   } else {
-    invalidatePackage(PACKAGE_NAME)
     await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
+  }
+}
+
+async function runBunInstallSafe(): Promise<boolean> {
+  try {
+    return await runBunInstall()
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[auto-update-checker] bun install error:", errorMessage)
+    return false
   }
 }
 
