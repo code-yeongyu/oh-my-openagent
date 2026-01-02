@@ -102,9 +102,7 @@ export function createRalphLoopHook(
         query: { directory: ctx.directory },
       })
 
-      const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
-        ?? (response as { data?: unknown[] }).data
-        ?? (Array.isArray(response) ? response : [])
+      const messages = (response as { data?: unknown[] }).data ?? []
 
       if (!Array.isArray(messages)) return false
 

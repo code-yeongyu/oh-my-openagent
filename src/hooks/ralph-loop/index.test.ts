@@ -10,6 +10,7 @@ describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
   let promptCalls: Array<{ sessionID: string; text: string }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
+  let messagesCalls: Array<{ sessionID: string }>
   let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
 
   function createMockPluginInput() {
@@ -23,8 +24,9 @@ describe("ralph-loop", () => {
             })
             return {}
           },
-          messages: async () => {
-            return { "200": mockSessionMessages }
+          messages: async (opts: { path: { id: string } }) => {
+            messagesCalls.push({ sessionID: opts.path.id })
+            return { data: mockSessionMessages }
           },
         },
         tui: {
@@ -45,6 +47,7 @@ describe("ralph-loop", () => {
   beforeEach(() => {
     promptCalls = []
     toastCalls = []
+    messagesCalls = []
     mockSessionMessages = []
 
     if (!existsSync(TEST_DIR)) {
@@ -379,6 +382,10 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(0)
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
       expect(hook.getState()).toBeNull()
+
+      // #then - messages API was called with correct session ID
+      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
     test("should handle multiple iterations correctly", async () => {
