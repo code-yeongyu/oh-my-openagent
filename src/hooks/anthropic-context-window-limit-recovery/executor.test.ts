@@ -1,6 +1,7 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, spyOn } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
+import * as storage from "./storage"
 
 describe("executeCompact lock management", () => {
   let autoCompactState: AutoCompactState
@@ -223,5 +224,87 @@ describe("executeCompact lock management", () => {
     // #then: Lock should be cleared
     // The continuation happens in setTimeout, but lock is cleared in finally before that
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+  })
+
+  test("falls through to summarize when truncation is insufficient", async () => {
+    // #given: Over token limit with truncation returning insufficient
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit",
+      currentTokens: 250000,
+      maxTokens: 200000,
+    })
+
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+      success: true,
+      sufficient: false,
+      truncatedCount: 3,
+      totalBytesRemoved: 10000,
+      targetBytesToRemove: 50000,
+      truncatedTools: [
+        { toolName: "Grep", originalSize: 5000 },
+        { toolName: "Read", originalSize: 3000 },
+        { toolName: "Bash", originalSize: 2000 },
+      ],
+    })
+
+    // #when: Execute compaction
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
+
+    // #then: Truncation was attempted
+    expect(truncateSpy).toHaveBeenCalled()
+
+    // #then: Summarize should be called (fall through from insufficient truncation)
+    expect(mockClient.session.summarize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { id: sessionID },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+      }),
+    )
+
+    // #then: Lock should be cleared
+    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+
+    truncateSpy.mockRestore()
+  })
+
+  test("does NOT call summarize when truncation is sufficient", async () => {
+    // #given: Over token limit with truncation returning sufficient
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit",
+      currentTokens: 250000,
+      maxTokens: 200000,
+    })
+
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+      success: true,
+      sufficient: true,
+      truncatedCount: 5,
+      totalBytesRemoved: 60000,
+      targetBytesToRemove: 50000,
+      truncatedTools: [
+        { toolName: "Grep", originalSize: 30000 },
+        { toolName: "Read", originalSize: 30000 },
+      ],
+    })
+
+    // #when: Execute compaction
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
+
+    // Wait for setTimeout callback
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    // #then: Truncation was attempted
+    expect(truncateSpy).toHaveBeenCalled()
+
+    // #then: Summarize should NOT be called (early return from sufficient truncation)
+    expect(mockClient.session.summarize).not.toHaveBeenCalled()
+
+    // #then: prompt_async should be called (Continue after successful truncation)
+    expect(mockClient.session.prompt_async).toHaveBeenCalled()
+
+    // #then: Lock should be cleared
+    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+
+    truncateSpy.mockRestore()
   })
 })
