@@ -53,7 +53,7 @@ import {
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
-import { type OhMyOpenCodeConfig, type HookName } from "./config";
+import { type HookName } from "./config";
 import { log } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";

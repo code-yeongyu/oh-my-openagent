@@ -1,4 +1,4 @@
-import type { CliMatch, AnalyzeResult, SgResult } from "./types"
+import type { AnalyzeResult, SgResult } from "./types"
 
 export function formatSearchResult(result: SgResult): string {
   if (result.error) {
@@ -93,7 +93,7 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
   return lines.join("\n")
 }
 
-export function formatTransformResult(original: string, transformed: string, editCount: number): string {
+export function formatTransformResult(_original: string, transformed: string, editCount: number): string {
   if (editCount === 0) {
     return "No matches found to transform"
   }
