@@ -1,8 +1,11 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "./types"
 
+const TASK_TTL_MS = 30 * 60 * 1000
+
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
+  private notifications: Map<string, BackgroundTask[]> = new Map()
 
   addTask(task: BackgroundTask): void {
     this.tasks.set(task.id, task)
@@ -33,6 +36,74 @@ class MockBackgroundManager {
     }
 
     return result
+  }
+
+  markForNotification(task: BackgroundTask): void {
+    const queue = this.notifications.get(task.parentSessionID) ?? []
+    queue.push(task)
+    this.notifications.set(task.parentSessionID, queue)
+  }
+
+  getPendingNotifications(sessionID: string): BackgroundTask[] {
+    return this.notifications.get(sessionID) ?? []
+  }
+
+  private clearNotificationsForTask(taskId: string): void {
+    for (const [sessionID, tasks] of this.notifications.entries()) {
+      const filtered = tasks.filter((t) => t.id !== taskId)
+      if (filtered.length === 0) {
+        this.notifications.delete(sessionID)
+      } else {
+        this.notifications.set(sessionID, filtered)
+      }
+    }
+  }
+
+  pruneStaleTasksAndNotifications(): { prunedTasks: string[]; prunedNotifications: number } {
+    const now = Date.now()
+    const prunedTasks: string[] = []
+    let prunedNotifications = 0
+
+    for (const [taskId, task] of this.tasks.entries()) {
+      const age = now - task.startedAt.getTime()
+      if (age > TASK_TTL_MS) {
+        prunedTasks.push(taskId)
+        this.clearNotificationsForTask(taskId)
+        this.tasks.delete(taskId)
+      }
+    }
+
+    for (const [sessionID, notifications] of this.notifications.entries()) {
+      if (notifications.length === 0) {
+        this.notifications.delete(sessionID)
+        continue
+      }
+      const validNotifications = notifications.filter((task) => {
+        const age = now - task.startedAt.getTime()
+        return age <= TASK_TTL_MS
+      })
+      const removed = notifications.length - validNotifications.length
+      prunedNotifications += removed
+      if (validNotifications.length === 0) {
+        this.notifications.delete(sessionID)
+      } else if (validNotifications.length !== notifications.length) {
+        this.notifications.set(sessionID, validNotifications)
+      }
+    }
+
+    return { prunedTasks, prunedNotifications }
+  }
+
+  getTaskCount(): number {
+    return this.tasks.size
+  }
+
+  getNotificationCount(): number {
+    let count = 0
+    for (const notifications of this.notifications.values()) {
+      count += notifications.length
+    }
+    return count
   }
 }
 
@@ -228,5 +299,118 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     // #then
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe("task-b")
+  })
+})
+
+describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
+  let manager: MockBackgroundManager
+
+  beforeEach(() => {
+    // #given
+    manager = new MockBackgroundManager()
+  })
+
+  test("should not prune fresh tasks", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-fresh",
+      sessionID: "session-fresh",
+      parentSessionID: "session-parent",
+      startedAt: new Date(),
+    })
+    manager.addTask(task)
+
+    // #when
+    const result = manager.pruneStaleTasksAndNotifications()
+
+    // #then
+    expect(result.prunedTasks).toHaveLength(0)
+    expect(manager.getTaskCount()).toBe(1)
+  })
+
+  test("should prune tasks older than 30 minutes", () => {
+    // #given
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const task = createMockTask({
+      id: "task-stale",
+      sessionID: "session-stale",
+      parentSessionID: "session-parent",
+      startedAt: staleDate,
+    })
+    manager.addTask(task)
+
+    // #when
+    const result = manager.pruneStaleTasksAndNotifications()
+
+    // #then
+    expect(result.prunedTasks).toContain("task-stale")
+    expect(manager.getTaskCount()).toBe(0)
+  })
+
+  test("should prune stale notifications", () => {
+    // #given
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const task = createMockTask({
+      id: "task-stale",
+      sessionID: "session-stale",
+      parentSessionID: "session-parent",
+      startedAt: staleDate,
+    })
+    manager.markForNotification(task)
+
+    // #when
+    const result = manager.pruneStaleTasksAndNotifications()
+
+    // #then
+    expect(result.prunedNotifications).toBe(1)
+    expect(manager.getNotificationCount()).toBe(0)
+  })
+
+  test("should clean up notifications when task is pruned", () => {
+    // #given
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const task = createMockTask({
+      id: "task-stale",
+      sessionID: "session-stale",
+      parentSessionID: "session-parent",
+      startedAt: staleDate,
+    })
+    manager.addTask(task)
+    manager.markForNotification(task)
+
+    // #when
+    manager.pruneStaleTasksAndNotifications()
+
+    // #then
+    expect(manager.getTaskCount()).toBe(0)
+    expect(manager.getNotificationCount()).toBe(0)
+  })
+
+  test("should keep fresh tasks while pruning stale ones", () => {
+    // #given
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleTask = createMockTask({
+      id: "task-stale",
+      sessionID: "session-stale",
+      parentSessionID: "session-parent",
+      startedAt: staleDate,
+    })
+    const freshTask = createMockTask({
+      id: "task-fresh",
+      sessionID: "session-fresh",
+      parentSessionID: "session-parent",
+      startedAt: new Date(),
+    })
+    manager.addTask(staleTask)
+    manager.addTask(freshTask)
+
+    // #when
+    const result = manager.pruneStaleTasksAndNotifications()
+
+    // #then
+    expect(result.prunedTasks).toHaveLength(1)
+    expect(result.prunedTasks).toContain("task-stale")
+    expect(manager.getTaskCount()).toBe(1)
+    expect(manager.getTask("task-fresh")).toBeDefined()
   })
 })
