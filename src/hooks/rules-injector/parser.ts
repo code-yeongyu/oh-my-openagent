@@ -60,7 +60,7 @@ function parseYamlContent(yamlContent: string): RuleMetadata {
       metadata.description = parseStringValue(rawValue);
     } else if (key === "alwaysApply") {
       metadata.alwaysApply = rawValue === "true";
-    } else if (key === "globs" || key === "paths") {
+    } else if (key === "globs" || key === "paths" || key === "applyTo") {
       const { value, consumed } = parseArrayOrStringValue(rawValue, lines, i);
       // Merge paths into globs (Claude Code compatibility)
       if (key === "paths") {
