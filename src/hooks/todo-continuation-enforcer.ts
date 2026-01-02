@@ -29,7 +29,7 @@ interface Todo {
 }
 
 interface SessionState {
-  lastErrorAt?: number
+  lastEventWasAbortError?: boolean
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
@@ -45,7 +45,6 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
-const ERROR_COOLDOWN_MS = 3_000
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -155,10 +154,7 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    if (state?.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
-      log(`[${HOOK_NAME}] Skipped injection: recent error`, { sessionID })
-      return
-    }
+
 
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
@@ -251,10 +247,11 @@ export function createTodoContinuationEnforcer(
       if (!sessionID) return
 
       const state = getState(sessionID)
-      state.lastErrorAt = Date.now()
+      const isAbort = isAbortError(props?.error)
+      state.lastEventWasAbortError = isAbort
       cancelCountdown(sessionID)
       
-      log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort: isAbortError(props?.error) })
+      log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
       return
     }
 
@@ -280,8 +277,9 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      if (state.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
-        log(`[${HOOK_NAME}] Skipped: recent error (cooldown)`, { sessionID })
+      if (state.lastEventWasAbortError) {
+        state.lastEventWasAbortError = false
+        log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
         return
       }
 
@@ -325,13 +323,14 @@ export function createTodoContinuationEnforcer(
 
       if (!sessionID) return
 
+      const state = sessions.get(sessionID)
+      if (state) {
+        state.lastEventWasAbortError = false
+      }
+
       if (role === "user") {
-        const state = sessions.get(sessionID)
-        if (state) {
-          state.lastErrorAt = undefined
-        }
         cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] User message: cleared error state`, { sessionID })
+        log(`[${HOOK_NAME}] User message: cleared abort state`, { sessionID })
       }
 
       if (role === "assistant") {
@@ -346,6 +345,10 @@ export function createTodoContinuationEnforcer(
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
+        const state = sessions.get(sessionID)
+        if (state) {
+          state.lastEventWasAbortError = false
+        }
         cancelCountdown(sessionID)
       }
       return
@@ -354,6 +357,10 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
+        const state = sessions.get(sessionID)
+        if (state) {
+          state.lastEventWasAbortError = false
+        }
         cancelCountdown(sessionID)
       }
       return
