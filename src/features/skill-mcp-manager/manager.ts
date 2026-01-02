@@ -69,6 +69,7 @@ export class SkillMcpManager {
       command,
       args,
       env: mergedEnv,
+      stderr: "ignore",
     })
 
     const client = new Client(
