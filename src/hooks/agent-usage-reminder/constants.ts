@@ -15,7 +15,7 @@ export const TARGET_TOOLS = new Set([
   "safe_glob",
   "webfetch",
   "context7_resolve-library-id",
-  "context7_get-library-docs",
+  "context7_query-docs",
   "websearch_exa_web_search_exa",
   "grep_app_searchgithub",
 ]);

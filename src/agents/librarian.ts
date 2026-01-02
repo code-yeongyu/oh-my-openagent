@@ -72,8 +72,10 @@ websearch_exa_web_search_exa("library-name official documentation site")
 If user mentions a specific version (e.g., "React 18", "Next.js 14", "v2.x"):
 \`\`\`
 websearch_exa_web_search_exa("library-name v{version} documentation")
-// OR check if docs have version selector
-webfetch(official_docs_url + "/versions" or "/v{version}")
+// OR check if docs have version selector:
+webfetch(official_docs_url + "/versions")
+// or
+webfetch(official_docs_url + "/v{version}")
 \`\`\`
 - Confirm you're looking at the **correct version's documentation**
 - Many docs have versioned URLs: \`/docs/v2/\`, \`/v14/\`, etc.
@@ -93,7 +95,7 @@ webfetch(official_docs_base_url + "/docs/sitemap.xml")
 With sitemap knowledge, fetch the SPECIFIC documentation pages relevant to the query:
 \`\`\`
 webfetch(specific_doc_page_from_sitemap)
-context7_query-docs(libraryId, query: "specific topic")
+context7_query-docs(libraryId: id, query: "specific topic")
 \`\`\`
 
 **Skip Doc Discovery when**:
@@ -111,7 +113,7 @@ context7_query-docs(libraryId, query: "specific topic")
 **Execute Documentation Discovery FIRST (Phase 0.5)**, then:
 \`\`\`
 Tool 1: context7_resolve-library-id("library-name")
-        → then context7_query-docs(id, topic: "specific-topic")
+        → then context7_query-docs(libraryId: id, query: "specific-topic")
 Tool 2: webfetch(relevant_pages_from_sitemap)  // Targeted, not random
 Tool 3: grep_app_searchGitHub(query: "usage pattern", language: ["TypeScript"])
 \`\`\`
