@@ -1,5 +1,6 @@
 import * as path from "node:path"
 import * as os from "node:os"
+import * as fs from "node:fs"
 
 export const PACKAGE_NAME = "oh-my-opencode"
 export const NPM_REGISTRY_URL = `https://registry.npmjs.org/-/package/${PACKAGE_NAME}/dist-tags`
@@ -28,12 +29,34 @@ export const INSTALLED_PACKAGE_JSON = path.join(
 
 /**
  * OpenCode config file locations (priority order)
+ * On Windows, checks ~/.config first (cross-platform), then %APPDATA% (fallback)
+ * This matches shared/config-path.ts behavior for consistency
  */
 function getUserConfigDir(): string {
   if (process.platform === "win32") {
-    return process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")
+    const crossPlatformDir = path.join(os.homedir(), ".config")
+    const appdataDir = process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")
+    
+    // Check cross-platform path first (~/.config)
+    const crossPlatformConfig = path.join(crossPlatformDir, "opencode", "opencode.json")
+    const crossPlatformConfigJsonc = path.join(crossPlatformDir, "opencode", "opencode.jsonc")
+    
+    if (fs.existsSync(crossPlatformConfig) || fs.existsSync(crossPlatformConfigJsonc)) {
+      return crossPlatformDir
+    }
+    
+    // Fall back to %APPDATA%
+    return appdataDir
   }
   return process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config")
+}
+
+/**
+ * Get the Windows-specific APPDATA directory (for fallback checks)
+ */
+export function getWindowsAppdataDir(): string | null {
+  if (process.platform !== "win32") return null
+  return process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")
 }
 
 export const USER_CONFIG_DIR = getUserConfigDir()
