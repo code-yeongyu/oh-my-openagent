@@ -74,6 +74,7 @@ export const HookNameSchema = z.enum([
   "compaction-context-injector",
   "claude-code-hooks",
   "auto-slash-command",
+  "edit-error-recovery",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

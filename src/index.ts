@@ -25,6 +25,7 @@ import {
   createThinkingBlockValidatorHook,
   createRalphLoopHook,
   createAutoSlashCommandHook,
+  createEditErrorRecoveryHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -150,6 +151,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
     ? createAutoSlashCommandHook()
+    : null;
+
+  const editErrorRecovery = isHookEnabled("edit-error-recovery")
+    ? createEditErrorRecoveryHook(ctx)
     : null;
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -436,6 +441,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
+      await editErrorRecovery?.["tool.execute.after"](input, output);
     },
   };
 };
