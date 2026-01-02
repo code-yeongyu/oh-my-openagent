@@ -1,11 +1,11 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
-import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
-import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import type { BackgroundManager } from "../features/background-agent"
+import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
 
 describe("todo-continuation-enforcer", () => {
-  let promptCalls: Array<{ sessionID: string; agent?: string; text: string }>
+  let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
   let toastCalls: Array<{ title: string; message: string }>
 
   function createMockPluginInput() {
@@ -20,6 +20,7 @@ describe("todo-continuation-enforcer", () => {
             promptCalls.push({
               sessionID: opts.path.id,
               agent: opts.body.agent,
+              model: opts.body.model,
               text: opts.body.parts[0].text,
             })
             return {}
@@ -41,8 +42,8 @@ describe("todo-continuation-enforcer", () => {
 
   function createMockBackgroundManager(runningTasks: boolean = false): BackgroundManager {
     return {
-      getTasksByParentSession: () => runningTasks 
-        ? [{ status: "running" }] 
+      getTasksByParentSession: () => runningTasks
+        ? [{ status: "running" }]
         : [],
     } as any
   }
@@ -229,9 +230,9 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - user sends message immediately (before 2s countdown)
     await hook.handler({
-      event: { 
-        type: "message.updated", 
-        properties: { info: { sessionID, role: "user" } } 
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } }
       },
     })
 
@@ -255,9 +256,9 @@ describe("todo-continuation-enforcer", () => {
     // #when - assistant starts responding
     await new Promise(r => setTimeout(r, 500))
     await hook.handler({
-      event: { 
-        type: "message.part.updated", 
-        properties: { info: { sessionID, role: "assistant" } } 
+      event: {
+        type: "message.part.updated",
+        properties: { info: { sessionID, role: "assistant" } }
       },
     })
 
@@ -418,12 +419,12 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - abort error occurs (with abort-specific error)
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { 
-          sessionID, 
-          error: { name: "MessageAbortedError", message: "The operation was aborted" } 
-        } 
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "MessageAbortedError", message: "The operation was aborted" }
+        }
       },
     })
 
@@ -447,20 +448,20 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - abort error occurs
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { 
-          sessionID, 
-          error: { name: "MessageAbortedError", message: "The operation was aborted" } 
-        } 
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "MessageAbortedError", message: "The operation was aborted" }
+        }
       },
     })
 
     // #when - assistant sends a message (intervening event clears abort state)
     await hook.handler({
-      event: { 
-        type: "message.updated", 
-        properties: { info: { sessionID, role: "assistant" } } 
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } }
       },
     })
 
@@ -484,12 +485,12 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - abort error occurs
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { 
-          sessionID, 
-          error: { message: "aborted" } 
-        } 
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { message: "aborted" }
+        }
       },
     })
 
@@ -518,12 +519,12 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - non-abort error occurs (e.g., network error, API error)
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { 
-          sessionID, 
-          error: { name: "NetworkError", message: "Connection failed" } 
-        } 
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "NetworkError", message: "Connection failed" }
+        }
       },
     })
 
@@ -547,12 +548,12 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - abort error occurs
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { 
-          sessionID, 
-          error: { name: "AbortError", message: "cancelled" } 
-        } 
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "AbortError", message: "cancelled" }
+        }
       },
     })
 
@@ -584,17 +585,17 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - first abort error
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { sessionID, error: { message: "aborted" } } 
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { message: "aborted" } }
       },
     })
 
     // #when - second abort error (immediately before idle)
     await hook.handler({
-      event: { 
-        type: "session.error", 
-        properties: { sessionID, error: { message: "interrupted" } } 
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { message: "interrupted" } }
       },
     })
 
