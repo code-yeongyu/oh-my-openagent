@@ -118,7 +118,7 @@ async function runBackgroundUpdateCheck(
     log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
   } else {
     await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-    log("[auto-update-checker] bun install failed, user needs to restart OpenCode")
+    log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
   }
 }
 
@@ -126,7 +126,8 @@ async function runBunInstallSafe(): Promise<boolean> {
   try {
     return await runBunInstall()
   } catch (err) {
-    log("[auto-update-checker] bun install error:", err)
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[auto-update-checker] bun install error:", errorMessage)
     return false
   }
 }
