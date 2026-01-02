@@ -401,21 +401,31 @@ export async function executeCompact(
 
         log("[auto-compact] aggressive truncation completed", aggressiveResult);
 
-        clearSessionState(autoCompactState, sessionID);
-        setTimeout(async () => {
-          try {
-            await (client as Client).session.prompt_async({
-              path: { sessionID },
-              body: { parts: [{ type: "text", text: "Continue" }] },
-              query: { directory },
-            });
-          } catch {}
-        }, 500);
-        return;
+        // Only return early if truncation was sufficient to get under token limit
+        // Otherwise fall through to PHASE 3 (Summarize)
+        if (aggressiveResult.sufficient) {
+          clearSessionState(autoCompactState, sessionID);
+          setTimeout(async () => {
+            try {
+              await (client as Client).session.prompt_async({
+                path: { sessionID },
+                body: { parts: [{ type: "text", text: "Continue" }] },
+                query: { directory },
+              });
+            } catch {}
+          }, 500);
+          return;
+        }
+        // Truncation was insufficient - fall through to Summarize
+        log("[auto-compact] truncation insufficient, falling through to summarize", {
+          sessionID,
+          truncatedCount: aggressiveResult.truncatedCount,
+          sufficient: aggressiveResult.sufficient,
+        });
       }
     }
 
-    // PHASE 3: Summarize - fallback when no tool outputs to truncate
+    // PHASE 3: Summarize - fallback when truncation insufficient or no tool outputs
     const retryState = getOrCreateRetryState(autoCompactState, sessionID);
 
     if (errorData?.errorType?.includes("non-empty content")) {
