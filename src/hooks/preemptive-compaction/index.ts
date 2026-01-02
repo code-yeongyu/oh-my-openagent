@@ -1,125 +1,135 @@
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-import type { PluginInput } from "@opencode-ai/plugin"
-import type { ExperimentalConfig } from "../../config"
-import type { PreemptiveCompactionState, TokenInfo } from "./types"
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import type { PluginInput } from "@opencode-ai/plugin";
+import type { ExperimentalConfig } from "../../config";
+import type { PreemptiveCompactionState, TokenInfo } from "./types";
 import {
   DEFAULT_THRESHOLD,
   MIN_TOKENS_FOR_COMPACTION,
   COMPACTION_COOLDOWN_MS,
-} from "./constants"
+} from "./constants";
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
-} from "../../features/hook-message-injector"
-import { log } from "../../shared/logger"
+} from "../../features/hook-message-injector";
+import { log } from "../../shared/logger";
 
 export interface SummarizeContext {
-  sessionID: string
-  providerID: string
-  modelID: string
-  usageRatio: number
-  directory: string
+  sessionID: string;
+  providerID: string;
+  modelID: string;
+  usageRatio: number;
+  directory: string;
 }
 
-export type BeforeSummarizeCallback = (ctx: SummarizeContext) => Promise<void> | void
+export type BeforeSummarizeCallback = (
+  ctx: SummarizeContext,
+) => Promise<void> | void;
 
-export type GetModelLimitCallback = (providerID: string, modelID: string) => number | undefined
+export type GetModelLimitCallback = (
+  providerID: string,
+  modelID: string,
+) => number | undefined;
 
 export interface PreemptiveCompactionOptions {
-  experimental?: ExperimentalConfig
-  onBeforeSummarize?: BeforeSummarizeCallback
-  getModelLimit?: GetModelLimitCallback
+  experimental?: ExperimentalConfig;
+  onBeforeSummarize?: BeforeSummarizeCallback;
+  getModelLimit?: GetModelLimitCallback;
 }
 
 interface MessageInfo {
-  id: string
-  role: string
-  sessionID: string
-  providerID?: string
-  modelID?: string
-  tokens?: TokenInfo
-  summary?: boolean
-  finish?: boolean
+  id: string;
+  role: string;
+  sessionID: string;
+  providerID?: string;
+  modelID?: string;
+  tokens?: TokenInfo;
+  summary?: boolean;
+  finish?: boolean;
 }
 
 interface MessageWrapper {
-  info: MessageInfo
+  info: MessageInfo;
 }
 
-const CLAUDE_MODEL_PATTERN = /claude-(opus|sonnet|haiku)/i
-const CLAUDE_DEFAULT_CONTEXT_LIMIT = 200_000
+const CLAUDE_MODEL_PATTERN = /claude-(opus|sonnet|haiku)/i;
+const CLAUDE_DEFAULT_CONTEXT_LIMIT =
+  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : 200_000;
 
 function isSupportedModel(modelID: string): boolean {
-  return CLAUDE_MODEL_PATTERN.test(modelID)
+  return CLAUDE_MODEL_PATTERN.test(modelID);
 }
 
 function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
+  if (!existsSync(MESSAGE_STORAGE)) return null;
 
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
+  const directPath = join(MESSAGE_STORAGE, sessionID);
+  if (existsSync(directPath)) return directPath;
 
   for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID);
+    if (existsSync(sessionPath)) return sessionPath;
   }
 
-  return null
+  return null;
 }
 
 function createState(): PreemptiveCompactionState {
   return {
     lastCompactionTime: new Map(),
     compactionInProgress: new Set(),
-  }
+  };
 }
 
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
-  options?: PreemptiveCompactionOptions
+  options?: PreemptiveCompactionOptions,
 ) {
-  const experimental = options?.experimental
-  const onBeforeSummarize = options?.onBeforeSummarize
-  const getModelLimit = options?.getModelLimit
-  const enabled = experimental?.preemptive_compaction !== false
-  const threshold = experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD
+  const experimental = options?.experimental;
+  const onBeforeSummarize = options?.onBeforeSummarize;
+  const getModelLimit = options?.getModelLimit;
+  const enabled = experimental?.preemptive_compaction !== false;
+  const threshold =
+    experimental?.preemptive_compaction_threshold ?? DEFAULT_THRESHOLD;
 
   if (!enabled) {
-    return { event: async () => {} }
+    return { event: async () => {} };
   }
 
-  const state = createState()
+  const state = createState();
 
   const checkAndTriggerCompaction = async (
     sessionID: string,
-    lastAssistant: MessageInfo
+    lastAssistant: MessageInfo,
   ): Promise<void> => {
-    if (state.compactionInProgress.has(sessionID)) return
+    if (state.compactionInProgress.has(sessionID)) return;
 
-    const lastCompaction = state.lastCompactionTime.get(sessionID) ?? 0
-    if (Date.now() - lastCompaction < COMPACTION_COOLDOWN_MS) return
+    const lastCompaction = state.lastCompactionTime.get(sessionID) ?? 0;
+    if (Date.now() - lastCompaction < COMPACTION_COOLDOWN_MS) return;
 
-    if (lastAssistant.summary === true) return
+    if (lastAssistant.summary === true) return;
 
-    const tokens = lastAssistant.tokens
-    if (!tokens) return
+    const tokens = lastAssistant.tokens;
+    if (!tokens) return;
 
-    const modelID = lastAssistant.modelID ?? ""
-    const providerID = lastAssistant.providerID ?? ""
+    const modelID = lastAssistant.modelID ?? "";
+    const providerID = lastAssistant.providerID ?? "";
 
     if (!isSupportedModel(modelID)) {
-      log("[preemptive-compaction] skipping unsupported model", { modelID })
-      return
+      log("[preemptive-compaction] skipping unsupported model", { modelID });
+      return;
     }
 
-    const configLimit = getModelLimit?.(providerID, modelID)
-    const contextLimit = configLimit ?? CLAUDE_DEFAULT_CONTEXT_LIMIT
-    const totalUsed = tokens.input + tokens.cache.read + tokens.output
+    const configLimit = getModelLimit?.(providerID, modelID);
+    const contextLimit = configLimit ?? CLAUDE_DEFAULT_CONTEXT_LIMIT;
+    const totalUsed = tokens.input + tokens.cache.read + tokens.output;
 
-    if (totalUsed < MIN_TOKENS_FOR_COMPACTION) return
+    if (totalUsed < MIN_TOKENS_FOR_COMPACTION) return;
 
-    const usageRatio = totalUsed / contextLimit
+    const usageRatio = totalUsed / contextLimit;
 
     log("[preemptive-compaction] checking", {
       sessionID,
@@ -127,16 +137,16 @@ export function createPreemptiveCompactionHook(
       contextLimit,
       usageRatio: usageRatio.toFixed(2),
       threshold,
-    })
+    });
 
-    if (usageRatio < threshold) return
+    if (usageRatio < threshold) return;
 
-    state.compactionInProgress.add(sessionID)
-    state.lastCompactionTime.set(sessionID, Date.now())
+    state.compactionInProgress.add(sessionID);
+    state.lastCompactionTime.set(sessionID, Date.now());
 
     if (!providerID || !modelID) {
-      state.compactionInProgress.delete(sessionID)
-      return
+      state.compactionInProgress.delete(sessionID);
+      return;
     }
 
     await ctx.client.tui
@@ -148,9 +158,12 @@ export function createPreemptiveCompactionHook(
           duration: 3000,
         },
       })
-      .catch(() => {})
+      .catch(() => {});
 
-    log("[preemptive-compaction] triggering compaction", { sessionID, usageRatio })
+    log("[preemptive-compaction] triggering compaction", {
+      sessionID,
+      usageRatio,
+    });
 
     try {
       if (onBeforeSummarize) {
@@ -160,14 +173,14 @@ export function createPreemptiveCompactionHook(
           modelID,
           usageRatio,
           directory: ctx.directory,
-        })
+        });
       }
 
       await ctx.client.session.summarize({
         path: { id: sessionID },
         body: { providerID, modelID },
         query: { directory: ctx.directory },
-      })
+      });
 
       await ctx.client.tui
         .showToast({
@@ -178,14 +191,16 @@ export function createPreemptiveCompactionHook(
             duration: 2000,
           },
         })
-        .catch(() => {})
+        .catch(() => {});
 
-      state.compactionInProgress.delete(sessionID)
+      state.compactionInProgress.delete(sessionID);
 
       setTimeout(async () => {
         try {
-          const messageDir = getMessageDir(sessionID)
-          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+          const messageDir = getMessageDir(sessionID);
+          const storedMessage = messageDir
+            ? findNearestMessageWithFields(messageDir)
+            : null;
 
           await ctx.client.session.promptAsync({
             path: { id: sessionID },
@@ -194,81 +209,93 @@ export function createPreemptiveCompactionHook(
               parts: [{ type: "text", text: "Continue" }],
             },
             query: { directory: ctx.directory },
-          })
+          });
         } catch {}
-      }, 500)
-      return
+      }, 500);
+      return;
     } catch (err) {
-      log("[preemptive-compaction] compaction failed", { sessionID, error: err })
+      log("[preemptive-compaction] compaction failed", {
+        sessionID,
+        error: err,
+      });
     } finally {
-      state.compactionInProgress.delete(sessionID)
+      state.compactionInProgress.delete(sessionID);
     }
-  }
+  };
 
-  const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
-    const props = event.properties as Record<string, unknown> | undefined
+  const eventHandler = async ({
+    event,
+  }: {
+    event: { type: string; properties?: unknown };
+  }) => {
+    const props = event.properties as Record<string, unknown> | undefined;
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
+      const sessionInfo = props?.info as { id?: string } | undefined;
       if (sessionInfo?.id) {
-        state.lastCompactionTime.delete(sessionInfo.id)
-        state.compactionInProgress.delete(sessionInfo.id)
+        state.lastCompactionTime.delete(sessionInfo.id);
+        state.compactionInProgress.delete(sessionInfo.id);
       }
-      return
+      return;
     }
 
     if (event.type === "message.updated") {
-      const info = props?.info as MessageInfo | undefined
-      if (!info) return
+      const info = props?.info as MessageInfo | undefined;
+      if (!info) return;
 
-      if (info.role !== "assistant" || !info.finish) return
+      if (info.role !== "assistant" || !info.finish) return;
 
-      const sessionID = info.sessionID
-      if (!sessionID) return
+      const sessionID = info.sessionID;
+      if (!sessionID) return;
 
-      await checkAndTriggerCompaction(sessionID, info)
-      return
+      await checkAndTriggerCompaction(sessionID, info);
+      return;
     }
 
     if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
-      if (!sessionID) return
+      const sessionID = props?.sessionID as string | undefined;
+      if (!sessionID) return;
 
       try {
         const resp = await ctx.client.session.messages({
           path: { id: sessionID },
           query: { directory: ctx.directory },
-        })
+        });
 
-        const messages = (resp.data ?? resp) as MessageWrapper[]
+        const messages = (resp.data ?? resp) as MessageWrapper[];
         const assistants = messages
           .filter((m) => m.info.role === "assistant")
-          .map((m) => m.info)
+          .map((m) => m.info);
 
-        if (assistants.length === 0) return
+        if (assistants.length === 0) return;
 
-        const lastAssistant = assistants[assistants.length - 1]
+        const lastAssistant = assistants[assistants.length - 1];
 
         if (!lastAssistant.providerID || !lastAssistant.modelID) {
-          const messageDir = getMessageDir(sessionID)
-          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-          if (storedMessage?.model?.providerID && storedMessage?.model?.modelID) {
-            lastAssistant.providerID = storedMessage.model.providerID
-            lastAssistant.modelID = storedMessage.model.modelID
+          const messageDir = getMessageDir(sessionID);
+          const storedMessage = messageDir
+            ? findNearestMessageWithFields(messageDir)
+            : null;
+          if (
+            storedMessage?.model?.providerID &&
+            storedMessage?.model?.modelID
+          ) {
+            lastAssistant.providerID = storedMessage.model.providerID;
+            lastAssistant.modelID = storedMessage.model.modelID;
             log("[preemptive-compaction] using stored message model info", {
               sessionID,
               providerID: lastAssistant.providerID,
               modelID: lastAssistant.modelID,
-            })
+            });
           }
         }
 
-        await checkAndTriggerCompaction(sessionID, lastAssistant)
+        await checkAndTriggerCompaction(sessionID, lastAssistant);
       } catch {}
     }
-  }
+  };
 
   return {
     event: eventHandler,
-  }
+  };
 }
