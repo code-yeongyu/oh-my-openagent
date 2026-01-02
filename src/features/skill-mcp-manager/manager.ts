@@ -55,18 +55,20 @@ export class SkillMcpManager {
     const command = config.command
     const args = config.args || []
 
+    // Always inherit parent process environment
     const mergedEnv: Record<string, string> = {}
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) mergedEnv[key] = value
+    }
+    // Overlay with skill-specific env vars if present
     if (config.env) {
-      for (const [key, value] of Object.entries(process.env)) {
-        if (value !== undefined) mergedEnv[key] = value
-      }
       Object.assign(mergedEnv, config.env)
     }
 
     const transport = new StdioClientTransport({
       command,
       args,
-      env: config.env ? mergedEnv : undefined,
+      env: mergedEnv,
     })
 
     const client = new Client(
