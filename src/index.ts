@@ -52,7 +52,7 @@ import {
   loadUserAgents,
   loadProjectAgents,
 } from "./features/claude-code-agent-loader";
-import { loadMcpConfigs } from "./features/claude-code-mcp-loader";
+import { loadMcpConfigs, getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "./features/claude-code-plugin-loader";
 import {
   setMainSession,
@@ -63,110 +63,9 @@ import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge, getUserConfigDir, addConfigLoadError, parseJsonc, detectConfigFile, migrateConfigFile } from "./shared";
+import { log } from "./shared";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
-import * as fs from "fs";
-import * as path from "path";
-
-function loadConfigFromPath(configPath: string, ctx: any): OhMyOpenCodeConfig | null {
-  try {
-    if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, "utf-8");
-      const rawConfig = parseJsonc<Record<string, unknown>>(content);
-
-      migrateConfigFile(configPath, rawConfig);
-
-      const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
-
-      if (!result.success) {
-        const errorMsg = result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
-        log(`Config validation error in ${configPath}:`, result.error.issues);
-        addConfigLoadError({ path: configPath, error: `Validation error: ${errorMsg}` });
-        return null;
-      }
-
-      log(`Config loaded from ${configPath}`, { agents: result.data.agents });
-      return result.data;
-    }
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    log(`Error loading config from ${configPath}:`, err);
-    addConfigLoadError({ path: configPath, error: errorMsg });
-  }
-  return null;
-}
-
-function mergeConfigs(
-  base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
-): OhMyOpenCodeConfig {
-  return {
-    ...base,
-    ...override,
-    agents: deepMerge(base.agents, override.agents),
-    disabled_agents: [
-      ...new Set([
-        ...(base.disabled_agents ?? []),
-        ...(override.disabled_agents ?? []),
-      ]),
-    ],
-    disabled_mcps: [
-      ...new Set([
-        ...(base.disabled_mcps ?? []),
-        ...(override.disabled_mcps ?? []),
-      ]),
-    ],
-    disabled_hooks: [
-      ...new Set([
-        ...(base.disabled_hooks ?? []),
-        ...(override.disabled_hooks ?? []),
-      ]),
-    ],
-    disabled_commands: [
-      ...new Set([
-        ...(base.disabled_commands ?? []),
-        ...(override.disabled_commands ?? []),
-      ]),
-    ],
-    disabled_skills: [
-      ...new Set([
-        ...(base.disabled_skills ?? []),
-        ...(override.disabled_skills ?? []),
-      ]),
-    ],
-    claude_code: deepMerge(base.claude_code, override.claude_code),
-  };
-}
-
-function loadPluginConfig(directory: string, ctx: any): OhMyOpenCodeConfig {
-  // User-level config path (OS-specific) - prefer .jsonc over .json
-  const userBasePath = path.join(getUserConfigDir(), "opencode", "oh-my-opencode");
-  const userDetected = detectConfigFile(userBasePath);
-  const userConfigPath = userDetected.format !== "none" ? userDetected.path : userBasePath + ".json";
-
-  // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
-  const projectDetected = detectConfigFile(projectBasePath);
-  const projectConfigPath = projectDetected.format !== "none" ? projectDetected.path : projectBasePath + ".json";
-
-  // Load user config first (base)
-  let config: OhMyOpenCodeConfig = loadConfigFromPath(userConfigPath, ctx) ?? {};
-
-  // Override with project config
-  const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
-  if (projectConfig) {
-    config = mergeConfigs(config, projectConfig);
-  }
-
-  log("Final merged config", {
-    agents: config.agents,
-    disabled_agents: config.disabled_agents,
-    disabled_mcps: config.disabled_mcps,
-    disabled_hooks: config.disabled_hooks,
-    claude_code: config.claude_code,
-  });
-  return config;
-}
+import { loadPluginConfig } from "./plugin-config";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
@@ -290,9 +189,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
-  const builtinSkills = createBuiltinSkills().filter(
-    (skill) => !disabledSkills.has(skill.name as any)
-  );
+  const systemMcpNames = getSystemMcpServerNames();
+  const builtinSkills = createBuiltinSkills().filter((skill) => {
+    if (disabledSkills.has(skill.name as any)) return false
+    if (skill.mcpConfig) {
+      for (const mcpName of Object.keys(skill.mcpConfig)) {
+        if (systemMcpNames.has(mcpName)) return false
+      }
+    }
+    return true
+  });
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
   const mergedSkills = mergeSkills(
     builtinSkills,

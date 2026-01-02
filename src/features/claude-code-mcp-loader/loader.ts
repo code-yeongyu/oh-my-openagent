@@ -1,4 +1,4 @@
-import { existsSync } from "fs"
+import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { getClaudeConfigDir } from "../../shared"
 import type {
@@ -40,6 +40,30 @@ async function loadMcpConfigFile(
     log(`Failed to load MCP config from ${filePath}`, error)
     return null
   }
+}
+
+export function getSystemMcpServerNames(): Set<string> {
+  const names = new Set<string>()
+  const paths = getMcpConfigPaths()
+
+  for (const { path } of paths) {
+    if (!existsSync(path)) continue
+
+    try {
+      const content = readFileSync(path, "utf-8")
+      const config = JSON.parse(content) as ClaudeCodeMcpConfig
+      if (!config?.mcpServers) continue
+
+      for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+        if (serverConfig.disabled) continue
+        names.add(name)
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return names
 }
 
 export async function loadMcpConfigs(): Promise<McpLoadResult> {
