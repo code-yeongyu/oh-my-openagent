@@ -18,6 +18,17 @@ interface SessionState {
   isRecovering?: boolean
 }
 
+interface OpenCodeSessionMessage {
+  info?: {
+    role?: string
+  }
+  parts?: Array<{
+    type: string
+    text?: string
+    [key: string]: unknown
+  }>
+}
+
 const CONTINUATION_PROMPT = `[RALPH LOOP - ITERATION {{ITERATION}}/{{MAX}}]
 
 Your previous attempt did not output the completion promise. Continue working on the task.
@@ -79,6 +90,41 @@ export function createRalphLoopHook(
 
   function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  }
+
+  async function detectCompletionInSessionMessages(
+    sessionID: string,
+    promise: string
+  ): Promise<boolean> {
+    try {
+      const response = await ctx.client.session.messages({
+        path: { id: sessionID },
+        query: { directory: ctx.directory },
+      })
+
+      const messages = (response as { data?: unknown[] }).data ?? []
+
+      if (!Array.isArray(messages)) return false
+
+      const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
+
+      for (const msg of messages as OpenCodeSessionMessage[]) {
+        if (msg.info?.role !== "assistant") continue
+
+        for (const part of msg.parts || []) {
+          if (part.type === "text" && part.text) {
+            if (pattern.test(part.text)) {
+              return true
+            }
+          }
+        }
+      }
+
+      return false
+    } catch (err) {
+      log(`[${HOOK_NAME}] Failed to fetch session messages`, { sessionID, error: String(err) })
+      return false
+    }
   }
 
   const startLoop = (
@@ -151,14 +197,20 @@ export function createRalphLoopHook(
         return
       }
 
-      // Generate transcript path from sessionID - OpenCode doesn't pass it in event properties
-      const transcriptPath = getTranscriptPath(sessionID)
+      const completionDetectedViaApi = await detectCompletionInSessionMessages(
+        sessionID,
+        state.completion_promise
+      )
 
-      if (detectCompletionPromise(transcriptPath, state.completion_promise)) {
+      const transcriptPath = getTranscriptPath(sessionID)
+      const completionDetectedViaTranscript = detectCompletionPromise(transcriptPath, state.completion_promise)
+
+      if (completionDetectedViaApi || completionDetectedViaTranscript) {
         log(`[${HOOK_NAME}] Completion detected!`, {
           sessionID,
           iteration: state.iteration,
           promise: state.completion_promise,
+          detectedVia: completionDetectedViaApi ? "session_messages_api" : "transcript_file",
         })
         clearState(ctx.directory, stateDir)
 
