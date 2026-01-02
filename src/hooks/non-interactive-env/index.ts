@@ -34,13 +34,16 @@ function shellEscape(value: string): string {
 }
 
 /**
- * Build env prefix string: VAR1=val1 VAR2=val2 ...
+ * Build env prefix string with line continuation for readability:
+ * VAR1=val1 \
+ * VAR2=val2 \
+ * ...
  * OpenCode's bash tool ignores args.env, so we must prepend to command.
  */
 function buildEnvPrefix(env: Record<string, string>): string {
   return Object.entries(env)
     .map(([key, value]) => `${key}=${shellEscape(value)}`)
-    .join(" ")
+    .join(" \\\n")
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
