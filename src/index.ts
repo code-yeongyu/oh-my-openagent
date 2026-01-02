@@ -1,5 +1,4 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { createBuiltinAgents } from "./agents";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -29,17 +28,6 @@ import {
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
-  loadUserCommands,
-  loadProjectCommands,
-  loadOpencodeGlobalCommands,
-  loadOpencodeProjectCommands,
-} from "./features/claude-code-command-loader";
-import { loadBuiltinCommands } from "./features/builtin-commands";
-import {
-  loadUserSkills,
-  loadProjectSkills,
-  loadOpencodeGlobalSkills,
-  loadOpencodeProjectSkills,
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
   discoverOpencodeGlobalSkills,
@@ -47,44 +35,35 @@ import {
   mergeSkills,
 } from "./features/opencode-skill-loader";
 import { createBuiltinSkills } from "./features/builtin-skills";
-
-import {
-  loadUserAgents,
-  loadProjectAgents,
-} from "./features/claude-code-agent-loader";
-import { loadMcpConfigs, getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
-import { loadAllPluginComponents } from "./features/claude-code-plugin-loader";
+import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
 import {
   setMainSession,
   getMainSessionID,
 } from "./features/claude-code-session-state";
-import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, createSkillTool, createSkillMcpTool, interactive_bash, getTmuxPath } from "./tools";
+import {
+  builtinTools,
+  createCallOmoAgent,
+  createBackgroundTools,
+  createLookAt,
+  createSkillTool,
+  createSkillMcpTool,
+  interactive_bash,
+  getTmuxPath,
+} from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
-import { createBuiltinMcps } from "./mcp";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
+import { type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log } from "./shared";
-import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "./agents/plan-prompt";
 import { loadPluginConfig } from "./plugin-config";
+import { createModelCacheState, getModelLimit } from "./plugin-state";
+import { createConfigHandler } from "./plugin-handlers";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
-  const modelContextLimitsCache = new Map<string, number>();
-  let anthropicContext1MEnabled = false;
-
-  const getModelLimit = (providerID: string, modelID: string): number | undefined => {
-    const key = `${providerID}/${modelID}`;
-    const cached = modelContextLimitsCache.get(key);
-    if (cached) return cached;
-
-    if (providerID === "anthropic" && anthropicContext1MEnabled && modelID.includes("sonnet")) {
-      return 1_000_000;
-    }
-    return undefined;
-  };
+  const modelCacheState = createModelCacheState();
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
     ? createContextWindowMonitorHook(ctx)
@@ -100,7 +79,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createCommentCheckerHooks(pluginConfig.comment_checker)
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
-    ? createToolOutputTruncatorHook(ctx, { experimental: pluginConfig.experimental })
+    ? createToolOutputTruncatorHook(ctx, {
+        experimental: pluginConfig.experimental,
+      })
     : null;
   const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
     ? createDirectoryAgentsInjectorHook(ctx)
@@ -111,13 +92,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
     ? createEmptyTaskResponseDetectorHook(ctx)
     : null;
-  const thinkMode = isHookEnabled("think-mode")
-    ? createThinkModeHook()
-    : null;
+  const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
-  const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
+  const anthropicContextWindowLimitRecovery = isHookEnabled(
+    "anthropic-context-window-limit-recovery"
+  )
     ? createAnthropicContextWindowLimitRecoveryHook(ctx, {
         experimental: pluginConfig.experimental,
         dcpForCompaction: pluginConfig.experimental?.dcp_for_compaction,
@@ -130,7 +111,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createPreemptiveCompactionHook(ctx, {
         experimental: pluginConfig.experimental,
         onBeforeSummarize: compactionContextInjector,
-        getModelLimit,
+        getModelLimit: (providerID, modelID) =>
+          getModelLimit(modelCacheState, providerID, modelID),
       })
     : null;
   const rulesInjector = isHookEnabled("rules-injector")
@@ -178,7 +160,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
-    sessionRecovery.setOnRecoveryCompleteCallback(todoContinuationEnforcer.markRecoveryComplete);
+    sessionRecovery.setOnRecoveryCompleteCallback(
+      todoContinuationEnforcer.markRecoveryComplete
+    );
   }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
@@ -191,13 +175,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
   const builtinSkills = createBuiltinSkills().filter((skill) => {
-    if (disabledSkills.has(skill.name as any)) return false
+    if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {
-        if (systemMcpNames.has(mcpName)) return false
+        if (systemMcpNames.has(mcpName)) return false;
       }
     }
-    return true
+    return true;
   });
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
   const mergedSkills = mergeSkills(
@@ -206,7 +190,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     includeClaudeSkills ? discoverUserClaudeSkills() : [],
     discoverOpencodeGlobalSkills(),
     includeClaudeSkills ? discoverProjectClaudeSkills() : [],
-    discoverOpencodeProjectSkills(),
+    discoverOpencodeProjectSkills()
   );
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
@@ -221,11 +205,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
-  const googleAuthHooks = pluginConfig.google_auth !== false
-    ? await createGoogleAntigravityAuthPlugin(ctx)
-    : null;
+  const googleAuthHooks =
+    pluginConfig.google_auth !== false
+      ? await createGoogleAntigravityAuthPlugin(ctx)
+      : null;
 
   const tmuxAvailable = await getTmuxPath();
+
+  const configHandler = createConfigHandler({
+    ctx,
+    pluginConfig,
+    modelCacheState,
+  });
 
   return {
     ...(googleAuthHooks ? { auth: googleAuthHooks.auth } : {}),
@@ -246,34 +237,54 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await autoSlashCommand?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
-        const parts = (output as { parts?: Array<{ type: string; text?: string }> }).parts;
-        const promptText = parts
-          ?.filter((p) => p.type === "text" && p.text)
-          .map((p) => p.text)
-          .join("\n")
-          .trim() || "";
+        const parts = (
+          output as { parts?: Array<{ type: string; text?: string }> }
+        ).parts;
+        const promptText =
+          parts
+            ?.filter((p) => p.type === "text" && p.text)
+            .map((p) => p.text)
+            .join("\n")
+            .trim() || "";
 
-        const isRalphLoopTemplate = promptText.includes("You are starting a Ralph Loop") && 
+        const isRalphLoopTemplate =
+          promptText.includes("You are starting a Ralph Loop") &&
           promptText.includes("<user-task>");
-        const isCancelRalphTemplate = promptText.includes("Cancel the currently active Ralph Loop");
+        const isCancelRalphTemplate = promptText.includes(
+          "Cancel the currently active Ralph Loop"
+        );
 
         if (isRalphLoopTemplate) {
-          const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i);
+          const taskMatch = promptText.match(
+            /<user-task>\s*([\s\S]*?)\s*<\/user-task>/i
+          );
           const rawTask = taskMatch?.[1]?.trim() || "";
-          
+
           const quotedMatch = rawTask.match(/^["'](.+?)["']/);
-          const prompt = quotedMatch?.[1] || rawTask.split(/\s+--/)[0]?.trim() || "Complete the task as instructed";
+          const prompt =
+            quotedMatch?.[1] ||
+            rawTask.split(/\s+--/)[0]?.trim() ||
+            "Complete the task as instructed";
 
           const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i);
-          const promiseMatch = rawTask.match(/--completion-promise=["']?([^"'\s]+)["']?/i);
+          const promiseMatch = rawTask.match(
+            /--completion-promise=["']?([^"'\s]+)["']?/i
+          );
 
-          log("[ralph-loop] Starting loop from chat.message", { sessionID: input.sessionID, prompt });
+          log("[ralph-loop] Starting loop from chat.message", {
+            sessionID: input.sessionID,
+            prompt,
+          });
           ralphLoop.startLoop(input.sessionID, prompt, {
-            maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
+            maxIterations: maxIterMatch
+              ? parseInt(maxIterMatch[1], 10)
+              : undefined,
             completionPromise: promiseMatch?.[1],
           });
         } else if (isCancelRalphTemplate) {
-          log("[ralph-loop] Cancelling loop from chat.message", { sessionID: input.sessionID });
+          log("[ralph-loop] Cancelling loop from chat.message", {
+            sessionID: input.sessionID,
+          });
           ralphLoop.cancelLoop(input.sessionID);
         }
       }
@@ -283,209 +294,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       input: Record<string, never>,
       output: { messages: Array<{ info: unknown; parts: unknown[] }> }
     ) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await thinkingBlockValidator?.["experimental.chat.messages.transform"]?.(input, output as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output as any);
+      await thinkingBlockValidator?.[
+        "experimental.chat.messages.transform"
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]?.(input, output as any);
+      await emptyMessageSanitizer?.[
+        "experimental.chat.messages.transform"
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ]?.(input, output as any);
     },
 
-    config: async (config) => {
-      type ProviderConfig = {
-        options?: { headers?: Record<string, string> }
-        models?: Record<string, { limit?: { context?: number } }>
-      }
-      const providers = config.provider as Record<string, ProviderConfig> | undefined;
-
-      const anthropicBeta = providers?.anthropic?.options?.headers?.["anthropic-beta"];
-      anthropicContext1MEnabled = anthropicBeta?.includes("context-1m") ?? false;
-
-      if (providers) {
-        for (const [providerID, providerConfig] of Object.entries(providers)) {
-          const models = providerConfig?.models;
-          if (models) {
-            for (const [modelID, modelConfig] of Object.entries(models)) {
-              const contextLimit = modelConfig?.limit?.context;
-              if (contextLimit) {
-                modelContextLimitsCache.set(`${providerID}/${modelID}`, contextLimit);
-              }
-            }
-          }
-
-
-        }
-      }
-
-      const pluginComponents = (pluginConfig.claude_code?.plugins ?? true)
-        ? await loadAllPluginComponents({
-            enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
-          })
-        : { commands: {}, skills: {}, agents: {}, mcpServers: {}, hooksConfigs: [], plugins: [], errors: [] };
-
-      if (pluginComponents.plugins.length > 0) {
-        log(`Loaded ${pluginComponents.plugins.length} Claude Code plugins`, {
-          plugins: pluginComponents.plugins.map(p => `${p.name}@${p.version}`),
-        });
-      }
-
-      if (pluginComponents.errors.length > 0) {
-        log(`Plugin load errors`, { errors: pluginComponents.errors });
-      }
-
-      const builtinAgents = createBuiltinAgents(
-        pluginConfig.disabled_agents,
-        pluginConfig.agents,
-        ctx.directory,
-        config.model,
-      );
-
-      const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
-      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
-      const pluginAgents = pluginComponents.agents;
-
-      const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
-      const builderEnabled = pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
-      const plannerEnabled = pluginConfig.sisyphus_agent?.planner_enabled ?? true;
-      const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
-
-      if (isSisyphusEnabled && builtinAgents.Sisyphus) {
-        // Set Sisyphus as default agent (feature added in OpenCode PR #5843)
-        (config as { default_agent?: string }).default_agent = "Sisyphus";
-
-        const agentConfig: Record<string, unknown> = {
-          Sisyphus: builtinAgents.Sisyphus,
-        };
-
-        if (builderEnabled) {
-          const { name: _buildName, ...buildConfigWithoutName } = config.agent?.build ?? {};
-          const openCodeBuilderOverride = pluginConfig.agents?.["OpenCode-Builder"];
-          const openCodeBuilderBase = {
-            ...buildConfigWithoutName,
-            description: `${config.agent?.build?.description ?? "Build agent"} (OpenCode default)`,
-          };
-
-          agentConfig["OpenCode-Builder"] = openCodeBuilderOverride
-            ? { ...openCodeBuilderBase, ...openCodeBuilderOverride }
-            : openCodeBuilderBase;
-        }
-
-        if (plannerEnabled) {
-          const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
-          const plannerSisyphusOverride = pluginConfig.agents?.["Planner-Sisyphus"];
-          const plannerSisyphusBase = {
-            ...planConfigWithoutName,
-            prompt: PLAN_SYSTEM_PROMPT,
-            permission: PLAN_PERMISSION,
-            description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
-            color: config.agent?.plan?.color ?? "#6495ED",
-          };
-
-          agentConfig["Planner-Sisyphus"] = plannerSisyphusOverride
-            ? { ...plannerSisyphusBase, ...plannerSisyphusOverride }
-            : plannerSisyphusBase;
-        }
-
-        // Filter out build/plan from config.agent - they'll be re-added as subagents if replaced
-        const filteredConfigAgents = config.agent ? 
-          Object.fromEntries(
-            Object.entries(config.agent).filter(([key]) => {
-              if (key === "build") return false;
-              if (key === "plan" && replacePlan) return false;
-              return true;
-            })
-          ) : {};
-
-        config.agent = {
-          ...agentConfig,
-          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")),
-          ...userAgents,
-          ...projectAgents,
-          ...pluginAgents,
-          ...filteredConfigAgents,  // Filtered config agents (excludes build/plan if replaced)
-          // Demote build/plan to subagent mode when replaced
-          build: { ...config.agent?.build, mode: "subagent" },
-          ...(replacePlan ? { plan: { ...config.agent?.plan, mode: "subagent" } } : {}),
-        };
-      } else {
-        config.agent = {
-          ...builtinAgents,
-          ...userAgents,
-          ...projectAgents,
-          ...pluginAgents,
-          ...config.agent,
-        };
-      }
-
-      config.tools = {
-        ...config.tools,
-        "grep_app_*": false, // Disable grep_app tools globally to reduce token usage (only librarian needs them)
-      };
-
-      if (config.agent.explore) {
-        config.agent.explore.tools = {
-          ...config.agent.explore.tools,
-          call_omo_agent: false,
-        };
-      }
-      if (config.agent.librarian) {
-        config.agent.librarian.tools = {
-          ...config.agent.librarian.tools,
-          call_omo_agent: false,
-          "grep_app_*": true,
-        };
-      }
-      if (config.agent["multimodal-looker"]) {
-        config.agent["multimodal-looker"].tools = {
-          ...config.agent["multimodal-looker"].tools,
-          task: false,
-          call_omo_agent: false,
-          look_at: false,
-        };
-      }
-
-      config.permission = {
-        ...config.permission,
-        webfetch: "allow",
-        external_directory: "allow",
-      }
-
-      const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
-        ? await loadMcpConfigs()
-        : { servers: {} };
-
-      config.mcp = {
-        ...config.mcp,
-        ...createBuiltinMcps(pluginConfig.disabled_mcps),
-        ...mcpResult.servers,
-        ...pluginComponents.mcpServers,
-      };
-
-      const builtinCommands = loadBuiltinCommands(pluginConfig.disabled_commands);
-      const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
-      const opencodeGlobalCommands = loadOpencodeGlobalCommands();
-      const systemCommands = config.command ?? {};
-      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
-      const opencodeProjectCommands = loadOpencodeProjectCommands();
-
-      const userSkills = (pluginConfig.claude_code?.skills ?? true) ? loadUserSkills() : {};
-      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkills() : {};
-      const opencodeGlobalSkills = loadOpencodeGlobalSkills();
-      const opencodeProjectSkills = loadOpencodeProjectSkills();
-
-      config.command = {
-        ...builtinCommands,
-        ...userCommands,
-        ...userSkills,
-        ...opencodeGlobalCommands,
-        ...opencodeGlobalSkills,
-        ...systemCommands,
-        ...projectCommands,
-        ...projectSkills,
-        ...opencodeProjectCommands,
-        ...opencodeProjectSkills,
-        ...pluginComponents.commands,
-        ...pluginComponents.skills,
-      };
-    },
+    config: configHandler,
 
     event: async (input) => {
       await autoUpdateChecker?.event(input);
@@ -564,7 +383,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
         const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = ["explore", "librarian"].includes(subagentType);
+        const isExploreOrLibrarian = ["explore", "librarian"].includes(
+          subagentType
+        );
 
         args.tools = {
           ...(args.tools as Record<string, boolean> | undefined),
@@ -579,15 +400,23 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const sessionID = input.sessionID || getMainSessionID();
 
         if (command === "ralph-loop" && sessionID) {
-          const rawArgs = args?.command?.replace(/^\/?(ralph-loop)\s*/i, "") || "";
+          const rawArgs =
+            args?.command?.replace(/^\/?(ralph-loop)\s*/i, "") || "";
           const taskMatch = rawArgs.match(/^["'](.+?)["']/);
-          const prompt = taskMatch?.[1] || rawArgs.split(/\s+--/)[0]?.trim() || "Complete the task as instructed";
+          const prompt =
+            taskMatch?.[1] ||
+            rawArgs.split(/\s+--/)[0]?.trim() ||
+            "Complete the task as instructed";
 
           const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i);
-          const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i);
+          const promiseMatch = rawArgs.match(
+            /--completion-promise=["']?([^"'\s]+)["']?/i
+          );
 
           ralphLoop.startLoop(sessionID, prompt, {
-            maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
+            maxIterations: maxIterMatch
+              ? parseInt(maxIterMatch[1], 10)
+              : undefined,
             completionPromise: promiseMatch?.[1],
           });
         } else if (command === "cancel-ralph" && sessionID) {
