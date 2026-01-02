@@ -78,6 +78,7 @@ $ARGUMENTS
         model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
         subtask: data.subtask,
         argumentHint: data["argument-hint"],
+        handoffs: data.handoffs,
       }
 
       commands.push({

@@ -8,6 +8,7 @@ import {
   sanitizeModelField,
   getClaudeConfigDir,
 } from "../../shared"
+import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
@@ -49,7 +50,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope["type"
 
     try {
       const content = readFileSync(commandPath, "utf-8")
-      const { data, body } = parseFrontmatter(content)
+      const { data, body } = parseFrontmatter<CommandFrontmatter>(content)
 
       const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
       const metadata: CommandMetadata = {

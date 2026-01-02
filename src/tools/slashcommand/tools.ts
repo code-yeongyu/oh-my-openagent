@@ -2,6 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
+import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
@@ -23,7 +24,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 
     try {
       const content = readFileSync(commandPath, "utf-8")
-      const { data, body } = parseFrontmatter(content)
+      const { data, body } = parseFrontmatter<CommandFrontmatter>(content)
 
       const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
       const metadata: CommandMetadata = {
