@@ -193,4 +193,70 @@ Line 4 after blank`
     expect(result.body).toBe("Body")
   })
   // #endregion
+
+  // #region extra fields tolerance
+  test("allows extra fields beyond typed interface", () => {
+    // #given
+    const content = `---
+description: Test command
+agent: build
+extra_field: should not fail
+another_extra:
+  nested: value
+  array:
+    - item1
+    - item2
+custom_boolean: true
+custom_number: 42
+---
+Body content`
+
+    interface MinimalMeta {
+      description: string
+      agent: string
+    }
+
+    // #when
+    const result = parseFrontmatter<MinimalMeta>(content)
+
+    // #then
+    expect(result.data.description).toBe("Test command")
+    expect(result.data.agent).toBe("build")
+    expect(result.body).toBe("Body content")
+    // @ts-expect-error - accessing extra field not in MinimalMeta
+    expect(result.data.extra_field).toBe("should not fail")
+    // @ts-expect-error - accessing extra field not in MinimalMeta
+    expect(result.data.another_extra).toEqual({ nested: "value", array: ["item1", "item2"] })
+    // @ts-expect-error - accessing extra field not in MinimalMeta
+    expect(result.data.custom_boolean).toBe(true)
+    // @ts-expect-error - accessing extra field not in MinimalMeta
+    expect(result.data.custom_number).toBe(42)
+  })
+
+  test("extra fields do not interfere with expected fields", () => {
+    // #given
+    const content = `---
+description: Original description
+unknown_field: extra value
+handoffs:
+  - label: Task 1
+    agent: test.agent
+---
+Content`
+
+    interface HandoffMeta {
+      description: string
+      handoffs: Array<{ label: string; agent: string }>
+    }
+
+    // #when
+    const result = parseFrontmatter<HandoffMeta>(content)
+
+    // #then
+    expect(result.data.description).toBe("Original description")
+    expect(result.data.handoffs).toHaveLength(1)
+    expect(result.data.handoffs[0].label).toBe("Task 1")
+    expect(result.data.handoffs[0].agent).toBe("test.agent")
+  })
+  // #endregion
 })

@@ -19,7 +19,8 @@ export function parseFrontmatter<T = Record<string, unknown>>(
   const body = match[2]
 
   try {
-    const parsed = yaml.load(yamlContent)
+    // Use JSON_SCHEMA for security - prevents code execution via YAML tags
+    const parsed = yaml.load(yamlContent, { schema: yaml.JSON_SCHEMA })
     const data = (parsed ?? {}) as T
     return { data, body }
   } catch {
