@@ -7,10 +7,11 @@ export const NON_INTERACTIVE_ENV: Record<string, string> = {
   GCM_INTERACTIVE: "never",
   HOMEBREW_NO_AUTO_UPDATE: "1",
   // Block interactive editors - git rebase, commit, etc.
-  GIT_EDITOR: "true",
-  EDITOR: "true",
-  VISUAL: "true",
-  GIT_SEQUENCE_EDITOR: "true",
+  GIT_EDITOR: ":",
+  EDITOR: ":",
+  VISUAL: "",
+  GIT_SEQUENCE_EDITOR: ":",
+  GIT_MERGE_AUTOEDIT: "no",
   // Block pagers
   GIT_PAGER: "cat",
   PAGER: "cat",
