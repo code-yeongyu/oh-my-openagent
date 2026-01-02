@@ -10,6 +10,8 @@ describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
   let promptCalls: Array<{ sessionID: string; text: string }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
+  let messagesCalls: Array<{ sessionID: string }>
+  let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
 
   function createMockPluginInput() {
     return {
@@ -21,6 +23,10 @@ describe("ralph-loop", () => {
               text: opts.body.parts[0].text,
             })
             return {}
+          },
+          messages: async (opts: { path: { id: string } }) => {
+            messagesCalls.push({ sessionID: opts.path.id })
+            return { data: mockSessionMessages }
           },
         },
         tui: {
@@ -35,12 +41,14 @@ describe("ralph-loop", () => {
         },
       },
       directory: TEST_DIR,
-    } as Parameters<typeof createRalphLoopHook>[0]
+    } as unknown as Parameters<typeof createRalphLoopHook>[0]
   }
 
   beforeEach(() => {
     promptCalls = []
     toastCalls = []
+    messagesCalls = []
+    mockSessionMessages = []
 
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
@@ -349,6 +357,35 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(0)
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
       expect(hook.getState()).toBeNull()
+    })
+
+    test("should detect completion promise via session messages API", async () => {
+      // #given - active loop with assistant message containing completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "API_DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // #then - loop completed via API detection, no continuation
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+
+      // #then - messages API was called with correct session ID
+      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
     test("should handle multiple iterations correctly", async () => {
