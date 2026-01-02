@@ -12,6 +12,8 @@ import {
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
 
+const TASK_TTL_MS = 30 * 60 * 1000
+
 type OpencodeClient = PluginInput["client"]
 
 interface MessagePartInfo {
@@ -345,11 +347,12 @@ export class BackgroundManager {
           },
           query: { directory: this.directory },
         })
-        this.clearNotificationsForTask(taskId)
         log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
       } catch (error) {
         log("[background-agent] prompt failed:", String(error))
       } finally {
+        // Always clean up both maps to prevent memory leaks
+        this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         log("[background-agent] Removed completed task from memory:", taskId)
       }
@@ -377,7 +380,42 @@ export class BackgroundManager {
     return false
   }
 
+  private pruneStaleTasksAndNotifications(): void {
+    const now = Date.now()
+
+    for (const [taskId, task] of this.tasks.entries()) {
+      const age = now - task.startedAt.getTime()
+      if (age > TASK_TTL_MS) {
+        log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
+        task.status = "error"
+        task.error = "Task timed out after 30 minutes"
+        task.completedAt = new Date()
+        this.clearNotificationsForTask(taskId)
+        this.tasks.delete(taskId)
+        subagentSessions.delete(task.sessionID)
+      }
+    }
+
+    for (const [sessionID, notifications] of this.notifications.entries()) {
+      if (notifications.length === 0) {
+        this.notifications.delete(sessionID)
+        continue
+      }
+      const validNotifications = notifications.filter((task) => {
+        const age = now - task.startedAt.getTime()
+        return age <= TASK_TTL_MS
+      })
+      if (validNotifications.length === 0) {
+        this.notifications.delete(sessionID)
+      } else if (validNotifications.length !== notifications.length) {
+        this.notifications.set(sessionID, validNotifications)
+      }
+    }
+  }
+
   private async pollRunningTasks(): Promise<void> {
+    this.pruneStaleTasksAndNotifications()
+
     const statusResult = await this.client.session.status()
     const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
 
