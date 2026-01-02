@@ -35,6 +35,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       }
 
       output.args.env = {
+        ...process.env,
         ...(output.args.env as Record<string, string> | undefined),
         ...NON_INTERACTIVE_ENV,
       }
