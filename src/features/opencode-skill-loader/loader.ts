@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { join, basename, dirname } from "path"
+import { join, basename } from "path"
 import { homedir } from "os"
 import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
