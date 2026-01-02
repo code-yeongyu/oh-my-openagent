@@ -33,6 +33,7 @@ interface SessionState {
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
+  countdownStartedAt?: number
 }
 
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
@@ -45,6 +46,7 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
+const COUNTDOWN_GRACE_PERIOD_MS = 500
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -113,6 +115,7 @@ export function createTodoContinuationEnforcer(
       clearInterval(state.countdownInterval)
       state.countdownInterval = undefined
     }
+    state.countdownStartedAt = undefined
   }
 
   function cleanup(sessionID: string): void {
@@ -228,6 +231,7 @@ export function createTodoContinuationEnforcer(
 
     let secondsRemaining = COUNTDOWN_SECONDS
     showCountdownToast(secondsRemaining, incompleteCount)
+    state.countdownStartedAt = Date.now()
 
     state.countdownInterval = setInterval(() => {
       secondsRemaining--
@@ -334,6 +338,13 @@ export function createTodoContinuationEnforcer(
       }
 
       if (role === "user") {
+        if (state?.countdownStartedAt) {
+          const elapsed = Date.now() - state.countdownStartedAt
+          if (elapsed < COUNTDOWN_GRACE_PERIOD_MS) {
+            log(`[${HOOK_NAME}] Ignoring user message in grace period`, { sessionID, elapsed })
+            return
+          }
+        }
         cancelCountdown(sessionID)
         log(`[${HOOK_NAME}] User message: cleared abort state`, { sessionID })
       }
