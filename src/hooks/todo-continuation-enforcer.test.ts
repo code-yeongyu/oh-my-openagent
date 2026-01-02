@@ -216,7 +216,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls.length).toBe(1)
   })
 
-  test("should cancel countdown on user message", async () => {
+  test("should cancel countdown on user message after grace period", async () => {
     // #given - session starting countdown
     const sessionID = "main-cancel"
     setMainSession(sessionID)
@@ -228,7 +228,8 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    // #when - user sends message immediately (before 2s countdown)
+    // #when - wait past grace period (500ms), then user sends message
+    await new Promise(r => setTimeout(r, 600))
     await hook.handler({
       event: {
         type: "message.updated",
@@ -236,9 +237,35 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // #then - wait past countdown time and verify no injection
+    // #then - wait past countdown time and verify no injection (countdown was cancelled)
     await new Promise(r => setTimeout(r, 2500))
     expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should ignore user message within grace period", async () => {
+    // #given - session starting countdown
+    const sessionID = "main-grace"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // #when - user message arrives within grace period (immediately)
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } }
+      },
+    })
+
+    // #then - countdown should continue (message was ignored)
+    // wait past 2s countdown and verify injection happens
+    await new Promise(r => setTimeout(r, 2500))
+    expect(promptCalls).toHaveLength(1)
   })
 
   test("should cancel countdown on assistant activity", async () => {
