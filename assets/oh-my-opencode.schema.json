@@ -74,7 +74,8 @@
           "preemptive-compaction",
           "compaction-context-injector",
           "claude-code-hooks",
-          "auto-slash-command"
+          "auto-slash-command",
+          "edit-error-recovery"
         ]
       }
     },
