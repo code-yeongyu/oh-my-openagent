@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywords, detectKeywordsWithType, extractPromptText } from "./detector"
+import { detectKeywordsWithType, extractPromptText } from "./detector"
 import { log } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
 
