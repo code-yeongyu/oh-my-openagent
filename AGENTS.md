@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-02T10:35:00+09:00
-**Commit:** bebe660
+**Generated:** 2026-01-02T22:41:22+09:00
+**Commit:** d0694e5
 **Branch:** dev
 
 ## OVERVIEW
@@ -22,7 +22,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # MCP configs: context7, websearch_exa, grep_app
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (723 lines)
+│   └── index.ts       # Main plugin entry (464 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 └── dist/              # Build output (ESM + .d.ts)
 ```
@@ -96,11 +96,11 @@ CI auto-commits schema changes on master, maintains rolling `next` draft release
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/index.ts` | 723 | Main plugin, all hook/tool init |
+| `src/index.ts` | 464 | Main plugin, all hook/tool init |
 | `src/cli/config-manager.ts` | 669 | JSONC parsing, env detection |
 | `src/auth/antigravity/fetch.ts` | 621 | Token refresh, URL rewriting |
 | `src/tools/lsp/client.ts` | 611 | LSP protocol, JSON-RPC |
-| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 554 | Multi-stage recovery |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 564 | Multi-stage recovery |
 | `src/agents/sisyphus.ts` | 504 | Orchestrator prompt |
 
 ## NOTES
