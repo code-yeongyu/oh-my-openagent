@@ -112,11 +112,6 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
       const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
       sessionFirstMessageProcessed.add(input.sessionID)
 
-      if (isFirstMessage) {
-        log("Skipping UserPromptSubmit hooks on first message for title generation", { sessionID: input.sessionID })
-        return
-      }
-
       if (!isHookDisabled(config, "UserPromptSubmit")) {
         const userPromptCtx: UserPromptSubmitContext = {
           sessionId: input.sessionID,
@@ -144,24 +139,33 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
 
         if (result.messages.length > 0) {
           const hookContent = result.messages.join("\n\n")
-          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length })
-          const message = output.message as {
-            agent?: string
-            model?: { modelID?: string; providerID?: string }
-            path?: { cwd?: string; root?: string }
-            tools?: Record<string, boolean>
+          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
+
+          if (isFirstMessage) {
+            const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
+            if (idx >= 0) {
+              output.parts[idx].text = `${hookContent}\n\n${output.parts[idx].text ?? ""}`
+              log("UserPromptSubmit hooks prepended to first message parts directly", { sessionID: input.sessionID })
+            }
+          } else {
+            const message = output.message as {
+              agent?: string
+              model?: { modelID?: string; providerID?: string }
+              path?: { cwd?: string; root?: string }
+              tools?: Record<string, boolean>
+            }
+
+            const success = injectHookMessage(input.sessionID, hookContent, {
+              agent: message.agent,
+              model: message.model,
+              path: message.path ?? { cwd: ctx.directory, root: "/" },
+              tools: message.tools,
+            })
+
+            log(success ? "Hook message injected via file system" : "File injection failed", {
+              sessionID: input.sessionID,
+            })
           }
-
-          const success = injectHookMessage(input.sessionID, hookContent, {
-            agent: message.agent,
-            model: message.model,
-            path: message.path ?? { cwd: ctx.directory, root: "/" },
-            tools: message.tools,
-          })
-
-          log(success ? "Hook message injected via file system" : "File injection failed", {
-            sessionID: input.sessionID,
-          })
         }
       }
     },
