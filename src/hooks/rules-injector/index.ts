@@ -100,8 +100,14 @@ export function createRulesInjectorHook(ctx: PluginInput) {
         const rawContent = readFileSync(candidate.path, "utf-8");
         const { metadata, body } = parseRuleFrontmatter(rawContent);
 
-        const matchResult = shouldApplyRule(metadata, resolved, projectRoot);
-        if (!matchResult.applies) continue;
+        let matchReason: string;
+        if (candidate.isSingleFile) {
+          matchReason = "copilot-instructions (always apply)";
+        } else {
+          const matchResult = shouldApplyRule(metadata, resolved, projectRoot);
+          if (!matchResult.applies) continue;
+          matchReason = matchResult.reason ?? "matched";
+        }
 
         const contentHash = createContentHash(body);
         if (isDuplicateByContentHash(contentHash, cache.contentHashes)) continue;
@@ -112,7 +118,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
 
         toInject.push({
           relativePath,
-          matchReason: matchResult.reason ?? "matched",
+          matchReason,
           content: body,
           distance: candidate.distance,
         });
