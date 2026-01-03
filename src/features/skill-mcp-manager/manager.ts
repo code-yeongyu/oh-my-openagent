@@ -9,12 +9,15 @@ interface ManagedClient {
   client: Client
   transport: StdioClientTransport
   skillName: string
+  lastUsedAt: number
 }
 
 export class SkillMcpManager {
   private clients: Map<string, ManagedClient> = new Map()
   private pendingConnections: Map<string, Promise<Client>> = new Map()
   private cleanupRegistered = false
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null
+  private readonly IDLE_TIMEOUT = 5 * 60 * 1000
 
   private getClientKey(info: SkillMcpClientInfo): string {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
@@ -24,30 +27,38 @@ export class SkillMcpManager {
     if (this.cleanupRegistered) return
     this.cleanupRegistered = true
 
-    const cleanup = () => {
+    const cleanup = async () => {
       for (const [, managed] of this.clients) {
         try {
-          managed.client.close()
+          await managed.client.close()
         } catch {
           // Ignore errors during cleanup
+        }
+        try {
+          await managed.transport.close()
+        } catch {
+          // Transport may already be terminated
         }
       }
       this.clients.clear()
       this.pendingConnections.clear()
     }
 
-    process.on("exit", cleanup)
-    process.on("SIGINT", () => {
-      cleanup()
+    // Note: 'exit' event is synchronous-only in Node.js, so we use 'beforeExit' for async cleanup
+    // However, 'beforeExit' is not emitted on explicit process.exit() calls
+    // Signal handlers are made async to properly await cleanup
+
+    process.on("SIGINT", async () => {
+      await cleanup()
       process.exit(0)
     })
-    process.on("SIGTERM", () => {
-      cleanup()
+    process.on("SIGTERM", async () => {
+      await cleanup()
       process.exit(0)
     })
     if (process.platform === "win32") {
-      process.on("SIGBREAK", () => {
-        cleanup()
+      process.on("SIGBREAK", async () => {
+        await cleanup()
         process.exit(0)
       })
     }
@@ -61,6 +72,7 @@ export class SkillMcpManager {
     const existing = this.clients.get(key)
 
     if (existing) {
+      existing.lastUsedAt = Date.now()
       return existing.client
     }
 
@@ -148,7 +160,8 @@ export class SkillMcpManager {
       )
     }
 
-    this.clients.set(key, { client, transport, skillName: info.skillName })
+    this.clients.set(key, { client, transport, skillName: info.skillName, lastUsedAt: Date.now() })
+    this.startCleanupTimer()
     return client
   }
 
@@ -158,26 +171,64 @@ export class SkillMcpManager {
     for (const [key, managed] of this.clients.entries()) {
       if (key.startsWith(`${sessionID}:`)) {
         keysToRemove.push(key)
+        // Delete from map first to prevent re-entrancy during async close
+        this.clients.delete(key)
         try {
           await managed.client.close()
         } catch {
           // Ignore close errors - process may already be terminated
         }
+        try {
+          await managed.transport.close()
+        } catch {
+          // Transport may already be terminated
+        }
       }
-    }
-
-    for (const key of keysToRemove) {
-      this.clients.delete(key)
     }
   }
 
   async disconnectAll(): Promise<void> {
-    for (const [, managed] of this.clients.entries()) {
+    this.stopCleanupTimer()
+    const clients = Array.from(this.clients.values())
+    this.clients.clear()
+    for (const managed of clients) {
       try {
         await managed.client.close()
       } catch { /* process may already be terminated */ }
+      try {
+        await managed.transport.close()
+      } catch { /* transport may already be terminated */ }
     }
-    this.clients.clear()
+  }
+
+  private startCleanupTimer(): void {
+    if (this.cleanupInterval) return
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupIdleClients()
+    }, 60_000)
+    this.cleanupInterval.unref()
+  }
+
+  private stopCleanupTimer(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.cleanupInterval = null
+    }
+  }
+
+  private async cleanupIdleClients(): Promise<void> {
+    const now = Date.now()
+    for (const [key, managed] of this.clients) {
+      if (now - managed.lastUsedAt > this.IDLE_TIMEOUT) {
+        this.clients.delete(key)
+        try {
+          await managed.client.close()
+        } catch { /* process may already be terminated */ }
+        try {
+          await managed.transport.close()
+        } catch { /* transport may already be terminated */ }
+      }
+    }
   }
 
   async listTools(
@@ -249,10 +300,13 @@ export class SkillMcpManager {
       const key = this.getClientKey(info)
       const existing = this.clients.get(key)
       if (existing) {
+        this.clients.delete(key)
         try {
           await existing.client.close()
         } catch { /* process may already be terminated */ }
-        this.clients.delete(key)
+        try {
+          await existing.transport.close()
+        } catch { /* transport may already be terminated */ }
         return await this.getOrCreateClient(info, config)
       }
       throw error
