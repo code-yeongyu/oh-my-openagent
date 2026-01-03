@@ -1051,5 +1051,8 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 第一位赞助者
 - **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
+- **Suyeol Jeon (devxoul)** [GitHub](https://github.com/devxoul)
+  - 他是开启我职业生涯的人，也是在如何构建优秀的代理工作流方面给了我很多启发的人。我从他那里学到了很多关于如何设计好的系统来打造优秀团队的知识，这些经验对开发这个harness起到了巨大的帮助作用。
+- **Hyerin Won (devwon)** [GitHub](https://github.com/devwon)
 
 *感谢 [@junhoyeo](https://github.com/junhoyeo) 制作了这张超帅的 hero 图。*
