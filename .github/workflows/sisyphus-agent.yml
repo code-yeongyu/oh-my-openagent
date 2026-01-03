@@ -15,11 +15,12 @@ jobs:
   agent:
     runs-on: ubuntu-latest
     # @sisyphus-dev-ai mention only (maintainers, exclude self)
-    if: |
+    if: >-
       github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.comment.body, '@sisyphus-dev-ai') &&
-       github.event.comment.user.login != 'sisyphus-dev-ai' &&
-       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body || '', '@sisyphus-dev-ai') &&
+       (github.event.comment.user.login || '') != 'sisyphus-dev-ai' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || ''))
 
     permissions:
       contents: read
