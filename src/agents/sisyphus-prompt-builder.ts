@@ -307,3 +307,37 @@ export function buildAntiPatternsSection(agents: AvailableAgent[]): string {
 |----------|-----------|
 ${patterns.join("\n")}`
 }
+
+export function buildUltraworkAgentTable(agents: AvailableAgent[]): string {
+  if (agents.length === 0) {
+    return `| Agent | When |
+|-------|------|
+| explore (multiple) | Codebase search, patterns, structures |
+| librarian (multiple) | External docs, GitHub OSS, remote repos |
+| plan | Work breakdown (NEVER plan yourself) |
+| oracle | Architecture, debugging after 2+ failures |`
+  }
+
+  const rows: string[] = [
+    "| Agent | When |",
+    "|-------|------|",
+  ]
+
+  const ultraworkAgentPriority = ["explore", "librarian", "plan", "oracle"]
+  const sortedAgents = [...agents].sort((a, b) => {
+    const aIdx = ultraworkAgentPriority.indexOf(a.name)
+    const bIdx = ultraworkAgentPriority.indexOf(b.name)
+    if (aIdx === -1 && bIdx === -1) return 0
+    if (aIdx === -1) return 1
+    if (bIdx === -1) return -1
+    return aIdx - bIdx
+  })
+
+  for (const agent of sortedAgents) {
+    const shortDesc = agent.description.split(".")[0] || agent.description
+    const suffix = (agent.name === "explore" || agent.name === "librarian") ? " (multiple)" : ""
+    rows.push(`| ${agent.name}${suffix} | ${shortDesc} |`)
+  }
+
+  return rows.join("\n")
+}
