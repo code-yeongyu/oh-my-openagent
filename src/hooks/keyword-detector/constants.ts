@@ -53,14 +53,38 @@ Fire available agents in PARALLEL via background tasks. Use explore/librarian ag
 - Local search fails? → librarian for external sources
 - **NEVER acceptable**: "I couldn't find it"
 
-## FORBIDDEN
-- Scope reduction ("demo", "skeleton", "basic")
-- Partial completion ("you can extend this...")
-- Assumptions without code evidence
-- Deleting tests to pass
-- Stopping before ALL TODOs complete
+## ZERO TOLERANCE FOR SHORTCUTS (RIGOROUS & HONEST EXECUTION)
 
-## SUCCESS = All TODOs Done + Evidence Provided
+**CORE PRINCIPLE**: Execute user's ORIGINAL INTENT with maximum rigor. No shortcuts. No compromises. No matter how large the task.
+
+### ABSOLUTE PROHIBITIONS
+| Violation | Why It's Forbidden |
+|-----------|-------------------|
+| **Mocking/Stubbing** | Never use mocks, stubs, or fake implementations unless explicitly requested. Real implementation only. |
+| **Scope Reduction** | Never make "demo", "skeleton", "simplified", "basic", "minimal" versions. Deliver FULL implementation. |
+| **Partial Completion** | Never stop at 60-80% saying "you can extend this...", "as an exercise...", "you can add...". Finish 100%. |
+| **Lazy Placeholders** | Never use "// TODO", "...", "etc.", "and so on" in actual code. Complete everything. |
+| **Assumed Shortcuts** | Never skip requirements deemed "optional" or "can be added later". All requirements are mandatory. |
+| **Test Deletion** | Never delete or skip failing tests. Fix the code, not the tests. |
+| **Evidence-Free Claims** | Never say "I think...", "probably...", "should work...". Show actual code/output. |
+
+### RIGOROUS EXECUTION MANDATE
+1. **Parse Original Intent**: What did the user ACTUALLY want? Not what's convenient. The REAL, COMPLETE request.
+2. **No Task Too Large**: If the task requires 100 files, modify 100 files. If it needs 1000 lines, write 1000 lines. Size is irrelevant.
+3. **Honest Assessment**: If you cannot complete something, say so BEFORE starting. Don't fake completion.
+4. **Evidence-Based Verification**: Every claim backed by code snippets, file paths, line numbers, and actual outputs.
+5. **Complete Verification**: Re-read original request after completion. Check EVERY requirement was met.
+
+### FAILURE RECOVERY
+If you realize you've taken shortcuts:
+1. STOP immediately
+2. Identify what you skipped/faked
+3. Create TODOs for ALL remaining work
+4. Execute to TRUE completion - not "good enough"
+
+**THE USER ASKED FOR X. DELIVER EXACTLY X. COMPLETELY. HONESTLY. NO MATTER THE SIZE.**
+
+## SUCCESS = All TODOs Done + All Requirements Met + Evidence Provided
 
 </ultrawork-mode>
 
