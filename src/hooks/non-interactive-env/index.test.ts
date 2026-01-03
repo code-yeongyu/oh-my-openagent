@@ -5,7 +5,7 @@ describe("non-interactive-env hook", () => {
   const mockCtx = {} as Parameters<typeof createNonInteractiveEnvHook>[0]
 
   describe("git command modification", () => {
-    test("#given git command #when hook executes #then prepends env vars", async () => {
+    test("#given git command #when hook executes #then prepends export statement", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git commit -m 'test'" },
@@ -17,10 +17,27 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
+      expect(cmd).toStartWith("export ")
       expect(cmd).toContain("GIT_EDITOR=:")
       expect(cmd).toContain("EDITOR=:")
       expect(cmd).toContain("PAGER=cat")
-      expect(cmd).toEndWith(" git commit -m 'test'")
+      expect(cmd).toContain("; git commit -m 'test'")
+    })
+
+    test("#given chained git commands #when hook executes #then export applies to all", async () => {
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git add file && git rebase --continue" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("export ")
+      expect(cmd).toContain("; git add file && git rebase --continue")
     })
 
     test("#given non-git bash command #when hook executes #then command unchanged", async () => {
