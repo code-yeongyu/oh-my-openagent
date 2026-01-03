@@ -322,4 +322,140 @@ describe("think-mode switcher", () => {
       expect(config.maxTokens).toBe(64000)
     })
   })
+
+  describe("Custom provider prefixes support", () => {
+    describe("getHighVariant with prefixes", () => {
+      it("should preserve vertex_ai/ prefix when getting high variant", () => {
+        // #given a model ID with vertex_ai/ prefix
+        const variant = getHighVariant("vertex_ai/claude-sonnet-4-5")
+
+        // #then should return high variant with prefix preserved
+        expect(variant).toBe("vertex_ai/claude-sonnet-4-5-high")
+      })
+
+      it("should preserve openai/ prefix when getting high variant", () => {
+        // #given a model ID with openai/ prefix
+        const variant = getHighVariant("openai/gpt-5-2")
+
+        // #then should return high variant with prefix preserved
+        expect(variant).toBe("openai/gpt-5-2-high")
+      })
+
+      it("should handle prefixes with dots in version numbers", () => {
+        // #given a model ID with prefix and dots
+        const variant = getHighVariant("vertex_ai/claude-opus-4.5")
+
+        // #then should normalize dots and preserve prefix
+        expect(variant).toBe("vertex_ai/claude-opus-4-5-high")
+      })
+
+      it("should handle multiple different prefixes", () => {
+        // #given various custom prefixes
+        expect(getHighVariant("azure/gpt-5")).toBe("azure/gpt-5-high")
+        expect(getHighVariant("bedrock/claude-sonnet-4-5")).toBe("bedrock/claude-sonnet-4-5-high")
+        expect(getHighVariant("custom-llm/gemini-3-pro")).toBe("custom-llm/gemini-3-pro-high")
+      })
+
+      it("should return null for prefixed models without high variant mapping", () => {
+        // #given prefixed model IDs without high variant mapping
+        expect(getHighVariant("vertex_ai/unknown-model")).toBeNull()
+        expect(getHighVariant("custom/llama-3-70b")).toBeNull()
+      })
+
+      it("should return null for already-high prefixed models", () => {
+        // #given prefixed model IDs that are already high
+        expect(getHighVariant("vertex_ai/claude-opus-4-5-high")).toBeNull()
+        expect(getHighVariant("openai/gpt-5-2-high")).toBeNull()
+      })
+    })
+
+    describe("isAlreadyHighVariant with prefixes", () => {
+      it("should detect -high suffix in prefixed models", () => {
+        // #given prefixed model IDs with -high suffix
+        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-5-high")).toBe(true)
+        expect(isAlreadyHighVariant("openai/gpt-5-2-high")).toBe(true)
+        expect(isAlreadyHighVariant("custom/gemini-3-pro-high")).toBe(true)
+      })
+
+      it("should return false for prefixed base models", () => {
+        // #given prefixed base model IDs without -high suffix
+        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-5")).toBe(false)
+        expect(isAlreadyHighVariant("openai/gpt-5-2")).toBe(false)
+      })
+
+      it("should handle prefixed models with dots", () => {
+        // #given prefixed model IDs with dots
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.2")).toBe(false)
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.2-high")).toBe(true)
+      })
+    })
+
+    describe("getThinkingConfig with prefixes", () => {
+      it("should return null for custom providers (not in THINKING_CONFIGS)", () => {
+        // #given custom provider with prefixed Claude model
+        const config = getThinkingConfig("dia-llm", "vertex_ai/claude-sonnet-4-5")
+
+        // #then should return null (custom provider not in THINKING_CONFIGS)
+        expect(config).toBeNull()
+      })
+
+      it("should work with prefixed models on known providers", () => {
+        // #given known provider (anthropic) with prefixed model
+        // This tests that the base model name is correctly extracted for capability check
+        const config = getThinkingConfig("anthropic", "custom-prefix/claude-opus-4-5")
+
+        // #then should return thinking config (base model is capable)
+        expect(config).not.toBeNull()
+        expect(config?.thinking).toBeDefined()
+      })
+
+      it("should return null for prefixed models that are already high", () => {
+        // #given prefixed already-high model
+        const config = getThinkingConfig("anthropic", "vertex_ai/claude-opus-4-5-high")
+
+        // #then should return null
+        expect(config).toBeNull()
+      })
+    })
+
+    describe("Real-world custom provider scenario", () => {
+      it("should handle LLM proxy with vertex_ai prefix correctly", () => {
+        // #given a custom LLM proxy provider using vertex_ai/ prefix
+        const providerID = "dia-llm"
+        const modelID = "vertex_ai/claude-sonnet-4-5"
+
+        // #when getting high variant
+        const highVariant = getHighVariant(modelID)
+
+        // #then should preserve the prefix
+        expect(highVariant).toBe("vertex_ai/claude-sonnet-4-5-high")
+
+        // #and when checking if already high
+        expect(isAlreadyHighVariant(modelID)).toBe(false)
+        expect(isAlreadyHighVariant(highVariant!)).toBe(true)
+
+        // #and when getting thinking config for custom provider
+        const config = getThinkingConfig(providerID, modelID)
+
+        // #then should return null (custom provider, not anthropic)
+        // This prevents applying incompatible thinking configs to custom providers
+        expect(config).toBeNull()
+      })
+
+      it("should not break when switching to high variant in think mode", () => {
+        // #given think mode switching vertex_ai/claude model to high variant
+        const original = "vertex_ai/claude-opus-4-5"
+        const high = getHighVariant(original)
+
+        // #then the high variant should be valid
+        expect(high).toBe("vertex_ai/claude-opus-4-5-high")
+
+        // #and should be recognized as already high
+        expect(isAlreadyHighVariant(high!)).toBe(true)
+
+        // #and switching again should return null (already high)
+        expect(getHighVariant(high!)).toBeNull()
+      })
+    })
+  })
 })
