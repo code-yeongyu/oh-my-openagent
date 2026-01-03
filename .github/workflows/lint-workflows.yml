@@ -14,7 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.10/scripts/download-actionlint.bash)
+
       - name: Run actionlint
-        uses: rhysd/actionlint-action@v1
-        with:
-          fail-on-warning: false
+        run: ./actionlint -color -shellcheck=""
