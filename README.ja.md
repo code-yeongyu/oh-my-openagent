@@ -4,7 +4,7 @@
 >
 > 一緒に歩みましょう！
 >
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | [Discordコミュニティ](https://discord.gg/PWpXmbhF)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | [Discordコミュニティ](https://discord.gg/aSfGzWtYxM)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
 > | :-----| :----- |
 > | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode`に関するニュースは私のXアカウントで投稿していましたが、無実の罪で凍結されたため、<br />[@justsisyphus](https://x.com/justsisyphus)が代わりに更新を投稿しています。 |
 > | [<img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-❤-ff69b4?style=flat-square&logo=github-sponsors&labelColor=black" width="156px" />](https://github.com/sponsors/code-yeongyu) | [スポンサーになって](https://github.com/sponsors/code-yeongyu) `oh-my-opencode` の開発を応援してください。皆さまのご支援がこのプロジェクトを成長させます。 |
