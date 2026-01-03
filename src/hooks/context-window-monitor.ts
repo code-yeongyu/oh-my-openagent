@@ -1,7 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
-const ANTHROPIC_ACTUAL_LIMIT = 200_000
+const ANTHROPIC_ACTUAL_LIMIT =
+  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
 const CONTEXT_REMINDER = `[SYSTEM REMINDER - 1M Context Window]

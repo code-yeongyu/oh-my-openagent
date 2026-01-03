@@ -48,7 +48,11 @@ interface MessageWrapper {
 }
 
 const CLAUDE_MODEL_PATTERN = /claude-(opus|sonnet|haiku)/i
-const CLAUDE_DEFAULT_CONTEXT_LIMIT = 200_000
+const CLAUDE_DEFAULT_CONTEXT_LIMIT =
+  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : 200_000
 
 function isSupportedModel(modelID: string): boolean {
   return CLAUDE_MODEL_PATTERN.test(modelID)
