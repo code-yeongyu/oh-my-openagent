@@ -43,6 +43,11 @@
 
 > "Oh My Opencode를 사용해서, 단 하루만에 8000개의 eslint 경고를 해결했습니다" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
+> "Ohmyopencode와 ralph loop을 사용해서, 하룻밤 만에 45,000줄짜리 tauri 앱을 SaaS 웹앱으로 전환했습니다. 인터뷰 프롬프트로 시작해서, 질문에 대한 평점과 추천을 요청했습니다. 일하는 모습을 지켜보는 것도 놀라웠고, 아침에 일어나니 거의 완성된 웹사이트가 있었습니다!" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+
+> "이번 주말에 open code, oh my opencode와 supermemory로 마인크래프트/소울라이크 같은 괴물을 만들어보고 있습니다."
+> "점심 먹고 산책하러 가는 동안 웅크리기 애니메이션 추가해달라고 시켰습니다. [영상]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
+
 > "이걸 코어에 넣고 그를 채용해야 합니다. 진심으로요. 이건 정말, 정말, 정말 좋습니다." — Henning Kilset
 
 > "@yeon_gyu_kim 을 설득할 수 있다면 고용하세요, 이 사람은 opencode를 혁신했습니다." — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
@@ -52,6 +57,8 @@
 > "oh-my-opencode를 쓰세요, 절대 돌아갈 수 없을 겁니다" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
 
 > "Oh My Opencode는 독보적입니다, 경쟁자가 없습니다" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
+
+> "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
 
 > "시지푸스 이름 자체가 이쁘잖아요?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
