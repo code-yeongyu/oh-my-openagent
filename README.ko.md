@@ -2,6 +2,9 @@
 >
 > *"저는 에이전트가 생성한 코드와 인간이 작성한 코드를 구분할 수 없으면서도, 훨씬 더 많은 것을 달성할 수 있는 세상을 만들어 소프트웨어 혁명을 일으키고자 합니다. 저는 이 여정에 개인적인 시간, 열정, 그리고 자금을 쏟아부었고, 앞으로도 계속 그렇게 할 것입니다."*
 >
+> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
+> > **오케스트레이터가 옵니다. 이번 주에요. [X에서 알림받기](https://x.com/justsisyphus/status/2006250634354548963)**
+>
 > 함께해주세요!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | [Discord 커뮤니티](https://discord.gg/aSfGzWtYxM)에서 기여자들과 `oh-my-opencode` 사용자들을 만나보세요. |

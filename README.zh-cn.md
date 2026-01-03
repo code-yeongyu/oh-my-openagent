@@ -2,6 +2,9 @@
 >
 > *"我致力于引发一场软件革命，创造一个AI生成的代码与人类代码无法区分、却能实现更多的世界。我已经在这段旅程中投入了个人时间、热情和资金，并将继续这样做。"*
 >
+> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
+> > **编排器即将到来。就在本周。[在X上获取通知](https://x.com/justsisyphus/status/2006250634354548963)**
+>
 > 与我们同行！
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | 加入我们的 [Discord 社区](https://discord.gg/aSfGzWtYxM)，和贡献者们、`oh-my-opencode` 用户们一起交流。 |

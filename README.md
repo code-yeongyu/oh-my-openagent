@@ -70,6 +70,8 @@ No stupid token consumption massive subagents here. No bloat tools here.
 > "Oh My Opencode is king of the hill and has no contenders" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
 
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
+>
+> "Isn't the name Sisyphus beautiful by itself?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
 ---
 
