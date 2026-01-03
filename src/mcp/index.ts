@@ -1,6 +1,9 @@
 import { websearch_exa } from "./websearch-exa"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
+import { honeycomb } from "./honeycomb"
+import { cypress } from "./cypress"
+import { vault } from "./vault"
 import type { McpName } from "./types"
 
 export { McpNameSchema, type McpName } from "./types"
@@ -9,6 +12,9 @@ const allBuiltinMcps: Record<McpName, { type: "remote"; url: string; enabled: bo
   websearch_exa,
   context7,
   grep_app,
+  honeycomb,
+  cypress,
+  vault,
 }
 
 export function createBuiltinMcps(disabledMcps: McpName[] = []) {

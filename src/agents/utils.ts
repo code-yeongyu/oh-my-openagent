@@ -7,6 +7,19 @@ import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
+import { createKnowledgeCuratorAgent, KNOWLEDGE_CURATOR_PROMPT_METADATA } from "./knowledge-curator"
+import { createDebuggerAgent, DEBUGGER_PROMPT_METADATA } from "./debugger"
+import { createDevOpsEngineerAgent, DEVOPS_ENGINEER_PROMPT_METADATA } from "./devops-engineer"
+import { createProjectManagerAgent, PROJECT_MANAGER_PROMPT_METADATA } from "./project-manager"
+import { createTestEngineerAgent, TEST_ENGINEER_PROMPT_METADATA } from "./test-engineer"
+import { createCodeReviewerAgent, CODE_REVIEWER_PROMPT_METADATA } from "./code-reviewer"
+import { createIncidentCommanderAgent, INCIDENT_COMMANDER_PROMPT_METADATA } from "./incident-commander"
+import { createSecurityReviewerAgent, SECURITY_REVIEWER_PROMPT_METADATA } from "./security-reviewer"
+import { createCodeIndexerAgent, CODE_INDEXER_PROMPT_METADATA } from "./code-indexer"
+import { createPerformanceAnalystAgent, PERFORMANCE_ANALYST_PROMPT_METADATA } from "./performance-analyst"
+import { createApiDesignerAgent, API_DESIGNER_PROMPT_METADATA } from "./api-designer"
+import { createDBAAgent, DBA_PROMPT_METADATA } from "./dba"
+import { createEstimatorAgent, ESTIMATOR_PROMPT_METADATA } from "./estimator"
 import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
 
@@ -20,6 +33,19 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+  "knowledge-curator": createKnowledgeCuratorAgent,
+  "debugger": createDebuggerAgent,
+  "devops-engineer": createDevOpsEngineerAgent,
+  "project-manager": createProjectManagerAgent,
+  "test-engineer": createTestEngineerAgent,
+  "code-reviewer": createCodeReviewerAgent,
+  "incident-commander": createIncidentCommanderAgent,
+  "security-reviewer": createSecurityReviewerAgent,
+  "code-indexer": createCodeIndexerAgent,
+  "performance-analyst": createPerformanceAnalystAgent,
+  "api-designer": createApiDesignerAgent,
+  "dba": createDBAAgent,
+  "estimator": createEstimatorAgent,
 }
 
 /**
@@ -33,6 +59,19 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
   "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
+  "knowledge-curator": KNOWLEDGE_CURATOR_PROMPT_METADATA,
+  "debugger": DEBUGGER_PROMPT_METADATA,
+  "devops-engineer": DEVOPS_ENGINEER_PROMPT_METADATA,
+  "project-manager": PROJECT_MANAGER_PROMPT_METADATA,
+  "test-engineer": TEST_ENGINEER_PROMPT_METADATA,
+  "code-reviewer": CODE_REVIEWER_PROMPT_METADATA,
+  "incident-commander": INCIDENT_COMMANDER_PROMPT_METADATA,
+  "security-reviewer": SECURITY_REVIEWER_PROMPT_METADATA,
+  "code-indexer": CODE_INDEXER_PROMPT_METADATA,
+  "performance-analyst": PERFORMANCE_ANALYST_PROMPT_METADATA,
+  "api-designer": API_DESIGNER_PROMPT_METADATA,
+  "dba": DBA_PROMPT_METADATA,
+  "estimator": ESTIMATOR_PROMPT_METADATA,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {

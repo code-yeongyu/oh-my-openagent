@@ -5,7 +5,7 @@ export type AgentFactory = (model?: string) => AgentConfig
 /**
  * Agent category for grouping in Sisyphus prompt sections
  */
-export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility"
+export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility" | "governance"
 
 /**
  * Cost classification for Tool Selection table
@@ -64,6 +64,19 @@ export type BuiltinAgentName =
   | "frontend-ui-ux-engineer"
   | "document-writer"
   | "multimodal-looker"
+  | "knowledge-curator"
+  | "debugger"
+  | "devops-engineer"
+  | "project-manager"
+  | "test-engineer"
+  | "code-reviewer"
+  | "incident-commander"
+  | "security-reviewer"
+  | "code-indexer"
+  | "performance-analyst"
+  | "api-designer"
+  | "dba"
+  | "estimator"
 
 export type OverridableAgentName =
   | "build"

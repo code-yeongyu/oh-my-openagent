@@ -24,6 +24,19 @@ export const BuiltinAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "knowledge-curator",
+  "debugger",
+  "devops-engineer",
+  "project-manager",
+  "test-engineer",
+  "code-reviewer",
+  "incident-commander",
+  "security-reviewer",
+  "code-indexer",
+  "performance-analyst",
+  "api-designer",
+  "dba",
+  "estimator",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -42,6 +55,19 @@ export const OverridableAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "knowledge-curator",
+  "debugger",
+  "devops-engineer",
+  "project-manager",
+  "test-engineer",
+  "code-reviewer",
+  "incident-commander",
+  "security-reviewer",
+  "code-indexer",
+  "performance-analyst",
+  "api-designer",
+  "dba",
+  "estimator",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -110,6 +136,19 @@ export const AgentOverridesSchema = z.object({
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
+  "knowledge-curator": AgentOverrideConfigSchema.optional(),
+  "debugger": AgentOverrideConfigSchema.optional(),
+  "devops-engineer": AgentOverrideConfigSchema.optional(),
+  "project-manager": AgentOverrideConfigSchema.optional(),
+  "test-engineer": AgentOverrideConfigSchema.optional(),
+  "code-reviewer": AgentOverrideConfigSchema.optional(),
+  "incident-commander": AgentOverrideConfigSchema.optional(),
+  "security-reviewer": AgentOverrideConfigSchema.optional(),
+  "code-indexer": AgentOverrideConfigSchema.optional(),
+  "performance-analyst": AgentOverrideConfigSchema.optional(),
+  "api-designer": AgentOverrideConfigSchema.optional(),
+  "dba": AgentOverrideConfigSchema.optional(),
+  "estimator": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({

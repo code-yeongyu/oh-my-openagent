@@ -1,26 +1,26 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-02T22:41:22+09:00
+**Generated:** 2026-01-03T20:45:00+01:00
 **Commit:** d0694e5
 **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3, Grok), 11 LSP tools, AST-Grep, Claude Code compatibility layer. "oh-my-zsh" for OpenCode.
+OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3, Grok), 11 LSP tools, AST-Grep, Claude Code compatibility layer, enterprise SaaS toolbelt. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # 7 AI agents - see src/agents/AGENTS.md
-│   ├── hooks/         # 22 lifecycle hooks - see src/hooks/AGENTS.md
-│   ├── tools/         # LSP, AST-Grep, session mgmt - see src/tools/AGENTS.md
-│   ├── features/      # Claude Code compat layer - see src/features/AGENTS.md
+│   ├── agents/        # 21 AI agents - see src/agents/AGENTS.md
+│   ├── hooks/         # 23 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── tools/         # LSP, AST-Grep, session mgmt, knowledge - see src/tools/AGENTS.md
+│   ├── features/      # Claude Code compat layer, knowledge repo, mem0 - see src/features/AGENTS.md
 │   ├── auth/          # Google Antigravity OAuth - see src/auth/AGENTS.md
 │   ├── shared/        # Cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
-│   ├── mcp/           # MCP configs: context7, websearch_exa, grep_app
+│   ├── mcp/           # MCP configs: context7, websearch_exa, grep_app, honeycomb, cypress, vault
 │   ├── config/        # Zod schema, TypeScript types
 │   └── index.ts       # Main plugin entry (464 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
@@ -72,6 +72,37 @@ oh-my-opencode/
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
 | document-writer | google/gemini-3-pro-preview | Technical docs |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
+| knowledge-curator | openai/gpt-5.2 | Knowledge governance |
+| debugger | openai/gpt-5.2 | Root cause analysis, debugging |
+| devops-engineer | openai/gpt-5.2 | Infrastructure, deployment |
+| project-manager | openai/gpt-5.2 | Jira/Linear/Confluence integration |
+| test-engineer | openai/gpt-5.2 | Test generation, coverage |
+| code-reviewer | openai/gpt-5.2 | PR review, code quality |
+| incident-commander | openai/gpt-5.2 | Incident response coordination |
+| security-reviewer | openai/gpt-5.2 | Security analysis, vulnerability scanning |
+| code-indexer | openai/gpt-5.2 | Semantic code search |
+| performance-analyst | openai/gpt-5.2 | Performance profiling, optimization |
+| api-designer | openai/gpt-5.2 | API design, documentation |
+| dba | openai/gpt-5.2 | Database design, query optimization |
+| estimator | openai/gpt-5.2 | Effort estimation, project planning |
+
+## ENTERPRISE SKILLS
+
+| Skill | Commands | MCPs |
+|-------|----------|------|
+| /debug | trace, logs, metrics, profile, breakpoint, step, inspect | mcp-debugger, devtools-debugger, jetbrains |
+| /deploy | release, rollback, status, diff, plan, apply | aws, terraform |
+| /project | issue, sprint, board, page, search, sync | atlassian, linear |
+| /test | run, generate, coverage, matrix, e2e, snapshot | playwright |
+| /review | pr, file, diff, security, approve, comment | github |
+| /incident | start, update, resolve, postmortem, page, escalate | pagerduty, slack |
+| /security | scan, audit, secrets, compliance, fix, report | semgrep, gitguardian |
+| /knowledge | query, propose, list, show, sync | mem0 |
+| /code-index | index, search, similar, explain | qdrant, chroma |
+| /perf | profile, trace, benchmark, analyze, compare, flamegraph | - |
+| /api | design, document, validate, generate, test, mock | postman |
+| /db | query, schema, migrate, analyze, optimize, explain | postgresql, sqlite |
+| /oncall | status, schedule, escalate, acknowledge, handoff, runbook | pagerduty, slack |
 
 ## COMMANDS
 
@@ -79,7 +110,7 @@ oh-my-opencode/
 bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
-bun test               # Run tests (380+)
+bun test               # Run tests (489+)
 ```
 
 ## DEPLOYMENT
