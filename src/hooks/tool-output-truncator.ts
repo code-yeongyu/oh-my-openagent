@@ -2,6 +2,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../config/schema"
 import { createDynamicTruncator } from "../shared/dynamic-truncator"
 
+const DEFAULT_MAX_TOKENS = 50_000 // ~200k chars
+const WEBFETCH_MAX_TOKENS = 10_000 // ~40k chars - web pages need aggressive truncation
+
 const TRUNCATABLE_TOOLS = [
   "grep",
   "Grep",
@@ -21,6 +24,11 @@ const TRUNCATABLE_TOOLS = [
   "WebFetch",
 ]
 
+const TOOL_SPECIFIC_MAX_TOKENS: Record<string, number> = {
+  webfetch: WEBFETCH_MAX_TOKENS,
+  WebFetch: WEBFETCH_MAX_TOKENS,
+}
+
 interface ToolOutputTruncatorOptions {
   experimental?: ExperimentalConfig
 }
@@ -36,7 +44,12 @@ export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOu
     if (!truncateAll && !TRUNCATABLE_TOOLS.includes(input.tool)) return
 
     try {
-      const { result, truncated } = await truncator.truncate(input.sessionID, output.output)
+      const targetMaxTokens = TOOL_SPECIFIC_MAX_TOKENS[input.tool] ?? DEFAULT_MAX_TOKENS
+      const { result, truncated } = await truncator.truncate(
+        input.sessionID,
+        output.output,
+        { targetMaxTokens }
+      )
       if (truncated) {
         output.output = result
       }
