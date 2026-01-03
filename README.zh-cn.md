@@ -830,7 +830,7 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 默认开启。Sisyphus 提供一个强力的编排器，带可选的专门 Agent：
 
 - **Sisyphus**：主编排 Agent（Claude Opus 4.5）
-- **Builder-Sisyphus**：OpenCode 默认构建 Agent（因 SDK 限制仅改名，默认禁用）
+- **OpenCode-Builder**：OpenCode 默认构建 Agent（因 SDK 限制仅改名，默认禁用）
 - **Planner-Sisyphus**：OpenCode 默认计划 Agent（因 SDK 限制仅改名，默认启用）
 
 **配置选项：**
@@ -846,7 +846,7 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 }
 ```
 
-**示例：启用 Builder-Sisyphus：**
+**示例：启用 OpenCode-Builder：**
 
 ```json
 {
@@ -856,7 +856,7 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 }
 ```
 
-这样能和 Sisyphus 一起启用 Builder-Sisyphus Agent。启用 Sisyphus 后，默认构建 Agent 总会降级为子 Agent 模式。
+这样能和 Sisyphus 一起启用 OpenCode-Builder Agent。启用 Sisyphus 后，默认构建 Agent 总会降级为子 Agent 模式。
 
 **示例：禁用所有 Sisyphus 编排：**
 
@@ -877,7 +877,7 @@ Sisyphus Agent 也能自定义：
       "model": "anthropic/claude-sonnet-4",
       "temperature": 0.3
     },
-    "Builder-Sisyphus": {
+    "OpenCode-Builder": {
       "model": "anthropic/claude-opus-4"
     },
     "Planner-Sisyphus": {
@@ -890,7 +890,7 @@ Sisyphus Agent 也能自定义：
 | 选项                        | 默认值   | 说明                                                                                                                                              |
 | --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `disabled`                  | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                                                              |
-| `default_builder_enabled`   | `false` | 设为 `true` 就启用 Builder-Sisyphus Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
+| `default_builder_enabled`   | `false` | 设为 `true` 就启用 OpenCode-Builder Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
 | `planner_enabled`           | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（与 OpenCode plan 相同，因 SDK 限制仅改名）。默认启用。                                                             |
 | `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
 
