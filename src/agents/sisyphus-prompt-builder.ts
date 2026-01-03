@@ -308,20 +308,8 @@ export function buildAntiPatternsSection(agents: AvailableAgent[]): string {
 ${patterns.join("\n")}`
 }
 
-export function buildUltraworkAgentTable(agents: AvailableAgent[]): string {
-  if (agents.length === 0) {
-    return `| Agent | When |
-|-------|------|
-| explore (multiple) | Codebase search, patterns, structures |
-| librarian (multiple) | External docs, GitHub OSS, remote repos |
-| plan | Work breakdown (NEVER plan yourself) |
-| oracle | Architecture, debugging after 2+ failures |`
-  }
-
-  const rows: string[] = [
-    "| Agent | When |",
-    "|-------|------|",
-  ]
+export function buildUltraworkAgentSection(agents: AvailableAgent[]): string {
+  if (agents.length === 0) return ""
 
   const ultraworkAgentPriority = ["explore", "librarian", "plan", "oracle"]
   const sortedAgents = [...agents].sort((a, b) => {
@@ -333,11 +321,12 @@ export function buildUltraworkAgentTable(agents: AvailableAgent[]): string {
     return aIdx - bIdx
   })
 
+  const lines: string[] = []
   for (const agent of sortedAgents) {
     const shortDesc = agent.description.split(".")[0] || agent.description
     const suffix = (agent.name === "explore" || agent.name === "librarian") ? " (multiple)" : ""
-    rows.push(`| ${agent.name}${suffix} | ${shortDesc} |`)
+    lines.push(`- **${agent.name}${suffix}**: ${shortDesc}`)
   }
 
-  return rows.join("\n")
+  return lines.join("\n")
 }
