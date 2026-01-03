@@ -3,6 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
+import { createCleanMcpEnvironment } from "./env-cleaner"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 
 interface ManagedClient {
@@ -115,15 +116,7 @@ export class SkillMcpManager {
     const command = config.command
     const args = config.args || []
 
-    // Always inherit parent process environment
-    const mergedEnv: Record<string, string> = {}
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value !== undefined) mergedEnv[key] = value
-    }
-    // Overlay with skill-specific env vars if present
-    if (config.env) {
-      Object.assign(mergedEnv, config.env)
-    }
+    const mergedEnv = createCleanMcpEnvironment(config.env)
 
     this.registerProcessCleanup()
 
