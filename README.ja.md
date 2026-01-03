@@ -2,6 +2,9 @@
 >
 > *「私はエージェントが生成したコードと人間が書いたコードを区別できない、しかしはるかに多くのことを達成できる世界を作り、ソフトウェア革命を起こすことを目指しています。私はこの旅に個人的な時間、情熱、そして資金を注ぎ込んできましたし、これからもそうし続けます。」*
 >
+> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
+> > **オーケストレーターが来ます。今週中に。[Xで通知を受け取る](https://x.com/justsisyphus/status/2006250634354548963)**
+>
 > 一緒に歩みましょう！
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | [Discordコミュニティ](https://discord.gg/aSfGzWtYxM)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
