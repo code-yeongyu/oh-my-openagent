@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { COPILOT_AGENT_DEFAULTS } from "./copilot-models"
 
-const DEFAULT_MODEL = "opencode/grok-code"
+const DEFAULT_MODEL = COPILOT_AGENT_DEFAULTS["explore"]
 
 export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",

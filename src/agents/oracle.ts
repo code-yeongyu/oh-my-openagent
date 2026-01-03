@@ -1,8 +1,9 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
+import { COPILOT_AGENT_DEFAULTS } from "./copilot-models"
 
-const DEFAULT_MODEL = "openai/gpt-5.2"
+const DEFAULT_MODEL = COPILOT_AGENT_DEFAULTS["oracle"]
 
 export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",

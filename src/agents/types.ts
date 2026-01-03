@@ -56,6 +56,14 @@ export function isGptModel(model: string): boolean {
   return model.startsWith("openai/") || model.startsWith("github-copilot/gpt-")
 }
 
+export function isClaudeModel(model: string): boolean {
+  return model.startsWith("anthropic/") || model.includes("claude")
+}
+
+export function isGeminiModel(model: string): boolean {
+  return model.startsWith("google/") || model.includes("gemini")
+}
+
 export type BuiltinAgentName =
   | "Sisyphus"
   | "oracle"

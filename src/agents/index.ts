@@ -18,5 +18,6 @@ export const builtinAgents: Record<string, AgentConfig> = {
 }
 
 export * from "./types"
+export * from "./copilot-models"
 export { createBuiltinAgents } from "./utils"
 export type { AvailableAgent } from "./sisyphus-prompt-builder"

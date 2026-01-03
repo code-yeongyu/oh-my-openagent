@@ -2,14 +2,14 @@ import { describe, test, expect } from "bun:test"
 import { createBuiltinAgents } from "./utils"
 
 describe("createBuiltinAgents with model overrides", () => {
-  test("Sisyphus with default model has thinking config", () => {
+  test("Sisyphus with default model has thinking config (Copilot Claude)", () => {
     // #given - no overrides
 
     // #when
     const agents = createBuiltinAgents()
 
-    // #then
-    expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    // #then - default is now github-copilot/claude-opus-4.5
+    expect(agents.Sisyphus.model).toBe("github-copilot/claude-opus-4.5")
     expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
   })
@@ -42,14 +42,14 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.thinking).toBeUndefined()
   })
 
-  test("Oracle with default model has reasoningEffort", () => {
+  test("Oracle with default model has reasoningEffort (Copilot GPT)", () => {
     // #given - no overrides
 
     // #when
     const agents = createBuiltinAgents()
 
-    // #then
-    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    // #then - default is now github-copilot/gpt-5.2
+    expect(agents.oracle.model).toBe("github-copilot/gpt-5.2")
     expect(agents.oracle.reasoningEffort).toBe("medium")
     expect(agents.oracle.textVerbosity).toBe("high")
     expect(agents.oracle.thinking).toBeUndefined()
@@ -83,5 +83,25 @@ describe("createBuiltinAgents with model overrides", () => {
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
     expect(agents.Sisyphus.temperature).toBe(0.5)
+  })
+
+  test("Explore agent uses Copilot Haiku by default", () => {
+    // #given - no overrides
+
+    // #when
+    const agents = createBuiltinAgents()
+
+    // #then - default is now github-copilot/claude-haiku-4.5
+    expect(agents.explore.model).toBe("github-copilot/claude-haiku-4.5")
+  })
+
+  test("Frontend agent uses Copilot Gemini by default", () => {
+    // #given - no overrides
+
+    // #when
+    const agents = createBuiltinAgents()
+
+    // #then - default is now github-copilot/gemini-3-pro-preview
+    expect(agents["frontend-ui-ux-engineer"].model).toBe("github-copilot/gemini-3-pro-preview")
   })
 })

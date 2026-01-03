@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { COPILOT_AGENT_DEFAULTS } from "./copilot-models"
 
-const DEFAULT_MODEL = "google/gemini-3-pro-preview"
+const DEFAULT_MODEL = COPILOT_AGENT_DEFAULTS["frontend-ui-ux-engineer"]
 
 export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",

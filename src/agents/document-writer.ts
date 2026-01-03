@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { COPILOT_AGENT_DEFAULTS } from "./copilot-models"
 
-const DEFAULT_MODEL = "google/gemini-3-flash-preview"
+const DEFAULT_MODEL = COPILOT_AGENT_DEFAULTS["document-writer"]
 
 export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",

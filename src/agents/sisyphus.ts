@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
+import { COPILOT_AGENT_DEFAULTS } from "./copilot-models"
 import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
   buildKeyTriggersSection,
@@ -14,7 +15,7 @@ import {
   categorizeTools,
 } from "./sisyphus-prompt-builder"
 
-const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
+const DEFAULT_MODEL = COPILOT_AGENT_DEFAULTS["Sisyphus"]
 
 const SISYPHUS_ROLE_SECTION = `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
