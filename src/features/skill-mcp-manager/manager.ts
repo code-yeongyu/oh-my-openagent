@@ -13,9 +13,44 @@ interface ManagedClient {
 
 export class SkillMcpManager {
   private clients: Map<string, ManagedClient> = new Map()
+  private pendingConnections: Map<string, Promise<Client>> = new Map()
+  private cleanupRegistered = false
 
   private getClientKey(info: SkillMcpClientInfo): string {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
+  }
+
+  private registerProcessCleanup(): void {
+    if (this.cleanupRegistered) return
+    this.cleanupRegistered = true
+
+    const cleanup = () => {
+      for (const [, managed] of this.clients) {
+        try {
+          managed.client.close()
+        } catch {
+          // Ignore errors during cleanup
+        }
+      }
+      this.clients.clear()
+      this.pendingConnections.clear()
+    }
+
+    process.on("exit", cleanup)
+    process.on("SIGINT", () => {
+      cleanup()
+      process.exit(0)
+    })
+    process.on("SIGTERM", () => {
+      cleanup()
+      process.exit(0)
+    })
+    if (process.platform === "win32") {
+      process.on("SIGBREAK", () => {
+        cleanup()
+        process.exit(0)
+      })
+    }
   }
 
   async getOrCreateClient(
@@ -29,9 +64,22 @@ export class SkillMcpManager {
       return existing.client
     }
 
+    // Prevent race condition: if a connection is already in progress, wait for it
+    const pending = this.pendingConnections.get(key)
+    if (pending) {
+      return pending
+    }
+
     const expandedConfig = expandEnvVarsInObject(config)
-    const client = await this.createClient(info, expandedConfig)
-    return client
+    const connectionPromise = this.createClient(info, expandedConfig)
+    this.pendingConnections.set(key, connectionPromise)
+
+    try {
+      const client = await connectionPromise
+      return client
+    } finally {
+      this.pendingConnections.delete(key)
+    }
   }
 
   private async createClient(
@@ -65,6 +113,8 @@ export class SkillMcpManager {
       Object.assign(mergedEnv, config.env)
     }
 
+    this.registerProcessCleanup()
+
     const transport = new StdioClientTransport({
       command,
       args,
@@ -80,6 +130,12 @@ export class SkillMcpManager {
     try {
       await client.connect(transport)
     } catch (error) {
+      // Close transport to prevent orphaned MCP process on connection failure
+      try {
+        await transport.close()
+      } catch {
+        // Process may already be terminated
+      }
       const errorMessage = error instanceof Error ? error.message : String(error)
       throw new Error(
         `Failed to connect to MCP server "${info.serverName}".\n\n` +
