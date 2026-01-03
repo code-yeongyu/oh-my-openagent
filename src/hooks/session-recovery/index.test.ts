@@ -83,8 +83,8 @@ describe("detectErrorType", () => {
       expect(result).toBe("thinking_block_order")
     })
 
-    it("should detect 'cannot be' error pattern with thinking", () => {
-      // #given an error using 'cannot be' phrasing
+    it("should detect 'cannot be thinking' error pattern", () => {
+      // #given an error using 'cannot be thinking' phrasing
       const error = {
         message:
           "messages.219: The last block in an assistant message cannot be thinking content",

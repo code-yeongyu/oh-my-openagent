@@ -135,7 +135,7 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
       message.includes("must start with") ||
       message.includes("preceeding") ||
       message.includes("final block") ||
-      message.includes("cannot be") ||
+      message.includes("cannot be thinking") ||
       (message.includes("expected") && message.includes("found")))
   ) {
     return "thinking_block_order"
