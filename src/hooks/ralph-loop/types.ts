@@ -13,4 +13,5 @@ export interface RalphLoopState {
 export interface RalphLoopOptions {
   config?: RalphLoopConfig
   getTranscriptPath?: (sessionId: string) => string
+  apiTimeout?: number
 }

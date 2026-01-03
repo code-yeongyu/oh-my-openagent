@@ -423,5 +423,162 @@ describe("ralph-loop", () => {
       expect(promptCalls[0].text).toContain("Create a calculator app")
       expect(promptCalls[0].text).toContain("<promise>CALCULATOR_DONE</promise>")
     })
+
+    test("should clear loop state on user abort (MessageAbortedError)", async () => {
+      // #given - active loop
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      // #when - user aborts (Ctrl+C)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError", message: "User aborted" },
+          },
+        },
+      })
+
+      // #then - loop state should be cleared immediately
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should NOT set recovery mode on user abort", async () => {
+      // #given - active loop
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+
+      // #when - user aborts (Ctrl+C)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError" },
+          },
+        },
+      })
+
+      // Start a new loop
+      hook.startLoop("session-123", "New task")
+
+      // #when - session goes idle immediately (should work, no recovery mode)
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - continuation should be injected (not blocked by recovery)
+      expect(promptCalls.length).toBe(1)
+    })
+
+    test("should only check LAST assistant message for completion", async () => {
+      // #given - multiple assistant messages, only first has completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I'll work on it. <promise>DONE</promise>" }] },
+        { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Working on more features..." }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - loop should continue (last message has no completion promise)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should detect completion only in LAST assistant message", async () => {
+      // #given - last assistant message has completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Starting work..." }] },
+        { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Task complete! <promise>DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - loop should complete (last message has completion promise)
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should check transcript BEFORE API to optimize performance", async () => {
+      // #given - transcript has completion promise
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should complete via transcript (API not called when transcript succeeds)
+      expect(promptCalls.length).toBe(0)
+      expect(hook.getState()).toBeNull()
+      // API should NOT be called since transcript found completion
+      expect(messagesCalls.length).toBe(0)
+    })
+  })
+
+  describe("API timeout protection", () => {
+    test("should not hang when session.messages() times out", async () => {
+      // #given - slow API that takes longer than timeout
+      const slowMock = {
+        ...createMockPluginInput(),
+        client: {
+          ...createMockPluginInput().client,
+          session: {
+            ...createMockPluginInput().client.session,
+            messages: async () => {
+              // Simulate slow API (would hang without timeout)
+              await new Promise((resolve) => setTimeout(resolve, 10000))
+              return { data: [] }
+            },
+          },
+        },
+      }
+      const hook = createRalphLoopHook(slowMock as any, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        apiTimeout: 100, // 100ms timeout for test
+      })
+      hook.startLoop("session-123", "Build something")
+
+      // #when - session goes idle (API will timeout)
+      const startTime = Date.now()
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+      const elapsed = Date.now() - startTime
+
+      // #then - should complete within timeout + buffer (not hang for 10s)
+      expect(elapsed).toBeLessThan(500)
+      // #then - loop should continue (API timeout = no completion detected)
+      expect(promptCalls.length).toBe(1)
+    })
   })
 })
