@@ -75,7 +75,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // OpenCode's bash tool uses hardcoded `...process.env` in spawn(),
       // ignoring any args.env we might set. Prepend to command instead.
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV)
-      output.args.command = `${envPrefix} ${command}`
+      output.args.command = `${envPrefix} \\\n${command}`
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,
