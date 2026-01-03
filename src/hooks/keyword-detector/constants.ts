@@ -2,54 +2,65 @@ export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
 export const INLINE_CODE_PATTERN = /`[^`]+`/g
 
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string }> = [
-  // ULTRAWORK: ulw, ultrawork
   {
     pattern: /(ultrawork|ulw)/i,
     message: `<ultrawork-mode>
-[CODE RED] Maximum precision required. Ultrathink before acting.
 
-YOU MUST LEVERAGE ALL AVAILABLE AGENTS TO THEIR FULLEST POTENTIAL.
-TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
+## TODO IS YOUR LIFELINE (NON-NEGOTIABLE)
 
-## AGENT UTILIZATION PRINCIPLES (by capability, not by name)
-- **Codebase Exploration**: Spawn exploration agents using BACKGROUND TASKS for file patterns, internal implementations, project structure
-- **Documentation & References**: Use librarian-type agents via BACKGROUND TASKS for API references, examples, external library docs
-- **Planning & Strategy**: NEVER plan yourself - ALWAYS spawn a dedicated planning agent for work breakdown
-- **High-IQ Reasoning**: Leverage specialized agents for architecture decisions, code review, strategic planning
-- **Frontend/UI Tasks**: Delegate to UI-specialized agents for design and implementation
+**USE TodoWrite OBSESSIVELY. This is the #1 most important tool.**
 
-## EXECUTION RULES
-- **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
-- **PARALLEL**: Fire independent agent calls simultaneously via background_task - NEVER wait sequentially.
-- **BACKGROUND FIRST**: Use background_task for exploration/research agents (10+ concurrent if needed).
-- **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
-- **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
+### TODO Rules
+1. **BEFORE any action**: Create TODOs FIRST. Break down into atomic, granular steps.
+2. **Be excessively detailed**: 10 small TODOs > 3 vague TODOs. Err on the side of too many.
+3. **Real-time updates**: Mark \`in_progress\` before starting, \`completed\` IMMEDIATELY after. NEVER batch.
+4. **One at a time**: Only ONE TODO should be \`in_progress\` at any moment.
+5. **Sub-tasks**: Complex TODO? Break it into sub-TODOs. Keep granularity high.
+6. **Questions too**: User asks a question? TODO: "Answer with evidence: [question]"
 
-## WORKFLOW
-1. Analyze the request and identify required capabilities
-2. Spawn exploration/librarian agents via background_task in PARALLEL (10+ if needed)
-3. Always Use Plan agent with gathered context to create detailed work breakdown
-4. Execute with continuous verification against original requirements
+### Example TODO Granularity
+BAD: "Implement user auth"
+GOOD:
+- "Read existing auth patterns in codebase"
+- "Create auth schema types"  
+- "Implement login endpoint"
+- "Implement token validation middleware"
+- "Add auth tests - login success case"
+- "Add auth tests - login failure case"
+- "Verify LSP diagnostics clean"
 
-## TDD (if test infrastructure exists)
+**YOUR WORK IS INVISIBLE WITHOUT TODOs. USE THEM.**
 
-1. Write spec (requirements)
-2. Write tests (failing)
-3. RED: tests fail
-4. Implement minimal code
-5. GREEN: tests pass
-6. Refactor if needed (must stay green)
-7. Next feature, repeat
+## TDD WORKFLOW (MANDATORY when tests exist)
 
-## ZERO TOLERANCE FAILURES
-- **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
-- **NO MockUp Work**: When user asked you to do "port A", you must "port A", fully, 100%. No Extra feature, No reduced feature, no mock data, fully working 100% port.
-- **NO Partial Completion**: Never stop at 60-80% saying "you can extend this..." - finish 100%
-- **NO Assumed Shortcuts**: Never skip requirements you deem "optional" or "can be added later"
-- **NO Premature Stopping**: Never declare done until ALL TODOs are completed and verified
-- **NO TEST DELETION**: Never delete or skip failing tests to make the build pass. Fix the code, not the tests.
+Check for test infrastructure FIRST. If exists, follow strictly:
 
-THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
+1. **RED**: Write failing test FIRST → \`bun test\` must FAIL
+2. **GREEN**: Write MINIMAL code to pass → \`bun test\` must PASS
+3. **REFACTOR**: Clean up, tests stay green → \`bun test\` still PASS
+4. **REPEAT**: Next test case, loop until complete
+
+**NEVER write implementation before test. NEVER delete failing tests.**
+
+## AGENT DEPLOYMENT
+
+Fire available agents in PARALLEL via background tasks. Use explore/librarian agents liberally (multiple concurrent if needed).
+
+## EVIDENCE-BASED ANSWERS
+
+- Every claim: code snippet + file path + line number
+- No "I think..." - find and SHOW actual code
+- Local search fails? → librarian for external sources
+- **NEVER acceptable**: "I couldn't find it"
+
+## FORBIDDEN
+- Scope reduction ("demo", "skeleton", "basic")
+- Partial completion ("you can extend this...")
+- Assumptions without code evidence
+- Deleting tests to pass
+- Stopping before ALL TODOs complete
+
+## SUCCESS = All TODOs Done + Evidence Provided
 
 </ultrawork-mode>
 
