@@ -303,6 +303,21 @@ jobs:
           export PATH="$HOME/.opencode/bin:$PATH"
 
           PROMPT=$(cat <<'PROMPT_EOF'
+          [analyze-mode]
+          ANALYSIS MODE. Gather context before diving deep:
+
+          CONTEXT GATHERING (parallel):
+          - 1-2 explore agents (codebase patterns, implementations)
+          - 1-2 librarian agents (if external library involved)
+          - Direct tools: Grep, AST-grep, LSP for targeted searches
+
+          IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
+          - Consult oracle for strategic guidance
+
+          SYNTHESIZE findings before proceeding.
+
+          ---
+
           Your username is @sisyphus-dev-ai, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
 
           ## Context
@@ -313,6 +328,14 @@ jobs:
 
           ## User's Request
           COMMENT_PLACEHOLDER
+
+          ---
+
+          ## CRITICAL: First Steps (MUST DO BEFORE ANYTHING ELSE)
+
+          1. **READ FULL CONVERSATION**: Before doing ANYTHING, use `gh issue view NUMBER_PLACEHOLDER --comments` (or `gh pr view NUMBER_PLACEHOLDER --comments` for PRs) to read the ENTIRE conversation history. Understand the full context - previous discussions, decisions, and what has already been tried.
+
+          2. **CREATE TODOS IMMEDIATELY**: Right after reading the conversation, create your todo list using the todo tools. Plan everything before starting any work.
 
           ---
 
