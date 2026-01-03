@@ -302,6 +302,77 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(0)
     })
 
+    test("should clear orphaned state when original session no longer exists", async () => {
+      // #given - state file exists from a previous session that no longer exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 3,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build something",
+        session_id: "orphaned-session-999", // This session no longer exists
+      }
+      writeState(TEST_DIR, state)
+
+      // Mock sessionExists to return false for the orphaned session
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        checkSessionExists: async (sessionID: string) => {
+          // Orphaned session doesn't exist, current session does
+          return sessionID !== "orphaned-session-999"
+        },
+      })
+
+      // #when - a new session goes idle (different from the orphaned session in state)
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "new-session-456" },
+        },
+      })
+
+      // #then - orphaned state should be cleared
+      expect(hook.getState()).toBeNull()
+      // #then - no continuation injected (state was cleared, not resumed)
+      expect(promptCalls.length).toBe(0)
+    })
+
+    test("should NOT clear state when original session still exists (different active session)", async () => {
+      // #given - state file exists from a session that still exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 2,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build something",
+        session_id: "active-session-123", // This session still exists
+      }
+      writeState(TEST_DIR, state)
+
+      // Mock sessionExists to return true for the active session
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        checkSessionExists: async (sessionID: string) => {
+          // Original session still exists
+          return sessionID === "active-session-123" || sessionID === "new-session-456"
+        },
+      })
+
+      // #when - a different session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "new-session-456" },
+        },
+      })
+
+      // #then - state should NOT be cleared (original session still active)
+      expect(hook.getState()).not.toBeNull()
+      expect(hook.getState()?.session_id).toBe("active-session-123")
+      // #then - no continuation injected (it's a different session's loop)
+      expect(promptCalls.length).toBe(0)
+    })
+
     test("should use default config values", () => {
       // #given - hook with config
       const hook = createRalphLoopHook(createMockPluginInput(), {
