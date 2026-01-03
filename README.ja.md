@@ -1048,5 +1048,8 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 最初のスポンサー
 - **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
+- **Suyeol Jeon (devxoul)** [GitHub](https://github.com/devxoul)
+  - 私のキャリアをスタートさせてくださった方であり、優れたエージェンティックワークフローをどのように構築できるかについて多大なインスピレーションを与えてくださった方です。優れたチームを作るために優れたシステムをどう設計すべきか多くのことを学び、その学びがこのharnessを作る上で大きな助けとなりました。
+- **Hyerin Won (devwon)** [GitHub](https://github.com/devwon)
 
 *素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*

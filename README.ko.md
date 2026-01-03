@@ -1041,5 +1041,8 @@ OpenCode 를 사용하여 이 프로젝트의 99% 를 작성했습니다. 기능
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - 첫 번째 스폰서
 - **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
+- **전수열 (devxoul)** [GitHub](https://github.com/devxoul)
+  - 저의 커리어 시작을 만들어주신분이며, 좋은 에이전틱 워크플로우를 어떻게 만들 수 있을까에 대해 많은 영감을 주신 분입니다. 좋은 팀을 만들기 위해 좋은 시스템을 어떻게 설계 할 수 있을지 많은 배움을 얻었고 그러한 내용들이 이 harness를 만드는데에 큰 도움이 되었습니다.
+- **원혜린 (devwon)** [GitHub](https://github.com/devwon)
 
 *멋진 히어로 이미지를 만들어주신 히어로 [@junhoyeo](https://github.com/junhoyeo) 께 감사드립니다*

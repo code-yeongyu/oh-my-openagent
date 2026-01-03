@@ -1103,5 +1103,8 @@ I have no affiliation with any project or model mentioned here. This is purely p
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
   - The first sponsor
 - **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
+- **Suyeol Jeon (devxoul)** [GitHub](https://github.com/devxoul)
+  - The person who launched my career and inspired me deeply on how to build great agentic workflows. I learned so much about designing great systems to build great teams, and those lessons were instrumental in creating this harness.
+- **Hyerin Won (devwon)** [GitHub](https://github.com/devwon)
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*
