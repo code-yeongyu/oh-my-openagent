@@ -4,7 +4,7 @@
 >
 > 함께해주세요!
 >
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | [Discord 커뮤니티](https://discord.gg/PWpXmbhF)에서 기여자들과 `oh-my-opencode` 사용자들을 만나보세요. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | [Discord 커뮤니티](https://discord.gg/aSfGzWtYxM)에서 기여자들과 `oh-my-opencode` 사용자들을 만나보세요. |
 > | :-----| :----- |
 > | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` 관련 소식은 제 X 계정에서 올렸었는데, 억울하게 정지당해서 <br />[@justsisyphus](https://x.com/justsisyphus)가 대신 소식을 전하고 있습니다. |
 > | [<img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-❤-ff69b4?style=flat-square&logo=github-sponsors&labelColor=black" width="156px" />](https://github.com/sponsors/code-yeongyu) | [스폰서가 되어](https://github.com/sponsors/code-yeongyu) `oh-my-opencode` 개발을 응원해주세요. 여러분의 후원이 이 프로젝트를 계속 성장시킵니다. |

@@ -7,7 +7,7 @@
 >
 > Be with us!
 >
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PWpXmbhF) | Join our [Discord community](https://discord.gg/PWpXmbhF) to connect with contributors and fellow `oh-my-opencode` users. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/aSfGzWtYxM) | Join our [Discord community](https://discord.gg/aSfGzWtYxM) to connect with contributors and fellow `oh-my-opencode` users. |
 > | :-----| :----- |
 > | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | News and updates for `oh-my-opencode` used to be posted on my X account. <br /> Since it was suspended mistakenly, [@justsisyphus](https://x.com/justsisyphus) now posts updates on my behalf. |
 > | [<img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-❤-ff69b4?style=flat-square&logo=github-sponsors&labelColor=black" width="156px" />](https://github.com/sponsors/code-yeongyu) | Support the development of `oh-my-opencode` by [becoming a sponsor](https://github.com/sponsors/code-yeongyu). Your contribution helps keep this project alive and growing. |
