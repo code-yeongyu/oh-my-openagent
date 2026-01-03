@@ -1,20 +1,16 @@
 import { existsSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
-import { join } from "node:path"
 import type { CheckResult, CheckDefinition, PluginInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import { parseJsonc } from "../../../shared"
-
-const OPENCODE_CONFIG_DIR = join(homedir(), ".config", "opencode")
-const OPENCODE_JSON = join(OPENCODE_CONFIG_DIR, "opencode.json")
-const OPENCODE_JSONC = join(OPENCODE_CONFIG_DIR, "opencode.jsonc")
+import { parseJsonc, getOpenCodeConfigPaths } from "../../../shared"
 
 function detectConfigPath(): { path: string; format: "json" | "jsonc" } | null {
-  if (existsSync(OPENCODE_JSONC)) {
-    return { path: OPENCODE_JSONC, format: "jsonc" }
+  const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+
+  if (existsSync(paths.configJsonc)) {
+    return { path: paths.configJsonc, format: "jsonc" }
   }
-  if (existsSync(OPENCODE_JSON)) {
-    return { path: OPENCODE_JSON, format: "json" }
+  if (existsSync(paths.configJson)) {
+    return { path: paths.configJson, format: "json" }
   }
   return null
 }
@@ -81,13 +77,14 @@ export async function checkPluginRegistration(): Promise<CheckResult> {
   const info = getPluginInfo()
 
   if (!info.configPath) {
+    const expectedPaths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
     return {
       name: CHECK_NAMES[CHECK_IDS.PLUGIN_REGISTRATION],
       status: "fail",
       message: "OpenCode config file not found",
       details: [
         "Run: bunx oh-my-opencode install",
-        `Expected: ${OPENCODE_JSON} or ${OPENCODE_JSONC}`,
+        `Expected: ${expectedPaths.configJson} or ${expectedPaths.configJsonc}`,
       ],
     }
   }
