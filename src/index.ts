@@ -48,6 +48,7 @@ import {
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
+  sessionExists,
   interactive_bash,
   getTmuxPath,
 } from "./tools";
@@ -146,7 +147,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
-    ? createRalphLoopHook(ctx, { config: pluginConfig.ralph_loop })
+    ? createRalphLoopHook(ctx, {
+        config: pluginConfig.ralph_loop,
+        checkSessionExists: async (sessionId) => sessionExists(sessionId),
+      })
     : null;
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")

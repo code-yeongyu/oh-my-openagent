@@ -64,6 +64,7 @@ export function createRalphLoopHook(
   const stateDir = config?.state_dir
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
+  const checkSessionExists = options?.checkSessionExists
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -199,6 +200,24 @@ export function createRalphLoopHook(
       }
 
       if (state.session_id && state.session_id !== sessionID) {
+        if (checkSessionExists) {
+          try {
+            const originalSessionExists = await checkSessionExists(state.session_id)
+            if (!originalSessionExists) {
+              clearState(ctx.directory, stateDir)
+              log(`[${HOOK_NAME}] Cleared orphaned state from deleted session`, {
+                orphanedSessionId: state.session_id,
+                currentSessionId: sessionID,
+              })
+              return
+            }
+          } catch (err) {
+            log(`[${HOOK_NAME}] Failed to check session existence`, {
+              sessionId: state.session_id,
+              error: String(err),
+            })
+          }
+        }
         return
       }
 
