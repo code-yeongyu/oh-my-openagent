@@ -44,8 +44,24 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 
        const config: AgentConfig = {
          description: formattedDescription,
-         mode: "subagent",
+         mode: data.mode || "subagent",
          prompt: body.trim(),
+       }
+
+       if (data.model) {
+         config.model = data.model
+       }
+       if (data.temperature !== undefined) {
+         config.temperature = data.temperature
+       }
+       if (data.top_p !== undefined) {
+         config.top_p = data.top_p
+       }
+       if (data.color) {
+         config.color = data.color
+       }
+       if (data.permission) {
+         config.permission = data.permission
        }
 
        const toolsConfig = parseToolsConfig(data.tools)

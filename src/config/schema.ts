@@ -115,22 +115,10 @@ export const AgentOverrideConfigSchema = z.object({
   permission: AgentPermissionSchema.optional(),
 })
 
-export const AgentOverridesSchema = z.object({
-  build: AgentOverrideConfigSchema.optional(),
-  plan: AgentOverrideConfigSchema.optional(),
-  Sisyphus: AgentOverrideConfigSchema.optional(),
-  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  "Prometheus (Planner)": AgentOverrideConfigSchema.optional(),
-  "Metis (Plan Consultant)": AgentOverrideConfigSchema.optional(),
-  "Momus (Plan Reviewer)": AgentOverrideConfigSchema.optional(),
-  oracle: AgentOverrideConfigSchema.optional(),
-  librarian: AgentOverrideConfigSchema.optional(),
-  explore: AgentOverrideConfigSchema.optional(),
-  "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
-  "document-writer": AgentOverrideConfigSchema.optional(),
-  "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  "orchestrator-sisyphus": AgentOverrideConfigSchema.optional(),
-})
+export const AgentOverridesSchema = z.record(
+  z.string(),
+  AgentOverrideConfigSchema.optional(),
+)
 
 export const ClaudeCodeConfigSchema = z.object({
   mcp: z.boolean().optional(),
