@@ -34,16 +34,18 @@ function shellEscape(value: string): string {
 }
 
 /**
- * Build env prefix string with line continuation for readability:
- * VAR1=val1 \
- * VAR2=val2 \
- * ...
+ * Build export statement for environment variables.
+ * Uses `export VAR1=val1 VAR2=val2;` format to ensure variables
+ * apply to ALL commands in a chain (e.g., `cmd1 && cmd2`).
+ *
+ * Previous approach used VAR=value prefix which only applies to the first command.
  * OpenCode's bash tool ignores args.env, so we must prepend to command.
  */
 function buildEnvPrefix(env: Record<string, string>): string {
-  return Object.entries(env)
+  const exports = Object.entries(env)
     .map(([key, value]) => `${key}=${shellEscape(value)}`)
-    .join(" \\\n")
+    .join(" ")
+  return `export ${exports};`
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
@@ -73,9 +75,11 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       }
 
       // OpenCode's bash tool uses hardcoded `...process.env` in spawn(),
-      // ignoring any args.env we might set. Prepend to command instead.
+      // ignoring any args.env we might set. Prepend export statement to command.
+      // Uses `export VAR=val;` format to ensure variables apply to ALL commands
+      // in a chain (e.g., `git add file && git rebase --continue`).
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV)
-      output.args.command = `${envPrefix} \\\n${command}`
+      output.args.command = `${envPrefix} ${command}`
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,

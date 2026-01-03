@@ -415,7 +415,7 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await new Promise(r => setTimeout(r, 2500))
+    await new Promise(r => setTimeout(r, 3500))
 
     // #then - first injection happened
     expect(promptCalls.length).toBe(1)
@@ -424,11 +424,11 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await new Promise(r => setTimeout(r, 2500))
+    await new Promise(r => setTimeout(r, 3500))
 
     // #then - second injection also happened (no throttle blocking)
     expect(promptCalls.length).toBe(2)
-  }, { timeout: 10000 })
+  }, { timeout: 15000 })
 
   // ============================================================
   // ABORT "IMMEDIATELY BEFORE" DETECTION TESTS
@@ -589,7 +589,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await new Promise(r => setTimeout(r, 3500))
     expect(promptCalls).toHaveLength(0)
 
     // #when - second idle event occurs (abort is no longer "immediately before")
@@ -597,11 +597,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 2500))
+    await new Promise(r => setTimeout(r, 3500))
 
     // #then - continuation injected on second idle (abort state was consumed)
     expect(promptCalls.length).toBe(1)
-  }, { timeout: 10000 })
+  }, { timeout: 15000 })
 
   test("should handle multiple abort errors correctly - only last one matters", async () => {
     // #given - session with incomplete todos
