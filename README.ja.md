@@ -826,7 +826,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 有効時（デフォルト）、Sisyphus はオプションの特殊エージェントを備えた強力なオーケストレーターを提供します：
 
 - **Sisyphus**: プライマリオーケストレーターエージェント (Claude Opus 4.5)
-- **Builder-Sisyphus**: OpenCode のデフォルトビルドエージェント（SDK 制限により名前変更、デフォルトで無効）
+- **OpenCode-Builder**: OpenCode のデフォルトビルドエージェント（SDK 制限により名前変更、デフォルトで無効）
 - **Planner-Sisyphus**: OpenCode のデフォルトプランエージェント（SDK 制限により名前変更、デフォルトで有効）
 
 **設定オプション：**
@@ -842,7 +842,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-**例：Builder-Sisyphus を有効化：**
+**例：OpenCode-Builder を有効化：**
 
 ```json
 {
@@ -852,7 +852,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-これにより、Sisyphus と並行して Builder-Sisyphus エージェントを有効化できます。Sisyphus が有効な場合、デフォルトのビルドエージェントは常にサブエージェントモードに降格されます。
+これにより、Sisyphus と並行して OpenCode-Builder エージェントを有効化できます。Sisyphus が有効な場合、デフォルトのビルドエージェントは常にサブエージェントモードに降格されます。
 
 **例：すべての Sisyphus オーケストレーションを無効化：**
 
@@ -873,7 +873,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
       "model": "anthropic/claude-sonnet-4",
       "temperature": 0.3
     },
-    "Builder-Sisyphus": {
+    "OpenCode-Builder": {
       "model": "anthropic/claude-opus-4"
     },
     "Planner-Sisyphus": {
@@ -886,7 +886,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 | オプション                  | デフォルト | 説明                                                                                                                                                         |
 | --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `disabled`                  | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
-| `default_builder_enabled`   | `false` | `true` の場合、Builder-Sisyphus エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
+| `default_builder_enabled`   | `false` | `true` の場合、OpenCode-Builder エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
 | `planner_enabled`           | `true`  | `true` の場合、Planner-Sisyphus エージェントを有効化します（OpenCode plan と同じ、SDK 制限により名前変更）。デフォルトで有効です。                                                       |
 | `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
 
