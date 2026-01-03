@@ -46,6 +46,11 @@
 
 > "Oh My Opencodeを使って、たった1日で8000個のeslint警告を解消しました" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
+> "Ohmyopencodeとralph loopを使って、一晩で45,000行のtauriアプリをSaaSウェブアプリに変換しました。インタビュープロンプトから始めて、質問に対する評価と推奨を求めました。作業する様子を見ているのは驚きでしたし、朝起きたらほぼ完成したウェブサイトがありました！" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+
+> "今週末はopen code、oh my opencode、supermemoryでマインクラフト/ソウルライクな何かを作る実験をしています。"
+> "昼食後の散歩に行く間に、しゃがみアニメーションを追加するよう頼みました。[動画]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
+
 > "これをコアに取り入れて彼を採用すべきです。マジで。本当に、本当に、本当に良いです" — Henning Kilset
 
 > "@yeon_gyu_kimを説得できるなら雇うべきです。彼はopencodeに革命を起こしました" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
@@ -55,6 +60,8 @@
 > "oh-my-opencodeを使ってください、もう戻れませんよ" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
 
 > "Oh My Opencodeは頂点に立っています、敵はいません" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
+
+> "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
 
 > "シジフォスという名前自体が美しいじゃないですか?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
