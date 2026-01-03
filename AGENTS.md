@@ -39,6 +39,29 @@ oh-my-opencode/
 | Config schema | `src/config/schema.ts` | Run `bun run build:schema` after |
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
 
+## TDD (Test-Driven Development)
+
+**MANDATORY for new features and bug fixes.** Follow RED-GREEN-REFACTOR:
+
+```
+1. RED    - Write failing test first (test MUST fail)
+2. GREEN  - Write MINIMAL code to pass (nothing more)
+3. REFACTOR - Clean up while tests stay GREEN
+4. REPEAT - Next test case
+```
+
+| Phase | Action | Verification |
+|-------|--------|--------------|
+| **RED** | Write test describing expected behavior | `bun test` → FAIL (expected) |
+| **GREEN** | Implement minimum code to pass | `bun test` → PASS |
+| **REFACTOR** | Improve code quality, remove duplication | `bun test` → PASS (must stay green) |
+
+**Rules:**
+- NEVER write implementation before test
+- NEVER delete failing tests to "pass" - fix the code
+- One test at a time - don't batch
+- Test file naming: `*.test.ts` alongside source
+
 ## CONVENTIONS
 
 - **Bun only**: `bun run`, `bun test`, `bunx` (NEVER npm/npx)
@@ -46,7 +69,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern in index.ts; explicit named exports for tools/hooks
 - **Naming**: kebab-case directories, createXXXHook/createXXXTool factories
-- **Testing**: BDD comments `#given`, `#when`, `#then` (same as AAA)
+- **Testing**: BDD comments `#given`, `#when`, `#then` (same as AAA); TDD workflow (RED-GREEN-REFACTOR)
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS
