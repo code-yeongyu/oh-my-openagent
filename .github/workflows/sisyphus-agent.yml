@@ -309,14 +309,17 @@ jobs:
             AUTHOR="$COMMENT_AUTHOR"
             COMMENT_ID="$COMMENT_ID_VAL"
 
-            # Check if PR or Issue
-            if gh api "repos/$REPO/issues/${ISSUE_NUM}" | jq -e '.pull_request' > /dev/null; then
+            # Check if PR or Issue and get title
+            ISSUE_DATA=$(gh api "repos/$REPO/issues/${ISSUE_NUM}")
+            TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+            if echo "$ISSUE_DATA" | jq -e '.pull_request' > /dev/null; then
               echo "type=pr" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             else
               echo "type=issue" >> $GITHUB_OUTPUT
               echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
             fi
+            echo "title=${TITLE}" >> $GITHUB_OUTPUT
           fi
 
           echo "comment<<EOF" >> $GITHUB_OUTPUT
@@ -362,6 +365,7 @@ jobs:
           COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
           CONTEXT_TYPE: ${{ steps.context.outputs.type }}
           CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
+          CONTEXT_TITLE: ${{ steps.context.outputs.title }}
           REPO_NAME: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
@@ -386,6 +390,7 @@ jobs:
           Your username is @sisyphus-dev-ai, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
 
           ## Context
+          - Title: TITLE_PLACEHOLDER
           - Type: TYPE_PLACEHOLDER
           - Number: #NUMBER_PLACEHOLDER
           - Repository: REPO_PLACEHOLDER
@@ -398,15 +403,34 @@ jobs:
 
           ## CRITICAL: First Steps (MUST DO BEFORE ANYTHING ELSE)
 
-          1. **READ FULL CONVERSATION**: Before doing ANYTHING, read the ENTIRE conversation history:
-             - **Issues**: `gh issue view NUMBER_PLACEHOLDER --comments`
-             - **PRs**: Use ALL THREE commands to get complete context:
-               - `gh pr view NUMBER_PLACEHOLDER --comments` (issue-style comments)
-               - `gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/comments` (inline review comments)
-               - `gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/reviews` (review bodies)
-             Understand the full context - previous discussions, decisions, and what has already been tried.
+          ### [CODE RED] MANDATORY CONTEXT READING - ZERO EXCEPTIONS
 
-          2. **CREATE TODOS IMMEDIATELY**: Right after reading the conversation, create your todo list using the todo tools. Plan everything before starting any work.
+          **YOU MUST READ ALL CONTENT. NOT SOME. NOT MOST. ALL.**
+
+          1. **READ FULL CONVERSATION** - Execute ALL commands below before ANY other action:
+             - **Issues**: `gh issue view NUMBER_PLACEHOLDER --comments`
+             - **PRs**: Use ALL THREE commands to get COMPLETE context:
+               ```bash
+               gh pr view NUMBER_PLACEHOLDER --comments
+               gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/comments
+               gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/reviews
+               ```
+             
+             **WHAT TO EXTRACT FROM THE CONVERSATION:**
+             - The ORIGINAL issue/PR description (first message) - this is often the TRUE requirement
+             - ALL previous attempts and their outcomes
+             - ALL decisions made and their reasoning
+             - ALL feedback, criticism, and rejection reasons
+             - ANY linked issues, PRs, or external references
+             - The EXACT ask from the user who mentioned you
+             
+             **FAILURE TO READ EVERYTHING = GUARANTEED FAILURE**
+             You WILL make wrong assumptions. You WILL repeat past mistakes. You WILL miss critical context.
+
+          2. **CREATE TODOS IMMEDIATELY**: Right after reading, create your todo list using todo tools.
+             - First todo: "Summarize issue/PR context and requirements"
+             - Break down ALL work into atomic, verifiable steps
+             - Plan everything BEFORE starting any work
 
           ---
 
@@ -421,6 +445,7 @@ jobs:
           PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
           PROMPT="${PROMPT//TYPE_PLACEHOLDER/$CONTEXT_TYPE}"
           PROMPT="${PROMPT//NUMBER_PLACEHOLDER/$CONTEXT_NUMBER}"
+          PROMPT="${PROMPT//TITLE_PLACEHOLDER/$CONTEXT_TITLE}"
           PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
           PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
 
