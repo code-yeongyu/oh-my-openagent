@@ -37,10 +37,19 @@ interface SessionState {
 
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
 
-Incomplete tasks remain in your todo list. Continue working on the next pending task.
+Incomplete tasks remain. Review and PARALLELIZE where possible:
 
+1. **Scan remaining TODOs** - Which can be delegated to specialists?
+2. **Delegate in parallel**:
+   - UI work → \`background_task(agent="frontend-ui-ux-engineer", ...)\`
+   - Documentation → \`background_task(agent="document-writer", ...)\`
+   - Research → \`background_task(agent="explore" or "librarian", ...)\`
+3. **Work on YOUR task** - Handle what only you can do
+4. **Collect results** - \`background_output\` before marking complete
+
+- Fire multiple background agents simultaneously
 - Proceed without asking for permission
-- Mark each task complete when finished
+- Mark each task complete when verified
 - Do not stop until all tasks are done`
 
 const COUNTDOWN_SECONDS = 2

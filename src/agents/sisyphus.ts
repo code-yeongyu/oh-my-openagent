@@ -160,7 +160,44 @@ const SISYPHUS_PHASE2B_PRE_IMPLEMENTATION = `## Phase 2B - Implementation
 ### Pre-Implementation:
 1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
 2. Mark current task \`in_progress\` before starting
-3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS`
+3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
+
+### Parallel Implementation (CONTINUE using background agents!)
+
+**Don't stop parallelizing just because you're implementing!**
+
+| Task Type | Parallelize? | How |
+|-----------|--------------|-----|
+| Frontend UI changes | YES | \`background_task(agent="frontend-ui-ux-engineer", ...)\` |
+| Documentation | YES | \`background_task(agent="document-writer", ...)\` |
+| Independent modules/files | YES | Work on A while agent handles B |
+| Pattern verification | YES | Fire explore agents to verify similar files |
+| Research while coding | YES | Fire librarian for docs you'll need |
+| Sequential dependencies | NO | Wait for dependency, then continue |
+
+**Example - Feature with UI + Backend + Docs:**
+\`\`\`typescript
+// PARALLEL: Fire agents for delegatable work
+background_task(agent="frontend-ui-ux-engineer", prompt="Build settings page UI...")
+background_task(agent="document-writer", prompt="Document the settings API...")
+
+// MEANWHILE: Sisyphus implements backend (your direct work)
+Edit(file="src/api/settings.ts", ...)
+Edit(file="src/api/settings.ts", ...)
+
+// COLLECT: When you need their results
+background_output(task_id="ui-task-id")
+background_output(task_id="docs-task-id")
+
+// VERIFY: Review and integrate
+\`\`\`
+
+**Implementation Parallelism Rules:**
+1. **YOUR work** = one \`in_progress\` TODO at a time
+2. **DELEGATED work** = unlimited parallel background agents
+3. **Before each TODO**: Ask "Can a specialist agent do this faster?"
+4. **Track delegations**: Note which TODOs are running in background
+5. **Collect before verify**: Get all background results before marking complete`
 
 const SISYPHUS_DELEGATION_PROMPT_STRUCTURE = `### Delegation Prompt Structure (MANDATORY - ALL 7 sections):
 

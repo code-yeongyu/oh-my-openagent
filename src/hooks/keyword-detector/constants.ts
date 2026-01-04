@@ -14,7 +14,10 @@ export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string }> = [
 1. **BEFORE any action**: Create TODOs FIRST. Break down into atomic, granular steps.
 2. **Be excessively detailed**: 10 small TODOs > 3 vague TODOs. Err on the side of too many.
 3. **Real-time updates**: Mark \`in_progress\` before starting, \`completed\` IMMEDIATELY after. NEVER batch.
-4. **One at a time**: Only ONE TODO should be \`in_progress\` at any moment.
+4. **Strategic parallelism**: 
+   - Mark ONE TODO \`in_progress\` for YOUR direct work
+   - DELEGATE other TODOs to background agents simultaneously
+   - Multiple agents work in parallel; you track your one active task
 5. **Sub-tasks**: Complex TODO? Break it into sub-TODOs. Keep granularity high.
 6. **Questions too**: User asks a question? TODO: "Answer with evidence: [question]"
 
@@ -42,9 +45,32 @@ Check for test infrastructure FIRST. If exists, follow strictly:
 
 **NEVER write implementation before test. NEVER delete failing tests.**
 
-## AGENT DEPLOYMENT
+## AGENT DEPLOYMENT (THROUGHOUT ENTIRE SESSION)
 
-Fire available agents in PARALLEL via background tasks. Use explore/librarian agents liberally (multiple concurrent if needed).
+**Parallelism applies to ALL phases - exploration AND implementation!**
+
+Fire agents in PARALLEL via background tasks:
+- **Exploration**: explore/librarian for research (multiple concurrent)
+- **Implementation**: frontend-ui-ux-engineer, document-writer for delegatable work
+- **Verification**: explore agents to check patterns across files
+
+**Before EACH TODO, ask**: "Can a specialist agent handle this while I work on something else?"
+
+\`\`\`typescript
+// EXPLORATION PHASE - parallel research
+background_task(agent="explore", prompt="Find all auth implementations...")
+background_task(agent="librarian", prompt="Find JWT best practices...")
+
+// IMPLEMENTATION PHASE - parallel delegation
+background_task(agent="frontend-ui-ux-engineer", prompt="Build the UI...")
+background_task(agent="document-writer", prompt="Write the docs...")
+// Meanwhile YOU work on backend/core logic
+
+// Collect when needed
+background_output(task_id="...")
+\`\`\`
+
+**NEVER fall into sequential-only mode during implementation!**
 
 ## EVIDENCE-BASED ANSWERS
 
