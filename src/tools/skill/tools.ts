@@ -40,7 +40,13 @@ function formatSkillsXml(skills: SkillInfo[]): string {
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`
 }
 
-function extractSkillBody(skill: LoadedSkill): string {
+async function extractSkillBody(skill: LoadedSkill): Promise<string> {
+  if (skill.lazyContent) {
+    const fullTemplate = await skill.lazyContent.load()
+    const templateMatch = fullTemplate.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
+    return templateMatch ? templateMatch[1].trim() : fullTemplate
+  }
+
   if (skill.path) {
     const content = readFileSync(skill.path, "utf-8")
     const { body } = parseFrontmatter(content)
@@ -145,7 +151,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         throw new Error(`Skill "${args.name}" not found. Available skills: ${available || "none"}`)
       }
 
-      const body = extractSkillBody(skill)
+      const body = await extractSkillBody(skill)
       const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
 
       const output = [
