@@ -8,6 +8,13 @@ import { getClaudeConfigDir } from "../../shared"
 
 const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 
+interface CachedClaudeTranscript {
+  path: string
+  lastUsed: number
+}
+
+const cachedClaudeTranscripts = new Map<string, CachedClaudeTranscript>()
+
 export function getTranscriptPath(sessionId: string): string {
   return join(TRANSCRIPT_DIR, `${sessionId}.jsonl`)
 }
@@ -116,6 +123,65 @@ interface DisabledTranscriptEntry {
   }
 }
 
+function formatClaudeToolUseEntry(toolName: string, toolInput: Record<string, unknown>): string {
+  const entry: DisabledTranscriptEntry = {
+    type: "assistant",
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool_use",
+          name: transformToolName(toolName),
+          input: toolInput,
+        },
+      ],
+    },
+  }
+  return JSON.stringify(entry)
+}
+
+export function clearCachedClaudeTranscript(sessionId: string): void {
+  const cached = cachedClaudeTranscripts.get(sessionId)
+  if (cached) {
+    deleteTempTranscript(cached.path)
+    cachedClaudeTranscripts.delete(sessionId)
+  }
+}
+
+export async function getPostToolUseTranscriptPath(params: {
+  client: {
+    session: {
+      messages: (opts: { path: { id: string }; query?: { directory: string } }) => Promise<unknown>
+    }
+  }
+  sessionId: string
+  directory: string
+  toolName: string
+  toolInput: Record<string, unknown>
+}): Promise<string | null> {
+  const cached = cachedClaudeTranscripts.get(params.sessionId)
+  if (cached && existsSync(cached.path)) {
+    appendFileSync(cached.path, formatClaudeToolUseEntry(params.toolName, params.toolInput) + "\n")
+    cachedClaudeTranscripts.set(params.sessionId, { path: cached.path, lastUsed: Date.now() })
+    return cached.path
+  }
+
+  const path = await buildTranscriptFromSession(
+    params.client,
+    params.sessionId,
+    params.directory,
+    params.toolName,
+    params.toolInput
+  )
+
+  if (!path) {
+    return null
+  }
+
+  cachedClaudeTranscripts.set(params.sessionId, { path, lastUsed: Date.now() })
+  return path
+}
+
 /**
  * Build Claude Code compatible transcript from session messages
  * 
@@ -163,41 +229,13 @@ export async function buildTranscriptFromSession(
           if (!part.state?.input) continue
 
           const rawToolName = part.tool as string
-          const toolName = transformToolName(rawToolName)
-
-          const entry: DisabledTranscriptEntry = {
-            type: "assistant",
-            message: {
-              role: "assistant",
-              content: [
-                {
-                  type: "tool_use",
-                  name: toolName,
-                  input: part.state.input,
-                },
-              ],
-            },
-          }
-          entries.push(JSON.stringify(entry))
+          entries.push(formatClaudeToolUseEntry(rawToolName, part.state.input))
         }
       }
     }
 
     // Always add current tool call as the last entry
-    const currentEntry: DisabledTranscriptEntry = {
-      type: "assistant",
-      message: {
-        role: "assistant",
-        content: [
-          {
-            type: "tool_use",
-            name: transformToolName(currentToolName),
-            input: currentToolInput,
-          },
-        ],
-      },
-    }
-    entries.push(JSON.stringify(currentEntry))
+    entries.push(formatClaudeToolUseEntry(currentToolName, currentToolInput))
 
     // Write to temp file
     const tempPath = join(
