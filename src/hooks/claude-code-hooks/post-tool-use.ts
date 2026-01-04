@@ -152,7 +152,8 @@ export async function executePostToolUseHooks(
               systemMessage: output.systemMessage,
             }
           }
-        } catch {
+        } catch (e) {
+          log("warn", "Failed to parse hook output JSON", e)
         }
       } else if (result.exitCode !== 0 && result.exitCode !== 2) {
         try {
