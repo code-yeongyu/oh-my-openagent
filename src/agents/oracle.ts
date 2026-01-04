@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "openai/gpt-5.2"
 
@@ -97,22 +98,28 @@ Organize your final answer in three tiers:
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`
 
 export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  const restrictions = createAgentToolRestrictions([
+    "write",
+    "edit",
+    "task",
+    "background_task",
+  ])
+
   const base = {
     description:
       "Expert technical advisor with deep reasoning for architecture decisions, code analysis, and engineering guidance.",
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, task: false, background_task: false },
-    permission: { edit: "deny" as const },
+    ...restrictions,
     prompt: ORACLE_SYSTEM_PROMPT,
-  }
+  } as AgentConfig
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium", textVerbosity: "high" }
+    return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
 
 export const oracleAgent = createOracleAgent()
