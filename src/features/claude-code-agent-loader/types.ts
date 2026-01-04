@@ -15,6 +15,8 @@ export interface AgentFrontmatter {
     edit?: "ask" | "allow" | "deny"
     bash?: "ask" | "allow" | "deny" | Record<string, "ask" | "allow" | "deny">
     webfetch?: "ask" | "allow" | "deny"
+    doom_loop?: "ask" | "allow" | "deny"
+    external_directory?: "ask" | "allow" | "deny"
   }
 }
 
