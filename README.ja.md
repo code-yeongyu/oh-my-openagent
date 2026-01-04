@@ -297,7 +297,7 @@ opencode auth login
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.1.2"
+    "opencode-antigravity-auth@1.2.7"
   ]
 }
 ```
@@ -345,7 +345,7 @@ opencode auth login
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth@4.1.1"
+    "opencode-openai-codex-auth@4.2.0"
   ]
 }
 ```
