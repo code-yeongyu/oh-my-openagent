@@ -103,7 +103,7 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, task: false, background_task: false },
+    permission: { write: "deny", edit: "deny", task: "deny", background_task: "deny" },
     prompt: ORACLE_SYSTEM_PROMPT,
   }
 
