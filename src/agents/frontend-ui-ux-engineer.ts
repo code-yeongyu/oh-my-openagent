@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "google/gemini-3-pro-preview"
 
@@ -21,12 +22,14 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
 export function createFrontendUiUxEngineerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
+  const restrictions = createAgentToolRestrictions(["background_task"])
+
   return {
     description:
       "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
     mode: "subagent" as const,
     model,
-    tools: { background_task: false },
+    ...restrictions,
     prompt: `# Role: Designer-Turned-Developer
 
 You are a designer who learned to code. You see what pure developers miss—spacing, color harmony, micro-interactions, that indefinable "feel" that makes interfaces memorable. Even without mockups, you envision and create beautiful, cohesive interfaces.

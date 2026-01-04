@@ -21,6 +21,7 @@ import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
+import { migrateAgentConfig } from "../shared/permission-compat";
 import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "../agents/plan-prompt";
 import type { ModelCacheState } from "../plugin-state";
 
@@ -95,13 +96,32 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       config.model as string | undefined
     );
 
-    const userAgents = (pluginConfig.claude_code?.agents ?? true)
+    const rawUserAgents = (pluginConfig.claude_code?.agents ?? true)
       ? loadUserAgents()
       : {};
-    const projectAgents = (pluginConfig.claude_code?.agents ?? true)
+    const rawProjectAgents = (pluginConfig.claude_code?.agents ?? true)
       ? loadProjectAgents()
       : {};
-    const pluginAgents = pluginComponents.agents;
+    const rawPluginAgents = pluginComponents.agents;
+
+    const userAgents = Object.fromEntries(
+      Object.entries(rawUserAgents).map(([k, v]) => [
+        k,
+        v ? migrateAgentConfig(v as Record<string, unknown>) : v,
+      ])
+    );
+    const projectAgents = Object.fromEntries(
+      Object.entries(rawProjectAgents).map(([k, v]) => [
+        k,
+        v ? migrateAgentConfig(v as Record<string, unknown>) : v,
+      ])
+    );
+    const pluginAgents = Object.fromEntries(
+      Object.entries(rawPluginAgents).map(([k, v]) => [
+        k,
+        v ? migrateAgentConfig(v as Record<string, unknown>) : v,
+      ])
+    );
 
     const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
     const builderEnabled =
@@ -162,15 +182,20 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           : plannerSisyphusBase;
       }
 
-      const filteredConfigAgents = configAgent
-        ? Object.fromEntries(
-            Object.entries(configAgent).filter(([key]) => {
+    const filteredConfigAgents = configAgent
+      ? Object.fromEntries(
+          Object.entries(configAgent)
+            .filter(([key]) => {
               if (key === "build") return false;
               if (key === "plan" && replacePlan) return false;
               return true;
             })
-          )
-        : {};
+            .map(([key, value]) => [
+              key,
+              value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+            ])
+        )
+      : {};
 
       config.agent = {
         ...agentConfig,
