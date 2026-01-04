@@ -30,7 +30,8 @@ export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    permission: { write: "deny", edit: "deny", background_task: "deny" },
+    tools: { write: false, background_task: false },
+    permission: { edit: "deny" as const },
     prompt: `You are a codebase search specialist. Your job: find files and code, return actionable results.
 
 ## Your Mission

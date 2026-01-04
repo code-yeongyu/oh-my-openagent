@@ -20,7 +20,7 @@ export function createDocumentWriterAgent(
       "A technical writer who crafts clear, comprehensive documentation. Specializes in README files, API docs, architecture docs, and user guides. MUST BE USED when executing documentation tasks from ai-todo list plans.",
     mode: "subagent" as const,
     model,
-    permission: { background_task: "deny" },
+    tools: { background_task: false },
     prompt: `<role>
 You are a TECHNICAL WRITER with deep engineering background who transforms complex codebases into crystal-clear documentation. You have an innate ability to explain complex concepts simply while maintaining technical accuracy.
 
