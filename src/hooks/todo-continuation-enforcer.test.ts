@@ -367,6 +367,48 @@ describe("todo-continuation-enforcer", () => {
     expect(toastCalls[0].message).toContain("2s")
   })
 
+  test("should include remaining todo list in continuation prompt", async () => {
+    // #given - session with multiple incomplete todos
+    const sessionID = "main-todo-list"
+    setMainSession(sessionID)
+
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Fix authentication bug", status: "pending", priority: "high" },
+      { id: "2", content: "Add unit tests", status: "in_progress", priority: "medium" },
+      { id: "3", content: "Update documentation", status: "completed", priority: "low" },
+      { id: "4", content: "Review code changes", status: "pending", priority: "high" },
+    ]})
+
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // #when - session goes idle and countdown completes
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await new Promise(r => setTimeout(r, 2500))
+
+    // #then - continuation prompt should include the remaining todo items
+    expect(promptCalls.length).toBe(1)
+    const promptText = promptCalls[0].text
+    
+    // Should contain status summary
+    expect(promptText).toContain("[Status: 1/4 completed, 3 remaining]")
+    
+    // Should contain remaining todos section
+    expect(promptText).toContain("Remaining Tasks:")
+    
+    // Should list pending tasks with content
+    expect(promptText).toContain("Fix authentication bug")
+    expect(promptText).toContain("Add unit tests")
+    expect(promptText).toContain("Review code changes")
+    
+    // Should NOT include completed task
+    expect(promptText).not.toContain("Update documentation")
+  })
+
   test("should not have 10s throttle between injections", async () => {
     // #given - new hook instance (no prior state)
     const sessionID = "main-no-throttle"

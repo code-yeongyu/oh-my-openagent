@@ -85,6 +85,23 @@ function isLastAssistantMessageAborted(messages: Array<{ info?: MessageInfo }>):
   return errorName === "MessageAbortedError" || errorName === "AbortError"
 }
 
+function getIncompleteTodos(todos: Todo[]): Todo[] {
+  return todos.filter(t => t.status !== "completed" && t.status !== "cancelled")
+}
+
+function formatRemainingTodos(todos: Todo[]): string {
+  const incompleteTodos = getIncompleteTodos(todos)
+  if (incompleteTodos.length === 0) return ""
+  
+  const lines = incompleteTodos.map((todo, idx) => {
+    const statusIndicator = todo.status === "in_progress" ? "🔄" : "⏳"
+    const priorityLabel = todo.priority === "high" ? "[HIGH]" : todo.priority === "medium" ? "[MED]" : "[LOW]"
+    return `  ${idx + 1}. ${statusIndicator} ${priorityLabel} ${todo.content}`
+  })
+  
+  return `\n\nRemaining Tasks:\n${lines.join("\n")}`
+}
+
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
@@ -198,7 +215,7 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
+    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]${formatRemainingTodos(todos)}`
 
     const modelField = prevMessage?.model?.providerID && prevMessage?.model?.modelID
       ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
