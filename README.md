@@ -687,7 +687,8 @@ Disable specific Claude Code compatibility features with the `claude_code` confi
     "commands": false,
     "skills": false,
     "agents": false,
-    "hooks": false
+    "hooks": false,
+    "plugins": false
   }
 }
 ```
@@ -699,8 +700,24 @@ Disable specific Claude Code compatibility features with the `claude_code` confi
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | Built-in agents (oracle, librarian, etc.)             |
 | `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+| `plugins`  | `~/.claude/plugins/` (Claude Code marketplace plugins)                                | -                                                     |
 
 All toggles default to `true` (enabled). Omit the `claude_code` object for full Claude Code compatibility.
+
+**Selectively disable specific plugins** using `plugins_override`:
+
+```json
+{
+  "claude_code": {
+    "plugins_override": {
+      "claude-mem@thedotmack": false,
+      "some-other-plugin@marketplace": false
+    }
+  }
+}
+```
+
+This allows you to keep the plugin system enabled while disabling specific plugins by their full identifier (`plugin-name@marketplace-name`).
 
 ### Not Just for the Agents
 
