@@ -60,13 +60,17 @@ export async function executePostToolUseHooks(
 
   // Try to build full transcript from API if client available
   if (ctx.client) {
-    transcriptPath = await getPostToolUseTranscriptPath({
-      client: ctx.client,
-      sessionId: ctx.sessionId,
-      directory: ctx.cwd,
-      toolName: ctx.toolName,
-      toolInput: ctx.toolInput,
-    }) ?? transcriptPath
+    try {
+      transcriptPath = await getPostToolUseTranscriptPath({
+        client: ctx.client,
+        sessionId: ctx.sessionId,
+        directory: ctx.cwd,
+        toolName: ctx.toolName,
+        toolInput: ctx.toolInput,
+      }) ?? transcriptPath
+    } catch (error) {
+      log(`Failed to get transcript path, using fallback: ${error}`)
+    }
   }
 
   const stdinData: PostToolUseInput = {
