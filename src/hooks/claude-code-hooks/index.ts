@@ -28,6 +28,7 @@ import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage }
 import type { PluginConfig } from "./types"
 import { log, isHookDisabled } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
+import { detectKeywordsWithType, removeCodeBlocks } from "../keyword-detector"
 
 const sessionFirstMessageProcessed = new Set<string>()
 const sessionErrorState = new Map<string, { hasError: boolean; errorMessage?: string }>()
@@ -137,9 +138,21 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
           return
         }
 
-        if (result.messages.length > 0) {
-          const hookContent = result.messages.join("\n\n")
-          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
+        const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt))
+        const keywordMessages = detectedKeywords.map((k) => k.message)
+
+        if (keywordMessages.length > 0) {
+          log("[claude-code-hooks] Detected keywords", {
+            sessionID: input.sessionID,
+            types: detectedKeywords.map((k) => k.type),
+          })
+        }
+
+        const allMessages = [...keywordMessages, ...result.messages]
+
+        if (allMessages.length > 0) {
+          const hookContent = allMessages.join("\n\n")
+          log(`[claude-code-hooks] Injecting ${allMessages.length} messages (${keywordMessages.length} keyword + ${result.messages.length} hook)`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
 
           if (isFirstMessage) {
             const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
