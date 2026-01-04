@@ -8,7 +8,7 @@ import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlink, isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
-import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
+import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
 
 function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
@@ -67,7 +67,7 @@ function loadSkillFromPath(
 ): LoadedSkill | null {
   try {
     const content = readFileSync(skillPath, "utf-8")
-    const { data, body } = parseFrontmatter<SkillMetadata>(content)
+    const { data } = parseFrontmatter<SkillMetadata>(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -77,7 +77,15 @@ function loadSkillFromPath(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
-    const wrappedTemplate = `<skill-instruction>
+    // Lazy content loader - only loads template on first use
+    const lazyContent: LazyContentLoader = {
+      loaded: false,
+      content: undefined,
+      load: async () => {
+        if (!lazyContent.loaded) {
+          const fileContent = await fs.readFile(skillPath, "utf-8")
+          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
+          lazyContent.content = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -87,11 +95,16 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
+          lazyContent.loaded = true
+        }
+        return lazyContent.content!
+      },
+    }
 
     const definition: CommandDefinition = {
       name: skillName,
       description: formattedDescription,
-      template: wrappedTemplate,
+      template: "", // Empty at startup, loaded lazily
       model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
       agent: data.agent,
       subtask: data.subtask,
@@ -109,6 +122,7 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
+      lazyContent,
     }
   } catch {
     return null
@@ -123,7 +137,7 @@ async function loadSkillFromPathAsync(
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
-    const { data, body } = parseFrontmatter<SkillMetadata>(content)
+    const { data } = parseFrontmatter<SkillMetadata>(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -133,7 +147,14 @@ async function loadSkillFromPathAsync(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
-    const wrappedTemplate = `<skill-instruction>
+    const lazyContent: LazyContentLoader = {
+      loaded: false,
+      content: undefined,
+      load: async () => {
+        if (!lazyContent.loaded) {
+          const fileContent = await fs.readFile(skillPath, "utf-8")
+          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
+          lazyContent.content = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -143,11 +164,16 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
+          lazyContent.loaded = true
+        }
+        return lazyContent.content!
+      },
+    }
 
     const definition: CommandDefinition = {
       name: skillName,
       description: formattedDescription,
-      template: wrappedTemplate,
+      template: "",
       model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
       agent: data.agent,
       subtask: data.subtask,
@@ -165,6 +191,7 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
+      lazyContent,
     }
   } catch {
     return null
