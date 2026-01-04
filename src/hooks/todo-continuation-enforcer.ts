@@ -95,7 +95,14 @@ function formatRemainingTodos(todos: Todo[]): string {
   
   const lines = incompleteTodos.map((todo, idx) => {
     const statusIndicator = todo.status === "in_progress" ? "🔄" : "⏳"
-    const priorityLabel = todo.priority === "high" ? "[HIGH]" : todo.priority === "medium" ? "[MED]" : "[LOW]"
+    const priorityLabel =
+      todo.priority === "high"
+        ? "[HIGH]"
+        : todo.priority === "medium"
+          ? "[MED]"
+          : todo.priority === "low"
+            ? "[LOW]"
+            : "[NONE]"
     return `  ${idx + 1}. ${statusIndicator} ${priorityLabel} ${todo.content}`
   })
   

@@ -407,6 +407,59 @@ describe("todo-continuation-enforcer", () => {
     
     // Should NOT include completed task
     expect(promptText).not.toContain("Update documentation")
+    
+    // Should include status indicators (🔄 for in_progress, ⏳ for pending)
+    expect(promptText).toContain("🔄")
+    expect(promptText).toContain("⏳")
+    
+    // Should include priority labels with correct format
+    expect(promptText).toContain("[HIGH]")
+    expect(promptText).toContain("[MED]")
+    
+    // Should have complete formatted entries
+    expect(promptText).toContain("🔄 [MED] Add unit tests")
+    expect(promptText).toContain("⏳ [HIGH] Fix authentication bug")
+    expect(promptText).toContain("⏳ [HIGH] Review code changes")
+  })
+
+  test("should handle undefined priority gracefully", async () => {
+    // #given - session with todos that have undefined/missing priority
+    const sessionID = "main-undefined-priority"
+    setMainSession(sessionID)
+
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Task with no priority", status: "pending", priority: undefined },
+      { id: "2", content: "Task with null priority", status: "pending", priority: null },
+      { id: "3", content: "Task with empty priority", status: "in_progress", priority: "" },
+      { id: "4", content: "Normal high priority", status: "pending", priority: "high" },
+    ]})
+
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // #when - session goes idle and countdown completes
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await new Promise(r => setTimeout(r, 2500))
+
+    // #then - should handle undefined priority with [NONE] label
+    expect(promptCalls.length).toBe(1)
+    const promptText = promptCalls[0].text
+    
+    // Should contain all tasks
+    expect(promptText).toContain("Task with no priority")
+    expect(promptText).toContain("Task with null priority")
+    expect(promptText).toContain("Task with empty priority")
+    expect(promptText).toContain("Normal high priority")
+    
+    // Should have [NONE] for undefined/null/empty priorities
+    expect(promptText).toContain("[NONE]")
+    
+    // Should still have [HIGH] for the normal priority task
+    expect(promptText).toContain("[HIGH]")
   })
 
   test("should not have 10s throttle between injections", async () => {
