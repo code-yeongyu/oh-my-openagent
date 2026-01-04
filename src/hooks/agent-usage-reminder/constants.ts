@@ -26,6 +26,9 @@ export const AGENT_TOOLS = new Set([
   "background_task",
 ]);
 
+// Remind again after this many direct tool calls without using agents
+export const DIRECT_TOOL_CALLS_BEFORE_REMINDER = 5;
+
 export const REMINDER_MESSAGE = `
 [Agent Usage Reminder]
 
@@ -50,4 +53,19 @@ WHY:
 - Reduces context window usage in main session
 
 ALWAYS prefer: Multiple parallel background_task calls > Direct tool calls
+`;
+
+export const IMPLEMENTATION_PHASE_REMINDER = `
+[Parallelism Reminder - Implementation Phase]
+
+You're doing direct tool calls. Consider delegating to background agents:
+
+\`\`\`typescript
+// Instead of sequential work, PARALLELIZE:
+background_task(agent="frontend-ui-ux-engineer", prompt="Build the UI...")
+background_task(agent="document-writer", prompt="Write the docs...")
+// Meanwhile YOU work on core logic
+\`\`\`
+
+**Ask before each task**: Can a specialist agent handle this while I work on something else?
 `;

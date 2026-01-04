@@ -4,7 +4,13 @@ import {
   saveAgentUsageState,
   clearAgentUsageState,
 } from "./storage";
-import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
+import {
+  TARGET_TOOLS,
+  AGENT_TOOLS,
+  REMINDER_MESSAGE,
+  IMPLEMENTATION_PHASE_REMINDER,
+  DIRECT_TOOL_CALLS_BEFORE_REMINDER,
+} from "./constants";
 import type { AgentUsageState } from "./types";
 
 interface ToolExecuteInput {
@@ -37,6 +43,8 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
         agentUsed: false,
         reminderCount: 0,
         updatedAt: Date.now(),
+        lastAgentUseAt: 0,
+        directToolCallsSinceAgent: 0,
       };
       sessionStates.set(sessionID, state);
     }
@@ -46,6 +54,8 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
   function markAgentUsed(sessionID: string): void {
     const state = getOrCreateState(sessionID);
     state.agentUsed = true;
+    state.lastAgentUseAt = Date.now();
+    state.directToolCallsSinceAgent = 0;
     state.updatedAt = Date.now();
     saveAgentUsageState(state);
   }
@@ -73,13 +83,26 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
 
     const state = getOrCreateState(sessionID);
 
-    if (state.agentUsed) {
+    // First time: never used agents - show full reminder
+    if (!state.agentUsed) {
+      output.output += REMINDER_MESSAGE;
+      state.reminderCount++;
+      state.updatedAt = Date.now();
+      saveAgentUsageState(state);
       return;
     }
 
-    output.output += REMINDER_MESSAGE;
-    state.reminderCount++;
+    // Has used agents before - track direct calls and remind periodically
+    state.directToolCallsSinceAgent++;
     state.updatedAt = Date.now();
+
+    // Remind again after N direct tool calls without using agents
+    if (state.directToolCallsSinceAgent >= DIRECT_TOOL_CALLS_BEFORE_REMINDER) {
+      output.output += IMPLEMENTATION_PHASE_REMINDER;
+      state.reminderCount++;
+      state.directToolCallsSinceAgent = 0;
+    }
+
     saveAgentUsageState(state);
   };
 

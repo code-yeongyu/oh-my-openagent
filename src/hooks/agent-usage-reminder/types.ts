@@ -3,4 +3,6 @@ export interface AgentUsageState {
   agentUsed: boolean;
   reminderCount: number;
   updatedAt: number;
+  lastAgentUseAt: number;
+  directToolCallsSinceAgent: number;
 }
