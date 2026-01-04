@@ -152,10 +152,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       if (builderEnabled) {
         const { name: _buildName, ...buildConfigWithoutName } =
           configAgent?.build ?? {};
+        const migratedBuildConfig = migrateAgentConfig(
+          buildConfigWithoutName as Record<string, unknown>
+        );
         const openCodeBuilderOverride =
           pluginConfig.agents?.["OpenCode-Builder"];
         const openCodeBuilderBase = {
-          ...buildConfigWithoutName,
+          ...migratedBuildConfig,
           description: `${configAgent?.build?.description ?? "Build agent"} (OpenCode default)`,
         };
 
@@ -167,10 +170,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       if (plannerEnabled) {
         const { name: _planName, ...planConfigWithoutName } =
           configAgent?.plan ?? {};
+        const migratedPlanConfig = migrateAgentConfig(
+          planConfigWithoutName as Record<string, unknown>
+        );
         const plannerSisyphusOverride =
           pluginConfig.agents?.["Planner-Sisyphus"];
         const plannerSisyphusBase = {
-          ...planConfigWithoutName,
+          ...migratedPlanConfig,
+          mode: "primary",
           prompt: PLAN_SYSTEM_PROMPT,
           permission: PLAN_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
@@ -197,6 +204,25 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         )
       : {};
 
+      const migratedBuild = configAgent?.build
+        ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
+        : {};
+      const migratedPlan = configAgent?.plan
+        ? migrateAgentConfig(configAgent.plan as Record<string, unknown>)
+        : {};
+
+      const planDemoteConfig = replacePlan
+        ? { disable: true }
+        : undefined;
+      
+      log("DEBUG plan demotion", {
+        replacePlan,
+        plannerEnabled,
+        hasPlannerSisyphus: !!agentConfig["Planner-Sisyphus"],
+        planDemoteConfig,
+        configAgentPlan: configAgent?.plan,
+      });
+
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
@@ -206,10 +232,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
-        build: { ...configAgent?.build, mode: "subagent" },
-        ...(replacePlan
-          ? { plan: { ...configAgent?.plan, mode: "subagent" } }
-          : {}),
+        build: { ...migratedBuild, mode: "subagent", hidden: true },
+        ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
       config.agent = {
