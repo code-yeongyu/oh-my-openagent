@@ -3,17 +3,23 @@ import { join, basename } from "path"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir, getOpenCodeConfigDir, log } from "../../shared"
 import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
 
-function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
-  if (!toolsStr) return undefined
+function parseToolsConfig(tools?: string | Record<string, boolean>): Record<string, boolean> | undefined {
+  if (!tools) return undefined
 
-  const tools = toolsStr.split(",").map((t) => t.trim()).filter(Boolean)
-  if (tools.length === 0) return undefined
+  // Handle object format: { tool1: true, tool2: false }
+  if (typeof tools === "object") {
+    return tools
+  }
+
+  // Handle string format: "tool1, tool2, tool3"
+  const toolList = tools.split(",").map((t) => t.trim()).filter(Boolean)
+  if (toolList.length === 0) return undefined
 
   const result: Record<string, boolean> = {}
-  for (const tool of tools) {
+  for (const tool of toolList) {
     result[tool.toLowerCase()] = true
   }
   return result
@@ -21,10 +27,15 @@ function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefine
 
 function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] {
   if (!existsSync(agentsDir)) {
+    log("loadAgentsFromDir: directory does not exist", { agentsDir })
     return []
   }
 
   const entries = readdirSync(agentsDir, { withFileTypes: true })
+  log("loadAgentsFromDir: found entries", { 
+    agentsDir, 
+    entries: entries.map(e => ({ name: e.name, isFile: e.isFile() }))
+  })
   const agents: LoadedAgent[] = []
 
   for (const entry of entries) {
@@ -69,13 +80,15 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
         config.tools = toolsConfig
       }
 
+      log("loadAgentsFromDir: parsed agent successfully", { name, agentPath })
       agents.push({
         name,
         path: agentPath,
         config,
         scope,
       })
-    } catch {
+    } catch (err) {
+      log("loadAgentsFromDir: ERROR parsing agent", { agentPath, error: String(err) })
       continue
     }
   }
@@ -84,22 +97,45 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 }
 
 export function loadUserAgents(): Record<string, AgentConfig> {
-  const userAgentsDir = join(getClaudeConfigDir(), "agents")
-  const agents = loadAgentsFromDir(userAgentsDir, "user")
+  // OpenCode uses ~/.config/opencode/agent (singular)
+  const opencodeAgentsDir = join(getOpenCodeConfigDir({ binary: "opencode" }), "agent")
+  // Claude Code uses ~/.claude/agents (plural)
+  const claudeAgentsDir = join(getClaudeConfigDir(), "agents")
+  
+  log("loadUserAgents searching directories", { opencodeAgentsDir, claudeAgentsDir })
+  
+  // Load from both locations, OpenCode takes precedence
+  const opencodeAgents = loadAgentsFromDir(opencodeAgentsDir, "user")
+  const claudeAgents = loadAgentsFromDir(claudeAgentsDir, "user")
+  
+  log("loadUserAgents found agents", { 
+    opencode: opencodeAgents.map(a => a.name), 
+    claude: claudeAgents.map(a => a.name) 
+  })
 
   const result: Record<string, AgentConfig> = {}
-  for (const agent of agents) {
+  // Claude agents first, so OpenCode agents can override
+  for (const agent of claudeAgents) {
+    result[agent.name] = agent.config
+  }
+  for (const agent of opencodeAgents) {
     result[agent.name] = agent.config
   }
   return result
 }
 
 export function loadProjectAgents(): Record<string, AgentConfig> {
-  const projectAgentsDir = join(process.cwd(), ".claude", "agents")
-  const agents = loadAgentsFromDir(projectAgentsDir, "project")
+  const opencodeProjectAgentsDir = join(process.cwd(), ".opencode", "agent")
+  const claudeProjectAgentsDir = join(process.cwd(), ".claude", "agents")
+  
+  const opencodeAgents = loadAgentsFromDir(opencodeProjectAgentsDir, "project")
+  const claudeAgents = loadAgentsFromDir(claudeProjectAgentsDir, "project")
 
   const result: Record<string, AgentConfig> = {}
-  for (const agent of agents) {
+  for (const agent of claudeAgents) {
+    result[agent.name] = agent.config
+  }
+  for (const agent of opencodeAgents) {
     result[agent.name] = agent.config
   }
   return result

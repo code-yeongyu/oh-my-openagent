@@ -1,5 +1,8 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgent } from "../agents/sisyphus-junior";
+import type { AgentConfig as SDKAgentConfig } from "@opencode-ai/sdk";
+import type { AgentOverrides, AgentOverrideConfig } from "../config";
+import { deepMerge } from "../shared";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -32,10 +35,48 @@ export interface ConfigHandlerDeps {
   modelCacheState: ModelCacheState;
 }
 
+/**
+ * Applies agent overrides from oh-my-opencode.json to external agents
+ * (user agents, project agents, plugin agents).
+ * This enables configuring models for agents defined outside of oh-my-opencode.
+ */
+function applyAgentOverrides(
+  agents: Record<string, SDKAgentConfig>,
+  overrides: AgentOverrides
+): Record<string, SDKAgentConfig> {
+  const result: Record<string, SDKAgentConfig> = {};
+
+  log("applyAgentOverrides called", { 
+    agentNames: Object.keys(agents), 
+    overrideNames: Object.keys(overrides) 
+  });
+
+  for (const [name, config] of Object.entries(agents)) {
+    const override = overrides[name];
+    if (override) {
+      log(`Applying override for agent: ${name}`, { override });
+      const { prompt_append, ...rest } = override;
+      const merged = deepMerge(config, rest as Partial<SDKAgentConfig>);
+
+      if (prompt_append && merged.prompt) {
+        merged.prompt = merged.prompt + "\n" + prompt_append;
+      }
+
+      result[name] = merged;
+    } else {
+      result[name] = config;
+    }
+  }
+
+  return result;
+}
+
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState } = deps;
 
   return async (config: Record<string, unknown>) => {
+    log("CONFIG HANDLER CALLED", { agents: pluginConfig.agents });
+    
     type ProviderConfig = {
       options?: { headers?: Record<string, string> };
       models?: Record<string, { limit?: { context?: number } }>;
@@ -97,24 +138,27 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       config.model as string | undefined
     );
 
+    const agentOverrides = pluginConfig.agents ?? {};
+
     // Claude Code agents: Do NOT apply permission migration
     // Claude Code uses whitelist-based tools format which is semantically different
     // from OpenCode's denylist-based permission system
     const userAgents = (pluginConfig.claude_code?.agents ?? true)
-      ? loadUserAgents()
+      ? applyAgentOverrides(loadUserAgents(), agentOverrides)
       : {};
     const projectAgents = (pluginConfig.claude_code?.agents ?? true)
-      ? loadProjectAgents()
+      ? applyAgentOverrides(loadProjectAgents(), agentOverrides)
       : {};
 
     // Plugin agents: Apply permission migration for compatibility
     const rawPluginAgents = pluginComponents.agents;
-    const pluginAgents = Object.fromEntries(
+    const pluginAgentsWithMigration = Object.fromEntries(
       Object.entries(rawPluginAgents).map(([k, v]) => [
         k,
         v ? migrateAgentConfig(v as Record<string, unknown>) : v,
       ])
     );
+    const pluginAgents = applyAgentOverrides(pluginAgentsWithMigration, agentOverrides);
 
     const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
     const builderEnabled =
@@ -208,6 +252,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
+      log("DEBUG merge order", {
+        userAgentsConductorModel: (userAgents.conductor as Record<string, unknown>)?.model,
+        filteredConfigAgentsConductor: !!filteredConfigAgents.conductor,
+        filteredConfigAgentsConductorModel: (filteredConfigAgents.conductor as Record<string, unknown>)?.model,
+      });
+
       const planDemoteConfig = replacePlan
         ? { mode: "subagent" as const, hidden: true }
         : undefined;
@@ -217,24 +267,29 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")
         ),
+        ...filteredConfigAgents,
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
-        ...filteredConfigAgents,
         build: { ...migratedBuild, mode: "subagent", hidden: true },
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
       config.agent = {
         ...builtinAgents,
+        ...configAgent,
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
-        ...configAgent,
       };
     }
 
     const agentResult = config.agent as AgentConfig;
+
+    log("FINAL config.agent conductor", { 
+      conductor: agentResult.conductor,
+      hasModel: !!(agentResult.conductor as Record<string, unknown>)?.model 
+    });
 
     config.tools = {
       ...(config.tools as Record<string, unknown>),

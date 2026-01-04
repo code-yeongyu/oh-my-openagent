@@ -327,14 +327,18 @@ $ARGUMENTS
   return skills
 }
 
-function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
-  if (!toolsStr) return undefined
+function parseToolsConfig(tools?: string | Record<string, boolean>): Record<string, boolean> | undefined {
+  if (!tools) return undefined
 
-  const tools = toolsStr.split(",").map((t) => t.trim()).filter(Boolean)
-  if (tools.length === 0) return undefined
+  if (typeof tools === "object") {
+    return tools
+  }
+
+  const toolList = tools.split(",").map((t) => t.trim()).filter(Boolean)
+  if (toolList.length === 0) return undefined
 
   const result: Record<string, boolean> = {}
-  for (const tool of tools) {
+  for (const tool of toolList) {
     result[tool.toLowerCase()] = true
   }
   return result
