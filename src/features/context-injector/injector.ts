@@ -1,6 +1,7 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import { log } from "../../shared"
+import { detectKeywordsWithType, extractPromptText } from "../../hooks/keyword-detector"
 
 interface OutputPart {
   type: string
@@ -83,22 +84,6 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const lastMessage = messages[messages.length - 1]
-      const sessionID = (lastMessage.info as unknown as { sessionID?: string }).sessionID
-      if (!sessionID) {
-        log("[context-injector] messages.transform: no sessionID on last message")
-        return
-      }
-
-      const hasPending = collector.hasPending(sessionID)
-      log("[context-injector] messages.transform check", {
-        sessionID,
-        hasPending,
-        messageCount: messages.length,
-      })
-
-      if (!hasPending) return
-
       let lastUserMessageIndex = -1
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].info.role === "user") {
@@ -112,14 +97,45 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const pending = collector.consume(sessionID)
-      if (!pending.hasContent) {
-        log("[context-injector] messages.transform: pending was empty")
+      const lastUserMessage = messages[lastUserMessageIndex]
+      const sessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
+      if (!sessionID) {
+        log("[context-injector] messages.transform: no sessionID on last user message")
         return
       }
 
-      const refMessage = messages[lastUserMessageIndex]
-      const refInfo = refMessage.info as unknown as {
+      const userParts = lastUserMessage.parts as Array<{ type: string; text?: string }>
+      const promptText = extractPromptText(userParts)
+      const detectedKeywords = detectKeywordsWithType(promptText)
+      const hasPendingFromCollector = collector.hasPending(sessionID)
+
+      log("[context-injector] messages.transform check", {
+        sessionID,
+        detectedKeywords: detectedKeywords.map((k) => k.type),
+        hasPendingFromCollector,
+        messageCount: messages.length,
+      })
+
+      const contextParts: string[] = []
+
+      for (const keyword of detectedKeywords) {
+        contextParts.push(keyword.message)
+      }
+
+      if (hasPendingFromCollector) {
+        const pending = collector.consume(sessionID)
+        if (pending.hasContent) {
+          contextParts.push(pending.merged)
+        }
+      }
+
+      if (contextParts.length === 0) {
+        return
+      }
+
+      const mergedContext = contextParts.join("\n\n")
+
+      const refInfo = lastUserMessage.info as unknown as {
         sessionID?: string
         agent?: string
         model?: { providerID?: string; modelID?: string }
@@ -146,7 +162,7 @@ export function createContextInjectorMessagesTransformHook(
             sessionID: sessionID,
             messageID: syntheticMessageId,
             type: "text",
-            text: pending.merged,
+            text: mergedContext,
             synthetic: true,
             time: { start: now, end: now },
           } as Part,
@@ -158,7 +174,8 @@ export function createContextInjectorMessagesTransformHook(
       log("[context-injector] Injected synthetic message", {
         sessionID,
         insertIndex: lastUserMessageIndex,
-        contextLength: pending.merged.length,
+        contextLength: mergedContext.length,
+        keywordTypes: detectedKeywords.map((k) => k.type),
         newMessageCount: messages.length,
       })
     },

@@ -234,11 +234,11 @@ describe("createContextInjectorMessagesTransformHook", () => {
     expect(output.messages[3].parts[0].text).toBe("Second message")
   })
 
-  it("does nothing when no pending context", async () => {
+  it("does nothing when no pending context and no keywords", async () => {
     // #given
     const hook = createContextInjectorMessagesTransformHook(collector)
     const sessionID = "ses_transform2"
-    const messages = [createMockMessage("user", "Message", sessionID)]
+    const messages = [createMockMessage("user", "Hello world", sessionID)]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const output = { messages } as any
 
@@ -247,6 +247,63 @@ describe("createContextInjectorMessagesTransformHook", () => {
 
     // #then
     expect(output.messages.length).toBe(1)
+  })
+
+  it("injects synthetic message when user message contains ulw keyword", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_keyword"
+    const messages = [createMockMessage("user", "ulw do this task", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(2)
+    expect(output.messages[0].parts[0].synthetic).toBe(true)
+    expect(output.messages[0].parts[0].text).toContain("ultrawork")
+    expect(output.messages[1].parts[0].text).toBe("ulw do this task")
+  })
+
+  it("injects synthetic message when user message contains ultrawork keyword", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_ultrawork"
+    const messages = [createMockMessage("user", "ultrawork please", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(2)
+    expect(output.messages[0].parts[0].synthetic).toBe(true)
+  })
+
+  it("combines keyword context with collector context", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_combined"
+    collector.register(sessionID, {
+      id: "extra",
+      source: "custom",
+      content: "Extra context from collector",
+    })
+    const messages = [createMockMessage("user", "ulw combined test", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(2)
+    const syntheticText = output.messages[0].parts[0].text
+    expect(syntheticText).toContain("ultrawork")
+    expect(syntheticText).toContain("Extra context from collector")
   })
 
   it("does nothing when no user messages", async () => {
