@@ -78,7 +78,9 @@ export async function loadSkillFromPathAsync(
 ): Promise<LoadedSkill | null> {
   try {
     const content = await readFile(skillPath, "utf-8")
-    const { data, body } = parseFrontmatter<SkillMetadata>(content)
+    const { data, body, parseError } = parseFrontmatter<SkillMetadata>(content)
+    if (parseError) return null
+    
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDirAsync(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
