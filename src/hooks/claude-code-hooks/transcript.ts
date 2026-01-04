@@ -15,6 +15,18 @@ interface CachedClaudeTranscript {
 
 const cachedClaudeTranscripts = new Map<string, CachedClaudeTranscript>()
 
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+function evictStaleCacheEntries(): void {
+  const now = Date.now()
+  for (const [sessionId, cached] of cachedClaudeTranscripts) {
+    if (now - cached.lastUsed > CACHE_TTL_MS) {
+      deleteTempTranscript(cached.path)
+      cachedClaudeTranscripts.delete(sessionId)
+    }
+  }
+}
+
 export function getTranscriptPath(sessionId: string): string {
   return join(TRANSCRIPT_DIR, `${sessionId}.jsonl`)
 }
@@ -159,11 +171,17 @@ export async function getPostToolUseTranscriptPath(params: {
   toolName: string
   toolInput: Record<string, unknown>
 }): Promise<string | null> {
+  evictStaleCacheEntries()
+
   const cached = cachedClaudeTranscripts.get(params.sessionId)
-  if (cached && existsSync(cached.path)) {
-    appendFileSync(cached.path, formatClaudeToolUseEntry(params.toolName, params.toolInput) + "\n")
-    cachedClaudeTranscripts.set(params.sessionId, { path: cached.path, lastUsed: Date.now() })
-    return cached.path
+  if (cached) {
+    try {
+      appendFileSync(cached.path, formatClaudeToolUseEntry(params.toolName, params.toolInput) + "\n")
+      cachedClaudeTranscripts.set(params.sessionId, { path: cached.path, lastUsed: Date.now() })
+      return cached.path
+    } catch {
+      cachedClaudeTranscripts.delete(params.sessionId)
+    }
   }
 
   const path = await buildTranscriptFromSession(

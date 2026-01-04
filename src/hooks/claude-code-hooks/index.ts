@@ -24,7 +24,7 @@ import {
   type PreCompactContext,
 } from "./pre-compact"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
-import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
+import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage, clearCachedClaudeTranscript } from "./transcript"
 import type { PluginConfig } from "./types"
 import { log, isHookDisabled } from "../../shared"
 import type { ContextCollector } from "../../features/context-injector"
@@ -347,6 +347,7 @@ export function createClaudeCodeHooksHook(
           sessionErrorState.delete(sessionInfo.id)
           sessionInterruptState.delete(sessionInfo.id)
           sessionFirstMessageProcessed.delete(sessionInfo.id)
+          clearCachedClaudeTranscript(sessionInfo.id)
         }
         return
       }
