@@ -1,5 +1,9 @@
 export { ContextCollector, contextCollector } from "./collector"
-export { injectPendingContext, createContextInjectorHook } from "./injector"
+export {
+  injectPendingContext,
+  createContextInjectorHook,
+  createContextInjectorMessagesTransformHook,
+} from "./injector"
 export type {
   ContextSourceType,
   ContextPriority,

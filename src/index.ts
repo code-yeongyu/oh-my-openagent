@@ -30,6 +30,7 @@ import {
 import {
   contextCollector,
   createContextInjectorHook,
+  createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -138,6 +139,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createKeywordDetectorHook(ctx)
     : null;
   const contextInjector = createContextInjectorHook(contextCollector);
+  const contextInjectorMessagesTransform =
+    createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)
     : null;
@@ -315,6 +318,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       input: Record<string, never>,
       output: { messages: Array<{ info: unknown; parts: unknown[] }> }
     ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await contextInjectorMessagesTransform?.["experimental.chat.messages.transform"]?.(input, output as any);
       await thinkingBlockValidator?.[
         "experimental.chat.messages.transform"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
