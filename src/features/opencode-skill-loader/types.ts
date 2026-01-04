@@ -17,6 +17,12 @@ export interface SkillMetadata {
   mcp?: SkillMcpConfig
 }
 
+export interface LazyContentLoader {
+  loaded: boolean
+  content?: string
+  load: () => Promise<string>
+}
+
 export interface LoadedSkill {
   name: string
   path?: string
@@ -28,4 +34,5 @@ export interface LoadedSkill {
   metadata?: Record<string, string>
   allowedTools?: string[]
   mcpConfig?: SkillMcpConfig
+  lazyContent?: LazyContentLoader
 }
