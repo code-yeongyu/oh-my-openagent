@@ -156,7 +156,7 @@ export async function executePostToolUseHooks(
               }
             }
           } catch (e) {
-            log("PostToolUse", `Failed to parse hook output: ${e}`)
+            log(`PostToolUse: Failed to parse hook output: ${e}`)
           }
         } else if (result.exitCode !== 0 && result.exitCode !== 2) {
           try {

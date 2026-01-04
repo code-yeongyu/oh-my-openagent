@@ -20,7 +20,9 @@ function debugLog(...args: unknown[]) {
 const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
-const COMMENT_MARKERS = ["//", "/*", "*/", "#", "<!--", "-->", "'''", "\"\"\"", "-- "]
+// "--" may match CLI args (--help), but false positives are acceptable for gating.
+// False negatives (missing Lua/Haskell/Ada comments like --comment) are worse.
+const COMMENT_MARKERS = ["//", "/*", "*/", "#", "<!--", "-->", "'''", "\"\"\"", "--"]
 
 function hasCommentMarkers(value?: string): boolean {
   if (!value) {
