@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
 
@@ -13,13 +14,20 @@ export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
 export function createMultimodalLookerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
+  const restrictions = createAgentToolRestrictions([
+    "write",
+    "edit",
+    "bash",
+    "background_task",
+  ])
+
   return {
     description:
       "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, bash: false, background_task: false },
+    ...restrictions,
     prompt: `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.
