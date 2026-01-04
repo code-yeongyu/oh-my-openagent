@@ -15,7 +15,8 @@
         "enum": [
           "websearch_exa",
           "context7",
-          "grep_app"
+          "grep_app",
+          "answeroverflow"
         ]
       }
     },

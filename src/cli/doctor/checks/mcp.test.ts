@@ -9,12 +9,13 @@ describe("mcp check", () => {
       const servers = mcp.getBuiltinMcpInfo()
 
       // #then should include expected servers
-      expect(servers.length).toBe(3)
+      expect(servers.length).toBe(4)
       expect(servers.every((s) => s.type === "builtin")).toBe(true)
       expect(servers.every((s) => s.enabled === true)).toBe(true)
       expect(servers.map((s) => s.id)).toContain("context7")
       expect(servers.map((s) => s.id)).toContain("websearch_exa")
       expect(servers.map((s) => s.id)).toContain("grep_app")
+      expect(servers.map((s) => s.id)).toContain("answeroverflow")
     })
   })
 
@@ -37,7 +38,7 @@ describe("mcp check", () => {
 
       // #then should pass
       expect(result.status).toBe("pass")
-      expect(result.message).toContain("3")
+      expect(result.message).toContain("4")
       expect(result.message).toContain("enabled")
     })
 
@@ -50,6 +51,7 @@ describe("mcp check", () => {
       expect(result.details?.some((d) => d.includes("context7"))).toBe(true)
       expect(result.details?.some((d) => d.includes("websearch_exa"))).toBe(true)
       expect(result.details?.some((d) => d.includes("grep_app"))).toBe(true)
+      expect(result.details?.some((d) => d.includes("answeroverflow"))).toBe(true)
     })
   })
 
