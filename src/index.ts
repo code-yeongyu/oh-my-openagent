@@ -33,10 +33,10 @@ import {
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
-  discoverUserClaudeSkills,
-  discoverProjectClaudeSkills,
-  discoverOpencodeGlobalSkills,
-  discoverOpencodeProjectSkills,
+  discoverUserClaudeSkillsAsync,
+  discoverProjectClaudeSkillsAsync,
+  discoverOpencodeGlobalSkillsAsync,
+  discoverOpencodeProjectSkillsAsync,
   mergeSkills,
 } from "./features/opencode-skill-loader";
 import { createBuiltinSkills } from "./features/builtin-skills";
@@ -201,13 +201,19 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     return true;
   });
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
+  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] = await Promise.all([
+    includeClaudeSkills ? discoverUserClaudeSkillsAsync() : Promise.resolve([]),
+    discoverOpencodeGlobalSkillsAsync(),
+    includeClaudeSkills ? discoverProjectClaudeSkillsAsync() : Promise.resolve([]),
+    discoverOpencodeProjectSkillsAsync(),
+  ]);
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    includeClaudeSkills ? discoverUserClaudeSkills() : [],
-    discoverOpencodeGlobalSkills(),
-    includeClaudeSkills ? discoverProjectClaudeSkills() : [],
-    discoverOpencodeProjectSkills()
+    userSkills,
+    globalSkills,
+    projectSkills,
+    opencodeProjectSkills
   );
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
