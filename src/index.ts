@@ -219,12 +219,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
-  const googleAuthHooks =
+  const [googleAuthHooks, tmuxAvailable] = await Promise.all([
     pluginConfig.google_auth !== false
-      ? await createGoogleAntigravityAuthPlugin(ctx)
-      : null;
-
-  const tmuxAvailable = await getTmuxPath();
+      ? createGoogleAntigravityAuthPlugin(ctx)
+      : Promise.resolve(null),
+    getTmuxPath(),
+  ]);
 
   const configHandler = createConfigHandler({
     ctx,
