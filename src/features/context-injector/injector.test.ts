@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import { ContextCollector } from "./collector"
-import { injectPendingContext, createContextInjectorHook } from "./injector"
+import {
+  injectPendingContext,
+  createContextInjectorHook,
+  createContextInjectorMessagesTransformHook,
+} from "./injector"
 
 describe("injectPendingContext", () => {
   let collector: ContextCollector
@@ -129,7 +133,7 @@ describe("createContextInjectorHook", () => {
   })
 
   describe("chat.message handler", () => {
-    it("injects pending context into output parts", async () => {
+    it("is a no-op (context injection moved to messages transform)", async () => {
       // #given
       const hook = createContextInjectorHook(collector)
       const sessionID = "ses_hook1"
@@ -148,8 +152,8 @@ describe("createContextInjectorHook", () => {
       await hook["chat.message"](input, output)
 
       // #then
-      expect(output.parts[0].text).toContain("Hook context")
-      expect(output.parts[0].text).toContain("User message")
+      expect(output.parts[0].text).toBe("User message")
+      expect(collector.hasPending(sessionID)).toBe(true)
     })
 
     it("does nothing when no pending context", async () => {
@@ -168,5 +172,121 @@ describe("createContextInjectorHook", () => {
       // #then
       expect(output.parts[0].text).toBe("User message")
     })
+  })
+})
+
+describe("createContextInjectorMessagesTransformHook", () => {
+  let collector: ContextCollector
+
+  beforeEach(() => {
+    collector = new ContextCollector()
+  })
+
+  const createMockMessage = (
+    role: "user" | "assistant",
+    text: string,
+    sessionID: string
+  ) => ({
+    info: {
+      id: `msg_${Date.now()}_${Math.random()}`,
+      sessionID,
+      role,
+      time: { created: Date.now() },
+      agent: "Sisyphus",
+      model: { providerID: "test", modelID: "test" },
+      path: { cwd: "/", root: "/" },
+    },
+    parts: [
+      {
+        id: `part_${Date.now()}`,
+        sessionID,
+        messageID: `msg_${Date.now()}`,
+        type: "text" as const,
+        text,
+      },
+    ],
+  })
+
+  it("inserts synthetic message before last user message", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform1"
+    collector.register(sessionID, {
+      id: "ulw",
+      source: "keyword-detector",
+      content: "Ultrawork context",
+    })
+    const messages = [
+      createMockMessage("user", "First message", sessionID),
+      createMockMessage("assistant", "Response", sessionID),
+      createMockMessage("user", "Second message", sessionID),
+    ]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(4)
+    expect(output.messages[2].parts[0].text).toBe("Ultrawork context")
+    expect(output.messages[2].parts[0].synthetic).toBe(true)
+    expect(output.messages[3].parts[0].text).toBe("Second message")
+  })
+
+  it("does nothing when no pending context", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform2"
+    const messages = [createMockMessage("user", "Message", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(1)
+  })
+
+  it("does nothing when no user messages", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform3"
+    collector.register(sessionID, {
+      id: "ctx",
+      source: "keyword-detector",
+      content: "Context",
+    })
+    const messages = [createMockMessage("assistant", "Response", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(output.messages.length).toBe(1)
+    expect(collector.hasPending(sessionID)).toBe(true)
+  })
+
+  it("consumes context after injection", async () => {
+    // #given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform4"
+    collector.register(sessionID, {
+      id: "ctx",
+      source: "keyword-detector",
+      content: "Context",
+    })
+    const messages = [createMockMessage("user", "Message", sessionID)]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const output = { messages } as any
+
+    // #when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // #then
+    expect(collector.hasPending(sessionID)).toBe(false)
   })
 })
