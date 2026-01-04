@@ -464,11 +464,13 @@ export interface PluginComponentsResult {
 export async function loadAllPluginComponents(options?: PluginLoaderOptions): Promise<PluginComponentsResult> {
   const { plugins, errors } = discoverInstalledPlugins(options)
 
-  const commands = loadPluginCommands(plugins)
-  const skills = loadPluginSkillsAsCommands(plugins)
-  const agents = loadPluginAgents(plugins)
-  const mcpServers = await loadPluginMcpServers(plugins)
-  const hooksConfigs = loadPluginHooksConfigs(plugins)
+  const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
+    Promise.resolve(loadPluginCommands(plugins)),
+    Promise.resolve(loadPluginSkillsAsCommands(plugins)),
+    Promise.resolve(loadPluginAgents(plugins)),
+    loadPluginMcpServers(plugins),
+    Promise.resolve(loadPluginHooksConfigs(plugins)),
+  ])
 
   log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
 
