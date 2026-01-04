@@ -122,6 +122,12 @@ function extractMessageIndex(error: unknown): number | null {
   return match ? parseInt(match[1], 10) : null
 }
 
+function extractToolUseIdsFromError(error: unknown): string[] {
+  const message = getErrorMessage(error)
+  const matches = message.match(/toolu_[a-zA-Z0-9]+/g)
+  return matches ? [...new Set(matches)] : []
+}
+
 export function detectErrorType(error: unknown): RecoveryErrorType {
   const message = getErrorMessage(error)
 
@@ -155,7 +161,8 @@ function extractToolUseIds(parts: MessagePart[]): string[] {
 async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  failedAssistantMsg: MessageData,
+  error?: unknown
 ): Promise<boolean> {
   // Try API parts first, fallback to filesystem if empty
   let parts = failedAssistantMsg.parts || []
@@ -168,7 +175,12 @@ async function recoverToolResultMissing(
       input: "state" in p ? (p as { state?: { input?: Record<string, unknown> } }).state?.input : undefined,
     }))
   }
-  const toolUseIds = extractToolUseIds(parts)
+  let toolUseIds = extractToolUseIds(parts)
+
+  // Fallback: extract tool_use IDs directly from error message
+  if (toolUseIds.length === 0 && error) {
+    toolUseIds = extractToolUseIdsFromError(error)
+  }
 
   if (toolUseIds.length === 0) {
     return false
@@ -196,7 +208,7 @@ async function recoverToolResultMissing(
 async function recoverThinkingBlockOrder(
   _client: Client,
   sessionID: string,
-  _failedAssistantMsg: MessageData,
+  failedAssistantMsg: MessageData,
   _directory: string,
   error: unknown
 ): Promise<boolean> {
@@ -205,6 +217,14 @@ async function recoverThinkingBlockOrder(
     const targetMessageID = findMessageByIndexNeedingThinking(sessionID, targetIndex)
     if (targetMessageID) {
       return prependThinkingPart(sessionID, targetMessageID)
+    }
+  }
+
+  // Fallback: try using the failed message ID directly
+  const failedMsgId = failedAssistantMsg.info?.id
+  if (failedMsgId) {
+    if (prependThinkingPart(sessionID, failedMsgId)) {
+      return true
     }
   }
 
@@ -392,7 +412,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
       let success = false
 
       if (errorType === "tool_result_missing") {
-        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
+        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg, info.error)
       } else if (errorType === "thinking_block_order") {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
         if (success && experimental?.auto_resume) {

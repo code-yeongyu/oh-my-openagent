@@ -370,20 +370,34 @@ export function findMessagesWithEmptyTextParts(sessionID: string): string[] {
 export function findMessageByIndexNeedingThinking(sessionID: string, targetIndex: number): string | null {
   const messages = readMessages(sessionID)
 
-  if (targetIndex < 0 || targetIndex >= messages.length) return null
+  // API index may differ from storage index due to system messages
+  const indicesToTry = [
+    targetIndex,
+    targetIndex - 1,
+    targetIndex + 1,
+    targetIndex - 2,
+    targetIndex + 2,
+    targetIndex - 3,
+    targetIndex - 4,
+    targetIndex - 5,
+  ]
 
-  const targetMsg = messages[targetIndex]
-  if (targetMsg.role !== "assistant") return null
+  for (const idx of indicesToTry) {
+    if (idx < 0 || idx >= messages.length) continue
 
-  const parts = readParts(targetMsg.id)
-  if (parts.length === 0) return null
+    const targetMsg = messages[idx]
+    if (targetMsg.role !== "assistant") continue
 
-  const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id))
-  const firstPart = sortedParts[0]
-  const firstIsThinking = THINKING_TYPES.has(firstPart.type)
+    const parts = readParts(targetMsg.id)
+    if (parts.length === 0) continue
 
-  if (!firstIsThinking) {
-    return targetMsg.id
+    const sortedParts = [...parts].sort((a, b) => a.id.localeCompare(b.id))
+    const firstPart = sortedParts[0]
+    const firstIsThinking = THINKING_TYPES.has(firstPart.type)
+
+    if (!firstIsThinking) {
+      return targetMsg.id
+    }
   }
 
   return null
