@@ -150,11 +150,10 @@ Skill body.
 
       try {
         const skills = discoverSkills({ includeClaudeCodePaths: false })
-        // #then - when YAML fails, skill uses directory name as fallback
+        // #then - malformed frontmatter should skip the skill entirely
         const skill = skills.find(s => s.name === "bad-yaml-skill")
 
-        expect(skill).toBeDefined()
-        expect(skill?.mcpConfig).toBeUndefined()
+        expect(skill).toBeUndefined()
       } finally {
         process.chdir(originalCwd)
       }

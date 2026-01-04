@@ -67,7 +67,8 @@ function loadSkillFromPath(
 ): LoadedSkill | null {
   try {
     const content = readFileSync(skillPath, "utf-8")
-    const { data } = parseFrontmatter<SkillMetadata>(content)
+    const { data, parseError } = parseFrontmatter<SkillMetadata>(content)
+    if (parseError) return null
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -84,8 +85,12 @@ function loadSkillFromPath(
       load: async () => {
         if (!lazyContent.loaded) {
           const fileContent = await fs.readFile(skillPath, "utf-8")
-          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
-          lazyContent.content = `<skill-instruction>
+          const { body, parseError } = parseFrontmatter<SkillMetadata>(fileContent)
+
+          if (parseError) {
+            lazyContent.content = ""
+          } else {
+            lazyContent.content = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -95,6 +100,8 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
+          }
+
           lazyContent.loaded = true
         }
         return lazyContent.content!
@@ -137,7 +144,8 @@ async function loadSkillFromPathAsync(
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
-    const { data } = parseFrontmatter<SkillMetadata>(content)
+    const { data, parseError } = parseFrontmatter<SkillMetadata>(content)
+    if (parseError) return null
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -153,8 +161,12 @@ async function loadSkillFromPathAsync(
       load: async () => {
         if (!lazyContent.loaded) {
           const fileContent = await fs.readFile(skillPath, "utf-8")
-          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
-          lazyContent.content = `<skill-instruction>
+          const { body, parseError } = parseFrontmatter<SkillMetadata>(fileContent)
+
+          if (parseError) {
+            lazyContent.content = ""
+          } else {
+            lazyContent.content = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -164,6 +176,8 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
+          }
+
           lazyContent.loaded = true
         }
         return lazyContent.content!
