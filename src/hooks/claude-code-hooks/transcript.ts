@@ -180,6 +180,7 @@ export async function getPostToolUseTranscriptPath(params: {
       cachedClaudeTranscripts.set(params.sessionId, { path: cached.path, lastUsed: Date.now() })
       return cached.path
     } catch {
+      deleteTempTranscript(cached.path)
       cachedClaudeTranscripts.delete(params.sessionId)
     }
   }
