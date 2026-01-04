@@ -54,7 +54,7 @@ import {
   createSkillMcpTool,
   sessionExists,
   interactive_bash,
-  getTmuxPath,
+  startTmuxCheck,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
@@ -65,6 +65,9 @@ import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  // Start background tmux check immediately
+  startTmuxCheck();
+
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
@@ -219,12 +222,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
-  const [googleAuthHooks, tmuxAvailable] = await Promise.all([
-    pluginConfig.google_auth !== false
-      ? createGoogleAntigravityAuthPlugin(ctx)
-      : Promise.resolve(null),
-    getTmuxPath(),
-  ]);
+  const googleAuthHooks = pluginConfig.google_auth !== false
+    ? await createGoogleAntigravityAuthPlugin(ctx)
+    : null;
 
   const configHandler = createConfigHandler({
     ctx,
@@ -242,7 +242,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       look_at: lookAt,
       skill: skillTool,
       skill_mcp: skillMcpTool,
-      ...(tmuxAvailable ? { interactive_bash } : {}),
+      interactive_bash,  // Always included, handles missing tmux gracefully via getCachedTmuxPath() ?? "tmux"
     },
 
     "chat.message": async (input, output) => {
