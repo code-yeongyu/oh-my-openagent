@@ -252,12 +252,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      log("DEBUG merge order", {
-        userAgentsConductorModel: (userAgents.conductor as Record<string, unknown>)?.model,
-        filteredConfigAgentsConductor: !!filteredConfigAgents.conductor,
-        filteredConfigAgentsConductorModel: (filteredConfigAgents.conductor as Record<string, unknown>)?.model,
-      });
-
       const planDemoteConfig = replacePlan
         ? { mode: "subagent" as const, hidden: true }
         : undefined;
@@ -285,11 +279,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     const agentResult = config.agent as AgentConfig;
-
-    log("FINAL config.agent conductor", { 
-      conductor: agentResult.conductor,
-      hasModel: !!(agentResult.conductor as Record<string, unknown>)?.model 
-    });
 
     config.tools = {
       ...(config.tools as Record<string, unknown>),

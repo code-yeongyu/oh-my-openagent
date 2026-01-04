@@ -330,6 +330,16 @@ $ARGUMENTS
 function parseToolsConfig(tools?: string | Record<string, boolean>): Record<string, boolean> | undefined {
   if (!tools) return undefined
 
+  if (Array.isArray(tools)) {
+    const result: Record<string, boolean> = {}
+    for (const tool of tools) {
+      if (typeof tool === "string") {
+        result[tool.toLowerCase()] = true
+      }
+    }
+    return Object.keys(result).length > 0 ? result : undefined
+  }
+
   if (typeof tools === "object") {
     return tools
   }
