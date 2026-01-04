@@ -29,7 +29,6 @@ interface Todo {
 }
 
 interface SessionState {
-  lastEventWasAbortError?: boolean
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
@@ -62,29 +61,28 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-function isAbortError(error: unknown): boolean {
-  if (!error) return false
-
-  if (typeof error === "object") {
-    const errObj = error as Record<string, unknown>
-    const name = errObj.name as string | undefined
-    const message = (errObj.message as string | undefined)?.toLowerCase() ?? ""
-
-    if (name === "MessageAbortedError" || name === "AbortError") return true
-    if (name === "DOMException" && message.includes("abort")) return true
-    if (message.includes("aborted") || message.includes("cancelled") || message.includes("interrupted")) return true
-  }
-
-  if (typeof error === "string") {
-    const lower = error.toLowerCase()
-    return lower.includes("abort") || lower.includes("cancel") || lower.includes("interrupt")
-  }
-
-  return false
-}
-
 function getIncompleteCount(todos: Todo[]): number {
   return todos.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+}
+
+interface MessageInfo {
+  id?: string
+  role?: string
+  error?: { name?: string; data?: unknown }
+}
+
+function isLastAssistantMessageAborted(messages: Array<{ info?: MessageInfo }>): boolean {
+  if (!messages || messages.length === 0) return false
+
+  const assistantMessages = messages.filter(m => m.info?.role === "assistant")
+  if (assistantMessages.length === 0) return false
+
+  const lastAssistant = assistantMessages[assistantMessages.length - 1]
+  const errorName = lastAssistant.info?.error?.name
+
+  if (!errorName) return false
+
+  return errorName === "MessageAbortedError" || errorName === "AbortError"
 }
 
 export function createTodoContinuationEnforcer(
@@ -255,12 +253,8 @@ export function createTodoContinuationEnforcer(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const state = getState(sessionID)
-      const isAbort = isAbortError(props?.error)
-      state.lastEventWasAbortError = isAbort
       cancelCountdown(sessionID)
-
-      log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
+      log(`[${HOOK_NAME}] session.error`, { sessionID })
       return
     }
 
@@ -286,12 +280,6 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      if (state.lastEventWasAbortError) {
-        state.lastEventWasAbortError = false
-        log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
-        return
-      }
-
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -299,6 +287,21 @@ export function createTodoContinuationEnforcer(
       if (hasRunningBgTasks) {
         log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
         return
+      }
+
+      try {
+        const messagesResp = await ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        })
+        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
+
+        if (isLastAssistantMessageAborted(messages)) {
+          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted`, { sessionID })
+          return
+        }
+      } catch (err) {
+        log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(err) })
       }
 
       let todos: Todo[] = []
@@ -332,12 +335,8 @@ export function createTodoContinuationEnforcer(
 
       if (!sessionID) return
 
-      const state = sessions.get(sessionID)
-      if (state) {
-        state.lastEventWasAbortError = false
-      }
-
       if (role === "user") {
+        const state = sessions.get(sessionID)
         if (state?.countdownStartedAt) {
           const elapsed = Date.now() - state.countdownStartedAt
           if (elapsed < COUNTDOWN_GRACE_PERIOD_MS) {
@@ -346,7 +345,6 @@ export function createTodoContinuationEnforcer(
           }
         }
         cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] User message: cleared abort state`, { sessionID })
       }
 
       if (role === "assistant") {
@@ -361,10 +359,6 @@ export function createTodoContinuationEnforcer(
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
-        const state = sessions.get(sessionID)
-        if (state) {
-          state.lastEventWasAbortError = false
-        }
         cancelCountdown(sessionID)
       }
       return
@@ -373,10 +367,6 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
-        const state = sessions.get(sessionID)
-        if (state) {
-          state.lastEventWasAbortError = false
-        }
         cancelCountdown(sessionID)
       }
       return
