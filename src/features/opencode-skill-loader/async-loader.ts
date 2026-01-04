@@ -80,7 +80,7 @@ export async function loadSkillFromPathAsync(
     const content = await readFile(skillPath, "utf-8")
     const { data, body, parseError } = parseFrontmatter<SkillMetadata>(content)
     if (parseError) return null
-    
+
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDirAsync(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -133,7 +133,10 @@ function parseAllowedTools(allowedTools: string | undefined): string[] | undefin
   return allowedTools.split(/\s+/).filter(Boolean)
 }
 
-export async function discoverSkillsInDirAsync(skillsDir: string): Promise<LoadedSkill[]> {
+export async function discoverSkillsInDirAsync(
+  skillsDir: string,
+  scope: SkillScope = "opencode-project"
+): Promise<LoadedSkill[]> {
   try {
     const entries = await readdir(skillsDir, { withFileTypes: true })
     
@@ -149,12 +152,12 @@ export async function discoverSkillsInDirAsync(skillsDir: string): Promise<Loade
         const skillMdPath = join(resolvedPath, "SKILL.md")
         try {
           await readFile(skillMdPath, "utf-8")
-          return await loadSkillFromPathAsync(skillMdPath, resolvedPath, dirName, "opencode-project")
+            return await loadSkillFromPathAsync(skillMdPath, resolvedPath, dirName, scope)
         } catch {
           const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
           try {
             await readFile(namedSkillMdPath, "utf-8")
-            return await loadSkillFromPathAsync(namedSkillMdPath, resolvedPath, dirName, "opencode-project")
+              return await loadSkillFromPathAsync(namedSkillMdPath, resolvedPath, dirName, scope)
           } catch {
             return null
           }
@@ -163,7 +166,7 @@ export async function discoverSkillsInDirAsync(skillsDir: string): Promise<Loade
 
       if (isMarkdownFile(entry)) {
         const skillName = basename(entry.name, ".md")
-        return await loadSkillFromPathAsync(entryPath, skillsDir, skillName, "opencode-project")
+        return await loadSkillFromPathAsync(entryPath, skillsDir, skillName, scope)
       }
 
       return null

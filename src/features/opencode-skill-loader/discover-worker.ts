@@ -31,9 +31,10 @@ parentPort.once("message", (data: { port: MessagePort }) => {
 
   port.on("message", async (input: WorkerInput) => {
     try {
-      const results = await Promise.all(
-        input.dirs.map(dir => discoverSkillsInDirAsync(dir))
-      )
+        const scope = input.scopes[0] ?? "opencode-project"
+        const results = await Promise.all(
+          input.dirs.map((dir) => discoverSkillsInDirAsync(dir, scope))
+        )
       
       const skills = results.flat()
       
