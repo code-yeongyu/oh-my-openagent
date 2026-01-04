@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywordsWithType, extractPromptText } from "./detector"
+import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
 import { log } from "../../shared"
-import { contextCollector } from "../../features/context-injector"
 
 export * from "./detector"
 export * from "./constants"
@@ -24,10 +23,9 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
-      const detectedKeywords = detectKeywordsWithType(promptText)
-      const messages = detectedKeywords.map((k) => k.message)
+      const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText))
 
-      if (messages.length === 0) {
+      if (detectedKeywords.length === 0) {
         return
       }
 
@@ -50,20 +48,9 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
           )
       }
 
-      const context = messages.join("\n")
-
-      for (const keyword of detectedKeywords) {
-        contextCollector.register(input.sessionID, {
-          id: `keyword-${keyword.type}`,
-          source: "keyword-detector",
-          content: keyword.message,
-          priority: keyword.type === "ultrawork" ? "critical" : "high",
-        })
-      }
-
-      log(`[keyword-detector] Registered ${messages.length} keyword contexts`, {
+      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
-        contextLength: context.length,
+        types: detectedKeywords.map((k) => k.type),
       })
     },
   }

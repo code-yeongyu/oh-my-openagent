@@ -1,7 +1,6 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import { log } from "../../shared"
-import { detectKeywordsWithType, extractPromptText } from "../../hooks/keyword-detector"
 
 interface OutputPart {
   type: string
@@ -80,7 +79,6 @@ export function createContextInjectorMessagesTransformHook(
     "experimental.chat.messages.transform": async (_input, output) => {
       const { messages } = output
       if (messages.length === 0) {
-        log("[context-injector] messages.transform: no messages")
         return
       }
 
@@ -93,47 +91,23 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       if (lastUserMessageIndex === -1) {
-        log("[context-injector] messages.transform: no user message found")
         return
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
       const sessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
       if (!sessionID) {
-        log("[context-injector] messages.transform: no sessionID on last user message")
         return
       }
 
-      const userParts = lastUserMessage.parts as Array<{ type: string; text?: string }>
-      const promptText = extractPromptText(userParts)
-      const detectedKeywords = detectKeywordsWithType(promptText)
-      const hasPendingFromCollector = collector.hasPending(sessionID)
-
-      log("[context-injector] messages.transform check", {
-        sessionID,
-        detectedKeywords: detectedKeywords.map((k) => k.type),
-        hasPendingFromCollector,
-        messageCount: messages.length,
-      })
-
-      const contextParts: string[] = []
-
-      for (const keyword of detectedKeywords) {
-        contextParts.push(keyword.message)
-      }
-
-      if (hasPendingFromCollector) {
-        const pending = collector.consume(sessionID)
-        if (pending.hasContent) {
-          contextParts.push(pending.merged)
-        }
-      }
-
-      if (contextParts.length === 0) {
+      if (!collector.hasPending(sessionID)) {
         return
       }
 
-      const mergedContext = contextParts.join("\n\n")
+      const pending = collector.consume(sessionID)
+      if (!pending.hasContent) {
+        return
+      }
 
       const refInfo = lastUserMessage.info as unknown as {
         sessionID?: string
@@ -162,7 +136,7 @@ export function createContextInjectorMessagesTransformHook(
             sessionID: sessionID,
             messageID: syntheticMessageId,
             type: "text",
-            text: mergedContext,
+            text: pending.merged,
             synthetic: true,
             time: { start: now, end: now },
           } as Part,
@@ -171,11 +145,10 @@ export function createContextInjectorMessagesTransformHook(
 
       messages.splice(lastUserMessageIndex, 0, syntheticMessage)
 
-      log("[context-injector] Injected synthetic message", {
+      log("[context-injector] Injected synthetic message from collector", {
         sessionID,
         insertIndex: lastUserMessageIndex,
-        contextLength: mergedContext.length,
-        keywordTypes: detectedKeywords.map((k) => k.type),
+        contextLength: pending.merged.length,
         newMessageCount: messages.length,
       })
     },
