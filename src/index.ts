@@ -27,6 +27,10 @@ import {
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
 } from "./hooks";
+import {
+  contextCollector,
+  createContextInjectorHook,
+} from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
   discoverUserClaudeSkills,
@@ -130,6 +134,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const keywordDetector = isHookEnabled("keyword-detector")
     ? createKeywordDetectorHook(ctx)
     : null;
+  const contextInjector = createContextInjectorHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)
     : null;
@@ -243,6 +248,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
+      await contextInjector["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
