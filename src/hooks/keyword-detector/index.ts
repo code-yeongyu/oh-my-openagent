@@ -6,8 +6,6 @@ export * from "./detector"
 export * from "./constants"
 export * from "./types"
 
-const sessionUltraworkNotified = new Set<string>()
-
 export function createKeywordDetectorHook(ctx: PluginInput) {
   return {
     "chat.message": async (
@@ -30,8 +28,7 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
-      if (hasUltrawork && !sessionUltraworkNotified.has(input.sessionID)) {
-        sessionUltraworkNotified.add(input.sessionID)
+      if (hasUltrawork) {
         log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
 
         ctx.client.tui
