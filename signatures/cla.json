@@ -167,6 +167,14 @@
       "created_at": "2026-01-03T23:51:28Z",
       "repoId": 1108837393,
       "pullRequestNo": 469
+    },
+    {
+      "name": "ChiR24",
+      "id": 125826529,
+      "comment_id": 3707776762,
+      "created_at": "2026-01-04T06:14:36Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 473
     }
   ]
 }
