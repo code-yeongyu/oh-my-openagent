@@ -20,7 +20,7 @@ function debugLog(...args: unknown[]) {
 const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
-const COMMENT_MARKERS = ["//", "/*", "*/", "#", "<!--", "-->", "'''", "\"\"\""]
+const COMMENT_MARKERS = ["//", "/*", "*/", "#", "<!--", "-->", "'''", "\"\"\"", "--"]
 
 function hasCommentMarkers(value?: string): boolean {
   if (!value) {
