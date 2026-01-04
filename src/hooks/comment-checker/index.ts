@@ -20,6 +20,32 @@ function debugLog(...args: unknown[]) {
 const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
+const COMMENT_MARKERS = ["//", "/*", "*/", "#", "<!--", "-->", "'''", "\"\"\""]
+
+function hasCommentMarkers(value?: string): boolean {
+  if (!value) {
+    return false
+  }
+
+  return COMMENT_MARKERS.some((marker) => value.includes(marker))
+}
+
+export function shouldRunCommentChecker(pendingCall: PendingCall): boolean {
+  if (hasCommentMarkers(pendingCall.content)) {
+    return true
+  }
+
+  if (hasCommentMarkers(pendingCall.oldString) || hasCommentMarkers(pendingCall.newString)) {
+    return true
+  }
+
+  if (pendingCall.edits) {
+    return pendingCall.edits.some((edit) => hasCommentMarkers(edit.old_string) || hasCommentMarkers(edit.new_string))
+  }
+
+  return false
+}
+
 let cliPathPromise: Promise<string | null> | null = null
 let cleanupIntervalStarted = false
 
@@ -126,7 +152,11 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
           return
         }
         
-        // CLI mode only
+        if (!shouldRunCommentChecker(pendingCall)) {
+          debugLog("skipping comment check - no comment markers detected")
+          return
+        }
+
         debugLog("using CLI:", cliPath)
         await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt)
       } catch (err) {
