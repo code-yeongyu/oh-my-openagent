@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { join, posix } from "node:path"
 
 export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
 
@@ -67,6 +67,12 @@ function getCliConfigDir(): string {
   }
 
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+
+  // If user provided a POSIX-style XDG path (common in tests/CI), preserve it even on Windows.
+  if (process.env.XDG_CONFIG_HOME && xdgConfig.startsWith("/") && !xdgConfig.includes("\\")) {
+    return posix.join(xdgConfig, "opencode")
+  }
+
   return join(xdgConfig, "opencode")
 }
 

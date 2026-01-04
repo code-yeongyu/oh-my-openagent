@@ -15,15 +15,23 @@ import {
 } from "./constants";
 import type { RuleFileCandidate } from "./types";
 
+function normalizePathForMatching(p: string): string {
+  return p.replace(/\\/g, "/")
+}
+
 function isGitHubInstructionsDir(dir: string): boolean {
-  return dir.includes(".github/instructions") || dir.endsWith(".github/instructions");
+  const normalized = normalizePathForMatching(dir)
+  return (
+    normalized.includes(".github/instructions") ||
+    normalized.endsWith(".github/instructions")
+  )
 }
 
 function isValidRuleFile(fileName: string, dir: string): boolean {
   if (isGitHubInstructionsDir(dir)) {
-    return GITHUB_INSTRUCTIONS_PATTERN.test(fileName);
+    return GITHUB_INSTRUCTIONS_PATTERN.test(fileName)
   }
-  return RULE_EXTENSIONS.some((ext) => fileName.endsWith(ext));
+  return RULE_EXTENSIONS.some((ext) => fileName.endsWith(ext))
 }
 
 /**
@@ -190,11 +198,11 @@ export function findRuleFiles(
         seenRealPaths.add(realPath);
 
         candidates.push({
-          path: filePath,
+          path: normalizePathForMatching(filePath),
           realPath,
           isGlobal: false,
           distance,
-        });
+        })
       }
     }
 
@@ -218,12 +226,12 @@ export function findRuleFiles(
             if (!seenRealPaths.has(realPath)) {
               seenRealPaths.add(realPath);
               candidates.push({
-                path: filePath,
+                path: normalizePathForMatching(filePath),
                 realPath,
                 isGlobal: false,
                 distance: 0,
                 isSingleFile: true,
-              });
+              })
             }
           }
         } catch {
@@ -244,11 +252,11 @@ export function findRuleFiles(
     seenRealPaths.add(realPath);
 
     candidates.push({
-      path: filePath,
+      path: normalizePathForMatching(filePath),
       realPath,
       isGlobal: true,
       distance: 9999, // Global rules always have max distance
-    });
+    })
   }
 
   // Sort by distance (closest first, then global rules last)
