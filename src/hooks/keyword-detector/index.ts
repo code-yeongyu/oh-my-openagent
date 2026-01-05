@@ -21,7 +21,7 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
-      const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText))
+      const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
 
       if (detectedKeywords.length === 0) {
         return
