@@ -96,26 +96,18 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       config.model as string | undefined
     );
 
-    const rawUserAgents = (pluginConfig.claude_code?.agents ?? true)
+    // Claude Code agents: Do NOT apply permission migration
+    // Claude Code uses whitelist-based tools format which is semantically different
+    // from OpenCode's denylist-based permission system
+    const userAgents = (pluginConfig.claude_code?.agents ?? true)
       ? loadUserAgents()
       : {};
-    const rawProjectAgents = (pluginConfig.claude_code?.agents ?? true)
+    const projectAgents = (pluginConfig.claude_code?.agents ?? true)
       ? loadProjectAgents()
       : {};
-    const rawPluginAgents = pluginComponents.agents;
 
-    const userAgents = Object.fromEntries(
-      Object.entries(rawUserAgents).map(([k, v]) => [
-        k,
-        v ? migrateAgentConfig(v as Record<string, unknown>) : v,
-      ])
-    );
-    const projectAgents = Object.fromEntries(
-      Object.entries(rawProjectAgents).map(([k, v]) => [
-        k,
-        v ? migrateAgentConfig(v as Record<string, unknown>) : v,
-      ])
-    );
+    // Plugin agents: Apply permission migration for compatibility
+    const rawPluginAgents = pluginComponents.agents;
     const pluginAgents = Object.fromEntries(
       Object.entries(rawPluginAgents).map(([k, v]) => [
         k,
