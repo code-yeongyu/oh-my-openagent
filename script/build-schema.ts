@@ -5,7 +5,7 @@ import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
 
 async function main() {
-  console.log("Generating JSON Schema...")
+   log console.log("Generating JSON Schema...")
 
   const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
     io: "input",
