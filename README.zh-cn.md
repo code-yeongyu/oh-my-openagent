@@ -206,7 +206,21 @@ oMoMoMoMoMo···
 
 ### 人类专用
 
-这种脏活累活让 LLM Agent 干。把这个链接复制粘贴到 opencode 会话里，让它自己动：
+运行交互式安装程序：
+
+```bash
+bunx oh-my-opencode install
+# 如果 bunx 不好使就换 npx
+npx oh-my-opencode install
+```
+
+> **Ubuntu/Debian 用户注意**：如果你是用 Snap 装的 Bun (`/snap/bin/bun`)，由于 Snap 的沙箱机制，`bunx` 会报 "script not found" 错误。要么改用 `npx`，要么用官方脚本重装 Bun：`curl -fsSL https://bun.sh/install | bash`
+
+按提示配置你的 Claude、ChatGPT 和 Gemini 订阅。安装完成后，按指引完成各提供商的认证。
+
+**备选方案：让 LLM Agent 干**
+
+把下面这行复制粘贴到新的 opencode 会话里：
 ```
 Install and configure by following the instructions here https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/README.md
 ```
