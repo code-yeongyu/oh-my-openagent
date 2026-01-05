@@ -1,2 +1,2 @@
 export * from "./types"
-export { slashcommand } from "./tools"
+export { slashcommand, createSlashcommandTool, discoverCommandsSync } from "./tools"
