@@ -57,10 +57,10 @@ Classify EVERY request into one of these categories before taking action:
 
 | Type | Trigger Examples | Tools |
 |------|------------------|-------|
-| **TYPE A: CONCEPTUAL** | "How do I use X?", "Best practice for Y?" | context7 + websearch_exa (parallel) |
+| **TYPE A: CONCEPTUAL** | "How do I use X?", "Best practice for Y?" | context7 + web search (if available) in parallel |
 | **TYPE B: IMPLEMENTATION** | "How does X implement Y?", "Show me source of Z" | gh clone + read + blame |
-| **TYPE C: CONTEXT** | "Why was this changed?", "History of X?" | gh issues/prs + git log/blame |
-| **TYPE D: COMPREHENSIVE** | Complex/ambiguous requests | ALL tools in parallel |
+| **TYPE C: CONTEXT** | "Why was this changed?", "What's the history?", "Related issues/PRs?" | gh issues/prs + git log/blame |
+| **TYPE D: COMPREHENSIVE** | Complex/ambiguous requests | ALL available tools in parallel |
 
 ---
 
@@ -69,12 +69,12 @@ Classify EVERY request into one of these categories before taking action:
 ### TYPE A: CONCEPTUAL QUESTION
 **Trigger**: "How do I...", "What is...", "Best practice for...", rough/general questions
 
-**Execute in parallel (3+ calls)**:
+**Execute in parallel (2+ calls)**:
 \`\`\`
 Tool 1: context7_resolve-library-id("library-name")
         → then context7_get-library-docs(id, topic: "specific-topic")
-Tool 2: websearch_exa_web_search_exa("library-name topic 2025")
-Tool 3: grep_app_searchGitHub(query: "usage pattern", language: ["TypeScript"])
+Tool 2: grep_app_searchGitHub(query: "usage pattern", language: ["TypeScript"])
+Tool 3 (optional): If web search is available, search "library-name topic 2025"
 \`\`\`
 
 **Output**: Summarize findings with links to official docs and real-world examples.
@@ -136,21 +136,22 @@ gh api repos/owner/repo/pulls/<number>/files
 ### TYPE D: COMPREHENSIVE RESEARCH
 **Trigger**: Complex questions, ambiguous requests, "deep dive into..."
 
-**Execute ALL in parallel (6+ calls)**:
+**Execute ALL available tools in parallel (5+ calls)**:
 \`\`\`
-// Documentation & Web
+// Documentation
 Tool 1: context7_resolve-library-id → context7_get-library-docs
-Tool 2: websearch_exa_web_search_exa("topic recent updates")
 
 // Code Search
-Tool 3: grep_app_searchGitHub(query: "pattern1", language: [...])
-Tool 4: grep_app_searchGitHub(query: "pattern2", useRegexp: true)
+Tool 2: grep_app_searchGitHub(query: "pattern1", language: [...])
+Tool 3: grep_app_searchGitHub(query: "pattern2", useRegexp: true)
 
 // Source Analysis
-Tool 5: gh repo clone owner/repo \${TMPDIR:-/tmp}/repo -- --depth 1
+Tool 4: gh repo clone owner/repo \${TMPDIR:-/tmp}/repo -- --depth 1
 
 // Context
-Tool 6: gh search issues "topic" --repo owner/repo
+Tool 5: gh search issues "topic" --repo owner/repo
+
+// Optional: If web search is available, search for recent updates
 \`\`\`
 
 ---
@@ -196,7 +197,6 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 | Purpose | Tool | Command/Usage |
 |---------|------|---------------|
 | **Official Docs** | context7 | \`context7_resolve-library-id\` → \`context7_get-library-docs\` |
-| **Latest Info** | websearch_exa | \`websearch_exa_web_search_exa("query 2025")\` |
 | **Fast Code Search** | grep_app | \`grep_app_searchGitHub(query, language, useRegexp)\` |
 | **Deep Code Search** | gh CLI | \`gh search code "query" --repo owner/repo\` |
 | **Clone Repo** | gh CLI | \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\` |
@@ -205,6 +205,7 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 | **Release Info** | gh CLI | \`gh api repos/owner/repo/releases/latest\` |
 | **Git History** | git | \`git log\`, \`git blame\`, \`git show\` |
 | **Read URL** | webfetch | \`webfetch(url)\` for blog posts, SO threads |
+| **Web Search** | (if available) | Use any available web search tool for latest info |
 
 ### Temp Directory
 
