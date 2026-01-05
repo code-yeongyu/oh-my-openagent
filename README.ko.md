@@ -319,7 +319,7 @@ opencode auth login
 }
 ```
 
-**사용 가능한 모델 이름**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**사용 가능한 모델 이름**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
 
 그 후 인증:
 
@@ -342,26 +342,19 @@ opencode auth login
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth@4.2.0"
+    "opencode-openai-codex-auth@4.3.0"
   ]
 }
 ```
 
-**중요**: 현재 공식 npm 패키지에 400 에러(`"No tool call found for function call output with call_id"`)를 유발하는 버그가 있습니다. 수정 버전이 배포될 때까지 **핫픽스 브랜치 사용을 권장합니다**. `~/.config/opencode/package.json`을 수정하세요:
+##### 모델 설정
 
-```json
-{
-  "dependencies": {
-    "opencode-openai-codex-auth": "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
-  }
-}
-```
-
-그 후 `cd ~/.config/opencode && bun i`를 실행하세요. `opencode.json`에서는 버전 없이 `"opencode-openai-codex-auth"`로 사용합니다 (`@4.1.0` 제외).
-
-#### 4.3.1 모델 설정
 `opencode.json`에 전체 모델 설정도 구성해야 합니다.
-[opencode-openai-codex-auth 문서](https://github.com/numman-ali/opencode-openai-codex-auth)를 읽고, [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json)에서 provider/models 설정을 복사하여, 사용자의 기존 셋업에 영향을 주지 않도록 깊게 고민하여 적절히 통합하세요.
+[opencode-openai-codex-auth 문서](https://github.com/numman-ali/opencode-openai-codex-auth)를 읽고, [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json) (OpenCode v1.0.210+) 또는 [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json) (구버전)에서 provider/models 설정을 복사하여, 사용자의 기존 셋업에 영향을 주지 않도록 깊게 고민하여 적절히 통합하세요.
+
+**사용 가능한 모델**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
+
+**Variants** (OpenCode v1.0.210+): `--variant=<none|low|medium|high|xhigh>` 옵션으로 추론 강도를 조절할 수 있습니다.
 
 그 후 인증:
 
