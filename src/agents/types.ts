@@ -52,10 +52,10 @@ export interface AgentPromptMetadata {
   keyTrigger?: string
 }
 
+import { isGptModel as isGptModelImpl } from "./model-adapter"
+
 export function isGptModel(model: string): boolean {
-  const normalized = model.toLowerCase()
-  const base = normalized.includes("/") ? normalized.split("/").pop() ?? "" : normalized
-  return base.startsWith("gpt-") || base.startsWith("codex-") || /^o\d/.test(base)
+  return isGptModelImpl(model)
 }
 
 export type BuiltinAgentName =
