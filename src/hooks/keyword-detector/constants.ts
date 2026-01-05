@@ -222,6 +222,8 @@ export function getUltraworkMessage(agentName?: string): string {
 
   return `<ultrawork-mode>
 
+**MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
 ${ULTRAWORK_TODO_SECTION}
 
 ${agentSection}
