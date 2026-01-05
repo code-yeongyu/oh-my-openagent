@@ -138,7 +138,7 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
           return
         }
 
-        const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt))
+        const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt), input.agent)
         const keywordMessages = detectedKeywords.map((k) => k.message)
 
         if (keywordMessages.length > 0) {
