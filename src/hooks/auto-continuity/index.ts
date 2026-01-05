@@ -15,6 +15,7 @@ interface AutoContinuityState {
   autoSaveTriggered: boolean;
   sessionName: string | null;
   initializedSessions: Set<string>;
+  yellowWarningShown: boolean;
 }
 
 const state: AutoContinuityState = {
@@ -23,6 +24,7 @@ const state: AutoContinuityState = {
   autoSaveTriggered: false,
   sessionName: null,
   initializedSessions: new Set(),
+  yellowWarningShown: false,
 };
 
 function getSessionName(): string {
@@ -141,9 +143,21 @@ function saveAutoHandoff(
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const filename = `auto-handoff-${timestamp}.md`;
   const filePath = path.join(handoffDir, filename);
+  const tempPath = `${filePath}.tmp`;
 
   const content = generateAutoHandoffContent(ledger, contextPct);
-  fs.writeFileSync(filePath, content, "utf-8");
+
+  try {
+    fs.writeFileSync(tempPath, content, "utf-8");
+    fs.renameSync(tempPath, filePath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+    throw err;
+  }
 
   return filePath;
 }
@@ -261,11 +275,10 @@ export function createAutoContinuityHook(
       return `🟠 **Context Warning** (${(contextPct * 100).toFixed(1)}%) - Consider running \`/create_handoff\` then \`/clear\` soon.`;
     }
 
-    // Yellow threshold - occasional reminder (20% chance)
-    if (contextPct >= yellow && contextPct < red) {
-      if (Math.random() < 0.2) {
-        return `🟡 Context at ${(contextPct * 100).toFixed(1)}%. Plan a good stopping point for handoff.`;
-      }
+    // Yellow threshold - show once per session when first crossing
+    if (contextPct >= yellow && contextPct < red && !state.yellowWarningShown) {
+      state.yellowWarningShown = true;
+      return `🟡 Context at ${(contextPct * 100).toFixed(1)}%. Plan a good stopping point for handoff.`;
     }
 
     return null;
@@ -490,17 +503,24 @@ export function createAutoContinuityHook(
             .filter((t) => t.status === "pending")
             .map((t) => String(t.content));
 
-          state.lastLedger = ledgerManager.updateState(state.lastLedger, {
-            done: done.slice(-10),
-            now: inProgress ? String(inProgress.content) : "",
-            next: pending.slice(0, 5),
-          });
+          try {
+            state.lastLedger = ledgerManager.updateState(state.lastLedger, {
+              done: done.slice(-10),
+              now: inProgress ? String(inProgress.content) : "",
+              next: pending.slice(0, 5),
+            });
 
-          log("[auto-continuity] Synced ledger with todos", {
-            done: done.length,
-            now: inProgress?.content,
-            next: pending.length,
-          });
+            log("[auto-continuity] Synced ledger with todos", {
+              done: done.length,
+              now: inProgress?.content,
+              next: pending.length,
+            });
+          } catch (updateErr) {
+            log("[auto-continuity] Failed to update ledger, reloading", {
+              err: updateErr,
+            });
+            state.lastLedger = ledgerManager.findLatestLedger();
+          }
         }
       } catch {
         // Ignore parse errors - output might not be JSON

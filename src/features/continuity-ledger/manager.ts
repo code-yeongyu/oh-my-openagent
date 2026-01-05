@@ -216,7 +216,20 @@ export class LedgerManager {
   saveLedger(ledger: Ledger): void {
     this.ensureDir();
     const content = this.serializeLedger(ledger);
-    fs.writeFileSync(ledger.metadata.filePath, content, "utf-8");
+    const filePath = ledger.metadata.filePath;
+    const tempPath = `${filePath}.tmp`;
+
+    try {
+      fs.writeFileSync(tempPath, content, "utf-8");
+      fs.renameSync(tempPath, filePath);
+    } catch (err) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw err;
+    }
   }
 
   private serializeLedger(ledger: Ledger): string {
