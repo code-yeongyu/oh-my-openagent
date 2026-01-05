@@ -30,7 +30,7 @@ describe("runner", () => {
         name: "Test Check",
         category: "installation",
         check: async () => {
-          await new Promise((r) => setTimeout(r, 10))
+          await new Promise((r) => setTimeout(r, 50))
           return { name: "Test", status: "pass", message: "OK" }
         },
       }
