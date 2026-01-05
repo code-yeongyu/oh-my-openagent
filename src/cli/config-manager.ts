@@ -310,6 +310,15 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     config.agents = agents
   }
 
+  // Categories: override model for Antigravity auth (gemini-3-pro-preview → gemini-3-pro-high)
+  if (installConfig.hasGemini) {
+    config.categories = {
+      visual: { model: "google/gemini-3-pro-high" },
+      artistry: { model: "google/gemini-3-pro-high" },
+      writing: { model: "google/gemini-3-pro-high" },
+    }
+  }
+
   return config
 }
 
