@@ -178,7 +178,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         const defaultModel = config.model as string | undefined;
         const plannerSisyphusBase = {
           model: (migratedPlanConfig as Record<string, unknown>).model ?? defaultModel,
-          mode: "all" as const,
+          mode: "primary" as const,
           prompt: PLAN_SYSTEM_PROMPT,
           permission: PLAN_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
