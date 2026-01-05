@@ -128,22 +128,25 @@ const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-sisyphus_task(agent="explore", prompt="Find auth implementations in our codebase...", background=true)
-sisyphus_task(agent="explore", prompt="Find error handling patterns here...", background=true)
+sisyphus_task(agent="explore", prompt="Find auth implementations in our codebase...")
+sisyphus_task(agent="explore", prompt="Find error handling patterns here...")
 // Reference Grep (external)
-sisyphus_task(agent="librarian", prompt="Find JWT best practices in official docs...", background=true)
-sisyphus_task(agent="librarian", prompt="Find how production apps handle auth in Express...", background=true)
-// Continue working immediately. System will notify when each completes.
+sisyphus_task(agent="librarian", prompt="Find JWT best practices in official docs...")
+sisyphus_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
+// Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
-result = sisyphus_task(...)  // Never wait synchronously for explore/librarian
+result = task(...)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
-1. Launch parallel agents with background=true → receive task_ids
+1. Launch parallel agents → receive task_ids
 2. Continue immediate work
-3. System will notify when tasks complete
-4. Use \`background_output(task_id="...")\` to get results when needed
+3. When results needed: \`background_output(task_id="...")\`
+4. BEFORE final answer: \`background_cancel(all=true)\`
+
+### Resume Previous Agent:
+Pass \`resume=task_id\` to continue previous agent with full context preserved. Useful for follow-up questions or multi-turn exploration.
 
 ### Search Stop Conditions
 
@@ -492,6 +495,7 @@ export function createSisyphusAgent(
     maxTokens: 64000,
     prompt,
     color: "#00CED1",
+    tools: { call_omo_agent: false },
   }
 
   if (isGptModel(model)) {

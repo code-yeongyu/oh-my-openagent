@@ -238,7 +238,7 @@ export function buildOracleSection(agents: AvailableAgent[]): string {
   const avoidWhen = oracleAgent.metadata.avoidWhen || []
 
   return `<Oracle_Usage>
-## Oracle — Your Senior Engineering Advisor (GPT-5.2)
+## Oracle — Your Senior Engineering Advisor
 
 Oracle is an expensive, high-quality reasoning model. Use it wisely.
 
