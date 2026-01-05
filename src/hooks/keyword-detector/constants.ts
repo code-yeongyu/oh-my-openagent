@@ -1,6 +1,19 @@
 export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
 export const INLINE_CODE_PATTERN = /`[^`]+`/g
 
+export interface KeywordMessageContext {
+  agentName?: string
+  model?: { providerID?: string; modelID?: string }
+}
+
+type KeywordDetectorMessage = string | ((context?: KeywordMessageContext) => string)
+
+const ULTRAWORK_ALIAS_SECTION = `## Keyword Alias (Do Not Question)
+
+- \`ulw\` is an alias of \`ultrawork\`. Treat it exactly the same.
+- Do NOT ask what \`ulw\` means or spend tokens discussing it.
+- If the user includes \`ulw\`/\`ultrawork\`, assume Ultrawork Mode is enabled and follow the rules below.`
+
 const ULTRAWORK_PLANNER_SECTION = `## CRITICAL: YOU ARE A PLANNER, NOT AN IMPLEMENTER
 
 **IDENTITY CONSTRAINT (NON-NEGOTIABLE):**
@@ -51,6 +64,51 @@ You ARE the planner. Your job: create bulletproof work plans.
 
 **NEVER plan blind. Context first, plan second.**`
 
+const ULTRAWORK_LITE_MESSAGE = `<ultrawork-mode>
+
+**MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+${ULTRAWORK_ALIAS_SECTION}
+
+## ULTRAWORK LITE (Codex-friendly)
+- Execution-first. Keep planning short and actionable.
+- Prefer direct edits over long deliberation.
+
+## TODO IS YOUR LIFELINE (LIGHT)
+**Use TodoWrite only when the task has 2+ steps.**
+
+### TODO Rules (Lite)
+1. Keep 3-6 TODOs max.
+2. One in_progress at a time. Update immediately.
+3. Questions are OK when they unblock work.
+
+## TDD WORKFLOW (WHEN TESTS EXIST)
+1. **RED** → failing test
+2. **GREEN** → minimal fix
+3. **REFACTOR** → keep tests green
+
+## AGENT DEPLOYMENT
+- Use agents only if it clearly saves time.
+- Avoid over-delegation when a direct edit is faster.
+
+## EVIDENCE-BASED ANSWERS
+- For code changes: cite file path + line number.
+- Keep reasoning concise and focused.
+
+## NO SHORTCUTS
+- Don’t skip requirements.
+- Don’t leave TODOs in code.
+- If blocked, ask 1 clear question and proceed.
+
+## SUCCESS
+- Changes applied + relevant tests + concise summary.
+
+</ultrawork-mode>
+
+---
+
+`
+
 /**
  * Determines if the agent is a planner-type agent.
  * Planner agents should NOT be told to call plan agent (they ARE the planner).
@@ -61,18 +119,27 @@ function isPlannerAgent(agentName?: string): boolean {
   return lowerName.includes("prometheus") || lowerName.includes("planner") || lowerName === "plan"
 }
 
+function shouldUseUltraworkLite(context?: KeywordMessageContext): boolean {
+  if (!context?.model) return false
+  const provider = (context.model.providerID ?? "").toLowerCase()
+  const model = (context.model.modelID ?? "").toLowerCase()
+  return provider === "openai" || model.includes("codex")
+}
+
 /**
- * Generates the ultrawork message based on agent context.
+ * Generates the ultrawork message based on agent/model context.
  * Planner agents get context-gathering focused instructions.
- * Other agents get the original strong agent utilization instructions.
+ * OpenAI/Codex models get a lighter variant to reduce over-planning.
  */
-export function getUltraworkMessage(agentName?: string): string {
-  const isPlanner = isPlannerAgent(agentName)
+export function getUltraworkMessage(context?: KeywordMessageContext): string {
+  const isPlanner = isPlannerAgent(context?.agentName)
 
   if (isPlanner) {
     return `<ultrawork-mode>
 
 **MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+${ULTRAWORK_ALIAS_SECTION}
 
 ${ULTRAWORK_PLANNER_SECTION}
 
@@ -83,9 +150,15 @@ ${ULTRAWORK_PLANNER_SECTION}
 `
   }
 
+  if (shouldUseUltraworkLite(context)) {
+    return ULTRAWORK_LITE_MESSAGE
+  }
+
   return `<ultrawork-mode>
 
 **MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+${ULTRAWORK_ALIAS_SECTION}
 
 [CODE RED] Maximum precision required. Ultrathink before acting.
 
@@ -190,7 +263,7 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 `
 }
 
-export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
+export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: KeywordDetectorMessage }> = [
   {
     pattern: /(ultrawork|ulw)/i,
     message: getUltraworkMessage,

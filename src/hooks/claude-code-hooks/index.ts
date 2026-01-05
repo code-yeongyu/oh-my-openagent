@@ -26,6 +26,7 @@ import {
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
 import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
 import type { PluginConfig } from "./types"
+import { detectKeywordsWithType, removeCodeBlocks } from "../keyword-detector"
 import { log, isHookDisabled } from "../../shared"
 import type { ContextCollector } from "../../features/context-injector"
 
@@ -141,9 +142,29 @@ export function createClaudeCodeHooksHook(
           return
         }
 
-        if (result.messages.length > 0) {
-          const hookContent = result.messages.join("\n\n")
-          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
+        let detectedKeywords: ReturnType<typeof detectKeywordsWithType> = []
+        let keywordMessages: string[] = []
+        if (!config.keywordDetectorDisabled) {
+          detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt), {
+            agentName: input.agent,
+            model: input.model,
+          })
+          keywordMessages = detectedKeywords.map((k) => k.message)
+
+          if (keywordMessages.length > 0) {
+            log("[claude-code-hooks] Detected keywords", {
+              sessionID: input.sessionID,
+              keywordCount: keywordMessages.length,
+              types: detectedKeywords.map((k) => k.type),
+            })
+          }
+        }
+
+        const allMessages = [...keywordMessages, ...result.messages]
+
+        if (allMessages.length > 0) {
+          const hookContent = allMessages.join("\n\n")
+          log(`[claude-code-hooks] Injecting ${allMessages.length} messages (${keywordMessages.length} keyword + ${result.messages.length} hook)`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
 
           if (isFirstMessage) {
             const idx = output.parts.findIndex((p) => p.type === "text" && p.text)

@@ -23,7 +23,10 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
-      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
+      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), {
+        agentName: input.agent,
+        model: input.model,
+      })
 
       if (detectedKeywords.length === 0) {
         return
