@@ -244,7 +244,15 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
       try {
         const task = manager.getTask(args.task_id)
         if (!task) {
-          return `Task not found: ${args.task_id}`
+          return `❌ Task not found: ${args.task_id}
+
+This task may have:
+- Expired (tasks are kept for 30 minutes after completion)
+- Never existed (check the task_id is correct)
+- Been cancelled via background_cancel
+
+If the task was long-running, it may have completed but expired before you checked.
+Try calling background_output sooner after receiving the completion notification.`
         }
 
         const shouldBlock = args.block === true
@@ -273,7 +281,9 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
 
           const currentTask = manager.getTask(args.task_id)
           if (!currentTask) {
-            return `Task was deleted: ${args.task_id}`
+            return `❌ Task was deleted or expired: ${args.task_id}
+
+The task may have been cleaned up (30 minute TTL after completion) or cancelled.`
           }
 
           if (currentTask.status === "completed") {
@@ -285,12 +295,17 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
           }
         }
 
-        // Timeout exceeded: return current status
         const finalTask = manager.getTask(args.task_id)
         if (!finalTask) {
-          return `Task was deleted: ${args.task_id}`
+          return `❌ Task was deleted or expired: ${args.task_id}
+
+The task may have been cleaned up (30 minute TTL after completion) or cancelled.`
         }
-        return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask)}`
+        return `⏱️ Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.
+
+Try checking again later or increase the timeout parameter.
+
+${formatTaskStatus(finalTask)}`
       } catch (error) {
         return `Error getting output: ${error instanceof Error ? error.message : String(error)}`
       }

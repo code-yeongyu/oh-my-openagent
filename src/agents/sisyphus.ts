@@ -126,24 +126,35 @@ const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 **Explore/Librarian = Grep, not consultants.
 
 \`\`\`typescript
-// CORRECT: Always background, always parallel
-// Contextual Grep (internal)
-background_task(agent="explore", prompt="Find auth implementations in our codebase...")
-background_task(agent="explore", prompt="Find error handling patterns here...")
-// Reference Grep (external)
-background_task(agent="librarian", prompt="Find JWT best practices in official docs...")
-background_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
-// Continue working immediately. Collect with background_output when needed.
+// CORRECT Pattern 1: Launch and do OTHER work while waiting
+background_task(agent="explore", prompt="Find auth implementations...")  // → task_id_1
+background_task(agent="librarian", prompt="Find JWT docs...")  // → task_id_2
+// Now work on something else while they run (read files, analyze code, etc.)
+// Later when you need results:
+background_output(task_id="task_id_1")
+background_output(task_id="task_id_2")
 
-// WRONG: Sequential or blocking
-result = task(...)  // Never wait synchronously for explore/librarian
+// CORRECT Pattern 2: Launch and MUST wait (no other work possible)
+background_task(agent="librarian", prompt="Search React docs...")  // → task_id
+background_output(task_id="task_id", block=true)  // Wait for completion
+// Now use the results immediately
+
+// WRONG: Launch then end turn idle
+background_task(agent="explore", prompt="Find patterns...")
+// "Waiting for task to complete..." → END TURN  // ❌ NEVER DO THIS
+// Instead: call background_output(block=true) or do other work
 \`\`\`
 
 ### Background Result Collection:
 1. Launch parallel agents → receive task_ids
-2. Continue immediate work
-3. When results needed: \`background_output(task_id="...")\`
-4. BEFORE final answer: \`background_cancel(all=true)\`
+2. **Do other work immediately** (don't wait idle)
+   - If you can make progress without results → do it
+   - If you NEED results to proceed → call \`background_output(task_id="...", block=true)\`
+3. Collect results when needed: \`background_output(task_id="...")\`
+4. **NEVER** say "waiting for tasks" then end turn - either work or call background_output
+5. BEFORE final answer: \`background_cancel(all=true)\`
+
+**When to block**: If user's question REQUIRES background task results and there's no other work possible, call \`background_output(task_id="...", block=true)\` to wait for completion. Don't end your turn idle.
 
 ### Search Stop Conditions
 
