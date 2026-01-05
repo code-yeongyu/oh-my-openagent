@@ -7,8 +7,6 @@ import {
   isOpenCodeInstalled,
   getOpenCodeVersion,
   addAuthPlugins,
-  setupChatGPTHotfix,
-  runBunInstall,
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
@@ -279,26 +277,6 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     step += 2
   }
 
-  if (config.hasChatGPT) {
-    printStep(step++, totalSteps, "Setting up ChatGPT hotfix...")
-    const hotfixResult = setupChatGPTHotfix()
-    if (!hotfixResult.success) {
-      printError(`Failed: ${hotfixResult.error}`)
-      return 1
-    }
-    printSuccess(`Hotfix configured ${SYMBOLS.arrow} ${color.dim(hotfixResult.configPath)}`)
-
-    printInfo("Installing dependencies with bun...")
-    const bunSuccess = await runBunInstall()
-    if (bunSuccess) {
-      printSuccess("Dependencies installed")
-    } else {
-      printWarning("bun install failed - run manually: cd ~/.config/opencode && bun i")
-    }
-  } else {
-    step++
-  }
-
   printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
@@ -408,25 +386,6 @@ export async function install(args: InstallArgs): Promise<number> {
       return 1
     }
     s.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
-  }
-
-  if (config.hasChatGPT) {
-    s.start("Setting up ChatGPT hotfix")
-    const hotfixResult = setupChatGPTHotfix()
-    if (!hotfixResult.success) {
-      s.stop(`Failed to setup hotfix: ${hotfixResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    s.stop(`Hotfix configured in ${color.cyan(hotfixResult.configPath)}`)
-
-    s.start("Installing dependencies with bun")
-    const bunSuccess = await runBunInstall()
-    if (bunSuccess) {
-      s.stop("Dependencies installed")
-    } else {
-      s.stop(color.yellow("bun install failed - run manually: cd ~/.config/opencode && bun i"))
-    }
   }
 
   s.start("Writing oh-my-opencode configuration")
