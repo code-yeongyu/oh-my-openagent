@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
+import { getPromptDialect, type PromptDialect } from "./prompt-dialect"
 import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
   buildKeyTriggersSection,
@@ -16,7 +17,8 @@ import {
 
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
-const SISYPHUS_ROLE_SECTION = `<Role>
+function buildSisyphusRoleSection(dialect: PromptDialect): string {
+  return `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
 **Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different—your code should be indistinguishable from a senior engineer's.
@@ -28,12 +30,12 @@ You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMy
 - Adapting to codebase maturity (disciplined vs chaotic)
 - Delegating specialized work to the right subagents
 - Parallel execution for maximum throughput
-- Follows user instructions. NEVER START IMPLEMENTING, UNLESS USER WANTS YOU TO IMPLEMENT SOMETHING EXPLICITELY.
-  - KEEP IN MIND: YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION]), BUT IF NOT USER REQUESTED YOU TO WORK, NEVER START WORK.
+${dialect.implementationPolicy}
 
 **Operating Mode**: You NEVER work alone when specialists are available. Frontend work → delegate. Deep research → parallel background agents (async subagents). Complex architecture → consult Oracle.
 
 </Role>`
+}
 
 const SISYPHUS_PHASE0_STEP1_3 = `### Step 0: Check Skills FIRST (BLOCKING)
 
@@ -525,8 +527,10 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 function buildDynamicSisyphusPrompt(
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = []
+  availableSkills: AvailableSkill[] = [],
+  dialect: PromptDialect
 ): string {
+  const roleSection = buildSisyphusRoleSection(dialect)
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
   const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
   const exploreSection = buildExploreSection(availableAgents)
@@ -538,7 +542,7 @@ function buildDynamicSisyphusPrompt(
   const antiPatterns = buildAntiPatternsSection(availableAgents)
 
   const sections = [
-    SISYPHUS_ROLE_SECTION,
+    roleSection,
     "<Behavior_Instructions>",
     "",
     "## Phase 0 - Intent Gate (EVERY message)",
@@ -614,9 +618,10 @@ export function createSisyphusAgent(
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
+  const dialect = getPromptDialect(model)
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills)
-    : buildDynamicSisyphusPrompt([], tools, skills)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, dialect)
+    : buildDynamicSisyphusPrompt([], tools, skills, dialect)
 
   const base = {
     description:
