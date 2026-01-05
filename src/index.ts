@@ -26,6 +26,9 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createTaskResumeInfoHook,
+  createStartWorkHook,
+  createSisyphusOrchestratorHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -49,12 +52,14 @@ import {
 import {
   builtinTools,
   createCallOmoAgent,
+  createBackgroundTools,
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
   createSlashcommandTool,
   discoverCommandsSync,
   sessionExists,
+  createSisyphusTask,
   interactive_bash,
   startTmuxCheck,
 } from "./tools";
@@ -185,6 +190,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
+  const startWork = isHookEnabled("start-work")
+    ? createStartWorkHook(ctx)
+    : null;
+
+  const sisyphusOrchestrator = isHookEnabled("sisyphus-orchestrator")
+    ? createSisyphusOrchestratorHook(ctx)
+    : null;
+
+  const taskResumeInfo = createTaskResumeInfoHook();
+
   const backgroundManager = new BackgroundManager(ctx);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -201,9 +216,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
+  const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
+  const sisyphusTask = createSisyphusTask({
+    manager: backgroundManager,
+    client: ctx.client,
+    userCategories: pluginConfig.categories,
+  });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
   const builtinSkills = createBuiltinSkills().filter((skill) => {
@@ -268,8 +289,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     tool: {
       ...builtinTools,
+      ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
+      sisyphus_task: sisyphusTask,
       skill: skillTool,
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,
@@ -281,6 +304,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await keywordDetector?.["chat.message"]?.(input, output);
       await contextInjector["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
+      await startWork?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
         const parts = (
@@ -437,6 +461,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
         args.tools = {
           ...(args.tools as Record<string, boolean> | undefined),
+          sisyphus_task: false,
           ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
         };
       }
@@ -484,24 +509,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
       await editErrorRecovery?.["tool.execute.after"](input, output);
-
-      if (input.tool === "sisyphus_task") {
-        const result = output.output;
-        if (result && typeof result === "string") {
-          const taskIdMatch = result.match(/task[_\s-]?id[:\s]+["']?([a-z0-9_-]+)["']?/i);
-          const sessionIdMatch = result.match(/session[_\s-]?id[:\s]+["']?([a-z0-9_-]+)["']?/i);
-          const descriptionMatch = result.match(/description[:\s]+["']?([^"'\n]+)["']?/i);
-
-          if (taskIdMatch?.[1] && sessionIdMatch?.[1]) {
-            backgroundManager.registerExternalTask({
-              taskId: taskIdMatch[1],
-              sessionID: sessionIdMatch[1],
-              parentSessionID: input.sessionID,
-              description: descriptionMatch?.[1] || "Background task",
-            });
-          }
-        }
-      }
+      await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
+      await taskResumeInfo["tool.execute.after"](input, output);
     },
   };
 };
