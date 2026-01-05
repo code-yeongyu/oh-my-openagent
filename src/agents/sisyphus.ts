@@ -57,7 +57,7 @@ Skills are specialized workflows. When relevant, they handle the task better tha
 | **Skill Match** | Matches skill trigger phrase | 1 | **INVOKE skill FIRST** via \`skill\` tool |
 | **Trivial** | Single file, known location | 1-2 | Direct tools only, skip exploration |
 | **Conceptual** | "How does X?", "Best practice?" | 3+ | context7 + websearch + explore in parallel |
-| **Implementation** | "Add feature", "Implement X" | 4+ | explore + lsp_references + grep + read patterns |
+| **Implementation** | "Add feature", "Implement X" | 4+ | explore + lsp_find_references + grep + read patterns |
 | **Debugging** | "Why error?", "Fix bug" | 4+ | lsp_diagnostics + explore + read + grep error |
 | **Refactoring** | "Refactor", "Improve", "Clean up" | 5+ | ast_grep + lsp_find_references + explore patterns |
 | **GitHub Work** | Issue mention, "create PR" | 4+ | Full cycle: investigate → implement → verify → PR |
