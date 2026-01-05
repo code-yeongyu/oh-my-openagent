@@ -83,19 +83,6 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
   }
 }
 
-const availableCommands = discoverCommandsSync()
-const availableSkills = discoverAllSkills()
-const availableItems = [
-  ...availableCommands,
-  ...availableSkills.map(skillToCommandInfo),
-]
-const commandListForDescription = availableItems
-  .map((cmd) => {
-    const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
-    return `- /${cmd.name}${hint}: ${cmd.metadata.description} (${cmd.scope})`
-  })
-  .join("\n")
-
 async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   const sections: string[] = []
 
@@ -151,15 +138,40 @@ function formatCommandList(items: CommandInfo[]): string {
   return lines.join("\n")
 }
 
-export const slashcommand: ToolDefinition = tool({
-  description: `Load a skill to get detailed instructions for a specific task.
+async function buildDescription(): Promise<string> {
+  const availableCommands = discoverCommandsSync()
+  const availableSkills = await discoverAllSkills()
+  const availableItems = [
+    ...availableCommands,
+    ...availableSkills.map(skillToCommandInfo),
+  ]
+  const commandListForDescription = availableItems
+    .map((cmd) => {
+      const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
+      return `- /${cmd.name}${hint}: ${cmd.metadata.description} (${cmd.scope})`
+    })
+    .join("\n")
+
+  return `Load a skill to get detailed instructions for a specific task.
 
 Skills provide specialized knowledge and step-by-step guidance.
 Use this when a task matches an available skill's description.
 
 <available_skills>
 ${commandListForDescription}
-</available_skills>`,
+</available_skills>`
+}
+
+let cachedDescription: string | null = null
+
+export const slashcommand: ToolDefinition = tool({
+  get description() {
+    if (!cachedDescription) {
+      cachedDescription = "Loading available commands and skills..."
+      buildDescription().then(desc => { cachedDescription = desc })
+    }
+    return cachedDescription
+  },
 
   args: {
     command: tool.schema
@@ -171,7 +183,7 @@ ${commandListForDescription}
 
   async execute(args) {
     const commands = discoverCommandsSync()
-    const skills = discoverAllSkills()
+    const skills = await discoverAllSkills()
     const allItems = [
       ...commands,
       ...skills.map(skillToCommandInfo),

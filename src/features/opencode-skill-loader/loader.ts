@@ -1,11 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from "fs"
 import { promises as fs } from "fs"
 import { join, basename } from "path"
 import { homedir } from "os"
 import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
-import { resolveSymlink, isMarkdownFile } from "../../shared/file-utils"
+import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
@@ -26,20 +25,17 @@ function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | u
   return undefined
 }
 
-function loadMcpJsonFromDir(skillDir: string): SkillMcpConfig | undefined {
+async function loadMcpJsonFromDir(skillDir: string): Promise<SkillMcpConfig | undefined> {
   const mcpJsonPath = join(skillDir, "mcp.json")
-  if (!existsSync(mcpJsonPath)) return undefined
-
+  
   try {
-    const content = readFileSync(mcpJsonPath, "utf-8")
+    const content = await fs.readFile(mcpJsonPath, "utf-8")
     const parsed = JSON.parse(content) as Record<string, unknown>
     
-    // AmpCode format: { "mcpServers": { "name": { ... } } }
     if (parsed && typeof parsed === "object" && "mcpServers" in parsed && parsed.mcpServers) {
       return parsed.mcpServers as SkillMcpConfig
     }
     
-    // Also support direct format: { "name": { command: ..., args: ... } }
     if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
       const hasCommandField = Object.values(parsed).some(
         (v) => v && typeof v === "object" && "command" in (v as Record<string, unknown>)
@@ -59,77 +55,7 @@ function parseAllowedTools(allowedTools: string | undefined): string[] | undefin
   return allowedTools.split(/\s+/).filter(Boolean)
 }
 
-function loadSkillFromPath(
-  skillPath: string,
-  resolvedPath: string,
-  defaultName: string,
-  scope: SkillScope
-): LoadedSkill | null {
-  try {
-    const content = readFileSync(skillPath, "utf-8")
-    const { data } = parseFrontmatter<SkillMetadata>(content)
-    const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
-    const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
-    const mcpConfig = mcpJsonMcp || frontmatterMcp
-
-    const skillName = data.name || defaultName
-    const originalDescription = data.description || ""
-    const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
-    const formattedDescription = `(${scope} - Skill) ${originalDescription}`
-
-    // Lazy content loader - only loads template on first use
-    const lazyContent: LazyContentLoader = {
-      loaded: false,
-      content: undefined,
-      load: async () => {
-        if (!lazyContent.loaded) {
-          const fileContent = await fs.readFile(skillPath, "utf-8")
-          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
-          lazyContent.content = `<skill-instruction>
-Base directory for this skill: ${resolvedPath}/
-File references (@path) in this skill are relative to this directory.
-
-${body.trim()}
-</skill-instruction>
-
-<user-request>
-$ARGUMENTS
-</user-request>`
-          lazyContent.loaded = true
-        }
-        return lazyContent.content!
-      },
-    }
-
-    const definition: CommandDefinition = {
-      name: skillName,
-      description: formattedDescription,
-      template: "", // Empty at startup, loaded lazily
-      model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
-      agent: data.agent,
-      subtask: data.subtask,
-      argumentHint: data["argument-hint"],
-    }
-
-    return {
-      name: skillName,
-      path: skillPath,
-      resolvedPath,
-      definition,
-      scope,
-      license: data.license,
-      compatibility: data.compatibility,
-      metadata: data.metadata,
-      allowedTools: parseAllowedTools(data["allowed-tools"]),
-      mcpConfig,
-      lazyContent,
-    }
-  } catch {
-    return null
-  }
-}
-
-async function loadSkillFromPathAsync(
+async function loadSkillFromPath(
   skillPath: string,
   resolvedPath: string,
   defaultName: string,
@@ -139,7 +65,7 @@ async function loadSkillFromPathAsync(
     const content = await fs.readFile(skillPath, "utf-8")
     const { data } = parseFrontmatter<SkillMetadata>(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
-    const mcpJsonMcp = loadMcpJsonFromDir(resolvedPath)
+    const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
     const skillName = data.name || defaultName
@@ -198,60 +124,7 @@ $ARGUMENTS
   }
 }
 
-/**
- * Load skills from a directory, supporting BOTH patterns:
- * - Directory with SKILL.md: skill-name/SKILL.md
- * - Directory with {SKILLNAME}.md: skill-name/{SKILLNAME}.md
- * - Direct markdown file: skill-name.md
- */
-function loadSkillsFromDir(skillsDir: string, scope: SkillScope): LoadedSkill[] {
-  if (!existsSync(skillsDir)) {
-    return []
-  }
-
-  const entries = readdirSync(skillsDir, { withFileTypes: true })
-  const skills: LoadedSkill[] = []
-
-  for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue
-
-    const entryPath = join(skillsDir, entry.name)
-
-    if (entry.isDirectory() || entry.isSymbolicLink()) {
-      const resolvedPath = resolveSymlink(entryPath)
-      const dirName = entry.name
-
-      const skillMdPath = join(resolvedPath, "SKILL.md")
-      if (existsSync(skillMdPath)) {
-        const skill = loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope)
-        if (skill) skills.push(skill)
-        continue
-      }
-
-      const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
-      if (existsSync(namedSkillMdPath)) {
-        const skill = loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope)
-        if (skill) skills.push(skill)
-        continue
-      }
-
-      continue
-    }
-
-    if (isMarkdownFile(entry)) {
-      const skillName = basename(entry.name, ".md")
-      const skill = loadSkillFromPath(entryPath, skillsDir, skillName, scope)
-      if (skill) skills.push(skill)
-    }
-  }
-
-  return skills
-}
-
-/**
- * Async version of loadSkillsFromDir using Promise-based fs operations.
- */
-async function loadSkillsFromDirAsync(skillsDir: string, scope: SkillScope): Promise<LoadedSkill[]> {
+async function loadSkillsFromDir(skillsDir: string, scope: SkillScope): Promise<LoadedSkill[]> {
   const entries = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => [])
   const skills: LoadedSkill[] = []
 
@@ -261,13 +134,13 @@ async function loadSkillsFromDirAsync(skillsDir: string, scope: SkillScope): Pro
     const entryPath = join(skillsDir, entry.name)
 
     if (entry.isDirectory() || entry.isSymbolicLink()) {
-      const resolvedPath = resolveSymlink(entryPath)
+      const resolvedPath = await resolveSymlinkAsync(entryPath)
       const dirName = entry.name
 
       const skillMdPath = join(resolvedPath, "SKILL.md")
       try {
         await fs.access(skillMdPath)
-        const skill = await loadSkillFromPathAsync(skillMdPath, resolvedPath, dirName, scope)
+        const skill = await loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope)
         if (skill) skills.push(skill)
         continue
       } catch {
@@ -276,7 +149,7 @@ async function loadSkillsFromDirAsync(skillsDir: string, scope: SkillScope): Pro
       const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
       try {
         await fs.access(namedSkillMdPath)
-        const skill = await loadSkillFromPathAsync(namedSkillMdPath, resolvedPath, dirName, scope)
+        const skill = await loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope)
         if (skill) skills.push(skill)
         continue
       } catch {
@@ -287,7 +160,7 @@ async function loadSkillsFromDirAsync(skillsDir: string, scope: SkillScope): Pro
 
     if (isMarkdownFile(entry)) {
       const skillName = basename(entry.name, ".md")
-      const skill = await loadSkillFromPathAsync(entryPath, skillsDir, skillName, scope)
+      const skill = await loadSkillFromPath(entryPath, skillsDir, skillName, scope)
       if (skill) skills.push(skill)
     }
   }
@@ -304,190 +177,86 @@ function skillsToRecord(skills: LoadedSkill[]): Record<string, CommandDefinition
   return result
 }
 
-/**
- * Load skills from Claude Code user directory (~/.claude/skills/)
- */
-export function loadUserSkills(): Record<string, CommandDefinition> {
+export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  const skills = loadSkillsFromDir(userSkillsDir, "user")
+  const skills = await loadSkillsFromDir(userSkillsDir, "user")
   return skillsToRecord(skills)
 }
 
-/**
- * Load skills from Claude Code project directory (.claude/skills/)
- */
-export function loadProjectSkills(): Record<string, CommandDefinition> {
+export async function loadProjectSkills(): Promise<Record<string, CommandDefinition>> {
   const projectSkillsDir = join(process.cwd(), ".claude", "skills")
-  const skills = loadSkillsFromDir(projectSkillsDir, "project")
+  const skills = await loadSkillsFromDir(projectSkillsDir, "project")
   return skillsToRecord(skills)
 }
 
-/**
- * Load skills from OpenCode global directory (~/.config/opencode/skill/)
- */
-export function loadOpencodeGlobalSkills(): Record<string, CommandDefinition> {
+export async function loadOpencodeGlobalSkills(): Promise<Record<string, CommandDefinition>> {
   const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
-  const skills = loadSkillsFromDir(opencodeSkillsDir, "opencode")
+  const skills = await loadSkillsFromDir(opencodeSkillsDir, "opencode")
   return skillsToRecord(skills)
 }
 
-/**
- * Load skills from OpenCode project directory (.opencode/skill/)
- */
-export function loadOpencodeProjectSkills(): Record<string, CommandDefinition> {
+export async function loadOpencodeProjectSkills(): Promise<Record<string, CommandDefinition>> {
   const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  const skills = loadSkillsFromDir(opencodeProjectDir, "opencode-project")
+  const skills = await loadSkillsFromDir(opencodeProjectDir, "opencode-project")
   return skillsToRecord(skills)
-}
-
-/**
- * Async version of loadUserSkills
- */
-export async function loadUserSkillsAsync(): Promise<Record<string, CommandDefinition>> {
-  const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  const skills = await loadSkillsFromDirAsync(userSkillsDir, "user")
-  return skillsToRecord(skills)
-}
-
-/**
- * Async version of loadProjectSkills
- */
-export async function loadProjectSkillsAsync(): Promise<Record<string, CommandDefinition>> {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
-  const skills = await loadSkillsFromDirAsync(projectSkillsDir, "project")
-  return skillsToRecord(skills)
-}
-
-/**
- * Async version of loadOpencodeGlobalSkills
- */
-export async function loadOpencodeGlobalSkillsAsync(): Promise<Record<string, CommandDefinition>> {
-  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
-  const skills = await loadSkillsFromDirAsync(opencodeSkillsDir, "opencode")
-  return skillsToRecord(skills)
-}
-
-/**
- * Async version of loadOpencodeProjectSkills
- */
-export async function loadOpencodeProjectSkillsAsync(): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  const skills = await loadSkillsFromDirAsync(opencodeProjectDir, "opencode-project")
-  return skillsToRecord(skills)
-}
-
-/**
- * Discover all skills from all sources with priority ordering.
- * Priority order: opencode-project > project > opencode > user
- * 
- * @returns Array of LoadedSkill objects for use in slashcommand discovery
- */
-export function discoverAllSkills(): LoadedSkill[] {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  const projectDir = join(process.cwd(), ".claude", "skills")
-  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "skill")
-  const userDir = join(getClaudeConfigDir(), "skills")
-
-  const opencodeProjectSkills = loadSkillsFromDir(opencodeProjectDir, "opencode-project")
-  const projectSkills = loadSkillsFromDir(projectDir, "project")
-  const opencodeGlobalSkills = loadSkillsFromDir(opencodeGlobalDir, "opencode")
-  const userSkills = loadSkillsFromDir(userDir, "user")
-
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
 }
 
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
 }
 
-/**
- * Discover skills with optional filtering.
- * When includeClaudeCodePaths is false, only loads from OpenCode paths.
- */
-export function discoverSkills(options: DiscoverSkillsOptions = {}): LoadedSkill[] {
-  const { includeClaudeCodePaths = true } = options
-
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "skill")
-
-  const opencodeProjectSkills = loadSkillsFromDir(opencodeProjectDir, "opencode-project")
-  const opencodeGlobalSkills = loadSkillsFromDir(opencodeGlobalDir, "opencode")
-
-  if (!includeClaudeCodePaths) {
-    return [...opencodeProjectSkills, ...opencodeGlobalSkills]
-  }
-
-  const projectDir = join(process.cwd(), ".claude", "skills")
-  const userDir = join(getClaudeConfigDir(), "skills")
-
-  const projectSkills = loadSkillsFromDir(projectDir, "project")
-  const userSkills = loadSkillsFromDir(userDir, "user")
+export async function discoverAllSkills(): Promise<LoadedSkill[]> {
+  const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills] = await Promise.all([
+    discoverOpencodeProjectSkills(),
+    discoverProjectClaudeSkills(),
+    discoverOpencodeGlobalSkills(),
+    discoverUserClaudeSkills(),
+  ])
 
   return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
 }
 
-/**
- * Get a skill by name from all available sources.
- */
-export function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): LoadedSkill | undefined {
-  const skills = discoverSkills(options)
-  return skills.find(s => s.name === name)
-}
-
-export function discoverUserClaudeSkills(): LoadedSkill[] {
-  const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  return loadSkillsFromDir(userSkillsDir, "user")
-}
-
-export function discoverProjectClaudeSkills(): LoadedSkill[] {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
-  return loadSkillsFromDir(projectSkillsDir, "project")
-}
-
-export function discoverOpencodeGlobalSkills(): LoadedSkill[] {
-  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
-  return loadSkillsFromDir(opencodeSkillsDir, "opencode")
-}
-
-export function discoverOpencodeProjectSkills(): LoadedSkill[] {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  return loadSkillsFromDir(opencodeProjectDir, "opencode-project")
-}
-
-export async function discoverUserClaudeSkillsAsync(): Promise<LoadedSkill[]> {
-  const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  return loadSkillsFromDirAsync(userSkillsDir, "user")
-}
-
-export async function discoverProjectClaudeSkillsAsync(): Promise<LoadedSkill[]> {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
-  return loadSkillsFromDirAsync(projectSkillsDir, "project")
-}
-
-export async function discoverOpencodeGlobalSkillsAsync(): Promise<LoadedSkill[]> {
-  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
-  return loadSkillsFromDirAsync(opencodeSkillsDir, "opencode")
-}
-
-export async function discoverOpencodeProjectSkillsAsync(): Promise<LoadedSkill[]> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
-  return loadSkillsFromDirAsync(opencodeProjectDir, "opencode-project")
-}
-
-export async function discoverAllSkillsAsync(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
+export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
   const { includeClaudeCodePaths = true } = options
 
-  const opencodeProjectSkills = await discoverOpencodeProjectSkillsAsync()
-  const opencodeGlobalSkills = await discoverOpencodeGlobalSkillsAsync()
+  const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
+    discoverOpencodeProjectSkills(),
+    discoverOpencodeGlobalSkills(),
+  ])
 
   if (!includeClaudeCodePaths) {
     return [...opencodeProjectSkills, ...opencodeGlobalSkills]
   }
 
   const [projectSkills, userSkills] = await Promise.all([
-    discoverProjectClaudeSkillsAsync(),
-    discoverUserClaudeSkillsAsync(),
+    discoverProjectClaudeSkills(),
+    discoverUserClaudeSkills(),
   ])
 
   return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+}
+
+export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
+  const skills = await discoverSkills(options)
+  return skills.find(s => s.name === name)
+}
+
+export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
+  const userSkillsDir = join(getClaudeConfigDir(), "skills")
+  return loadSkillsFromDir(userSkillsDir, "user")
+}
+
+export async function discoverProjectClaudeSkills(): Promise<LoadedSkill[]> {
+  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+  return loadSkillsFromDir(projectSkillsDir, "project")
+}
+
+export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
+  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
+  return loadSkillsFromDir(opencodeSkillsDir, "opencode")
+}
+
+export async function discoverOpencodeProjectSkills(): Promise<LoadedSkill[]> {
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  return loadSkillsFromDir(opencodeProjectDir, "opencode-project")
 }

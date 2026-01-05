@@ -1,16 +1,16 @@
 import { createBuiltinAgents } from "../agents";
 import {
-  loadUserCommandsAsync,
-  loadProjectCommandsAsync,
-  loadOpencodeGlobalCommandsAsync,
-  loadOpencodeProjectCommandsAsync,
+  loadUserCommands,
+  loadProjectCommands,
+  loadOpencodeGlobalCommands,
+  loadOpencodeProjectCommands,
 } from "../features/claude-code-command-loader";
 import { loadBuiltinCommands } from "../features/builtin-commands";
 import {
-  loadUserSkillsAsync,
-  loadProjectSkillsAsync,
-  loadOpencodeGlobalSkillsAsync,
-  loadOpencodeProjectSkillsAsync,
+  loadUserSkills,
+  loadProjectSkills,
+  loadOpencodeGlobalSkills,
+  loadOpencodeProjectSkills,
 } from "../features/opencode-skill-loader";
 import {
   loadUserAgents,
@@ -298,14 +298,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       opencodeGlobalSkills,
       opencodeProjectSkills,
     ] = await Promise.all([
-      includeClaudeCommands ? loadUserCommandsAsync() : Promise.resolve({}),
-      includeClaudeCommands ? loadProjectCommandsAsync() : Promise.resolve({}),
-      loadOpencodeGlobalCommandsAsync(),
-      loadOpencodeProjectCommandsAsync(),
-      includeClaudeSkills ? loadUserSkillsAsync() : Promise.resolve({}),
-      includeClaudeSkills ? loadProjectSkillsAsync() : Promise.resolve({}),
-      loadOpencodeGlobalSkillsAsync(),
-      loadOpencodeProjectSkillsAsync(),
+      includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
+      includeClaudeCommands ? loadProjectCommands() : Promise.resolve({}),
+      loadOpencodeGlobalCommands(),
+      loadOpencodeProjectCommands(),
+      includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
+      includeClaudeSkills ? loadProjectSkills() : Promise.resolve({}),
+      loadOpencodeGlobalSkills(),
+      loadOpencodeProjectSkills(),
     ]);
 
     config.command = {
