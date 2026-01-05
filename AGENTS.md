@@ -20,7 +20,7 @@ oh-my-opencode/
 │   ├── auth/          # Google Antigravity OAuth - see src/auth/AGENTS.md
 │   ├── shared/        # Cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
-│   ├── mcp/           # MCP configs: context7, websearch_exa, grep_app
+│   ├── mcp/           # MCP configs: context7, grep_app
 │   ├── config/        # Zod schema, TypeScript types
 │   └── index.ts       # Main plugin entry (464 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
