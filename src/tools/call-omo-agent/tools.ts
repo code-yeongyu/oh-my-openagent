@@ -142,6 +142,7 @@ async function executeSync(
         tools: {
           task: false,
           call_omo_agent: false,
+          sisyphus_task: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
