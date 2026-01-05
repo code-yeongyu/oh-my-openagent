@@ -13,7 +13,6 @@
       "items": {
         "type": "string",
         "enum": [
-          "websearch_exa",
           "context7",
           "grep_app"
         ]
