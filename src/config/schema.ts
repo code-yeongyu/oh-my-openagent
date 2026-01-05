@@ -1,12 +1,12 @@
-import { z } from "zod"
-import { AnyMcpNameSchema, McpNameSchema } from "../mcp/types"
+import { z } from "zod";
+import { AnyMcpNameSchema, McpNameSchema } from "../mcp/types";
 
-const PermissionValue = z.enum(["ask", "allow", "deny"])
+const PermissionValue = z.enum(["ask", "allow", "deny"]);
 
 const BashPermission = z.union([
   PermissionValue,
   z.record(z.string(), PermissionValue),
-])
+]);
 
 const AgentPermissionSchema = z.object({
   edit: PermissionValue.optional(),
@@ -14,7 +14,7 @@ const AgentPermissionSchema = z.object({
   webfetch: PermissionValue.optional(),
   doom_loop: PermissionValue.optional(),
   external_directory: PermissionValue.optional(),
-})
+});
 
 export const BuiltinAgentNameSchema = z.enum([
   "Sisyphus",
@@ -24,11 +24,9 @@ export const BuiltinAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
-])
+]);
 
-export const BuiltinSkillNameSchema = z.enum([
-  "playwright",
-])
+export const BuiltinSkillNameSchema = z.enum(["playwright"]);
 
 export const OverridableAgentNameSchema = z.enum([
   "build",
@@ -42,9 +40,9 @@ export const OverridableAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
-])
+]);
 
-export const AgentNameSchema = BuiltinAgentNameSchema
+export const AgentNameSchema = BuiltinAgentNameSchema;
 
 export const HookNameSchema = z.enum([
   "todo-continuation-enforcer",
@@ -75,11 +73,10 @@ export const HookNameSchema = z.enum([
   "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
-])
+  "auto-continuity",
+]);
 
-export const BuiltinCommandNameSchema = z.enum([
-  "init-deep",
-])
+export const BuiltinCommandNameSchema = z.enum(["init-deep"]);
 
 export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
@@ -96,7 +93,7 @@ export const AgentOverrideConfigSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
   permission: AgentPermissionSchema.optional(),
-})
+});
 
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
@@ -110,7 +107,7 @@ export const AgentOverridesSchema = z.object({
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
-})
+});
 
 export const ClaudeCodeConfigSchema = z.object({
   mcp: z.boolean().optional(),
@@ -120,19 +117,19 @@ export const ClaudeCodeConfigSchema = z.object({
   hooks: z.boolean().optional(),
   plugins: z.boolean().optional(),
   plugins_override: z.record(z.string(), z.boolean()).optional(),
-})
+});
 
 export const SisyphusAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
   default_builder_enabled: z.boolean().optional(),
   planner_enabled: z.boolean().optional(),
   replace_plan: z.boolean().optional(),
-})
+});
 
 export const CommentCheckerConfigSchema = z.object({
   /** Custom prompt to replace the default warning message. Use {{comments}} placeholder for detected comments XML. */
   custom_prompt: z.string().optional(),
-})
+});
 
 export const DynamicContextPruningConfigSchema = z.object({
   /** Enable dynamic context pruning (default: false) */
@@ -140,35 +137,52 @@ export const DynamicContextPruningConfigSchema = z.object({
   /** Notification level: off, minimal, or detailed (default: detailed) */
   notification: z.enum(["off", "minimal", "detailed"]).default("detailed"),
   /** Turn protection - prevent pruning recent tool outputs */
-  turn_protection: z.object({
-    enabled: z.boolean().default(true),
-    turns: z.number().min(1).max(10).default(3),
-  }).optional(),
+  turn_protection: z
+    .object({
+      enabled: z.boolean().default(true),
+      turns: z.number().min(1).max(10).default(3),
+    })
+    .optional(),
   /** Tools that should never be pruned */
-  protected_tools: z.array(z.string()).default([
-    "task", "todowrite", "todoread",
-    "lsp_rename", "lsp_code_action_resolve",
-    "session_read", "session_write", "session_search",
-  ]),
+  protected_tools: z
+    .array(z.string())
+    .default([
+      "task",
+      "todowrite",
+      "todoread",
+      "lsp_rename",
+      "lsp_code_action_resolve",
+      "session_read",
+      "session_write",
+      "session_search",
+    ]),
   /** Pruning strategies configuration */
-  strategies: z.object({
-    /** Remove duplicate tool calls (same tool + same args) */
-    deduplication: z.object({
-      enabled: z.boolean().default(true),
-    }).optional(),
-    /** Prune write inputs when file subsequently read */
-    supersede_writes: z.object({
-      enabled: z.boolean().default(true),
-      /** Aggressive mode: prune any write if ANY subsequent read */
-      aggressive: z.boolean().default(false),
-    }).optional(),
-    /** Prune errored tool inputs after N turns */
-    purge_errors: z.object({
-      enabled: z.boolean().default(true),
-      turns: z.number().min(1).max(20).default(5),
-    }).optional(),
-  }).optional(),
-})
+  strategies: z
+    .object({
+      /** Remove duplicate tool calls (same tool + same args) */
+      deduplication: z
+        .object({
+          enabled: z.boolean().default(true),
+        })
+        .optional(),
+      /** Prune write inputs when file subsequently read */
+      supersede_writes: z
+        .object({
+          enabled: z.boolean().default(true),
+          /** Aggressive mode: prune any write if ANY subsequent read */
+          aggressive: z.boolean().default(false),
+        })
+        .optional(),
+      /** Prune errored tool inputs after N turns */
+      purge_errors: z
+        .object({
+          enabled: z.boolean().default(true),
+          turns: z.number().min(1).max(20).default(5),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
@@ -183,7 +197,7 @@ export const ExperimentalConfigSchema = z.object({
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded (default: false) */
   dcp_for_compaction: z.boolean().optional(),
-})
+});
 
 export const SkillSourceSchema = z.union([
   z.string(),
@@ -192,7 +206,7 @@ export const SkillSourceSchema = z.union([
     recursive: z.boolean().optional(),
     glob: z.string().optional(),
   }),
-])
+]);
 
 export const SkillDefinitionSchema = z.object({
   description: z.string().optional(),
@@ -207,21 +221,22 @@ export const SkillDefinitionSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
   "allowed-tools": z.array(z.string()).optional(),
   disable: z.boolean().optional(),
-})
+});
 
-export const SkillEntrySchema = z.union([
-  z.boolean(),
-  SkillDefinitionSchema,
-])
+export const SkillEntrySchema = z.union([z.boolean(), SkillDefinitionSchema]);
 
 export const SkillsConfigSchema = z.union([
   z.array(z.string()),
-  z.record(z.string(), SkillEntrySchema).and(z.object({
-    sources: z.array(SkillSourceSchema).optional(),
-    enable: z.array(z.string()).optional(),
-    disable: z.array(z.string()).optional(),
-  }).partial()),
-])
+  z.record(z.string(), SkillEntrySchema).and(
+    z
+      .object({
+        sources: z.array(SkillSourceSchema).optional(),
+        enable: z.array(z.string()).optional(),
+        disable: z.array(z.string()).optional(),
+      })
+      .partial(),
+  ),
+]);
 
 export const RalphLoopConfigSchema = z.object({
   /** Enable ralph loop functionality (default: false - opt-in feature) */
@@ -230,7 +245,7 @@ export const RalphLoopConfigSchema = z.object({
   default_max_iterations: z.number().min(1).max(1000).default(100),
   /** Custom state file directory relative to project root (default: .opencode/) */
   state_dir: z.string().optional(),
-})
+});
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -248,21 +263,28 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
-})
+});
 
-export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
-export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
-export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
-export type AgentName = z.infer<typeof AgentNameSchema>
-export type HookName = z.infer<typeof HookNameSchema>
-export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>
-export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>
-export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
-export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
-export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
-export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningConfigSchema>
-export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
-export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
-export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
+export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>;
+export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>;
+export type AgentOverrides = z.infer<typeof AgentOverridesSchema>;
+export type AgentName = z.infer<typeof AgentNameSchema>;
+export type HookName = z.infer<typeof HookNameSchema>;
+export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>;
+export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>;
+export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>;
+export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>;
+export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>;
+export type DynamicContextPruningConfig = z.infer<
+  typeof DynamicContextPruningConfigSchema
+>;
+export type SkillsConfig = z.infer<typeof SkillsConfigSchema>;
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>;
 
-export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
+export {
+  AnyMcpNameSchema,
+  type AnyMcpName,
+  McpNameSchema,
+  type McpName,
+} from "../mcp/types";

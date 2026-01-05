@@ -26,6 +26,7 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createAutoContinuityHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -79,7 +80,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createContextWindowMonitorHook(ctx)
     : null;
   const sessionRecovery = isHookEnabled("session-recovery")
-    ? createSessionRecoveryHook(ctx, { experimental: pluginConfig.experimental })
+    ? createSessionRecoveryHook(ctx, {
+        experimental: pluginConfig.experimental,
+      })
     : null;
   const sessionNotification = isHookEnabled("session-notification")
     ? createSessionNotification(ctx)
@@ -99,7 +102,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? createDirectoryReadmeInjectorHook(ctx)
     : null;
-  const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
+  const emptyTaskResponseDetector = isHookEnabled(
+    "empty-task-response-detector",
+  )
     ? createEmptyTaskResponseDetectorHook(ctx)
     : null;
   const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
@@ -107,7 +112,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
   });
   const anthropicContextWindowLimitRecovery = isHookEnabled(
-    "anthropic-context-window-limit-recovery"
+    "anthropic-context-window-limit-recovery",
   )
     ? createAnthropicContextWindowLimitRecoveryHook(ctx, {
         experimental: pluginConfig.experimental,
@@ -172,6 +177,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
+  const autoContinuity = isHookEnabled("auto-continuity")
+    ? createAutoContinuityHook(ctx)
+    : null;
+
   const backgroundManager = new BackgroundManager(ctx);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -181,7 +190,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
     sessionRecovery.setOnRecoveryCompleteCallback(
-      todoContinuationEnforcer.markRecoveryComplete
+      todoContinuationEnforcer.markRecoveryComplete,
     );
   }
 
@@ -204,19 +213,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     return true;
   });
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
-  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] = await Promise.all([
-    includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
-    discoverOpencodeGlobalSkills(),
-    includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
-    discoverOpencodeProjectSkills(),
-  ]);
+  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
+    await Promise.all([
+      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+      discoverOpencodeGlobalSkills(),
+      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
+      discoverOpencodeProjectSkills(),
+    ]);
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
     userSkills,
     globalSkills,
     projectSkills,
-    opencodeProjectSkills
+    opencodeProjectSkills,
   );
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
@@ -231,9 +241,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
-  const googleAuthHooks = pluginConfig.google_auth !== false
-    ? await createGoogleAntigravityAuthPlugin(ctx)
-    : null;
+  const googleAuthHooks =
+    pluginConfig.google_auth !== false
+      ? await createGoogleAntigravityAuthPlugin(ctx)
+      : null;
 
   const configHandler = createConfigHandler({
     ctx,
@@ -251,12 +262,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       look_at: lookAt,
       skill: skillTool,
       skill_mcp: skillMcpTool,
-      interactive_bash,  // Always included, handles missing tmux gracefully via getCachedTmuxPath() ?? "tmux"
+      interactive_bash, // Always included, handles missing tmux gracefully via getCachedTmuxPath() ?? "tmux"
     },
 
     "chat.message": async (input, output) => {
       if (input.agent === "Sisyphus") {
-        (output.message as Record<string, unknown>).variant = "max"
+        (output.message as Record<string, unknown>).variant = "max";
       }
 
       await claudeCodeHooks["chat.message"]?.(input, output);
@@ -279,12 +290,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           promptText.includes("You are starting a Ralph Loop") &&
           promptText.includes("<user-task>");
         const isCancelRalphTemplate = promptText.includes(
-          "Cancel the currently active Ralph Loop"
+          "Cancel the currently active Ralph Loop",
         );
 
         if (isRalphLoopTemplate) {
           const taskMatch = promptText.match(
-            /<user-task>\s*([\s\S]*?)\s*<\/user-task>/i
+            /<user-task>\s*([\s\S]*?)\s*<\/user-task>/i,
           );
           const rawTask = taskMatch?.[1]?.trim() || "";
 
@@ -296,7 +307,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
           const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i);
           const promiseMatch = rawTask.match(
-            /--completion-promise=["']?([^"'\s]+)["']?/i
+            /--completion-promise=["']?([^"'\s]+)["']?/i,
           );
 
           log("[ralph-loop] Starting loop from chat.message", {
@@ -320,10 +331,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "experimental.chat.messages.transform": async (
       input: Record<string, never>,
-      output: { messages: Array<{ info: unknown; parts: unknown[] }> }
+      output: { messages: Array<{ info: unknown; parts: unknown[] }> },
     ) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await contextInjectorMessagesTransform?.["experimental.chat.messages.transform"]?.(input, output as any);
+      await contextInjectorMessagesTransform?.[
+        "experimental.chat.messages.transform"
+      ]?.(input, output as any);
       await thinkingBlockValidator?.[
         "experimental.chat.messages.transform"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -352,6 +365,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await autoContinuity?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -414,7 +428,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const args = output.args as Record<string, unknown>;
         const subagentType = args.subagent_type as string;
         const isExploreOrLibrarian = ["explore", "librarian"].includes(
-          subagentType
+          subagentType,
         );
 
         args.tools = {
@@ -440,7 +454,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
           const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i);
           const promiseMatch = rawArgs.match(
-            /--completion-promise=["']?([^"'\s]+)["']?/i
+            /--completion-promise=["']?([^"'\s]+)["']?/i,
           );
 
           ralphLoop.startLoop(sessionID, prompt, {
@@ -467,6 +481,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
       await editErrorRecovery?.["tool.execute.after"](input, output);
+      await autoContinuity?.["tool.execute.after"]?.(input, output);
     },
   };
 };

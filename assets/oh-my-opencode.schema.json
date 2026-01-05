@@ -71,7 +71,8 @@
           "compaction-context-injector",
           "claude-code-hooks",
           "auto-slash-command",
-          "edit-error-recovery"
+          "edit-error-recovery",
+          "auto-continuity"
         ]
       }
     },
