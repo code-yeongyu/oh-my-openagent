@@ -276,22 +276,22 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   const agents: Record<string, Record<string, unknown>> = {}
 
   if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = { model: "opencode/big-pickle" }
+    agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
   }
 
+  agents["librarian"] = { model: "opencode/glm-4.7-free" }
+
   if (installConfig.hasGemini) {
-    agents["librarian"] = { model: "google/gemini-3-flash" }
     agents["explore"] = { model: "google/gemini-3-flash" }
   } else if (installConfig.hasClaude && installConfig.isMax20) {
     agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
   } else {
-    agents["librarian"] = { model: "opencode/big-pickle" }
-    agents["explore"] = { model: "opencode/big-pickle" }
+    agents["explore"] = { model: "opencode/glm-4.7-free" }
   }
 
   if (!installConfig.hasChatGPT) {
     agents["oracle"] = {
-      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/big-pickle",
+      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
     }
   }
 
@@ -300,7 +300,7 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     agents["document-writer"] = { model: "google/gemini-3-flash" }
     agents["multimodal-looker"] = { model: "google/gemini-3-flash" }
   } else {
-    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/big-pickle"
+    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
     agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
     agents["document-writer"] = { model: fallbackModel }
     agents["multimodal-looker"] = { model: fallbackModel }
@@ -698,17 +698,17 @@ export function detectCurrentConfig(): DetectedConfig {
 
     const agents = omoConfig.agents ?? {}
 
-    if (agents["Sisyphus"]?.model === "opencode/big-pickle") {
+    if (agents["Sisyphus"]?.model === "opencode/glm-4.7-free") {
       result.hasClaude = false
       result.isMax20 = false
-    } else if (agents["librarian"]?.model === "opencode/big-pickle") {
+    } else if (agents["librarian"]?.model === "opencode/glm-4.7-free") {
       result.hasClaude = true
       result.isMax20 = false
     }
 
     if (agents["oracle"]?.model?.startsWith("anthropic/")) {
       result.hasChatGPT = false
-    } else if (agents["oracle"]?.model === "opencode/big-pickle") {
+    } else if (agents["oracle"]?.model === "opencode/glm-4.7-free") {
       result.hasChatGPT = false
     }
 
