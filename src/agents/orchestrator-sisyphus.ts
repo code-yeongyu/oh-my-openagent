@@ -69,6 +69,42 @@ sisyphus_task(category="high-iq", prompt="...")     // Backend/strategic work
 \`\`\``
 }
 
+function buildSkillsSection(skills: AvailableSkill[]): string {
+  if (skills.length === 0) {
+    return ""
+  }
+
+  const skillRows = skills.map((s) => {
+    const shortDesc = s.description.split(".")[0] || s.description
+    return `| \`${s.name}\` | ${shortDesc} |`
+  })
+
+  return `
+#### 3.2.2: Skill Selection (PREPEND TO PROMPT)
+
+**Skills are specialized instructions that guide subagent behavior. Consider them alongside category selection.**
+
+| Skill | When to Use |
+|-------|-------------|
+${skillRows.join("\n")}
+
+**When to include skills:**
+- Task matches a skill's domain (e.g., \`frontend-ui-ux\` for UI work, \`playwright\` for browser automation)
+- Multiple skills can be combined
+
+**Usage:**
+\`\`\`typescript
+sisyphus_task(category="visual-engineering", skills=["frontend-ui-ux"], prompt="...")
+sisyphus_task(category="general", skills=["playwright"], prompt="...")  // Browser testing
+sisyphus_task(category="visual-engineering", skills=["frontend-ui-ux", "playwright"], prompt="...")  // UI with browser testing
+\`\`\`
+
+**IMPORTANT:**
+- Skills are OPTIONAL - only include if task clearly benefits from specialized guidance
+- Skills get prepended to the subagent's prompt, providing domain-specific instructions
+- If no appropriate skill exists, omit the \`skills\` parameter entirely`
+}
+
 function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<string, CategoryConfig>): string {
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const hasVisual = "visual-engineering" in allCategories
@@ -906,6 +942,8 @@ STRATEGIC CATEGORY JUSTIFICATION (MANDATORY):
 
 **If you cannot fill ALL 4 sections with substantive content, USE \`general\` INSTEAD.**
 
+{SKILLS_SECTION}
+
 ---
 
 **BEFORE invoking sisyphus_task(), you MUST state:**
@@ -1379,16 +1417,19 @@ NEVER skip steps. NEVER rush. Complete ALL tasks.
 
 function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const agents = ctx?.availableAgents ?? []
+  const skills = ctx?.availableSkills ?? []
   const userCategories = ctx?.userCategories
 
   const categorySection = buildCategorySection(userCategories)
   const agentSection = buildAgentSelectionSection(agents)
   const decisionMatrix = buildDecisionMatrix(agents, userCategories)
+  const skillsSection = buildSkillsSection(skills)
 
   return ORCHESTRATOR_SISYPHUS_SYSTEM_PROMPT
     .replace("{CATEGORY_SECTION}", categorySection)
     .replace("{AGENT_SECTION}", agentSection)
     .replace("{DECISION_MATRIX}", decisionMatrix)
+    .replace("{SKILLS_SECTION}", skillsSection)
 }
 
 export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): AgentConfig {
