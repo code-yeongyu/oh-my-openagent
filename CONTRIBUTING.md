@@ -89,7 +89,7 @@ oh-my-opencode/
 │   ├── agents/        # AI agents (OmO, oracle, librarian, explore, etc.)
 │   ├── hooks/         # 21 lifecycle hooks
 │   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, etc.
-│   ├── mcp/           # MCP server integrations (context7, websearch_exa, grep_app)
+│   ├── mcp/           # MCP server integrations (context7, grep_app)
 │   ├── features/      # Claude Code compatibility layers
 │   ├── config/        # Zod schemas and TypeScript types
 │   ├── auth/          # Google Antigravity OAuth

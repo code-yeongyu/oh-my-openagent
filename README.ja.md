@@ -563,7 +563,6 @@ OpenCode セッション履歴をナビゲートおよび検索するための�
     ```
 - **Online**: プロジェクトのルールがすべてではありません。拡張機能のための内蔵 MCP を提供します：
   - **context7**: ライブラリの最新公式ドキュメントを取得
-  - **websearch_exa**: Exa AI を活用したリアルタイムウェブ検索
   - **grep_app**: 数百万の公開 GitHub リポジトリから超高速コード検索（実装例を探すのに最適）
 
 #### マルチモーダルを活用し、トークンは節約する
@@ -655,7 +654,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 | トグル     | `false` の場合、ロードが無効になるパス                                                | 影響を受けないもの                                    |
 | ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | 内蔵 MCP (context7, websearch_exa)                    |
+| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | 内蔵 MCP (context7, grep_app)                         |
 | `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | 内蔵エージェント (oracle, librarian 等)               |
@@ -928,17 +927,16 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 ### MCPs
 
-コンテキスト7、Exa、grep.app MCP がデフォルトで有効になっています。
+Context7、grep.app MCP がデフォルトで有効になっています。
 
 - **context7**: ライブラリの最新公式ドキュメントを取得
-- **websearch_exa**: Exa AI を活用したリアルタイムウェブ検索
 - **grep_app**: [grep.app](https://grep.app) を通じて数百万の公開 GitHub リポジトリから超高速コード検索
 
 不要であれば、`~/.config/opencode/oh-my-opencode.json` または `.opencode/oh-my-opencode.json` の `disabled_mcps` を使用して無効化できます：
 
 ```json
 {
-  "disabled_mcps": ["context7", "websearch_exa", "grep_app"]
+  "disabled_mcps": ["context7", "grep_app"]
 }
 ```
 
