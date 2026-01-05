@@ -413,7 +413,7 @@ export class BackgroundManager {
       if (age > TASK_TTL_MS) {
         log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
         task.status = "error"
-        task.error = "Task timed out after 90 minutes"
+        task.error = "Task timed out after 30 minutes"
         task.completedAt = new Date()
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)

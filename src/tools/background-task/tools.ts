@@ -299,7 +299,7 @@ The task may have been cleaned up (30 minute TTL after completion) or cancelled.
         if (!finalTask) {
           return `❌ Task was deleted or expired: ${args.task_id}
 
-The task may have been cleaned up (90 minute TTL after completion) or cancelled.`
+The task may have been cleaned up (30 minute TTL after completion) or cancelled.`
         }
         return `⏱️ Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.
 
