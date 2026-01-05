@@ -12,7 +12,9 @@ import {
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
 
-const TASK_TTL_MS = 30 * 60 * 1000
+// Increased from 30 to 90 minutes to accommodate long-running librarian searches
+// which can legitimately take 10-15 minutes when searching remote repos/docs
+const TASK_TTL_MS = 90 * 60 * 1000
 
 type OpencodeClient = PluginInput["client"]
 
@@ -109,32 +111,7 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
-    this.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: input.agent,
-        tools: {
-          task: false,
-          background_task: false,
-        },
-        parts: [{ type: "text", text: input.prompt }],
-      },
-    }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
-      const existingTask = this.findBySession(sessionID)
-      if (existingTask) {
-        existingTask.status = "error"
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-        } else {
-          existingTask.error = errorMessage
-        }
-        existingTask.completedAt = new Date()
-        this.markForNotification(existingTask)
-        this.notifyParentSession(existingTask)
-      }
-    })
+    this.launchWithRetry(sessionID, input.agent, input.prompt, task.id, 0)
 
     return task
   }
@@ -173,6 +150,58 @@ export class BackgroundManager {
       }
     }
     return undefined
+  }
+
+  private async launchWithRetry(
+    sessionID: string,
+    agent: string,
+    prompt: string,
+    taskId: string,
+    attempt: number
+  ): Promise<void> {
+    const maxRetries = 3
+    const backoffMs = [0, 2000, 5000]
+
+    try {
+      await this.client.session.promptAsync({
+        path: { id: sessionID },
+        body: {
+          agent,
+          tools: {
+            task: false,
+            background_task: false,
+          },
+          parts: [{ type: "text", text: prompt }],
+        },
+      })
+    } catch (error) {
+      log(`[background-agent] promptAsync error (attempt ${attempt + 1}/${maxRetries}):`, error)
+      const existingTask = this.findBySession(sessionID)
+      if (!existingTask) return
+
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isRetryable = !errorMessage.includes("agent.name") && !errorMessage.includes("undefined")
+
+      if (isRetryable && attempt < maxRetries - 1) {
+        const delayMs = backoffMs[attempt]
+        log(`[background-agent] Retrying task ${taskId} after ${delayMs}ms...`)
+        
+        setTimeout(() => {
+          this.launchWithRetry(sessionID, agent, prompt, taskId, attempt + 1)
+        }, delayMs)
+        return
+      }
+
+      existingTask.status = "error"
+      if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        existingTask.error = `Agent "${agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+      } else {
+        existingTask.error = `Failed after ${attempt + 1} attempts: ${errorMessage}`
+      }
+      existingTask.completedAt = new Date()
+      this.markForNotification(existingTask)
+      this.notifyParentSession(existingTask)
+    }
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
@@ -349,13 +378,11 @@ export class BackgroundManager {
         })
         log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
       } catch (error) {
-        log("[background-agent] prompt failed:", String(error))
-      } finally {
-        // Always clean up both maps to prevent memory leaks
-        this.clearNotificationsForTask(taskId)
-        this.tasks.delete(taskId)
-        log("[background-agent] Removed completed task from memory:", taskId)
+        log("[background-agent] prompt failed - notification preserved for PreToolUse injection:", String(error))
       }
+      
+      this.tasks.delete(taskId)
+      log("[background-agent] Removed completed task from task map (notification preserved):", taskId)
     }, 200)
   }
 
@@ -388,7 +415,7 @@ export class BackgroundManager {
       if (age > TASK_TTL_MS) {
         log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
         task.status = "error"
-        task.error = "Task timed out after 30 minutes"
+        task.error = "Task timed out after 90 minutes"
         task.completedAt = new Date()
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)

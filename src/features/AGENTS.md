@@ -47,10 +47,19 @@ features/
 
 ## BACKGROUND AGENT
 
-- Lifecycle: pending → running → completed/failed
-- OS notification on complete
-- `background_output` to retrieve results
-- `background_cancel` with task_id or all=true
+- **Lifecycle**: pending → running → completed/error/cancelled
+- **TTL**: Tasks kept for 90 minutes after completion
+- **Retry**: Automatic retry (3 attempts, exponential backoff) for transient failures
+- **Notification Delivery**: 
+  - OS toast on completion
+  - Automatic injection at next tool use via PreToolUse hook
+  - Ensures agent always receives completion notifications
+- **Tools**:
+  - `background_output`: Retrieve results by task_id
+  - `background_cancel`: Cancel by task_id or all=true
+- **Error Handling**: 
+  - Non-retryable errors (agent not found) fail immediately
+  - Retryable errors (network timeouts) retry with 0ms, 2s, 5s delays
 
 ## SKILL MCP
 

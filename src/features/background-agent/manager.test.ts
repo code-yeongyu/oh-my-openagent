@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "./types"
 
-const TASK_TTL_MS = 30 * 60 * 1000
+const TASK_TTL_MS = 90 * 60 * 1000
 
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
@@ -328,9 +328,9 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     expect(manager.getTaskCount()).toBe(1)
   })
 
-  test("should prune tasks older than 30 minutes", () => {
+  test("should prune tasks older than 90 minutes", () => {
     // #given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 91 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -349,7 +349,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should prune stale notifications", () => {
     // #given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 91 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -368,7 +368,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should clean up notifications when task is pruned", () => {
     // #given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 91 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
@@ -388,7 +388,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
 
   test("should keep fresh tasks while pruning stale ones", () => {
     // #given
-    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const staleDate = new Date(Date.now() - 91 * 60 * 1000)
     const staleTask = createMockTask({
       id: "task-stale",
       sessionID: "session-stale",
