@@ -1,3 +1,5 @@
+export type ToolPermission = boolean | "allow" | "deny" | "ask"
+
 export interface MessageMeta {
   id: string
   sessionID: string
@@ -15,7 +17,7 @@ export interface MessageMeta {
     cwd: string
     root: string
   }
-  tools?: Record<string, boolean>
+  tools?: Record<string, ToolPermission>
 }
 
 export interface OriginalMessageContext {
@@ -28,7 +30,7 @@ export interface OriginalMessageContext {
     cwd?: string
     root?: string
   }
-  tools?: Record<string, boolean>
+  tools?: Record<string, ToolPermission>
 }
 
 export interface TextPart {

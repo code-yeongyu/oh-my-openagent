@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
-import type { MessageMeta, OriginalMessageContext, TextPart } from "./types"
+import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 
 export interface StoredMessage {
   agent?: string
   model?: { providerID?: string; modelID?: string }
-  tools?: Record<string, boolean>
+  tools?: Record<string, ToolPermission>
 }
 
 export function findNearestMessageWithFields(messageDir: string): StoredMessage | null {
