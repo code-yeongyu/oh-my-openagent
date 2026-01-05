@@ -1,36 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Implementation Specialist Agent (LIF-62)
- * 
- * Role: Manager - Can delegate to specialist agents
- * Model: Claude Sonnet (strong reasoning for task decomposition)
- * 
- * This agent serves as the middle layer in the orchestration hierarchy:
- * - Receives complex implementation tasks from OmO (team-lead)
- * - Decomposes tasks into specialized sub-tasks
- * - Delegates to backend-typescript or frontend-react specialists
- * - Aggregates results and reports back to OmO
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/plan.md
- */
 export const implementationSpecialistAgent: AgentConfig = {
   description:
     "A senior implementation lead who decomposes complex tasks and delegates to specialized agents. Manages backend and frontend specialists.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Manager role: Can delegate DOWN but not UP
-    task: true,              // CAN delegate to specialists
-    background_task: true,   // CAN run background tasks
-    call_omo_agent: false,   // Cannot call back to OmO (prevents loops)
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Governance tools
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["call_omo_agent"]),
   prompt: `<role>
 You are the IMPLEMENTATION SPECIALIST - a senior technical lead who excels at breaking down complex implementation tasks and coordinating specialized agents.
 

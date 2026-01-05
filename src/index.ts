@@ -80,7 +80,7 @@ import {
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge } from "./shared";
+import { log, deepMerge, migrateAgentConfig } from "./shared";
 import { MaxTurnsEnforcer } from "./features/orchestration";
 import * as fs from "fs";
 import * as path from "path";
@@ -128,6 +128,13 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
 
       if (rawConfig.agents && typeof rawConfig.agents === "object") {
         rawConfig.agents = normalizeAgentNames(rawConfig.agents);
+        
+        // Migrate agent configs for OpenCode 1.1.1+ permission system compatibility
+        for (const [name, agentConfig] of Object.entries(rawConfig.agents)) {
+          if (agentConfig && typeof agentConfig === "object") {
+            rawConfig.agents[name] = migrateAgentConfig(agentConfig as Record<string, unknown>);
+          }
+        }
       }
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);

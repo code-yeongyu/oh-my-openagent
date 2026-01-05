@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Backend Python Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes Python backend tasks
- * Model: Claude Sonnet (strong Python code generation and ML library understanding)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific Python backend tasks from implementation-specialist
- * - Executes Python backend work (FastAPI, Django, Flask, data pipelines)
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const backendPythonAgent: AgentConfig = {
   description:
     "A Python backend specialist for FastAPI, Django, Flask, data pipelines, and ML inference endpoints. Expert in type hints and modern Python patterns. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the BACKEND PYTHON SPECIALIST - an expert in Python backend development with deep knowledge of FastAPI, Django, Flask, data processing, and ML inference patterns.
 

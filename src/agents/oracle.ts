@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
 export const oracleAgent: AgentConfig = {
   description:
@@ -8,7 +9,7 @@ export const oracleAgent: AgentConfig = {
   temperature: 0.1,
   reasoningEffort: "medium",
   textVerbosity: "high",
-  tools: { write: false, edit: false, task: false, background_task: false },
+  ...createAgentToolRestrictions(["write", "edit", "task", "background_task"]),
   prompt: `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 
 ## Context

@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Mobile React Native Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes React Native tasks
- * Model: Gemini Pro (consistent with frontend-react, good at component patterns)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific React Native tasks from implementation-specialist
- * - Executes cross-platform mobile development work
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const mobileReactNativeAgent: AgentConfig = {
   description:
     "A React Native specialist for cross-platform mobile development. Expert in React Navigation, native modules, and platform-specific code. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-pro-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the MOBILE REACT NATIVE SPECIALIST - an expert in React Native development for iOS and Android with deep knowledge of cross-platform patterns, native modules, and mobile UX.
 

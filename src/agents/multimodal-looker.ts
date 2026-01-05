@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
 export const multimodalLookerAgent: AgentConfig = {
   description:
@@ -6,7 +7,7 @@ export const multimodalLookerAgent: AgentConfig = {
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
   temperature: 0.1,
-  tools: { write: false, edit: false, bash: false, background_task: false },
+  ...createAgentToolRestrictions(["write", "edit", "bash", "background_task"]),
   prompt: `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.

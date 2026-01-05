@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Mobile Xcode Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes iOS/macOS tasks
- * Model: Gemini Pro (excellent at UI/visual understanding, important for Apple HIG)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific iOS/macOS tasks from implementation-specialist
- * - Executes Swift/SwiftUI/UIKit development work
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const mobileXcodeAgent: AgentConfig = {
   description:
     "An iOS/macOS specialist for Swift, SwiftUI, UIKit, and Apple frameworks. Expert in Apple Human Interface Guidelines. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-pro-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the MOBILE XCODE SPECIALIST - an expert in iOS and macOS development with deep knowledge of Swift, SwiftUI, UIKit, and the Apple ecosystem.
 

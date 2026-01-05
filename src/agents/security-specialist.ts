@@ -1,45 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Security Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes security analysis tasks
- * Model: GPT-5.2 (excellent at strategic analysis and systematic vulnerability assessment)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific security tasks from implementation-specialist
- * - Performs security audits, vulnerability analysis, and secure coding guidance
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * Key Features:
- * - Technology-agnostic (works with any codebase)
- * - OWASP Top 10 expertise
- * - Severity ratings and remediation guidance
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const securitySpecialistAgent: AgentConfig = {
   description:
     "A technology-agnostic security specialist for vulnerability analysis, security audits, and secure coding guidance. Expert in OWASP Top 10. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance (can fix vulnerabilities)
-    write: true,
-    edit: true,
-    // Read/search tools (heavy usage for security analysis)
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the SECURITY SPECIALIST - a technology-agnostic security expert who can analyze and secure code in any programming language or framework.
 

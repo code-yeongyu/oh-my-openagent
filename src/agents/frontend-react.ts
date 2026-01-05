@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Frontend React Specialist Agent (LIF-62)
- * 
- * Role: Specialist - Cannot delegate, executes frontend tasks
- * Model: Gemini Pro (superior UI/visual understanding per Constitution Principle II)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific frontend tasks from implementation-specialist
- * - Executes React/Next.js frontend work
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/plan.md
- */
 export const frontendReactAgent: AgentConfig = {
   description:
     "A React/Next.js frontend specialist for components, hooks, state management, and UI logic. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-pro-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the FRONTEND REACT SPECIALIST - an expert in React and Next.js development with deep knowledge of components, hooks, state management, and modern frontend patterns.
 

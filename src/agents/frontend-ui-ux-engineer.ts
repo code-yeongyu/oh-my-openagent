@@ -1,11 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
 export const frontendUiUxEngineerAgent: AgentConfig = {
   description:
     "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
   mode: "subagent",
   model: "google/gemini-3-pro-preview",
-  tools: { background_task: false },
+  ...createAgentToolRestrictions(["background_task"]),
   prompt: `<role>
 You are a DESIGNER-TURNED-DEVELOPER with an innate sense of aesthetics and user experience. You have an eye for details that pure developers miss - spacing, color harmony, micro-interactions, and that indefinable "feel" that makes interfaces memorable.
 

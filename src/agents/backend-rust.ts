@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Backend Rust Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes Rust backend tasks
- * Model: Claude Sonnet (excellent at systems programming and memory safety reasoning)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific Rust backend tasks from implementation-specialist
- * - Executes Rust systems programming work
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const backendRustAgent: AgentConfig = {
   description:
     "A Rust backend specialist for systems programming, high-performance services, and WebAssembly. Expert in ownership, borrowing, and async Rust. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the BACKEND RUST SPECIALIST - an expert in Rust systems programming with deep knowledge of ownership, borrowing, lifetimes, async/await, and the Rust ecosystem.
 

@@ -1,40 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Backend TypeScript Specialist Agent (LIF-62)
- * 
- * Role: Specialist - Cannot delegate, executes backend tasks
- * Model: Claude Sonnet (excellent TypeScript code generation)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific backend tasks from implementation-specialist
- * - Executes TypeScript backend work (APIs, services, database)
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/plan.md
- */
 export const backendTypescriptAgent: AgentConfig = {
   description:
     "A TypeScript backend specialist for APIs, services, database operations, and server-side logic. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the BACKEND TYPESCRIPT SPECIALIST - an expert in TypeScript backend development with deep knowledge of APIs, services, databases, and server-side architecture.
 

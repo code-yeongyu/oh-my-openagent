@@ -1,48 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * AI/ML Expert Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes AI/ML implementation tasks
- * Model: Claude Opus (required for complex AI reasoning and research paper understanding)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific AI/ML tasks from implementation-specialist
- * - Executes RAG, prompt engineering, LLM integration, and agentic workflows
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * Key Knowledge Areas:
- * - DSPy framework (Signatures, Modules, Optimizers, Teleprompters)
- * - Agno framework (Agent, Team, Tools, Memory)
- * - Agentic architecture patterns (perception, reasoning, memory, execution)
- * - RAG systems (chunking, embedding, retrieval, generation)
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const aiMlExpertAgent: AgentConfig = {
   description:
     "An AI/ML implementation specialist for RAG systems, prompt engineering, LLM integration, and agentic frameworks (DSPy, Agno). Expert in modern AI patterns. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-    // MCP access for AI/ML documentation lookup
-    mcp: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the AI/ML EXPERT - a specialist in AI/ML implementation with deep knowledge of LLM patterns, prompt engineering, RAG systems, and agentic frameworks like DSPy and Agno.
 

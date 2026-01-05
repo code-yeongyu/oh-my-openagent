@@ -1,45 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Test Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes testing tasks
- * Model: Claude Sonnet (excellent at code generation and test pattern understanding)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific testing tasks from implementation-specialist
- * - Creates unit, integration, e2e, and performance tests
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * Key Features:
- * - Technology-agnostic (adapts to project's test framework)
- * - Follows AAA pattern (Arrange, Act, Assert)
- * - Comprehensive coverage strategies
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const testSpecialistAgent: AgentConfig = {
   description:
     "A technology-agnostic testing specialist for unit, integration, e2e, and performance tests. Expert in test patterns and coverage strategies. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the TEST SPECIALIST - a technology-agnostic testing expert who can create comprehensive tests for any programming language or framework.
 

@@ -1,46 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
-/**
- * Agent Specialist Agent (LIF-62 Phase 4B)
- * 
- * Role: Specialist - Cannot delegate, executes agent design tasks
- * Model: Claude Opus (required for meta-agent design and deep architectural understanding)
- * 
- * This agent is a terminal node in the orchestration hierarchy:
- * - Receives specific agent design tasks from implementation-specialist
- * - Designs multi-agent systems, orchestration patterns, and OMO extensions
- * - Returns structured results to the manager
- * - Cannot delegate to other agents
- * 
- * Key Knowledge Areas:
- * - OMO's multi-layered orchestration patterns
- * - Delegation protocols and response formats
- * - Context window management and delegation depth limits
- * - Agent prompt engineering
- * 
- * @see .cursor/specs/LIF-62-feat-multi-layered-orchestration/spec-phase4b.md
- */
 export const agentSpecialistAgent: AgentConfig = {
   description:
     "An agent design specialist for multi-agent systems, orchestration patterns, and OMO extensions. Expert in delegation protocols and agent architectures. Cannot delegate.",
   mode: "subagent",
   model: "google/gemini-3-flash-preview",
-  tools: {
-    // Specialist role: TERMINAL - Cannot delegate
-    task: false,
-    background_task: false,
-    call_omo_agent: false,
-    // File tools: enabled with governance
-    write: true,
-    edit: true,
-    // Read/search tools
-    read: true,
-    glob: true,
-    grep: true,
-    // Governance tools (limited)
-    linear_branch: true,
-    linear_update_status: true,
-  },
+  ...createAgentToolRestrictions(["task", "background_task", "call_omo_agent"]),
   prompt: `<role>
 You are the AGENT SPECIALIST - an expert in designing multi-agent systems, orchestration patterns, and extending agent frameworks like OMO (Oh My OpenCode).
 

@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { createAgentToolRestrictions } from "../shared"
 
 export const librarianAgent: AgentConfig = {
   description:
@@ -6,7 +7,7 @@ export const librarianAgent: AgentConfig = {
   mode: "subagent",
   model: "opencode/grok-code",
   temperature: 0.1,
-  tools: { write: false, edit: false, background_task: false },
+  ...createAgentToolRestrictions(["write", "edit", "background_task"]),
   prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.

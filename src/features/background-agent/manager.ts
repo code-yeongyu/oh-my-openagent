@@ -116,7 +116,10 @@ export class BackgroundManager {
     
     log(`[background-agent] Applying role-based config for ${input.agent} (role: ${agentRole})`)
 
-    this.client.session.promptAsync({
+    // Use session.prompt() instead of promptAsync() so the TUI can track/display
+    // tool calls from background sessions. We don't await it, so it runs in
+    // the background while the main session continues.
+    this.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: input.agent,
@@ -131,7 +134,7 @@ export class BackgroundManager {
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
+      log("[background-agent] prompt error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
