@@ -127,6 +127,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
     - [Built-in Skills](#built-in-skills)
     - [Sisyphus Agent](#sisyphus-agent)
     - [Background Tasks](#background-tasks)
+    - [Categories](#categories)
     - [Hooks](#hooks)
     - [MCPs](#mcps)
     - [LSP](#lsp)
@@ -553,6 +554,7 @@ Hand your best tools to your best colleagues. Now they can properly refactor, na
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 - **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
+- **sisyphus_task**: Category-based task delegation with specialized agents. Supports pre-configured categories (visual, business-logic) or direct agent targeting. Use `background_output` to retrieve results and `background_cancel` to cancel tasks. See [Categories](#categories).
 
 #### Session Management
 
@@ -932,7 +934,8 @@ When enabled (default), Sisyphus provides a powerful orchestrator with optional 
 
 - **Sisyphus**: Primary orchestrator agent (Claude Opus 4.5)
 - **OpenCode-Builder**: OpenCode's default build agent, renamed due to SDK limitations (disabled by default)
-- **Planner-Sisyphus**: OpenCode's default plan agent, renamed due to SDK limitations (enabled by default)
+- **Prometheus (Planner)**: OpenCode's default plan agent with work-planner methodology (enabled by default)
+- **Metis (Plan Consultant)**: Pre-planning analysis agent that identifies hidden requirements and AI failure points
 
 **Configuration Options:**
 
@@ -981,19 +984,22 @@ You can also customize Sisyphus agents like other agents:
     "OpenCode-Builder": {
       "model": "anthropic/claude-opus-4"
     },
-    "Planner-Sisyphus": {
+    "Prometheus (Planner)": {
       "model": "openai/gpt-5.2"
+    },
+    "Metis (Plan Consultant)": {
+      "model": "anthropic/claude-sonnet-4-5"
     }
   }
 }
 ```
 
-| Option                    | Default | Description                                                                                                                        |
-| ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `disabled`                | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                      |
-| `default_builder_enabled` | `false` | When `true`, enables OpenCode-Builder agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.         |
-| `planner_enabled`         | `true`  | When `true`, enables Planner-Sisyphus agent (same as OpenCode plan, renamed due to SDK limitations). Enabled by default.           |
-| `replace_plan`            | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Planner-Sisyphus and default plan available. |
+| Option                      | Default | Description                                                                                                                                         |
+| --------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`                  | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                                       |
+| `default_builder_enabled`   | `false` | When `true`, enables OpenCode-Builder agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.                         |
+| `planner_enabled`           | `true`  | When `true`, enables Prometheus (Planner) agent with work-planner methodology. Enabled by default.                                                 |
+| `replace_plan`              | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Prometheus (Planner) and default plan available.             |
 
 ### Background Tasks
 
@@ -1028,6 +1034,50 @@ Configure concurrency limits for background agent tasks. This controls how many 
 - Limit expensive models (e.g., Opus) to prevent cost spikes
 - Allow more concurrent tasks for fast/cheap models (e.g., Gemini Flash)
 - Respect provider rate limits by setting provider-level caps
+
+### Categories
+
+Categories enable domain-specific task delegation via the `sisyphus_task` tool. Each category pre-configures a specialized `Sisyphus-Junior-{category}` agent with optimized model settings and prompts.
+
+**Default Categories:**
+
+| Category | Model | Description |
+|----------|-------|-------------|
+| `visual` | `google/gemini-3-pro-preview` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7). |
+| `business-logic` | `openai/gpt-5.2` | Backend logic, architecture, strategic reasoning. Low creativity (temp 0.1). |
+
+**Usage:**
+
+```
+// Via sisyphus_task tool
+sisyphus_task(category="visual", prompt="Create a responsive dashboard component")
+sisyphus_task(category="business-logic", prompt="Design the payment processing flow")
+
+// Or target a specific agent directly
+sisyphus_task(agent="oracle", prompt="Review this architecture")
+```
+
+**Custom Categories:**
+
+Add custom categories in `oh-my-opencode.json`:
+
+```json
+{
+  "categories": {
+    "data-science": {
+      "model": "anthropic/claude-sonnet-4-5",
+      "temperature": 0.2,
+      "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
+    },
+    "visual": {
+      "model": "google/gemini-3-pro-high",
+      "prompt_append": "Use shadcn/ui components and Tailwind CSS."
+    }
+  }
+}
+```
+
+Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`.
 
 ### Hooks
 

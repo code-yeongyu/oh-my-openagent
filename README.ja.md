@@ -862,7 +862,8 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 - **Sisyphus**: プライマリオーケストレーターエージェント (Claude Opus 4.5)
 - **OpenCode-Builder**: OpenCode のデフォルトビルドエージェント（SDK 制限により名前変更、デフォルトで無効）
-- **Planner-Sisyphus**: OpenCode のデフォルトプランエージェント（SDK 制限により名前変更、デフォルトで有効）
+- **Prometheus (Planner)**: OpenCode のデフォルトプランエージェント + work-planner 方法論（デフォルトで有効）
+- **Metis (Plan Consultant)**: 隠された要件と AI 失敗ポイントを特定する事前計画分析エージェント
 
 **設定オプション：**
 
@@ -911,8 +912,11 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
     "OpenCode-Builder": {
       "model": "anthropic/claude-opus-4"
     },
-    "Planner-Sisyphus": {
+    "Prometheus (Planner)": {
       "model": "openai/gpt-5.2"
+    },
+    "Metis (Plan Consultant)": {
+      "model": "anthropic/claude-sonnet-4-5"
     }
   }
 }
@@ -922,8 +926,8 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 | --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `disabled`                  | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
 | `default_builder_enabled`   | `false` | `true` の場合、OpenCode-Builder エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
-| `planner_enabled`           | `true`  | `true` の場合、Planner-Sisyphus エージェントを有効化します（OpenCode plan と同じ、SDK 制限により名前変更）。デフォルトで有効です。                                                       |
-| `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
+| `planner_enabled`           | `true`  | `true` の場合、Prometheus (Planner) エージェントを有効化します（work-planner 方法論を含む）。デフォルトで有効です。                                                                   |
+| `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Prometheus (Planner) とデフォルトのプランの両方を利用できます。                             |
 
 ### Background Tasks
 
