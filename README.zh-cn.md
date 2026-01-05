@@ -330,7 +330,7 @@ opencode auth login
 }
 ```
 
-**可用模型名**：`google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**可用模型名**：`google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
 
 然后认证：
 
@@ -353,26 +353,19 @@ opencode auth login
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth@4.2.0"
+    "opencode-openai-codex-auth@4.3.0"
   ]
 }
 ```
 
-**重要**：现在官方 npm 包有个 bug 会报 400 错（`"No tool call found for function call output with call_id"`）。修复版出来前，**一定要用 hotfix 分支**。改一下 `~/.config/opencode/package.json`：
-
-```json
-{
-  "dependencies": {
-    "opencode-openai-codex-auth": "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
-  }
-}
-```
-
-然后跑 `cd ~/.config/opencode && bun i`。在 `opencode.json` 里用 `"opencode-openai-codex-auth"`（别带版本号）。
-
 ##### 模型配置
+
 要在 `opencode.json` 里配完整的模型设置。
-去读 [opencode-openai-codex-auth 文档](https://github.com/numman-ali/opencode-openai-codex-auth)，从 [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json) 抄 provider/models 配置，动脑子合并，别搞炸了。
+去读 [opencode-openai-codex-auth 文档](https://github.com/numman-ali/opencode-openai-codex-auth)，从 [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json)（OpenCode v1.0.210+）或 [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json)（旧版本）抄 provider/models 配置，动脑子合并，别搞炸了。
+
+**可用模型**：`openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
+
+**Variants**（OpenCode v1.0.210+）：用 `--variant=<none|low|medium|high|xhigh>` 控制推理强度。
 
 然后认证：
 
