@@ -11,9 +11,9 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     expect(models).toBeTruthy()
 
     const required = [
-      "gemini-3-pro-high",
-      "gemini-3-pro-low",
-      "gemini-3-flash",
+      "antigravity-gemini-3-pro-high",
+      "antigravity-gemini-3-pro-low",
+      "antigravity-gemini-3-flash",
     ]
 
     for (const key of required) {
