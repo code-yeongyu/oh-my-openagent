@@ -12,10 +12,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": [
-          "context7",
-          "grep_app"
-        ]
+        "minLength": 1
       }
     },
     "disabled_agents": {

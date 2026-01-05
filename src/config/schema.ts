@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { McpNameSchema } from "../mcp/types"
+import { AnyMcpNameSchema, McpNameSchema } from "../mcp/types"
 
 const PermissionValue = z.enum(["ask", "allow", "deny"])
 
@@ -234,7 +234,7 @@ export const RalphLoopConfigSchema = z.object({
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
-  disabled_mcps: z.array(McpNameSchema).optional(),
+  disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
@@ -265,4 +265,4 @@ export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 
-export { McpNameSchema, type McpName } from "../mcp/types"
+export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
