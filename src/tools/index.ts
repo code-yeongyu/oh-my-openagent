@@ -19,7 +19,7 @@ import {
 
 import { grep } from "./grep"
 import { glob } from "./glob"
-import { slashcommand } from "./slashcommand"
+export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
 
 import {
   session_list,
@@ -73,7 +73,6 @@ export const builtinTools: Record<string, ToolDefinition> = {
   ast_grep_replace,
   grep,
   glob,
-  slashcommand,
   session_list,
   session_read,
   session_search,

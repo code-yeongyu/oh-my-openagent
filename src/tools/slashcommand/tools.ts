@@ -6,7 +6,7 @@ import type { CommandFrontmatter } from "../../features/claude-code-command-load
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
-import type { CommandScope, CommandMetadata, CommandInfo } from "./types"
+import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
   if (!existsSync(commandsDir)) {
@@ -51,7 +51,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
   return commands
 }
 
-function discoverCommandsSync(): CommandInfo[] {
+export function discoverCommandsSync(): CommandInfo[] {
   const { homedir } = require("os")
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
@@ -138,87 +138,109 @@ function formatCommandList(items: CommandInfo[]): string {
   return lines.join("\n")
 }
 
-async function buildDescription(): Promise<string> {
-  const availableCommands = discoverCommandsSync()
-  const availableSkills = await discoverAllSkills()
-  const availableItems = [
-    ...availableCommands,
-    ...availableSkills.map(skillToCommandInfo),
-  ]
-  const commandListForDescription = availableItems
+const TOOL_DESCRIPTION_PREFIX = `Load a skill to get detailed instructions for a specific task.
+
+Skills provide specialized knowledge and step-by-step guidance.
+Use this when a task matches an available skill's description.
+`
+
+function buildDescriptionFromItems(items: CommandInfo[]): string {
+  const commandListForDescription = items
     .map((cmd) => {
       const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
       return `- /${cmd.name}${hint}: ${cmd.metadata.description} (${cmd.scope})`
     })
     .join("\n")
 
-  return `Load a skill to get detailed instructions for a specific task.
-
-Skills provide specialized knowledge and step-by-step guidance.
-Use this when a task matches an available skill's description.
-
+  return `${TOOL_DESCRIPTION_PREFIX}
 <available_skills>
 ${commandListForDescription}
 </available_skills>`
 }
 
-let cachedDescription: string | null = null
+export function createSlashcommandTool(options: SlashcommandToolOptions = {}): ToolDefinition {
+  let cachedCommands: CommandInfo[] | null = options.commands ?? null
+  let cachedSkills: LoadedSkill[] | null = options.skills ?? null
+  let cachedDescription: string | null = null
 
-export const slashcommand: ToolDefinition = tool({
-  get description() {
-    if (!cachedDescription) {
-      cachedDescription = "Loading available commands and skills..."
-      buildDescription().then(desc => { cachedDescription = desc })
-    }
+  const getCommands = (): CommandInfo[] => {
+    if (cachedCommands) return cachedCommands
+    cachedCommands = discoverCommandsSync()
+    return cachedCommands
+  }
+
+  const getSkills = async (): Promise<LoadedSkill[]> => {
+    if (cachedSkills) return cachedSkills
+    cachedSkills = await discoverAllSkills()
+    return cachedSkills
+  }
+
+  const getAllItems = async (): Promise<CommandInfo[]> => {
+    const commands = getCommands()
+    const skills = await getSkills()
+    return [...commands, ...skills.map(skillToCommandInfo)]
+  }
+
+  const buildDescription = async (): Promise<string> => {
+    if (cachedDescription) return cachedDescription
+    const allItems = await getAllItems()
+    cachedDescription = buildDescriptionFromItems(allItems)
     return cachedDescription
-  },
+  }
 
-  args: {
-    command: tool.schema
-      .string()
-      .describe(
-        "The slash command to execute (without the leading slash). E.g., 'commit', 'plan', 'execute'."
-      ),
-  },
+  // Pre-warm the cache immediately
+  buildDescription()
 
-  async execute(args) {
-    const commands = discoverCommandsSync()
-    const skills = await discoverAllSkills()
-    const allItems = [
-      ...commands,
-      ...skills.map(skillToCommandInfo),
-    ]
+  return tool({
+    get description() {
+      return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
+    },
 
-    if (!args.command) {
-      return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."
-    }
+    args: {
+      command: tool.schema
+        .string()
+        .describe(
+          "The slash command to execute (without the leading slash). E.g., 'commit', 'plan', 'execute'."
+        ),
+    },
 
-    const cmdName = args.command.replace(/^\//, "")
+    async execute(args) {
+      const allItems = await getAllItems()
 
-    const exactMatch = allItems.find(
-      (cmd) => cmd.name.toLowerCase() === cmdName.toLowerCase()
-    )
+      if (!args.command) {
+        return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."
+      }
 
-    if (exactMatch) {
-      return await formatLoadedCommand(exactMatch)
-    }
+      const cmdName = args.command.replace(/^\//, "")
 
-    const partialMatches = allItems.filter((cmd) =>
-      cmd.name.toLowerCase().includes(cmdName.toLowerCase())
-    )
-
-    if (partialMatches.length > 0) {
-      const matchList = partialMatches.map((cmd) => `/${cmd.name}`).join(", ")
-      return (
-        `No exact match for "/${cmdName}". Did you mean: ${matchList}?\n\n` +
-        formatCommandList(allItems)
+      const exactMatch = allItems.find(
+        (cmd) => cmd.name.toLowerCase() === cmdName.toLowerCase()
       )
-    }
 
-    return (
-      `Command or skill "/${cmdName}" not found.\n\n` +
-      formatCommandList(allItems) +
-      "\n\nTry a different name."
-    )
-  },
-})
+      if (exactMatch) {
+        return await formatLoadedCommand(exactMatch)
+      }
+
+      const partialMatches = allItems.filter((cmd) =>
+        cmd.name.toLowerCase().includes(cmdName.toLowerCase())
+      )
+
+      if (partialMatches.length > 0) {
+        const matchList = partialMatches.map((cmd) => `/${cmd.name}`).join(", ")
+        return (
+          `No exact match for "/${cmdName}". Did you mean: ${matchList}?\n\n` +
+          formatCommandList(allItems)
+        )
+      }
+
+      return (
+        `Command or skill "/${cmdName}" not found.\n\n` +
+        formatCommandList(allItems) +
+        "\n\nTry a different name."
+      )
+    },
+  })
+}
+
+// Default instance for backward compatibility (lazy loading)
+export const slashcommand = createSlashcommandTool()
