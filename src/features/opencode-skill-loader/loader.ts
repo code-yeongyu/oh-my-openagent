@@ -341,6 +341,42 @@ export function loadOpencodeProjectSkills(): Record<string, CommandDefinition> {
 }
 
 /**
+ * Async version of loadUserSkills
+ */
+export async function loadUserSkillsAsync(): Promise<Record<string, CommandDefinition>> {
+  const userSkillsDir = join(getClaudeConfigDir(), "skills")
+  const skills = await loadSkillsFromDirAsync(userSkillsDir, "user")
+  return skillsToRecord(skills)
+}
+
+/**
+ * Async version of loadProjectSkills
+ */
+export async function loadProjectSkillsAsync(): Promise<Record<string, CommandDefinition>> {
+  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+  const skills = await loadSkillsFromDirAsync(projectSkillsDir, "project")
+  return skillsToRecord(skills)
+}
+
+/**
+ * Async version of loadOpencodeGlobalSkills
+ */
+export async function loadOpencodeGlobalSkillsAsync(): Promise<Record<string, CommandDefinition>> {
+  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
+  const skills = await loadSkillsFromDirAsync(opencodeSkillsDir, "opencode")
+  return skillsToRecord(skills)
+}
+
+/**
+ * Async version of loadOpencodeProjectSkills
+ */
+export async function loadOpencodeProjectSkillsAsync(): Promise<Record<string, CommandDefinition>> {
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  const skills = await loadSkillsFromDirAsync(opencodeProjectDir, "opencode-project")
+  return skillsToRecord(skills)
+}
+
+/**
  * Discover all skills from all sources with priority ordering.
  * Priority order: opencode-project > project > opencode > user
  * 
