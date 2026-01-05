@@ -5,7 +5,7 @@ import type { CheckResult, CheckDefinition, McpServerInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import { parseJsonc } from "../../../shared"
 
-const BUILTIN_MCP_SERVERS = ["context7", "websearch_exa", "grep_app"]
+const BUILTIN_MCP_SERVERS = ["context7", "grep_app"]
 
 const MCP_CONFIG_PATHS = [
   join(homedir(), ".claude", ".mcp.json"),
