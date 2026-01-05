@@ -30,6 +30,21 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.thinking).toBeUndefined()
   })
 
+  test("Sisyphus with Codex model override has no thinking or reasoningEffort", () => {
+    // #given
+    const overrides = {
+      Sisyphus: { model: "openai/codex-1" },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents.Sisyphus.model).toBe("openai/codex-1")
+    expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
+    expect(agents.Sisyphus.thinking).toBeUndefined()
+  })
+
   test("Sisyphus with systemDefaultModel GPT has reasoningEffort, no thinking", () => {
     // #given
     const systemDefaultModel = "openai/gpt-5.2"
