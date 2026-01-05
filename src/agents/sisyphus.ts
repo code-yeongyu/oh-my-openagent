@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { isGptModel } from "./types"
+import { getModelCapabilities } from "./model-capabilities"
 import { getPromptDialect, type PromptDialect } from "./prompt-dialect"
 import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
@@ -635,11 +635,16 @@ export function createSisyphusAgent(
     tools: { call_omo_agent: false },
   }
 
-  if (isGptModel(model)) {
+  const capabilities = getModelCapabilities(model)
+  if (capabilities.supportsReasoningEffort) {
     return { ...base, reasoningEffort: "medium" }
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  if (capabilities.supportsThinking) {
+    return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  }
+
+  return base
 }
 
 export const sisyphusAgent = createSisyphusAgent()

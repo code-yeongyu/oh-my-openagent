@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
+import { getModelCapabilities } from "./model-capabilities"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "openai/gpt-5.2"
@@ -114,11 +114,16 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     prompt: ORACLE_SYSTEM_PROMPT,
   } as AgentConfig
 
-  if (isGptModel(model)) {
+  const capabilities = getModelCapabilities(model)
+  if (capabilities.supportsReasoningEffort) {
     return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  if (capabilities.supportsThinking) {
+    return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  }
+
+  return base
 }
 
 export const oracleAgent = createOracleAgent()
