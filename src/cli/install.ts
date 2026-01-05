@@ -49,7 +49,7 @@ function formatConfigSummary(config: InstallConfig): string {
   const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
   const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
   const librarianModel = "glm-4.7-free"
-  const frontendModel = config.hasGemini ? "gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
 
   lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)

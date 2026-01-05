@@ -279,8 +279,10 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
 
   agents["librarian"] = { model: "opencode/glm-4.7-free" }
 
+  // Gemini models use `antigravity-` prefix for explicit Antigravity quota routing
+  // @see ANTIGRAVITY_PROVIDER_CONFIG comments for rationale
   if (installConfig.hasGemini) {
-    agents["explore"] = { model: "google/gemini-3-flash" }
+    agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
   } else if (installConfig.hasClaude && installConfig.isMax20) {
     agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
   } else {
@@ -294,9 +296,9 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   }
 
   if (installConfig.hasGemini) {
-    agents["frontend-ui-ux-engineer"] = { model: "google/gemini-3-pro-high" }
-    agents["document-writer"] = { model: "google/gemini-3-flash" }
-    agents["multimodal-looker"] = { model: "google/gemini-3-flash" }
+    agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
+    agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
+    agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
   } else {
     const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
     agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
@@ -497,25 +499,39 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   }
 }
 
+/**
+ * Antigravity Provider Configuration
+ *
+ * IMPORTANT: Model names MUST use `antigravity-` prefix for stability.
+ *
+ * The opencode-antigravity-auth plugin supports two naming conventions:
+ * - `antigravity-gemini-3-pro-high` (RECOMMENDED, explicit Antigravity quota routing)
+ * - `gemini-3-pro-high` (LEGACY, backward compatible but may break in future)
+ *
+ * Legacy names rely on Gemini CLI using `-preview` suffix for disambiguation.
+ * If Google removes `-preview`, legacy names may route to wrong quota.
+ *
+ * @see https://github.com/NoeFabris/opencode-antigravity-auth#migration-guide-v127
+ */
 export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
     models: {
-      "gemini-3-pro-high": {
+      "antigravity-gemini-3-pro-high": {
         name: "Gemini 3 Pro High (Antigravity)",
         thinking: true,
         attachment: true,
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "gemini-3-pro-low": {
+      "antigravity-gemini-3-pro-low": {
         name: "Gemini 3 Pro Low (Antigravity)",
         thinking: true,
         attachment: true,
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "gemini-3-flash": {
+      "antigravity-gemini-3-flash": {
         name: "Gemini 3 Flash (Antigravity)",
         attachment: true,
         limit: { context: 1048576, output: 65536 },
