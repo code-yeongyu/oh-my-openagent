@@ -192,7 +192,10 @@ export function createAutoContinuityHook(
   };
 
   if (!continuityConfig.enabled) {
-    return { event: async () => {} };
+    return {
+      event: async () => {},
+      "tool.execute.after": async () => {},
+    };
   }
 
   const projectDir = ctx.directory;
@@ -295,7 +298,10 @@ export function createAutoContinuityHook(
     }
 
     if (ledger.openQuestions.length > 0) {
-      lines.push(`**UNCONFIRMED:** ${ledger.openQuestions.join("; ")}`);
+      const cleanQuestions = ledger.openQuestions.map((q) =>
+        q.replace(/^UNCONFIRMED:\s*/i, ""),
+      );
+      lines.push(`**UNCONFIRMED:** ${cleanQuestions.join("; ")}`);
     }
 
     lines.push(
@@ -306,8 +312,19 @@ export function createAutoContinuityHook(
     return lines.join("\n");
   };
 
-  const injectLedgerContext = async (sessionID: string, ledger: Ledger) => {
+  const injectingContextFor = new Set<string>();
+
+  const injectLedgerContext = async (
+    sessionID: string,
+    ledger: Ledger,
+  ): Promise<boolean> => {
+    if (injectingContextFor.has(sessionID)) {
+      return false;
+    }
+
+    injectingContextFor.add(sessionID);
     const context = generateLedgerContext(ledger);
+
     try {
       await ctx.client.session.prompt({
         path: { id: sessionID },
@@ -321,8 +338,12 @@ export function createAutoContinuityHook(
         },
       });
       log("[auto-continuity] Injected ledger context", { sessionID });
+      return true;
     } catch (err) {
       log("[auto-continuity] Failed to inject ledger context", { err });
+      return false;
+    } finally {
+      injectingContextFor.delete(sessionID);
     }
   };
 
@@ -375,16 +396,31 @@ export function createAutoContinuityHook(
       const sessionID = info.sessionID;
       if (!sessionID || state.initializedSessions.has(sessionID)) return;
 
-      state.initializedSessions.add(sessionID);
-
-      // Inject ledger context if we have one with meaningful content
-      if (
+      // Check if ledger has meaningful content worth injecting
+      const hasContent =
         state.lastLedger &&
         (state.lastLedger.goal ||
           state.lastLedger.state.now ||
-          state.lastLedger.state.done.length > 0)
-      ) {
-        await injectLedgerContext(sessionID, state.lastLedger);
+          state.lastLedger.state.done.length > 0);
+
+      if (hasContent) {
+        const injected = await injectLedgerContext(
+          sessionID,
+          state.lastLedger!,
+        );
+        if (injected) {
+          state.initializedSessions.add(sessionID);
+        }
+      } else {
+        state.initializedSessions.add(sessionID);
+      }
+
+      // Prune old sessions to prevent memory leak (keep last 100)
+      if (state.initializedSessions.size > 100) {
+        const sessions = Array.from(state.initializedSessions);
+        sessions.slice(0, sessions.length - 100).forEach((s) => {
+          state.initializedSessions.delete(s);
+        });
       }
     }
 
@@ -433,32 +469,41 @@ export function createAutoContinuityHook(
     // Sync ledger with todo updates
     if (input.tool === "todowrite" && state.lastLedger) {
       try {
-        const todos = JSON.parse(output.output) as Array<{
-          content: string;
-          status: string;
-        }>;
+        const parsed = JSON.parse(output.output);
+        const todos = Array.isArray(parsed) ? parsed : [];
 
-        const done = todos
-          .filter((t) => t.status === "completed")
-          .map((t) => t.content);
-        const inProgress = todos.find((t) => t.status === "in_progress");
-        const pending = todos
-          .filter((t) => t.status === "pending")
-          .map((t) => t.content);
+        if (
+          todos.length > 0 &&
+          todos.every(
+            (t) =>
+              typeof t === "object" &&
+              t !== null &&
+              "content" in t &&
+              "status" in t,
+          )
+        ) {
+          const done = todos
+            .filter((t) => t.status === "completed")
+            .map((t) => String(t.content));
+          const inProgress = todos.find((t) => t.status === "in_progress");
+          const pending = todos
+            .filter((t) => t.status === "pending")
+            .map((t) => String(t.content));
 
-        state.lastLedger = ledgerManager.updateState(state.lastLedger, {
-          done: done.slice(-10),
-          now: inProgress?.content || "",
-          next: pending.slice(0, 5),
-        });
+          state.lastLedger = ledgerManager.updateState(state.lastLedger, {
+            done: done.slice(-10),
+            now: inProgress ? String(inProgress.content) : "",
+            next: pending.slice(0, 5),
+          });
 
-        log("[auto-continuity] Synced ledger with todos", {
-          done: done.length,
-          now: inProgress?.content,
-          next: pending.length,
-        });
+          log("[auto-continuity] Synced ledger with todos", {
+            done: done.length,
+            now: inProgress?.content,
+            next: pending.length,
+          });
+        }
       } catch {
-        // Ignore parse errors
+        // Ignore parse errors - output might not be JSON
       }
     }
 
