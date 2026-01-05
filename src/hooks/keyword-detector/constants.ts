@@ -112,15 +112,66 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
-## TDD (if test infrastructure exists)
+## VERIFICATION GUARANTEE (NON-NEGOTIABLE)
 
-1. Write spec (requirements)
-2. Write tests (failing)
-3. RED: tests fail
-4. Implement minimal code
-5. GREEN: tests pass
-6. Refactor if needed (must stay green)
-7. Next feature, repeat
+**NOTHING is "done" without PROOF it works.**
+
+### Pre-Implementation: Define Success Criteria
+
+BEFORE writing ANY code, you MUST define:
+
+| Criteria Type | Description | Example |
+|---------------|-------------|---------|
+| **Functional** | What specific behavior must work | "Button click triggers API call" |
+| **Observable** | What can be measured/seen | "Console shows 'success', no errors" |
+| **Pass/Fail** | Binary, no ambiguity | "Returns 200 OK" not "should work" |
+
+Write these criteria explicitly. Share with user if scope is non-trivial.
+
+### Test Plan Template (MANDATORY for non-trivial tasks)
+
+\`\`\`
+## Test Plan
+### Objective: [What we're verifying]
+### Prerequisites: [Setup needed]
+### Test Cases:
+1. [Test Name]: [Input] → [Expected Output] → [How to verify]
+2. ...
+### Success Criteria: ALL test cases pass
+### How to Execute: [Exact commands/steps]
+\`\`\`
+
+### Execution & Evidence Requirements
+
+| Phase | Action | Required Evidence |
+|-------|--------|-------------------|
+| **Build** | Run build command | Exit code 0, no errors |
+| **Test** | Execute test suite | All tests pass (screenshot/output) |
+| **Manual Verify** | Test the actual feature | Demonstrate it works (describe what you observed) |
+| **Regression** | Ensure nothing broke | Existing tests still pass |
+
+**WITHOUT evidence = NOT verified = NOT done.**
+
+### TDD Workflow (when test infrastructure exists)
+
+1. **SPEC**: Define what "working" means (success criteria above)
+2. **RED**: Write failing test → Run it → Confirm it FAILS
+3. **GREEN**: Write minimal code → Run test → Confirm it PASSES
+4. **REFACTOR**: Clean up → Tests MUST stay green
+5. **VERIFY**: Run full test suite, confirm no regressions
+6. **EVIDENCE**: Report what you ran and what output you saw
+
+### Verification Anti-Patterns (BLOCKING)
+
+| Violation | Why It Fails |
+|-----------|--------------|
+| "It should work now" | No evidence. Run it. |
+| "I added the tests" | Did they pass? Show output. |
+| "Fixed the bug" | How do you know? What did you test? |
+| "Implementation complete" | Did you verify against success criteria? |
+| Skipping test execution | Tests exist to be RUN, not just written |
+
+**CLAIM NOTHING WITHOUT PROOF. EXECUTE. VERIFY. SHOW EVIDENCE.**
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
