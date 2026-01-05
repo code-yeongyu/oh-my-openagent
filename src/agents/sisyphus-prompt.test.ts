@@ -8,6 +8,7 @@ describe("Sisyphus prompt dialect", () => {
 
     // #then
     expect(agent.prompt).toContain("implies code changes")
+    expect(agent.prompt).toContain("Do NOT output patches or diffs in chat")
     expect(agent.prompt).not.toContain("NEVER START IMPLEMENTING")
   })
 
