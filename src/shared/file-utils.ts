@@ -1,4 +1,5 @@
 import { lstatSync, readlinkSync } from "fs"
+import { promises as fs } from "fs"
 import { resolve } from "path"
 
 export function isMarkdownFile(entry: { name: string; isFile: () => boolean }): boolean {
@@ -18,6 +19,19 @@ export function resolveSymlink(filePath: string): string {
     const stats = lstatSync(filePath, { throwIfNoEntry: false })
     if (stats?.isSymbolicLink()) {
       return resolve(filePath, "..", readlinkSync(filePath))
+    }
+    return filePath
+  } catch {
+    return filePath
+  }
+}
+
+export async function resolveSymlinkAsync(filePath: string): Promise<string> {
+  try {
+    const stats = await fs.lstat(filePath)
+    if (stats.isSymbolicLink()) {
+      const linkTarget = await fs.readlink(filePath)
+      return resolve(filePath, "..", linkTarget)
     }
     return filePath
   } catch {

@@ -129,22 +129,38 @@ async function formatMcpCapabilities(
 }
 
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
-  const skills = options.skills ?? discoverSkills({ includeClaudeCodePaths: !options.opencodeOnly })
-  const skillInfos = skills.map(loadedSkillToInfo)
+  let cachedSkills: LoadedSkill[] | null = null
+  let cachedDescription: string | null = null
 
-  const description = skillInfos.length === 0
-    ? TOOL_DESCRIPTION_NO_SKILLS
-    : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+  const getSkills = async (): Promise<LoadedSkill[]> => {
+    if (options.skills) return options.skills
+    if (cachedSkills) return cachedSkills
+    cachedSkills = await discoverSkills({ includeClaudeCodePaths: !options.opencodeOnly })
+    return cachedSkills
+  }
+
+  const getDescription = async (): Promise<string> => {
+    if (cachedDescription) return cachedDescription
+    const skills = await getSkills()
+    const skillInfos = skills.map(loadedSkillToInfo)
+    cachedDescription = skillInfos.length === 0
+      ? TOOL_DESCRIPTION_NO_SKILLS
+      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    return cachedDescription
+  }
+
+  getDescription()
 
   return tool({
-    description,
+    get description() {
+      return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
+    },
     args: {
       name: tool.schema.string().describe("The skill identifier from available_skills (e.g., 'code-review')"),
     },
     async execute(args: SkillArgs) {
-      const skill = options.skills
-        ? skills.find(s => s.name === args.name)
-        : skills.find(s => s.name === args.name)
+      const skills = await getSkills()
+      const skill = skills.find(s => s.name === args.name)
 
       if (!skill) {
         const available = skills.map(s => s.name).join(", ")

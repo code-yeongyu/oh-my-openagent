@@ -94,7 +94,7 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
   }
 }
 
-function discoverAllCommands(): CommandInfo[] {
+async function discoverAllCommands(): Promise<CommandInfo[]> {
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
   const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
@@ -105,7 +105,7 @@ function discoverAllCommands(): CommandInfo[] {
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
 
-  const skills = discoverAllSkills()
+  const skills = await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)
 
   return [
@@ -117,8 +117,8 @@ function discoverAllCommands(): CommandInfo[] {
   ]
 }
 
-function findCommand(commandName: string): CommandInfo | null {
-  const allCommands = discoverAllCommands()
+async function findCommand(commandName: string): Promise<CommandInfo | null> {
+  const allCommands = await discoverAllCommands()
   return allCommands.find(
     (cmd) => cmd.name.toLowerCase() === commandName.toLowerCase()
   ) ?? null
@@ -170,7 +170,7 @@ export interface ExecuteResult {
 }
 
 export async function executeSlashCommand(parsed: ParsedSlashCommand): Promise<ExecuteResult> {
-  const command = findCommand(parsed.command)
+  const command = await findCommand(parsed.command)
 
   if (!command) {
     return {

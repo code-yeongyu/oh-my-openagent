@@ -53,7 +53,7 @@ This is the skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "test-skill")
 
         // #then
@@ -89,7 +89,7 @@ This is a simple skill.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "simple-skill")
 
         // #then
@@ -122,7 +122,7 @@ Skill with env vars.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "env-skill")
 
         // #then
@@ -149,7 +149,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         // #then - when YAML fails, skill uses directory name as fallback
         const skill = skills.find(s => s.name === "bad-yaml-skill")
 
@@ -186,7 +186,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "ampcode-skill")
 
         // #then
@@ -227,7 +227,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "priority-skill")
 
         // #then - mcp.json should take priority
@@ -259,7 +259,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "direct-format")
 
         // #then
