@@ -582,7 +582,6 @@ These tools enable agents to reference previous conversations and maintain conti
     ```
 - **Online**: Project rules aren't everything. Built-in MCPs for extended capabilities:
   - **context7**: Official documentation lookup
-  - **websearch_exa**: Real-time web search
   - **grep_app**: Ultra-fast code search across public GitHub repos (great for finding implementation examples)
 
 #### Be Multimodal. Save Tokens.
@@ -694,7 +693,7 @@ Disable specific Claude Code compatibility features with the `claude_code` confi
 
 | Toggle     | When `false`, stops loading from...                                                   | Unaffected                                            |
 | ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, websearch_exa)                |
+| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, grep_app)                     |
 | `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | Built-in agents (oracle, librarian, etc.)             |
@@ -983,17 +982,16 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 ### MCPs
 
-Context7, Exa, and grep.app MCP enabled by default.
+Context7 and grep.app MCP enabled by default.
 
 - **context7**: Fetches up-to-date official documentation for libraries
-- **websearch_exa**: Real-time web search powered by Exa AI
 - **grep_app**: Ultra-fast code search across millions of public GitHub repositories via [grep.app](https://grep.app)
 
 Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
-  "disabled_mcps": ["context7", "websearch_exa", "grep_app"]
+  "disabled_mcps": ["context7", "grep_app"]
 }
 ```
 
