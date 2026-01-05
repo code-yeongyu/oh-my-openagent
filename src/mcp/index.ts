@@ -9,11 +9,11 @@ const allBuiltinMcps: Record<McpName, { type: "remote"; url: string; enabled: bo
   grep_app,
 }
 
-export function createBuiltinMcps(disabledMcps: McpName[] = []) {
+export function createBuiltinMcps(disabledMcps: string[] = []) {
   const mcps: Record<string, { type: "remote"; url: string; enabled: boolean }> = {}
 
   for (const [name, config] of Object.entries(allBuiltinMcps)) {
-    if (!disabledMcps.includes(name as McpName)) {
+    if (!disabledMcps.includes(name)) {
       mcps[name] = config
     }
   }

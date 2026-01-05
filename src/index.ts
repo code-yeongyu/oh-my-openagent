@@ -53,6 +53,8 @@ import {
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
+  createSlashcommandTool,
+  discoverCommandsSync,
   sessionExists,
   interactive_bash,
   startTmuxCheck,
@@ -231,6 +233,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
+  const commands = discoverCommandsSync();
+  const slashcommandTool = createSlashcommandTool({
+    commands,
+    skills: mergedSkills,
+  });
+
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
     : null;
@@ -251,7 +259,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       look_at: lookAt,
       skill: skillTool,
       skill_mcp: skillMcpTool,
-      interactive_bash,  // Always included, handles missing tmux gracefully via getCachedTmuxPath() ?? "tmux"
+      slashcommand: slashcommandTool,
+      interactive_bash,
     },
 
     "chat.message": async (input, output) => {
