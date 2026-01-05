@@ -48,10 +48,10 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Agent Configuration")))
   lines.push("")
 
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "big-pickle"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "big-pickle")
-  const librarianModel = config.hasClaude && config.isMax20 ? "claude-sonnet-4-5" : "big-pickle"
-  const frontendModel = config.hasGemini ? "gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "big-pickle")
+  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
+  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const librarianModel = "glm-4.7-free"
+  const frontendModel = config.hasGemini ? "gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
 
   lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
@@ -163,7 +163,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   const claude = await p.select({
     message: "Do you have a Claude Pro/Max subscription?",
     options: [
-      { value: "no" as const, label: "No", hint: "Will use opencode/big-pickle as fallback" },
+      { value: "no" as const, label: "No", hint: "Will use opencode/glm-4.7-free as fallback" },
       { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
       { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.5 for Librarian" },
     ],
@@ -310,7 +310,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
-    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
+    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
@@ -439,7 +439,7 @@ export async function install(args: InstallArgs): Promise<number> {
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
   if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
-    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
+    p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
