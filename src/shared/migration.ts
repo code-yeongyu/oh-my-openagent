@@ -3,14 +3,16 @@ import { log } from "./logger"
 
 // Migration map: old keys → new keys (for backward compatibility)
 export const AGENT_NAME_MAP: Record<string, string> = {
-  // Legacy names (backward compatibility)
   omo: "Sisyphus",
   "OmO": "Sisyphus",
-  "OmO-Plan": "Planner-Sisyphus",
-  "omo-plan": "Planner-Sisyphus",
-  // Current names
   sisyphus: "Sisyphus",
-  "planner-sisyphus": "Planner-Sisyphus",
+  "OmO-Plan": "Prometheus (Planner)",
+  "omo-plan": "Prometheus (Planner)",
+  "Planner-Sisyphus": "Prometheus (Planner)",
+  "planner-sisyphus": "Prometheus (Planner)",
+  prometheus: "Prometheus (Planner)",
+  "plan-consultant": "Metis (Plan Consultant)",
+  metis: "Metis (Plan Consultant)",
   build: "build",
   oracle: "oracle",
   librarian: "librarian",
@@ -24,6 +26,15 @@ export const AGENT_NAME_MAP: Record<string, string> = {
 export const HOOK_NAME_MAP: Record<string, string> = {
   // Legacy names (backward compatibility)
   "anthropic-auto-compact": "anthropic-context-window-limit-recovery",
+}
+
+// Model to category mapping for auto-migration
+export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
+  "google/gemini-3-pro-preview": "visual-engineering",
+  "openai/gpt-5.2": "high-iq",
+  "anthropic/claude-haiku-4-5": "quick",
+  "anthropic/claude-opus-4-5": "most-capable",
+  "anthropic/claude-sonnet-4-5": "general",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
@@ -56,6 +67,45 @@ export function migrateHookNames(hooks: string[]): { migrated: string[]; changed
   return { migrated, changed }
 }
 
+export function migrateAgentConfigToCategory(config: Record<string, unknown>): {
+  migrated: Record<string, unknown>
+  changed: boolean
+} {
+  const { model, ...rest } = config
+  if (typeof model !== "string") {
+    return { migrated: config, changed: false }
+  }
+
+  const category = MODEL_TO_CATEGORY_MAP[model]
+  if (!category) {
+    return { migrated: config, changed: false }
+  }
+
+  return {
+    migrated: { category, ...rest },
+    changed: true,
+  }
+}
+
+export function shouldDeleteAgentConfig(
+  config: Record<string, unknown>,
+  category: string
+): boolean {
+  const { DEFAULT_CATEGORIES } = require("../tools/sisyphus-task/constants")
+  const defaults = DEFAULT_CATEGORIES[category]
+  if (!defaults) return false
+
+  const keys = Object.keys(config).filter((k) => k !== "category")
+  if (keys.length === 0) return true
+
+  for (const key of keys) {
+    if (config[key] !== (defaults as Record<string, unknown>)[key]) {
+      return false
+    }
+  }
+  return true
+}
+
 export function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown>): boolean {
   let needsWrite = false
 
@@ -64,6 +114,22 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     if (changed) {
       rawConfig.agents = migrated
       needsWrite = true
+    }
+  }
+
+  if (rawConfig.agents && typeof rawConfig.agents === "object") {
+    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+    for (const [name, config] of Object.entries(agents)) {
+      const { migrated, changed } = migrateAgentConfigToCategory(config)
+      if (changed) {
+        const category = migrated.category as string
+        if (shouldDeleteAgentConfig(migrated, category)) {
+          delete agents[name]
+        } else {
+          agents[name] = migrated
+        }
+        needsWrite = true
+      }
     }
   }
 
@@ -83,8 +149,12 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
 
   if (needsWrite) {
     try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+      const backupPath = `${configPath}.bak.${timestamp}`
+      fs.copyFileSync(configPath, backupPath)
+
       fs.writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n", "utf-8")
-      log(`Migrated config file: ${configPath}`)
+      log(`Migrated config file: ${configPath} (backup: ${backupPath})`)
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)
     }
