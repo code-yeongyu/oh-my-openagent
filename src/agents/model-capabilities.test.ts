@@ -5,6 +5,7 @@ describe("getModelCapabilities", () => {
   test("flags OpenAI reasoning-capable GPT models", () => {
     // #given / #then
     expect(getModelCapabilities("openai/gpt-5.2").supportsReasoningEffort).toBe(true)
+    expect(getModelCapabilities("openai/gpt-5.1-codex").supportsReasoningEffort).toBe(true)
     expect(getModelCapabilities("gpt-5.2").supportsReasoningEffort).toBe(true)
     expect(getModelCapabilities("o3").supportsReasoningEffort).toBe(true)
   })
