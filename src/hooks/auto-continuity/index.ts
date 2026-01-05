@@ -268,6 +268,64 @@ export function createAutoContinuityHook(
     return null;
   };
 
+  const generateLedgerContext = (ledger: Ledger): string => {
+    const lines = [
+      `[CONTINUITY RESTORED - Session: ${ledger.metadata.sessionName}]`,
+      "",
+      `**Goal:** ${ledger.goal || "Not specified"}`,
+      `**Current Focus:** ${ledger.state.now || "Not specified"}`,
+    ];
+
+    if (ledger.state.done.length > 0) {
+      lines.push(`**Completed:** ${ledger.state.done.slice(-5).join(", ")}`);
+    }
+
+    if (ledger.state.next.length > 0) {
+      lines.push(`**Next:** ${ledger.state.next.join(", ")}`);
+    }
+
+    if (ledger.keyDecisions.length > 0) {
+      lines.push(
+        `**Key Decisions:** ${ledger.keyDecisions.map((d) => d.decision).join("; ")}`,
+      );
+    }
+
+    if (ledger.workingSet.keyFiles.length > 0) {
+      lines.push(`**Working Files:** ${ledger.workingSet.keyFiles.join(", ")}`);
+    }
+
+    if (ledger.openQuestions.length > 0) {
+      lines.push(`**UNCONFIRMED:** ${ledger.openQuestions.join("; ")}`);
+    }
+
+    lines.push(
+      "",
+      "Ledger auto-loaded. Update with `/continuity_ledger` as you progress.",
+    );
+
+    return lines.join("\n");
+  };
+
+  const injectLedgerContext = async (sessionID: string, ledger: Ledger) => {
+    const context = generateLedgerContext(ledger);
+    try {
+      await ctx.client.session.prompt({
+        path: { id: sessionID },
+        body: {
+          parts: [
+            {
+              type: "text",
+              text: `[SYSTEM REMINDER - CONTINUITY CONTEXT]\n\n${context}`,
+            },
+          ],
+        },
+      });
+      log("[auto-continuity] Injected ledger context", { sessionID });
+    } catch (err) {
+      log("[auto-continuity] Failed to inject ledger context", { err });
+    }
+  };
+
   const eventHandler = async ({
     event,
   }: {
@@ -285,7 +343,19 @@ export function createAutoContinuityHook(
         // Main session created
         state.autoSaveTriggered = false;
 
-        if (state.lastLedger) {
+        // Create ledger if none exists
+        if (!state.lastLedger) {
+          const sessionName = getSessionName();
+          state.lastLedger = ledgerManager.createLedger(sessionName, {
+            goal: "",
+            state: { done: [], now: "", next: [] },
+          });
+          state.sessionName = sessionName;
+          log("[auto-continuity] Created new ledger for session", {
+            sessionID: sessionInfo.id,
+            ledger: sessionName,
+          });
+        } else {
           const prunedLedger = ledgerManager.pruneLedger(state.lastLedger);
           state.lastLedger = prunedLedger;
 
@@ -294,6 +364,27 @@ export function createAutoContinuityHook(
             ledger: prunedLedger.metadata.sessionName,
           });
         }
+      }
+    }
+
+    // Inject ledger on first user message (after session.created)
+    if (event.type === "message.created") {
+      const info = props?.info as MessageInfo | undefined;
+      if (!info || info.role !== "user") return;
+
+      const sessionID = info.sessionID;
+      if (!sessionID || state.initializedSessions.has(sessionID)) return;
+
+      state.initializedSessions.add(sessionID);
+
+      // Inject ledger context if we have one with meaningful content
+      if (
+        state.lastLedger &&
+        (state.lastLedger.goal ||
+          state.lastLedger.state.now ||
+          state.lastLedger.state.done.length > 0)
+      ) {
+        await injectLedgerContext(sessionID, state.lastLedger);
       }
     }
 
@@ -333,14 +424,44 @@ export function createAutoContinuityHook(
     }
   };
 
-  // Hook into tool execution to append context warnings to output
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
     output: { title: string; output: string; metadata: unknown },
   ) => {
     const { sessionID } = input;
 
-    // Only check after certain tools that might indicate significant work
+    // Sync ledger with todo updates
+    if (input.tool === "todowrite" && state.lastLedger) {
+      try {
+        const todos = JSON.parse(output.output) as Array<{
+          content: string;
+          status: string;
+        }>;
+
+        const done = todos
+          .filter((t) => t.status === "completed")
+          .map((t) => t.content);
+        const inProgress = todos.find((t) => t.status === "in_progress");
+        const pending = todos
+          .filter((t) => t.status === "pending")
+          .map((t) => t.content);
+
+        state.lastLedger = ledgerManager.updateState(state.lastLedger, {
+          done: done.slice(-10),
+          now: inProgress?.content || "",
+          next: pending.slice(0, 5),
+        });
+
+        log("[auto-continuity] Synced ledger with todos", {
+          done: done.length,
+          now: inProgress?.content,
+          next: pending.length,
+        });
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
     const significantTools = ["edit", "write", "bash", "task"];
     if (!significantTools.includes(input.tool)) return;
 
