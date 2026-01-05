@@ -286,15 +286,23 @@ bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> 
 - User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
 
 The CLI will:
-- Register the plugin in `opencode.json`
+- Register the plugin in OpenCode's config file
 - Configure agent models based on subscription flags
 - Show which auth steps are needed
+
+> **Note**: OpenCode's configuration file can be either `opencode.json` or `opencode.jsonc` (JSON with Comments). When both exist, `.jsonc` takes priority. Throughout this guide, we refer to it as `opencode.json` for simplicity, but all verification steps check for both formats.
 
 ### Step 3: Verify Setup
 
 ```bash
 opencode --version  # Should be 1.0.150 or higher
-cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
+
+# Check for opencode.jsonc first, then opencode.json
+if [ -f ~/.config/opencode/opencode.jsonc ]; then
+    cat ~/.config/opencode/opencode.jsonc  # Should contain "oh-my-opencode" in plugin array
+elif [ -f ~/.config/opencode/opencode.json ]; then
+    cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
+fi
 ```
 
 ### Step 4: Configure Authentication
@@ -315,7 +323,7 @@ opencode auth login
 
 #### Google Gemini (Antigravity OAuth)
 
-First, add the opencode-antigravity-auth plugin:
+First, add the opencode-antigravity-auth plugin to your OpenCode config file:
 
 ```json
 {
@@ -328,7 +336,7 @@ First, add the opencode-antigravity-auth plugin:
 
 ##### Model Configuration
 
-You'll also need full model settings in `opencode.json`.
+You'll also need full model settings in your OpenCode config file.
 Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy provider/models config from the README, and merge carefully to avoid breaking the user's existing setup.
 
 ##### oh-my-opencode Agent Model Override
@@ -363,7 +371,7 @@ opencode auth login
 
 #### OpenAI (ChatGPT Plus/Pro)
 
-First, add the opencode-openai-codex-auth plugin:
+First, add the opencode-openai-codex-auth plugin to your OpenCode config file:
 
 ```json
 {
@@ -384,10 +392,10 @@ First, add the opencode-openai-codex-auth plugin:
 }
 ```
 
-Then run `cd ~/.config/opencode && bun i`. In `opencode.json`, use `"opencode-openai-codex-auth"` without the version suffix.
+Then run `cd ~/.config/opencode && bun i`. In your OpenCode config file, use `"opencode-openai-codex-auth"` without the version suffix.
 
 ##### Model Configuration
-You'll also need full model settings in `opencode.json`.
+You'll also need full model settings in your OpenCode config file.
 Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json), and merge carefully to avoid breaking the user's existing setup.
 
 Then authenticate:
