@@ -12,9 +12,7 @@ import {
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
 
-// Increased from 30 to 90 minutes to accommodate long-running librarian searches
-// which can legitimately take 10-15 minutes when searching remote repos/docs
-const TASK_TTL_MS = 90 * 60 * 1000
+const TASK_TTL_MS = 30 * 60 * 1000
 
 type OpencodeClient = PluginInput["client"]
 
@@ -160,7 +158,7 @@ export class BackgroundManager {
     attempt: number
   ): Promise<void> {
     const maxRetries = 3
-    const backoffMs = [0, 2000, 5000]
+    const backoffMs = [0, 2000]
 
     try {
       await this.client.session.promptAsync({

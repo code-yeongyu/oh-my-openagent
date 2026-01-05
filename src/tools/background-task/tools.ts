@@ -247,7 +247,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
           return `❌ Task not found: ${args.task_id}
 
 This task may have:
-- Expired (tasks are kept for 90 minutes after completion)
+- Expired (tasks are kept for 30 minutes after completion)
 - Never existed (check the task_id is correct)
 - Been cancelled via background_cancel
 
@@ -283,7 +283,7 @@ Try calling background_output sooner after receiving the completion notification
           if (!currentTask) {
             return `❌ Task was deleted or expired: ${args.task_id}
 
-The task may have been cleaned up (90 minute TTL after completion) or cancelled.`
+The task may have been cleaned up (30 minute TTL after completion) or cancelled.`
           }
 
           if (currentTask.status === "completed") {

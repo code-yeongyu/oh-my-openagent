@@ -154,7 +154,7 @@ background_task(agent="explore", prompt="Find patterns...")
 4. **NEVER** say "waiting for tasks" then end turn - either work or call background_output
 5. BEFORE final answer: \`background_cancel(all=true)\`
 
-**When to block**: If user's question REQUIRES background task results and there's no other work possible, call \`background_output(block=true)\` to wait for completion. Don't end your turn idle.
+**When to block**: If user's question REQUIRES background task results and there's no other work possible, call \`background_output(task_id="...", block=true)\` to wait for completion. Don't end your turn idle.
 
 ### Search Stop Conditions
 
