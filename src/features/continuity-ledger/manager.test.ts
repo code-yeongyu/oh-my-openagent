@@ -289,3 +289,158 @@ describe("createLedgerManager", () => {
     expect(manager).toBeInstanceOf(LedgerManager);
   });
 });
+
+describe("Edge Cases", () => {
+  const testDir = "/tmp/test-edge-cases";
+  let manager: LedgerManager;
+
+  beforeEach(() => {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true });
+    }
+    fs.mkdirSync(testDir, { recursive: true });
+    manager = createLedgerManager(testDir);
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true });
+    }
+  });
+
+  describe("session name sanitization", () => {
+    test("sanitizes session names with invalid characters", () => {
+      const ledger = manager.createLedger('test<>:"/\\|?*session');
+      expect(ledger.metadata.sessionName).toBe("test---------session");
+      expect(fs.existsSync(ledger.metadata.filePath)).toBe(true);
+    });
+
+    test("sanitizes session names with dots", () => {
+      const ledger = manager.createLedger("test...session...");
+      expect(ledger.metadata.sessionName).toBe("test.session");
+    });
+
+    test("truncates very long session names", () => {
+      const longName = "a".repeat(300);
+      const ledger = manager.createLedger(longName);
+      expect(ledger.metadata.sessionName.length).toBeLessThanOrEqual(200);
+    });
+
+    test("handles empty session name", () => {
+      const ledger = manager.createLedger("");
+      expect(ledger.metadata.sessionName).toBe("");
+      expect(fs.existsSync(ledger.metadata.filePath)).toBe(true);
+    });
+  });
+
+  describe("state parsing edge cases", () => {
+    test("handles placeholder values in state", () => {
+      const ledger = manager.createLedger("test-placeholder");
+      const loaded = manager.loadLedger(
+        "CONTINUITY_CLAUDE-test-placeholder.md",
+      );
+      expect(loaded?.state.done).toEqual([]);
+      expect(loaded?.state.next).toEqual([]);
+    });
+
+    test("handles empty content gracefully", () => {
+      manager.createLedger("test-empty");
+      const filePath = path.join(
+        testDir,
+        "thoughts/ledgers/CONTINUITY_CLAUDE-test-empty.md",
+      );
+      fs.writeFileSync(filePath, "");
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-empty.md");
+      expect(loaded).not.toBeNull();
+      expect(loaded?.goal).toBe("");
+      expect(loaded?.state.done).toEqual([]);
+    });
+
+    test("handles malformed markdown gracefully", () => {
+      manager.createLedger("test-malformed");
+      const filePath = path.join(
+        testDir,
+        "thoughts/ledgers/CONTINUITY_CLAUDE-test-malformed.md",
+      );
+      fs.writeFileSync(filePath, "# Not a valid ledger\nRandom content here");
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-malformed.md");
+      expect(loaded).not.toBeNull();
+      expect(loaded?.goal).toBe("");
+    });
+  });
+
+  describe("findLatestLedger race condition handling", () => {
+    test("handles file deletion during search", async () => {
+      manager.createLedger("session-1");
+      manager.createLedger("session-2");
+      const found = manager.findLatestLedger();
+      expect(found).not.toBeNull();
+    });
+
+    test("returns null when all files fail to stat", () => {
+      const found = manager.findLatestLedger();
+      expect(found).toBeNull();
+    });
+  });
+
+  describe("working set parsing", () => {
+    test("handles files with special characters in names", () => {
+      const ledger = manager.createLedger("test-files", {
+        workingSet: {
+          keyFiles: ["src/my file.ts", "src/another-file.ts"],
+        },
+      });
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-files.md");
+      expect(loaded?.workingSet.keyFiles).toContain("src/my file.ts");
+    });
+
+    test("handles empty working set", () => {
+      const ledger = manager.createLedger("test-empty-ws");
+      expect(ledger.workingSet.keyFiles).toEqual([]);
+      expect(ledger.workingSet.branch).toBeUndefined();
+    });
+  });
+
+  describe("decisions parsing", () => {
+    test("handles decisions with colons in rationale", () => {
+      const ledger = manager.createLedger("test-colons", {
+        keyDecisions: [
+          {
+            decision: "Use Redis",
+            rationale: "Performance: 10x faster than SQL",
+          },
+        ],
+      });
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-colons.md");
+      expect(loaded?.keyDecisions.length).toBe(1);
+      expect(loaded?.keyDecisions[0].decision).toBe("Use Redis");
+    });
+  });
+
+  describe("unicode and special content", () => {
+    test("handles unicode in goal and state", () => {
+      const ledger = manager.createLedger("test-unicode", {
+        goal: "Implement 日本語 feature with émojis 🎉",
+        state: {
+          done: ["完了した task"],
+          now: "Working on 中文",
+          next: ["Next: العربية"],
+        },
+      });
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-unicode.md");
+      expect(loaded?.goal).toContain("日本語");
+      expect(loaded?.goal).toContain("🎉");
+    });
+  });
+
+  describe("concurrent access", () => {
+    test("handles rapid sequential updates", () => {
+      let ledger = manager.createLedger("test-concurrent");
+      for (let i = 0; i < 10; i++) {
+        ledger = manager.updateState(ledger, { now: `Task ${i}` });
+      }
+      const loaded = manager.loadLedger("CONTINUITY_CLAUDE-test-concurrent.md");
+      expect(loaded?.state.now).toBe("Task 9");
+    });
+  });
+});

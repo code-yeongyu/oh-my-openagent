@@ -120,13 +120,22 @@ function ensureHandoffDir(projectDir: string, sessionName: string): string {
   return handoffDir;
 }
 
+function sanitizeForFilename(name: string): string {
+  return name
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
+    .replace(/\.+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .substring(0, 200);
+}
+
 function saveAutoHandoff(
   projectDir: string,
   ledger: Ledger | null,
   contextPct: number,
 ): string {
-  const sessionName =
+  const rawSessionName =
     ledger?.metadata.sessionName || state.sessionName || getSessionName();
+  const sessionName = sanitizeForFilename(rawSessionName);
   const handoffDir = ensureHandoffDir(projectDir, sessionName);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -172,6 +181,14 @@ export function createAutoContinuityHook(
   const continuityConfig: ContinuityConfig = {
     ...DEFAULT_CONTINUITY_CONFIG,
     ...options?.config,
+    ledger: {
+      ...DEFAULT_CONTINUITY_CONFIG.ledger,
+      ...options?.config?.ledger,
+    },
+    contextThresholds: {
+      ...DEFAULT_CONTINUITY_CONFIG.contextThresholds,
+      ...options?.config?.contextThresholds,
+    },
   };
 
   if (!continuityConfig.enabled) {
@@ -207,7 +224,11 @@ export function createAutoContinuityHook(
         ? 1_000_000
         : 200_000;
 
-    const totalUsed = tokens.input + tokens.cache.read + tokens.output;
+    const totalUsed =
+      tokens.input +
+      tokens.cache.read +
+      tokens.output +
+      (tokens.reasoning || 0);
     const contextPct = totalUsed / CLAUDE_DEFAULT_CONTEXT_LIMIT;
 
     state.lastContextPercentage = contextPct;

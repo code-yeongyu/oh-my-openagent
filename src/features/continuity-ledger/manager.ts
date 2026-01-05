@@ -27,6 +27,14 @@ export class LedgerManager {
     }
   }
 
+  private sanitizeSessionName(name: string): string {
+    return name
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
+      .replace(/\.+/g, ".")
+      .replace(/^\.+|\.+$/g, "")
+      .substring(0, 200);
+  }
+
   findLatestLedger(): Ledger | null {
     if (!fs.existsSync(this.ledgerDir)) {
       return null;
@@ -34,18 +42,28 @@ export class LedgerManager {
 
     const files = fs
       .readdirSync(this.ledgerDir)
-      .filter((f) => f.startsWith("CONTINUITY_CLAUDE-") && f.endsWith(".md"))
-      .sort((a, b) => {
-        const statA = fs.statSync(path.join(this.ledgerDir, a));
-        const statB = fs.statSync(path.join(this.ledgerDir, b));
-        return statB.mtime.getTime() - statA.mtime.getTime();
-      });
+      .filter((f) => f.startsWith("CONTINUITY_CLAUDE-") && f.endsWith(".md"));
 
     if (files.length === 0) {
       return null;
     }
 
-    return this.loadLedger(files[0]);
+    const filesWithStats: Array<{ name: string; mtime: number }> = [];
+    for (const f of files) {
+      try {
+        const stat = fs.statSync(path.join(this.ledgerDir, f));
+        filesWithStats.push({ name: f, mtime: stat.mtime.getTime() });
+      } catch {
+        continue;
+      }
+    }
+
+    if (filesWithStats.length === 0) {
+      return null;
+    }
+
+    filesWithStats.sort((a, b) => b.mtime - a.mtime);
+    return this.loadLedger(filesWithStats[0].name);
   }
 
   loadLedger(filename: string): Ledger | null {
@@ -109,20 +127,20 @@ export class LedgerManager {
     const nowMatch = content.match(/- Now: ([^\n]+)/);
     const nextMatch = content.match(/- Next: ([^\n]+)/);
 
+    const parseCommaSeparated = (value: string | undefined): string[] => {
+      if (!value) return [];
+      const trimmed = value.trim();
+      if (trimmed.startsWith("<") && trimmed.endsWith(">")) return [];
+      return trimmed
+        .split(/,\s*(?=[^,]*(?:,|$))/)
+        .map((s) => s.trim())
+        .filter((s) => s && !s.startsWith("<"));
+    };
+
     return {
-      done: doneMatch
-        ? doneMatch[1]
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
+      done: parseCommaSeparated(doneMatch?.[1]),
       now: nowMatch?.[1]?.trim() || "",
-      next: nextMatch
-        ? nextMatch[1]
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
+      next: parseCommaSeparated(nextMatch?.[1]),
     };
   }
 
@@ -170,13 +188,14 @@ export class LedgerManager {
   createLedger(sessionName: string, initialData: Partial<Ledger> = {}): Ledger {
     this.ensureDir();
 
-    const filename = `CONTINUITY_CLAUDE-${sessionName}.md`;
+    const sanitizedName = this.sanitizeSessionName(sessionName);
+    const filename = `CONTINUITY_CLAUDE-${sanitizedName}.md`;
     const filePath = path.join(this.ledgerDir, filename);
     const now = new Date().toISOString();
 
     const ledger: Ledger = {
       metadata: {
-        sessionName,
+        sessionName: sanitizedName,
         updatedAt: now,
         createdAt: now,
         filePath,
@@ -242,7 +261,7 @@ export class LedgerManager {
       ledger.workingSet.buildCmd
         ? `- Build cmd: \`${ledger.workingSet.buildCmd}\``
         : "",
-    ].filter((line) => line !== undefined);
+    ].filter((line) => line !== "");
 
     if (ledger.agentReports.length > 0) {
       lines.push("", "## Agent Reports");
@@ -329,14 +348,10 @@ export class LedgerManager {
   generateStatusLine(ledger: Ledger | null, contextPercentage: number): string {
     const tokenDisplay = `${(contextPercentage * 100).toFixed(0)}%`;
 
-    let color: "green" | "yellow" | "red" = "green";
     let warning = "";
-
     if (contextPercentage >= 0.8) {
-      color = "red";
       warning = " [CRITICAL]";
     } else if (contextPercentage >= 0.6) {
-      color = "yellow";
       warning = " [WARNING]";
     }
 
