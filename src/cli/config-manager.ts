@@ -55,8 +55,6 @@ function getOmoConfig(): string {
   return getConfigContext().paths.omoConfig
 }
 
-const CHATGPT_HOTFIX_REPO = "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
-
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
 const BUN_INSTALL_TIMEOUT_MS = BUN_INSTALL_TIMEOUT_SECONDS * 1000
 
@@ -441,48 +439,6 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
   }
 }
 
-export function setupChatGPTHotfix(): ConfigMergeResult {
-  try {
-    ensureConfigDir()
-  } catch (err) {
-    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
-  }
-
-  const packageJsonPath = getPackageJson()
-
-  try {
-    let packageJson: Record<string, unknown> = {}
-    if (existsSync(packageJsonPath)) {
-      try {
-        const stat = statSync(packageJsonPath)
-        const content = readFileSync(packageJsonPath, "utf-8")
-
-        if (stat.size > 0 && !isEmptyOrWhitespace(content)) {
-          packageJson = JSON.parse(content)
-          if (typeof packageJson !== "object" || packageJson === null || Array.isArray(packageJson)) {
-            packageJson = {}
-          }
-        }
-      } catch (parseErr) {
-        if (parseErr instanceof SyntaxError) {
-          packageJson = {}
-        } else {
-          throw parseErr
-        }
-      }
-    }
-
-    const deps = (packageJson.dependencies ?? {}) as Record<string, string>
-    deps["opencode-openai-codex-auth"] = CHATGPT_HOTFIX_REPO
-    packageJson.dependencies = deps
-
-    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n")
-    return { success: true, configPath: packageJsonPath }
-  } catch (err) {
-    return { success: false, configPath: packageJsonPath, error: formatErrorWithSuggestion(err, "setup ChatGPT hotfix in package.json") }
-  }
-}
-
 export interface BunInstallResult {
   success: boolean
   timedOut?: boolean
@@ -544,18 +500,9 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
 export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
-    // NOTE: opencode-antigravity-auth expects full model specs (name/limit/modalities).
-    // If these are incomplete, models may appear but fail at runtime (e.g. 404).
     models: {
       "gemini-3-pro-high": {
         name: "Gemini 3 Pro High (Antigravity)",
-        thinking: true,
-        attachment: true,
-        limit: { context: 1048576, output: 65535 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-      "gemini-3-pro-medium": {
-        name: "Gemini 3 Pro Medium (Antigravity)",
         thinking: true,
         attachment: true,
         limit: { context: 1048576, output: 65535 },
@@ -574,12 +521,6 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
         limit: { context: 1048576, output: 65536 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "gemini-3-flash-lite": {
-        name: "Gemini 3 Flash Lite (Antigravity)",
-        attachment: true,
-        limit: { context: 1048576, output: 65536 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
     },
   },
 }
@@ -587,12 +528,48 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
 const CODEX_PROVIDER_CONFIG = {
   openai: {
     name: "OpenAI",
-    api: "codex",
+    options: {
+      reasoningEffort: "medium",
+      reasoningSummary: "auto",
+      textVerbosity: "medium",
+      include: ["reasoning.encrypted_content"],
+      store: false,
+    },
     models: {
-      "gpt-5.2": { name: "GPT-5.2" },
-      "o3": { name: "o3", thinking: true },
-      "o4-mini": { name: "o4-mini", thinking: true },
-      "codex-1": { name: "Codex-1" },
+      "gpt-5.2": {
+        name: "GPT 5.2 (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          none: { reasoningEffort: "none", reasoningSummary: "auto", textVerbosity: "medium" },
+          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
+      "gpt-5.2-codex": {
+        name: "GPT 5.2 Codex (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
+      "gpt-5.1-codex-max": {
+        name: "GPT 5.1 Codex Max (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          low: { reasoningEffort: "low", reasoningSummary: "detailed", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "detailed", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
     },
   },
 }

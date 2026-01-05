@@ -12,10 +12,8 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 
     const required = [
       "gemini-3-pro-high",
-      "gemini-3-pro-medium",
       "gemini-3-pro-low",
       "gemini-3-flash",
-      "gemini-3-flash-lite",
     ]
 
     for (const key of required) {
