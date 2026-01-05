@@ -168,16 +168,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
 
       if (plannerEnabled) {
-        const { name: _planName, ...planConfigWithoutName } =
+        const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
           configAgent?.plan ?? {};
         const migratedPlanConfig = migrateAgentConfig(
           planConfigWithoutName as Record<string, unknown>
         );
         const plannerSisyphusOverride =
           pluginConfig.agents?.["Planner-Sisyphus"];
+        const defaultModel = config.model as string | undefined;
         const plannerSisyphusBase = {
-          ...migratedPlanConfig,
-          mode: "primary",
+          model: (migratedPlanConfig as Record<string, unknown>).model ?? defaultModel,
+          mode: "all" as const,
           prompt: PLAN_SYSTEM_PROMPT,
           permission: PLAN_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
@@ -209,7 +210,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan
-        ? { disable: true }
+        ? { mode: "subagent" as const, hidden: true }
         : undefined;
 
       config.agent = {
