@@ -13,6 +13,7 @@ import {
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
+import { getTaskToastManager } from "../task-toast-manager"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
@@ -122,17 +123,14 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
-    if (tuiClient.tui?.showToast) {
-      tuiClient.tui.showToast({
-        body: {
-          title: "Background Task Started",
-          message: `"${input.description}" running with ${input.agent}`,
-          variant: "info",
-          duration: 3000,
-        },
-      }).catch(() => {})
+    const toastManager = getTaskToastManager()
+    if (toastManager) {
+      toastManager.addTask({
+        id: task.id,
+        description: input.description,
+        agent: input.agent,
+        isBackground: true,
+      })
     }
 
     this.client.session.promptAsync({
@@ -378,17 +376,13 @@ export class BackgroundManager {
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
-    if (tuiClient.tui?.showToast) {
-      tuiClient.tui.showToast({
-        body: {
-          title: "Background Task Completed",
-          message: `Task "${task.description}" finished in ${duration}.`,
-          variant: "success",
-          duration: 5000,
-        },
-      }).catch(() => {})
+    const toastManager = getTaskToastManager()
+    if (toastManager) {
+      toastManager.showCompletionToast({
+        id: task.id,
+        description: task.description,
+        duration,
+      })
     }
 
     const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`

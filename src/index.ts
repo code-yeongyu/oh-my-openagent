@@ -66,6 +66,7 @@ import {
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
+import { initTaskToastManager } from "./features/task-toast-manager";
 import { type HookName } from "./config";
 import { log, detectExternalNotificationPlugin, getNotificationConflictWarning } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
@@ -206,6 +207,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const backgroundManager = new BackgroundManager(ctx);
+
+  initTaskToastManager(ctx.client);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })

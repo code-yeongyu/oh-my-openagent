@@ -14,6 +14,37 @@ import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "sisyphus-orchestrator"
 
+const ALLOWED_PATH_PREFIX = ".sisyphus/"
+const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
+
+const DIRECT_WORK_REMINDER = `
+
+---
+
+[SYSTEM REMINDER - DELEGATION REQUIRED]
+
+You just performed direct file modifications outside \`.sisyphus/\`.
+
+**Sisyphus is an ORCHESTRATOR, not an IMPLEMENTER.**
+
+As an orchestrator, you should:
+- **DELEGATE** implementation work to subagents via \`sisyphus_task\`
+- **VERIFY** the work done by subagents
+- **COORDINATE** multiple tasks and ensure completion
+
+You should NOT:
+- Write code directly (except for \`.sisyphus/\` files like plans and notepads)
+- Make direct file edits outside \`.sisyphus/\`
+- Implement features yourself
+
+**If you need to make changes:**
+1. Use \`sisyphus_task\` to delegate to an appropriate subagent
+2. Provide clear instructions in the prompt
+3. Verify the subagent's work after completion
+
+---
+`
+
 const BOULDER_CONTINUATION_PROMPT = `[SYSTEM REMINDER - BOULDER CONTINUATION]
 
 You have an active work plan with incomplete tasks. Continue working.
@@ -208,11 +239,19 @@ interface ToolExecuteInput {
   agent?: string
 }
 
-interface ToolExecuteOutput {
+interface ToolExecuteAfterInput {
+  tool: string
+  sessionID?: string
+  callID?: string
+}
+
+interface ToolExecuteAfterOutput {
   title: string
   output: string
-  metadata: unknown
+  metadata: Record<string, unknown>
 }
+
+type ToolExecuteOutput = ToolExecuteAfterOutput
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -427,9 +466,26 @@ export function createSisyphusOrchestratorHook(
     },
 
     "tool.execute.after": async (
-      input: ToolExecuteInput,
-      output: ToolExecuteOutput
+      input: ToolExecuteAfterInput,
+      output: ToolExecuteAfterOutput
     ): Promise<void> => {
+      if (!isCallerOrchestrator(input.sessionID)) {
+        return
+      }
+
+      if (WRITE_EDIT_TOOLS.includes(input.tool)) {
+        const filePath = output.metadata?.filePath as string | undefined
+        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+          output.output = (output.output || "") + DIRECT_WORK_REMINDER
+          log(`[${HOOK_NAME}] Direct work reminder appended`, {
+            sessionID: input.sessionID,
+            tool: input.tool,
+            filePath,
+          })
+        }
+        return
+      }
+
       if (input.tool !== "sisyphus_task") {
         return
       }
@@ -438,10 +494,6 @@ export function createSisyphusOrchestratorHook(
       const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task resumed")
       
       if (isBackgroundLaunch) {
-        return
-      }
-
-      if (!isCallerOrchestrator(input.sessionID)) {
         return
       }
       

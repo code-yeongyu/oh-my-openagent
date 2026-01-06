@@ -8,6 +8,7 @@ import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS 
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
+import { getTaskToastManager } from "../../features/task-toast-manager"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -242,20 +243,10 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         }
       }
 
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tuiClient = client as any
-        if (tuiClient.tui?.showToast) {
-          tuiClient.tui.showToast({
-            body: {
-              title: "Task Started",
-              message: `"${args.description}" running with ${agentToUse}`,
-              variant: "info",
-              duration: 3000,
-            },
-          }).catch(() => {})
-        }
+      const toastManager = getTaskToastManager()
+      let taskId: string | undefined
 
+      try {
         const createResult = await client.session.create({
           body: {
             parentID: ctx.sessionID,
@@ -268,7 +259,17 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         }
 
         const sessionID = createResult.data.id
+        taskId = `sync_${sessionID.slice(0, 8)}`
         const startTime = new Date()
+
+        if (toastManager) {
+          toastManager.addTask({
+            id: taskId,
+            description: args.description,
+            agent: agentToUse,
+            isBackground: false,
+          })
+        }
 
         ctx.metadata?.({
           title: args.description,
@@ -308,6 +309,10 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
         const duration = formatDuration(startTime)
 
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
+
         return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
@@ -317,6 +322,9 @@ Session ID: ${sessionID}
 
 ${textContent || "(No text output)"}`
       } catch (error) {
+        if (toastManager && taskId !== undefined) {
+          toastManager.removeTask(taskId)
+        }
         const message = error instanceof Error ? error.message : String(error)
         return `❌ Task failed: ${message}`
       }

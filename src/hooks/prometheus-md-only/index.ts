@@ -1,5 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
 export * from "./constants"
@@ -10,15 +13,35 @@ function isAllowedFile(filePath: string): boolean {
   return hasAllowedExtension && isInAllowedPath
 }
 
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
+}
+
 const TASK_TOOLS = ["sisyphus_task", "task", "call_omo_agent"]
+
+function getAgentFromSession(sessionID: string): string | undefined {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir) return undefined
+  return findNearestMessageWithFields(messageDir)?.agent
+}
 
 export function createPrometheusMdOnlyHook(_ctx: PluginInput) {
   return {
     "tool.execute.before": async (
-      input: { tool: string; sessionID: string; callID: string; agent?: string },
+      input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      const agentName = input.agent
+      const agentName = getAgentFromSession(input.sessionID)
       
       if (!agentName || !PROMETHEUS_AGENTS.includes(agentName)) {
         return
