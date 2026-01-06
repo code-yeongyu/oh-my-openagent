@@ -3,15 +3,6 @@ description: Ask a question or start a discussion about oh-my-opencode
 title: "[Question]: "
 labels: ["question", "needs-triage"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Language Policy
-        
-        **Please write your issue in English.** This helps maintainers and the community collaborate effectively.
-        
-        If English isn't your first language, don't worry! Use translation tools if needed. Clear communication matters more than perfect grammar.
-
   - type: checkboxes
     id: prerequisites
     attributes:
