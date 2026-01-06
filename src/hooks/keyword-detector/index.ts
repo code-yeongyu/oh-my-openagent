@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
 import { log } from "../../shared"
+import { getMainSessionID } from "../../features/claude-code-session-state"
 
 export * from "./detector"
 export * from "./constants"
@@ -27,29 +28,20 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
         return
       }
 
-      // Check if this is a subagent session (has parent)
-      // Only ultrawork keywords work in subagent sessions
+      // Only ultrawork keywords work in non-main sessions
       // Other keywords (search, analyze, etc.) only work in main sessions
-      try {
-        const sessionInfo = await ctx.client.session.get({ path: { id: input.sessionID } })
-        const isSubagentSession = !!sessionInfo.data?.parentID
+      const mainSessionID = getMainSessionID()
+      const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
-        if (isSubagentSession) {
-          // Filter to only ultrawork keywords in subagent sessions
-          detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
-          if (detectedKeywords.length === 0) {
-            log(`[keyword-detector] Skipping non-ultrawork keywords in subagent session`, {
-              sessionID: input.sessionID,
-              parentID: sessionInfo.data?.parentID,
-            })
-            return
-          }
+      if (isNonMainSession) {
+        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        if (detectedKeywords.length === 0) {
+          log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
+            sessionID: input.sessionID,
+            mainSessionID,
+          })
+          return
         }
-      } catch (err) {
-        log(`[keyword-detector] Failed to get session info, proceeding with all keywords`, {
-          error: err,
-          sessionID: input.sessionID,
-        })
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
