@@ -166,10 +166,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? createAutoSlashCommandHook()
-    : null;
-
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
     : null;
@@ -238,6 +234,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     commands,
     skills: mergedSkills,
   });
+
+  const autoSlashCommand = isHookEnabled("auto-slash-command")
+    ? createAutoSlashCommandHook({ skills: mergedSkills })
+    : null;
 
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
