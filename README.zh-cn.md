@@ -647,7 +647,8 @@ Oh My OpenCode 会扫这些地方：
     "commands": false,
     "skills": false,
     "agents": false,
-    "hooks": false
+    "hooks": false,
+    "plugins": false
   }
 }
 ```
@@ -659,8 +660,24 @@ Oh My OpenCode 会扫这些地方：
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | 内置 Agent（oracle、librarian 等）                    |
 | `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+| `plugins`  | `~/.claude/plugins/`（Claude Code 市场插件）                                          | -                                                     |
 
 默认都是 `true`（开）。想全兼容 Claude Code？那就别写 `claude_code` 这段。
+
+**只禁用特定插件**用 `plugins_override`：
+
+```json
+{
+  "claude_code": {
+    "plugins_override": {
+      "claude-mem@thedotmack": false,
+      "some-other-plugin@marketplace": false
+    }
+  }
+}
+```
+
+这样插件系统还是开着的，只是用完整标识符（`plugin-name@marketplace-name`）关掉特定插件。
 
 ### 不只是为了 Agent，也是为了你
 
