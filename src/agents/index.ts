@@ -124,4 +124,6 @@ export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
 export * from "./types"
 export * from "./sisyphus"
 export * from "./sisyphus-prompt-builder"
+export * from "./sisyphus-fork-extensions"
+export { createOmoAgent } from "./omo"
 export { createBuiltinAgents, injectGovernance } from "./utils"
