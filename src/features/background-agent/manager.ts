@@ -86,9 +86,13 @@ export class BackgroundManager {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
       },
+    }).catch((error) => {
+      this.concurrencyManager.release(model)
+      throw error
     })
 
     if (createResult.error) {
+      this.concurrencyManager.release(model)
       throw new Error(`Failed to create background session: ${createResult.error}`)
     }
 
@@ -345,6 +349,10 @@ export class BackgroundManager {
 
     const taskId = task.id
     setTimeout(async () => {
+      if (task.model) {
+        this.concurrencyManager.release(task.model)
+      }
+
       try {
         const messageDir = getMessageDir(task.parentSessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
@@ -367,10 +375,6 @@ export class BackgroundManager {
       } catch (error) {
         log("[background-agent] prompt failed:", String(error))
       } finally {
-        if (task.model) {
-          this.concurrencyManager.release(task.model)
-        }
-        // Always clean up both maps to prevent memory leaks
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         log("[background-agent] Removed completed task from memory:", taskId)
