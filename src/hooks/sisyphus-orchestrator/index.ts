@@ -42,7 +42,19 @@ Subagents FREQUENTLY claim completion when:
 5. Verify notepad was updated - Must have substantive content
 
 DO NOT TRUST THE AGENT'S SELF-REPORT.
-VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.`
+They are non-deterministic and not exceptional - they CANNOT distinguish between completed and incomplete states.
+VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
+
+**HANDS-ON QA REQUIRED (after ALL tasks complete):**
+
+| Deliverable Type | Verification Tool | Action |
+|------------------|-------------------|--------|
+| **Frontend/UI** | \`/playwright\` skill | Navigate, interact, screenshot evidence |
+| **TUI/CLI** | \`interactive_bash\` (tmux) | Run interactively, verify output |
+| **API/Backend** | \`bash\` with curl | Send requests, verify responses |
+
+Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages, integration problems.
+**FAILURE TO DO HANDS-ON QA = INCOMPLETE WORK.**`
 
 function buildOrchestratorReminder(planName: string, progress: { total: number; completed: number }): string {
   const remaining = progress.total - progress.completed

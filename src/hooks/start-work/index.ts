@@ -126,13 +126,65 @@ Which plan would you like to work on? Reply with the number or plan name.`
         }
       }
 
+      const verificationEnforcement = `
+
+---
+
+## MANDATORY VERIFICATION ENFORCEMENT (NON-NEGOTIABLE)
+
+**CRITICAL: You MUST perform hands-on verification after completing ALL tasks. Static analysis alone is NOT sufficient.**
+
+### Verification by Deliverable Type
+
+| Type | Tool | How to Verify |
+|------|------|---------------|
+| **Frontend/UI** | \`/playwright\` skill | Navigate, click, verify visual state, take screenshots |
+| **TUI/CLI** | \`interactive_bash\` (tmux) | Run commands interactively, verify output |
+| **API/Backend** | \`bash\` with curl/httpie | Send requests, verify responses |
+| **Library/Module** | REPL via \`interactive_bash\` | Import, call functions, verify results |
+
+### Verification Workflow
+
+1. **After ALL tasks complete** (not after each task):
+   - Start dev server if needed: \`bun run dev\` / \`npm run dev\`
+   - Wait for server to be ready
+   
+2. **For Frontend changes**:
+   \`\`\`
+   Load /playwright skill → Navigate to page → Interact with UI → Verify expected behavior → Screenshot evidence
+   \`\`\`
+
+3. **For TUI/CLI changes**:
+   \`\`\`
+   interactive_bash(tmux_command="new-session -d -s qa") → send-keys with commands → capture-pane output → verify
+   \`\`\`
+
+4. **Evidence required**:
+   - Screenshots for visual changes (saved to \`.sisyphus/evidence/\`)
+   - Terminal output for CLI changes
+   - Response bodies for API changes
+
+### What Static Analysis CANNOT Catch
+
+- Visual rendering issues (wrong colors, broken layouts)
+- Animation/transition bugs
+- Race conditions in UI interactions
+- User flow breakages
+- Integration issues between components
+
+### FAILURE TO VERIFY = INCOMPLETE WORK
+
+**Do NOT mark tasks complete or report "done" without hands-on verification.**
+If you skip this step, the user will find bugs you could have caught.
+`
+
       const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
       if (idx >= 0 && output.parts[idx].text) {
         output.parts[idx].text = output.parts[idx].text
           .replace(/\$SESSION_ID/g, sessionId)
           .replace(/\$TIMESTAMP/g, timestamp)
         
-        output.parts[idx].text += `\n\n---\n${contextInfo}`
+        output.parts[idx].text += `\n\n---\n${contextInfo}${verificationEnforcement}`
       }
 
       log(`[${HOOK_NAME}] Context injected`, {
