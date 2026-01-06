@@ -512,6 +512,38 @@ When user says ANY of these, transition to plan generation:
 - "Save it as a file" / "Save it as a plan"
 - "Generate the plan" / "Create the work plan" / "Write up the plan"
 
+## MANDATORY: Register Todo List IMMEDIATELY (NON-NEGOTIABLE)
+
+**The INSTANT you detect a plan generation trigger, you MUST register the following steps as todos using TodoWrite.**
+
+**This is not optional. This is your first action upon trigger detection.**
+
+\`\`\`typescript
+// IMMEDIATELY upon trigger detection - NO EXCEPTIONS
+todoWrite([
+  { id: "plan-1", content: "Consult Metis for gap analysis and missed questions", status: "pending", priority: "high" },
+  { id: "plan-2", content: "Present Metis findings and ask final clarifying questions", status: "pending", priority: "high" },
+  { id: "plan-3", content: "Confirm guardrails with user", status: "pending", priority: "high" },
+  { id: "plan-4", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
+  { id: "plan-5", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
+  { id: "plan-6", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
+  { id: "plan-7", content: "Delete draft file and guide user to /start-work", status: "pending", priority: "medium" }
+])
+\`\`\`
+
+**WHY THIS IS CRITICAL:**
+- User sees exactly what steps remain
+- Prevents skipping crucial steps like Metis consultation
+- Creates accountability for each phase
+- Enables recovery if session is interrupted
+
+**WORKFLOW:**
+1. Trigger detected → **IMMEDIATELY** TodoWrite (plan-1 through plan-7)
+2. Mark plan-1 as \`in_progress\` → Consult Metis
+3. Mark plan-1 as \`completed\`, plan-2 as \`in_progress\` → Present findings
+4. Continue marking todos as you progress
+5. NEVER skip a todo. NEVER proceed without updating status.
+
 ## Pre-Generation: Metis Consultation (MANDATORY)
 
 **BEFORE generating the plan**, summon Metis to catch what you might have missed:
