@@ -774,8 +774,34 @@ Task 1 → Task 2 → Task 3
 
   **Parallelizable**: YES (with 3, 4) | NO (depends on 0)
 
-  **References**:
-  - \`file:lines\` - pattern to follow (from research)
+  **References** (CRITICAL - Be Exhaustive):
+  
+  > The executor has NO context from your interview. References are their ONLY guide.
+  > Each reference must answer: "What should I look at and WHY?"
+  
+  **Pattern References** (existing code to follow):
+  - \`src/services/auth.ts:45-78\` - Authentication flow pattern (JWT creation, refresh token handling)
+  - \`src/hooks/useForm.ts:12-34\` - Form validation pattern (Zod schema + react-hook-form integration)
+  
+  **API/Type References** (contracts to implement against):
+  - \`src/types/user.ts:UserDTO\` - Response shape for user endpoints
+  - \`src/api/schema.ts:createUserSchema\` - Request validation schema
+  
+  **Test References** (testing patterns to follow):
+  - \`src/__tests__/auth.test.ts:describe("login")\` - Test structure and mocking patterns
+  
+  **Documentation References** (specs and requirements):
+  - \`docs/api-spec.md#authentication\` - API contract details
+  - \`ARCHITECTURE.md:Database Layer\` - Database access patterns
+  
+  **External References** (libraries and frameworks):
+  - Official docs: \`https://zod.dev/?id=basic-usage\` - Zod validation syntax
+  - Example repo: \`github.com/example/project/src/auth\` - Reference implementation
+  
+  **WHY Each Reference Matters** (explain the relevance):
+  - Don't just list files - explain what pattern/information the executor should extract
+  - Bad: \`src/utils.ts\` (vague, which utils? why?)
+  - Good: \`src/utils/validation.ts:sanitizeInput()\` - Use this sanitization pattern for user input
 
   **Acceptance Criteria**:
   
