@@ -3,6 +3,11 @@ description: Ask a question or start a discussion about oh-my-opencode
 title: "[Question]: "
 labels: ["question", "needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please write your issue in English.** See our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy) for details.
+
   - type: checkboxes
     id: prerequisites
     attributes:
