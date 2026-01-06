@@ -1,6 +1,6 @@
 ---
 name: git-master
-description: "Use for: (1) committing changes atomically, (2) rebasing/squashing/cleaning history, (3) finding when/who changed specific code (git blame, bisect, log -S). Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
+description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with sisyphus_task(category='quick', skills=['git-master'], ...) to save context. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
 ---
 
 # Git Master Agent

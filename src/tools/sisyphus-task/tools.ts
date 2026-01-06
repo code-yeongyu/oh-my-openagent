@@ -98,8 +98,8 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
     args: {
       description: tool.schema.string().describe("Short task description"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      category: tool.schema.string().optional().describe(`Category name (e.g., ${CATEGORY_EXAMPLES}). Mutually exclusive with agent.`),
-      agent: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
+      category: tool.schema.string().optional().describe(`Category name (e.g., ${CATEGORY_EXAMPLES}). Mutually exclusive with subagent_type.`),
+      subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
       background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
       skills: tool.schema.array(tool.schema.string()).optional().describe("Array of skill names to prepend to the prompt. Skills will be resolved and their content prepended with a separator."),
@@ -160,12 +160,12 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
       }
 
-      if (args.category && args.agent) {
-        return `❌ Invalid arguments: Provide EITHER category OR agent, not both.`
+      if (args.category && args.subagent_type) {
+        return `❌ Invalid arguments: Provide EITHER category OR subagent_type, not both.`
       }
 
-      if (!args.category && !args.agent) {
-        return `❌ Invalid arguments: Must provide either category or agent.`
+      if (!args.category && !args.subagent_type) {
+        return `❌ Invalid arguments: Must provide either category or subagent_type.`
       }
 
       let agentToUse: string
@@ -181,7 +181,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         agentToUse = SISYPHUS_JUNIOR_AGENT
         categoryModel = parseModelString(resolved.config.model)
       } else {
-        agentToUse = args.agent!.trim()
+        agentToUse = args.subagent_type!.trim()
         if (!agentToUse) {
           return `❌ Agent name cannot be empty.`
         }
