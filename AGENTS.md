@@ -116,7 +116,7 @@ oh-my-opencode/
 | Agent | Default Model | Purpose |
 |-------|-------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
-| oracle | openai/gpt-5.2 | Strategic advisor, code review |
+| oracle | openai/gpt-5.2 | Read-only consultation. High-IQ debugging, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs |
 | explore | opencode/grok-code | Fast codebase exploration |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
