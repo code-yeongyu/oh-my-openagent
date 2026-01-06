@@ -208,6 +208,9 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 ### 人間の方へ
 
 面倒な作業は LLM エージェントに任せましょう。このリンクをコピーして貼り付け、インストールと設定をお願いしてください。
+```
+Install and configure by following the instructions here https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/README.md
+```
 
 ### LLM エージェントの方へ
 
