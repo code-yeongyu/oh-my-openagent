@@ -49,7 +49,6 @@ import {
 import {
   builtinTools,
   createCallOmoAgent,
-  createBackgroundTools,
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
@@ -202,7 +201,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
-  const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
@@ -270,7 +268,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     tool: {
       ...builtinTools,
-      ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
       skill: skillTool,
@@ -440,7 +437,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
         args.tools = {
           ...(args.tools as Record<string, boolean> | undefined),
-          background_task: false,
           ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
         };
       }
@@ -488,6 +484,24 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
       await editErrorRecovery?.["tool.execute.after"](input, output);
+
+      if (input.tool === "sisyphus_task") {
+        const result = output.output;
+        if (result && typeof result === "string") {
+          const taskIdMatch = result.match(/task[_\s-]?id[:\s]+["']?([a-z0-9_-]+)["']?/i);
+          const sessionIdMatch = result.match(/session[_\s-]?id[:\s]+["']?([a-z0-9_-]+)["']?/i);
+          const descriptionMatch = result.match(/description[:\s]+["']?([^"'\n]+)["']?/i);
+
+          if (taskIdMatch?.[1] && sessionIdMatch?.[1]) {
+            backgroundManager.registerExternalTask({
+              taskId: taskIdMatch[1],
+              sessionID: sessionIdMatch[1],
+              parentSessionID: input.sessionID,
+              description: descriptionMatch?.[1] || "Background task",
+            });
+          }
+        }
+      }
     },
   };
 };
