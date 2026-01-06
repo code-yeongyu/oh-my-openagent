@@ -128,7 +128,6 @@ export class BackgroundManager {
         agent: input.agent,
         tools: {
           task: false,
-          background_task: false,
           call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
@@ -190,6 +189,42 @@ export class BackgroundManager {
       }
     }
     return undefined
+  }
+
+  /**
+   * Register an external task (e.g., from sisyphus_task) for notification tracking.
+   * This allows tasks created by external tools to receive the same toast/prompt notifications.
+   */
+  registerExternalTask(input: {
+    taskId: string
+    sessionID: string
+    parentSessionID: string
+    description: string
+    agent?: string
+  }): BackgroundTask {
+    const task: BackgroundTask = {
+      id: input.taskId,
+      sessionID: input.sessionID,
+      parentSessionID: input.parentSessionID,
+      parentMessageID: "",
+      description: input.description,
+      prompt: "",
+      agent: input.agent || "sisyphus_task",
+      status: "running",
+      startedAt: new Date(),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+      },
+    }
+
+    this.tasks.set(task.id, task)
+    subagentSessions.add(input.sessionID)
+    this.startPolling()
+
+    log("[background-agent] Registered external task:", { taskId: task.id, sessionID: input.sessionID })
+
+    return task
   }
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
