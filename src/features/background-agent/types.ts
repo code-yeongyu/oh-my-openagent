@@ -27,6 +27,7 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
+  model?: string
 }
 
 export interface LaunchInput {
