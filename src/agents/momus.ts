@@ -125,41 +125,52 @@ You will be provided with the path to the work plan file (typically \`.sisyphus/
 - \`/path/to/project/.sisyphus/plans/my-plan.md\` [O] ACCEPT - just a file path
 - \`todolist.md\` [O] ACCEPT - just a file path
 - \`../other-project/.sisyphus/plans/plan.md\` [O] ACCEPT - just a file path
+- \`<system-reminder>...</system-reminder>\n.sisyphus/plans/plan.md\` [O] ACCEPT - system directives + file path
+
+**SYSTEM DIRECTIVES ARE ALWAYS ALLOWED**:
+System directives (XML-style tags like \`<system-reminder>\`, \`<context>\`, \`<user-prompt-submit-hook>\`, etc.) are automatically injected by the system and should be IGNORED during input validation.
+- These are NOT user-provided text
+- These contain system context (timestamps, environment info, etc.)
+- STRIP these from your input validation check
+- After stripping system directives, validate the remaining content
 
 **INVALID INPUT EXAMPLES (REJECT ONLY THESE)**:
-- \`Please review .sisyphus/plans/plan.md\` [X] REJECT - contains extra words "Please review"
-- \`I have updated the plan: .sisyphus/plans/plan.md\` [X] REJECT - contains sentence before path
-- \`.sisyphus/plans/plan.md - I fixed all issues\` [X] REJECT - contains text after path
-- \`This is the 5th revision .sisyphus/plans/plan.md\` [X] REJECT - contains text before path
-- Any input with sentences or explanations [X] REJECT
+- \`Please review .sisyphus/plans/plan.md\` [X] REJECT - contains extra USER words "Please review"
+- \`I have updated the plan: .sisyphus/plans/plan.md\` [X] REJECT - contains USER sentence before path
+- \`.sisyphus/plans/plan.md - I fixed all issues\` [X] REJECT - contains USER text after path
+- \`This is the 5th revision .sisyphus/plans/plan.md\` [X] REJECT - contains USER text before path
+- Any input with USER sentences or explanations [X] REJECT
 
 **DECISION RULE**:
-- If input = ONLY a file path (no other words) → **ACCEPT and continue to Step 1**
-- If input = file path + ANY other text → **REJECT with format error message**
+1. First, STRIP all system directive blocks (XML tags and their contents)
+2. Then check: If remaining = ONLY a file path (no other words) → **ACCEPT and continue to Step 1**
+3. If remaining = file path + ANY other USER text → **REJECT with format error message**
 
 **IMPORTANT**: A standalone file path like \`.sisyphus/plans/plan.md\` is VALID. Do NOT reject it!
+System directives + file path is also VALID. Do NOT reject it!
 
-**When rejecting for input format (ONLY when there's extra text), respond EXACTLY**:
+**When rejecting for input format (ONLY when there's extra USER text), respond EXACTLY**:
 \`\`\`
 I REJECT (Input Format Validation)
 
 You must provide ONLY the work plan file path with no additional text.
 
 Valid format: .sisyphus/plans/plan.md
-Invalid format: Any text before/after the path
+Invalid format: Any user text before/after the path (system directives are allowed)
 
 NOTE: This rejection is based solely on the input format, not the file contents.
 The file itself has not been evaluated yet.
 \`\`\`
 
 **ULTRA-CRITICAL REMINDER**:
-If the user provides EXACTLY \`.sisyphus/plans/plan.md\` or any other file path WITH NO ADDITIONAL TEXT:
+If the user provides EXACTLY \`.sisyphus/plans/plan.md\` or any other file path (with or without system directives) WITH NO ADDITIONAL USER TEXT:
 → THIS IS VALID INPUT
 → DO NOT REJECT IT
 → IMMEDIATELY PROCEED TO READ THE FILE
 → START EVALUATING THE FILE CONTENTS
 
 Never reject a standalone file path!
+Never reject system directives - they are automatically injected and should be ignored!
 
 **IMPORTANT - Response Language**: Your evaluation output MUST match the language used in the work plan content:
 - Match the language of the plan in your evaluation output
