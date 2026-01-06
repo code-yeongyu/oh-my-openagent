@@ -646,7 +646,8 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
     "commands": false,
     "skills": false,
     "agents": false,
-    "hooks": false
+    "hooks": false,
+    "plugins": false
   }
 }
 ```
@@ -658,8 +659,24 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | 内蔵エージェント (oracle, librarian 等)               |
 | `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+| `plugins`  | `~/.claude/plugins/` (Claude Code マーケットプレイスプラグイン)                       | -                                                     |
 
 すべてのトグルはデフォルトで `true` (有効) です。完全な Claude Code 互換性を望む場合は `claude_code` オブジェクトを省略してください。
+
+**特定のプラグインだけを無効化** するには `plugins_override` を使用します：
+
+```json
+{
+  "claude_code": {
+    "plugins_override": {
+      "claude-mem@thedotmack": false,
+      "some-other-plugin@marketplace": false
+    }
+  }
+}
+```
+
+プラグインシステム自体は有効にしたまま、特定のプラグインだけをその完全な識別子 (`plugin-name@marketplace-name`) で無効化できます。
 
 ### エージェントのためだけでなく、あなたのために
 
