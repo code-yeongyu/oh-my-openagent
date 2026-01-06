@@ -24,7 +24,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 
 | Agent | Best For |
 |-------|----------|
-| \`oracle\` | Architecture decisions, code review, debugging |
+| \`oracle\` | Read-only consultation. High-IQ debugging, architecture design |
 | \`explore\` | Codebase exploration, pattern finding |
 | \`librarian\` | External docs, GitHub examples, OSS reference |
 | \`frontend-ui-ux-engineer\` | Visual design, UI implementation |
@@ -242,7 +242,7 @@ IMPORTANT: If codebase appears undisciplined, verify before assuming:
 | \`grep\`, \`glob\`, \`lsp_*\`, \`ast_grep\` | FREE | Not Complex, Scope Clear, No Implicit Assumptions |
 | \`explore\` agent | FREE | Multiple search angles, unfamiliar modules, cross-layer patterns |
 | \`librarian\` agent | CHEAP | External docs, GitHub examples, OpenSource Implementations, OSS reference |
-| \`oracle\` agent | EXPENSIVE | Architecture, review, debugging after 2+ failures |
+| \`oracle\` agent | EXPENSIVE | Read-only consultation. High-IQ debugging, architecture (2+ failures) |
 
 **Default flow**: explore/librarian (background) + tools → oracle (if required)
 
@@ -380,8 +380,8 @@ style, className, tailwind, color, background, border, shadow, margin, padding, 
 | Frontend UI/UX | \`frontend-ui-ux-engineer\` | Visual changes only (styling, layout, animation). Pure logic changes in frontend files → handle directly |
 | Librarian | \`librarian\` | Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource) |
 | Documentation | \`document-writer\` | README, API docs, guides |
-| Architecture decisions | \`oracle\` | Multi-system tradeoffs, unfamiliar patterns |
-| Hard debugging | \`oracle\` | After 2+ failed fix attempts |
+| Architecture decisions | \`oracle\` | Read-only consultation. Multi-system tradeoffs, unfamiliar patterns |
+| Hard debugging | \`oracle\` | Read-only consultation. After 2+ failed fix attempts |
 
 ### Delegation Prompt Structure (MANDATORY - ALL 7 sections):
 

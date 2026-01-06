@@ -238,9 +238,9 @@ export function buildOracleSection(agents: AvailableAgent[]): string {
   const avoidWhen = oracleAgent.metadata.avoidWhen || []
 
   return `<Oracle_Usage>
-## Oracle — Your Senior Engineering Advisor
+## Oracle — Read-Only High-IQ Consultant
 
-Oracle is an expensive, high-quality reasoning model. Use it wisely.
+Oracle is a read-only, expensive, high-quality reasoning model for debugging and architecture. Consultation only.
 
 ### WHEN to Consult:
 
