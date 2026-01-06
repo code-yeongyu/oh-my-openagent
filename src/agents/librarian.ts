@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+const DEFAULT_MODEL = "opencode/glm-4.7-free"
 
 export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -25,7 +25,6 @@ export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
-    "background_task",
   ])
 
   return {

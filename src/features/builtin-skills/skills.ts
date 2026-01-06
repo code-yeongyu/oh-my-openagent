@@ -2,7 +2,7 @@ import type { BuiltinSkill } from "./types"
 
 const playwrightSkill: BuiltinSkill = {
   name: "playwright",
-  description: "Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions.",
+  description: "MUST USE for any browser-related tasks. Browser automation via Playwright MCP - verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.",
   template: `# Playwright Browser Automation
 
 This skill provides browser automation capabilities via the Playwright MCP server.`,
