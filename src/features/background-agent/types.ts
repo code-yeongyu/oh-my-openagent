@@ -26,6 +26,8 @@ export interface BackgroundTask {
   result?: string
   error?: string
   progress?: TaskProgress
+  parentModel?: { providerID: string; modelID: string }
+  model?: string
 }
 
 export interface LaunchInput {
@@ -34,4 +36,5 @@ export interface LaunchInput {
   agent: string
   parentSessionID: string
   parentMessageID: string
+  parentModel?: { providerID: string; modelID: string }
 }

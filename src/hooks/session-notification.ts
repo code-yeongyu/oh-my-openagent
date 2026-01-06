@@ -1,5 +1,31 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
+import { spawn } from "node:child_process"
+import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
+import {
+  getOsascriptPath,
+  getNotifySendPath,
+  getPowershellPath,
+  getAfplayPath,
+  getPaplayPath,
+  getAplayPath,
+  startBackgroundCheck,
+} from "./session-notification-utils"
+
+/**
+ * Execute a command using node:child_process instead of Bun shell.
+ * This avoids Bun's ShellInterpreter GC bug on Windows (oven-sh/bun#23177, #24368).
+ */
+function execCommand(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, {
+      stdio: "ignore",
+      detached: false,
+    })
+    proc.on("close", () => resolve())
+    proc.on("error", () => resolve())
+  })
+}
 
 interface Todo {
   content: string
@@ -50,15 +76,28 @@ async function sendNotification(
 ): Promise<void> {
   switch (p) {
     case "darwin": {
+      const osascriptPath = await getOsascriptPath()
+      if (!osascriptPath) return
+
       const esTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      await ctx.$`osascript -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`
+      const script = `display notification "${esMessage}" with title "${esTitle}"`
+      // Use node:child_process instead of Bun shell to avoid potential GC issues
+      await execCommand(osascriptPath, ["-e", script]).catch(() => {})
       break
     }
-    case "linux":
-      await ctx.$`notify-send ${title} ${message} 2>/dev/null`.catch(() => {})
+    case "linux": {
+      const notifySendPath = await getNotifySendPath()
+      if (!notifySendPath) return
+
+      // Use node:child_process instead of Bun shell to avoid potential GC issues
+      await execCommand(notifySendPath, [title, message]).catch(() => {})
       break
+    }
     case "win32": {
+      const powershellPath = await getPowershellPath()
+      if (!powershellPath) return
+
       const psTitle = title.replace(/'/g, "''")
       const psMessage = message.replace(/'/g, "''")
       const toastScript = `
@@ -73,7 +112,8 @@ $Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
 $Notifier.Show($Toast)
 `.trim().replace(/\n/g, "; ")
-      await ctx.$`powershell -Command ${toastScript}`.catch(() => {})
+      // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
+      await execCommand(powershellPath, ["-Command", toastScript]).catch(() => {})
       break
     }
   }
@@ -81,17 +121,34 @@ $Notifier.Show($Toast)
 
 async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Promise<void> {
   switch (p) {
-    case "darwin":
-      ctx.$`afplay ${soundPath}`.catch(() => {})
+    case "darwin": {
+      const afplayPath = await getAfplayPath()
+      if (!afplayPath) return
+      // Use node:child_process instead of Bun shell to avoid potential GC issues
+      execCommand(afplayPath, [soundPath]).catch(() => {})
       break
-    case "linux":
-      ctx.$`paplay ${soundPath} 2>/dev/null`.catch(() => {
-        ctx.$`aplay ${soundPath} 2>/dev/null`.catch(() => {})
-      })
+    }
+    case "linux": {
+      const paplayPath = await getPaplayPath()
+      if (paplayPath) {
+        // Use node:child_process instead of Bun shell to avoid potential GC issues
+        execCommand(paplayPath, [soundPath]).catch(() => {})
+      } else {
+        const aplayPath = await getAplayPath()
+        if (aplayPath) {
+          execCommand(aplayPath, [soundPath]).catch(() => {})
+        }
+      }
       break
-    case "win32":
-      ctx.$`powershell -Command ${"(New-Object Media.SoundPlayer '" + soundPath + "').PlaySync()"}`.catch(() => {})
+    }
+    case "win32": {
+      const powershellPath = await getPowershellPath()
+      if (!powershellPath) return
+      // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
+      const soundScript = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
+      execCommand(powershellPath, ["-Command", soundScript]).catch(() => {})
       break
+    }
   }
 }
 
@@ -113,6 +170,8 @@ export function createSessionNotification(
   const currentPlatform = detectPlatform()
   const defaultSoundPath = getDefaultSoundPath(currentPlatform)
 
+  startBackgroundCheck(currentPlatform)
+
   const mergedConfig = {
     title: "OpenCode",
     message: "Agent is ready for input",
@@ -129,6 +188,8 @@ export function createSessionNotification(
   const sessionActivitySinceIdle = new Set<string>()
   // Track notification execution version to handle race conditions
   const notificationVersions = new Map<string, number>()
+  // Track sessions currently executing notification (prevents duplicate execution)
+  const executingNotifications = new Set<string>()
 
   function cleanupOldSessions() {
     const maxSessions = mergedConfig.maxTrackedSessions
@@ -143,6 +204,10 @@ export function createSessionNotification(
     if (notificationVersions.size > maxSessions) {
       const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
       sessionsToRemove.forEach(id => notificationVersions.delete(id))
+    }
+    if (executingNotifications.size > maxSessions) {
+      const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
+      sessionsToRemove.forEach(id => executingNotifications.delete(id))
     }
   }
 
@@ -163,42 +228,57 @@ export function createSessionNotification(
   }
 
   async function executeNotification(sessionID: string, version: number) {
-    pendingTimers.delete(sessionID)
+    if (executingNotifications.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+      return
+    }
 
-    // Race condition fix: check if version matches (activity happened during async wait)
     if (notificationVersions.get(sessionID) !== version) {
+      pendingTimers.delete(sessionID)
       return
     }
 
     if (sessionActivitySinceIdle.has(sessionID)) {
       sessionActivitySinceIdle.delete(sessionID)
+      pendingTimers.delete(sessionID)
       return
     }
 
-    if (notifiedSessions.has(sessionID)) return
+    if (notifiedSessions.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+      return
+    }
 
-    if (mergedConfig.skipIfIncompleteTodos) {
-      const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
-      // Re-check version after async call (race condition fix)
+    executingNotifications.add(sessionID)
+    try {
+      if (mergedConfig.skipIfIncompleteTodos) {
+        const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
+        if (notificationVersions.get(sessionID) !== version) {
+          return
+        }
+        if (hasPendingWork) return
+      }
+
       if (notificationVersions.get(sessionID) !== version) {
         return
       }
-      if (hasPendingWork) return
-    }
 
-    if (notificationVersions.get(sessionID) !== version) {
-      return
-    }
+      if (sessionActivitySinceIdle.has(sessionID)) {
+        sessionActivitySinceIdle.delete(sessionID)
+        return
+      }
 
-    notifiedSessions.add(sessionID)
+      notifiedSessions.add(sessionID)
 
-    try {
       await sendNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.message)
 
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await playSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
-    } catch {}
+    } finally {
+      executingNotifications.delete(sessionID)
+      pendingTimers.delete(sessionID)
+    }
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -219,8 +299,15 @@ export function createSessionNotification(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
+      if (subagentSessions.has(sessionID)) return
+
+      // Only trigger notifications for the main session (not subagent sessions)
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return
+
       if (notifiedSessions.has(sessionID)) return
       if (pendingTimers.has(sessionID)) return
+      if (executingNotifications.has(sessionID)) return
 
       sessionActivitySinceIdle.delete(sessionID)
       
@@ -260,6 +347,7 @@ export function createSessionNotification(
         notifiedSessions.delete(sessionInfo.id)
         sessionActivitySinceIdle.delete(sessionInfo.id)
         notificationVersions.delete(sessionInfo.id)
+        executingNotifications.delete(sessionInfo.id)
       }
     }
   }
