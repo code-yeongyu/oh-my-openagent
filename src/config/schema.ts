@@ -234,6 +234,8 @@ export const ExperimentalConfigSchema = z.object({
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded (default: false) */
   dcp_for_compaction: z.boolean().optional(),
+  /** Number of recent messages to protect from truncation (default: 3) */
+  truncation_protection_messages: z.number().min(1).max(10).optional(),
 })
 
 export const SkillSourceSchema = z.union([

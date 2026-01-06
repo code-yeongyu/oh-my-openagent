@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ExperimentalConfig } from "../../config"
+import type { ExperimentalConfig, DynamicContextPruningConfig } from "../../config"
 import type { PreemptiveCompactionState, TokenInfo } from "./types"
 import {
   DEFAULT_THRESHOLD,
@@ -12,7 +12,10 @@ import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../../features/hook-message-injector"
+import { executeDynamicContextPruning } from "../anthropic-context-window-limit-recovery/pruning-executor"
+import { truncateUntilTargetTokens } from "../anthropic-context-window-limit-recovery/storage"
 import { log } from "../../shared/logger"
+import { logCompaction } from "./compaction-logger"
 
 export interface SummarizeContext {
   sessionID: string
@@ -31,6 +34,9 @@ export interface PreemptiveCompactionOptions {
   onBeforeSummarize?: BeforeSummarizeCallback
   getModelLimit?: GetModelLimitCallback
 }
+
+// Default chars per token for estimation
+const CHARS_PER_TOKEN = 4
 
 interface MessageInfo {
   id: string
@@ -125,7 +131,7 @@ export function createPreemptiveCompactionHook(
 
     if (totalUsed < MIN_TOKENS_FOR_COMPACTION) return
 
-    const usageRatio = totalUsed / contextLimit
+    let usageRatio = totalUsed / contextLimit
 
     log("[preemptive-compaction] checking", {
       sessionID,
@@ -145,16 +151,189 @@ export function createPreemptiveCompactionHook(
       return
     }
 
-    await ctx.client.tui
-      .showToast({
-        body: {
-          title: "Preemptive Compaction",
-          message: `Context at ${(usageRatio * 100).toFixed(0)}% - compacting to prevent overflow...`,
-          variant: "warning",
-          duration: 3000,
+    const timestamp = new Date().toISOString()
+    
+    logCompaction({
+      timestamp,
+      sessionID,
+      phase: "triggered",
+      data: {
+        totalUsed,
+        contextLimit,
+        usageRatio,
+        threshold,
+      },
+    })
+
+    let tokensSaved = 0
+    let currentTokens = totalUsed
+    const dcpEnabled = experimental?.dynamic_context_pruning?.enabled || experimental?.dcp_for_compaction
+
+    if (dcpEnabled) {
+      await ctx.client.tui
+        .showToast({
+          body: {
+            title: "Smart Compaction",
+            message: `Context at ${(usageRatio * 100).toFixed(0)}% - running DCP + truncation first...`,
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
+
+      log("[preemptive-compaction] Phase 1: DCP", { sessionID, currentTokens })
+
+      const dcpConfig: DynamicContextPruningConfig = experimental?.dynamic_context_pruning ?? {
+        enabled: true,
+        notification: "detailed",
+        protected_tools: [
+          "task", "todowrite", "todoread",
+          "lsp_rename", "lsp_code_action_resolve",
+        ],
+      }
+
+      try {
+        const pruningResult = await executeDynamicContextPruning(
+          sessionID,
+          dcpConfig,
+          ctx.client
+        )
+
+        if (pruningResult.itemsPruned > 0) {
+          tokensSaved += pruningResult.totalTokensSaved
+          log("[preemptive-compaction] DCP completed", {
+            itemsPruned: pruningResult.itemsPruned,
+            tokensSaved: pruningResult.totalTokensSaved,
+          })
+          
+          logCompaction({
+            timestamp,
+            sessionID,
+            phase: "dcp",
+            data: {
+              itemsPruned: pruningResult.itemsPruned,
+              tokensSaved: pruningResult.totalTokensSaved,
+              strategies: pruningResult.strategies,
+            },
+          })
+        }
+      } catch (error) {
+        log("[preemptive-compaction] DCP failed", { error: String(error) })
+      }
+
+      log("[preemptive-compaction] Phase 2: Truncation", { sessionID })
+
+      const protectedMessages = experimental?.truncation_protection_messages ?? 3
+      const truncationResult = truncateUntilTargetTokens(
+        sessionID,
+        currentTokens - tokensSaved,
+        contextLimit,
+        threshold,
+        CHARS_PER_TOKEN,
+        protectedMessages
+      )
+
+      if (truncationResult.truncatedCount > 0) {
+        const truncationTokensSaved = Math.floor(truncationResult.totalBytesRemoved / CHARS_PER_TOKEN)
+        tokensSaved += truncationTokensSaved
+        log("[preemptive-compaction] Truncation completed", {
+          truncatedCount: truncationResult.truncatedCount,
+          bytesRemoved: truncationResult.totalBytesRemoved,
+          tokensSaved: truncationTokensSaved,
+        })
+        
+        logCompaction({
+          timestamp,
+          sessionID,
+          phase: "truncation",
+          data: {
+            truncatedCount: truncationResult.truncatedCount,
+            bytesRemoved: truncationResult.totalBytesRemoved,
+            tokensSaved: truncationTokensSaved,
+            tools: truncationResult.truncatedTools.map(t => t.toolName),
+          },
+        })
+      }
+
+      currentTokens = totalUsed - tokensSaved
+      usageRatio = currentTokens / contextLimit
+
+      log("[preemptive-compaction] After DCP + Truncation", {
+        originalTokens: totalUsed,
+        tokensSaved,
+        currentTokens,
+        newUsageRatio: usageRatio.toFixed(2),
+        threshold,
+      })
+
+      logCompaction({
+        timestamp,
+        sessionID,
+        phase: "decision",
+        data: {
+          originalTokens: totalUsed,
+          tokensSaved,
+          currentTokens,
+          newUsageRatio: usageRatio,
+          threshold,
+          needsSummarize: usageRatio >= threshold,
         },
       })
-      .catch(() => {})
+
+      if (usageRatio < threshold) {
+        await ctx.client.tui
+          .showToast({
+            body: {
+              title: "Smart Compaction Success",
+              message: `Reduced to ${(usageRatio * 100).toFixed(0)}% via DCP + truncation. No summarization needed.`,
+              variant: "success",
+              duration: 4000,
+            },
+          })
+          .catch(() => {})
+
+        log("[preemptive-compaction] Skipping summarization - pruning was sufficient", {
+          sessionID,
+          tokensSaved,
+          newUsageRatio: usageRatio.toFixed(2),
+        })
+
+        logCompaction({
+          timestamp,
+          sessionID,
+          phase: "skipped",
+          data: {
+            finalUsageRatio: usageRatio,
+            tokensSaved,
+          },
+        })
+
+        state.compactionInProgress.delete(sessionID)
+        return
+      }
+
+      await ctx.client.tui
+        .showToast({
+          body: {
+            title: "Smart Compaction",
+            message: `Still at ${(usageRatio * 100).toFixed(0)}% after pruning. Summarizing...`,
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
+    } else {
+      await ctx.client.tui
+        .showToast({
+          body: {
+            title: "Preemptive Compaction",
+            message: `Context at ${(usageRatio * 100).toFixed(0)}% - compacting to prevent overflow...`,
+            variant: "warning",
+            duration: 3000,
+          },
+        })
+        .catch(() => {})
+    }
 
     log("[preemptive-compaction] triggering compaction", { sessionID, usageRatio })
 
@@ -186,6 +365,13 @@ export function createPreemptiveCompactionHook(
           },
         })
         .catch(() => {})
+
+      logCompaction({
+        timestamp,
+        sessionID,
+        phase: "summarized",
+        data: {},
+      })
 
       state.compactionInProgress.delete(sessionID)
       return

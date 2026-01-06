@@ -367,12 +367,14 @@ export async function executeCompact(
         targetRatio: TRUNCATE_CONFIG.targetTokenRatio,
       });
 
+      // In error recovery (over 100%), bypass message protection to truncate aggressively
       const aggressiveResult = truncateUntilTargetTokens(
         sessionID,
         errorData.currentTokens,
         errorData.maxTokens,
         TRUNCATE_CONFIG.targetTokenRatio,
         TRUNCATE_CONFIG.charsPerToken,
+        0,
       );
 
       if (aggressiveResult.truncatedCount > 0) {

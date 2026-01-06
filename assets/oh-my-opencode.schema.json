@@ -2236,6 +2236,11 @@
         },
         "dcp_for_compaction": {
           "type": "boolean"
+        },
+        "truncation_protection_messages": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
         }
       }
     },

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { getOpenCodeStorageDir } from "../../shared/data-path"
 
@@ -71,11 +71,44 @@ function getMessageIds(sessionID: string): string[] {
   return messageIds
 }
 
-export function findToolResultsBySize(sessionID: string): ToolResultInfo[] {
+export function findToolResultsBySize(
+  sessionID: string,
+  protectedMessageCount: number = 0
+): ToolResultInfo[] {
   const messageIds = getMessageIds(sessionID)
   const results: ToolResultInfo[] = []
 
+  // Protect the last N messages from truncation
+  // Message IDs are typically ordered, but we sort by the message file's mtime to be safe
+  const protectedMessageIds = new Set<string>()
+  if (protectedMessageCount > 0 && messageIds.length > 0) {
+    const messageDir = getMessageDirForSession(sessionID)
+    if (messageDir) {
+      const messageTimestamps: Array<{ id: string; mtime: number }> = []
+      for (const msgId of messageIds) {
+        try {
+          const msgPath = join(messageDir, `${msgId}.json`)
+          if (existsSync(msgPath)) {
+            const stat = statSync(msgPath)
+            messageTimestamps.push({ id: msgId, mtime: stat.mtimeMs })
+          }
+        } catch {
+          continue
+        }
+      }
+      // Sort by mtime descending (newest first)
+      messageTimestamps.sort((a, b) => b.mtime - a.mtime)
+      // Protect the most recent N messages
+      for (let i = 0; i < Math.min(protectedMessageCount, messageTimestamps.length); i++) {
+        protectedMessageIds.add(messageTimestamps[i].id)
+      }
+    }
+  }
+
   for (const messageID of messageIds) {
+    // Skip protected messages
+    if (protectedMessageIds.has(messageID)) continue
+
     const partDir = join(PART_STORAGE, messageID)
     if (!existsSync(partDir)) continue
 
@@ -102,6 +135,20 @@ export function findToolResultsBySize(sessionID: string): ToolResultInfo[] {
   }
 
   return results.sort((a, b) => b.outputSize - a.outputSize)
+}
+
+function getMessageDirForSession(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
 }
 
 export function findLargestToolResult(sessionID: string): ToolResultInfo | null {
@@ -186,7 +233,8 @@ export function truncateUntilTargetTokens(
   currentTokens: number,
   maxTokens: number,
   targetRatio: number = 0.8,
-  charsPerToken: number = 4
+  charsPerToken: number = 4,
+  protectedMessageCount: number = 3
 ): AggressiveTruncateResult {
   const targetTokens = Math.floor(maxTokens * targetRatio)
   const tokensToReduce = currentTokens - targetTokens
@@ -203,7 +251,7 @@ export function truncateUntilTargetTokens(
     }
   }
 
-  const results = findToolResultsBySize(sessionID)
+  const results = findToolResultsBySize(sessionID, protectedMessageCount)
 
   if (results.length === 0) {
     return {
