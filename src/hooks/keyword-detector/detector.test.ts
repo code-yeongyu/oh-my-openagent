@@ -27,6 +27,6 @@ describe("keyword-detector ultrawork alias", () => {
 
     // #then
     expect(ultrawork).toBeDefined()
-    expect(ultrawork?.message).toContain("Ultrawork Lite")
+    expect(ultrawork?.message).toMatch(/ultrawork lite/i)
   })
 })

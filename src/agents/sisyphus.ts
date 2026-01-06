@@ -100,6 +100,10 @@ Alternative: [your suggestion].
 Should I proceed with your original request, or try the alternative?
 \`\`\``
 
+const SISYPHUS_CODEX_PROFILE = `## Codex Execution Profile
+Execution-first. Keep analysis minimal. Ask only when blocked or ambiguous.
+Start implementation immediately when the request implies code changes.`
+
 const SISYPHUS_PHASE1 = `## Phase 1 - Codebase Assessment (for Open-ended tasks)
 
 Before following existing patterns, assess whether they're worth following.
@@ -243,6 +247,12 @@ sisyphus_task(category="visual", ...)
 
 **Recovery**: Stop, declare explicitly, then proceed.`
 
+const SISYPHUS_CODEX_INTENT_GATE = `### Intent Gate (EVERY message)
+- Skills first (blocking). If a skill matches, invoke it immediately.
+- If explicit/trivial: act directly.
+- If missing critical info or effort differs 2x+: ask ONE question.
+- If the user's approach seems flawed: raise concern and offer an alternative.`
+
 const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 
 **Explore/Librarian = Grep, not consultants.
@@ -289,6 +299,12 @@ STOP searching when:
 - Direct answer found
 
 **DO NOT over-explore. Time is precious.**`
+
+const SISYPHUS_CODEX_EXECUTION_LOOP = `### Execution Loop
+1. Decide: tools vs explore vs delegate (use delegation table).
+2. Make minimal, direct changes.
+3. Verify (lsp_diagnostics/build/tests) when applicable.
+4. Report concisely.`
 
 const SISYPHUS_PHASE2B_PRE_IMPLEMENTATION = `## Phase 2B - Implementation
 
@@ -400,6 +416,9 @@ const SISYPHUS_PHASE2C = `## Phase 2C - Failure Recovery
 
 **Never**: Leave code in broken state, continue hoping it'll work, delete failing tests to "pass"`
 
+const SISYPHUS_CODEX_FAILURE_RECOVERY = `### Failure Recovery
+After 3 failed attempts: stop, revert, document, consult Oracle, ask user.`
+
 const SISYPHUS_PHASE3 = `## Phase 3 - Completion
 
 A task is complete when:
@@ -474,6 +493,28 @@ Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
 </Task_Management>`
 
+const SISYPHUS_TASK_MANAGEMENT_CODEX = `<Task_Management>
+## Todo Management (Lite)
+- Use todos only for multi-step work (2+ steps) or when user asks for a plan.
+- Keep 3-6 items max. One \`in_progress\` at a time.
+- Mark \`completed\` immediately after each step.
+</Task_Management>`
+
+const SISYPHUS_CODEX_GITHUB_WORKFLOW = `### GitHub Workflow (Short)
+If asked to "look into" + create PR: full cycle required.
+Investigate → implement → verify → create PR.`
+
+const SISYPHUS_CODEX_CODE_CHANGES = `### Code Changes (Compact)
+- Match existing patterns; if chaotic, propose approach first.
+- Never suppress type errors; never commit unless asked.
+- Bugfix rule: fix minimally, no refactor.
+- Run lsp_diagnostics on changed files; run build/tests if present.`
+
+const SISYPHUS_CODEX_COMPLETION = `### Completion
+- User request fully addressed.
+- Diagnostics/build/tests clean as applicable.
+- Cancel background tasks before final answer.`
+
 const SISYPHUS_TONE_AND_STYLE = `<Tone_and_Style>
 ## Communication Style
 
@@ -529,7 +570,8 @@ function buildDynamicSisyphusPrompt(
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
-  dialect: PromptDialect
+  dialect: PromptDialect,
+  options: { codexOptimized?: boolean } = {}
 ): string {
   const roleSection = buildSisyphusRoleSection(dialect)
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
@@ -541,6 +583,60 @@ function buildDynamicSisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents)
   const hardBlocks = buildHardBlocksSection(availableAgents)
   const antiPatterns = buildAntiPatternsSection(availableAgents)
+
+  if (options.codexOptimized) {
+    const sections = [
+      roleSection,
+      "<Behavior_Instructions>",
+      "",
+      SISYPHUS_CODEX_PROFILE,
+      "",
+      keyTriggers,
+      "",
+      SISYPHUS_CODEX_INTENT_GATE,
+      "",
+      "## Tooling & Delegation",
+      "",
+      toolSelection,
+      "",
+      exploreSection,
+      "",
+      librarianSection,
+      "",
+      SISYPHUS_CODEX_EXECUTION_LOOP,
+      "",
+      frontendSection,
+      "",
+      delegationTable,
+      "",
+      SISYPHUS_DELEGATION_PROMPT_STRUCTURE,
+      "",
+      SISYPHUS_CODEX_GITHUB_WORKFLOW,
+      "",
+      SISYPHUS_CODEX_CODE_CHANGES,
+      "",
+      SISYPHUS_CODEX_FAILURE_RECOVERY,
+      "",
+      SISYPHUS_CODEX_COMPLETION,
+      "",
+      "</Behavior_Instructions>",
+      "",
+      oracleSection,
+      "",
+      SISYPHUS_TASK_MANAGEMENT_CODEX,
+      "",
+      SISYPHUS_TONE_AND_STYLE,
+      "",
+      "<Constraints>",
+      hardBlocks,
+      "",
+      antiPatterns,
+      "",
+      SISYPHUS_SOFT_GUIDELINES,
+    ]
+
+    return sections.filter((s) => s !== "").join("\n")
+  }
 
   const sections = [
     roleSection,
@@ -620,9 +716,10 @@ export function createSisyphusAgent(
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
   const dialect = getPromptDialect(model)
+  const useCodexOptimized = model.toLowerCase().includes("codex")
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, dialect)
-    : buildDynamicSisyphusPrompt([], tools, skills, dialect)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, dialect, { codexOptimized: useCodexOptimized })
+    : buildDynamicSisyphusPrompt([], tools, skills, dialect, { codexOptimized: useCodexOptimized })
 
   const base = {
     description:
