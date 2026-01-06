@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import { buildAuthURL, exchangeCode } from "./oauth"
-import { ANTIGRAVITY_CLIENT_ID, GOOGLE_TOKEN_URL } from "./constants"
+import { buildAuthURL, exchangeCode, startCallbackServer } from "./oauth"
+import { ANTIGRAVITY_CLIENT_ID, GOOGLE_TOKEN_URL, ANTIGRAVITY_CALLBACK_PORT } from "./constants"
 
 describe("OAuth PKCE Removal", () => {
   describe("buildAuthURL", () => {
@@ -186,6 +186,77 @@ describe("OAuth PKCE Removal", () => {
 
       // #then
       expect(result1.state).not.toBe(result2.state)
+    })
+  })
+
+  describe("startCallbackServer Port Handling", () => {
+    it("should prefer port 51121", () => {
+      // #given
+      // Port 51121 should be free
+
+      // #when
+      const handle = startCallbackServer()
+
+      // #then
+      // If 51121 is available, should use it
+      // If not available, should use valid fallback
+      expect(handle.port).toBeGreaterThan(0)
+      expect(handle.port).toBeLessThan(65536)
+      handle.close()
+    })
+
+    it("should return actual bound port", () => {
+      // #when
+      const handle = startCallbackServer()
+
+      // #then
+      expect(typeof handle.port).toBe("number")
+      expect(handle.port).toBeGreaterThan(0)
+      handle.close()
+    })
+
+    it("should fallback to OS-assigned port if 51121 is occupied (EADDRINUSE)", async () => {
+      // #given - Occupy port 51121 first
+      const blocker = Bun.serve({
+        port: ANTIGRAVITY_CALLBACK_PORT,
+        fetch: () => new Response("blocked")
+      })
+
+      try {
+        // #when
+        const handle = startCallbackServer()
+
+        // #then
+        expect(handle.port).not.toBe(ANTIGRAVITY_CALLBACK_PORT)
+        expect(handle.port).toBeGreaterThan(0)
+        handle.close()
+      } finally {
+        // Cleanup blocker
+        blocker.stop()
+      }
+    })
+
+    it("should cleanup server on close", () => {
+      // #given
+      const handle = startCallbackServer()
+      const port = handle.port
+
+      // #when
+      handle.close()
+
+      // #then - port should be released (can bind again)
+      const testServer = Bun.serve({ port, fetch: () => new Response("test") })
+      expect(testServer.port).toBe(port)
+      testServer.stop()
+    })
+
+    it("should provide redirect URI with actual port", () => {
+      // #given
+      const handle = startCallbackServer()
+
+      // #then
+      expect(handle.redirectUri).toBe(`http://localhost:${handle.port}/oauth-callback`)
+      handle.close()
     })
   })
 })

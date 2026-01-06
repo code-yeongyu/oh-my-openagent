@@ -148,6 +148,7 @@ export async function fetchUserInfo(
 
 export interface CallbackServerHandle {
   port: number
+  redirectUri: string
   waitForCallback: () => Promise<CallbackResult>
   close: () => void
 }
@@ -171,43 +172,53 @@ export function startCallbackServer(
     }
   }
 
-  server = Bun.serve({
-    port: 0,
-    fetch(request: Request): Response {
-      const url = new URL(request.url)
+  const fetchHandler = (request: Request): Response => {
+    const url = new URL(request.url)
 
-      if (url.pathname === "/oauth-callback") {
-        const code = url.searchParams.get("code") || ""
-        const state = url.searchParams.get("state") || ""
-        const error = url.searchParams.get("error") || undefined
+    if (url.pathname === "/oauth-callback") {
+      const code = url.searchParams.get("code") || ""
+      const state = url.searchParams.get("state") || ""
+      const error = url.searchParams.get("error") || undefined
 
-        let responseBody: string
-        if (code && !error) {
-          responseBody =
-            "<html><body><h1>Login successful</h1><p>You can close this window.</p></body></html>"
-        } else {
-          responseBody =
-            "<html><body><h1>Login failed</h1><p>Please check the CLI output.</p></body></html>"
-        }
-
-        setTimeout(() => {
-          cleanup()
-          if (resolveCallback) {
-            resolveCallback({ code, state, error })
-          }
-        }, 100)
-
-        return new Response(responseBody, {
-          status: 200,
-          headers: { "Content-Type": "text/html" },
-        })
+      let responseBody: string
+      if (code && !error) {
+        responseBody =
+          "<html><body><h1>Login successful</h1><p>You can close this window.</p></body></html>"
+      } else {
+        responseBody =
+          "<html><body><h1>Login failed</h1><p>Please check the CLI output.</p></body></html>"
       }
 
-      return new Response("Not Found", { status: 404 })
-    },
-  })
+      setTimeout(() => {
+        cleanup()
+        if (resolveCallback) {
+          resolveCallback({ code, state, error })
+        }
+      }, 100)
+
+      return new Response(responseBody, {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      })
+    }
+
+    return new Response("Not Found", { status: 404 })
+  }
+
+  try {
+    server = Bun.serve({
+      port: ANTIGRAVITY_CALLBACK_PORT,
+      fetch: fetchHandler,
+    })
+  } catch (error) {
+    server = Bun.serve({
+      port: 0,
+      fetch: fetchHandler,
+    })
+  }
 
   const actualPort = server.port as number
+  const redirectUri = `http://localhost:${actualPort}/oauth-callback`
 
   const waitForCallback = (): Promise<CallbackResult> => {
     return new Promise((resolve, reject) => {
@@ -223,6 +234,7 @@ export function startCallbackServer(
 
   return {
     port: actualPort,
+    redirectUri,
     waitForCallback,
     close: cleanup,
   }
