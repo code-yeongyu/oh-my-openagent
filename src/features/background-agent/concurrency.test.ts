@@ -116,6 +116,46 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     // #then
     expect(limit).toBe(4)
   })
+
+  test("should return Infinity when defaultConcurrency is 0", () => {
+    // #given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 0 }
+    const manager = new ConcurrencyManager(config)
+
+    // #when
+    const limit = manager.getConcurrencyLimit("any-model")
+
+    // #then
+    expect(limit).toBe(Infinity)
+  })
+
+  test("should return Infinity when providerConcurrency is 0", () => {
+    // #given
+    const config: BackgroundTaskConfig = {
+      providerConcurrency: { anthropic: 0 }
+    }
+    const manager = new ConcurrencyManager(config)
+
+    // #when
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+
+    // #then
+    expect(limit).toBe(Infinity)
+  })
+
+  test("should return Infinity when modelConcurrency is 0", () => {
+    // #given
+    const config: BackgroundTaskConfig = {
+      modelConcurrency: { "anthropic/claude-sonnet-4-5": 0 }
+    }
+    const manager = new ConcurrencyManager(config)
+
+    // #when
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+
+    // #then
+    expect(limit).toBe(Infinity)
+  })
 })
 
 describe("ConcurrencyManager.acquire/release", () => {
