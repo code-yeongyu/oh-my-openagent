@@ -58,3 +58,19 @@ export type { MetaLearningExtractorConfig } from "./meta-learning-extractor";
 // Read-before-write enforcement (LIF-103)
 export { createReadBeforeWriteHook } from "./read-before-write";
 export type { ReadBeforeWriteConfig } from "./read-before-write";
+
+// Upstream hooks (LIF-111 Phase 4)
+export { createEmptyMessageSanitizerHook } from "./empty-message-sanitizer";
+export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+export { createCompactionContextInjector } from "./compaction-context-injector";
+export {
+  createPreemptiveCompactionHook,
+  type SummarizeContext,
+  type BeforeSummarizeCallback,
+  type GetModelLimitCallback,
+  type PreemptiveCompactionOptions,
+  type PreemptiveCompactionState,
+  type TokenInfo,
+  type ModelLimits,
+} from "./preemptive-compaction";
+export { createEditErrorRecoveryHook, EDIT_ERROR_PATTERNS, EDIT_ERROR_REMINDER } from "./edit-error-recovery";

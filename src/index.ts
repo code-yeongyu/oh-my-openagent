@@ -31,6 +31,11 @@ import {
   createWorkflowStateEnforcerHook,
   createMetaLearningExtractorHook,
   createReadBeforeWriteHook,
+  createEmptyMessageSanitizerHook,
+  createThinkingBlockValidatorHook,
+  createPreemptiveCompactionHook,
+  createCompactionContextInjector,
+  createEditErrorRecoveryHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -370,6 +375,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createReadBeforeWriteHook(ctx, pluginConfig.governance?.read_before_write)
     : null;
 
+  // LIF-111 Phase 4: Upstream hooks
+  const emptyMessageSanitizer = isHookEnabled("empty-message-sanitizer")
+    ? createEmptyMessageSanitizerHook()
+    : null;
+  const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
+    ? createThinkingBlockValidatorHook()
+    : null;
+  const compactionContextInjector = isHookEnabled("compaction-context-injector")
+    ? createCompactionContextInjector()
+    : null;
+  const preemptiveCompaction = isHookEnabled("preemptive-compaction")
+    ? createPreemptiveCompactionHook(ctx, {
+        experimental: pluginConfig.experimental,
+        onBeforeSummarize: compactionContextInjector ?? undefined,
+      })
+    : null;
+  const editErrorRecovery = isHookEnabled("edit-error-recovery")
+    ? createEditErrorRecoveryHook(ctx)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -436,10 +461,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
-      // Governance: Linear context injection
       await governanceLinearInjector?.["chat.message"]?.(input, output);
-      // LIF-72: Workflow state enforcement
       await workflowStateEnforcer?.["chat.message"]?.(input, output);
+    },
+
+    "experimental.chat.messages.transform": async (input, output) => {
+      await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output);
+      await thinkingBlockValidator?.["experimental.chat.messages.transform"]?.(input, output);
     },
 
     config: async (config) => {
@@ -560,6 +588,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
+      await preemptiveCompaction?.event(input);
       await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
@@ -737,6 +766,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await securityScanner?.["tool.execute.after"](input, output);
       await conflictDetector?.["tool.execute.after"](input, output);
       await governanceHistorian?.["tool.execute.after"](input, output);
+      await safeHookCall("edit-error-recovery", () => editErrorRecovery?.["tool.execute.after"](input, output));
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

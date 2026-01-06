@@ -1,0 +1,3 @@
+export const DEFAULT_THRESHOLD = 0.85
+export const MIN_TOKENS_FOR_COMPACTION = 50_000
+export const COMPACTION_COOLDOWN_MS = 60_000
