@@ -80,6 +80,7 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
     },
     content: skill.definition.template,
     scope: skill.scope,
+    lazyContentLoader: skill.lazyContent,
   }
 }
 
@@ -112,8 +113,13 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
+  let content = cmd.content || ""
+  if (!content && cmd.lazyContentLoader) {
+    content = await cmd.lazyContentLoader.load()
+  }
+
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
-  const withFileRefs = await resolveFileReferencesInText(cmd.content || "", commandDir)
+  const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   sections.push(resolvedContent.trim())
 
