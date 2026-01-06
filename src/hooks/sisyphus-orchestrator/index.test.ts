@@ -77,7 +77,7 @@ describe("sisyphus-orchestrator hook", () => {
 
       // #when
       await hook["tool.execute.after"](
-        { tool: "other_tool", sessionID: "session-123", agent: "orchestrator-sisyphus" },
+        { tool: "other_tool", sessionID: "session-123" },
         output
       )
 
@@ -140,8 +140,8 @@ describe("sisyphus-orchestrator hook", () => {
 
       // #then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("VERIFICATION REQUIRED")
-      expect(output.output).toContain("SUBAGENTS LIE")
+      expect(output.output).toContain("MANDATORY VERIFICATION")
+      expect(output.output).toContain("sisyphus_task(resume=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -180,6 +180,7 @@ describe("sisyphus-orchestrator hook", () => {
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
       expect(output.output).toContain("SUBAGENTS LIE")
+      expect(output.output).toContain("sisyphus_task(resume=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -323,9 +324,8 @@ describe("sisyphus-orchestrator hook", () => {
         output
       )
 
-      // #then - output should contain boulder.json path and notepad path format
-      expect(output.output).toContain(".sisyphus/boulder.json")
-      expect(output.output).toContain(".sisyphus/notepads/my-feature/{category}.md")
+      // #then - output should contain plan name and progress
+      expect(output.output).toContain("my-feature")
       expect(output.output).toContain("1/3 done")
       expect(output.output).toContain("2 left")
       
@@ -361,13 +361,151 @@ describe("sisyphus-orchestrator hook", () => {
         output
       )
 
-      // #then - should include resume and checkbox instructions
+      // #then - should include resume instructions and verification
       expect(output.output).toContain("sisyphus_task(resume=")
-      expect(output.output).toContain("- [ ]")
-      expect(output.output).toContain("- [x]")
-      expect(output.output).toContain("VERIFY")
+      expect(output.output).toContain("[x]")
+      expect(output.output).toContain("MANDATORY VERIFICATION")
       
       cleanupMessageStorage(sessionID)
+    })
+
+    describe("Write/Edit tool direct work reminder", () => {
+      const ORCHESTRATOR_SESSION = "orchestrator-write-test"
+
+      beforeEach(() => {
+        setupMessageStorage(ORCHESTRATOR_SESSION, "orchestrator-sisyphus")
+      })
+
+      afterEach(() => {
+        cleanupMessageStorage(ORCHESTRATOR_SESSION)
+      })
+
+      test("should append delegation reminder when orchestrator writes outside .sisyphus/", async () => {
+        // #given
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const output = {
+          title: "Write",
+          output: "File written successfully",
+          metadata: { filePath: "/path/to/code.ts" },
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // #then
+        expect(output.output).toContain("DELEGATION REQUIRED")
+        expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).toContain("sisyphus_task")
+      })
+
+      test("should append delegation reminder when orchestrator edits outside .sisyphus/", async () => {
+        // #given
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const output = {
+          title: "Edit",
+          output: "File edited successfully",
+          metadata: { filePath: "/src/components/button.tsx" },
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Edit", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // #then
+        expect(output.output).toContain("DELEGATION REQUIRED")
+      })
+
+      test("should NOT append reminder when orchestrator writes inside .sisyphus/", async () => {
+        // #given
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const originalOutput = "File written successfully"
+        const output = {
+          title: "Write",
+          output: originalOutput,
+          metadata: { filePath: "/project/.sisyphus/plans/work-plan.md" },
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // #then
+        expect(output.output).toBe(originalOutput)
+        expect(output.output).not.toContain("DELEGATION REQUIRED")
+      })
+
+      test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
+        // #given
+        const nonOrchestratorSession = "non-orchestrator-session"
+        setupMessageStorage(nonOrchestratorSession, "Sisyphus-Junior")
+        
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const originalOutput = "File written successfully"
+        const output = {
+          title: "Write",
+          output: originalOutput,
+          metadata: { filePath: "/path/to/code.ts" },
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Write", sessionID: nonOrchestratorSession },
+          output
+        )
+
+        // #then
+        expect(output.output).toBe(originalOutput)
+        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        
+        cleanupMessageStorage(nonOrchestratorSession)
+      })
+
+      test("should NOT append reminder for read-only tools", async () => {
+        // #given
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const originalOutput = "File content"
+        const output = {
+          title: "Read",
+          output: originalOutput,
+          metadata: { filePath: "/path/to/code.ts" },
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Read", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // #then
+        expect(output.output).toBe(originalOutput)
+      })
+
+      test("should handle missing filePath gracefully", async () => {
+        // #given
+        const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+        const originalOutput = "File written successfully"
+        const output = {
+          title: "Write",
+          output: originalOutput,
+          metadata: {},
+        }
+
+        // #when
+        await hook["tool.execute.after"](
+          { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // #then
+        expect(output.output).toBe(originalOutput)
+      })
     })
   })
 

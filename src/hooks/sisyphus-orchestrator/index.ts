@@ -70,10 +70,8 @@ Subagents FREQUENTLY claim completion when:
 2. Run tests yourself - Must PASS (not "agent said it passed")
 3. Read the actual code - Must match requirements
 4. Check build/typecheck - Must succeed
-5. Verify notepad was updated - Must have substantive content
 
 DO NOT TRUST THE AGENT'S SELF-REPORT.
-They are non-deterministic and not exceptional - they CANNOT distinguish between completed and incomplete states.
 VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
 
 **HANDS-ON QA REQUIRED (after ALL tasks complete):**
@@ -87,45 +85,41 @@ VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
 Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages, integration problems.
 **FAILURE TO DO HANDS-ON QA = INCOMPLETE WORK.**`
 
-function buildOrchestratorReminder(planName: string, progress: { total: number; completed: number }): string {
+function buildVerificationReminder(sessionId: string): string {
+  return `${VERIFICATION_REMINDER}
+
+---
+
+**If ANY verification fails, use this immediately:**
+\`\`\`
+sisyphus_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
+\`\`\``
+}
+
+function buildOrchestratorReminder(planName: string, progress: { total: number; completed: number }, sessionId: string): string {
   const remaining = progress.total - progress.completed
   return `
 ---
 
-**State:** \`.sisyphus/boulder.json\` | Plan: ${planName} | ${progress.completed}/${progress.total} done, ${remaining} left
-
-**Notepad:** \`.sisyphus/notepads/${planName}/{category}.md\`
+**State:** Plan: ${planName} | ${progress.completed}/${progress.total} done, ${remaining} left
 
 ---
 
-${VERIFICATION_REMINDER}
+${buildVerificationReminder(sessionId)}
 
-**COMMIT FREQUENTLY:**
-- Commit after each verified task unit - one logical change per commit
-- Do NOT accumulate multiple tasks into one big commit
-- Atomic commits make rollback and review easier
-- If verification passes, commit immediately before moving on
-
-**THEN:**
-- Broken? \`sisyphus_task(resume="<session_id>", prompt="fix: ...")\`
-- Verified? Commit atomic unit, mark \`- [ ]\` to \`- [x]\`, next task`
+ALL pass? → commit atomic unit, mark \`[x]\`, next task.`
 }
 
-function buildStandaloneVerificationReminder(): string {
+function buildStandaloneVerificationReminder(sessionId: string): string {
   return `
 ---
 
-## SISYPHUS_TASK COMPLETED - VERIFICATION REQUIRED
+${buildVerificationReminder(sessionId)}`
+}
 
-${VERIFICATION_REMINDER}
-
-**VERIFICATION CHECKLIST:**
-- [ ] lsp_diagnostics on changed files - Run it yourself
-- [ ] Tests pass - Run the test command yourself
-- [ ] Code correct - Read the files yourself
-- [ ] No regressions - Check related functionality
-
-**REMEMBER:** Agent's "done" does NOT mean actually done.`
+function extractSessionIdFromOutput(output: string): string {
+  const match = output.match(/Session ID:\s*(ses_[a-zA-Z0-9]+)/)
+  return match?.[1] ?? "<session_id>"
 }
 
 interface GitFileStat {
@@ -233,12 +227,6 @@ function formatFileChanges(stats: GitFileStat[], notepadPath?: string): string {
   return lines.join("\n")
 }
 
-interface ToolExecuteInput {
-  tool: string
-  sessionID?: string
-  agent?: string
-}
-
 interface ToolExecuteAfterInput {
   tool: string
   sessionID?: string
@@ -250,8 +238,6 @@ interface ToolExecuteAfterOutput {
   output: string
   metadata: Record<string, unknown>
 }
-
-type ToolExecuteOutput = ToolExecuteAfterOutput
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -500,6 +486,7 @@ export function createSisyphusOrchestratorHook(
       if (output.output && typeof output.output === "string") {
         const gitStats = getGitDiffStats(ctx.directory)
         const fileChanges = formatFileChanges(gitStats)
+        const subagentSessionId = extractSessionIdFromOutput(output.output)
 
         const boulderState = readBoulderState(ctx.directory)
 
@@ -518,7 +505,7 @@ export function createSisyphusOrchestratorHook(
 ## SUBAGENT WORK COMPLETED
 
 ${fileChanges}
-${buildOrchestratorReminder(boulderState.plan_name, progress)}`
+${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)}`
 
           log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
             plan: boulderState.plan_name,
@@ -526,7 +513,7 @@ ${buildOrchestratorReminder(boulderState.plan_name, progress)}`
             fileCount: gitStats.length,
           })
         } else {
-          output.output += `\n${buildStandaloneVerificationReminder()}`
+          output.output += `\n${buildStandaloneVerificationReminder(subagentSessionId)}`
 
           log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
             sessionID: input.sessionID,
