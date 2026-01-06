@@ -582,6 +582,7 @@ These tools enable agents to reference previous conversations and maintain conti
     - Use camelCase for function names
     ```
 - **Online**: Project rules aren't everything. Built-in MCPs for extended capabilities:
+  - **websearch**: Real-time web search powered by [Exa AI](https://exa.ai)
   - **context7**: Official documentation lookup
   - **grep_app**: Ultra-fast code search across public GitHub repos (great for finding implementation examples)
 
@@ -983,8 +984,9 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 ### MCPs
 
-Context7 and grep.app MCP enabled by default.
+Exa, Context7 and grep.app MCP enabled by default.
 
+- **websearch**: Real-time web search powered by [Exa AI](https://exa.ai) - searches the web and returns relevant content
 - **context7**: Fetches up-to-date official documentation for libraries
 - **grep_app**: Ultra-fast code search across millions of public GitHub repositories via [grep.app](https://grep.app)
 
@@ -992,7 +994,7 @@ Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-openco
 
 ```json
 {
-  "disabled_mcps": ["context7", "grep_app"]
+  "disabled_mcps": ["websearch", "context7", "grep_app"]
 }
 ```
 
