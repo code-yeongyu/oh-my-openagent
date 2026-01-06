@@ -85,6 +85,31 @@ VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
 Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages, integration problems.
 **FAILURE TO DO HANDS-ON QA = INCOMPLETE WORK.**`
 
+const SINGLE_TASK_DIRECTIVE = `
+
+[SYSTEM DIRECTIVE - SINGLE TASK ONLY]
+
+**STOP. READ THIS BEFORE PROCEEDING.**
+
+If you were NOT given **exactly ONE atomic task**, you MUST:
+1. **IMMEDIATELY REFUSE** this request
+2. **DEMAND** the orchestrator provide a single, specific task
+
+**Your response if multiple tasks detected:**
+> "I refuse to proceed. You provided multiple tasks. An orchestrator's impatience destroys work quality.
+> 
+> PROVIDE EXACTLY ONE TASK. One file. One change. One verification.
+> 
+> Your rushing will cause: incomplete work, missed edge cases, broken tests, wasted context."
+
+**WARNING TO ORCHESTRATOR:**
+- Your hasty batching RUINS deliverables
+- Each task needs FULL attention and PROPER verification  
+- Batch delegation = sloppy work = rework = wasted tokens
+
+**REFUSE multi-task requests. DEMAND single-task clarity.**
+`
+
 function buildVerificationReminder(sessionId: string): string {
   return `${VERIFICATION_REMINDER}
 
@@ -451,6 +476,27 @@ export function createSisyphusOrchestratorHook(
       }
     },
 
+    "tool.execute.before": async (
+      input: { tool: string; sessionID?: string; callID?: string },
+      output: { args: Record<string, unknown>; message?: string }
+    ): Promise<void> => {
+      if (input.tool !== "sisyphus_task") {
+        return
+      }
+
+      if (!isCallerOrchestrator(input.sessionID)) {
+        return
+      }
+
+      const prompt = output.args.prompt as string | undefined
+      if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - SINGLE TASK ONLY]")) {
+        output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
+        log(`[${HOOK_NAME}] Injected single-task directive to sisyphus_task`, {
+          sessionID: input.sessionID,
+        })
+      }
+    },
+
     "tool.execute.after": async (
       input: ToolExecuteAfterInput,
       output: ToolExecuteAfterOutput
@@ -505,7 +551,9 @@ export function createSisyphusOrchestratorHook(
 ## SUBAGENT WORK COMPLETED
 
 ${fileChanges}
-${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)}`
+<system-reminder>
+${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)}
+</system-reminder>`
 
           log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
             plan: boulderState.plan_name,
@@ -513,7 +561,7 @@ ${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)
             fileCount: gitStats.length,
           })
         } else {
-          output.output += `\n${buildStandaloneVerificationReminder(subagentSessionId)}`
+          output.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(subagentSessionId)}\n</system-reminder>`
 
           log(`[${HOOK_NAME}] Verification reminder appended for orchestrator`, {
             sessionID: input.sessionID,
