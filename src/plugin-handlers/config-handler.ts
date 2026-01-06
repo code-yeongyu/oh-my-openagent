@@ -176,7 +176,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           pluginConfig.agents?.["Prometheus (Planner)"];
         const defaultModel = config.model as string | undefined;
         const prometheusBase = {
-          model: (migratedPlanConfig as Record<string, unknown>).model ?? defaultModel,
+          model: defaultModel ?? "anthropic/claude-opus-4-5",
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
