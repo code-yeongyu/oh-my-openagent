@@ -5,21 +5,30 @@ import { existsSync } from "fs"
 import { homedir } from "os"
 
 const DEFAULT_ZSH_PATHS = ["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh"]
+const DEFAULT_BASH_PATHS = ["/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash"]
 
 function getHomeDir(): string {
   return process.env.HOME || process.env.USERPROFILE || homedir()
 }
 
-function findZshPath(customZshPath?: string): string | null {
-  if (customZshPath && existsSync(customZshPath)) {
-    return customZshPath
+function findShellPath(defaultPaths: string[], customPath?: string): string | null {
+  if (customPath && existsSync(customPath)) {
+    return customPath
   }
-  for (const path of DEFAULT_ZSH_PATHS) {
+  for (const path of defaultPaths) {
     if (existsSync(path)) {
       return path
     }
   }
   return null
+}
+
+function findZshPath(customZshPath?: string): string | null {
+  return findShellPath(DEFAULT_ZSH_PATHS, customZshPath)
+}
+
+function findBashPath(): string | null {
+  return findShellPath(DEFAULT_BASH_PATHS)
 }
 
 const execAsync = promisify(exec)
@@ -55,10 +64,18 @@ export async function executeHookCommand(
   let finalCommand = expandedCommand
 
   if (options?.forceZsh) {
-    const zshPath = options.zshPath || findZshPath()
+    // Always verify shell exists before using it
+    const zshPath = findZshPath(options.zshPath)
+    const escapedCommand = expandedCommand.replace(/'/g, "'\\''")
     if (zshPath) {
-      const escapedCommand = expandedCommand.replace(/'/g, "'\\''")
       finalCommand = `${zshPath} -lc '${escapedCommand}'`
+    } else {
+      // Fall back to bash login shell to preserve PATH from user profile
+      const bashPath = findBashPath()
+      if (bashPath) {
+        finalCommand = `${bashPath} -lc '${escapedCommand}'`
+      }
+      // If neither zsh nor bash found, fall through to spawn with shell: true
     }
   }
 
