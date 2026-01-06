@@ -222,7 +222,7 @@ export function createMyHook(input: PluginInput) {
 
 ## Pull Request Process
 
-1. **Fork** the repository and create your branch from `master`
+1. **Fork** the repository and create your branch from `dev`
 2. **Make changes** following the conventions above
 3. **Build and test** locally:
    ```bash
