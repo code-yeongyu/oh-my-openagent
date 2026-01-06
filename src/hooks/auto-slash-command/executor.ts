@@ -10,7 +10,7 @@ import {
 } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
+import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
 
 interface CommandScope {
@@ -32,6 +32,7 @@ interface CommandInfo {
   metadata: CommandMetadata
   content?: string
   scope: CommandScope["type"]
+  lazyContentLoader?: LazyContentLoader
 }
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope["type"]): CommandInfo[] {
@@ -91,10 +92,15 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
     },
     content: skill.definition.template,
     scope: "skill",
+    lazyContentLoader: skill.lazyContent,
   }
 }
 
-async function discoverAllCommands(): Promise<CommandInfo[]> {
+export interface ExecutorOptions {
+  skills?: LoadedSkill[]
+}
+
+async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
   const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
@@ -105,7 +111,7 @@ async function discoverAllCommands(): Promise<CommandInfo[]> {
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
 
-  const skills = await discoverAllSkills()
+  const skills = options?.skills ?? await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)
 
   return [
@@ -117,8 +123,8 @@ async function discoverAllCommands(): Promise<CommandInfo[]> {
   ]
 }
 
-async function findCommand(commandName: string): Promise<CommandInfo | null> {
-  const allCommands = await discoverAllCommands()
+async function findCommand(commandName: string, options?: ExecutorOptions): Promise<CommandInfo | null> {
+  const allCommands = await discoverAllCommands(options)
   return allCommands.find(
     (cmd) => cmd.name.toLowerCase() === commandName.toLowerCase()
   ) ?? null
@@ -149,8 +155,13 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
+  let content = cmd.content || ""
+  if (!content && cmd.lazyContentLoader) {
+    content = await cmd.lazyContentLoader.load()
+  }
+
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
-  const withFileRefs = await resolveFileReferencesInText(cmd.content || "", commandDir)
+  const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   sections.push(resolvedContent.trim())
 
@@ -169,8 +180,8 @@ export interface ExecuteResult {
   error?: string
 }
 
-export async function executeSlashCommand(parsed: ParsedSlashCommand): Promise<ExecuteResult> {
-  const command = await findCommand(parsed.command)
+export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: ExecutorOptions): Promise<ExecuteResult> {
+  const command = await findCommand(parsed.command, options)
 
   if (!command) {
     return {
