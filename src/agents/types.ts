@@ -7,6 +7,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
  */
 export type BuiltinAgentName =
   | "OmO"
+  | "Sisyphus"
   | "oracle"
   | "librarian"
   | "explore"
@@ -42,6 +43,8 @@ export type OverridableAgentName =
   | "build"
   | "plan"
   | "OmO-Plan"
+  | "OpenCode-Builder"
+  | "Planner-Sisyphus"
   | BuiltinAgentName
 
 export type AgentName = BuiltinAgentName

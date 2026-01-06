@@ -49,23 +49,27 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
-    "@code-yeongyu/comment-checker": "^0.5.0",
+    "@clack/prompts": "^0.11.0",
+    "@code-yeongyu/comment-checker": "^0.6.1",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "^1.1.1",
+    "@opencode-ai/sdk": "^1.1.1",
+    "commander": "^14.0.2",
     "hono": "^4.10.4",
+    "js-yaml": "^4.1.1",
+    "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
     "yaml": "^2.8.2",
-    "zod": "4.1.8"
+    "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
-    "oh-my-opencode": "^0.1.30",
     "typescript": "^5.7.3"
-  },
-  "peerDependencies": {
-    "bun": ">=1.0.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",

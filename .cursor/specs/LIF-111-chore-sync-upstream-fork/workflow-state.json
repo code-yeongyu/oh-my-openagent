@@ -1,5 +1,5 @@
 {
-  "currentStep": "tasks",
+  "currentStep": "implement",
   "completedSteps": [
     "specify",
     "plan",
@@ -14,6 +14,6 @@
   "linearIssueId": null,
   "linearStatus": "in_progress",
   "createdAt": "2026-01-02T21:39:50.138Z",
-  "updatedAt": "2026-01-06T19:49:31.234Z",
-  "lastCommand": "/tasks"
+  "updatedAt": "2026-01-06T20:45:37.062Z",
+  "lastCommand": "/implement"
 }

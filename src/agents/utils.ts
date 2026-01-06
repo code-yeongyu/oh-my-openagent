@@ -40,6 +40,7 @@ import { getGovernanceTemplate } from "../config/governance-template"
 
 const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
   OmO: omoAgent,
+  Sisyphus: omoAgent,
   oracle: oracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,
@@ -80,9 +81,10 @@ const allBuiltinAgents: Record<BuiltinAgentName, AgentConfig> = {
  */
 const AGENT_GOVERNANCE_LEVELS: Record<BuiltinAgentName, GovernanceLevel> = {
   // Team Lead - already has governance
-  OmO: "none",                      // Already has governance in prompt
+  OmO: "none",
+  Sisyphus: "none",
   // Advisor - read-only
-  oracle: "none",                   // Read-only advisor
+  oracle: "none",
   // Utility - read-only
   librarian: "none",                // Read-only research
   explore: "none",                  // Read-only exploration

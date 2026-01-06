@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { McpNameSchema } from "../mcp/types"
+import { AnyMcpNameSchema, McpNameSchema } from "../mcp/types"
 
 const PermissionValue = z.enum(["ask", "allow", "deny"])
 
@@ -17,8 +17,9 @@ const AgentPermissionSchema = z.object({
 })
 
 export const BuiltinAgentNameSchema = z.enum([
-  // Primary orchestrator
+  // Primary orchestrators (OmO = fork, Sisyphus = upstream)
   "OmO",
+  "Sisyphus",
   // Core agents
   "oracle",
   "librarian",
@@ -57,6 +58,9 @@ export const OverridableAgentNameSchema = z.enum([
   "plan",
   "OmO",
   "OmO-Plan",
+  "Sisyphus",
+  "OpenCode-Builder",
+  "Planner-Sisyphus",
   "oracle",
   "librarian",
   "explore",
@@ -116,6 +120,14 @@ export const HookNameSchema = z.enum([
   "workflow-state-enforcer",
   "meta-learning-extractor",
   "read-before-write",
+  "empty-message-sanitizer",
+  "thinking-block-validator",
+  "ralph-loop",
+  "preemptive-compaction",
+  "compaction-context-injector",
+  "claude-code-hooks",
+  "auto-slash-command",
+  "edit-error-recovery",
 ])
 
 export const AgentOverrideConfigSchema = z
@@ -144,6 +156,9 @@ export const AgentOverridesSchema = z.object({
   plan: AgentOverrideConfigSchema.optional(),
   OmO: AgentOverrideConfigSchema.optional(),
   "OmO-Plan": AgentOverrideConfigSchema.optional(),
+  Sisyphus: AgentOverrideConfigSchema.optional(),
+  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
+  "Planner-Sisyphus": AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
@@ -179,6 +194,114 @@ export const ClaudeCodeConfigSchema = z.object({
 export const OmoAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
 })
+
+export const SisyphusAgentConfigSchema = z.object({
+  disabled: z.boolean().optional(),
+  default_builder_enabled: z.boolean().optional(),
+  planner_enabled: z.boolean().optional(),
+  replace_plan: z.boolean().optional(),
+})
+
+export const PrimaryOrchestratorSchema = z.enum(["OmO", "Sisyphus"]).default("OmO")
+
+export const CommentCheckerConfigSchema = z.object({
+  custom_prompt: z.string().optional(),
+})
+
+export const DynamicContextPruningConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  notification: z.enum(["off", "minimal", "detailed"]).default("detailed"),
+  turn_protection: z.object({
+    enabled: z.boolean().default(true),
+    turns: z.number().min(1).max(10).default(3),
+  }).optional(),
+  protected_tools: z.array(z.string()).default([
+    "task", "todowrite", "todoread",
+    "lsp_rename", "lsp_code_action_resolve",
+    "session_read", "session_write", "session_search",
+  ]),
+  strategies: z.object({
+    deduplication: z.object({
+      enabled: z.boolean().default(true),
+    }).optional(),
+    supersede_writes: z.object({
+      enabled: z.boolean().default(true),
+      aggressive: z.boolean().default(false),
+    }).optional(),
+    purge_errors: z.object({
+      enabled: z.boolean().default(true),
+      turns: z.number().min(1).max(20).default(5),
+    }).optional(),
+  }).optional(),
+})
+
+export const ExperimentalConfigSchema = z.object({
+  aggressive_truncation: z.boolean().optional(),
+  auto_resume: z.boolean().optional(),
+  preemptive_compaction: z.boolean().optional(),
+  preemptive_compaction_threshold: z.number().min(0.5).max(0.95).optional(),
+  truncate_all_tool_outputs: z.boolean().optional(),
+  dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
+  dcp_for_compaction: z.boolean().optional(),
+})
+
+export const SkillSourceSchema = z.union([
+  z.string(),
+  z.object({
+    path: z.string(),
+    recursive: z.boolean().optional(),
+    glob: z.string().optional(),
+  }),
+])
+
+export const SkillDefinitionSchema = z.object({
+  description: z.string().optional(),
+  template: z.string().optional(),
+  from: z.string().optional(),
+  model: z.string().optional(),
+  agent: z.string().optional(),
+  subtask: z.boolean().optional(),
+  "argument-hint": z.string().optional(),
+  license: z.string().optional(),
+  compatibility: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  "allowed-tools": z.array(z.string()).optional(),
+  disable: z.boolean().optional(),
+})
+
+export const SkillEntrySchema = z.union([
+  z.boolean(),
+  SkillDefinitionSchema,
+])
+
+export const SkillsConfigSchema = z.union([
+  z.array(z.string()),
+  z.record(z.string(), SkillEntrySchema).and(z.object({
+    sources: z.array(SkillSourceSchema).optional(),
+    enable: z.array(z.string()).optional(),
+    disable: z.array(z.string()).optional(),
+  }).partial()),
+])
+
+export const RalphLoopConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  default_max_iterations: z.number().min(1).max(1000).default(100),
+  state_dir: z.string().optional(),
+})
+
+export const BackgroundTaskConfigSchema = z.object({
+  defaultConcurrency: z.number().min(1).optional(),
+  providerConcurrency: z.record(z.string(), z.number().min(1)).optional(),
+  modelConcurrency: z.record(z.string(), z.number().min(1)).optional(),
+})
+
+export const BuiltinSkillNameSchema = z.enum([
+  "playwright",
+])
+
+export const BuiltinCommandNameSchema = z.enum([
+  "init-deep",
+])
 
 // Memory Tools configuration (LIF-73)
 export const MemoryToolsConfigSchema = z.object({
@@ -349,13 +472,23 @@ export const GovernanceConfigSchema = z.object({
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
-  disabled_mcps: z.array(McpNameSchema).optional(),
+  disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
+  disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
+  disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
   omo_agent: OmoAgentConfigSchema.optional(),
+  sisyphus_agent: SisyphusAgentConfigSchema.optional(),
+  primary_orchestrator: PrimaryOrchestratorSchema.optional(),
+  comment_checker: CommentCheckerConfigSchema.optional(),
+  experimental: ExperimentalConfigSchema.optional(),
+  auto_update: z.boolean().optional(),
+  skills: SkillsConfigSchema.optional(),
+  ralph_loop: RalphLoopConfigSchema.optional(),
+  background_task: BackgroundTaskConfigSchema.optional(),
   governance: GovernanceConfigSchema.optional(),
   memory_tools: MemoryToolsConfigSchema.optional(),
   meta_learning: MetaLearningConfigSchema.optional(),
@@ -364,9 +497,19 @@ export const OhMyOpenCodeConfigSchema = z.object({
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
+export type BackgroundTaskConfig = z.infer<typeof BackgroundTaskConfigSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
+export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>
+export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>
 export type OmoAgentConfig = z.infer<typeof OmoAgentConfigSchema>
+export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
+export type CommentCheckerConfig = z.infer<typeof CommentCheckerConfigSchema>
+export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
+export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningConfigSchema>
+export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
+export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 export type GovernanceConfig = z.infer<typeof GovernanceConfigSchema>
 export type GovernancePathValidationConfig = z.infer<typeof GovernancePathValidationSchema>
 export type GovernanceHistorianConfig = z.infer<typeof GovernanceHistorianSchema>
@@ -385,4 +528,4 @@ export type MemoryToolsConfig = z.infer<typeof MemoryToolsConfigSchema>
 export type MetaLearningConfig = z.infer<typeof MetaLearningConfigSchema>
 export type GovernanceReadBeforeWriteConfig = z.infer<typeof GovernanceReadBeforeWriteSchema>
 
-export { McpNameSchema, type McpName } from "../mcp/types"
+export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
