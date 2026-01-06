@@ -10,20 +10,14 @@ export class ConcurrencyManager {
   }
 
   getConcurrencyLimit(model: string): number {
-    const modelLimit = this.config?.modelConcurrency?.[model]
-    if (modelLimit !== undefined) {
-      return modelLimit === 0 ? Infinity : modelLimit
+    if (this.config?.modelConcurrency?.[model]) {
+      return this.config.modelConcurrency[model]
     }
     const provider = model.split('/')[0]
-    const providerLimit = this.config?.providerConcurrency?.[provider]
-    if (providerLimit !== undefined) {
-      return providerLimit === 0 ? Infinity : providerLimit
+    if (this.config?.providerConcurrency?.[provider]) {
+      return this.config.providerConcurrency[provider]
     }
-    const defaultLimit = this.config?.defaultConcurrency
-    if (defaultLimit !== undefined) {
-      return defaultLimit === 0 ? Infinity : defaultLimit
-    }
-    return 5
+    return this.config?.defaultConcurrency ?? Infinity
   }
 
   async acquire(model: string): Promise<void> {
