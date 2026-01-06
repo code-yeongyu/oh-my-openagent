@@ -27,7 +27,7 @@ describe("session-notification", () => {
     
     // Mock spawn to track notification commands
     // Uses node:child_process.spawn instead of Bun shell to avoid GC crash
-    spawnMock = spyOn(childProcess, "spawn").mockImplementation((cmd: string, args?: string[]) => {
+    spawnMock = spyOn(childProcess, "spawn").mockImplementation(((cmd: string, args?: string[]) => {
       // Track notification commands (osascript, notify-send, powershell)
       if (cmd.includes("osascript") || cmd.includes("notify-send") || cmd.includes("powershell")) {
         notificationCalls.push(`${cmd} ${(args ?? []).join(" ")}`)
@@ -35,7 +35,7 @@ describe("session-notification", () => {
       const emitter = new EventEmitter()
       setTimeout(() => emitter.emit("close", 0), 0)
       return emitter as any
-    })
+    }) as typeof childProcess.spawn)
     
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
