@@ -25,7 +25,7 @@ const DIRECT_WORK_REMINDER = `
 
 You just performed direct file modifications outside \`.sisyphus/\`.
 
-**Sisyphus is an ORCHESTRATOR, not an IMPLEMENTER.**
+**You are an ORCHESTRATOR, not an IMPLEMENTER.**
 
 As an orchestrator, you should:
 - **DELEGATE** implementation work to subagents via \`sisyphus_task\`
