@@ -10,6 +10,7 @@
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Join our [Discord community](https://discord.gg/PUwSMR9XNk) to connect with contributors and fellow `oh-my-opencode` users. |
 > | :-----| :----- |
 > | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | News and updates for `oh-my-opencode` used to be posted on my X account. <br /> Since it was suspended mistakenly, [@justsisyphus](https://x.com/justsisyphus) now posts updates on my behalf. |
+> | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | Follow [@code-yeongyu](https://github.com/code-yeongyu) on GitHub for more projects. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
@@ -41,7 +42,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
 </div>
 
@@ -128,8 +129,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
 
 # Oh My OpenCode
 
-oMoMoMoMoMo···
-
+Meet Sisyphus: The Batteries-Included Agent that codes like you.
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
 But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
@@ -197,8 +197,17 @@ Meet our main agent: Sisyphus (Opus 4.5 High). Below are the tools Sisyphus uses
 
 Just by installing this, you make your agents to work like:
 
-1. While Gemini 3 Pro writes the frontend as a background task, Claude Opus 4.5 handles the backend. Stuck debugging? Call GPT 5.2 for help. When the frontend reports done, verify and ship.
-2. Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
+1. Sisyphus doesn't waste time hunting for files himself; he keeps the main agent's context lean. Instead, he fires off background tasks to faster, cheaper models in parallel to map the territory for him.
+1. Sisyphus leverages LSP for refactoring; it's more deterministic, safer, and surgical.
+1. When the heavy lifting requires a UI touch, Sisyphus delegates frontend tasks directly to Gemini 3 Pro.
+1. If Sisyphus gets stuck in a loop or hits a wall, he doesn't keep banging his head—he calls GPT 5.2 for high-IQ strategic backup.
+1. Working with a complex open-source framework? Sisyphus spawns subagents to digest the raw source code and documentation in real-time. He operates with total contextual awareness.
+1. When Sisyphus touches comments, he either justifies their existence or nukes them. He keeps your codebase clean.
+1. Sisyphus is bound by his TODO list. If he doesn't finish what he started, the system forces him back into "bouldering" mode. Your task gets done, period.
+1. Honestly, don't even bother reading the docs. Just write your prompt. Include the 'ultrawork' keyword. Sisyphus will analyze the structure, gather the context, dig through external source code, and just keep bouldering until the job is 100% complete.
+1. Actually, typing 'ultrawork' is too much effort. Just type 'ulw'. Just ulw. Sip your coffee. Your work is done.
+
+Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
 3. Stop worrying about context management when delegating to LLMs. I've got it covered.
     - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
     - **Your agent is now the dev team lead. You're the AI Manager.**
@@ -321,7 +330,7 @@ First, add the opencode-antigravity-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.1.2"
+    "opencode-antigravity-auth@1.2.7"
   ]
 }
 ```
@@ -346,7 +355,7 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 }
 ```
 
-**Available model names**: `google/gemini-3-pro-high`, `google/gemini-3-pro-medium`, `google/gemini-3-pro-low`, `google/gemini-3-flash`, `google/gemini-3-flash`, `google/gemini-3-flash-lite`, `google/claude-sonnet-4-5`, `google/claude-sonnet-4-5-thinking`, `google/claude-opus-4-5-thinking`, `google/gpt-oss-120b-medium`
+**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
 
 Then authenticate:
 
@@ -369,26 +378,19 @@ First, add the opencode-openai-codex-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth@4.1.1"
+    "opencode-openai-codex-auth@4.3.0"
   ]
 }
 ```
 
-**Important**: The official npm package currently has a bug causing 400 errors (`"No tool call found for function call output with call_id"`). **Use the hotfix branch** until fixed. Edit `~/.config/opencode/package.json`:
-
-```json
-{
-  "dependencies": {
-    "opencode-openai-codex-auth": "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
-  }
-}
-```
-
-Then run `cd ~/.config/opencode && bun i`. In `opencode.json`, use `"opencode-openai-codex-auth"` without the version suffix.
-
 ##### Model Configuration
+
 You'll also need full model settings in `opencode.json`.
-Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/full-opencode.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/full-opencode.json), and merge carefully to avoid breaking the user's existing setup.
+Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json) (for OpenCode v1.0.210+) or [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json) (for older versions), and merge carefully to avoid breaking the user's existing setup.
+
+**Available models**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
+
+**Variants** (OpenCode v1.0.210+): Use `--variant=<none|low|medium|high|xhigh>` for reasoning effort control.
 
 Then authenticate:
 
@@ -581,8 +583,8 @@ These tools enable agents to reference previous conversations and maintain conti
     - Use camelCase for function names
     ```
 - **Online**: Project rules aren't everything. Built-in MCPs for extended capabilities:
+  - **websearch**: Real-time web search powered by [Exa AI](https://exa.ai)
   - **context7**: Official documentation lookup
-  - **websearch_exa**: Real-time web search
   - **grep_app**: Ultra-fast code search across public GitHub repos (great for finding implementation examples)
 
 #### Be Multimodal. Save Tokens.
@@ -687,20 +689,37 @@ Disable specific Claude Code compatibility features with the `claude_code` confi
     "commands": false,
     "skills": false,
     "agents": false,
-    "hooks": false
+    "hooks": false,
+    "plugins": false
   }
 }
 ```
 
 | Toggle     | When `false`, stops loading from...                                                   | Unaffected                                            |
 | ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, websearch_exa)                |
+| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, grep_app)                     |
 | `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | Built-in agents (oracle, librarian, etc.)             |
 | `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+| `plugins`  | `~/.claude/plugins/` (Claude Code marketplace plugins)                                | -                                                     |
 
 All toggles default to `true` (enabled). Omit the `claude_code` object for full Claude Code compatibility.
+
+**Selectively disable specific plugins** using `plugins_override`:
+
+```json
+{
+  "claude_code": {
+    "plugins_override": {
+      "claude-mem@thedotmack": false,
+      "some-other-plugin@marketplace": false
+    }
+  }
+}
+```
+
+This allows you to keep the plugin system enabled while disabling specific plugins by their full identifier (`plugin-name@marketplace-name`).
 
 ### Not Just for the Agents
 
@@ -967,6 +986,40 @@ You can also customize Sisyphus agents like other agents:
 | `planner_enabled`           | `true`  | When `true`, enables Planner-Sisyphus agent (same as OpenCode plan, renamed due to SDK limitations). Enabled by default.                           |
 | `replace_plan`              | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Planner-Sisyphus and default plan available.                 |
 
+### Background Tasks
+
+Configure concurrency limits for background agent tasks. This controls how many parallel background agents can run simultaneously.
+
+```json
+{
+  "background_task": {
+    "defaultConcurrency": 5,
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 5,
+      "google": 10
+    },
+    "modelConcurrency": {
+      "anthropic/claude-opus-4-5": 2,
+      "google/gemini-3-flash": 10
+    }
+  }
+}
+```
+
+| Option                | Default | Description                                                                                                    |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -       | Default maximum concurrent background tasks for all providers/models                                           |
+| `providerConcurrency` | -       | Per-provider concurrency limits. Keys are provider names (e.g., `anthropic`, `openai`, `google`)               |
+| `modelConcurrency`    | -       | Per-model concurrency limits. Keys are full model names (e.g., `anthropic/claude-opus-4-5`). Overrides provider limits. |
+
+**Priority Order**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+**Use Cases**:
+- Limit expensive models (e.g., Opus) to prevent cost spikes
+- Allow more concurrent tasks for fast/cheap models (e.g., Gemini Flash)
+- Respect provider rate limits by setting provider-level caps
+
 ### Hooks
 
 Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
@@ -983,17 +1036,17 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 ### MCPs
 
-Context7, Exa, and grep.app MCP enabled by default.
+Exa, Context7 and grep.app MCP enabled by default.
 
+- **websearch**: Real-time web search powered by [Exa AI](https://exa.ai) - searches the web and returns relevant content
 - **context7**: Fetches up-to-date official documentation for libraries
-- **websearch_exa**: Real-time web search powered by Exa AI
 - **grep_app**: Ultra-fast code search across millions of public GitHub repositories via [grep.app](https://grep.app)
 
 Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
 ```json
 {
-  "disabled_mcps": ["context7", "websearch_exa", "grep_app"]
+  "disabled_mcps": ["websearch", "context7", "grep_app"]
 }
 ```
 

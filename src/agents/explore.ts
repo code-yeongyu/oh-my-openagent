@@ -28,7 +28,6 @@ export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
-    "background_task",
   ])
 
   return {

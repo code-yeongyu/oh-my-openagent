@@ -53,6 +53,8 @@ import {
   createLookAt,
   createSkillTool,
   createSkillMcpTool,
+  createSlashcommandTool,
+  discoverCommandsSync,
   sessionExists,
   interactive_bash,
   startTmuxCheck,
@@ -164,10 +166,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? createAutoSlashCommandHook()
-    : null;
-
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
     : null;
@@ -231,6 +229,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
+  const commands = discoverCommandsSync();
+  const slashcommandTool = createSlashcommandTool({
+    commands,
+    skills: mergedSkills,
+  });
+
+  const autoSlashCommand = isHookEnabled("auto-slash-command")
+    ? createAutoSlashCommandHook({ skills: mergedSkills })
+    : null;
+
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)
     : null;
@@ -251,14 +259,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       look_at: lookAt,
       skill: skillTool,
       skill_mcp: skillMcpTool,
-      interactive_bash,  // Always included, handles missing tmux gracefully via getCachedTmuxPath() ?? "tmux"
+      slashcommand: slashcommandTool,
+      interactive_bash,
     },
 
     "chat.message": async (input, output) => {
-      if (input.agent === "Sisyphus") {
-        (output.message as Record<string, unknown>).variant = "max"
-      }
-
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
       await contextInjector["chat.message"]?.(input, output);

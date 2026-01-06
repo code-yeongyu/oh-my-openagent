@@ -1,4 +1,4 @@
-import { websearch_exa } from "./websearch-exa"
+import { websearch } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
 import type { McpName } from "./types"
@@ -13,16 +13,16 @@ type RemoteMcpConfig = {
 }
 
 const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
-  websearch_exa,
+  websearch,
   context7,
   grep_app,
 }
 
-export function createBuiltinMcps(disabledMcps: McpName[] = []) {
+export function createBuiltinMcps(disabledMcps: string[] = []) {
   const mcps: Record<string, RemoteMcpConfig> = {}
 
   for (const [name, config] of Object.entries(allBuiltinMcps)) {
-    if (!disabledMcps.includes(name as McpName)) {
+    if (!disabledMcps.includes(name)) {
       mcps[name] = config
     }
   }

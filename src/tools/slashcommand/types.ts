@@ -1,3 +1,5 @@
+import type { LoadedSkill, LazyContentLoader } from "../../features/opencode-skill-loader"
+
 export type CommandScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project"
 
 export interface CommandMetadata {
@@ -15,4 +17,12 @@ export interface CommandInfo {
   metadata: CommandMetadata
   content?: string
   scope: CommandScope
+  lazyContentLoader?: LazyContentLoader
+}
+
+export interface SlashcommandToolOptions {
+  /** Pre-loaded commands (skip discovery if provided) */
+  commands?: CommandInfo[]
+  /** Pre-loaded skills (skip discovery if provided) */
+  skills?: LoadedSkill[]
 }

@@ -302,6 +302,74 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 })
 
+describe("BackgroundManager.notifyParentSession - release ordering", () => {
+  test("should unblock queued task even when prompt hangs", async () => {
+    // #given - concurrency limit 1, task1 running, task2 waiting
+    const { ConcurrencyManager } = await import("./concurrency")
+    const concurrencyManager = new ConcurrencyManager({ defaultConcurrency: 1 })
+
+    await concurrencyManager.acquire("explore")
+
+    let task2Resolved = false
+    const task2Promise = concurrencyManager.acquire("explore").then(() => {
+      task2Resolved = true
+    })
+
+    await Promise.resolve()
+    expect(task2Resolved).toBe(false)
+
+    // #when - simulate notifyParentSession: release BEFORE prompt (fixed behavior)
+    let promptStarted = false
+    const simulateNotifyParentSession = async () => {
+      concurrencyManager.release("explore")
+
+      promptStarted = true
+      await new Promise(() => {})
+    }
+
+    simulateNotifyParentSession()
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // #then - task2 should be unblocked even though prompt never completes
+    expect(promptStarted).toBe(true)
+    await task2Promise
+    expect(task2Resolved).toBe(true)
+  })
+
+  test("should keep queue blocked if release is after prompt (demonstrates the bug)", async () => {
+    // #given - same setup
+    const { ConcurrencyManager } = await import("./concurrency")
+    const concurrencyManager = new ConcurrencyManager({ defaultConcurrency: 1 })
+
+    await concurrencyManager.acquire("explore")
+
+    let task2Resolved = false
+    concurrencyManager.acquire("explore").then(() => {
+      task2Resolved = true
+    })
+
+    await Promise.resolve()
+    expect(task2Resolved).toBe(false)
+
+    // #when - simulate BUGGY behavior: release AFTER prompt (in finally)
+    const simulateBuggyNotifyParentSession = async () => {
+      try {
+        await new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 50))
+      } finally {
+        concurrencyManager.release("explore")
+      }
+    }
+
+    await simulateBuggyNotifyParentSession().catch(() => {})
+
+    // #then - task2 resolves only after prompt completes (blocked during hang)
+    await Promise.resolve()
+    expect(task2Resolved).toBe(true)
+  })
+})
+
 describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
   let manager: MockBackgroundManager
 
