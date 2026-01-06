@@ -102,6 +102,7 @@ function getUserConfigDir(): string {
 
 const AGENT_NAME_MAP: Record<string, string> = {
   omo: "OmO",
+  sisyphus: "Sisyphus",
   build: "build",
   oracle: "oracle",
   librarian: "librarian",
@@ -452,26 +453,33 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents(ctx.directory) : {};
 
       const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
+      const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
+      const primaryOrchestrator = pluginConfig.primary_orchestrator ?? "OmO";
 
-      if (isOmoEnabled && builtinAgents.OmO) {
-        // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // use `config.default_agent = "OmO"` instead of demoting build/plan.
-        // Tracking: https://github.com/sst/opencode/pull/5313
+      const hasPrimaryOrchestrator = 
+        (primaryOrchestrator === "OmO" && isOmoEnabled && builtinAgents.OmO) ||
+        (primaryOrchestrator === "Sisyphus" && isSisyphusEnabled && builtinAgents.Sisyphus);
+
+      if (hasPrimaryOrchestrator) {
+        const primaryAgent = primaryOrchestrator === "Sisyphus" ? builtinAgents.Sisyphus : builtinAgents.OmO;
+        const primaryAgentName = primaryOrchestrator;
+        const planAgentName = primaryOrchestrator === "Sisyphus" ? "Planner-Sisyphus" : "OmO-Plan";
+
         const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
-        const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
-        const omoPlanBase = {
-          ...builtinAgents.OmO,
+        const planOverride = pluginConfig.agents?.[planAgentName];
+        const planBase = {
+          ...primaryAgent,
           ...planConfigWithoutName,
           description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
           color: config.agent?.plan?.color ?? "#6495ED",
         };
 
-        const omoPlanConfig = omoPlanOverride ? deepMerge(omoPlanBase, omoPlanOverride) : omoPlanBase;
+        const planConfig = planOverride ? deepMerge(planBase, planOverride) : planBase;
 
         config.agent = {
-          OmO: builtinAgents.OmO,
-          "OmO-Plan": omoPlanConfig,
-          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "OmO")),
+          [primaryAgentName]: primaryAgent,
+          [planAgentName]: planConfig,
+          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== primaryAgentName)),
           ...userAgents,
           ...projectAgents,
           ...config.agent,

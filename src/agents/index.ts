@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentRole } from "./types"
 import { omoAgent } from "./omo"
+import { sisyphusAgent } from "./sisyphus"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
 import { exploreAgent } from "./explore"
@@ -34,6 +35,7 @@ import { contextLearnerAgent } from "./context-learner"
 
 export const builtinAgents: Record<string, AgentConfig> = {
   OmO: omoAgent,
+  Sisyphus: sisyphusAgent,
   oracle: oracleAgent,
   librarian: librarianAgent,
   explore: exploreAgent,
@@ -80,8 +82,9 @@ export const builtinAgents: Record<string, AgentConfig> = {
  * - utility: explore/librarian (read-only, research)
  */
 export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
-  // Team Lead
+  // Team Leads
   OmO: "team-lead",
+  Sisyphus: "team-lead",
   // Manager
   "implementation-specialist": "manager",
   // Specialists (file-modifying) - Existing
@@ -119,4 +122,6 @@ export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
 }
 
 export * from "./types"
+export * from "./sisyphus"
+export * from "./sisyphus-prompt-builder"
 export { createBuiltinAgents, injectGovernance } from "./utils"
