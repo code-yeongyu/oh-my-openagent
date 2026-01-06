@@ -78,6 +78,9 @@ export function createContextInjectorMessagesTransformHook(
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
       const { messages } = output
+      log("[DEBUG] experimental.chat.messages.transform called", {
+        messageCount: messages.length,
+      })
       if (messages.length === 0) {
         return
       }
@@ -91,16 +94,28 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       if (lastUserMessageIndex === -1) {
+        log("[DEBUG] No user message found in messages")
         return
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
       const sessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
+      log("[DEBUG] Extracted sessionID from lastUserMessage.info", {
+        sessionID,
+        infoKeys: Object.keys(lastUserMessage.info),
+        lastUserMessageInfo: JSON.stringify(lastUserMessage.info).slice(0, 200),
+      })
       if (!sessionID) {
+        log("[DEBUG] sessionID is undefined or empty")
         return
       }
 
-      if (!collector.hasPending(sessionID)) {
+      const hasPending = collector.hasPending(sessionID)
+      log("[DEBUG] Checking hasPending", {
+        sessionID,
+        hasPending,
+      })
+      if (!hasPending) {
         return
       }
 

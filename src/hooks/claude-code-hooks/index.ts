@@ -169,6 +169,11 @@ export function createClaudeCodeHooksHook(
               log("UserPromptSubmit hooks prepended to first message parts directly", { sessionID: input.sessionID })
             }
           } else if (contextCollector) {
+            log("[DEBUG] Registering hook content to contextCollector", {
+              sessionID: input.sessionID,
+              contentLength: hookContent.length,
+              contentPreview: hookContent.slice(0, 100),
+            })
             contextCollector.register(input.sessionID, {
               id: "hook-context",
               source: "custom",
