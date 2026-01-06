@@ -128,22 +128,22 @@ const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-background_task(agent="explore", prompt="Find auth implementations in our codebase...")
-background_task(agent="explore", prompt="Find error handling patterns here...")
+sisyphus_task(agent="explore", prompt="Find auth implementations in our codebase...", background=true)
+sisyphus_task(agent="explore", prompt="Find error handling patterns here...", background=true)
 // Reference Grep (external)
-background_task(agent="librarian", prompt="Find JWT best practices in official docs...")
-background_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
-// Continue working immediately. Collect with background_output when needed.
+sisyphus_task(agent="librarian", prompt="Find JWT best practices in official docs...", background=true)
+sisyphus_task(agent="librarian", prompt="Find how production apps handle auth in Express...", background=true)
+// Continue working immediately. System will notify when each completes.
 
 // WRONG: Sequential or blocking
-result = task(...)  // Never wait synchronously for explore/librarian
+result = sisyphus_task(...)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
-1. Launch parallel agents → receive task_ids
+1. Launch parallel agents with background=true → receive task_ids
 2. Continue immediate work
-3. When results needed: \`background_output(task_id="...")\`
-4. BEFORE final answer: \`background_cancel(all=true)\`
+3. System will notify when tasks complete
+4. Use \`background_output(task_id="...")\` to get results when needed
 
 ### Search Stop Conditions
 
