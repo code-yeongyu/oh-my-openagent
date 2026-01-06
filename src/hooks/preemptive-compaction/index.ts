@@ -169,9 +169,10 @@ export function createPreemptiveCompactionHook(
         })
       }
 
+      const summarizeBody = { providerID, modelID, auto: true }
       await ctx.client.session.summarize({
         path: { id: sessionID },
-        body: { providerID, modelID },
+        body: summarizeBody as never,
         query: { directory: ctx.directory },
       })
 
@@ -187,22 +188,6 @@ export function createPreemptiveCompactionHook(
         .catch(() => {})
 
       state.compactionInProgress.delete(sessionID)
-
-      setTimeout(async () => {
-        try {
-          const messageDir = getMessageDir(sessionID)
-          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-
-          await ctx.client.session.promptAsync({
-            path: { id: sessionID },
-            body: {
-              agent: storedMessage?.agent,
-              parts: [{ type: "text", text: "Continue" }],
-            },
-            query: { directory: ctx.directory },
-          })
-        } catch {}
-      }, 500)
       return
     } catch (err) {
       log("[preemptive-compaction] compaction failed", { sessionID, error: err })
