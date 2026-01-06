@@ -26,6 +26,29 @@ First off, thanks for taking the time to contribute! This document provides guid
 
 Be respectful, inclusive, and constructive. We're all here to make better tools together.
 
+## Language Policy
+
+**English is the primary language for all communications in this repository.**
+
+This includes:
+- Issues and bug reports
+- Pull requests and code reviews
+- Documentation and comments
+- Discussions and community interactions
+
+### Why English?
+
+- **Global Accessibility**: English allows contributors from all regions to collaborate effectively
+- **Consistency**: A single language keeps discussions organized and searchable
+- **Open Source Best Practice**: Most successful open-source projects use English as the lingua franca
+
+### Need Help with English?
+
+If English isn't your first language, don't worry! We value your contributions regardless of perfect grammar. You can:
+- Use translation tools to help compose messages
+- Ask for help from other community members
+- Focus on clear, simple communication rather than perfect prose
+
 ## Getting Started
 
 ### Prerequisites

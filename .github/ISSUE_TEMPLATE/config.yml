@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discord Community
+    url: https://discord.gg/PUwSMR9XNk
+    about: Join our Discord server for real-time discussions and community support
+  - name: Documentation
+    url: https://github.com/code-yeongyu/oh-my-opencode#readme
+    about: Read the comprehensive documentation and guides
