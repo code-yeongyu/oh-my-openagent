@@ -911,6 +911,40 @@ Sisyphus Agent 也能自定义：
 | `planner_enabled`           | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（与 OpenCode plan 相同，因 SDK 限制仅改名）。默认启用。                                                             |
 | `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
 
+### Background Tasks（后台任务）
+
+配置后台 Agent 任务的并发限制。这控制了可以同时运行多少个并行后台 Agent。
+
+```json
+{
+  "background_task": {
+    "defaultConcurrency": 5,
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 5,
+      "google": 10
+    },
+    "modelConcurrency": {
+      "anthropic/claude-opus-4-5": 2,
+      "google/gemini-3-flash": 10
+    }
+  }
+}
+```
+
+| 选项                  | 默认值 | 说明                                                                                                           |
+| --------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -      | 所有提供商/模型的默认最大并发后台任务数                                                                        |
+| `providerConcurrency` | -      | 按提供商设置并发限制。键是提供商名称（例如：`anthropic`、`openai`、`google`）                                  |
+| `modelConcurrency`    | -      | 按模型设置并发限制。键是完整的模型名称（例如：`anthropic/claude-opus-4-5`）。会覆盖提供商级别的限制。          |
+
+**优先级顺序**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+**使用场景**:
+- 限制昂贵的模型（如 Opus）以防止成本飙升
+- 允许快速/便宜的模型（如 Gemini Flash）执行更多并发任务
+- 通过设置提供商级别上限来遵守提供商的速率限制
+
 ### Hooks
 
 在 `~/.config/opencode/oh-my-opencode.json` 或 `.opencode/oh-my-opencode.json` 的 `disabled_hooks` 里关掉你不想要的内置 hook：
