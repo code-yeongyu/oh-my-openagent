@@ -159,4 +159,109 @@ describe("prometheus-md-only", () => {
       hook["tool.execute.before"](input, output)
     ).resolves.toBeUndefined()
   })
+
+  test("should inject read-only warning when Prometheus calls sisyphus_task", async () => {
+    // #given
+    const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+    const input = {
+      tool: "sisyphus_task",
+      sessionID: "test-session",
+      callID: "call-1",
+      agent: "Prometheus (Planner)",
+    }
+    const output = {
+      args: { prompt: "Analyze this codebase" },
+    }
+
+    // #when
+    await hook["tool.execute.before"](input, output)
+
+    // #then
+    expect(output.args.prompt).toContain("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")
+    expect(output.args.prompt).toContain("DO NOT modify any files")
+  })
+
+  test("should inject read-only warning when Prometheus calls task", async () => {
+    // #given
+    const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+    const input = {
+      tool: "task",
+      sessionID: "test-session",
+      callID: "call-1",
+      agent: "Prometheus (Planner)",
+    }
+    const output = {
+      args: { prompt: "Research this library" },
+    }
+
+    // #when
+    await hook["tool.execute.before"](input, output)
+
+    // #then
+    expect(output.args.prompt).toContain("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")
+  })
+
+  test("should inject read-only warning when Prometheus calls call_omo_agent", async () => {
+    // #given
+    const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+    const input = {
+      tool: "call_omo_agent",
+      sessionID: "test-session",
+      callID: "call-1",
+      agent: "Prometheus (Planner)",
+    }
+    const output = {
+      args: { prompt: "Find implementation examples" },
+    }
+
+    // #when
+    await hook["tool.execute.before"](input, output)
+
+    // #then
+    expect(output.args.prompt).toContain("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")
+  })
+
+  test("should not inject warning for non-Prometheus agents calling sisyphus_task", async () => {
+    // #given
+    const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+    const input = {
+      tool: "sisyphus_task",
+      sessionID: "test-session",
+      callID: "call-1",
+      agent: "Sisyphus",
+    }
+    const originalPrompt = "Implement this feature"
+    const output = {
+      args: { prompt: originalPrompt },
+    }
+
+    // #when
+    await hook["tool.execute.before"](input, output)
+
+    // #then
+    expect(output.args.prompt).toBe(originalPrompt)
+    expect(output.args.prompt).not.toContain("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")
+  })
+
+  test("should not double-inject warning if already present", async () => {
+    // #given
+    const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+    const input = {
+      tool: "sisyphus_task",
+      sessionID: "test-session",
+      callID: "call-1",
+      agent: "Prometheus (Planner)",
+    }
+    const promptWithWarning = "Some prompt [SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION] already here"
+    const output = {
+      args: { prompt: promptWithWarning },
+    }
+
+    // #when
+    await hook["tool.execute.before"](input, output)
+
+    // #then
+    const occurrences = (output.args.prompt as string).split("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]").length - 1
+    expect(occurrences).toBe(1)
+  })
 })
