@@ -116,6 +116,7 @@ export class BackgroundManager {
         tools: {
           task: false,
           background_task: false,
+          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
