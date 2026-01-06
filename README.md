@@ -969,6 +969,40 @@ You can also customize Sisyphus agents like other agents:
 | `planner_enabled`           | `true`  | When `true`, enables Planner-Sisyphus agent (same as OpenCode plan, renamed due to SDK limitations). Enabled by default.                           |
 | `replace_plan`              | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Planner-Sisyphus and default plan available.                 |
 
+### Background Tasks
+
+Configure concurrency limits for background agent tasks. This controls how many parallel background agents can run simultaneously.
+
+```json
+{
+  "background_task": {
+    "defaultConcurrency": 5,
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 5,
+      "google": 10
+    },
+    "modelConcurrency": {
+      "anthropic/claude-opus-4-5": 2,
+      "google/gemini-3-flash": 10
+    }
+  }
+}
+```
+
+| Option                | Default | Description                                                                                                    |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -       | Default maximum concurrent background tasks for all providers/models                                           |
+| `providerConcurrency` | -       | Per-provider concurrency limits. Keys are provider names (e.g., `anthropic`, `openai`, `google`)               |
+| `modelConcurrency`    | -       | Per-model concurrency limits. Keys are full model names (e.g., `anthropic/claude-opus-4-5`). Overrides provider limits. |
+
+**Priority Order**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+**Use Cases**:
+- Limit expensive models (e.g., Opus) to prevent cost spikes
+- Allow more concurrent tasks for fast/cheap models (e.g., Gemini Flash)
+- Respect provider rate limits by setting provider-level caps
+
 ### Hooks
 
 Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:

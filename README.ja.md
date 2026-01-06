@@ -907,6 +907,40 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 | `planner_enabled`           | `true`  | `true` の場合、Planner-Sisyphus エージェントを有効化します（OpenCode plan と同じ、SDK 制限により名前変更）。デフォルトで有効です。                                                       |
 | `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Planner-Sisyphus とデフォルトのプランの両方を利用できます。                                |
 
+### Background Tasks
+
+バックグラウンドエージェントタスクの同時実行数を設定します。並列で実行できるバックグラウンドエージェントの数を制御します。
+
+```json
+{
+  "background_task": {
+    "defaultConcurrency": 5,
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 5,
+      "google": 10
+    },
+    "modelConcurrency": {
+      "anthropic/claude-opus-4-5": 2,
+      "google/gemini-3-flash": 10
+    }
+  }
+}
+```
+
+| オプション            | デフォルト | 説明                                                                                                           |
+| --------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -          | すべてのプロバイダー/モデルに対するデフォルトの最大同時バックグラウンドタスク数                                 |
+| `providerConcurrency` | -          | プロバイダーごとの同時実行制限。キーはプロバイダー名（例：`anthropic`、`openai`、`google`）                     |
+| `modelConcurrency`    | -          | モデルごとの同時実行制限。キーは完全なモデル名（例：`anthropic/claude-opus-4-5`）。プロバイダー制限より優先されます。 |
+
+**優先順位**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+**ユースケース**:
+- 高価なモデル（例：Opus）を制限してコストの急増を防ぐ
+- 高速で安価なモデル（例：Gemini Flash）により多くの同時タスクを許可する
+- プロバイダーレベルの上限を設定してプロバイダーのレートリミットを遵守する
+
 ### Hooks
 
 `~/.config/opencode/oh-my-opencode.json` または `.opencode/oh-my-opencode.json` の `disabled_hooks` を通じて特定の内蔵フックを無効化できます：
