@@ -1658,6 +1658,35 @@
           "type": "string"
         }
       }
+    },
+    "background_task": {
+      "type": "object",
+      "properties": {
+        "defaultConcurrency": {
+          "type": "number",
+          "minimum": 1
+        },
+        "providerConcurrency": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "modelConcurrency": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
+      }
     }
   }
 }
