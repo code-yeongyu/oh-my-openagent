@@ -124,47 +124,26 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const refInfo = lastUserMessage.info as unknown as {
-        sessionID?: string
-        agent?: string
-        model?: { providerID?: string; modelID?: string }
-        path?: { cwd?: string; root?: string }
+      const textPartIndex = lastUserMessage.parts.findIndex(
+        (p) => p.type === "text" && (p as { text?: string }).text
+      )
+
+      if (textPartIndex === -1) {
+        log("[context-injector] No text part found in last user message, skipping injection", {
+          sessionID,
+          partsCount: lastUserMessage.parts.length,
+        })
+        return
       }
 
-      const syntheticMessageId = `synthetic_ctx_${Date.now()}`
-      const syntheticPartId = `synthetic_ctx_part_${Date.now()}`
-      const now = Date.now()
+      const textPart = lastUserMessage.parts[textPartIndex] as { text?: string }
+      const originalText = textPart.text ?? ""
+      textPart.text = `${pending.merged}\n\n---\n\n${originalText}`
 
-      const syntheticMessage: MessageWithParts = {
-        info: {
-          id: syntheticMessageId,
-          sessionID: sessionID,
-          role: "user",
-          time: { created: now },
-          agent: refInfo.agent ?? "Sisyphus",
-          model: refInfo.model ?? { providerID: "unknown", modelID: "unknown" },
-          path: refInfo.path ?? { cwd: "/", root: "/" },
-        } as unknown as Message,
-        parts: [
-          {
-            id: syntheticPartId,
-            sessionID: sessionID,
-            messageID: syntheticMessageId,
-            type: "text",
-            text: pending.merged,
-            synthetic: true,
-            time: { start: now, end: now },
-          } as Part,
-        ],
-      }
-
-      messages.splice(lastUserMessageIndex, 0, syntheticMessage)
-
-      log("[context-injector] Injected synthetic message from collector", {
+      log("[context-injector] Prepended context to last user message", {
         sessionID,
-        insertIndex: lastUserMessageIndex,
         contextLength: pending.merged.length,
-        newMessageCount: messages.length,
+        originalTextLength: originalText.length,
       })
     },
   }
