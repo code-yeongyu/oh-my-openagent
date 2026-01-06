@@ -21,10 +21,35 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
-      const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
+      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
 
       if (detectedKeywords.length === 0) {
         return
+      }
+
+      // Check if this is a subagent session (has parent)
+      // Only ultrawork keywords work in subagent sessions
+      // Other keywords (search, analyze, etc.) only work in main sessions
+      try {
+        const sessionInfo = await ctx.client.session.get({ path: { id: input.sessionID } })
+        const isSubagentSession = !!sessionInfo.data?.parentID
+
+        if (isSubagentSession) {
+          // Filter to only ultrawork keywords in subagent sessions
+          detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+          if (detectedKeywords.length === 0) {
+            log(`[keyword-detector] Skipping non-ultrawork keywords in subagent session`, {
+              sessionID: input.sessionID,
+              parentID: sessionInfo.data?.parentID,
+            })
+            return
+          }
+        }
+      } catch (err) {
+        log(`[keyword-detector] Failed to get session info, proceeding with all keywords`, {
+          error: err,
+          sessionID: input.sessionID,
+        })
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
