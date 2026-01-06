@@ -37,7 +37,8 @@
         "type": "string",
         "enum": [
           "playwright",
-          "frontend-ui-ux"
+          "frontend-ui-ux",
+          "git-master"
         ]
       }
     },
@@ -1996,6 +1997,19 @@
       "type": "object",
       "properties": {
         "force_enable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "git_master": {
+      "type": "object",
+      "properties": {
+        "commit_footer": {
+          "default": true,
+          "type": "boolean"
+        },
+        "include_co_authored_by": {
+          "default": true,
           "type": "boolean"
         }
       }

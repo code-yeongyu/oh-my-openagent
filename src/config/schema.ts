@@ -30,6 +30,7 @@ export const BuiltinAgentNameSchema = z.enum([
 export const BuiltinSkillNameSchema = z.enum([
   "playwright",
   "frontend-ui-ux",
+  "git-master",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -283,6 +284,12 @@ export const NotificationConfigSchema = z.object({
   force_enable: z.boolean().optional(),
 })
 
+export const GitMasterConfigSchema = z.object({
+  /** Add "Ultraworked with Sisyphus" footer to commit messages (default: true) */
+  commit_footer: z.boolean().default(true),
+  /** Add "Co-authored-by: Sisyphus" trailer to commit messages (default: true) */
+  include_co_authored_by: z.boolean().default(true),
+})
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -302,6 +309,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   ralph_loop: RalphLoopConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
+  git_master: GitMasterConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -323,5 +331,6 @@ export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
 export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
 export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
+export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

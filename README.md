@@ -917,6 +917,7 @@ Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `
 Oh My OpenCode includes built-in skills that provide additional capabilities:
 
 - **playwright**: Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions.
+- **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `sisyphus_task(category='quick', skills=['git-master'], ...)` to save context.
 
 Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
@@ -926,7 +927,25 @@ Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-openc
 }
 ```
 
-Available built-in skills: `playwright`
+Available built-in skills: `playwright`, `git-master`
+
+### Git Master
+
+Configure git-master skill behavior:
+
+```json
+{
+  "git_master": {
+    "commit_footer": true,
+    "include_co_authored_by": true
+  }
+}
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `commit_footer` | `true` | Adds "Ultraworked with Sisyphus" footer to commit messages. |
+| `include_co_authored_by` | `true` | Adds `Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>` trailer to commits. |
 
 ### Sisyphus Agent
 
