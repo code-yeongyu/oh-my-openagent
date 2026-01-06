@@ -22,7 +22,7 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
 export function createFrontendUiUxEngineerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
-  const restrictions = createAgentToolRestrictions(["background_task"])
+  const restrictions = createAgentToolRestrictions([])
 
   return {
     description:
