@@ -18,7 +18,6 @@ export function createMultimodalLookerAgent(
     "write",
     "edit",
     "bash",
-    "background_task",
   ])
 
   return {

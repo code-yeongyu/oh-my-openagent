@@ -16,7 +16,7 @@ export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
 export function createDocumentWriterAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
-  const restrictions = createAgentToolRestrictions(["background_task"])
+  const restrictions = createAgentToolRestrictions([])
 
   return {
     description:
