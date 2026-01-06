@@ -243,6 +243,19 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
       }
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tuiClient = client as any
+        if (tuiClient.tui?.showToast) {
+          tuiClient.tui.showToast({
+            body: {
+              title: "Task Started",
+              message: `"${args.description}" running with ${agentToUse}`,
+              variant: "info",
+              duration: 3000,
+            },
+          }).catch(() => {})
+        }
+
         const createResult = await client.session.create({
           body: {
             parentID: ctx.sessionID,

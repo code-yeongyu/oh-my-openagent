@@ -122,6 +122,19 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tuiClient = this.client as any
+    if (tuiClient.tui?.showToast) {
+      tuiClient.tui.showToast({
+        body: {
+          title: "Background Task Started",
+          message: `"${input.description}" running with ${input.agent}`,
+          variant: "info",
+          duration: 3000,
+        },
+      }).catch(() => {})
+    }
+
     this.client.session.promptAsync({
       path: { id: sessionID },
       body: {

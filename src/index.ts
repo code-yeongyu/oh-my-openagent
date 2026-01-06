@@ -29,6 +29,7 @@ import {
   createTaskResumeInfoHook,
   createStartWorkHook,
   createSisyphusOrchestratorHook,
+  createPrometheusMdOnlyHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -196,6 +197,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const sisyphusOrchestrator = isHookEnabled("sisyphus-orchestrator")
     ? createSisyphusOrchestratorHook(ctx)
+    : null;
+
+  const prometheusMdOnly = isHookEnabled("prometheus-md-only")
+    ? createPrometheusMdOnlyHook(ctx)
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
@@ -451,6 +456,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
+      await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
