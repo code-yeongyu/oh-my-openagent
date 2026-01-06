@@ -104,6 +104,7 @@ export const AgentOverrideConfigSchema = z.object({
   skills: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
+  reasoningEffort: z.enum(["none", "low", "medium", "high", "xhigh"]).optional(),
   prompt: z.string().optional(),
   prompt_append: z.string().optional(),
   tools: z.record(z.string(), z.boolean()).optional(),

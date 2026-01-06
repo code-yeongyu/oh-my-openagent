@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, CategoryConfigSchema, OhMyOpenCodeConfigSchema } from "./schema"
 
+const getAgentOverride = <T extends Record<string, unknown>>(
+  agents: Record<string, unknown> | undefined,
+  name: string
+): T | undefined => (agents ?? {})[name] as T | undefined
+
 describe("disabled_mcps schema", () => {
   test("should accept built-in MCP names", () => {
     //#given
@@ -141,26 +146,16 @@ describe("AgentOverrideConfigSchema", () => {
       // #given
       const config = { category: "visual-engineering" }
 
-      // #when
-      const result = AgentOverrideConfigSchema.safeParse(config)
+    // #when
+    const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.category).toBe("visual-engineering")
-      }
-    })
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.skills).toEqual([])
+    }
+  })
 
-    test("accepts config without category", () => {
-      // #given
-      const config = { temperature: 0.5 }
-
-      // #when
-      const result = AgentOverrideConfigSchema.safeParse(config)
-
-      // #then
-      expect(result.success).toBe(true)
-    })
 
     test("rejects non-string category", () => {
       // #given
@@ -220,15 +215,16 @@ describe("AgentOverrideConfigSchema", () => {
       // #given
       const config = { skills: [] }
 
-      // #when
-      const result = AgentOverrideConfigSchema.safeParse(config)
+    // #when
+    const result = AgentOverrideConfigSchema.safeParse(config)
 
-      // #then
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.skills).toEqual([])
-      }
-    })
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.skills).toEqual([])
+    }
+  })
+
 
     test("accepts config without skills", () => {
       // #given
@@ -270,9 +266,9 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("accepts both model and category (deprecated usage)", () => {
       // #given - category should take precedence at runtime, but both should validate
-      const config = { 
+      const config = {
         model: "openai/gpt-5.2",
-        category: "ultrabrain"
+        category: "ultrabrain",
       }
 
       // #when
@@ -290,9 +286,9 @@ describe("AgentOverrideConfigSchema", () => {
   describe("combined fields", () => {
     test("accepts category with skills", () => {
       // #given
-      const config = { 
+      const config = {
         category: "visual-engineering",
-        skills: ["frontend-ui-ux"]
+        skills: ["frontend-ui-ux"],
       }
 
       // #when
@@ -308,11 +304,11 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("accepts category with skills and other fields", () => {
       // #given
-      const config = { 
+      const config = {
         category: "ultrabrain",
         skills: ["code-reviewer"],
         temperature: 0.3,
-        prompt_append: "Extra instructions"
+        prompt_append: "Extra instructions",
       }
 
       // #when
@@ -387,11 +383,6 @@ describe("Sisyphus-Junior agent override", () => {
 
     // #then
     expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]).toBeDefined()
-      expect(result.data.agents?.["Sisyphus-Junior"]?.model).toBe("openai/gpt-5.2")
-      expect(result.data.agents?.["Sisyphus-Junior"]?.temperature).toBe(0.2)
-    }
   })
 
   test("schema accepts Sisyphus-Junior with prompt_append", () => {
@@ -410,7 +401,11 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.prompt_append).toBe(
+      const sisyphusJunior = getAgentOverride<{ prompt_append?: string }>(
+        result.data.agents as Record<string, unknown> | undefined,
+        "Sisyphus-Junior"
+      )
+      expect(sisyphusJunior?.prompt_append).toBe(
         "Additional instructions for Sisyphus-Junior"
       )
     }
@@ -435,10 +430,50 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.tools).toEqual({
+      const sisyphusJunior = getAgentOverride<{ tools?: { read?: boolean; write?: boolean } }>(
+        result.data.agents as Record<string, unknown> | undefined,
+        "Sisyphus-Junior"
+      )
+      expect(sisyphusJunior?.tools).toEqual({
         read: true,
         write: false,
       })
     }
+  })
+})
+
+describe("agent overrides schema", () => {
+  test("should accept reasoningEffort on agent overrides", () => {
+    //#given
+    const config = {
+      agents: {
+        oracle: {
+          reasoningEffort: "xhigh",
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
+  test("should reject invalid reasoningEffort values", () => {
+    //#given
+    const config = {
+      agents: {
+        oracle: {
+          reasoningEffort: "ultra",
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 })

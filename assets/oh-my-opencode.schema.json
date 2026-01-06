@@ -124,6 +124,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
             "prompt": {
               "type": "string"
             },
@@ -250,6 +260,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
             "prompt": {
               "type": "string"
             },
@@ -375,6 +395,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"
@@ -627,6 +657,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"
@@ -1006,6 +1046,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
             "prompt": {
               "type": "string"
             },
@@ -1131,6 +1181,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"
@@ -1258,6 +1318,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
             "prompt": {
               "type": "string"
             },
@@ -1383,6 +1453,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"
@@ -1510,6 +1590,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
             "prompt": {
               "type": "string"
             },
@@ -1635,6 +1725,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"
@@ -1887,6 +1987,16 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
             "prompt": {
               "type": "string"

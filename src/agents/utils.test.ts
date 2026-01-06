@@ -87,6 +87,19 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.oracle.textVerbosity).toBeUndefined()
   })
 
+  test("Oracle override can set reasoningEffort", () => {
+    // #given
+    const overrides = {
+      oracle: { model: "openai/gpt-5.2", reasoningEffort: "xhigh" },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents.oracle.reasoningEffort).toBe("xhigh")
+  })
+
   test("non-model overrides are still applied after factory rebuild", () => {
     // #given
     const overrides = {
