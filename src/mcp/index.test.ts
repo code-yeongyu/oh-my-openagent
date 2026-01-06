@@ -10,9 +10,10 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     //#then
+    expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(2)
+    expect(Object.keys(result)).toHaveLength(3)
   })
 
   test("should filter out disabled built-in MCPs", () => {
@@ -23,19 +24,21 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     //#then
+    expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(1)
+    expect(Object.keys(result)).toHaveLength(2)
   })
 
-  test("should filter out both built-in MCPs when both disabled", () => {
+  test("should filter out all built-in MCPs when all disabled", () => {
     //#given
-    const disabledMcps = ["context7", "grep_app"]
+    const disabledMcps = ["websearch", "context7", "grep_app"]
 
     //#when
     const result = createBuiltinMcps(disabledMcps)
 
     //#then
+    expect(result).not.toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).not.toHaveProperty("grep_app")
     expect(Object.keys(result)).toHaveLength(0)
@@ -49,9 +52,10 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     //#then
+    expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(1)
+    expect(Object.keys(result)).toHaveLength(2)
   })
 
   test("should handle empty disabled_mcps by default", () => {
@@ -60,9 +64,10 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps()
 
     //#then
+    expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(2)
+    expect(Object.keys(result)).toHaveLength(3)
   })
 
   test("should only filter built-in MCPs, ignoring unknown names", () => {
@@ -73,8 +78,9 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     //#then
+    expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(2)
+    expect(Object.keys(result)).toHaveLength(3)
   })
 })
