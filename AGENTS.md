@@ -86,7 +86,7 @@ oh-my-opencode/
 
 ## AGENT MODELS
 
-| Agent | Model | Purpose |
+| Agent | Default Model | Purpose |
 |-------|-------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
 | oracle | openai/gpt-5.2 | Strategy, code review |
