@@ -60,7 +60,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     expect(limit).toBe(2)
   })
 
-  test("should return Infinity when no config provided", () => {
+  test("should return default 5 when no config provided", () => {
     // #given
     const manager = new ConcurrencyManager()
 
@@ -68,10 +68,10 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
 
     // #then
-    expect(limit).toBe(Infinity)
+    expect(limit).toBe(5)
   })
 
-  test("should return Infinity when config exists but no concurrency settings", () => {
+  test("should return default 5 when config exists but no concurrency settings", () => {
     // #given
     const config: BackgroundTaskConfig = {}
     const manager = new ConcurrencyManager(config)
@@ -80,7 +80,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
 
     // #then
-    expect(limit).toBe(Infinity)
+    expect(limit).toBe(5)
   })
 
   test("should prioritize model-specific over provider-specific over default", () => {
@@ -140,16 +140,17 @@ describe("ConcurrencyManager.acquire/release", () => {
     expect(true).toBe(true)
   })
 
-  test("should allow unlimited acquires when limit is Infinity", async () => {
-    // #given - no config = Infinity limit
+  test("should allow acquires up to default limit of 5", async () => {
+    // #given - no config = default limit of 5
 
     // #when
     await manager.acquire("model-a")
     await manager.acquire("model-a")
     await manager.acquire("model-a")
     await manager.acquire("model-a")
+    await manager.acquire("model-a")
 
-    // #then
+    // #then - all 5 resolved
     expect(true).toBe(true)
   })
 
@@ -251,8 +252,8 @@ describe("ConcurrencyManager.acquire/release", () => {
     expect(true).toBe(true)
   })
 
-  test("should handle release when limit is Infinity", () => {
-    // #given - no config = Infinity limit
+  test("should handle release when no prior acquire", () => {
+    // #given - default config
 
     // #when - release without acquire
     manager.release("model-a")

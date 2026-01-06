@@ -17,7 +17,7 @@ export class ConcurrencyManager {
     if (this.config?.providerConcurrency?.[provider]) {
       return this.config.providerConcurrency[provider]
     }
-    return this.config?.defaultConcurrency ?? Infinity
+    return this.config?.defaultConcurrency ?? 5
   }
 
   async acquire(model: string): Promise<void> {
