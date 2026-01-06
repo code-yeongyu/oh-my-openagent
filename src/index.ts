@@ -126,10 +126,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEmptyTaskResponseDetectorHook(ctx)
     : null;
   const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
-  const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
-    disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
-    keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
-  });
+  const claudeCodeHooks = createClaudeCodeHooksHook(
+    ctx,
+    {
+      disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+      keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
+    },
+    contextCollector
+  );
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery"
   )
@@ -224,7 +228,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
-  const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
+  const backgroundTools = createBackgroundTools();
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
