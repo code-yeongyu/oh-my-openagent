@@ -10,6 +10,8 @@ describe("createSisyphusAgent prompt variants", () => {
     expect(agent.prompt).toContain("## Codex Execution Profile")
     expect(agent.prompt).not.toContain("## Phase 0 - Intent Gate")
     expect(agent.prompt).not.toContain("## Phase 1 - Codebase Assessment")
+    expect(agent.prompt).toContain("background_output block=false")
+    expect(agent.prompt).toContain("Batch related reads/greps")
     expect(agent.prompt).toContain("### Delegation Table:")
     expect(agent.prompt).toContain("### Delegation Prompt Structure")
   })
