@@ -102,7 +102,6 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     "write",
     "edit",
     "task",
-    "background_task",
   ])
 
   const base = {
