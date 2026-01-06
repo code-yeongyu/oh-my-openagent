@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-AI agent definitions for multi-model orchestration. 7 specialized agents: Sisyphus (orchestrator), oracle (strategy), librarian (research), explore (grep), frontend-ui-ux-engineer, document-writer, multimodal-looker.
+AI agent definitions for multi-model orchestration. 7 specialized agents: Sisyphus (orchestrator), oracle (read-only consultation), librarian (research), explore (grep), frontend-ui-ux-engineer, document-writer, multimodal-looker.
 
 ## STRUCTURE
 
@@ -27,7 +27,7 @@ agents/
 | Agent | Default Model | Fallback | Purpose |
 |-------|---------------|----------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | - | Primary orchestrator with extended thinking |
-| oracle | openai/gpt-5.2 | - | Architecture, debugging, code review |
+| oracle | openai/gpt-5.2 | - | Read-only consultation. High-IQ debugging, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | google/gemini-3-flash | Docs, OSS research, GitHub examples |
 | explore | opencode/grok-code | google/gemini-3-flash, anthropic/claude-haiku-4-5 | Fast contextual grep |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | UI/UX code generation |

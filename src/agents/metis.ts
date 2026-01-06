@@ -252,7 +252,7 @@ call_omo_agent(subagent_type="librarian", prompt="Find OSS implementations of Z.
 | \`ast_grep_search\` | Find structural patterns | Refactoring, Build |
 | \`explore\` agent | Codebase pattern discovery | Build, Research |
 | \`librarian\` agent | External docs, best practices | Build, Architecture, Research |
-| \`oracle\` agent | Strategic decisions | Architecture |
+| \`oracle\` agent | Read-only consultation. High-IQ debugging, architecture | Architecture |
 
 ---
 
