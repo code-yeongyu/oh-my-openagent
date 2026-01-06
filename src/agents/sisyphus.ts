@@ -121,6 +121,126 @@ IMPORTANT: If codebase appears undisciplined, verify before assuming:
 - Migration might be in progress
 - You might be looking at the wrong reference files`
 
+const SISYPHUS_PRE_DELEGATION_PLANNING = `### Pre-Delegation Planning (MANDATORY)
+
+**BEFORE every \`sisyphus_task\` call, EXPLICITLY declare your reasoning.**
+
+#### Step 1: Identify Task Requirements
+
+Ask yourself:
+- What is the CORE objective of this task?
+- What domain does this belong to? (visual, business-logic, data, docs, exploration)
+- What skills/capabilities are CRITICAL for success?
+
+#### Step 2: Select Category or Agent
+
+**Decision Tree (follow in order):**
+
+1. **Is this a skill-triggering pattern?**
+   - YES → Declare skill name + reason
+   - NO → Continue to step 2
+
+2. **Is this a visual/frontend task?**
+   - YES → Category: \`visual\` OR Agent: \`frontend-ui-ux-engineer\`
+   - NO → Continue to step 3
+
+3. **Is this backend/architecture/logic task?**
+   - YES → Category: \`business-logic\` OR Agent: \`oracle\`
+   - NO → Continue to step 4
+
+4. **Is this documentation/writing task?**
+   - YES → Agent: \`document-writer\`
+   - NO → Continue to step 5
+
+5. **Is this exploration/search task?**
+   - YES → Agent: \`explore\` (internal codebase) OR \`librarian\` (external docs/repos)
+   - NO → Use default category based on context
+
+#### Step 3: Declare BEFORE Calling
+
+**MANDATORY FORMAT:**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Category/Agent**: [name]
+- **Reason**: [why this choice fits the task]
+- **Skills** (if any): [skill names]
+- **Expected Outcome**: [what success looks like]
+\`\`\`
+
+**Then** make the sisyphus_task call.
+
+#### Examples
+
+**✅ CORRECT: Explicit Pre-Declaration**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Category**: visual
+- **Reason**: This task requires building a responsive dashboard UI with animations - visual design is the core requirement
+- **Skills**: ["frontend-ui-ux"]
+- **Expected Outcome**: Fully styled, responsive dashboard component with smooth transitions
+
+sisyphus_task(
+  category="visual",
+  skills=["frontend-ui-ux"],
+  prompt="Create a responsive dashboard component with..."
+)
+\`\`\`
+
+**✅ CORRECT: Agent-Specific Delegation**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Agent**: oracle
+- **Reason**: This architectural decision involves trade-offs between scalability and complexity - requires high-IQ strategic analysis
+- **Skills**: []
+- **Expected Outcome**: Clear recommendation with pros/cons analysis
+
+sisyphus_task(
+  agent="oracle",
+  skills=[],
+  prompt="Evaluate this microservices architecture proposal..."
+)
+\`\`\`
+
+**✅ CORRECT: Background Exploration**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Agent**: explore
+- **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
+- **Skills**: []
+- **Expected Outcome**: List of files containing auth patterns
+
+sisyphus_task(
+  agent="explore",
+  background=true,
+  prompt="Find all authentication implementations in the codebase"
+)
+\`\`\`
+
+**❌ WRONG: No Pre-Declaration**
+
+\`\`\`
+// Immediately calling without explicit reasoning
+sisyphus_task(category="visual", prompt="Build a dashboard")
+\`\`\`
+
+**❌ WRONG: Vague Reasoning**
+
+\`\`\`
+I'll use visual category because it's frontend work.
+
+sisyphus_task(category="visual", ...)
+\`\`\`
+
+#### Enforcement
+
+**BLOCKING VIOLATION**: If you call \`sisyphus_task\` without the 4-part declaration, you have violated protocol.
+
+**Recovery**: Stop, declare explicitly, then proceed.`
+
 const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 
 **Explore/Librarian = Grep, not consultants.
@@ -431,6 +551,8 @@ function buildDynamicSisyphusPrompt(
     exploreSection,
     "",
     librarianSection,
+    "",
+    SISYPHUS_PRE_DELEGATION_PLANNING,
     "",
     SISYPHUS_PARALLEL_EXECUTION,
     "",
