@@ -22,6 +22,14 @@ import { glob } from "./glob"
 import { slashcommand } from "./slashcommand"
 import { skill } from "./skill"
 import { memoryTools } from "./memory"
+import {
+  session_list,
+  session_read,
+  session_search,
+  session_info,
+} from "./session-manager"
+
+export { sessionExists } from "./session-manager/storage"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { getTmuxPath } from "./interactive-bash/utils"
@@ -82,4 +90,8 @@ export const builtinTools = {
   slashcommand,
   skill,
   ...memoryTools,
+  session_list,
+  session_read,
+  session_search,
+  session_info,
 }
