@@ -28,7 +28,7 @@
 No stupid token consumption massive subagents here. No bloat tools here.
 
 **Certified, Verified, Tested, Actually Useful Harness in Production, after $24,000 worth of tokens spent.**
-**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+**START WITH YOUR ChatGPT, Claude, Gemini, GitHub Copilot SUBSCRIPTIONS. WE ALL COVER THEM.**
 
 
 <div align="center">
@@ -132,7 +132,7 @@ Meet Sisyphus: The Batteries-Included Agent that codes like you.
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
 But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
-**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+**START WITH YOUR ChatGPT, Claude, Gemini, GitHub Copilot SUBSCRIPTIONS. WE ALL COVER THEM.**
 
 - Endlessly extensible. Endlessly customizable.
 - Zero screen flicker.
@@ -250,7 +250,7 @@ follow these steps:
 
 ### Step 0: Ask user about subscriptions
 
-Ask the user these 3 questions to determine CLI options:
+Ask the user these 4 questions to determine CLI options:
 
 1. **Do you have a Claude Pro/Max Subscription?**
    - If **yes**: **Are you on max20 (20x mode)?**
@@ -265,6 +265,10 @@ Ask the user these 3 questions to determine CLI options:
 3. **Will you integrate Gemini models?**
    - If **yes** → `--gemini=yes`
    - If **no** → `--gemini=no`
+
+4. **Do you have GitHub Copilot access?**
+   - If **yes** → `--githubcopilot=yes`
+   - If **no** → `--githubcopilot=no`
 
 ### Step 1: Install OpenCode (if not installed)
 
@@ -285,13 +289,14 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --githubcopilot=<yes|no>
 ```
 
 **Examples:**
-- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
-- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+- User has all subscriptions with max20 and GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --githubcopilot=yes`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --githubcopilot=yes`
+- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --githubcopilot=no`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --githubcopilot=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
@@ -483,13 +488,13 @@ To remove oh-my-opencode:
 
 ### Agents: Your Teammates
 
-- **Sisyphus** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
-- **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`anthropic/claude-sonnet-4-5` or `google/gemini-3-flash`): Multi-repo analysis, doc lookup, implementation examples. Uses Gemini 3 Flash when Antigravity auth is configured, otherwise Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
-- **explore** (`opencode/grok-code`, `google/gemini-3-flash`, or `anthropic/claude-haiku-4-5`): Fast codebase exploration and pattern matching. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code.
-- **frontend-ui-ux-engineer** (`google/gemini-3-pro-high`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
-- **document-writer** (`google/gemini-3-flash`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
-- **multimodal-looker** (`google/gemini-3-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
+- **Sisyphus** (`anthropic/claude-opus-4-5` or `github-copilot/claude-opus-4.5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
+- **oracle** (`openai/gpt-5.2` or `github-copilot/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
+- **librarian** (`anthropic/claude-sonnet-4-5`, `google/gemini-3-flash`, or `github-copilot/claude-haiku-4.5`): Multi-repo analysis, doc lookup, implementation examples. Uses GitHub Copilot Haiku when configured, otherwise Gemini 3 Flash with Antigravity auth or Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
+- **explore** (`opencode/grok-code`, `google/gemini-3-flash`, or `anthropic/claude-haiku-4-5` or `github-copilot/claude-haiku-4.5`): Fast codebase exploration and pattern matching. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, GitHub Copilot Haiku when configured otherwise Grok. Inspired by Claude Code.
+- **frontend-ui-ux-engineer** (`google/gemini-3-pro-high` or `github-copilot/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
+- **document-writer** (`google/gemini-3-flash` or `github-copilot/gemini-3-pro-preview`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
+- **multimodal-looker** (`google/gemini-3-flash` or `github-copilot/gemini-3-flash-preview`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
 
 The main agent invokes these automatically, but you can call them explicitly:
 

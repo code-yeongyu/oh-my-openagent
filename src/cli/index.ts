@@ -23,20 +23,24 @@ program
   .command("install")
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
+  .option("--local", "Install to project-local .opencode directory instead of global config")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--chatgpt <value>", "ChatGPT subscription: no, yes")
   .option("--gemini <value>", "Gemini integration: no, yes")
+  .option("--githubcopilot <value>", "GitHub Copilot access: no, yes")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes
-  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --githubcopilot=yes
+  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --githubcopilot=yes
+  $ bunx oh-my-opencode install --local --no-tui --claude=no --chatgpt=no --gemini=no --githubcopilot=yes
 
 Model Providers:
-  Claude      Required for Sisyphus (main orchestrator) and Librarian agents
-  ChatGPT     Powers the Oracle agent for debugging and architecture
-  Gemini      Powers frontend, documentation, and multimodal agents
+  Claude        Required for Sisyphus (main orchestrator) and Librarian agents
+  ChatGPT       Powers the Oracle agent for debugging and architecture
+  Gemini         Powers frontend, documentation, and multimodal agents
+  GitHub Copilot Built-in OpenCode provider for Claude, GPT, and Gemini models
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -44,7 +48,9 @@ Model Providers:
       claude: options.claude,
       chatgpt: options.chatgpt,
       gemini: options.gemini,
+      githubcopilot: options.githubcopilot,
       skipAuth: options.skipAuth ?? false,
+      local: options.local ?? false,
     }
     const exitCode = await install(args)
     process.exit(exitCode)

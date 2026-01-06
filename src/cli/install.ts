@@ -9,6 +9,7 @@ import {
   addAuthPlugins,
   addProviderConfig,
   detectCurrentConfig,
+  initLocalConfigContext,
 } from "./config-manager"
 
 const SYMBOLS = {
@@ -38,6 +39,7 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
   lines.push(formatProvider("ChatGPT", config.hasChatGPT))
   lines.push(formatProvider("Gemini", config.hasGemini))
+  lines.push(formatProvider("GitHub Copilot", config.hasGitHubCopilot))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -46,14 +48,16 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Agent Configuration")))
   lines.push("")
 
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-  const librarianModel = "glm-4.7-free"
-  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const sisyphusModel = config.hasGitHubCopilot ? "github-copilot/claude-opus-4.5" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const oracleModel = config.hasGitHubCopilot ? "github-copilot/gpt-5.2" : (config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"))
+  const librarianModel = config.hasGitHubCopilot ? "github-copilot/claude-haiku-4.5" : "glm-4.7-free"
+  const exploreModel = config.hasGitHubCopilot ? "github-copilot/claude-haiku-4.5" : (config.hasGemini ? "google/antigravity-gemini-3-flash" : (config.hasClaude && config.isMax20 ? "anthropic/claude-haiku-4-5" : "opencode/grok-code"))
+  const frontendModel = config.hasGitHubCopilot ? "github-copilot/gemini-3-pro-preview" : (config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"))
 
   lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Librarian    ${SYMBOLS.arrow} ${color.cyan(librarianModel)}`)
+  lines.push(`  ${SYMBOLS.bullet} Explore      ${SYMBOLS.arrow} ${color.cyan(exploreModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Frontend     ${SYMBOLS.arrow} ${color.cyan(frontendModel)}`)
 
   return lines.join("\n")
@@ -130,6 +134,12 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
   }
 
+  if (args.githubcopilot === undefined) {
+    errors.push("--githubcopilot is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.githubcopilot)) {
+    errors.push(`Invalid --githubcopilot value: ${args.githubcopilot} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -139,10 +149,11 @@ function argsToConfig(args: InstallArgs): InstallConfig {
     isMax20: args.claude === "max20",
     hasChatGPT: args.chatgpt === "yes",
     hasGemini: args.gemini === "yes",
+    hasGitHubCopilot: args.githubcopilot === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg; githubcopilot: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -152,6 +163,7 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
     claude,
     chatgpt: detected.hasChatGPT ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
+    githubcopilot: detected.hasGitHubCopilot ? "yes" : "no",
   }
 }
 
@@ -201,11 +213,26 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
+  const githubcopilot = await p.select({
+    message: "Do you have GitHub Copilot access?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Agents will use provider models" },
+      { value: "yes" as const, label: "Yes", hint: "Use GitHub Copilot models via GitHub provider" },
+    ],
+    initialValue: initial.githubcopilot,
+  })
+
+  if (p.isCancel(githubcopilot)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
     hasChatGPT: chatgpt === "yes",
     hasGemini: gemini === "yes",
+    hasGitHubCopilot: githubcopilot === "yes",
   }
 }
 
@@ -218,9 +245,13 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes>")
+    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes> --githubcopilot=<no|yes>")
     console.log()
     return 1
+  }
+
+  if (args.local) {
+    initLocalConfigContext()
   }
 
   const detected = detectCurrentConfig()
@@ -244,7 +275,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    printInfo(`Current config: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    printInfo(`Current config: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}, GitHub Copilot=${initial.githubcopilot}`)
   }
 
   const config = argsToConfig(args)
@@ -257,7 +288,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   }
   printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini || config.hasChatGPT || config.hasGitHubCopilot) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -287,11 +318,11 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasGitHubCopilot) {
     printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasGitHubCopilot) && !args.skipAuth) {
     console.log(color.bold("Next Steps - Authenticate your providers:"))
     console.log()
     if (config.hasClaude) {
@@ -302,6 +333,9 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     }
     if (config.hasGemini) {
       console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
+    }
+    if (config.hasGitHubCopilot) {
+      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select GitHub → GitHub Copilot)")}`)
     }
     console.log()
   }
@@ -331,6 +365,10 @@ export async function install(args: InstallArgs): Promise<number> {
     return runNonTuiInstall(args)
   }
 
+  if (args.local) {
+    initLocalConfigContext()
+  }
+
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
 
@@ -338,7 +376,7 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    p.log.info(`Existing configuration detected: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    p.log.info(`Existing configuration detected: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}, GitHub Copilot=${initial.githubcopilot}`)
   }
 
   const s = p.spinner()
@@ -368,7 +406,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini || config.hasChatGPT || config.hasGitHubCopilot) {
     s.start("Adding auth plugins (fetching latest versions)")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -397,13 +435,13 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasGitHubCopilot) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasGitHubCopilot) && !args.skipAuth) {
     const steps: string[] = []
     if (config.hasClaude) {
       steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
@@ -413,6 +451,9 @@ export async function install(args: InstallArgs): Promise<number> {
     }
     if (config.hasGemini) {
       steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
+    }
+    if (config.hasGitHubCopilot) {
+      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select GitHub → GitHub Copilot)")}`)
     }
     p.note(steps.join("\n"), "Next Steps - Authenticate your providers")
   }

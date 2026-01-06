@@ -14,19 +14,39 @@ interface ConfigContext {
   binary: OpenCodeBinaryType
   version: string | null
   paths: OpenCodeConfigPaths
+  isLocal: boolean
 }
 
 let configContext: ConfigContext | null = null
 
 export function initConfigContext(binary: OpenCodeBinaryType, version: string | null): void {
+  if (configContext?.isLocal) {
+    return
+  }
   const paths = getOpenCodeConfigPaths({ binary, version })
-  configContext = { binary, version, paths }
+  configContext = { binary, version, paths, isLocal: false }
+}
+
+export function initLocalConfigContext(directory: string = process.cwd()): void {
+  const localDir = join(directory, ".opencode")
+  configContext = {
+    binary: "opencode",
+    version: null,
+    paths: {
+      configDir: localDir,
+      configJson: join(localDir, "opencode.json"),
+      configJsonc: join(localDir, "opencode.jsonc"),
+      packageJson: join(localDir, "package.json"),
+      omoConfig: join(localDir, "oh-my-opencode.json"),
+    },
+    isLocal: true,
+  }
 }
 
 export function getConfigContext(): ConfigContext {
   if (!configContext) {
     const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
-    configContext = { binary: "opencode", version: null, paths }
+    configContext = { binary: "opencode", version: null, paths, isLocal: false }
   }
   return configContext
 }
@@ -273,37 +293,47 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
 
   const agents: Record<string, Record<string, unknown>> = {}
 
-  if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
-  }
-
-  agents["librarian"] = { model: "opencode/glm-4.7-free" }
-
-  // Gemini models use `antigravity-` prefix for explicit Antigravity quota routing
-  // @see ANTIGRAVITY_PROVIDER_CONFIG comments for rationale
-  if (installConfig.hasGemini) {
-    agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
-  } else if (installConfig.hasClaude && installConfig.isMax20) {
-    agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
+  if (installConfig.hasGitHubCopilot) {
+    agents["Sisyphus"] = { model: "github-copilot/claude-opus-4.5" }
+    agents["librarian"] = { model: "github-copilot/claude-haiku-4.5" }
+    agents["explore"] = { model: "github-copilot/claude-haiku-4.5" }
+    agents["oracle"] = { model: "github-copilot/gpt-5.2" }
+    agents["frontend-ui-ux-engineer"] = { model: "github-copilot/gemini-3-pro-preview" }
+    agents["document-writer"] = { model: "github-copilot/gemini-3-pro-preview" }
+    agents["multimodal-looker"] = { model: "github-copilot/gemini-3-flash-preview" }
   } else {
-    agents["explore"] = { model: "opencode/glm-4.7-free" }
-  }
-
-  if (!installConfig.hasChatGPT) {
-    agents["oracle"] = {
-      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
+    if (!installConfig.hasClaude) {
+      agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
     }
-  }
 
-  if (installConfig.hasGemini) {
-    agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
-    agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
-    agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
-  } else {
-    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
-    agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
-    agents["document-writer"] = { model: fallbackModel }
-    agents["multimodal-looker"] = { model: fallbackModel }
+    agents["librarian"] = { model: "opencode/glm-4.7-free" }
+
+    // Gemini models use `antigravity-` prefix for explicit Antigravity quota routing
+    // @see ANTIGRAVITY_PROVIDER_CONFIG comments for rationale
+    if (installConfig.hasGemini) {
+      agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
+    } else if (installConfig.hasClaude && installConfig.isMax20) {
+      agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
+    } else {
+      agents["explore"] = { model: "opencode/glm-4.7-free" }
+    }
+
+    if (!installConfig.hasChatGPT) {
+      agents["oracle"] = {
+        model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
+      }
+    }
+
+    if (installConfig.hasGemini) {
+      agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
+      agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
+      agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
+    } else {
+      const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
+      agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
+      agents["document-writer"] = { model: fallbackModel }
+      agents["multimodal-looker"] = { model: fallbackModel }
+    }
   }
 
   if (Object.keys(agents).length > 0) {
@@ -645,6 +675,7 @@ export function detectCurrentConfig(): DetectedConfig {
     isMax20: true,
     hasChatGPT: true,
     hasGemini: false,
+    hasGitHubCopilot: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -690,6 +721,11 @@ export function detectCurrentConfig(): DetectedConfig {
     }
 
     const agents = omoConfig.agents ?? {}
+
+    // Detect GitHub Copilot - check if any agent uses github-copilot/ models
+    result.hasGitHubCopilot = Object.values(agents).some(
+      (agent) => typeof agent === "object" && agent !== null && "model" in agent && String(agent.model).startsWith("github-copilot/")
+    )
 
     if (agents["Sisyphus"]?.model === "opencode/glm-4.7-free") {
       result.hasClaude = false
