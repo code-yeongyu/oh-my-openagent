@@ -85,7 +85,10 @@ describe("formatTable", () => {
 
     // #then
     const lines = result.split("\n")
+    expect(lines[0]).toBe("| Status |")
     expect(lines[1]).toBe("| :----: |")
+    expect(lines[2]).toBe("|   OK   |")
+    expect(lines[3]).toBe("| ERROR  |")
   })
 
   test("should handle CJK characters with correct width", () => {
@@ -109,6 +112,30 @@ describe("formatTable", () => {
     const lines = result.split("\n")
     expect(lines[2]).toBe("| 张三 | Active   |")
     expect(lines[3]).toBe("| John | Inactive |")
+  })
+
+  test("should handle rows with fewer cells than headers", () => {
+    // #given
+    const table: ParsedTable = {
+      startIndex: 0,
+      endIndex: 0,
+      original: "",
+      headers: ["A", "B", "C"],
+      alignments: ["left", "left", "left"],
+      rows: [
+        ["1", "2"],
+        ["x"],
+      ],
+    }
+
+    // #when
+    const result = formatTable(table)
+
+    // #then
+    const lines = result.split("\n")
+    expect(lines[0]).toBe("| A | B | C |")
+    expect(lines[2]).toBe("| 1 | 2 |   |")
+    expect(lines[3]).toBe("| x |   |   |")
   })
 })
 

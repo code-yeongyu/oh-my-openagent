@@ -132,5 +132,6 @@ without any tables`
     // #then
     expect(tables).toHaveLength(1)
     expect(tables[0].rows[0]).toEqual(["🎉", "Party"])
+    expect(tables[0].rows[1]).toEqual(["👨‍👩‍👧", "Family"])
   })
 })

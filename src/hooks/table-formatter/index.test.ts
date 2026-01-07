@@ -47,13 +47,13 @@ describe("createTableFormatterHook", () => {
 
 | A | B |
 |---|---|
-| 1 | 2 |
+| 111 | 2 |
 
 Second table:
 
 | X | Y |
 |---|---|
-| a | b |`,
+| a | bbb |`,
     }
 
     // #when
@@ -63,8 +63,10 @@ Second table:
     )
 
     // #then
-    expect(output.text).toContain("| A | B |")
-    expect(output.text).toContain("| X | Y |")
+    expect(output.text).toContain("| A   | B |")
+    expect(output.text).toContain("| 111 | 2 |")
+    expect(output.text).toContain("| X | Y   |")
+    expect(output.text).toContain("| a | bbb |")
   })
 
   test("should handle CJK characters correctly", async () => {
@@ -83,9 +85,10 @@ Second table:
       output
     )
 
-    // #then
-    expect(output.text).toContain("FP 발생")
-    expect(output.text).toContain("Perfect")
+    // #then - verify padding occurred (KR padded to width of KR1/KR5, Status column aligned)
+    expect(output.text).toContain("| KR  | Status  |")
+    expect(output.text).toContain("| KR1 | FP 발생 |")
+    expect(output.text).toContain("| KR5 | Perfect |")
   })
 
   test("should handle emoji correctly", async () => {
@@ -94,7 +97,8 @@ Second table:
     const output = {
       text: `| Status | Desc |
 |---|---|
-| ✅ Perfect | good |`,
+| ✅ Perfect | good |
+| ❌ Fail | bad |`,
     }
 
     // #when
@@ -103,7 +107,9 @@ Second table:
       output
     )
 
-    // #then
-    expect(output.text).toContain("✅ Perfect")
+    // #then - verify emoji width handling and padding
+    expect(output.text).toContain("| Status     | Desc |")
+    expect(output.text).toContain("| ✅ Perfect | good |")
+    expect(output.text).toContain("| ❌ Fail    | bad  |")
   })
 })
