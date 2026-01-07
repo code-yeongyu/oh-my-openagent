@@ -238,6 +238,11 @@ export const BackgroundTaskConfigSchema = z.object({
   modelConcurrency: z.record(z.string(), z.number().min(1)).optional(),
 })
 
+export const NotificationConfigSchema = z.object({
+  /** Force enable session-notification even if external notification plugins are detected (default: false) */
+  force_enable: z.boolean().optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -255,6 +260,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
+  notification: NotificationConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -272,5 +278,6 @@ export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningCo
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
+export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
