@@ -216,18 +216,17 @@ export interface ParsedOAuthError {
  * Multi-account support types
  */
 
+/** All model families for rate limit tracking */
+export const MODEL_FAMILIES = ["claude", "gemini-flash", "gemini-pro"] as const
+
 /** Model family for rate limit tracking */
-export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro"
+export type ModelFamily = (typeof MODEL_FAMILIES)[number]
 
 /** Account tier for prioritization */
 export type AccountTier = "free" | "paid"
 
 /** Rate limit state per model family (Unix timestamps in ms) */
-export interface RateLimitState {
-  claude?: number
-  "gemini-flash"?: number
-  "gemini-pro"?: number
-}
+export type RateLimitState = Partial<Record<ModelFamily, number>>
 
 /** Account metadata for storage */
 export interface AccountMetadata {

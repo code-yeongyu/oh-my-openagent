@@ -96,6 +96,8 @@ describe("storage", () => {
       } finally {
         if (originalXdg !== undefined) {
           process.env.XDG_DATA_HOME = originalXdg
+        } else {
+          delete process.env.XDG_DATA_HOME
         }
       }
     })

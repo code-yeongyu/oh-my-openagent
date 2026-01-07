@@ -224,7 +224,18 @@ async function attemptFetch(
 
       if (response.status === 429) {
         const retryAfter = response.headers.get("retry-after")
-        const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000
+        let retryAfterMs = 60000
+        if (retryAfter) {
+          const parsed = parseInt(retryAfter, 10)
+          if (!isNaN(parsed) && parsed > 0) {
+            retryAfterMs = parsed * 1000
+          } else {
+            const httpDate = Date.parse(retryAfter)
+            if (!isNaN(httpDate)) {
+              retryAfterMs = Math.max(0, httpDate - Date.now())
+            }
+          }
+        }
         debugLog(`[429] Rate limited, retry-after: ${retryAfterMs}ms`)
         return { type: "rate-limited" as const, retryAfterMs, status: 429 }
       }
@@ -385,6 +396,7 @@ export function createAntigravityFetch(
 ): (url: string, init?: RequestInit) => Promise<Response> {
   let cachedTokens: AntigravityTokens | null = null
   let cachedProjectId: string | null = null
+  let lastAccountIndex: number | null = null
   const fetchInstanceId = crypto.randomUUID()
   let manager: AccountManager | null = accountManager || null
   let accountsLoaded = false
@@ -420,6 +432,13 @@ export function createAntigravityFetch(
 
       if (currentAccount) {
         debugLog(`[ACCOUNTS] Using account ${currentAccount.index + 1}/${manager.getAccountCount()} for ${family}`)
+
+        // Clear cached project ID when account changes
+        if (lastAccountIndex !== null && lastAccountIndex !== currentAccount.index) {
+          debugLog(`[ACCOUNTS] Account changed from ${lastAccountIndex + 1} to ${currentAccount.index + 1}, clearing cached project ID`)
+          cachedProjectId = null
+        }
+        lastAccountIndex = currentAccount.index
 
         if (currentAccount.access && currentAccount.expires) {
           auth.access = currentAccount.access
@@ -663,27 +682,8 @@ export function createAntigravityFetch(
             }
           }
 
-          const isServerError = rateLimitInfo.status >= 500
-          debugLog(`[RATE-LIMIT] No alternative account available, returning ${rateLimitInfo.status}`)
-          return new Response(
-            JSON.stringify({
-              error: {
-                message: isServerError
-                  ? `Server error (${rateLimitInfo.status}). Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`
-                  : `Rate limited. Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`,
-                type: isServerError ? "server_error" : "rate_limit",
-                code: isServerError ? "server_error" : "rate_limited",
-              },
-            }),
-            {
-              status: rateLimitInfo.status,
-              statusText: isServerError ? "Server Error" : "Too Many Requests",
-              headers: {
-                "Content-Type": "application/json",
-                "Retry-After": String(Math.ceil(rateLimitInfo.retryAfterMs / 1000)),
-              },
-            }
-          )
+          debugLog(`[RATE-LIMIT] No alternative account available, trying next endpoint`)
+          continue
         }
 
         if (response && response instanceof Response) {

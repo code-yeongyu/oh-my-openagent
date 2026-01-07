@@ -1,12 +1,13 @@
 import { saveAccounts } from "./storage"
 import { parseStoredToken, formatTokenForStorage } from "./token"
-import type {
-  AccountStorage,
-  AccountMetadata,
-  AccountTier,
-  AntigravityRefreshParts,
-  ModelFamily,
-  RateLimitState,
+import {
+  MODEL_FAMILIES,
+  type AccountStorage,
+  type AccountMetadata,
+  type AccountTier,
+  type AntigravityRefreshParts,
+  type ModelFamily,
+  type RateLimitState,
 } from "./types"
 
 export interface ManagedAccount {
@@ -62,8 +63,8 @@ export class AccountManager {
           projectId: acc.projectId,
           managedProjectId: acc.managedProjectId,
         },
-        access: index === validActiveIndex ? auth.access : undefined,
-        expires: index === validActiveIndex ? auth.expires : undefined,
+        access: index === validActiveIndex ? auth.access : acc.accessToken,
+        expires: index === validActiveIndex ? auth.expires : acc.expiresAt,
         rateLimits: acc.rateLimits ?? {},
         lastUsed: 0,
         email: acc.email,
@@ -152,14 +153,10 @@ export class AccountManager {
 
   clearExpiredRateLimits(account: ManagedAccount): void {
     const now = Date.now()
-    if (account.rateLimits.claude !== undefined && now >= account.rateLimits.claude) {
-      delete account.rateLimits.claude
-    }
-    if (account.rateLimits["gemini-flash"] !== undefined && now >= account.rateLimits["gemini-flash"]) {
-      delete account.rateLimits["gemini-flash"]
-    }
-    if (account.rateLimits["gemini-pro"] !== undefined && now >= account.rateLimits["gemini-pro"]) {
-      delete account.rateLimits["gemini-pro"]
+    for (const family of MODEL_FAMILIES) {
+      if (account.rateLimits[family] !== undefined && now >= account.rateLimits[family]!) {
+        delete account.rateLimits[family]
+      }
     }
   }
 

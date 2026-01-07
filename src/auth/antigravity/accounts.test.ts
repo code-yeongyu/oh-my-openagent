@@ -120,12 +120,12 @@ describe("AccountManager", () => {
       expect(current?.parts.refreshToken).toBe("single-refresh")
     })
 
-    it("should set access and expires only on active account from stored accounts", () => {
+    it("should use auth tokens for active account and restore stored tokens for others", () => {
       // #given
       const storedAccounts = createMockAccountStorage(
         [
-          createMockAccountMetadata({ email: "user1@example.com" }),
-          createMockAccountMetadata({ email: "user2@example.com" }),
+          createMockAccountMetadata({ email: "user1@example.com", accessToken: "stored-token-1" }),
+          createMockAccountMetadata({ email: "user2@example.com", accessToken: "stored-token-2" }),
         ],
         1
       )
@@ -136,7 +136,7 @@ describe("AccountManager", () => {
 
       // #then
       const accounts = manager.getAccounts()
-      expect(accounts[0]?.access).toBeUndefined()
+      expect(accounts[0]?.access).toBe("stored-token-1")
       expect(accounts[1]?.access).toBe("access-token")
     })
   })

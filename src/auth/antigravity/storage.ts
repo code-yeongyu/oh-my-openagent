@@ -31,10 +31,14 @@ export async function loadAccounts(path?: string): Promise<AccountStorage | null
 
     return data
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    const errorCode = (error as NodeJS.ErrnoException).code
+    if (errorCode === "ENOENT") {
       return null
     }
-    return null
+    if (error instanceof SyntaxError) {
+      return null
+    }
+    throw error
   }
 }
 
@@ -44,7 +48,9 @@ export async function saveAccounts(storage: AccountStorage, path?: string): Prom
   await fs.mkdir(dirname(storagePath), { recursive: true })
 
   const content = JSON.stringify(storage, null, 2)
-  await fs.writeFile(storagePath, content, { encoding: "utf-8", mode: 0o600 })
+  const tempPath = `${storagePath}.tmp.${process.pid}`
+  await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 })
+  await fs.rename(tempPath, storagePath)
 }
 
 function isValidAccountStorage(data: unknown): data is AccountStorage {
