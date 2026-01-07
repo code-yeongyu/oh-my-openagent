@@ -385,12 +385,17 @@ export function createSisyphusOrchestratorHook(
 
         log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
+        // Read boulder state FIRST to check if this session is part of an active boulder
+        const boulderState = readBoulderState(ctx.directory)
+        const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
+
         const mainSessionID = getMainSessionID()
         const isMainSession = sessionID === mainSessionID
         const isBackgroundTaskSession = subagentSessions.has(sessionID)
 
-        if (mainSessionID && !isMainSession && !isBackgroundTaskSession) {
-          log(`[${HOOK_NAME}] Skipped: not main or background task session`, { sessionID })
+        // Allow continuation if: main session OR background task OR boulder session
+        if (mainSessionID && !isMainSession && !isBackgroundTaskSession && !isBoulderSession) {
+          log(`[${HOOK_NAME}] Skipped: not main, background task, or boulder session`, { sessionID })
           return
         }
 
@@ -411,7 +416,7 @@ export function createSisyphusOrchestratorHook(
           return
         }
 
-        const boulderState = readBoulderState(ctx.directory)
+
         if (!boulderState) {
           log(`[${HOOK_NAME}] No active boulder`, { sessionID })
           return
