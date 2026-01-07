@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promises as fs } from "node:fs"
-import { AccountManager } from "./accounts"
+import { AccountManager, type ManagedAccount } from "./accounts"
 import type {
   AccountStorage,
   AccountMetadata,
@@ -711,15 +711,3 @@ describe("AccountManager", () => {
     })
   })
 })
-
-// Type import for test
-interface ManagedAccount {
-  index: number
-  parts: AntigravityRefreshParts
-  access?: string
-  expires?: number
-  rateLimits: RateLimitState
-  lastUsed: number
-  email?: string
-  tier?: AccountTier
-}
