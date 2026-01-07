@@ -1,6 +1,6 @@
 import type { ParsedTable } from "./types"
 
-const TABLE_ROW_REGEX = /^\|(.+)\|$/
+const TABLE_ROW_REGEX = /^\s*\|(.+)\|\s*$/
 
 function parseAlignment(cell: string): "left" | "center" | "right" {
   const trimmed = cell.trim()
