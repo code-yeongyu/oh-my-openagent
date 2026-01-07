@@ -72,11 +72,13 @@ export function formatTable(table: ParsedTable): string {
   const separatorRow = `| ${separators.join(" | ")} |`
 
   const formattedRows = rows.map((row) => {
-    const formattedCells = row.map((cell, col) => {
-      const width = columnWidths[col] ?? stringWidth(cell)
+    const formattedCells: string[] = []
+    for (let col = 0; col < columnCount; col++) {
+      const cell = row[col] ?? ""
+      const width = columnWidths[col]
       const alignment = alignments[col] ?? "left"
-      return padCell(cell, width, alignment)
-    })
+      formattedCells.push(padCell(cell, width, alignment))
+    }
     return `| ${formattedCells.join(" | ")} |`
   })
 
