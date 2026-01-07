@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-22 lifecycle hooks intercepting/modifying agent behavior. Context injection, error recovery, output control, notifications.
+23 lifecycle hooks intercepting/modifying agent behavior. Context injection, error recovery, output control, notifications.
 
 ## STRUCTURE
 
@@ -26,6 +26,7 @@ hooks/
 ├── ralph-loop/                 # Self-referential dev loop
 ├── rules-injector/             # Conditional rules from .claude/rules/
 ├── session-recovery/           # Recover from errors (430 lines)
+├── table-formatter/            # Format markdown tables with proper column alignment
 ├── think-mode/                 # Auto-detect thinking triggers
 ├── agent-usage-reminder/       # Remind to use specialists
 ├── context-window-monitor.ts   # Monitor usage (standalone)

@@ -26,6 +26,7 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createTableFormatterHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -168,6 +169,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
+    : null;
+
+  const tableFormatter = isHookEnabled("table-formatter")
+    ? createTableFormatterHook()
     : null;
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -337,6 +342,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         "experimental.chat.messages.transform"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ]?.(input, output as any);
+    },
+
+    "experimental.text.complete": async (
+      input: { sessionID: string; messageID: string; partID: string },
+      output: { text: string }
+    ) => {
+      await tableFormatter?.["experimental.text.complete"]?.(input, output);
     },
 
     config: configHandler,

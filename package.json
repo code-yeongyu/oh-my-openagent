@@ -64,6 +64,7 @@
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
+    "string-width": "^8.1.0",
     "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
   },

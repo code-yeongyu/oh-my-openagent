@@ -75,6 +75,7 @@ export const HookNameSchema = z.enum([
   "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
+  "table-formatter",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
