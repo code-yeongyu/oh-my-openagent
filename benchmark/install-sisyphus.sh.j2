@@ -18,10 +18,11 @@ bun install -g opencode-ai@latest
 {% endif %}
 
 # Install oh-my-opencode plugin (provides Sisyphus agent)
+# --claude=no uses opencode/zen provider (free) instead of Anthropic
 {% if omo_version %}
-bunx oh-my-opencode@{{ omo_version }} install --no-tui --claude=yes --chatgpt=no --gemini=no
+bunx oh-my-opencode@{{ omo_version }} install --no-tui --claude=no --chatgpt=no --gemini=no
 {% else %}
-bunx oh-my-opencode@latest install --no-tui --claude=yes --chatgpt=no --gemini=no
+bunx oh-my-opencode@latest install --no-tui --claude=no --chatgpt=no --gemini=no
 {% endif %}
 
 opencode --version
