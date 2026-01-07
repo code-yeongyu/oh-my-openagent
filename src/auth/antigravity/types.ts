@@ -211,3 +211,44 @@ export interface ParsedOAuthError {
   code?: string
   description?: string
 }
+
+/**
+ * Multi-account support types
+ */
+
+/** Model family for rate limit tracking */
+export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro"
+
+/** Account tier for prioritization */
+export type AccountTier = "free" | "paid"
+
+/** Rate limit state per model family (Unix timestamps in ms) */
+export interface RateLimitState {
+  claude?: number
+  "gemini-flash"?: number
+  "gemini-pro"?: number
+}
+
+/** Account metadata for storage */
+export interface AccountMetadata {
+  email: string
+  tier: AccountTier
+  refreshToken: string
+  projectId: string
+  managedProjectId?: string
+  accessToken: string
+  expiresAt: number
+  rateLimits: RateLimitState
+}
+
+/** Storage schema for persisting multiple accounts */
+export interface AccountStorage {
+  version: number
+  accounts: AccountMetadata[]
+  activeIndex: number
+}
+
+/** Runtime account state extends metadata */
+export interface ManagedAccount extends AccountMetadata {
+  // Runtime fields can be added here if needed
+}
