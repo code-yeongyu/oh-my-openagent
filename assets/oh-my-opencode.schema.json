@@ -1687,6 +1687,14 @@
           }
         }
       }
+    },
+    "notification": {
+      "type": "object",
+      "properties": {
+        "force_enable": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
