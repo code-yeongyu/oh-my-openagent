@@ -33,6 +33,7 @@ interface SessionState {
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
   countdownStartedAt?: number
+  abortDetectedAt?: number
 }
 
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
@@ -253,6 +254,13 @@ export function createTodoContinuationEnforcer(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
+      const error = props?.error as { name?: string } | undefined
+      if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
+        const state = getState(sessionID)
+        state.abortDetectedAt = Date.now()
+        log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
+      }
+
       cancelCountdown(sessionID)
       log(`[${HOOK_NAME}] session.error`, { sessionID })
       return
@@ -280,6 +288,18 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 1: Event-based abort detection (primary, most reliable)
+      if (state.abortDetectedAt) {
+        const timeSinceAbort = Date.now() - state.abortDetectedAt
+        const ABORT_WINDOW_MS = 3000
+        if (timeSinceAbort < ABORT_WINDOW_MS) {
+          log(`[${HOOK_NAME}] Skipped: abort detected via event ${timeSinceAbort}ms ago`, { sessionID })
+          state.abortDetectedAt = undefined
+          return
+        }
+        state.abortDetectedAt = undefined
+      }
+
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -289,6 +309,7 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 2: API-based abort detection (fallback, for cases where event was missed)
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
@@ -297,7 +318,7 @@ export function createTodoContinuationEnforcer(
         const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
 
         if (isLastAssistantMessageAborted(messages)) {
-          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted`, { sessionID })
+          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
           return
         }
       } catch (err) {
@@ -344,10 +365,13 @@ export function createTodoContinuationEnforcer(
             return
           }
         }
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
 
       if (role === "assistant") {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
@@ -359,6 +383,8 @@ export function createTodoContinuationEnforcer(
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
@@ -367,6 +393,8 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
