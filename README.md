@@ -169,7 +169,7 @@ fi
 ### Step 3: Verify Setup
 
 ```bash
-opencode --version  # Should be 1.0.132 or higher
+opencode --version  # Should be 1.1.1 or higher
 cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
 ```
 
@@ -264,6 +264,7 @@ The plugin works perfectly with defaults. Aside from the recommended `google_aut
 ### Agents: Your Teammates
 
 - **OmO** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
+- **Sisyphus** (`anthropic/claude-opus-4-5`): **Experimental senior orchestrator.** Plans obsessively with todos, delegates strategically to specialists. Designed for complex multi-phase projects. Enable via config: `"sisyphus_agent": { "enabled": true }`.
 - **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
 - **librarian** (`anthropic/claude-sonnet-4-5`): Multi-repo analysis, doc lookup, implementation examples. Uses Claude Sonnet 4.5 for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
 - **explore** (`opencode/grok-code`): Fast codebase exploration and pattern matching. Claude Code uses Haiku; we use Grok—it's free, blazing fast, and plenty smart for file traversal. Inspired by Claude Code.
@@ -462,6 +463,8 @@ When agents thrive, you thrive. But I want to help you directly too.
 - **Todo Continuation Enforcer**: Makes agents finish all TODOs before stopping. Kills the chronic LLM habit of quitting halfway.
 - **Comment Checker**: LLMs love comments. Too many comments. This reminds them to cut the noise. Smartly ignores valid patterns (BDD, directives, docstrings) and demands justification for the rest. Clean code wins.
 - **Think Mode**: Auto-detects when extended thinking is needed and switches modes. Catches phrases like "think deeply" or "ultrathink" and dynamically adjusts model settings for maximum reasoning.
+- **Preemptive Compaction**: Automatically triggers session compaction at 70%+ context usage (customizable). Preserves critical state (original requests, goals, work completed) via Compaction Context Injector.
+- **Session History Manager**: New `session-manager` toolset for searching, reading, and analyzing historical sessions across the workspace.
 - **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/).
   - At 70%+ usage, reminds agents there's still headroom—prevents rushed, sloppy work.
 - **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
@@ -561,7 +564,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+Available agents: `sisyphus`, `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
 
 ### OmO Agent
 
@@ -601,6 +604,28 @@ You can also customize OmO and OmO-Plan like other agents:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `disabled` | `false` | When `true`, disables OmO agents and restores original build/plan as primary. When `false` (default), OmO and OmO-Plan become primary agents. |
+
+### Experimental Features
+
+Enable and tune experimental capabilities:
+
+```json
+{
+  "experimental": {
+    "preemptive_compaction": true,
+    "threshold": 0.75,
+    "dcp": "enabled",
+    "auto_resume": true
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `preemptive_compaction` | `false` | Enable proactive session compaction before hitting limits |
+| `threshold` | `0.7` | Context usage ratio (0.0-1.0) to trigger compaction |
+| `dcp` | `"disabled"` | "enabled" to use Deep Context Preservation during compaction |
+| `auto_resume` | `false` | Automatically resume session from compacted state |
 
 ### Hooks
 
@@ -779,6 +804,7 @@ I have no affiliation with any project or model mentioned here. This is purely p
 
 - Productivity might spike too hard. Don't let your coworker notice.
   - Actually, I'll spread the word. Let's see who wins.
+- Requires **OpenCode 1.1.1 or higher**.
 - If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
   - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
     - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.

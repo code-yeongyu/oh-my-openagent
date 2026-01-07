@@ -262,6 +262,7 @@ opencode auth login
 ### Agents: 당신의 새로운 팀원들
 
 - **OmO** (`anthropic/claude-opus-4-5`): **기본 에이전트입니다.** OpenCode를 위한 강력한 AI 오케스트레이터입니다. 전문 서브에이전트를 활용하여 복잡한 작업을 계획, 위임, 실행합니다. 백그라운드 태스크 위임과 todo 기반 워크플로우를 강조합니다. 최대 추론 능력을 위해 Claude Opus 4.5와 확장된 사고(32k 버짓)를 사용합니다.
+- **Sisyphus** (`anthropic/claude-opus-4-5`): **실험적 시니어 오케스트레이터.** Todo를 집요하게 계획하고, 전문가에게 전략적으로 위임합니다. 복잡한 다단계 프로젝트를 위해 설계되었습니다. 설정으로 활성화: `"sisyphus_agent": { "enabled": true }`.
 - **oracle** (`openai/gpt-5.2`): 아키텍처, 코드 리뷰, 전략 수립을 위한 전문가 조언자. GPT-5.2의 뛰어난 논리적 추론과 깊은 분석 능력을 활용합니다. AmpCode 에서 영감을 받았습니다.
 - **librarian** (`anthropic/claude-sonnet-4-5`): 멀티 레포 분석, 문서 조회, 구현 예제 담당. Claude Sonnet 4.5를 사용하여 깊은 코드베이스 이해와 GitHub 조사, 근거 기반의 답변을 제공합니다. AmpCode 에서 영감을 받았습니다.
 - **explore** (`opencode/grok-code`): 빠른 코드베이스 탐색, 파일 패턴 매칭. Claude Code는 Haiku를 쓰지만, 우리는 Grok을 씁니다. 현재 무료이고, 극도로 빠르며, 파일 탐색 작업에 충분한 지능을 갖췄기 때문입니다. Claude Code 에서 영감을 받았습니다.

@@ -79,10 +79,10 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (OmO, Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker, context-learner)
-│   ├── hooks/         # 35+ lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
-│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, session-manager, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
-│   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app)
+│   ├── agents/        # AI agents (OmO, Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker, context-learner, 20+ specialists)
+│   ├── hooks/         # 40+ lifecycle hooks (preemptive-compaction, edit-error-recovery, session-recovery, etc.)
+│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, session-manager, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent, sync-fork, Linear (7)
+│   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app, deepwiki, serena)
 │   ├── features/      # Terminal, Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
 │   ├── config/        # Zod schema, TypeScript types
 │   ├── auth/          # Google Antigravity OAuth

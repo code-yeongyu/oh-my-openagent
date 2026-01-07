@@ -448,12 +448,12 @@ Comprehensive task breakdown for synchronizing fork with upstream (code-yeongyu/
 
 | ID | Task | Status | Estimate | Dependencies | Notes |
 |----|------|--------|----------|--------------|-------|
-| T125 | Update AGENTS.md with new capabilities | Not Started | 1h | T124 | Add Sisyphus, new hooks, new tools |
-| T126 | Update README.md with new features | Not Started | 45min | T125 | Document Sisyphus, experimental features |
-| T127 | Update README.ko.md | Not Started | 15min | T126 | Korean translation updates |
+| T125 | Update AGENTS.md with new capabilities | ✅ Done | 1h | T124 | Add Sisyphus, new hooks, new tools |
+| T126 | Update README.md with new features | ✅ Done | 45min | T125 | Document Sisyphus, experimental features |
+| T127 | Update README.ko.md | ✅ Done | 15min | T126 | Korean translation updates |
 | T128 | Update README.ja.md | Not Started | 15min | T127 | Japanese translation updates |
-| T129 | Create docs/guides/upstream-sync-migration.md | Not Started | 45min | T128 | Migration notes for users |
-| T130 | Update changelog/ with sync entry | Not Started | 30min | T129 | Document all synced changes |
+| T129 | Create docs/guides/upstream-sync-migration.md | ✅ Done | 45min | T128 | Migration notes for users |
+| T130 | Update changelog/ with sync entry | ✅ Done | 30min | T129 | Document all synced changes |
 | T131 | Remove FORK_CUSTOMIZATIONS.md (if temporary) | Not Started | 5min | T130 | Cleanup |
 | T132 | Final typecheck | Not Started | 10min | T131 | Must pass |
 | T133 | Final build | Not Started | 10min | T132 | Must succeed |
