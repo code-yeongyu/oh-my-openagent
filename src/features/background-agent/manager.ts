@@ -4,6 +4,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type {
   BackgroundTask,
   LaunchInput,
+  ResumeInput,
 } from "./types"
 import { log } from "../../shared/logger"
 import { ConcurrencyManager } from "./concurrency"
@@ -78,9 +79,9 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    const model = input.agent
+    const concurrencyKey = input.agent
 
-    await this.concurrencyManager.acquire(model)
+    await this.concurrencyManager.acquire(concurrencyKey)
 
     const createResult = await this.client.session.create({
       body: {
@@ -88,12 +89,12 @@ export class BackgroundManager {
         title: `Background: ${input.description}`,
       },
     }).catch((error) => {
-      this.concurrencyManager.release(model)
+      this.concurrencyManager.release(concurrencyKey)
       throw error
     })
 
     if (createResult.error) {
-      this.concurrencyManager.release(model)
+      this.concurrencyManager.release(concurrencyKey)
       throw new Error(`Failed to create background session: ${createResult.error}`)
     }
 
@@ -115,7 +116,8 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentModel: input.parentModel,
-      model,
+      model: input.model,
+      concurrencyKey,
     }
 
     this.tasks.set(task.id, task)
@@ -155,8 +157,8 @@ export class BackgroundManager {
           existingTask.error = errorMessage
         }
         existingTask.completedAt = new Date()
-        if (existingTask.model) {
-          this.concurrencyManager.release(existingTask.model)
+        if (existingTask.concurrencyKey) {
+          this.concurrencyManager.release(existingTask.concurrencyKey)
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask)
@@ -238,6 +240,62 @@ export class BackgroundManager {
     return task
   }
 
+  async resume(input: ResumeInput): Promise<BackgroundTask> {
+    const existingTask = this.findBySession(input.sessionId)
+    if (!existingTask) {
+      throw new Error(`Task not found for session: ${input.sessionId}`)
+    }
+
+    existingTask.status = "running"
+    existingTask.completedAt = undefined
+    existingTask.error = undefined
+    existingTask.parentSessionID = input.parentSessionID
+    existingTask.parentMessageID = input.parentMessageID
+    existingTask.parentModel = input.parentModel
+
+    existingTask.progress = {
+      toolCalls: existingTask.progress?.toolCalls ?? 0,
+      lastUpdate: new Date(),
+    }
+
+    this.startPolling()
+    subagentSessions.add(existingTask.sessionID)
+
+    const toastManager = getTaskToastManager()
+    if (toastManager) {
+      toastManager.addTask({
+        id: existingTask.id,
+        description: existingTask.description,
+        agent: existingTask.agent,
+        isBackground: true,
+      })
+    }
+
+    log("[background-agent] Resuming task:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
+
+    this.client.session.promptAsync({
+      path: { id: existingTask.sessionID },
+      body: {
+        agent: existingTask.agent,
+        tools: {
+          task: false,
+          call_omo_agent: false,
+        },
+        parts: [{ type: "text", text: input.prompt }],
+      },
+    }).catch((error) => {
+      log("[background-agent] resume promptAsync error:", error)
+      existingTask.status = "error"
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      existingTask.error = errorMessage
+      existingTask.completedAt = new Date()
+      this.markForNotification(existingTask)
+      this.notifyParentSession(existingTask)
+    })
+
+    return existingTask
+  }
+
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
     try {
       const response = await this.client.session.todo({
@@ -315,8 +373,8 @@ export class BackgroundManager {
         task.error = "Session deleted"
       }
 
-      if (task.model) {
-        this.concurrencyManager.release(task.model)
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
       }
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
@@ -391,8 +449,8 @@ export class BackgroundManager {
 
     const taskId = task.id
     setTimeout(async () => {
-      if (task.model) {
-        this.concurrencyManager.release(task.model)
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
       }
 
       try {
@@ -455,8 +513,8 @@ export class BackgroundManager {
         task.status = "error"
         task.error = "Task timed out after 30 minutes"
         task.completedAt = new Date()
-        if (task.model) {
-          this.concurrencyManager.release(task.model)
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
         }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)

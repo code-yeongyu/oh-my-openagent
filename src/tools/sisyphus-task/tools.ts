@@ -276,34 +276,52 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        await client.session.prompt({
-          path: { id: sessionID },
-          body: {
-            agent: agentToUse,
-            model: categoryModel,
-            tools: {
-              task: false,
-              sisyphus_task: false,
+        try {
+          await client.session.prompt({
+            path: { id: sessionID },
+            body: {
+              agent: agentToUse,
+              model: categoryModel,
+              tools: {
+                task: false,
+                sisyphus_task: false,
+              },
+              parts: [{ type: "text", text: args.prompt }],
             },
-            parts: [{ type: "text", text: args.prompt }],
-          },
-        })
+          })
+        } catch (promptError) {
+          if (toastManager && taskId !== undefined) {
+            toastManager.removeTask(taskId)
+          }
+          const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+          if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+            return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
+          }
+          return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+        }
 
         const messagesResult = await client.session.messages({
           path: { id: sessionID },
         })
 
         if (messagesResult.error) {
-          return `❌ Error fetching result: ${messagesResult.error}`
+          return `❌ Error fetching result: ${messagesResult.error}\n\nSession ID: ${sessionID}`
         }
 
         const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
-          info?: { role?: string }
+          info?: { role?: string; time?: { created?: number } }
           parts?: Array<{ type?: string; text?: string }>
         }>
 
-        const assistantMessages = messages.filter((m) => m.info?.role === "assistant")
-        const lastMessage = assistantMessages[assistantMessages.length - 1]
+        const assistantMessages = messages
+          .filter((m) => m.info?.role === "assistant")
+          .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+        const lastMessage = assistantMessages[0]
+        
+        if (!lastMessage) {
+          return `❌ No assistant response found.\n\nSession ID: ${sessionID}`
+        }
+        
         const textParts = lastMessage?.parts?.filter((p) => p.type === "text") ?? []
         const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
 
