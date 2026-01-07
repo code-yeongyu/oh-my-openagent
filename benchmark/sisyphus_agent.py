@@ -70,12 +70,11 @@ class SisyphusAgent(BaseInstalledAgent):
             "llama": ["LLAMA_API_KEY"],
             "mistral": ["MISTRAL_API_KEY"],
             "openai": ["OPENAI_API_KEY"],
+            "opencode": [],  # opencode/zen - no API key required
             "xai": ["XAI_API_KEY"],
         }
 
         keys = provider_keys.get(provider, [])
-        if not keys:
-            raise ValueError(f"Unknown provider {provider}")
 
         for key in keys:
             if key in os.environ:
