@@ -1,6 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
-import { spawn } from "node:child_process"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
 import {
   getOsascriptPath,
@@ -11,21 +10,6 @@ import {
   getAplayPath,
   startBackgroundCheck,
 } from "./session-notification-utils"
-
-/**
- * Execute a command using node:child_process instead of Bun shell.
- * This avoids Bun's ShellInterpreter GC bug on Windows (oven-sh/bun#23177, #24368).
- */
-function execCommand(command: string, args: string[]): Promise<void> {
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, {
-      stdio: "ignore",
-      detached: false,
-    })
-    proc.on("close", () => resolve())
-    proc.on("error", () => resolve())
-  })
-}
 
 interface Todo {
   content: string
@@ -81,17 +65,14 @@ async function sendNotification(
 
       const esTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      const script = `display notification "${esMessage}" with title "${esTitle}"`
-      // Use node:child_process instead of Bun shell to avoid potential GC issues
-      await execCommand(osascriptPath, ["-e", script]).catch(() => {})
+      await ctx.$`${osascriptPath} -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`.catch(() => {})
       break
     }
     case "linux": {
       const notifySendPath = await getNotifySendPath()
       if (!notifySendPath) return
 
-      // Use node:child_process instead of Bun shell to avoid potential GC issues
-      await execCommand(notifySendPath, [title, message]).catch(() => {})
+      await ctx.$`${notifySendPath} ${title} ${message} 2>/dev/null`.catch(() => {})
       break
     }
     case "win32": {
@@ -112,8 +93,7 @@ $Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
 $Notifier.Show($Toast)
 `.trim().replace(/\n/g, "; ")
-      // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
-      await execCommand(powershellPath, ["-Command", toastScript]).catch(() => {})
+      await ctx.$`${powershellPath} -Command ${toastScript}`.catch(() => {})
       break
     }
   }
@@ -124,19 +104,17 @@ async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Prom
     case "darwin": {
       const afplayPath = await getAfplayPath()
       if (!afplayPath) return
-      // Use node:child_process instead of Bun shell to avoid potential GC issues
-      execCommand(afplayPath, [soundPath]).catch(() => {})
+      ctx.$`${afplayPath} ${soundPath}`.catch(() => {})
       break
     }
     case "linux": {
       const paplayPath = await getPaplayPath()
       if (paplayPath) {
-        // Use node:child_process instead of Bun shell to avoid potential GC issues
-        execCommand(paplayPath, [soundPath]).catch(() => {})
+        ctx.$`${paplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
       } else {
         const aplayPath = await getAplayPath()
         if (aplayPath) {
-          execCommand(aplayPath, [soundPath]).catch(() => {})
+          ctx.$`${aplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
         }
       }
       break
@@ -144,9 +122,7 @@ async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Prom
     case "win32": {
       const powershellPath = await getPowershellPath()
       if (!powershellPath) return
-      // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
-      const soundScript = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
-      execCommand(powershellPath, ["-Command", soundScript]).catch(() => {})
+      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + soundPath.replace(/'/g, "''") + "').PlaySync()"}`.catch(() => {})
       break
     }
   }
