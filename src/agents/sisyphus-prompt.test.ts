@@ -29,4 +29,23 @@ describe("Sisyphus prompt dialect", () => {
     // #then
     expect(agent.prompt).toContain("NEVER START IMPLEMENTING")
   })
+
+  test("Codex prompt preserves spacing and constraints wrapper", () => {
+    // #given
+    const agent = createSisyphusAgent("openai/codex-1", [], [], [])
+
+    // #then
+    expect(agent.prompt).toContain("</Behavior_Instructions>\n\n<Task_Management>")
+    expect(agent.prompt).toContain("<Constraints>")
+    expect(agent.prompt).toContain("</Constraints>")
+  })
+
+  test("Claude prompt includes constraints wrapper", () => {
+    // #given
+    const agent = createSisyphusAgent("anthropic/claude-opus-4-5", [], [], [])
+
+    // #then
+    expect(agent.prompt).toContain("<Constraints>")
+    expect(agent.prompt).toContain("</Constraints>")
+  })
 })

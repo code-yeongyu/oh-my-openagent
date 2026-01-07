@@ -46,4 +46,9 @@ describe("model adapter", () => {
     expect(claude.supportsTextVerbosity).toBe(false)
     expect(claude.supportsThinking).toBe(true)
   })
+
+  test("default implementation policy uses explicit wording", () => {
+    // #given / #then
+    expect(DEFAULT_PROMPT_DIALECT.implementationPolicy).toContain("EXPLICITLY")
+  })
 })

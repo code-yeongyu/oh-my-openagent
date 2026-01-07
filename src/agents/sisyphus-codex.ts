@@ -129,7 +129,9 @@ export function buildCodexSisyphusPrompt(parts: CodexSisyphusPromptParts): strin
     parts.antiPatterns,
     "",
     parts.softGuidelines,
+    "",
+    "</Constraints>",
   ]
 
-  return sections.filter((s) => s !== "").join("\n")
+  return sections.join("\n")
 }

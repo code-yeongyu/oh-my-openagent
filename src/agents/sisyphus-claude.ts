@@ -399,7 +399,9 @@ export function buildClaudeSisyphusPrompt(parts: ClaudeSisyphusPromptParts): str
     parts.antiPatterns,
     "",
     parts.softGuidelines,
+    "",
+    "</Constraints>",
   ]
 
-  return sections.filter((s) => s !== "").join("\n")
+  return sections.join("\n")
 }
