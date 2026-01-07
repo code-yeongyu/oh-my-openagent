@@ -9,7 +9,7 @@ AI agent definitions for multi-model orchestration. 7 specialized agents: Sisyph
 ```
 agents/
 ├── sisyphus.ts              # Primary orchestrator (Claude Opus 4.5)
-├── oracle.ts                # Strategic advisor (GPT-5.2)
+├── oracle.ts                # Strategic advisor (Claude Opus 4.5)
 ├── librarian.ts             # Multi-repo research (Claude Sonnet 4.5)
 ├── explore.ts               # Fast codebase grep (Grok Code)
 ├── frontend-ui-ux-engineer.ts  # UI generation (Gemini 3 Pro)
@@ -27,7 +27,7 @@ agents/
 | Agent | Default Model | Fallback | Purpose |
 |-------|---------------|----------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | - | Primary orchestrator with extended thinking |
-| oracle | openai/gpt-5.2 | - | Read-only consultation. High-IQ debugging, architecture |
+| oracle | anthropic/claude-opus-4-5 | - | Read-only consultation. High-IQ debugging, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | google/gemini-3-flash | Docs, OSS research, GitHub examples |
 | explore | opencode/grok-code | google/gemini-3-flash, anthropic/claude-haiku-4-5 | Fast contextual grep |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | UI/UX code generation |
