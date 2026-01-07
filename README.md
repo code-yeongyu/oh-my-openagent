@@ -1051,11 +1051,7 @@ Use external CLI tools (like Cursor) for background agents. This allows you to l
 
 #### Cursor Provider
 
-When using `provider: "cursor"`, the following models are available:
-
-`gpt-5.2`, `gpt-5.1`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5.1-codex-max`, `gemini-3-pro`, `gemini-3-flash`, `grok`, `composer-1`
-
-**Requirements**: Cursor must be installed and authenticated. Test with `cursor agent -p --model gpt-5.1-codex --output-format json "test"`.
+**Requirements**: Cursor must be installed and authenticated. Test with `cursor-agent -p --model <model> --output-format json "test"`.
 
 #### Adding New Providers
 

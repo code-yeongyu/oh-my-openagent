@@ -16,7 +16,6 @@ export class CursorProvider implements ExternalCliProviderInterface {
     const { model, prompt, workspace, timeout = DEFAULT_TIMEOUT } = options
 
     const args = [
-      "agent",
       "-p",
       "--model", model,
       "--output-format", "json",
@@ -35,7 +34,7 @@ export class CursorProvider implements ExternalCliProviderInterface {
       let stderr = ""
       let timedOut = false
 
-      const proc = spawn("cursor", args, {
+      const proc = spawn("cursor-agent", args, {
         stdio: ["pipe", "pipe", "pipe"],
         timeout,
       })
@@ -119,7 +118,7 @@ export class CursorProvider implements ExternalCliProviderInterface {
 
   async isAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      const proc = spawn("cursor", ["--version"], {
+      const proc = spawn("cursor-agent", ["--version"], {
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 5000,
       })
