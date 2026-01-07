@@ -81,12 +81,13 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           metadata: { sessionId: task.sessionID },
         })
 
+        const agentDisplayName = manager.getDisplayName(task.agent)
         return `Background task launched successfully.
 
 Task ID: ${task.id}
 Session ID: ${task.sessionID}
 Description: ${task.description}
-Agent: ${task.agent}
+Agent: ${agentDisplayName}
 Status: ${task.status}
 
 The system will notify you when the task completes.
@@ -110,9 +111,10 @@ function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + "..."
 }
 
-function formatTaskStatus(task: BackgroundTask): string {
+function formatTaskStatus(task: BackgroundTask, agentDisplayName?: string): string {
   const duration = formatDuration(task.startedAt, task.completedAt)
   const promptPreview = truncateText(task.prompt, 500)
+  const displayName = agentDisplayName ?? task.agent
   
   let progressSection = ""
   if (task.progress?.lastTool) {
@@ -151,7 +153,7 @@ ${truncated}
 |-------|-------|
 | Task ID | \`${task.id}\` |
 | Description | ${task.description} |
-| Agent | ${task.agent} |
+| Agent | ${displayName} |
 | Status | **${task.status}** |
 | Duration | ${duration} |
 | Session ID | \`${task.sessionID}\` |${progressSection}
@@ -249,6 +251,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
 
         const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
+        const agentDisplayName = manager.getDisplayName(task.agent)
 
         // Already completed: return result immediately (regardless of block flag)
         if (task.status === "completed") {
@@ -257,12 +260,12 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
 
         // Error or cancelled: return status immediately
         if (task.status === "error" || task.status === "cancelled") {
-          return formatTaskStatus(task)
+          return formatTaskStatus(task, agentDisplayName)
         }
 
         // Non-blocking and still running: return status
         if (!shouldBlock) {
-          return formatTaskStatus(task)
+          return formatTaskStatus(task, agentDisplayName)
         }
 
         // Blocking: poll until completion or timeout
@@ -281,7 +284,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
           }
 
           if (currentTask.status === "error" || currentTask.status === "cancelled") {
-            return formatTaskStatus(currentTask)
+            return formatTaskStatus(currentTask, manager.getDisplayName(currentTask.agent))
           }
         }
 
@@ -290,7 +293,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
         if (!finalTask) {
           return `Task was deleted: ${args.task_id}`
         }
-        return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask)}`
+        return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask, manager.getDisplayName(finalTask.agent))}`
       } catch (error) {
         return `Error getting output: ${error instanceof Error ? error.message : String(error)}`
       }

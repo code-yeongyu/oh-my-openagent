@@ -56,6 +56,8 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
+export type AgentDisplayNames = Record<string, string>
+
 export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
@@ -63,13 +65,19 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private concurrencyManager: ConcurrencyManager
+  private displayNames: AgentDisplayNames
 
-  constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
+  constructor(ctx: PluginInput, config?: BackgroundTaskConfig, displayNames?: AgentDisplayNames) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
+    this.displayNames = displayNames ?? {}
+  }
+
+  getDisplayName(agent: string): string {
+    return this.displayNames[agent] ?? agent
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -327,6 +335,7 @@ export class BackgroundManager {
 
   private notifyParentSession(task: BackgroundTask): void {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
+    const agentDisplayName = this.getDisplayName(task.agent)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
@@ -336,14 +345,14 @@ export class BackgroundManager {
       tuiClient.tui.showToast({
         body: {
           title: "Background Task Completed",
-          message: `Task "${task.description}" finished in ${duration}.`,
+          message: `Task "${task.description}" (${agentDisplayName}) finished in ${duration}.`,
           variant: "success",
           duration: 5000,
         },
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
+    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" (${agentDisplayName}) finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
 
     log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
 

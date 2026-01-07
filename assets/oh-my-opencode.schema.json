@@ -124,6 +124,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -236,6 +239,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -352,6 +358,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -464,6 +473,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -580,6 +592,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -692,6 +707,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -808,6 +826,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -920,6 +941,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -1036,6 +1060,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -1150,6 +1177,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -1262,6 +1292,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {

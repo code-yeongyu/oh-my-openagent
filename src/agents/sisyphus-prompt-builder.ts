@@ -4,6 +4,7 @@ export interface AvailableAgent {
   name: BuiltinAgentName
   description: string
   metadata: AgentPromptMetadata
+  displayName?: string
 }
 
 export interface AvailableTool {
@@ -136,7 +137,7 @@ export function buildToolSelectionTable(
 
   for (const agent of sortedAgents) {
     const shortDesc = agent.description.split(".")[0] || agent.description
-    rows.push(`| \`${agent.name}\` agent | ${agent.metadata.cost} | ${shortDesc} |`)
+    rows.push(`| \`${agent.displayName ?? agent.name}\` agent | ${agent.metadata.cost} | ${shortDesc} |`)
   }
 
   rows.push("")
@@ -195,7 +196,7 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
 
   for (const agent of agents) {
     for (const trigger of agent.metadata.triggers) {
-      rows.push(`| ${trigger.domain} | \`${agent.name}\` | ${trigger.trigger} |`)
+      rows.push(`| ${trigger.domain} | \`${agent.displayName ?? agent.name}\` | ${trigger.trigger} |`)
     }
   }
 
@@ -325,7 +326,7 @@ export function buildUltraworkAgentSection(agents: AvailableAgent[]): string {
   for (const agent of sortedAgents) {
     const shortDesc = agent.description.split(".")[0] || agent.description
     const suffix = (agent.name === "explore" || agent.name === "librarian") ? " (multiple)" : ""
-    lines.push(`- **${agent.name}${suffix}**: ${shortDesc}`)
+    lines.push(`- **${agent.displayName ?? agent.name}${suffix}**: ${shortDesc}`)
   }
 
   return lines.join("\n")

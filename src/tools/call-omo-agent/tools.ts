@@ -1,7 +1,7 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
-import type { BackgroundManager } from "../../features/background-agent"
+import type { BackgroundManager, AgentDisplayNames } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 
 type ToolContextWithMetadata = {
@@ -14,12 +14,14 @@ type ToolContextWithMetadata = {
 
 export function createCallOmoAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  displayNames?: AgentDisplayNames
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
   ).join("\n")
   const description = CALL_OMO_AGENT_DESCRIPTION.replace("{agents}", agentDescriptions)
+  const getDisplayName = (agent: string) => displayNames?.[agent] ?? agent
 
   return tool({
     description,
@@ -46,10 +48,10 @@ export function createCallOmoAgent(
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolCtx, backgroundManager)
+        return await executeBackground(args, toolCtx, backgroundManager, getDisplayName)
       }
 
-      return await executeSync(args, toolCtx, ctx)
+      return await executeSync(args, toolCtx, ctx, getDisplayName)
     },
   })
 }
@@ -57,7 +59,8 @@ export function createCallOmoAgent(
 async function executeBackground(
   args: CallOmoAgentArgs,
   toolContext: ToolContextWithMetadata,
-  manager: BackgroundManager
+  manager: BackgroundManager,
+  getDisplayName: (agent: string) => string
 ): Promise<string> {
   try {
     const task = await manager.launch({
@@ -73,12 +76,13 @@ async function executeBackground(
       metadata: { sessionId: task.sessionID },
     })
 
+    const agentDisplayName = getDisplayName(task.agent)
     return `Background agent task launched successfully.
 
 Task ID: ${task.id}
 Session ID: ${task.sessionID}
 Description: ${task.description}
-Agent: ${task.agent} (subagent)
+Agent: ${agentDisplayName} (subagent)
 Status: ${task.status}
 
 The system will notify you when the task completes.
@@ -94,9 +98,11 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 async function executeSync(
   args: CallOmoAgentArgs,
   toolContext: ToolContextWithMetadata,
-  ctx: PluginInput
+  ctx: PluginInput,
+  getDisplayName: (agent: string) => string
 ): Promise<string> {
   let sessionID: string
+  const agentDisplayName = getDisplayName(args.subagent_type)
 
   if (args.session_id) {
     log(`[call_omo_agent] Using existing session: ${args.session_id}`)
@@ -113,7 +119,7 @@ async function executeSync(
     const createResult = await ctx.client.session.create({
       body: {
         parentID: toolContext.sessionID,
-        title: `${args.description} (@${args.subagent_type} subagent)`,
+        title: `${args.description} (@${agentDisplayName} subagent)`,
       },
     })
 

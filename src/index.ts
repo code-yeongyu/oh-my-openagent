@@ -170,7 +170,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
-  const backgroundManager = new BackgroundManager(ctx);
+  const agentDisplayNames: Record<string, string> = {};
+  if (pluginConfig.agents) {
+    for (const [name, override] of Object.entries(pluginConfig.agents)) {
+      const displayName = (override as { display_name?: string } | undefined)?.display_name;
+      if (displayName) {
+        agentDisplayNames[name] = displayName;
+      }
+    }
+  }
+
+  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task, agentDisplayNames);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })
@@ -188,7 +198,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
+  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager, agentDisplayNames);
   const lookAt = createLookAt(ctx);
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();

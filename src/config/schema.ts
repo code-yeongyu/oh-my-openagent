@@ -90,6 +90,7 @@ export const AgentOverrideConfigSchema = z.object({
   tools: z.record(z.string(), z.boolean()).optional(),
   disable: z.boolean().optional(),
   description: z.string().optional(),
+  display_name: z.string().optional(),
   mode: z.enum(["subagent", "primary", "all"]).optional(),
   color: z
     .string()

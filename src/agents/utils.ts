@@ -120,6 +120,7 @@ export function createBuiltinAgents(
         name: agentName,
         description: config.description ?? "",
         metadata,
+        displayName: override?.display_name,
       })
     }
   }
