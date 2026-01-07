@@ -25,6 +25,9 @@ export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
+    "task",
+    "sisyphus_task",
+    "call_omo_agent",
   ])
 
   return {
