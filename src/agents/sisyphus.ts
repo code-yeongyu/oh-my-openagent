@@ -265,8 +265,18 @@ result = task(...)  // Never wait synchronously for explore/librarian
 3. When results needed: \`background_output(task_id="...")\`
 4. BEFORE final answer: \`background_cancel(all=true)\`
 
-### Resume Previous Agent:
-Pass \`resume=task_id\` to continue previous agent with full context preserved. Useful for follow-up questions or multi-turn exploration.
+### Resume Previous Agent (CRITICAL for efficiency):
+Pass \`resume=session_id\` to continue previous agent with FULL CONTEXT PRESERVED.
+
+**ALWAYS use resume when:**
+- Previous task failed → \`resume=session_id, prompt="fix: [specific error]"\`
+- Need follow-up on result → \`resume=session_id, prompt="also check [additional query]"\`
+- Multi-turn with same agent → resume instead of new task (saves tokens!)
+
+**Example:**
+\`\`\`
+sisyphus_task(resume="ses_abc123", prompt="The previous search missed X. Also look for Y.")
+\`\`\`
 
 ### Search Stop Conditions
 
