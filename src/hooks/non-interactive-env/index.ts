@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
+import { isNonInteractive } from "./detector"
 import { log, detectShellType, buildEnvPrefix } from "../../shared"
 
 export * from "./constants"
@@ -42,6 +43,10 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // Only prepend env vars for git commands (editor blocking, pager, etc.)
       const isGitCommand = /\bgit\b/.test(command)
       if (!isGitCommand) {
+        return
+      }
+
+      if (!isNonInteractive()) {
         return
       }
 

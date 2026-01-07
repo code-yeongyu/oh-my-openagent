@@ -43,7 +43,8 @@ export function shellEscape(value: string, shellType: ShellType): string {
       return `'${value.replace(/'/g, "''")}'`
 
     case "cmd":
-      return `"${value.replace(/"/g, '""')}"`
+      // Escape % first (for environment variable expansion), then " (for quoting)
+      return `"${value.replace(/%/g, '%%').replace(/"/g, '""')}"`
 
     default:
       return value

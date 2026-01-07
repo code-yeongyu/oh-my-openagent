@@ -176,9 +176,9 @@ describe("shell-env", () => {
         expect(result).toBe('"say ""hello"""')
       })
 
-      test("#given string with percent signs #when shellEscape is called with cmd #then wraps in double quotes", () => {
+      test("#given string with percent signs #when shellEscape is called with cmd #then escapes percent signs", () => {
         const result = shellEscape("%PATH%", "cmd")
-        expect(result).toBe('"%PATH%"')
+        expect(result).toBe('"%%PATH%%"')
       })
 
       test("#given Windows path with backslashes #when shellEscape is called with cmd #then preserves backslashes", () => {
