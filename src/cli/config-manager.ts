@@ -350,7 +350,6 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
           return { success: true, configPath: omoConfigPath }
         }
 
-        delete existing.agents
         const merged = deepMerge(existing, newConfig)
         writeFileSync(omoConfigPath, JSON.stringify(merged, null, 2) + "\n")
       } catch (parseErr) {
