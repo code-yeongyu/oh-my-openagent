@@ -1,5 +1,4 @@
-import { spawn } from "bun"
-import { existsSync } from "fs"
+import { spawn, spawnSync } from "bun"
 import { release } from "os"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
@@ -15,6 +14,16 @@ function getWindowsBuildNumber(): number | null {
   return null
 }
 
+function isPwshAvailable(): boolean {
+  if (process.platform !== "win32") return false
+  const result = spawnSync(["where", "pwsh"], { stdout: "pipe", stderr: "pipe" })
+  return result.exitCode === 0
+}
+
+function escapePowerShellPath(path: string): string {
+  return path.replace(/'/g, "''")
+}
+
 type WindowsZipExtractor = "tar" | "pwsh" | "powershell"
 
 function getWindowsZipExtractor(): WindowsZipExtractor {
@@ -24,7 +33,7 @@ function getWindowsZipExtractor(): WindowsZipExtractor {
     return "tar"
   }
   
-  if (existsSync("C:\\Program Files\\PowerShell\\7\\pwsh.exe")) {
+  if (isPwshAvailable()) {
     return "pwsh"
   }
   
@@ -45,14 +54,14 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
         })
         break
       case "pwsh":
-        proc = spawn(["pwsh", "-Command", `Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force`], {
+        proc = spawn(["pwsh", "-Command", `Expand-Archive -Path '${escapePowerShellPath(archivePath)}' -DestinationPath '${escapePowerShellPath(destDir)}' -Force`], {
           stdout: "pipe",
           stderr: "pipe",
         })
         break
       case "powershell":
       default:
-        proc = spawn(["powershell", "-Command", `Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force`], {
+        proc = spawn(["powershell", "-Command", `Expand-Archive -Path '${escapePowerShellPath(archivePath)}' -DestinationPath '${escapePowerShellPath(destDir)}' -Force`], {
           stdout: "pipe",
           stderr: "pipe",
         })
