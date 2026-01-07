@@ -17,6 +17,23 @@ bun install -g opencode-ai@{{ version }}
 bun install -g opencode-ai@latest
 {% endif %}
 
+# Pre-create oh-my-opencode config BEFORE install to disable problematic hooks
+# This prevents hooks from initializing during plugin load
+# - comment-checker: Downloads Go binary from GitHub (rate limiting with multiple containers)
+# - auto-update-checker: Checks for updates (unnecessary in benchmarks)
+# - session-notification: OS notifications (no display in containers)
+# - background-notification: OS notifications (no display in containers)
+mkdir -p ~/.config/opencode
+cat > ~/.config/opencode/oh-my-opencode.json << 'EOF'
+{
+  "disabled_hooks": [
+    "auto-update-checker",
+    "session-notification",
+    "background-notification"
+  ]
+}
+EOF
+
 # Install oh-my-opencode plugin (provides Sisyphus agent)
 # --claude=no uses opencode/zen provider (free) instead of Anthropic
 {% if omo_version %}
