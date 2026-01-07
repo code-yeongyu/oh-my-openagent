@@ -5,12 +5,14 @@ import type {
   BackgroundTask,
   LaunchInput,
 } from "./types"
+import type { ExternalCliBackendConfig } from "../external-cli"
 import { log } from "../../shared/logger"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
+import { executeExternalCli } from "../external-cli"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
@@ -54,18 +56,32 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
+export interface BackgroundManagerOptions {
+  externalCli?: ExternalCliBackendConfig
+}
+
 export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
+  private externalCliConfig?: ExternalCliBackendConfig
 
-  constructor(ctx: PluginInput) {
+  constructor(ctx: PluginInput, options?: BackgroundManagerOptions) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
+    this.externalCliConfig = options?.externalCli
+  }
+
+  isExternalCliEnabled(): boolean {
+    return this.externalCliConfig?.enabled === true
+  }
+
+  getExternalCliProvider(): string | undefined {
+    return this.externalCliConfig?.provider
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -73,6 +89,86 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
+    if (this.isExternalCliEnabled()) {
+      return this.launchWithExternalCli(input)
+    }
+
+    return this.launchWithOpencode(input)
+  }
+
+  private async launchWithExternalCli(input: LaunchInput): Promise<BackgroundTask> {
+    const config = this.externalCliConfig!
+    const model = config.models?.[input.agent] ?? config.default_model
+    const provider = config.provider
+
+    const taskId = `bg_${crypto.randomUUID().slice(0, 8)}`
+    const sessionID = `${provider}_${taskId}`
+
+    const task: BackgroundTask = {
+      id: taskId,
+      sessionID,
+      parentSessionID: input.parentSessionID,
+      parentMessageID: input.parentMessageID,
+      description: input.description,
+      prompt: input.prompt,
+      agent: input.agent,
+      status: "running",
+      startedAt: new Date(),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+      },
+      parentModel: input.parentModel,
+      backend: "external-cli",
+    }
+
+    this.tasks.set(task.id, task)
+
+    log("[background-agent] Launching external-cli task:", { taskId: task.id, provider, model, agent: input.agent })
+
+    executeExternalCli(provider, {
+      model,
+      prompt: input.prompt,
+      workspace: config.workspace ?? this.directory,
+      timeout: config.timeout,
+    }).then((result) => {
+      const existingTask = this.getTask(taskId)
+      if (!existingTask) return
+
+      if (result.success) {
+        existingTask.status = "completed"
+        existingTask.result = result.result
+      } else {
+        existingTask.status = "error"
+        existingTask.error = result.error
+        existingTask.result = result.result
+      }
+      existingTask.completedAt = new Date()
+      if (result.duration_ms) {
+        existingTask.progress = {
+          ...existingTask.progress!,
+          lastUpdate: new Date(),
+        }
+      }
+      this.markForNotification(existingTask)
+      this.notifyParentSession(existingTask)
+      log("[background-agent] External-cli task completed:", { taskId, provider, success: result.success })
+    }).catch((error) => {
+      const existingTask = this.getTask(taskId)
+      if (!existingTask) return
+
+      existingTask.status = "error"
+      existingTask.error = error instanceof Error ? error.message : String(error)
+      existingTask.completedAt = new Date()
+      this.markForNotification(existingTask)
+      this.notifyParentSession(existingTask)
+      log("[background-agent] External-cli task error:", { taskId, provider, error })
+    })
+
+    return task
+  }
+
+  private async launchWithOpencode(input: LaunchInput): Promise<BackgroundTask> {
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
@@ -102,6 +198,7 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentModel: input.parentModel,
+      backend: "opencode",
     }
 
     this.tasks.set(task.id, task)

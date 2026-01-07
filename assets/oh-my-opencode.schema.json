@@ -1658,6 +1658,44 @@
           "type": "string"
         }
       }
+    },
+    "external_cli": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "provider": {
+          "default": "cursor",
+          "type": "string",
+          "enum": [
+            "cursor"
+          ]
+        },
+        "models": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "default_model": {
+          "default": "gpt-5.1-codex",
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "timeout": {
+          "default": 300000,
+          "type": "number",
+          "minimum": 1000,
+          "maximum": 600000
+        }
+      }
     }
   }
 }

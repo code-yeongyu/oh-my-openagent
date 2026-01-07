@@ -145,13 +145,15 @@ ${truncated}
 > **Failed**: The task encountered an error. Check the last message for details.`
   }
 
+  const backendInfo = task.backend === "external-cli" ? " (external-cli)" : ""
+
   return `# Task Status
 
 | Field | Value |
 |-------|-------|
 | Task ID | \`${task.id}\` |
 | Description | ${task.description} |
-| Agent | ${task.agent} |
+| Agent | ${task.agent}${backendInfo} |
 | Status | **${task.status}** |
 | Duration | ${duration} |
 | Session ID | \`${task.sessionID}\` |${progressSection}
@@ -164,6 +166,23 @@ ${promptPreview}
 }
 
 async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
+  const duration = formatDuration(task.startedAt, task.completedAt)
+  const backendInfo = task.backend === "external-cli" ? " (external-cli)" : ""
+
+  if (task.backend === "external-cli") {
+    const resultContent = task.result || task.error || "(No output)"
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Agent: ${task.agent}${backendInfo}
+Duration: ${duration}
+
+---
+
+${resultContent}`
+  }
+
   const messagesResult = await client.session.messages({
     path: { id: task.sessionID },
   })
@@ -172,7 +191,6 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
     return `Error fetching messages: ${messagesResult.error}`
   }
 
-  // Handle both SDK response structures: direct array or wrapped in .data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
     info?: { role?: string }
@@ -184,7 +202,7 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${duration}
 Session ID: ${task.sessionID}
 
 ---
@@ -201,7 +219,7 @@ Session ID: ${task.sessionID}
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${duration}
 Session ID: ${task.sessionID}
 
 ---
@@ -217,8 +235,6 @@ Session ID: ${task.sessionID}
     .map((p) => p.text ?? "")
     .filter((text) => text.length > 0)
     .join("\n")
-
-  const duration = formatDuration(task.startedAt, task.completedAt)
 
   return `Task Result
 

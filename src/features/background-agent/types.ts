@@ -4,6 +4,8 @@ export type BackgroundTaskStatus =
   | "error"
   | "cancelled"
 
+export type BackgroundBackend = "opencode" | "external-cli"
+
 export interface TaskProgress {
   toolCalls: number
   lastTool?: string
@@ -27,6 +29,7 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
+  backend: BackgroundBackend
 }
 
 export interface LaunchInput {
@@ -37,3 +40,5 @@ export interface LaunchInput {
   parentMessageID: string
   parentModel?: { providerID: string; modelID: string }
 }
+
+

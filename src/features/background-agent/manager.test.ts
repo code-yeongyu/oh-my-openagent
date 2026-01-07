@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "./types"
+import type { ExternalCliBackendConfig } from "../external-cli"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
@@ -115,6 +116,7 @@ function createMockTask(overrides: Partial<BackgroundTask> & { id: string; sessi
     agent: "test-agent",
     status: "running",
     startedAt: new Date(),
+    backend: "opencode",
     ...overrides,
   }
 }
@@ -412,5 +414,62 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     expect(result.prunedTasks).toContain("task-stale")
     expect(manager.getTaskCount()).toBe(1)
     expect(manager.getTask("task-fresh")).toBeDefined()
+  })
+})
+
+describe("BackgroundManager external-cli configuration", () => {
+  test("should identify external-cli tasks by backend field", () => {
+    // #given
+    const externalTask = createMockTask({
+      id: "external-task-1",
+      sessionID: "cursor_external-task-1",
+      parentSessionID: "main-session",
+      backend: "external-cli",
+    })
+    const opencodeTask = createMockTask({
+      id: "opencode-task-1",
+      sessionID: "opencode-session-1",
+      parentSessionID: "main-session",
+      backend: "opencode",
+    })
+
+    // #then
+    expect(externalTask.backend).toBe("external-cli")
+    expect(opencodeTask.backend).toBe("opencode")
+  })
+
+  test("external-cli config should have all required fields including provider", () => {
+    // #given
+    const config: ExternalCliBackendConfig = {
+      enabled: true,
+      provider: "cursor",
+      models: { explore: "gpt-5.1-codex-mini", librarian: "gpt-5.2" },
+      default_model: "gpt-5.1-codex",
+      workspace: "/path/to/project",
+      timeout: 300000,
+    }
+
+    // #then
+    expect(config.enabled).toBe(true)
+    expect(config.provider).toBe("cursor")
+    expect(config.models?.explore).toBe("gpt-5.1-codex-mini")
+    expect(config.default_model).toBe("gpt-5.1-codex")
+    expect(config.timeout).toBe(300000)
+  })
+
+  test("external-cli config should work with minimal fields", () => {
+    // #given
+    const config: ExternalCliBackendConfig = {
+      enabled: false,
+      provider: "cursor",
+      default_model: "gpt-5.1-codex",
+      timeout: 300000,
+    }
+
+    // #then
+    expect(config.enabled).toBe(false)
+    expect(config.provider).toBe("cursor")
+    expect(config.models).toBeUndefined()
+    expect(config.workspace).toBeUndefined()
   })
 })

@@ -1021,6 +1021,46 @@ Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json`
 
 Each server supports: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
+### External CLI
+
+Use external CLI tools (like Cursor) for background agents. This allows you to leverage your existing subscriptions for background agent execution instead of OpenCode's native agent system.
+
+```json
+{
+  "external_cli": {
+    "enabled": true,
+    "provider": "cursor",
+    "models": {
+      "explore": "gpt-5.1-codex-mini",
+      "librarian": "gpt-5.2"
+    },
+    "default_model": "gpt-5.1-codex",
+    "timeout": 300000
+  }
+}
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `enabled` | `false` | Enable external CLI backend for background agents (opt-in) |
+| `provider` | `cursor` | CLI provider to use. Currently supported: `cursor` |
+| `models` | `{}` | Agent-specific model overrides. Keys are agent names, values are provider-specific model names |
+| `default_model` | `gpt-5.1-codex` | Default model when no agent-specific model is configured |
+| `workspace` | current directory | Workspace path for CLI commands |
+| `timeout` | `300000` | Timeout in milliseconds (5 minutes default, max 10 minutes) |
+
+#### Cursor Provider
+
+When using `provider: "cursor"`, the following models are available:
+
+`gpt-5.2`, `gpt-5.1`, `gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5.1-codex-max`, `gemini-3-pro`, `gemini-3-flash`, `grok`, `composer-1`
+
+**Requirements**: Cursor must be installed and authenticated. Test with `cursor agent -p --model gpt-5.1-codex --output-format json "test"`.
+
+#### Adding New Providers
+
+The external CLI system is designed to be extensible. New providers can be added by implementing the `ExternalCliProviderInterface` in `src/features/external-cli/providers/`.
+
 ### Experimental
 
 Opt-in experimental features that may change or be removed in future versions. Use with caution.

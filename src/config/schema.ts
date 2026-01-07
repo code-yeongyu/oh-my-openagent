@@ -232,6 +232,23 @@ export const RalphLoopConfigSchema = z.object({
   state_dir: z.string().optional(),
 })
 
+export const ExternalCliProviderSchema = z.enum(["cursor"])
+
+export const ExternalCliConfigSchema = z.object({
+  /** Enable external CLI as backend for background agents (default: false - opt-in feature) */
+  enabled: z.boolean().default(false),
+  /** CLI provider to use for background agent execution */
+  provider: ExternalCliProviderSchema.default("cursor"),
+  /** Model mapping for each agent type. Keys are agent names (explore, librarian, etc.), values are provider-specific model names */
+  models: z.record(z.string(), z.string()).optional(),
+  /** Default model to use when no agent-specific model is configured */
+  default_model: z.string().default("gpt-5.1-codex"),
+  /** Workspace path for CLI commands (default: current directory) */
+  workspace: z.string().optional(),
+  /** Timeout in milliseconds for CLI commands (default: 300000 = 5 minutes) */
+  timeout: z.number().min(1000).max(600000).default(300000),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -248,6 +265,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
+  external_cli: ExternalCliConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -264,5 +282,7 @@ export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningCo
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
+export type ExternalCliProvider = z.infer<typeof ExternalCliProviderSchema>
+export type ExternalCliConfig = z.infer<typeof ExternalCliConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

@@ -174,7 +174,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
-  const backgroundManager = new BackgroundManager(ctx);
+  const externalCliConfig = pluginConfig.external_cli
+    ? {
+        enabled: pluginConfig.external_cli.enabled ?? false,
+        provider: pluginConfig.external_cli.provider ?? "cursor",
+        models: pluginConfig.external_cli.models,
+        default_model: pluginConfig.external_cli.default_model ?? "gpt-5.1-codex",
+        workspace: pluginConfig.external_cli.workspace,
+        timeout: pluginConfig.external_cli.timeout ?? 300000,
+      }
+    : undefined;
+
+  const backgroundManager = new BackgroundManager(ctx, {
+    externalCli: externalCliConfig,
+  });
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })
