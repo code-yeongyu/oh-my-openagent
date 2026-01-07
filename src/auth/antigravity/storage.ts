@@ -48,9 +48,14 @@ export async function saveAccounts(storage: AccountStorage, path?: string): Prom
   await fs.mkdir(dirname(storagePath), { recursive: true })
 
   const content = JSON.stringify(storage, null, 2)
-  const tempPath = `${storagePath}.tmp.${process.pid}`
+  const tempPath = `${storagePath}.tmp.${process.pid}.${Date.now()}`
   await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 })
-  await fs.rename(tempPath, storagePath)
+  try {
+    await fs.rename(tempPath, storagePath)
+  } catch (error) {
+    await fs.unlink(tempPath).catch(() => {})
+    throw error
+  }
 }
 
 function isValidAccountStorage(data: unknown): data is AccountStorage {

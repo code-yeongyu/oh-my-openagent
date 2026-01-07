@@ -340,7 +340,8 @@ export async function createGoogleAntigravityAuthPlugin({
                   const { default: open } = await import("open")
                   try {
                     await open(additionalUrl)
-                  } catch {
+                  } catch (openError) {
+                    console.error("[antigravity-plugin] Failed to open browser:", openError)
                     await client.tui.showToast({
                       body: {
                         message: `Failed to open browser. Please visit: ${additionalUrl}`,
