@@ -47,11 +47,17 @@
 
 ## 用户评价
 
+> "它让我取消了Cursor的订阅。开源社区正在发生令人难以置信的事情。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
+
 > "如果 Claude Code 能在 7 天内完成人类 3 个月的工作，那么 Sisyphus 只需要 1 小时。任务完成之前它就是一直干。It is a discipline agent." — B, Quant Researcher
 
 > "只用了一天，就用 Oh My Opencode 干掉了 8000 个 eslint 警告" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
 > "用Ohmyopencode和ralph loop，一夜之间把45,000行的tauri应用转成了SaaS网页应用。从面试提示开始，让它对问题进行评分和推荐。看着它工作真是太神奇了，早上醒来一个基本能用的网站就搞定了！" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+
+> "用了 oh-my-opencode，你就回不去了" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "我还没法用言语表达它到底好在哪，但开发体验已经达到了完全不同的次元。" - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
 
 > "这个周末在用open code、oh my opencode和supermemory做一个我的世界/魂类的怪物项目。"
 > "吃完午饭去散步的时候让它加蹲下动画。[视频]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
@@ -60,15 +66,7 @@
 
 > "如果你能说服 @yeon_gyu_kim，就雇佣他吧，这家伙彻底改变了 opencode" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
 
-> "哇靠 @androolloyd 这玩意儿是真的，oh my opencode 太强了" — [z80.eth](https://x.com/0xz80/status/2001815226505924791)
-
-> "用了 oh-my-opencode，你就回不去了" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
-
-> "Oh My Opencode 独孤求败，没有对手" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
-
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
-
-> "西西弗斯这个名字本身不就很美吗?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
 ---
 

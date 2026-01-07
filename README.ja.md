@@ -45,11 +45,17 @@
 
 ## ユーザーレビュー
 
+> "Cursorのサブスクリプションを解約しました。オープンソースコミュニティで信じられないことが起きています。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
+
 > "人間が3ヶ月かかる仕事をClaude Codeが7日でやるなら、Sisyphusは1時間でやります。タスクが完了するまでただ動き続ける。It is a discipline agent." — B, Quant Researcher
 
 > "Oh My Opencodeを使って、たった1日で8000個のeslint警告を解消しました" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
 > "Ohmyopencodeとralph loopを使って、一晩で45,000行のtauriアプリをSaaSウェブアプリに変換しました。インタビュープロンプトから始めて、質問に対する評価と推奨を求めました。作業する様子を見ているのは驚きでしたし、朝起きたらほぼ完成したウェブサイトがありました！" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+
+> "oh-my-opencodeを使ってください、もう戻れませんよ" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "何どうすごいのかあまり言語化できてないけど、開発体験が異次元に上がった。" - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
 
 > "今週末はopen code、oh my opencode、supermemoryでマインクラフト/ソウルライクな何かを作る実験をしています。"
 > "昼食後の散歩に行く間に、しゃがみアニメーションを追加するよう頼みました。[動画]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
@@ -58,15 +64,7 @@
 
 > "@yeon_gyu_kimを説得できるなら雇うべきです。彼はopencodeに革命を起こしました" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
 
-> "やばい、これマジで本物だ @androolloyd oh my opencode 最高すぎる" — [z80.eth](https://x.com/0xz80/status/2001815226505924791)
-
-> "oh-my-opencodeを使ってください、もう戻れませんよ" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
-
-> "Oh My Opencodeは頂点に立っています、敵はいません" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
-
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
-
-> "シジフォスという名前自体が美しいじゃないですか?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
 ---
 
