@@ -1,6 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn, mock } from "bun:test"
-import { EventEmitter } from "node:events"
-import * as childProcess from "node:child_process"
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
@@ -8,11 +6,20 @@ import * as utils from "./session-notification-utils"
 
 describe("session-notification", () => {
   let notificationCalls: string[]
-  let spawnMock: ReturnType<typeof spyOn>
 
   function createMockPluginInput() {
     return {
-      $: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
+        // #given - track notification commands (osascript, notify-send, powershell)
+        const cmdStr = typeof cmd === "string" 
+          ? cmd 
+          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
+        
+        if (cmdStr.includes("osascript") || cmdStr.includes("notify-send") || cmdStr.includes("powershell")) {
+          notificationCalls.push(cmdStr)
+        }
+        return { stdout: "", stderr: "", exitCode: 0 }
+      },
       client: {
         session: {
           todo: async () => ({ data: [] }),
@@ -24,18 +31,6 @@ describe("session-notification", () => {
 
   beforeEach(() => {
     notificationCalls = []
-    
-    // Mock spawn to track notification commands
-    // Uses node:child_process.spawn instead of Bun shell to avoid GC crash
-    spawnMock = spyOn(childProcess, "spawn").mockImplementation(((cmd: string, args?: string[]) => {
-      // Track notification commands (osascript, notify-send, powershell)
-      if (cmd.includes("osascript") || cmd.includes("notify-send") || cmd.includes("powershell")) {
-        notificationCalls.push(`${cmd} ${(args ?? []).join(" ")}`)
-      }
-      const emitter = new EventEmitter()
-      setTimeout(() => emitter.emit("close", 0), 0)
-      return emitter as any
-    }) as typeof childProcess.spawn)
     
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
