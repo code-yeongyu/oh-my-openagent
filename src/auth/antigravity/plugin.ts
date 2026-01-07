@@ -38,12 +38,21 @@ import {
 import { createAntigravityFetch } from "./fetch"
 import { fetchProjectContext } from "./project"
 import { formatTokenForStorage } from "./token"
+import { AccountManager } from "./accounts"
+import { loadAccounts } from "./storage"
+import { promptAddAnotherAccount, promptAccountTier } from "./cli"
+import type { AccountTier, AntigravityRefreshParts } from "./types"
 
 /**
  * Provider ID for Google models
  * Antigravity is an auth method for Google, not a separate provider
  */
 const GOOGLE_PROVIDER_ID = "google"
+
+/**
+ * Maximum number of Google accounts that can be added
+ */
+const MAX_ACCOUNTS = 10
 
 /**
  * Type guard to check if auth is OAuth type
@@ -118,6 +127,31 @@ export async function createGoogleAntigravityAuthPlugin({
         console.log("[antigravity-plugin] OAuth auth detected, creating custom fetch")
       }
 
+      let accountManager: AccountManager | null = null
+      try {
+        const storedAccounts = await loadAccounts()
+        if (storedAccounts) {
+          accountManager = new AccountManager(currentAuth, storedAccounts)
+          if (process.env.ANTIGRAVITY_DEBUG === "1") {
+            console.log(`[antigravity-plugin] Loaded ${accountManager.getAccountCount()} accounts from storage`)
+          }
+        } else if (currentAuth.refresh.includes("|||")) {
+          accountManager = new AccountManager(currentAuth, null)
+          await accountManager.save()
+          if (process.env.ANTIGRAVITY_DEBUG === "1") {
+            console.log("[antigravity-plugin] Migrated multi-account auth to storage")
+          }
+        }
+      } catch (error) {
+        if (process.env.ANTIGRAVITY_DEBUG === "1") {
+          console.error(
+            `[antigravity-plugin] Failed to load accounts: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          )
+        }
+      }
+
       cachedClientId =
         (provider.options?.clientId as string) || ANTIGRAVITY_CLIENT_ID
       cachedClientSecret =
@@ -180,6 +214,7 @@ export async function createGoogleAntigravityAuthPlugin({
       return {
         fetch: antigravityFetch,
         apiKey: "antigravity-oauth",
+        accountManager,
       }
     },
 
@@ -197,6 +232,7 @@ export async function createGoogleAntigravityAuthPlugin({
         /**
          * Starts the OAuth authorization flow.
          * Opens browser for Google OAuth and waits for callback.
+         * Supports multi-account flow with prompts for additional accounts.
          *
          * @returns Authorization result with URL and callback
          */
@@ -238,28 +274,207 @@ export async function createGoogleAntigravityAuthPlugin({
 
                 const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret, serverHandle.port)
 
+                let email: string | undefined
                 try {
                   const userInfo = await fetchUserInfo(tokens.access_token)
+                  email = userInfo.email
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
-                    console.log(`[antigravity-plugin] Authenticated as: ${userInfo.email}`)
+                    console.log(`[antigravity-plugin] Authenticated as: ${email}`)
                   }
                 } catch {
                   // User info is optional
                 }
 
                 const projectContext = await fetchProjectContext(tokens.access_token)
+                const projectId = projectContext.cloudaicompanionProject || ""
+                const tier = await promptAccountTier()
 
-                const formattedRefresh = formatTokenForStorage(
-                  tokens.refresh_token,
-                  projectContext.cloudaicompanionProject || "",
-                  projectContext.managedProjectId
-                )
+                const expires = Date.now() + tokens.expires_in * 1000
+                const accounts: Array<{
+                  parts: AntigravityRefreshParts
+                  access: string
+                  expires: number
+                  email?: string
+                  tier: AccountTier
+                  projectId: string
+                }> = [{
+                  parts: {
+                    refreshToken: tokens.refresh_token,
+                    projectId,
+                    managedProjectId: projectContext.managedProjectId,
+                  },
+                  access: tokens.access_token,
+                  expires,
+                  email,
+                  tier,
+                  projectId,
+                }]
+
+                await client.tui.showToast({
+                  body: {
+                    message: `Account 1 authenticated${email ? ` (${email})` : ""}`,
+                    variant: "success",
+                  },
+                })
+
+                while (accounts.length < MAX_ACCOUNTS) {
+                  const addAnother = await promptAddAnotherAccount(accounts.length)
+                  if (!addAnother) break
+
+                  const additionalServerHandle = startCallbackServer()
+                  const { url: additionalUrl, verifier: additionalVerifier } = await buildAuthURL(
+                    undefined,
+                    cachedClientId,
+                    additionalServerHandle.port
+                  )
+
+                  const { default: open } = await import("open")
+                  await open(additionalUrl)
+
+                  try {
+                    const additionalResult = await additionalServerHandle.waitForCallback()
+
+                    if (additionalResult.error || !additionalResult.code) {
+                      await client.tui.showToast({
+                        body: {
+                          message: "Skipping this account...",
+                          variant: "warning",
+                        },
+                      })
+                      continue
+                    }
+
+                    const additionalState = decodeState(additionalResult.state)
+                    if (additionalState.verifier !== additionalVerifier) {
+                      await client.tui.showToast({
+                        body: {
+                          message: "Verification failed, skipping...",
+                          variant: "warning",
+                        },
+                      })
+                      continue
+                    }
+
+                    const additionalTokens = await exchangeCode(
+                      additionalResult.code,
+                      additionalVerifier,
+                      cachedClientId,
+                      cachedClientSecret,
+                      additionalServerHandle.port
+                    )
+
+                    let additionalEmail: string | undefined
+                    try {
+                      const additionalUserInfo = await fetchUserInfo(additionalTokens.access_token)
+                      additionalEmail = additionalUserInfo.email
+                    } catch {
+                      // User info is optional
+                    }
+
+                    const additionalProjectContext = await fetchProjectContext(additionalTokens.access_token)
+                    const additionalProjectId = additionalProjectContext.cloudaicompanionProject || ""
+                    const additionalTier = await promptAccountTier()
+
+                    const additionalExpires = Date.now() + additionalTokens.expires_in * 1000
+
+                    accounts.push({
+                      parts: {
+                        refreshToken: additionalTokens.refresh_token,
+                        projectId: additionalProjectId,
+                        managedProjectId: additionalProjectContext.managedProjectId,
+                      },
+                      access: additionalTokens.access_token,
+                      expires: additionalExpires,
+                      email: additionalEmail,
+                      tier: additionalTier,
+                      projectId: additionalProjectId,
+                    })
+
+                    await client.tui.showToast({
+                      body: {
+                        message: `Account ${accounts.length} authenticated${additionalEmail ? ` (${additionalEmail})` : ""}`,
+                        variant: "success",
+                      },
+                    })
+                  } catch (error) {
+                    additionalServerHandle.close()
+                    if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                      console.error(
+                        `[antigravity-plugin] Additional account OAuth failed: ${
+                          error instanceof Error ? error.message : "Unknown error"
+                        }`
+                      )
+                    }
+                    await client.tui.showToast({
+                      body: {
+                        message: "Failed to authenticate additional account, skipping...",
+                        variant: "warning",
+                      },
+                    })
+                    continue
+                  }
+                }
+
+                const firstAccount = accounts[0]!
+                try {
+                  const accountManager = new AccountManager(
+                    {
+                      refresh: formatTokenForStorage(
+                        firstAccount.parts.refreshToken,
+                        firstAccount.projectId,
+                        firstAccount.parts.managedProjectId
+                      ),
+                      access: firstAccount.access,
+                      expires: firstAccount.expires,
+                    },
+                    null
+                  )
+
+                  for (let i = 1; i < accounts.length; i++) {
+                    const acc = accounts[i]!
+                    accountManager.addAccount(
+                      acc.parts,
+                      acc.access,
+                      acc.expires,
+                      acc.email,
+                      acc.tier
+                    )
+                  }
+
+                  const currentAccount = accountManager.getCurrentAccount()
+                  if (currentAccount) {
+                    currentAccount.email = firstAccount.email
+                    currentAccount.tier = firstAccount.tier
+                  }
+
+                  await accountManager.save()
+
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.log(`[antigravity-plugin] Saved ${accounts.length} accounts to storage`)
+                  }
+                } catch (error) {
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.error(
+                      `[antigravity-plugin] Failed to save accounts: ${
+                        error instanceof Error ? error.message : "Unknown error"
+                      }`
+                    )
+                  }
+                }
+
+                const allRefreshTokens = accounts
+                  .map((acc) => formatTokenForStorage(
+                    acc.parts.refreshToken,
+                    acc.projectId,
+                    acc.parts.managedProjectId
+                  ))
+                  .join("|||")
 
                 return {
                   type: "success" as const,
-                  access: tokens.access_token,
-                  refresh: formattedRefresh,
-                  expires: Date.now() + tokens.expires_in * 1000,
+                  access: firstAccount.access,
+                  refresh: allRefreshTokens,
+                  expires: firstAccount.expires,
                 }
               } catch (error) {
                 serverHandle.close()
