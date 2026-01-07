@@ -37,7 +37,7 @@ import {
 } from "./oauth"
 import { createAntigravityFetch } from "./fetch"
 import { fetchProjectContext } from "./project"
-import { formatTokenForStorage } from "./token"
+import { formatTokenForStorage, parseStoredToken } from "./token"
 import { AccountManager } from "./accounts"
 import { loadAccounts } from "./storage"
 import { promptAddAnotherAccount, promptAccountTier } from "./cli"
@@ -136,7 +136,16 @@ export async function createGoogleAntigravityAuthPlugin({
             console.log(`[antigravity-plugin] Loaded ${accountManager.getAccountCount()} accounts from storage`)
           }
         } else if (currentAuth.refresh.includes("|||")) {
-          accountManager = new AccountManager(currentAuth, null)
+          const tokens = currentAuth.refresh.split("|||")
+          const firstToken = tokens[0]!
+          accountManager = new AccountManager(
+            { refresh: firstToken, access: currentAuth.access || "", expires: currentAuth.expires || 0 },
+            null
+          )
+          for (let i = 1; i < tokens.length; i++) {
+            const parts = parseStoredToken(tokens[i]!)
+            accountManager.addAccount(parts)
+          }
           await accountManager.save()
           if (process.env.ANTIGRAVITY_DEBUG === "1") {
             console.log("[antigravity-plugin] Migrated multi-account auth to storage")

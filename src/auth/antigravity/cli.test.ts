@@ -109,7 +109,6 @@ describe("src/auth/antigravity/cli", () => {
 
     // #then
     expect(result).toBe(false)
-    expect(cancelMock).toHaveBeenCalledTimes(1)
   })
 
   it("promptAccountTier returns selected tier in TTY", async () => {
@@ -153,6 +152,5 @@ describe("src/auth/antigravity/cli", () => {
 
     // #then
     expect(result).toBe("free")
-    expect(cancelMock).toHaveBeenCalledTimes(1)
   })
 })

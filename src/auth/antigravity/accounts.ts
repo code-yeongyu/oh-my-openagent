@@ -189,6 +189,18 @@ export class AccountManager {
 
     this.accounts.splice(index, 1)
 
+    if (index < this.activeIndex) {
+      this.activeIndex--
+    } else if (index === this.activeIndex) {
+      this.activeIndex = Math.min(this.activeIndex, Math.max(0, this.accounts.length - 1))
+    }
+
+    if (index < this.currentIndex) {
+      this.currentIndex--
+    } else if (index === this.currentIndex) {
+      this.currentIndex = Math.min(this.currentIndex, Math.max(0, this.accounts.length - 1))
+    }
+
     for (let i = 0; i < this.accounts.length; i++) {
       this.accounts[i]!.index = i
     }

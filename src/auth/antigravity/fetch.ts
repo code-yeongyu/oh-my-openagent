@@ -663,18 +663,21 @@ export function createAntigravityFetch(
             }
           }
 
-          debugLog(`[RATE-LIMIT] No alternative account available, returning 429`)
+          const isServerError = rateLimitInfo.status >= 500
+          debugLog(`[RATE-LIMIT] No alternative account available, returning ${rateLimitInfo.status}`)
           return new Response(
             JSON.stringify({
               error: {
-                message: `Rate limited. Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`,
-                type: "rate_limit",
-                code: "rate_limited",
+                message: isServerError
+                  ? `Server error (${rateLimitInfo.status}). Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`
+                  : `Rate limited. Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`,
+                type: isServerError ? "server_error" : "rate_limit",
+                code: isServerError ? "server_error" : "rate_limited",
               },
             }),
             {
-              status: 429,
-              statusText: "Too Many Requests",
+              status: rateLimitInfo.status,
+              statusText: isServerError ? "Server Error" : "Too Many Requests",
               headers: {
                 "Content-Type": "application/json",
                 "Retry-After": String(Math.ceil(rateLimitInfo.retryAfterMs / 1000)),

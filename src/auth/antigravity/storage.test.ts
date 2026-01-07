@@ -59,19 +59,20 @@ describe("storage", () => {
         return
       }
 
-      process.env.XDG_DATA_HOME = "/custom/data"
+      try {
+        process.env.XDG_DATA_HOME = "/custom/data"
 
-      // #when
-      const result = getDataDir()
+        // #when
+        const result = getDataDir()
 
-      // #then
-      expect(result).toBe("/custom/data/opencode")
-
-      // cleanup
-      if (originalXdg !== undefined) {
-        process.env.XDG_DATA_HOME = originalXdg
-      } else {
-        delete process.env.XDG_DATA_HOME
+        // #then
+        expect(result).toBe("/custom/data/opencode")
+      } finally {
+        if (originalXdg !== undefined) {
+          process.env.XDG_DATA_HOME = originalXdg
+        } else {
+          delete process.env.XDG_DATA_HOME
+        }
       }
     })
 
@@ -84,17 +85,18 @@ describe("storage", () => {
         return
       }
 
-      delete process.env.XDG_DATA_HOME
+      try {
+        delete process.env.XDG_DATA_HOME
 
-      // #when
-      const result = getDataDir()
+        // #when
+        const result = getDataDir()
 
-      // #then
-      expect(result).toBe(join(homedir(), ".local", "share", "opencode"))
-
-      // cleanup
-      if (originalXdg !== undefined) {
-        process.env.XDG_DATA_HOME = originalXdg
+        // #then
+        expect(result).toBe(join(homedir(), ".local", "share", "opencode"))
+      } finally {
+        if (originalXdg !== undefined) {
+          process.env.XDG_DATA_HOME = originalXdg
+        }
       }
     })
   })

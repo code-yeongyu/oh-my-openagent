@@ -44,7 +44,7 @@ export async function saveAccounts(storage: AccountStorage, path?: string): Prom
   await fs.mkdir(dirname(storagePath), { recursive: true })
 
   const content = JSON.stringify(storage, null, 2)
-  await fs.writeFile(storagePath, content, "utf-8")
+  await fs.writeFile(storagePath, content, { encoding: "utf-8", mode: 0o600 })
 }
 
 function isValidAccountStorage(data: unknown): data is AccountStorage {

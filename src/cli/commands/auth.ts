@@ -57,8 +57,8 @@ export async function removeAccount(indexOrEmail: string): Promise<number> {
 
   let index: number
 
-  const parsedIndex = parseInt(indexOrEmail, 10)
-  if (!isNaN(parsedIndex)) {
+  const parsedIndex = Number(indexOrEmail)
+  if (Number.isInteger(parsedIndex) && String(parsedIndex) === indexOrEmail) {
     index = parsedIndex
   } else {
     index = accounts.accounts.findIndex((acc) => acc.email === indexOrEmail)
