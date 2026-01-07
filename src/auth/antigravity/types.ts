@@ -247,8 +247,3 @@ export interface AccountStorage {
   accounts: AccountMetadata[]
   activeIndex: number
 }
-
-/** Runtime account state extends metadata */
-export interface ManagedAccount extends AccountMetadata {
-  // Runtime fields can be added here if needed
-}

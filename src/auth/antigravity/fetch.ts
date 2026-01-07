@@ -389,7 +389,7 @@ export function createAntigravityFetch(
   let manager: AccountManager | null = accountManager || null
   let accountsLoaded = false
 
-  return async (url: string, init: RequestInit = {}): Promise<Response> => {
+  const fetchFn = async (url: string, init: RequestInit = {}): Promise<Response> => {
     debugLog(`Intercepting request to: ${url}`)
 
     // Get current auth state
@@ -659,7 +659,7 @@ export function createAntigravityFetch(
             const nextAccount = manager.getCurrentOrNextForFamily(family)
             if (nextAccount && nextAccount.index !== currentAccount.index) {
               debugLog(`[RATE-LIMIT] Switched to account ${nextAccount.index + 1}`)
-              return createAntigravityFetch(getAuth, client, providerId, clientId, clientSecret, manager)(url, init)
+              return fetchFn(url, init)
             }
           }
 
@@ -715,6 +715,8 @@ export function createAntigravityFetch(
 
     return executeWithEndpoints()
   }
+
+  return fetchFn
 }
 
 /**
