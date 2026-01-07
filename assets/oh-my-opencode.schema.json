@@ -1406,9 +1406,6 @@
     "experimental": {
       "type": "object",
       "properties": {
-        "aggressive_truncation": {
-          "type": "boolean"
-        },
         "auto_resume": {
           "type": "boolean"
         },

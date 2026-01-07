@@ -117,7 +117,6 @@ describe("executeCompact lock management", () => {
 
     const experimental = {
       truncate_all_tool_outputs: false,
-      aggressive_truncation: true,
     }
     const dcpForCompaction = true
 

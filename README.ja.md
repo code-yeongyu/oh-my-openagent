@@ -1022,8 +1022,8 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
   "experimental": {
     "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
-    "aggressive_truncation": true,
-    "auto_resume": true
+    "auto_resume": true,
+    "dcp_for_compaction": true
   }
 }
 ```
@@ -1032,7 +1032,6 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 | --------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `preemptive_compaction_threshold` | `0.85`     | プリエンプティブコンパクションをトリガーする閾値（0.5-0.95）。`preemptive-compaction` フックはデフォルトで有効です。このオプションで閾値をカスタマイズできます。                 |
 | `truncate_all_tool_outputs`       | `false`    | ホワイトリストのツール（Grep、Glob、LSP、AST-grep）だけでなく、すべてのツール出力を切り詰めます。Tool output truncator はデフォルトで有効です - `disabled_hooks`で無効化できます。 |
-| `aggressive_truncation`           | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                 |
 | `auto_resume`                     | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                        |
 | `dcp_for_compaction`              | `false`    | コンパクション用DCP（動的コンテキスト整理）を有効化 - トークン制限超過時に最初に実行されます。コンパクション前に重複したツール呼び出しと古いツール出力を整理します。                |
 

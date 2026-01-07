@@ -1023,8 +1023,8 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
   "experimental": {
     "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
-    "aggressive_truncation": true,
-    "auto_resume": true
+    "auto_resume": true,
+    "dcp_for_compaction": true
   }
 }
 ```
@@ -1033,7 +1033,6 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 | --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `preemptive_compaction_threshold` | `0.85`  | 触发预防性压缩的阈值比例（0.5-0.95）。`preemptive-compaction` 钩子默认启用；此选项用于自定义阈值。                                                     |
 | `truncate_all_tool_outputs`       | `false` | 截断所有工具输出，而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。Tool output truncator 默认启用 - 使用 `disabled_hooks` 禁用。                    |
-| `aggressive_truncation`           | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
 | `auto_resume`                     | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
 | `dcp_for_compaction`              | `false` | 启用压缩用 DCP（动态上下文剪枝）- 在超出 token 限制时首先执行。在压缩前清理重复的工具调用和旧的工具输出。                                            |
 
