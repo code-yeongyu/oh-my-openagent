@@ -20,6 +20,9 @@
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "./constants"
 import { fetchProjectContext, clearProjectContextCache, invalidateProjectContextByRefreshToken } from "./project"
 import { isTokenExpired, refreshAccessToken, parseStoredToken, formatTokenForStorage, AntigravityTokenRefreshError } from "./token"
+import { AccountManager, type ManagedAccount } from "./accounts"
+import { loadAccounts } from "./storage"
+import type { ModelFamily } from "./types"
 import { transformRequest } from "./request"
 import { convertRequestBody, hasOpenAIMessages } from "./message-converter"
 import {
@@ -69,6 +72,15 @@ function isRetryableError(status: number): boolean {
   return false
 }
 
+/**
+ * Detect model family from URL for rate limit tracking
+ */
+function getModelFamilyFromUrl(url: string): ModelFamily {
+  if (url.includes("claude")) return "claude"
+  if (url.includes("flash")) return "gemini-flash"
+  return "gemini-pro"
+}
+
 const GCP_PERMISSION_ERROR_PATTERNS = [
   "PERMISSION_DENIED",
   "does not have permission",
@@ -109,7 +121,13 @@ interface AttemptFetchOptions {
   thoughtSignature?: string
 }
 
-type AttemptFetchResult = Response | null | "pass-through" | "needs-refresh"
+interface RateLimitInfo {
+  type: "rate-limited"
+  retryAfterMs: number
+  status: number
+}
+
+type AttemptFetchResult = Response | null | "pass-through" | "needs-refresh" | RateLimitInfo
 
 async function attemptFetch(
   options: AttemptFetchOptions
@@ -202,6 +220,18 @@ async function attemptFetch(
             debugLog(`[RETRY] GCP permission error, max retries exceeded`)
           }
         } catch {}
+      }
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("retry-after")
+        const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000
+        debugLog(`[429] Rate limited, retry-after: ${retryAfterMs}ms`)
+        return { type: "rate-limited" as const, retryAfterMs, status: 429 }
+      }
+
+      if (response.status >= 500 && response.status < 600) {
+        debugLog(`[5xx] Server error ${response.status}, marking for rotation`)
+        return { type: "rate-limited" as const, retryAfterMs: 300000, status: response.status }
       }
 
       if (!response.ok && (await isRetryableResponse(response))) {
@@ -350,11 +380,14 @@ export function createAntigravityFetch(
   client: AuthClient,
   providerId: string,
   clientId?: string,
-  clientSecret?: string
+  clientSecret?: string,
+  accountManager?: AccountManager | null
 ): (url: string, init?: RequestInit) => Promise<Response> {
   let cachedTokens: AntigravityTokens | null = null
   let cachedProjectId: string | null = null
   const fetchInstanceId = crypto.randomUUID()
+  let manager: AccountManager | null = accountManager || null
+  let accountsLoaded = false
 
   return async (url: string, init: RequestInit = {}): Promise<Response> => {
     debugLog(`Intercepting request to: ${url}`)
@@ -366,7 +399,40 @@ export function createAntigravityFetch(
     }
 
     // Parse stored token format
-    const refreshParts = parseStoredToken(auth.refresh)
+    let refreshParts = parseStoredToken(auth.refresh)
+
+    if (!accountsLoaded && !manager && auth.refresh) {
+      const storedAccounts = await loadAccounts()
+      if (storedAccounts) {
+        manager = new AccountManager(
+          { refresh: auth.refresh, access: auth.access || "", expires: auth.expires || 0 },
+          storedAccounts
+        )
+        debugLog(`[ACCOUNTS] Loaded ${manager.getAccountCount()} accounts from storage`)
+      }
+      accountsLoaded = true
+    }
+
+    let currentAccount: ManagedAccount | null = null
+    if (manager) {
+      const family = getModelFamilyFromUrl(url)
+      currentAccount = manager.getCurrentOrNextForFamily(family)
+
+      if (currentAccount) {
+        debugLog(`[ACCOUNTS] Using account ${currentAccount.index + 1}/${manager.getAccountCount()} for ${family}`)
+
+        if (currentAccount.access && currentAccount.expires) {
+          auth.access = currentAccount.access
+          auth.expires = currentAccount.expires
+        }
+
+        refreshParts = {
+          refreshToken: currentAccount.parts.refreshToken,
+          projectId: currentAccount.parts.projectId,
+          managedProjectId: currentAccount.parts.managedProjectId,
+        }
+      }
+    }
 
     // Build initial token state
     if (!cachedTokens) {
@@ -581,7 +647,43 @@ export function createAntigravityFetch(
           }
         }
 
-        if (response) {
+        if (response && typeof response === "object" && "type" in response && response.type === "rate-limited") {
+          const rateLimitInfo = response as RateLimitInfo
+          const family = getModelFamilyFromUrl(url)
+
+          if (rateLimitInfo.retryAfterMs > 5000 && manager && currentAccount) {
+            manager.markRateLimited(currentAccount, rateLimitInfo.retryAfterMs, family)
+            await manager.save()
+            debugLog(`[RATE-LIMIT] Account ${currentAccount.index + 1} rate-limited for ${family}, rotating...`)
+
+            const nextAccount = manager.getCurrentOrNextForFamily(family)
+            if (nextAccount && nextAccount.index !== currentAccount.index) {
+              debugLog(`[RATE-LIMIT] Switched to account ${nextAccount.index + 1}`)
+              return createAntigravityFetch(getAuth, client, providerId, clientId, clientSecret, manager)(url, init)
+            }
+          }
+
+          debugLog(`[RATE-LIMIT] No alternative account available, returning 429`)
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: `Rate limited. Retry after ${Math.ceil(rateLimitInfo.retryAfterMs / 1000)} seconds`,
+                type: "rate_limit",
+                code: "rate_limited",
+              },
+            }),
+            {
+              status: 429,
+              statusText: "Too Many Requests",
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": String(Math.ceil(rateLimitInfo.retryAfterMs / 1000)),
+              },
+            }
+          )
+        }
+
+        if (response && response instanceof Response) {
           debugLog(`Success with endpoint: ${endpoint}`)
           const transformedResponse = await transformResponseWithThinking(
             response,
