@@ -10,6 +10,7 @@
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | 加入我们的 [Discord 社区](https://discord.gg/PUwSMR9XNk)，和贡献者们、`oh-my-opencode` 用户们一起交流。 |
 > | :-----| :----- |
 > | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` 的消息之前在我的 X 账号发，但账号被无辜封了，<br />现在 [@justsisyphus](https://x.com/justsisyphus) 替我发更新。 |
+> | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | 在 GitHub 上关注 [@code-yeongyu](https://github.com/code-yeongyu)，了解更多项目。 |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
@@ -46,11 +47,17 @@
 
 ## 用户评价
 
+> "它让我取消了Cursor的订阅。开源社区正在发生令人难以置信的事情。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
+
 > "如果 Claude Code 能在 7 天内完成人类 3 个月的工作，那么 Sisyphus 只需要 1 小时。任务完成之前它就是一直干。It is a discipline agent." — B, Quant Researcher
 
 > "只用了一天，就用 Oh My Opencode 干掉了 8000 个 eslint 警告" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
 > "用Ohmyopencode和ralph loop，一夜之间把45,000行的tauri应用转成了SaaS网页应用。从面试提示开始，让它对问题进行评分和推荐。看着它工作真是太神奇了，早上醒来一个基本能用的网站就搞定了！" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+
+> "用了 oh-my-opencode，你就回不去了" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+
+> "我还没法用言语表达它到底好在哪，但开发体验已经达到了完全不同的次元。" - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
 
 > "这个周末在用open code、oh my opencode和supermemory做一个我的世界/魂类的怪物项目。"
 > "吃完午饭去散步的时候让它加蹲下动画。[视频]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
@@ -59,15 +66,7 @@
 
 > "如果你能说服 @yeon_gyu_kim，就雇佣他吧，这家伙彻底改变了 opencode" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
 
-> "哇靠 @androolloyd 这玩意儿是真的，oh my opencode 太强了" — [z80.eth](https://x.com/0xz80/status/2001815226505924791)
-
-> "用了 oh-my-opencode，你就回不去了" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
-
-> "Oh My Opencode 独孤求败，没有对手" — [RyanOnThePath](https://x.com/RyanOnThePath/status/2001438321252118548)
-
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
-
-> "西西弗斯这个名字本身不就很美吗?" — Sigrid ([@sigridjin_eth](https://x.com/sigridjin_eth))
 
 ---
 
@@ -646,7 +645,8 @@ Oh My OpenCode 会扫这些地方：
     "commands": false,
     "skills": false,
     "agents": false,
-    "hooks": false
+    "hooks": false,
+    "plugins": false
   }
 }
 ```
@@ -658,8 +658,24 @@ Oh My OpenCode 会扫这些地方：
 | `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
 | `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | 内置 Agent（oracle、librarian 等）                    |
 | `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
+| `plugins`  | `~/.claude/plugins/`（Claude Code 市场插件）                                          | -                                                     |
 
 默认都是 `true`（开）。想全兼容 Claude Code？那就别写 `claude_code` 这段。
+
+**只禁用特定插件**用 `plugins_override`：
+
+```json
+{
+  "claude_code": {
+    "plugins_override": {
+      "claude-mem@thedotmack": false,
+      "some-other-plugin@marketplace": false
+    }
+  }
+}
+```
+
+这样插件系统还是开着的，只是用完整标识符（`plugin-name@marketplace-name`）关掉特定插件。
 
 ### 不只是为了 Agent，也是为了你
 
@@ -909,6 +925,40 @@ Sisyphus Agent 也能自定义：
 | `default_builder_enabled`   | `false` | 设为 `true` 就启用 OpenCode-Builder Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
 | `planner_enabled`           | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（与 OpenCode plan 相同，因 SDK 限制仅改名）。默认启用。                                                             |
 | `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
+
+### Background Tasks（后台任务）
+
+配置后台 Agent 任务的并发限制。这控制了可以同时运行多少个并行后台 Agent。
+
+```json
+{
+  "background_task": {
+    "defaultConcurrency": 5,
+    "providerConcurrency": {
+      "anthropic": 3,
+      "openai": 5,
+      "google": 10
+    },
+    "modelConcurrency": {
+      "anthropic/claude-opus-4-5": 2,
+      "google/gemini-3-flash": 10
+    }
+  }
+}
+```
+
+| 选项                  | 默认值 | 说明                                                                                                           |
+| --------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -      | 所有提供商/模型的默认最大并发后台任务数                                                                        |
+| `providerConcurrency` | -      | 按提供商设置并发限制。键是提供商名称（例如：`anthropic`、`openai`、`google`）                                  |
+| `modelConcurrency`    | -      | 按模型设置并发限制。键是完整的模型名称（例如：`anthropic/claude-opus-4-5`）。会覆盖提供商级别的限制。          |
+
+**优先级顺序**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+**使用场景**:
+- 限制昂贵的模型（如 Opus）以防止成本飙升
+- 允许快速/便宜的模型（如 Gemini Flash）执行更多并发任务
+- 通过设置提供商级别上限来遵守提供商的速率限制
 
 ### Hooks
 

@@ -27,7 +27,7 @@ export class CursorProvider implements ExternalCliProviderInterface {
 
     args.push(prompt)
 
-    log("[external-cli:cursor] Executing:", { model, promptLength: prompt.length })
+    log("[external-cli:cursor] Executing:", { model, promptLength: prompt.length, args })
 
     return new Promise((resolve) => {
       let stdout = ""
@@ -36,8 +36,9 @@ export class CursorProvider implements ExternalCliProviderInterface {
 
       const proc = spawn("cursor-agent", args, {
         stdio: ["pipe", "pipe", "pipe"],
-        timeout,
       })
+
+      proc.stdin.end()
 
       const timeoutId = setTimeout(() => {
         timedOut = true
@@ -76,6 +77,7 @@ export class CursorProvider implements ExternalCliProviderInterface {
 
         try {
           const response = JSON.parse(stdout.trim()) as CursorAgentResponse
+          log("[external-cli:cursor] Response:", { response: JSON.stringify(response, null, 2) })
 
           if (response.is_error) {
             resolve({
@@ -120,14 +122,22 @@ export class CursorProvider implements ExternalCliProviderInterface {
     return new Promise((resolve) => {
       const proc = spawn("cursor-agent", ["--version"], {
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: 5000,
       })
 
+      proc.stdin.end()
+
+      const timeoutId = setTimeout(() => {
+        proc.kill("SIGTERM")
+        resolve(false)
+      }, 5000)
+
       proc.on("close", (code) => {
+        clearTimeout(timeoutId)
         resolve(code === 0)
       })
 
       proc.on("error", () => {
+        clearTimeout(timeoutId)
         resolve(false)
       })
     })

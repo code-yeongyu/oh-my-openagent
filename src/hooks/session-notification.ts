@@ -122,7 +122,7 @@ async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Prom
     case "win32": {
       const powershellPath = await getPowershellPath()
       if (!powershellPath) return
-      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + soundPath + "').PlaySync()"}`.catch(() => {})
+      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + soundPath.replace(/'/g, "''") + "').PlaySync()"}`.catch(() => {})
       break
     }
   }

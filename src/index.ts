@@ -62,7 +62,7 @@ import {
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { type HookName } from "./config";
-import { log } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -83,9 +83,24 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const sessionRecovery = isHookEnabled("session-recovery")
     ? createSessionRecoveryHook(ctx, { experimental: pluginConfig.experimental })
     : null;
-  const sessionNotification = isHookEnabled("session-notification")
-    ? createSessionNotification(ctx)
-    : null;
+  
+  // Check for conflicting notification plugins before creating session-notification
+  let sessionNotification = null;
+  if (isHookEnabled("session-notification")) {
+    const forceEnable = pluginConfig.notification?.force_enable ?? false;
+    const externalNotifier = detectExternalNotificationPlugin(ctx.directory);
+    
+    if (externalNotifier.detected && !forceEnable) {
+      // External notification plugin detected - skip our notification to avoid conflicts
+      console.warn(getNotificationConflictWarning(externalNotifier.pluginName!));
+      log("session-notification disabled due to external notifier conflict", {
+        detected: externalNotifier.pluginName,
+        allPlugins: externalNotifier.allPlugins,
+      });
+    } else {
+      sessionNotification = createSessionNotification(ctx);
+    }
+  }
 
   const commentChecker = isHookEnabled("comment-checker")
     ? createCommentCheckerHooks(pluginConfig.comment_checker)
@@ -166,10 +181,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? createAutoSlashCommandHook()
-    : null;
-
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
     : null;
@@ -185,9 +196,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     : undefined;
 
-  const backgroundManager = new BackgroundManager(ctx, {
-    externalCli: externalCliConfig,
-  });
+  const backgroundManager = new BackgroundManager(
+    ctx,
+    { externalCli: externalCliConfig },
+    pluginConfig.background_task
+  );
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })
@@ -251,6 +264,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     commands,
     skills: mergedSkills,
   });
+
+  const autoSlashCommand = isHookEnabled("auto-slash-command")
+    ? createAutoSlashCommandHook({ skills: mergedSkills })
+    : null;
 
   const googleAuthHooks = pluginConfig.google_auth !== false
     ? await createGoogleAntigravityAuthPlugin(ctx)

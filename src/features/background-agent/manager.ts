@@ -7,6 +7,8 @@ import type {
 } from "./types"
 import type { ExternalCliBackendConfig } from "../external-cli"
 import { log } from "../../shared/logger"
+import { ConcurrencyManager } from "./concurrency"
+import type { BackgroundTaskConfig } from "../../config/schema"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
@@ -67,13 +69,15 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private externalCliConfig?: ExternalCliBackendConfig
+  private concurrencyManager: ConcurrencyManager
 
-  constructor(ctx: PluginInput, options?: BackgroundManagerOptions) {
+  constructor(ctx: PluginInput, options?: BackgroundManagerOptions, config?: BackgroundTaskConfig) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
     this.externalCliConfig = options?.externalCli
+    this.concurrencyManager = new ConcurrencyManager(config)
   }
 
   isExternalCliEnabled(): boolean {
@@ -169,14 +173,22 @@ export class BackgroundManager {
   }
 
   private async launchWithOpencode(input: LaunchInput): Promise<BackgroundTask> {
+    const model = input.agent
+
+    await this.concurrencyManager.acquire(model)
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
       },
+    }).catch((error) => {
+      this.concurrencyManager.release(model)
+      throw error
     })
 
     if (createResult.error) {
+      this.concurrencyManager.release(model)
       throw new Error(`Failed to create background session: ${createResult.error}`)
     }
 
@@ -199,6 +211,7 @@ export class BackgroundManager {
       },
       parentModel: input.parentModel,
       backend: "opencode",
+      model,
     }
 
     this.tasks.set(task.id, task)
@@ -213,6 +226,7 @@ export class BackgroundManager {
         tools: {
           task: false,
           background_task: false,
+          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -228,6 +242,9 @@ export class BackgroundManager {
           existingTask.error = errorMessage
         }
         existingTask.completedAt = new Date()
+        if (existingTask.model) {
+          this.concurrencyManager.release(existingTask.model)
+        }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask)
       }
@@ -349,6 +366,9 @@ export class BackgroundManager {
         task.error = "Session deleted"
       }
 
+      if (task.model) {
+        this.concurrencyManager.release(task.model)
+      }
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
@@ -426,6 +446,10 @@ export class BackgroundManager {
 
     const taskId = task.id
     setTimeout(async () => {
+      if (task.model) {
+        this.concurrencyManager.release(task.model)
+      }
+
       try {
         const messageDir = getMessageDir(task.parentSessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
@@ -448,7 +472,6 @@ export class BackgroundManager {
       } catch (error) {
         log("[background-agent] prompt failed:", String(error))
       } finally {
-        // Always clean up both maps to prevent memory leaks
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         log("[background-agent] Removed completed task from memory:", taskId)
@@ -487,6 +510,9 @@ export class BackgroundManager {
         task.status = "error"
         task.error = "Task timed out after 30 minutes"
         task.completedAt = new Date()
+        if (task.model) {
+          this.concurrencyManager.release(task.model)
+        }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)

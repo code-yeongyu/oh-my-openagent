@@ -30,6 +30,7 @@ export interface BackgroundTask {
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
   backend: BackgroundBackend
+  model?: string
 }
 
 export interface LaunchInput {

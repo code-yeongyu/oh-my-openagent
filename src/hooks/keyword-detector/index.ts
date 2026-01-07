@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
 import { log } from "../../shared"
+import { getMainSessionID } from "../../features/claude-code-session-state"
 
 export * from "./detector"
 export * from "./constants"
@@ -21,10 +22,26 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
-      const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
+      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
 
       if (detectedKeywords.length === 0) {
         return
+      }
+
+      // Only ultrawork keywords work in non-main sessions
+      // Other keywords (search, analyze, etc.) only work in main sessions
+      const mainSessionID = getMainSessionID()
+      const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
+
+      if (isNonMainSession) {
+        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        if (detectedKeywords.length === 0) {
+          log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
+            sessionID: input.sessionID,
+            mainSessionID,
+          })
+          return
+        }
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
