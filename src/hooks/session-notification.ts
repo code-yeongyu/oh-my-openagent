@@ -1,6 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
-import { spawn } from "node:child_process"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
 import {
   getOsascriptPath,
@@ -11,20 +10,19 @@ import {
   getAplayPath,
   startBackgroundCheck,
 } from "./session-notification-utils"
+import { tracedSpawnAsync, trace, isTracingEnabled } from "../shared/debug-tracer"
 
 /**
  * Execute a command using node:child_process instead of Bun shell.
  * This avoids Bun's ShellInterpreter GC bug on Windows (oven-sh/bun#23177, #24368).
+ * Now with tracing support for crash debugging.
  */
-function execCommand(command: string, args: string[]): Promise<void> {
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, {
-      stdio: "ignore",
-      detached: false,
-    })
-    proc.on("close", () => resolve())
-    proc.on("error", () => resolve())
-  })
+function execCommand(command: string, args: string[], traceName?: string): Promise<void> {
+  return tracedSpawnAsync(command, args, {
+    stdio: "ignore",
+    detached: false,
+    traceName: traceName || `notification.${command.split(/[/\\]/).pop()}`,
+  }).then(() => {})
 }
 
 interface Todo {
@@ -74,6 +72,10 @@ async function sendNotification(
   title: string,
   message: string
 ): Promise<void> {
+  if (isTracingEnabled()) {
+    trace("notification.send", "notification.start", { platform: p, title })
+  }
+  
   switch (p) {
     case "darwin": {
       const osascriptPath = await getOsascriptPath()
@@ -83,7 +85,7 @@ async function sendNotification(
       const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       const script = `display notification "${esMessage}" with title "${esTitle}"`
       // Use node:child_process instead of Bun shell to avoid potential GC issues
-      await execCommand(osascriptPath, ["-e", script]).catch(() => {})
+      await execCommand(osascriptPath, ["-e", script], "notification.darwin.osascript").catch(() => {})
       break
     }
     case "linux": {
@@ -91,7 +93,7 @@ async function sendNotification(
       if (!notifySendPath) return
 
       // Use node:child_process instead of Bun shell to avoid potential GC issues
-      await execCommand(notifySendPath, [title, message]).catch(() => {})
+      await execCommand(notifySendPath, [title, message], "notification.linux.notify-send").catch(() => {})
       break
     }
     case "win32": {
@@ -113,30 +115,38 @@ $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNoti
 $Notifier.Show($Toast)
 `.trim().replace(/\n/g, "; ")
       // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
-      await execCommand(powershellPath, ["-Command", toastScript]).catch(() => {})
+      await execCommand(powershellPath, ["-Command", toastScript], "notification.win32.toast").catch(() => {})
       break
     }
+  }
+  
+  if (isTracingEnabled()) {
+    trace("notification.send", "notification.complete", { platform: p })
   }
 }
 
 async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Promise<void> {
+  if (isTracingEnabled()) {
+    trace("notification.sound", "sound.start", { platform: p, soundPath })
+  }
+  
   switch (p) {
     case "darwin": {
       const afplayPath = await getAfplayPath()
       if (!afplayPath) return
       // Use node:child_process instead of Bun shell to avoid potential GC issues
-      execCommand(afplayPath, [soundPath]).catch(() => {})
+      execCommand(afplayPath, [soundPath], "notification.darwin.afplay").catch(() => {})
       break
     }
     case "linux": {
       const paplayPath = await getPaplayPath()
       if (paplayPath) {
         // Use node:child_process instead of Bun shell to avoid potential GC issues
-        execCommand(paplayPath, [soundPath]).catch(() => {})
+        execCommand(paplayPath, [soundPath], "notification.linux.paplay").catch(() => {})
       } else {
         const aplayPath = await getAplayPath()
         if (aplayPath) {
-          execCommand(aplayPath, [soundPath]).catch(() => {})
+          execCommand(aplayPath, [soundPath], "notification.linux.aplay").catch(() => {})
         }
       }
       break
@@ -146,7 +156,7 @@ async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Prom
       if (!powershellPath) return
       // Use node:child_process instead of Bun shell to avoid GC crash (oven-sh/bun#23177)
       const soundScript = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
-      execCommand(powershellPath, ["-Command", soundScript]).catch(() => {})
+      execCommand(powershellPath, ["-Command", soundScript], "notification.win32.sound").catch(() => {})
       break
     }
   }

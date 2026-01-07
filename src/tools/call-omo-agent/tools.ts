@@ -3,6 +3,7 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { trace, startSpan, endSpan, isTracingEnabled } from "../../shared/debug-tracer"
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -37,6 +38,16 @@ export function createCallOmoAgent(
     async execute(args: CallOmoAgentArgs, toolContext) {
       const toolCtx = toolContext as ToolContextWithMetadata
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
+      
+      // Trace agent invocation
+      const spanId = isTracingEnabled() 
+        ? startSpan("subagent.start", `call_omo_agent.${args.subagent_type}`, {
+            agent: args.subagent_type,
+            runInBackground: args.run_in_background,
+            description: args.description,
+            sessionId: args.session_id,
+          })
+        : undefined
 
       if (!ALLOWED_AGENTS.includes(args.subagent_type as typeof ALLOWED_AGENTS[number])) {
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`

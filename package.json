@@ -68,6 +68,7 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.10",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "latest",

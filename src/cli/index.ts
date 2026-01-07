@@ -4,6 +4,7 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { debugBundle, type DebugBundleOptions } from "./debug-bundle"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -131,6 +132,37 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("debug-bundle")
+  .description("Create a diagnostic bundle for crash debugging")
+  .option("-o, --output <path>", "Output file path")
+  .option("--verbose", "Show detailed diagnostic information")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode debug-bundle
+  $ bunx oh-my-opencode debug-bundle --output crash-report.json
+  $ bunx oh-my-opencode debug-bundle --verbose
+
+This command collects:
+  - Trace events from the debug log (if tracing was enabled)
+  - System information (OS, memory, CPU)
+  - Redacted environment variables
+  - Recent log entries
+
+To enable tracing before a crash:
+  PowerShell: $env:OMO_DEBUG = "1"; opencode
+  CMD:        set OMO_DEBUG=1 && opencode
+  Bash:       OMO_DEBUG=1 opencode
+`)
+  .action(async (options) => {
+    const bundleOptions: DebugBundleOptions = {
+      output: options.output,
+      verbose: options.verbose ?? false,
+    }
+    const exitCode = await debugBundle(bundleOptions)
     process.exit(exitCode)
   })
 

@@ -6,6 +6,7 @@ import type {
   LaunchInput,
 } from "./types"
 import { log } from "../../shared/logger"
+import { trace, startSpan, endSpan, isTracingEnabled } from "../../shared/debug-tracer"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
 import {
@@ -121,6 +122,17 @@ export class BackgroundManager {
     this.startPolling()
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
+    
+    // Trace subagent launch
+    if (isTracingEnabled()) {
+      trace("subagent.start", `background.${input.agent}.launch`, {
+        taskId: task.id,
+        sessionID,
+        parentSessionID: input.parentSessionID,
+        agent: input.agent,
+        description: input.description,
+      })
+    }
 
     this.client.session.promptAsync({
       path: { id: sessionID },
@@ -150,6 +162,16 @@ export class BackgroundManager {
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask)
+        
+        // Trace task error
+        if (isTracingEnabled()) {
+          trace("subagent.error", `background.${input.agent}.error`, {
+            taskId: existingTask.id,
+            sessionID,
+            agent: input.agent,
+            error: errorMessage,
+          }, error instanceof Error ? error : new Error(errorMessage))
+        }
       }
     })
 
@@ -252,6 +274,18 @@ export class BackgroundManager {
         this.markForNotification(task)
         this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
+        
+        // Trace task completion
+        if (isTracingEnabled()) {
+          const durationMs = task.completedAt.getTime() - task.startedAt.getTime()
+          trace("background.complete", `background.${task.agent}.complete`, {
+            taskId: task.id,
+            sessionID,
+            agent: task.agent,
+            durationMs,
+            toolCalls: task.progress?.toolCalls,
+          })
+        }
       })
     }
 
@@ -267,6 +301,16 @@ export class BackgroundManager {
         task.status = "cancelled"
         task.completedAt = new Date()
         task.error = "Session deleted"
+        
+        // Trace task cancellation
+        if (isTracingEnabled()) {
+          trace("subagent.stop", `background.${task.agent}.cancelled`, {
+            taskId: task.id,
+            sessionID,
+            agent: task.agent,
+            reason: "session_deleted",
+          })
+        }
       }
 
       if (task.model) {

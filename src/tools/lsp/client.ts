@@ -3,6 +3,7 @@ import { readFileSync } from "fs"
 import { extname, resolve } from "path"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
+import { trace, startSpan, endSpan, isTracingEnabled } from "../../shared/debug-tracer"
 
 interface ManagedClient {
   client: LSPClient
@@ -202,6 +203,16 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
+    const serverName = this.server.command[0]?.split(/[/\\]/).pop() || "lsp"
+    
+    if (isTracingEnabled()) {
+      trace("spawn.start", `lsp.${serverName}.start`, {
+        server: this.server.id,
+        command: this.server.command,
+        root: this.root,
+      })
+    }
+    
     this.proc = spawn(this.server.command, {
       stdin: "pipe",
       stdout: "pipe",
@@ -214,7 +225,23 @@ export class LSPClient {
     })
 
     if (!this.proc) {
+      if (isTracingEnabled()) {
+        trace("spawn.error", `lsp.${serverName}.spawn_failed`, {
+          server: this.server.id,
+        })
+      }
       throw new Error(`Failed to spawn LSP server: ${this.server.command.join(" ")}`)
+    }
+    
+    // Track process exit
+    if (isTracingEnabled()) {
+      this.proc.exited.then((code) => {
+        trace("spawn.exit", `lsp.${serverName}.exit`, {
+          server: this.server.id,
+          exitCode: code,
+          pid: this.proc?.pid,
+        })
+      }).catch(() => {})
     }
 
     this.startReading()
@@ -224,6 +251,13 @@ export class LSPClient {
 
     if (this.proc.exitCode !== null) {
       const stderr = this.stderrBuffer.join("\n")
+      if (isTracingEnabled()) {
+        trace("spawn.error", `lsp.${serverName}.immediate_exit`, {
+          server: this.server.id,
+          exitCode: this.proc.exitCode,
+          stderr: stderr.slice(0, 500),
+        })
+      }
       throw new Error(
         `LSP server exited immediately with code ${this.proc.exitCode}` + (stderr ? `\nstderr: ${stderr}` : "")
       )

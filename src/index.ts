@@ -1,4 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import { initTracer, trace } from "./shared/debug-tracer";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -68,6 +69,13 @@ import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  // Initialize debug tracer early (enabled via OMO_DEBUG=1 env var)
+  initTracer();
+  trace("system.init", "plugin.start", {
+    directory: ctx.directory,
+    platform: process.platform,
+  });
+
   // Start background tmux check immediately
   startTmuxCheck();
 
