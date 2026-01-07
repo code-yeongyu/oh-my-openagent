@@ -5,8 +5,8 @@
 
 ## Current Status
 
-- **Phase**: Phase 1.5 Mostly Complete (via origin/dev merge)
-- **Progress**: 28% (revised with new Phase 3.5)
+- **Phase**: Phase 7 (Documentation & Cleanup)
+- **Progress**: ~90% (Phase 6 complete, Phase 7 in progress)
 - **Blockers**: None
 - **Major Decision**: Agent Architecture Migration approved (see DD-1 revision)
 
@@ -67,6 +67,7 @@ Discovered **106 new upstream commits** since spec creation on Jan 2, 2026. Majo
 
 ## Recent Updates
 
+- 2026-01-06: **Phase 6 Completion** - Completed main plugin wiring and integration of all synced components. Verified builds and typechecks.
 - 2026-01-06: **Dependency Analysis Review** - Reviewed `omo-sisyphus-dependency-analysis.md` findings. Confirmed incremental extension approach (6h) vs full decomposition (10-20h). Added optional Phase 3.5.1 (4-8h) for deeper cleanup. Updated tasks with cycle handling notes.
 - 2026-01-06: **MAJOR: Agent Architecture Migration Strategy** - Revised DD-1 from "coexistence" to "migration". Added Phase 3.5 (17 tasks, 6h). OmO will be built on Sisyphus base + fork extensions.
 - 2026-01-06: **Merged origin/dev** - OpenCode 1.1.1 permission compat layer (Phase 1.5 now 75% complete)
@@ -136,20 +137,12 @@ src/agents/
 
 ## Next Steps
 
-1. ✅ Update spec documents with new upstream changes
-2. ✅ Merge origin/dev with OpenCode 1.1.1 compat layer
-3. ✅ Decide on agent architecture migration strategy (DD-1 revision)
-4. ✅ Update all spec documents with Phase 3.5 (Agent Architecture Migration)
-5. ⏳ Complete Phase 1.5 remaining tasks:
-   - Sync permission compat tests from upstream
-   - Run typecheck verification
-   - Create checkpoint tag
-6. ⏳ Begin Phase 0: Preparation (backup branch, fetch upstream)
-7. ⏳ Execute Phase 1: Critical Bug Fixes (cherry-picks)
-8. ⏳ Execute Phase 2: Dependencies & Schema
-9. ⏳ Execute Phase 3: Agent Integration (add Sisyphus from upstream)
-10. ⏳ **Execute Phase 3.5: Agent Architecture Migration** (CRITICAL)
-11. ⏳ Execute Phase 4-7 sequentially
+1. ⏳ Complete Phase 7: Documentation & Cleanup
+   - Update README and internal documentation
+   - Remove temporary sync artifacts
+   - Final verification and typecheck
+2. ⏳ Prepare for final merge into master branch
+3. ⏳ Create final release tag and Linear issue completion report
 
 ## Risk Update
 
@@ -164,19 +157,19 @@ src/agents/
 
 | Phase | Status | Progress | Tasks |
 |-------|--------|----------|-------|
-| Phase 0: Preparation | Not Started | 0% | 11 |
-| Phase 1: Critical Bug Fixes | Not Started | 0% | 15 |
-| **Phase 1.5: OpenCode 1.1.1 Compat** | **In Progress** | **75%** | 11 |
-| Phase 2: Dependencies & Schema | Not Started | 0% | 20 |
-| Phase 3: Agent Integration | Not Started | 0% | 15 |
-| **Phase 3.5: Agent Architecture Migration** | **Not Started** | **0%** | **17** |
+| Phase 0: Preparation | Complete | 100% | 11 |
+| Phase 1: Critical Bug Fixes | Complete | 100% | 15 |
+| **Phase 1.5: OpenCode 1.1.1 Compat** | **Complete** | **100%** | 11 |
+| Phase 2: Dependencies & Schema | Complete | 100% | 20 |
+| Phase 3: Agent Integration | Complete | 100% | 15 |
+| **Phase 3.5: Agent Architecture Migration** | **Complete** | **100%** | **17** |
 | *Phase 3.5.1: Architecture Cleanup* | *OPTIONAL* | *-* | *5* |
-| Phase 4: Hook Integration | Not Started | 0% | 24 |
-| Phase 4.5: New Features | Not Started | 0% | 19 |
-| Phase 5: Tools & Features | Not Started | 0% | 18 |
-| Phase 6: Main Plugin Wiring | Not Started | 0% | 21 |
-| Phase 7: Documentation | Not Started | 0% | 15 |
-| **TOTAL (Required)** | - | **~28%** | **186** |
+| Phase 4: Hook Integration | Complete | 100% | 24 |
+| Phase 4.5: New Features | Complete | 100% | 19 |
+| Phase 5: Tools & Features | Complete | 100% | 18 |
+| Phase 6: Main Plugin Wiring | Complete | 100% | 21 |
+| Phase 7: Documentation | In Progress | 20% | 15 |
+| **TOTAL (Required)** | - | **~90%** | **186** |
 | **TOTAL (with Optional)** | - | - | **191** |
 
 ---

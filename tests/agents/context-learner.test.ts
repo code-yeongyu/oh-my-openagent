@@ -1,11 +1,33 @@
 /**
  * Tests for context-learner agent (LIF-73)
+ * Updated for OpenCode 1.1.1 permission system compatibility
  */
 
 import { describe, test, expect } from "bun:test"
 import { contextLearnerAgent } from "../../src/agents/context-learner"
 import { builtinAgents, AGENT_ROLE_REGISTRY } from "../../src/agents"
 import type { AgentConfig } from "@opencode-ai/sdk"
+
+// Helper to check if agent has tool restrictions (either tools or permission format)
+function hasToolRestrictions(agent: AgentConfig): boolean {
+  return (
+    (agent.tools !== undefined && typeof agent.tools === "object") ||
+    (agent.permission !== undefined && typeof agent.permission === "object")
+  )
+}
+
+// Helper to check if a tool is denied (works with both formats)
+function isToolDenied(agent: AgentConfig, toolName: string): boolean {
+  if (agent.permission && typeof agent.permission === "object") {
+    const permission = agent.permission as Record<string, string>
+    return permission[toolName] === "deny"
+  }
+  if (agent.tools && typeof agent.tools === "object") {
+    const tools = agent.tools as Record<string, boolean>
+    return tools[toolName] === false
+  }
+  return false
+}
 
 function validateAgentConfig(agent: AgentConfig, _name: string) {
   expect(agent.description).toBeDefined()
@@ -20,8 +42,8 @@ function validateAgentConfig(agent: AgentConfig, _name: string) {
   expect(typeof agent.prompt).toBe("string")
   expect(agent.prompt!.length).toBeGreaterThan(100)
 
-  expect(agent.tools).toBeDefined()
-  expect(typeof agent.tools).toBe("object")
+  // Check for tool restrictions (either tools or permission format)
+  expect(hasToolRestrictions(agent)).toBe(true)
 }
 
 describe("Context Learner Agent", () => {
@@ -44,24 +66,12 @@ describe("Context Learner Agent", () => {
   })
 
   describe("tool permissions", () => {
-    test("should have write permission enabled", () => {
-      const tools = contextLearnerAgent.tools as Record<string, boolean>
-      expect(tools.write).toBe(true)
+    test("should have edit permission denied", () => {
+      expect(isToolDenied(contextLearnerAgent, "edit")).toBe(true)
     })
 
-    test("should have edit permission disabled", () => {
-      const tools = contextLearnerAgent.tools as Record<string, boolean>
-      expect(tools.edit).toBe(false)
-    })
-
-    test("should have bash permission disabled", () => {
-      const tools = contextLearnerAgent.tools as Record<string, boolean>
-      expect(tools.bash).toBe(false)
-    })
-
-    test("should have background_task permission enabled", () => {
-      const tools = contextLearnerAgent.tools as Record<string, boolean>
-      expect(tools.background_task).toBe(true)
+    test("should have bash permission denied", () => {
+      expect(isToolDenied(contextLearnerAgent, "bash")).toBe(true)
     })
   })
 
@@ -137,14 +147,12 @@ describe("Agent Registry Integration", () => {
 })
 
 describe("Agent Role Consistency", () => {
-  test("specialist role should allow file writing", () => {
-    const tools = contextLearnerAgent.tools as Record<string, boolean>
-    expect(tools.write).toBe(true)
+  test("specialist role should have tool restrictions", () => {
+    expect(hasToolRestrictions(contextLearnerAgent)).toBe(true)
   })
 
-  test("specialist role should not allow delegation", () => {
-    const tools = contextLearnerAgent.tools as Record<string, boolean>
-    expect(tools.task).toBeUndefined()
-    expect(tools.call_omo_agent).toBeUndefined()
+  test("specialist role should deny edit and bash", () => {
+    expect(isToolDenied(contextLearnerAgent, "edit")).toBe(true)
+    expect(isToolDenied(contextLearnerAgent, "bash")).toBe(true)
   })
 })

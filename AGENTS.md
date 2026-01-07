@@ -79,9 +79,9 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (OmO, oracle, librarian, explore, frontend, document-writer, multimodal-looker, context-learner)
-│   ├── hooks/         # 21 lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
-│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
+│   ├── agents/        # AI agents (OmO, Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker, context-learner)
+│   ├── hooks/         # 35+ lifecycle hooks (comment-checker, rules-injector, keyword-detector, etc.)
+│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, session-manager, background-task, look-at, skill, slashcommand, interactive-bash, call-omo-agent
 │   ├── mcp/           # MCP servers (context7, websearch_exa, grep_app)
 │   ├── features/      # Terminal, Background agent, Claude Code loaders (agent, command, skill, mcp, session-state), hook-message-injector
 │   ├── config/        # Zod schema, TypeScript types
@@ -145,6 +145,7 @@ oh-my-opencode/
 | Agent | Model | Purpose |
 |-------|-------|---------|
 | OmO | anthropic/claude-opus-4-5 | Primary orchestrator, team leader |
+| Sisyphus | anthropic/claude-opus-4-5 | Senior orchestrator. Plans obsessively with todos, delegates strategically to specialists. |
 | oracle | openai/gpt-5.2 | Strategic advisor, code review, architecture |
 | librarian | opencode/big-pickle | Multi-repo analysis, docs lookup, GitHub examples |
 | explore | opencode/grok-code | Fast codebase exploration, file patterns |
@@ -152,6 +153,14 @@ oh-my-opencode/
 | document-writer | google/gemini-3-pro-preview | Technical documentation |
 | multimodal-looker | google/gemini-2.5-flash | PDF/image/diagram analysis |
 | context-learner | google/gemini-2.5-flash | Meta-learning extraction from sessions |
+
+## CORE CAPABILITIES
+
+- **Preemptive Compaction**: Automatically triggers session compaction at 70%+ context usage (customizable). Uses **Compaction Context Injector** to preserve critical state (original requests, goals, work completed, remaining tasks).
+- **Session Recovery**: Multi-layered recovery system for agent sessions. Includes **Empty Message Sanitizer** (prevents API errors) and **Thinking Block Validator** (ensures reasoning continuity for extended thinking models).
+- **Background Agent Concurrency**: Advanced task manager with model-based concurrency limits, allowing massive parallel execution without hitting provider rate limits.
+- **OpenCode 1.1.1 Permissions**: Full compatibility with the granular permission system. Auto-migrates legacy `tools` configurations to the new `permission` format at runtime.
+- **Session History Manager**: New `session-manager` toolset for searching, reading, and analyzing historical sessions across the workspace.
 
 ## COMMANDS
 
@@ -202,7 +211,7 @@ gh run list --workflow=publish
 ## NOTES
 
 - **No tests**: Test framework not configured
-- **OpenCode version**: Requires >= 1.0.132 (earlier versions have config bugs)
+- **OpenCode version**: Requires >= 1.1.1 for full permission compatibility (earlier versions supported back to 1.0.132)
 - **Multi-language docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA)
 - **Config locations**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Schema autocomplete**: Add `$schema` field in config for IDE support
