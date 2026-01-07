@@ -2,21 +2,28 @@
 set -e
 
 apt-get update
-apt-get install -y curl
+apt-get install -y curl unzip
 
+# Install bun (required by oh-my-opencode)
+curl -fsSL https://bun.sh/install | bash
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+bun --version
+
+# Install nvm and Node.js
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-
 source "$HOME/.nvm/nvm.sh"
-
 nvm install 22
 npm -v
 
+# Install OpenCode
 {% if version %}
 npm i -g opencode-ai@{{ version }}
 {% else %}
 npm i -g opencode-ai@latest
 {% endif %}
 
+# Install oh-my-opencode plugin (provides Sisyphus agent)
 {% if omo_version %}
 npx oh-my-opencode@{{ omo_version }} install --no-tui --claude=yes --chatgpt=no --gemini=no
 {% else %}
