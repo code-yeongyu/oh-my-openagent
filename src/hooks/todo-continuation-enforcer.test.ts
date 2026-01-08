@@ -349,6 +349,25 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should accept skipAgents option without error", async () => {
+    // #given - session with skipAgents configured for Prometheus
+    const sessionID = "main-prometheus-option"
+    setMainSession(sessionID)
+
+    // #when - create hook with skipAgents option (should not throw)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      skipAgents: ["Prometheus (Planner)", "custom-agent"],
+    })
+
+    // #then - handler works without error
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 100))
+    expect(toastCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
   test("should show countdown toast updates", async () => {
     // #given - session with incomplete todos
     const sessionID = "main-toast"

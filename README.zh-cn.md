@@ -863,7 +863,8 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 
 - **Sisyphus**：主编排 Agent（Claude Opus 4.5）
 - **OpenCode-Builder**：OpenCode 默认构建 Agent（因 SDK 限制仅改名，默认禁用）
-- **Planner-Sisyphus**：OpenCode 默认计划 Agent（因 SDK 限制仅改名，默认启用）
+- **Prometheus (Planner)**：OpenCode 默认计划 Agent + work-planner 方法论（默认启用）
+- **Metis (Plan Consultant)**：识别隐藏需求和 AI 失败点的预规划分析 Agent
 
 **配置选项：**
 
@@ -912,8 +913,11 @@ Sisyphus Agent 也能自定义：
     "OpenCode-Builder": {
       "model": "anthropic/claude-opus-4"
     },
-    "Planner-Sisyphus": {
+    "Prometheus (Planner)": {
       "model": "openai/gpt-5.2"
+    },
+    "Metis (Plan Consultant)": {
+      "model": "anthropic/claude-sonnet-4-5"
     }
   }
 }
@@ -923,8 +927,8 @@ Sisyphus Agent 也能自定义：
 | --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `disabled`                  | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                                                              |
 | `default_builder_enabled`   | `false` | 设为 `true` 就启用 OpenCode-Builder Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
-| `planner_enabled`           | `true`  | 设为 `true` 就启用 Planner-Sisyphus Agent（与 OpenCode plan 相同，因 SDK 限制仅改名）。默认启用。                                                             |
-| `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Planner-Sisyphus 和默认计划。                                                        |
+| `planner_enabled`           | `true`  | 设为 `true` 就启用 Prometheus (Planner) Agent（含 work-planner 方法论）。默认启用。                                                                         |
+| `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Prometheus (Planner) 和默认计划。                                                      |
 
 ### Background Tasks（后台任务）
 

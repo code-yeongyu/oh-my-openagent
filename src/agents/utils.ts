@@ -7,8 +7,13 @@ import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
+import { metisAgent } from "./metis"
+import { createOrchestratorSisyphusAgent, orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
+import { momusAgent } from "./momus"
 import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
+import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
+import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -20,6 +25,9 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+  "Metis (Plan Consultant)": metisAgent,
+  "Momus (Plan Reviewer)": momusAgent,
+  "orchestrator-sisyphus": orchestratorSisyphusAgent,
 }
 
 /**
@@ -39,8 +47,31 @@ function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
 }
 
-function buildAgent(source: AgentSource, model?: string): AgentConfig {
-  return isFactory(source) ? source(model) : source
+export function buildAgent(source: AgentSource, model?: string): AgentConfig {
+  const base = isFactory(source) ? source(model) : source
+
+  const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[] }
+  if (agentWithCategory.category) {
+    const categoryConfig = DEFAULT_CATEGORIES[agentWithCategory.category]
+    if (categoryConfig) {
+      if (!base.model) {
+        base.model = categoryConfig.model
+      }
+      if (base.temperature === undefined && categoryConfig.temperature !== undefined) {
+        base.temperature = categoryConfig.temperature
+      }
+    }
+  }
+
+  if (agentWithCategory.skills?.length) {
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills)
+    if (resolved.size > 0) {
+      const skillContent = Array.from(resolved.values()).join("\n\n")
+      base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
+    }
+  }
+
+  return base
 }
 
 /**
@@ -96,6 +127,7 @@ export function createBuiltinAgents(
     const agentName = name as BuiltinAgentName
 
     if (agentName === "Sisyphus") continue
+    if (agentName === "orchestrator-sisyphus") continue
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
@@ -140,6 +172,17 @@ export function createBuiltinAgents(
     }
 
     result["Sisyphus"] = sisyphusConfig
+  }
+
+  if (!disabledAgents.includes("orchestrator-sisyphus")) {
+    const orchestratorOverride = agentOverrides["orchestrator-sisyphus"]
+    let orchestratorConfig = createOrchestratorSisyphusAgent({ availableAgents })
+
+    if (orchestratorOverride) {
+      orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
+    }
+
+    result["orchestrator-sisyphus"] = orchestratorConfig
   }
 
   return result
