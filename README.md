@@ -1,11 +1,11 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > We're building a fully productized version of Sisyphus to define the future of frontier agents. Join the waitlist [here](https://sisyphuslabs.ai).
+> > **We're building a fully productized version of Sisyphus to define the future of frontier agents. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=2)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
 > > **The Orchestrator is now available in beta. Use `oh-my-opencode@beta` to install it.**
 >
 > Be with us!
