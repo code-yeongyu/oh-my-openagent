@@ -1,11 +1,11 @@
 > [!NOTE]
 >
 > [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > Sisyphusの完全製品化バージョンを構築中です。フロンティアエージェントの未来を定義します。[こちら](https://sisyphuslabs.ai)からウェイトリストに参加してください。
+> > **Sisyphusの完全製品化バージョンを構築中です。フロンティアエージェントの未来を定義します。<br />[こちら](https://sisyphuslabs.ai)からウェイトリストに参加してください。**
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=2)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
 > > **オーケストレーターがベータ版で利用可能になりました。`oh-my-opencode@beta`を使用してインストールしてください。**
 >
 > 一緒に歩みましょう！
