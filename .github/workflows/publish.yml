@@ -1,5 +1,5 @@
 name: publish
-run-name: "${{ format('release {0}', inputs.bump) }}"
+run-name: "${{ format('release {0} ({1})', inputs.bump, inputs.tag || 'latest') }}"
 
 on:
   workflow_dispatch:
@@ -16,6 +16,15 @@ on:
         description: "Override version (optional)"
         required: false
         type: string
+      tag:
+        description: "npm dist-tag (latest, beta, next)"
+        required: false
+        type: choice
+        default: "latest"
+        options:
+          - latest
+          - beta
+          - next
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -126,6 +135,7 @@ jobs:
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
+          NPM_TAG: ${{ inputs.tag || 'latest' }}
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
@@ -136,6 +146,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge to master
+        if: inputs.tag == 'latest' || inputs.tag == ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

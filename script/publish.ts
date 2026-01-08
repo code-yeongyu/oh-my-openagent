@@ -5,6 +5,7 @@ import { $ } from "bun"
 const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
 const versionOverride = process.env.VERSION
+const npmTag = process.env.NPM_TAG || "latest"
 
 console.log("=== Publishing oh-my-opencode ===\n")
 
@@ -107,12 +108,11 @@ async function getContributors(previous: string): Promise<string[]> {
 }
 
 async function buildAndPublish(): Promise<void> {
-  console.log("\nPublishing to npm...")
-  // --ignore-scripts: workflow에서 이미 빌드 완료, prepublishOnly 재실행 방지
+  console.log(`\nPublishing to npm with tag: ${npmTag}...`)
   if (process.env.CI) {
-    await $`npm publish --access public --provenance --ignore-scripts`
+    await $`npm publish --access public --provenance --ignore-scripts --tag ${npmTag}`
   } else {
-    await $`npm publish --access public --ignore-scripts`
+    await $`npm publish --access public --ignore-scripts --tag ${npmTag}`
   }
 }
 
