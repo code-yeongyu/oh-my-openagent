@@ -643,3 +643,34 @@ describe("BackgroundManager.resume", () => {
     expect(result.progress?.toolCalls).toBe(42)
   })
 })
+
+describe("LaunchInput.skillContent", () => {
+  test("skillContent should be optional in LaunchInput type", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+    }
+
+    // #when / #then - should compile without skillContent
+    expect(input.skillContent).toBeUndefined()
+  })
+
+  test("skillContent can be provided in LaunchInput", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      skillContent: "You are a playwright expert",
+    }
+
+    // #when / #then
+    expect(input.skillContent).toBe("You are a playwright expert")
+  })
+})

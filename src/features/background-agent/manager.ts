@@ -140,6 +140,7 @@ export class BackgroundManager {
       path: { id: sessionID },
       body: {
         agent: input.agent,
+        system: input.skillContent,
         tools: {
           task: false,
           call_omo_agent: false,

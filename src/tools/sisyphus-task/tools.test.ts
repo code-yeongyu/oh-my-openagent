@@ -214,4 +214,56 @@ describe("sisyphus-task", () => {
       expect(SISYPHUS_TASK_DESCRIPTION).toContain("Array of skill names")
     })
   })
+
+  describe("buildSystemContent", () => {
+    test("returns undefined when no skills and no category promptAppend", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+
+      // #when
+      const result = buildSystemContent({ skills: undefined, categoryPromptAppend: undefined })
+
+      // #then
+      expect(result).toBeUndefined()
+    })
+
+    test("returns skill content only when skills provided without category", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const skillContent = "You are a playwright expert"
+
+      // #when
+      const result = buildSystemContent({ skillContent, categoryPromptAppend: undefined })
+
+      // #then
+      expect(result).toBe(skillContent)
+    })
+
+    test("returns category promptAppend only when no skills", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const categoryPromptAppend = "Focus on visual design"
+
+      // #when
+      const result = buildSystemContent({ skillContent: undefined, categoryPromptAppend })
+
+      // #then
+      expect(result).toBe(categoryPromptAppend)
+    })
+
+    test("combines skill content and category promptAppend with separator", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const skillContent = "You are a playwright expert"
+      const categoryPromptAppend = "Focus on visual design"
+
+      // #when
+      const result = buildSystemContent({ skillContent, categoryPromptAppend })
+
+      // #then
+      expect(result).toContain(skillContent)
+      expect(result).toContain(categoryPromptAppend)
+      expect(result).toContain("\n\n")
+    })
+  })
 })

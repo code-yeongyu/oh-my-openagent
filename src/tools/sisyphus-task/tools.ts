@@ -90,6 +90,25 @@ export interface SisyphusTaskToolOptions {
   userCategories?: CategoriesConfig
 }
 
+export interface BuildSystemContentInput {
+  skillContent?: string
+  categoryPromptAppend?: string
+}
+
+export function buildSystemContent(input: BuildSystemContentInput): string | undefined {
+  const { skillContent, categoryPromptAppend } = input
+
+  if (!skillContent && !categoryPromptAppend) {
+    return undefined
+  }
+
+  if (skillContent && categoryPromptAppend) {
+    return `${skillContent}\n\n${categoryPromptAppend}`
+  }
+
+  return skillContent || categoryPromptAppend
+}
+
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
   const { manager, client, userCategories } = options
 
@@ -111,15 +130,14 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       }
       const runInBackground = args.background === true
 
-      // Handle skills - resolve and prepend to prompt
+      let skillContent: string | undefined
       if (args.skills && args.skills.length > 0) {
         const { resolved, notFound } = resolveMultipleSkills(args.skills)
         if (notFound.length > 0) {
           const available = createBuiltinSkills().map(s => s.name).join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
         }
-        const skillContent = Array.from(resolved.values()).join("\n\n")
-        args.prompt = skillContent + "\n\n---\n\n" + args.prompt
+        skillContent = Array.from(resolved.values()).join("\n\n")
       }
 
       const messageDir = getMessageDir(ctx.sessionID)
@@ -169,8 +187,8 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
       }
 
       let agentToUse: string
-
       let categoryModel: { providerID: string; modelID: string } | undefined
+      let categoryPromptAppend: string | undefined
 
       if (args.category) {
         const resolved = resolveCategoryConfig(args.category, userCategories)
@@ -180,6 +198,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
         agentToUse = SISYPHUS_JUNIOR_AGENT
         categoryModel = parseModelString(resolved.config.model)
+        categoryPromptAppend = resolved.promptAppend || undefined
       } else {
         agentToUse = args.subagent_type!.trim()
         if (!agentToUse) {
@@ -211,6 +230,8 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
       }
 
+      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+
       if (runInBackground) {
         try {
           const task = await manager.launch({
@@ -222,6 +243,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             parentModel,
             model: categoryModel,
             skills: args.skills,
+            skillContent: systemContent,
           })
 
           ctx.metadata?.({
@@ -284,6 +306,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             body: {
               agent: agentToUse,
               model: categoryModel,
+              system: systemContent,
               tools: {
                 task: false,
                 sisyphus_task: false,
