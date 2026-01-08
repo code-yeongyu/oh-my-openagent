@@ -40,6 +40,7 @@ export interface LaunchInput {
   parentMessageID: string
   parentModel?: { providerID: string; modelID: string }
   model?: { providerID: string; modelID: string }
+  skills?: string[]
 }
 
 export interface ResumeInput {

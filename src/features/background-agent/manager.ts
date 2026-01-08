@@ -132,6 +132,7 @@ export class BackgroundManager {
         description: input.description,
         agent: input.agent,
         isBackground: true,
+        skills: input.skills,
       })
     }
 

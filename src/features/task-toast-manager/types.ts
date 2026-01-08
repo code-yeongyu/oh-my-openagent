@@ -7,6 +7,7 @@ export interface TrackedTask {
   status: TaskStatus
   startedAt: Date
   isBackground: boolean
+  skills?: string[]
 }
 
 export interface TaskToastOptions {

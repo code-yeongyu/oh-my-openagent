@@ -18,15 +18,13 @@ export class TaskToastManager {
     this.concurrencyManager = manager
   }
 
-  /**
-   * Register a new task and show consolidated toast
-   */
   addTask(task: {
     id: string
     description: string
     agent: string
     isBackground: boolean
     status?: TaskStatus
+    skills?: string[]
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
@@ -35,6 +33,7 @@ export class TaskToastManager {
       status: task.status ?? "running",
       startedAt: new Date(),
       isBackground: task.isBackground,
+      skills: task.skills,
     }
 
     this.tasks.set(task.id, trackedTask)
@@ -89,22 +88,31 @@ export class TaskToastManager {
     return `${hours}h ${minutes % 60}m`
   }
 
-  /**
-   * Build task list message
-   */
+  private getConcurrencyInfo(): string {
+    if (!this.concurrencyManager) return ""
+    const running = this.getRunningTasks()
+    const queued = this.getQueuedTasks()
+    const total = running.length + queued.length
+    const limit = this.concurrencyManager.getConcurrencyLimit("default")
+    if (limit === Infinity) return ""
+    return ` [${total}/${limit}]`
+  }
+
   private buildTaskListMessage(newTask: TrackedTask): string {
     const running = this.getRunningTasks()
     const queued = this.getQueuedTasks()
+    const concurrencyInfo = this.getConcurrencyInfo()
 
     const lines: string[] = []
 
     if (running.length > 0) {
-      lines.push(`Running (${running.length}):`)
+      lines.push(`Running (${running.length}):${concurrencyInfo}`)
       for (const task of running) {
         const duration = this.formatDuration(task.startedAt)
         const bgIcon = task.isBackground ? "⚡" : "🔄"
         const isNew = task.id === newTask.id ? " ← NEW" : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent}) - ${duration}${isNew}`)
+        const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
+        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo} - ${duration}${isNew}`)
       }
     }
 
@@ -113,7 +121,8 @@ export class TaskToastManager {
       lines.push(`Queued (${queued.length}):`)
       for (const task of queued) {
         const bgIcon = task.isBackground ? "⏳" : "⏸️"
-        lines.push(`${bgIcon} ${task.description} (${task.agent})`)
+        const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
+        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo}`)
       }
     }
 

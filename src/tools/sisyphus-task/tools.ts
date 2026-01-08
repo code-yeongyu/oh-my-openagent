@@ -221,6 +221,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             parentMessageID: ctx.messageID,
             parentModel,
             model: categoryModel,
+            skills: args.skills,
           })
 
           ctx.metadata?.({
@@ -268,6 +269,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             description: args.description,
             agent: agentToUse,
             isBackground: false,
+            skills: args.skills,
           })
         }
 
