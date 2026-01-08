@@ -48,6 +48,11 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
          prompt: body.trim(),
        }
 
+       // Extract model field for Gemini detection and potential use by OpenCode
+       if (data.model && typeof data.model === "string" && data.model.trim().length > 0) {
+         config.model = data.model.trim()
+       }
+
        const toolsConfig = parseToolsConfig(data.tools)
       if (toolsConfig) {
         config.tools = toolsConfig

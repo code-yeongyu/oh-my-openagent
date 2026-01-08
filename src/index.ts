@@ -33,7 +33,15 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
-import { willHaveGeminiAgents } from "./agents";
+import { willHaveGeminiAgents, hasExternalGeminiAgents } from "./agents";
+import {
+  loadUserAgents,
+  loadProjectAgents,
+} from "./features/claude-code-agent-loader";
+import {
+  discoverInstalledPlugins,
+  loadPluginAgents,
+} from "./features/claude-code-plugin-loader";
 import {
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
@@ -260,14 +268,49 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   // 2. At least one Gemini-using agent is active
   // This prevents unnecessary auth prompts when Gemini agents aren't being used
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/525
-  const hasActiveGeminiAgents = willHaveGeminiAgents(
+  
+  // Check 1: Builtin agents (fast, no I/O)
+  const hasBuiltinGeminiAgents = willHaveGeminiAgents(
     pluginConfig.disabled_agents,
     pluginConfig.agents
   );
+  
+  // Check 2: External agents (user, project, plugin agents with Gemini models)
+  // Load these synchronously to check for Gemini before deciding on auth
+  let hasExternalGeminiAgentsActive = false;
+  if (!hasBuiltinGeminiAgents) {
+    // Only load external agents if builtin check didn't find Gemini
+    // This avoids unnecessary I/O when we already know auth is needed
+    const includeClaudeAgents = pluginConfig.claude_code?.agents !== false;
+    const includePlugins = pluginConfig.claude_code?.plugins !== false;
+    
+    const externalAgents: Array<Record<string, import("@opencode-ai/sdk").AgentConfig>> = [];
+    
+    if (includeClaudeAgents) {
+      externalAgents.push(loadUserAgents());
+      externalAgents.push(loadProjectAgents());
+    }
+    
+    if (includePlugins) {
+      const { plugins } = discoverInstalledPlugins({
+        enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+      });
+      externalAgents.push(loadPluginAgents(plugins));
+    }
+    
+    hasExternalGeminiAgentsActive = hasExternalGeminiAgents(
+      externalAgents,
+      pluginConfig.disabled_agents ?? []
+    );
+  }
+  
+  const hasActiveGeminiAgents = hasBuiltinGeminiAgents || hasExternalGeminiAgentsActive;
 
   if (process.env.ANTIGRAVITY_DEBUG === "1") {
     log("[oh-my-opencode] Gemini agents active check", {
       hasActiveGeminiAgents,
+      hasBuiltinGeminiAgents,
+      hasExternalGeminiAgentsActive,
       disabledAgents: pluginConfig.disabled_agents,
       agentOverrides: Object.keys(pluginConfig.agents ?? {}),
     });

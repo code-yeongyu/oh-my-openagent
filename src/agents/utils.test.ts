@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { createBuiltinAgents, hasGeminiModelAgents, willHaveGeminiAgents } from "./utils"
+import { createBuiltinAgents, hasGeminiModelAgents, willHaveGeminiAgents, hasExternalGeminiAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 
 describe("createBuiltinAgents with model overrides", () => {
@@ -272,5 +272,135 @@ describe("willHaveGeminiAgents", () => {
 
     // #then - explore is disabled so its override doesn't count
     expect(result).toBe(false)
+  })
+})
+
+describe("hasExternalGeminiAgents", () => {
+  test("returns true when user agent uses Gemini model", () => {
+    // #given - user-defined agent with Gemini model
+    const userAgents: Record<string, AgentConfig> = {
+      "my-gemini-agent": { model: "google/gemini-3-pro-preview" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents])
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("returns true when project agent uses Gemini model", () => {
+    // #given - project-defined agent with Gemini model
+    const projectAgents: Record<string, AgentConfig> = {
+      "project-gemini": { model: "google/gemini-3-flash" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([projectAgents])
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("returns true when plugin agent uses Gemini model", () => {
+    // #given - plugin-defined agent with Gemini model
+    const pluginAgents: Record<string, AgentConfig> = {
+      "my-plugin:gemini-agent": { model: "google/gemini-3-pro-preview" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([pluginAgents])
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("returns false when no external agents use Gemini", () => {
+    // #given - all agents use non-Gemini models
+    const userAgents: Record<string, AgentConfig> = {
+      "my-claude-agent": { model: "anthropic/claude-sonnet-4" },
+    }
+    const projectAgents: Record<string, AgentConfig> = {
+      "project-gpt": { model: "openai/gpt-5.2" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents, projectAgents])
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("returns false when external agents have no model defined", () => {
+    // #given - agents without model field
+    const userAgents: Record<string, AgentConfig> = {
+      "my-agent": { description: "Agent without model" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents])
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("returns false when all agent sources are empty", () => {
+    // #given - no agents
+    const userAgents: Record<string, AgentConfig> = {}
+    const projectAgents: Record<string, AgentConfig> = {}
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents, projectAgents])
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("returns false when Gemini agent is disabled", () => {
+    // #given - Gemini agent that is disabled
+    const userAgents: Record<string, AgentConfig> = {
+      "my-gemini-agent": { model: "google/gemini-3-pro-preview" },
+    }
+    const disabledAgents = ["my-gemini-agent"]
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents], disabledAgents)
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("returns true when one agent is disabled but another Gemini agent is active", () => {
+    // #given - one disabled, one active Gemini agent
+    const userAgents: Record<string, AgentConfig> = {
+      "disabled-gemini": { model: "google/gemini-3-pro-preview" },
+      "active-gemini": { model: "google/gemini-3-flash" },
+    }
+    const disabledAgents = ["disabled-gemini"]
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents], disabledAgents)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("returns true when Gemini agent is in one of multiple sources", () => {
+    // #given - Gemini agent only in project agents
+    const userAgents: Record<string, AgentConfig> = {
+      "my-claude-agent": { model: "anthropic/claude-sonnet-4" },
+    }
+    const projectAgents: Record<string, AgentConfig> = {
+      "project-gemini": { model: "google/gemini-3-pro-preview" },
+    }
+    const pluginAgents: Record<string, AgentConfig> = {
+      "plugin:gpt-agent": { model: "openai/gpt-5.2" },
+    }
+
+    // #when
+    const result = hasExternalGeminiAgents([userAgents, projectAgents, pluginAgents])
+
+    // #then
+    expect(result).toBe(true)
   })
 })

@@ -99,6 +99,38 @@ export function hasGeminiModelAgents(
 }
 
 /**
+ * Check if any of the provided external agents (user, project, plugin) use Gemini models.
+ * This function should be called with loaded agent configs to detect Gemini usage
+ * in agents defined outside pluginConfig.
+ *
+ * @param externalAgents - Array of agent config records (user agents, project agents, etc.)
+ * @param disabledAgents - List of disabled agent names to exclude from check
+ * @returns true if at least one non-disabled external agent uses a google/gemini-* model
+ */
+export function hasExternalGeminiAgents(
+  externalAgents: Array<Record<string, AgentConfig>>,
+  disabledAgents: string[] = []
+): boolean {
+  const disabledSet = new Set(disabledAgents)
+  
+  for (const agents of externalAgents) {
+    for (const [name, config] of Object.entries(agents)) {
+      // Skip if this agent is disabled
+      if (disabledSet.has(name)) {
+        continue
+      }
+      
+      // Check if agent uses a Gemini model
+      if (config.model?.startsWith("google/gemini")) {
+        return true
+      }
+    }
+  }
+  
+  return false
+}
+
+/**
  * Agents that use Gemini models by default.
  * These are the only agents that would trigger Google auth requirement.
  */
