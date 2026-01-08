@@ -35,11 +35,12 @@ export const ANTIGRAVITY_SCOPES = [
   "https://www.googleapis.com/auth/experimentsandconfigs",
 ] as const
 
-// API Endpoint Fallbacks (order: daily → autopush → prod)
+// API Endpoint Fallbacks - matches CLIProxyAPI antigravity_executor.go:1192-1201
+// Claude models only available on SANDBOX endpoints (429 quota vs 404 not found)
 export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
-  "https://daily-cloudcode-pa.sandbox.googleapis.com", // dev
-  "https://autopush-cloudcode-pa.sandbox.googleapis.com", // staging
-  "https://cloudcode-pa.googleapis.com", // prod
+  "https://daily-cloudcode-pa.sandbox.googleapis.com",
+  "https://daily-cloudcode-pa.googleapis.com",
+  "https://cloudcode-pa.googleapis.com",
 ] as const
 
 // API Version
@@ -254,25 +255,13 @@ export const ANTIGRAVITY_SUPPORTED_MODELS = [
 /**
  * Converts UI model names to Antigravity API model names.
  *
- * NOTE: Most CLIProxyAPI alias mappings do NOT work with the public Antigravity API.
- * Tested 2026-01-08: Only -preview suffix names work for Gemini 3.
- * Claude models are NOT available via Antigravity API.
- *
- * Working models (use as-is):
- * - gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-pro
- * - gemini-3-pro-preview, gemini-3-flash-preview
- *
- * NOT working (404):
- * - gemini-3-pro-high, gemini-3-pro-low, gemini-3-flash (transformed names)
- * - claude-* models (not available)
- * - computer use models (not available)
+ * NOTE: Tested 2026-01-08 - Gemini 3 models work with -preview suffix directly.
+ * The CLIProxyAPI transformations (gemini-3-pro-high, gemini-3-flash) return 404.
+ * Claude models return 404 on all endpoints (may require special access/quota).
  */
 export function alias2ModelName(modelName: string): string {
-  // Strip "gemini-" prefix from Claude model names (if Google ever enables them)
-  // e.g., "gemini-claude-sonnet-4-5" → "claude-sonnet-4-5"
   if (modelName.startsWith("gemini-claude-")) {
     return modelName.substring("gemini-".length)
   }
-
   return modelName
 }
