@@ -352,6 +352,7 @@ export function createSisyphusOrchestratorHook(
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
+          agent: "orchestrator-sisyphus",
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },

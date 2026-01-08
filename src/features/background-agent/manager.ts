@@ -98,6 +98,7 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentModel: input.parentModel,
+      parentAgent: input.parentAgent,
       model: input.model,
       concurrencyKey,
     }
@@ -236,6 +237,7 @@ export class BackgroundManager {
     existingTask.parentSessionID = input.parentSessionID
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
+    existingTask.parentAgent = input.parentAgent
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -438,8 +440,8 @@ export class BackgroundManager {
       }
 
       try {
-        // Use only parentModel - don't fallback to prevMessage.model
-        // This prevents accidentally changing parent session's model
+        // Use only parentModel/parentAgent - don't fallback to prevMessage
+        // This prevents accidentally changing parent session's model/agent
         const modelField = task.parentModel?.providerID && task.parentModel?.modelID
           ? { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
           : undefined
@@ -447,6 +449,7 @@ export class BackgroundManager {
         await this.client.session.prompt({
           path: { id: task.parentSessionID },
           body: {
+            agent: task.parentAgent,
             model: modelField,
             parts: [{ type: "text", text: message }],
           },

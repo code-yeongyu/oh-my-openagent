@@ -9,6 +9,7 @@ import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/ho
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
+import { subagentSessions } from "../../features/claude-code-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -159,6 +160,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
               parentSessionID: ctx.sessionID,
               parentMessageID: ctx.messageID,
               parentModel,
+              parentAgent: prevMessage?.agent,
             })
 
             ctx.metadata?.({
@@ -325,6 +327,7 @@ ${textContent || "(No text output)"}`
             parentSessionID: ctx.sessionID,
             parentMessageID: ctx.messageID,
             parentModel,
+            parentAgent: prevMessage?.agent,
             model: categoryModel,
             skills: args.skills,
             skillContent: systemContent,
@@ -352,6 +355,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
       const toastManager = getTaskToastManager()
       let taskId: string | undefined
+      let syncSessionID: string | undefined
 
       try {
         const createResult = await client.session.create({
@@ -366,6 +370,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         }
 
         const sessionID = createResult.data.id
+        syncSessionID = sessionID
+        subagentSessions.add(sessionID)
         taskId = `sync_${sessionID.slice(0, 8)}`
         const startTime = new Date()
 
@@ -461,6 +467,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           toastManager.removeTask(taskId)
         }
 
+        subagentSessions.delete(sessionID)
+
         return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
@@ -472,6 +480,9 @@ ${textContent || "(No text output)"}`
       } catch (error) {
         if (toastManager && taskId !== undefined) {
           toastManager.removeTask(taskId)
+        }
+        if (syncSessionID) {
+          subagentSessions.delete(syncSessionID)
         }
         const message = error instanceof Error ? error.message : String(error)
         return `❌ Task failed: ${message}`
