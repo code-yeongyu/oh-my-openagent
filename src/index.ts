@@ -406,6 +406,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await sisyphusOrchestrator?.handler(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
