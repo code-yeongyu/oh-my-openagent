@@ -35,14 +35,25 @@ export { createSkillTool } from "./skill"
 export { getTmuxPath } from "./interactive-bash/utils"
 export { createSkillMcpTool } from "./skill-mcp"
 
-import type { ToolDefinition } from "@opencode-ai/plugin"
+import {
+  createBackgroundOutput,
+  createBackgroundCancel,
+} from "./background-task"
+
+import type { PluginInput, ToolDefinition } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../features/background-agent"
+
+type OpencodeClient = PluginInput["client"]
 
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 export { createSisyphusTask, type SisyphusTaskToolOptions, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./sisyphus-task"
 
-export function createBackgroundTools(): Record<string, ToolDefinition> {
-  return {}
+export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
+  return {
+    background_output: createBackgroundOutput(manager, client),
+    background_cancel: createBackgroundCancel(manager, client),
+  }
 }
 
 export const builtinTools: Record<string, ToolDefinition> = {
