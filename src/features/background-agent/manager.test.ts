@@ -1,11 +1,12 @@
 import { describe, test, expect, beforeEach } from "bun:test"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, ResumeInput } from "./types"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
   private notifications: Map<string, BackgroundTask[]> = new Map()
+  public resumeCalls: Array<{ sessionId: string; prompt: string }> = []
 
   addTask(task: BackgroundTask): void {
     this.tasks.set(task.id, task)
@@ -13,6 +14,15 @@ class MockBackgroundManager {
 
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id)
+  }
+
+  findBySession(sessionID: string): BackgroundTask | undefined {
+    for (const task of this.tasks.values()) {
+      if (task.sessionID === sessionID) {
+        return task
+      }
+    }
+    return undefined
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
@@ -104,6 +114,29 @@ class MockBackgroundManager {
       count += notifications.length
     }
     return count
+  }
+
+  resume(input: ResumeInput): BackgroundTask {
+    const existingTask = this.findBySession(input.sessionId)
+    if (!existingTask) {
+      throw new Error(`Task not found for session: ${input.sessionId}`)
+    }
+
+    this.resumeCalls.push({ sessionId: input.sessionId, prompt: input.prompt })
+
+    existingTask.status = "running"
+    existingTask.completedAt = undefined
+    existingTask.error = undefined
+    existingTask.parentSessionID = input.parentSessionID
+    existingTask.parentMessageID = input.parentMessageID
+    existingTask.parentModel = input.parentModel
+
+    existingTask.progress = {
+      toolCalls: existingTask.progress?.toolCalls ?? 0,
+      lastUpdate: new Date(),
+    }
+
+    return existingTask
   }
 }
 
@@ -480,5 +513,164 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     expect(result.prunedTasks).toContain("task-stale")
     expect(manager.getTaskCount()).toBe(1)
     expect(manager.getTask("task-fresh")).toBeDefined()
+  })
+})
+
+describe("BackgroundManager.resume", () => {
+  let manager: MockBackgroundManager
+
+  beforeEach(() => {
+    // #given
+    manager = new MockBackgroundManager()
+  })
+
+  test("should throw error when task not found", () => {
+    // #given - empty manager
+
+    // #when / #then
+    expect(() => manager.resume({
+      sessionId: "non-existent",
+      prompt: "continue",
+      parentSessionID: "session-new",
+      parentMessageID: "msg-new",
+    })).toThrow("Task not found for session: non-existent")
+  })
+
+  test("should resume existing task and reset state to running", () => {
+    // #given
+    const completedTask = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID: "session-parent",
+      status: "completed",
+    })
+    completedTask.completedAt = new Date()
+    completedTask.error = "previous error"
+    manager.addTask(completedTask)
+
+    // #when
+    const result = manager.resume({
+      sessionId: "session-a",
+      prompt: "continue the work",
+      parentSessionID: "session-new-parent",
+      parentMessageID: "msg-new",
+    })
+
+    // #then
+    expect(result.status).toBe("running")
+    expect(result.completedAt).toBeUndefined()
+    expect(result.error).toBeUndefined()
+    expect(result.parentSessionID).toBe("session-new-parent")
+    expect(result.parentMessageID).toBe("msg-new")
+  })
+
+  test("should preserve task identity while updating parent context", () => {
+    // #given
+    const existingTask = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID: "old-parent",
+      description: "original description",
+      agent: "explore",
+    })
+    manager.addTask(existingTask)
+
+    // #when
+    const result = manager.resume({
+      sessionId: "session-a",
+      prompt: "new prompt",
+      parentSessionID: "new-parent",
+      parentMessageID: "new-msg",
+      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+    })
+
+    // #then
+    expect(result.id).toBe("task-a")
+    expect(result.sessionID).toBe("session-a")
+    expect(result.description).toBe("original description")
+    expect(result.agent).toBe("explore")
+    expect(result.parentModel).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
+  })
+
+  test("should track resume calls with prompt", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID: "session-parent",
+    })
+    manager.addTask(task)
+
+    // #when
+    manager.resume({
+      sessionId: "session-a",
+      prompt: "continue with additional context",
+      parentSessionID: "session-new",
+      parentMessageID: "msg-new",
+    })
+
+    // #then
+    expect(manager.resumeCalls).toHaveLength(1)
+    expect(manager.resumeCalls[0]).toEqual({
+      sessionId: "session-a",
+      prompt: "continue with additional context",
+    })
+  })
+
+  test("should preserve existing tool call count in progress", () => {
+    // #given
+    const taskWithProgress = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID: "session-parent",
+    })
+    taskWithProgress.progress = {
+      toolCalls: 42,
+      lastTool: "read",
+      lastUpdate: new Date(),
+    }
+    manager.addTask(taskWithProgress)
+
+    // #when
+    const result = manager.resume({
+      sessionId: "session-a",
+      prompt: "continue",
+      parentSessionID: "session-new",
+      parentMessageID: "msg-new",
+    })
+
+    // #then
+    expect(result.progress?.toolCalls).toBe(42)
+  })
+})
+
+describe("LaunchInput.skillContent", () => {
+  test("skillContent should be optional in LaunchInput type", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+    }
+
+    // #when / #then - should compile without skillContent
+    expect(input.skillContent).toBeUndefined()
+  })
+
+  test("skillContent can be provided in LaunchInput", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      skillContent: "You are a playwright expert",
+    }
+
+    // #when / #then
+    expect(input.skillContent).toBe("You are a playwright expert")
   })
 })

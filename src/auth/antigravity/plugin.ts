@@ -33,7 +33,6 @@ import {
   exchangeCode,
   startCallbackServer,
   fetchUserInfo,
-  decodeState,
 } from "./oauth"
 import { createAntigravityFetch } from "./fetch"
 import { fetchProjectContext } from "./project"
@@ -248,7 +247,7 @@ export async function createGoogleAntigravityAuthPlugin({
          */
         authorize: async (): Promise<AuthOuathResult> => {
           const serverHandle = startCallbackServer()
-          const { url, verifier } = await buildAuthURL(undefined, cachedClientId, serverHandle.port)
+          const { url, state: expectedState } = await buildAuthURL(undefined, cachedClientId, serverHandle.port)
 
           const browserOpened = await openBrowserURL(url)
 
@@ -277,15 +276,15 @@ export async function createGoogleAntigravityAuthPlugin({
                   return { type: "failed" as const }
                 }
 
-                const state = decodeState(result.state)
-                if (state.verifier !== verifier) {
+                if (result.state !== expectedState) {
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
-                    console.error("[antigravity-plugin] PKCE verifier mismatch")
+                    console.error("[antigravity-plugin] State mismatch - possible CSRF attack")
                   }
                   return { type: "failed" as const }
                 }
 
-                const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret, serverHandle.port)
+                const redirectUri = `http://localhost:${serverHandle.port}/oauth-callback`
+                const tokens = await exchangeCode(result.code, redirectUri, cachedClientId, cachedClientSecret)
 
                 if (!tokens.refresh_token) {
                   serverHandle.close()
@@ -343,7 +342,7 @@ export async function createGoogleAntigravityAuthPlugin({
                   if (!addAnother) break
 
                   const additionalServerHandle = startCallbackServer()
-                  const { url: additionalUrl, verifier: additionalVerifier } = await buildAuthURL(
+                  const { url: additionalUrl, state: expectedAdditionalState } = await buildAuthURL(
                     undefined,
                     cachedClientId,
                     additionalServerHandle.port
@@ -373,24 +372,23 @@ export async function createGoogleAntigravityAuthPlugin({
                       continue
                     }
 
-                    const additionalState = decodeState(additionalResult.state)
-                    if (additionalState.verifier !== additionalVerifier) {
+                    if (additionalResult.state !== expectedAdditionalState) {
                       additionalServerHandle.close()
                       await client.tui.showToast({
                         body: {
-                          message: "Verification failed, skipping...",
+                          message: "State mismatch, skipping...",
                           variant: "warning",
                         },
                       })
                       continue
                     }
 
+                    const additionalRedirectUri = `http://localhost:${additionalServerHandle.port}/oauth-callback`
                     const additionalTokens = await exchangeCode(
                       additionalResult.code,
-                      additionalVerifier,
+                      additionalRedirectUri,
                       cachedClientId,
-                      cachedClientSecret,
-                      additionalServerHandle.port
+                      cachedClientSecret
                     )
 
                     if (!additionalTokens.refresh_token) {
