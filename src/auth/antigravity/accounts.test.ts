@@ -710,4 +710,335 @@ describe("AccountManager", () => {
       expect(count).toBe(3)
     })
   })
+
+  describe("removeAccount activeIndex adjustment", () => {
+    it("should adjust activeIndex when removing account before active", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com" }),
+          createMockAccountMetadata({ email: "user2@example.com" }),
+          createMockAccountMetadata({ email: "user3@example.com" }),
+        ],
+        2
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when
+      manager.removeAccount(0)
+
+      // #then
+      const current = manager.getCurrentAccount()
+      expect(current?.email).toBe("user3@example.com")
+    })
+
+    it("should switch to next account when removing active account", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com" }),
+          createMockAccountMetadata({ email: "user2@example.com" }),
+          createMockAccountMetadata({ email: "user3@example.com" }),
+        ],
+        1
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when
+      manager.removeAccount(1)
+
+      // #then
+      const current = manager.getCurrentAccount()
+      expect(current?.email).toBe("user3@example.com")
+    })
+
+    it("should not adjust activeIndex when removing account after active", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com" }),
+          createMockAccountMetadata({ email: "user2@example.com" }),
+          createMockAccountMetadata({ email: "user3@example.com" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when
+      manager.removeAccount(2)
+
+      // #then
+      const current = manager.getCurrentAccount()
+      expect(current?.email).toBe("user1@example.com")
+    })
+
+    it("should handle removing last remaining account", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [createMockAccountMetadata({ email: "user1@example.com" })],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when
+      manager.removeAccount(0)
+
+      // #then
+      expect(manager.getAccountCount()).toBe(0)
+      expect(manager.getCurrentAccount()).toBeNull()
+    })
+  })
+
+  describe("round-robin rotation", () => {
+    it("should rotate through accounts in round-robin fashion", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com", tier: "free" }),
+          createMockAccountMetadata({ email: "user2@example.com", tier: "free" }),
+          createMockAccountMetadata({ email: "user3@example.com", tier: "free" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when - mark first account as rate limited and get next multiple times
+      const first = manager.getCurrentAccount()!
+      manager.markRateLimited(first, 60000, "claude")
+
+      const second = manager.getCurrentOrNextForFamily("claude")
+      manager.markRateLimited(second!, 60000, "claude")
+
+      const third = manager.getCurrentOrNextForFamily("claude")
+
+      // #then
+      expect(second?.email).toBe("user2@example.com")
+      expect(third?.email).toBe("user3@example.com")
+    })
+
+    it("should wrap around when reaching end of account list", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com", tier: "free" }),
+          createMockAccountMetadata({ email: "user2@example.com", tier: "free" }),
+        ],
+        1
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when - rate limit current, then get next repeatedly
+      const current = manager.getCurrentAccount()!
+      manager.markRateLimited(current, 60000, "claude")
+      const next = manager.getCurrentOrNextForFamily("claude")
+
+      // #then
+      expect(next?.email).toBe("user1@example.com")
+    })
+  })
+
+  describe("rate limit expiry during rotation", () => {
+    it("should clear expired rate limits before selecting account", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com", tier: "paid" }),
+          createMockAccountMetadata({ email: "user2@example.com", tier: "free" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const paidAccount = manager.getCurrentAccount()!
+
+      // #when - set expired rate limit on paid account
+      paidAccount.rateLimits.claude = Date.now() - 1000
+
+      const selected = manager.getCurrentOrNextForFamily("claude")
+
+      // #then - should use paid account since limit expired
+      expect(selected?.email).toBe("user1@example.com")
+      expect(selected?.rateLimits.claude).toBeUndefined()
+    })
+
+    it("should not use account with future rate limit", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com", tier: "paid" }),
+          createMockAccountMetadata({ email: "user2@example.com", tier: "free" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const paidAccount = manager.getCurrentAccount()!
+
+      // #when - set future rate limit on paid account
+      paidAccount.rateLimits.claude = Date.now() + 60000
+
+      const selected = manager.getCurrentOrNextForFamily("claude")
+
+      // #then - should use free account since paid is still limited
+      expect(selected?.email).toBe("user2@example.com")
+    })
+  })
+
+  describe("partial rate limiting across model families", () => {
+    it("should allow account for one family while limited for another", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [createMockAccountMetadata({ email: "user1@example.com" })],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const account = manager.getCurrentAccount()!
+
+      // #when - rate limit for claude only
+      manager.markRateLimited(account, 60000, "claude")
+
+      const claudeAccount = manager.getCurrentOrNextForFamily("claude")
+      const geminiAccount = manager.getCurrentOrNextForFamily("gemini-flash")
+
+      // #then
+      expect(claudeAccount).toBeNull()
+      expect(geminiAccount?.email).toBe("user1@example.com")
+    })
+
+    it("should handle mixed rate limits across multiple accounts", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com" }),
+          createMockAccountMetadata({ email: "user2@example.com" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const accounts = manager.getAccounts()
+
+      // #when - user1 limited for claude, user2 limited for gemini
+      manager.markRateLimited(accounts[0]!, 60000, "claude")
+      manager.markRateLimited(accounts[1]!, 60000, "gemini-flash")
+
+      const claudeAccount = manager.getCurrentOrNextForFamily("claude")
+      const geminiAccount = manager.getCurrentOrNextForFamily("gemini-flash")
+
+      // #then
+      expect(claudeAccount?.email).toBe("user2@example.com")
+      expect(geminiAccount?.email).toBe("user1@example.com")
+    })
+
+    it("should handle all families rate limited for an account", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "user1@example.com" }),
+          createMockAccountMetadata({ email: "user2@example.com" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const account = manager.getCurrentAccount()!
+
+      // #when - rate limit all families for first account
+      manager.markRateLimited(account, 60000, "claude")
+      manager.markRateLimited(account, 60000, "gemini-flash")
+      manager.markRateLimited(account, 60000, "gemini-pro")
+
+      // #then - should rotate to second account for all families
+      expect(manager.getCurrentOrNextForFamily("claude")?.email).toBe("user2@example.com")
+      expect(manager.getCurrentOrNextForFamily("gemini-flash")?.email).toBe("user2@example.com")
+      expect(manager.getCurrentOrNextForFamily("gemini-pro")?.email).toBe("user2@example.com")
+    })
+  })
+
+  describe("tier prioritization edge cases", () => {
+    it("should use free account when all paid accounts are rate limited", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "paid1@example.com", tier: "paid" }),
+          createMockAccountMetadata({ email: "paid2@example.com", tier: "paid" }),
+          createMockAccountMetadata({ email: "free1@example.com", tier: "free" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+      const accounts = manager.getAccounts()
+
+      // #when - rate limit all paid accounts
+      manager.markRateLimited(accounts[0]!, 60000, "claude")
+      manager.markRateLimited(accounts[1]!, 60000, "claude")
+
+      const selected = manager.getCurrentOrNextForFamily("claude")
+
+      // #then - should fall back to free account
+      expect(selected?.email).toBe("free1@example.com")
+      expect(selected?.tier).toBe("free")
+    })
+
+    it("should switch to paid account when current free and paid becomes available", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [
+          createMockAccountMetadata({ email: "free@example.com", tier: "free" }),
+          createMockAccountMetadata({ email: "paid@example.com", tier: "paid" }),
+        ],
+        0
+      )
+      const auth = createMockAuthDetails()
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #when - current is free, paid is available
+      const selected = manager.getCurrentOrNextForFamily("claude")
+
+      // #then - should prefer paid account
+      expect(selected?.email).toBe("paid@example.com")
+    })
+  })
+
+  describe("constructor edge cases", () => {
+    it("should handle invalid activeIndex in stored accounts", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [createMockAccountMetadata({ email: "user1@example.com" })],
+        999
+      )
+      const auth = createMockAuthDetails()
+
+      // #when
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #then - should fall back to 0
+      const current = manager.getCurrentAccount()
+      expect(current?.email).toBe("user1@example.com")
+    })
+
+    it("should handle negative activeIndex", () => {
+      // #given
+      const storedAccounts = createMockAccountStorage(
+        [createMockAccountMetadata({ email: "user1@example.com" })],
+        -1
+      )
+      const auth = createMockAuthDetails()
+
+      // #when
+      const manager = new AccountManager(auth, storedAccounts)
+
+      // #then - should fall back to 0
+      const current = manager.getCurrentAccount()
+      expect(current?.email).toBe("user1@example.com")
+    })
+  })
 })
