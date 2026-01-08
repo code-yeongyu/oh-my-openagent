@@ -18,5 +18,5 @@ export const builtinAgents: Record<string, AgentConfig> = {
 }
 
 export * from "./types"
-export { createBuiltinAgents } from "./utils"
+export { createBuiltinAgents, hasGeminiModelAgents, willHaveGeminiAgents } from "./utils"
 export type { AvailableAgent } from "./sisyphus-prompt-builder"

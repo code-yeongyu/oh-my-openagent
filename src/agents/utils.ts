@@ -83,6 +83,75 @@ function mergeAgentConfig(
   return merged
 }
 
+/**
+ * Check if any agents in the config use a Google Gemini model.
+ * Used to conditionally load Google auth plugin only when needed.
+ *
+ * @param agents - Record of agent configurations
+ * @returns true if at least one agent uses a google/gemini-* model
+ */
+export function hasGeminiModelAgents(
+  agents: Record<string, AgentConfig>
+): boolean {
+  return Object.values(agents).some(
+    (agent) => agent.model?.startsWith("google/gemini") ?? false
+  )
+}
+
+/**
+ * Agents that use Gemini models by default.
+ * These are the only agents that would trigger Google auth requirement.
+ */
+const GEMINI_AGENTS: BuiltinAgentName[] = [
+  "frontend-ui-ux-engineer",
+  "document-writer",
+  "multimodal-looker",
+]
+
+/**
+ * Check if any Gemini-using agents will be active based on configuration.
+ * This is a lightweight check that doesn't require building all agents.
+ *
+ * @param disabledAgents - List of disabled agent names from pluginConfig
+ * @param agentOverrides - Agent overrides from pluginConfig
+ * @returns true if at least one Gemini agent will be active
+ */
+export function willHaveGeminiAgents(
+  disabledAgents: BuiltinAgentName[] = [],
+  agentOverrides: AgentOverrides = {}
+): boolean {
+  for (const agentName of GEMINI_AGENTS) {
+    // Check if this Gemini agent is disabled
+    if (disabledAgents.includes(agentName)) {
+      continue
+    }
+
+    // Check if user overrode the model to a non-Gemini model
+    const override = agentOverrides[agentName]
+    if (override?.model && !override.model.startsWith("google/gemini")) {
+      continue
+    }
+
+    // This Gemini agent is active with a Gemini model
+    return true
+  }
+
+  // Also check if any other agent was overridden to use Gemini
+  for (const [agentName, override] of Object.entries(agentOverrides)) {
+    // Skip if this agent is disabled
+    if (disabledAgents.includes(agentName as BuiltinAgentName)) {
+      continue
+    }
+
+    // Check if user set a Gemini model for a non-default-Gemini agent
+    if (override?.model?.startsWith("google/gemini")) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export function createBuiltinAgents(
   disabledAgents: BuiltinAgentName[] = [],
   agentOverrides: AgentOverrides = {},
