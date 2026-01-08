@@ -160,7 +160,7 @@ export const CategoryConfigSchema = z.object({
 
 export const BuiltinCategoryNameSchema = z.enum([
   "visual-engineering",
-  "high-iq",
+  "ultrabrain",
   "artistry",
   "quick",
   "most-capable",

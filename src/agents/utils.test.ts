@@ -193,7 +193,7 @@ describe("buildAgent with category and skills", () => {
       "test-agent": () =>
         ({
           description: "Test agent",
-          category: "high-iq",
+          category: "ultrabrain",
           skills: ["frontend-ui-ux"],
           prompt: "Task description",
         }) as AgentConfig,

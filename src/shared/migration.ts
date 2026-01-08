@@ -31,7 +31,7 @@ export const HOOK_NAME_MAP: Record<string, string> = {
 // Model to category mapping for auto-migration
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
-  "openai/gpt-5.2": "high-iq",
+  "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
   "anthropic/claude-opus-4-5": "most-capable",
   "anthropic/claude-sonnet-4-5": "general",

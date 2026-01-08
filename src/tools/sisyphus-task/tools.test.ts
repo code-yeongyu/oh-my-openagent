@@ -42,9 +42,9 @@ describe("sisyphus-task", () => {
       expect(category.temperature).toBe(0.7)
     })
 
-    test("high-iq category has gpt model", () => {
+    test("ultrabrain category has gpt model", () => {
       // #given
-      const category = DEFAULT_CATEGORIES["high-iq"]
+      const category = DEFAULT_CATEGORIES["ultrabrain"]
 
       // #when / #then
       expect(category).toBeDefined()
@@ -63,9 +63,9 @@ describe("sisyphus-task", () => {
       expect(promptAppend).toContain("Design-first")
     })
 
-    test("high-iq category has strategic prompt", () => {
+    test("ultrabrain category has strategic prompt", () => {
       // #given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["high-iq"]
+      const promptAppend = CATEGORY_PROMPT_APPENDS["ultrabrain"]
 
       // #when / #then
       expect(promptAppend).toContain("BUSINESS LOGIC")

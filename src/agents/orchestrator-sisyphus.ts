@@ -65,7 +65,7 @@ ${categoryRows.join("\n")}
 
 \`\`\`typescript
 sisyphus_task(category="visual-engineering", prompt="...")      // UI/frontend work
-sisyphus_task(category="high-iq", prompt="...")     // Backend/strategic work
+sisyphus_task(category="ultrabrain", prompt="...")     // Backend/strategic work
 \`\`\``
 }
 
@@ -108,11 +108,11 @@ sisyphus_task(category="visual-engineering", skills=["frontend-ui-ux", "playwrig
 function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<string, CategoryConfig>): string {
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const hasVisual = "visual-engineering" in allCategories
-  const hasStrategic = "high-iq" in allCategories
+  const hasStrategic = "ultrabrain" in allCategories
   
   const rows: string[] = []
   if (hasVisual) rows.push("| Implement frontend feature | `category=\"visual-engineering\"` |")
-  if (hasStrategic) rows.push("| Implement backend feature | `category=\"high-iq\"` |")
+  if (hasStrategic) rows.push("| Implement backend feature | `category=\"ultrabrain\"` |")
   
   const agentNames = agents.map((a) => a.name)
   if (agentNames.includes("oracle")) rows.push("| Code review / architecture | `agent=\"oracle\"` |")
@@ -702,13 +702,13 @@ When calling \`sisyphus_task()\`, your prompt MUST be:
 
 **BAD (will fail):**
 \`\`\`
-sisyphus_task(category="high-iq", prompt="Fix the auth bug")
+sisyphus_task(category="ultrabrain", prompt="Fix the auth bug")
 \`\`\`
 
 **GOOD (will succeed):**
 \`\`\`
 sisyphus_task(
-  category="high-iq",
+  category="ultrabrain",
   prompt="""
   ## TASK
   Fix authentication token expiry bug in src/auth/token.ts
@@ -1235,7 +1235,7 @@ The answer is almost always YES.
 - [X] Git commits (delegate to git-master)
 
 **DELEGATION TARGETS:**
-- \`sisyphus_task(category="high-iq", background=false)\` → backend/logic implementation
+- \`sisyphus_task(category="ultrabrain", background=false)\` → backend/logic implementation
 - \`sisyphus_task(category="visual-engineering", background=false)\` → frontend/UI implementation
 - \`sisyphus_task(agent="git-master", background=false)\` → ALL git commits
 - \`sisyphus_task(agent="document-writer", background=false)\` → documentation

@@ -308,7 +308,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "high-iq", "quick", "most-capable", "general"]
+    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "most-capable", "general"]
 
     // #when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
@@ -335,7 +335,7 @@ describe("migrateAgentConfigToCategory", () => {
     const { migrated } = migrateAgentConfigToCategory(config)
 
     // #then: All non-model fields should be preserved
-    expect(migrated.category).toBe("high-iq")
+    expect(migrated.category).toBe("ultrabrain")
     expect(migrated.temperature).toBe(0.1)
     expect(migrated.top_p).toBe(0.95)
     expect(migrated.maxTokens).toBe(4096)
@@ -398,7 +398,7 @@ describe("shouldDeleteAgentConfig", () => {
   test("handles different categories with their defaults", () => {
     // #given: Configs for different categories
     const configs = [
-      { category: "high-iq", temperature: 0.1 },
+      { category: "ultrabrain", temperature: 0.1 },
       { category: "quick", temperature: 0.3 },
       { category: "most-capable", temperature: 0.1 },
       { category: "general", temperature: 0.3 },
@@ -547,7 +547,7 @@ describe("migrateConfigFile with backup", () => {
     const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
     const agents = migratedConfig.agents as Record<string, unknown>
     expect(agents.oracle).toBeDefined()
-    expect((agents.oracle as Record<string, unknown>).category).toBe("high-iq")
+    expect((agents.oracle as Record<string, unknown>).category).toBe("ultrabrain")
     expect((agents.oracle as Record<string, unknown>).temperature).toBe(0.5)
     expect((agents.oracle as Record<string, unknown>).model).toBeUndefined()
 

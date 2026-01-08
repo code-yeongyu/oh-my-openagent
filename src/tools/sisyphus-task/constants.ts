@@ -188,7 +188,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
     model: "google/gemini-3-pro-preview",
     temperature: 0.7,
   },
-  "high-iq": {
+  ultrabrain: {
     model: "openai/gpt-5.2",
     temperature: 0.1,
   },
@@ -216,7 +216,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
-  "high-iq": STRATEGIC_CATEGORY_PROMPT_APPEND,
+  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
   "most-capable": MOST_CAPABLE_CATEGORY_PROMPT_APPEND,
@@ -226,7 +226,7 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
-  "high-iq": "Strict architecture design, very complex business logic",
+  ultrabrain: "Strict architecture design, very complex business logic",
   artistry: "Highly creative/artistic tasks, novel ideas",
   quick: "Cheap & fast - small tasks with minimal overhead, budget-friendly",
   "most-capable": "Complex tasks requiring maximum capability",
