@@ -8,6 +8,7 @@ import {
     ANTIGRAVITY_API_VERSION,
     ANTIGRAVITY_ENDPOINT_FALLBACKS,
     ANTIGRAVITY_HEADERS,
+    ANTIGRAVITY_SYSTEM_PROMPT,
     SKIP_THOUGHT_SIGNATURE_VALIDATOR,
 } from "./constants"
 import type { AntigravityRequestBody } from "./types"
@@ -133,6 +134,58 @@ function generateRequestId(): string {
   return `agent-${crypto.randomUUID()}`
 }
 
+/**
+ * Inject ANTIGRAVITY_SYSTEM_PROMPT into request.systemInstruction.
+ * Prepends Antigravity prompt before any existing systemInstruction.
+ * Prevents duplicate injection by checking for <identity> marker.
+ *
+ * CRITICAL: Modifies wrappedBody.request.systemInstruction (NOT outer body!)
+ *
+ * @param wrappedBody - The wrapped request body with request field
+ */
+export function injectSystemPrompt(wrappedBody: { request?: unknown }): void {
+  if (!wrappedBody.request || typeof wrappedBody.request !== "object") {
+    return
+  }
+
+  const req = wrappedBody.request as Record<string, unknown>
+
+  // Check for duplicate injection - if <identity> marker exists in first part, skip
+  if (req.systemInstruction && typeof req.systemInstruction === "object") {
+    const existing = req.systemInstruction as Record<string, unknown>
+    if (existing.parts && Array.isArray(existing.parts)) {
+      const firstPart = existing.parts[0]
+      if (firstPart && typeof firstPart === "object" && "text" in firstPart) {
+        const text = (firstPart as { text: string }).text
+        if (text.includes("<identity>")) {
+          return // Already injected, skip
+        }
+      }
+    }
+  }
+
+  // Build new parts array - Antigravity prompt first, then existing parts
+  const newParts: Array<{ text: string }> = [{ text: ANTIGRAVITY_SYSTEM_PROMPT }]
+
+  // Prepend existing parts if systemInstruction exists with parts
+  if (req.systemInstruction && typeof req.systemInstruction === "object") {
+    const existing = req.systemInstruction as Record<string, unknown>
+    if (existing.parts && Array.isArray(existing.parts)) {
+      for (const part of existing.parts) {
+        if (part && typeof part === "object" && "text" in part) {
+          newParts.push(part as { text: string })
+        }
+      }
+    }
+  }
+
+  // Set the new systemInstruction
+  req.systemInstruction = {
+    role: "user",
+    parts: newParts,
+  }
+}
+
 export function wrapRequestBody(
   body: Record<string, unknown>,
   projectId: string,
@@ -142,7 +195,7 @@ export function wrapRequestBody(
   const requestPayload = { ...body }
   delete requestPayload.model
 
-  return {
+  const wrappedBody: AntigravityRequestBody = {
     project: projectId,
     model: modelName,
     userAgent: "antigravity",
@@ -152,6 +205,11 @@ export function wrapRequestBody(
       sessionId,
     },
   }
+
+  // Inject Antigravity system prompt into request.systemInstruction
+  injectSystemPrompt(wrappedBody)
+
+  return wrappedBody
 }
 
 interface ContentPart {
