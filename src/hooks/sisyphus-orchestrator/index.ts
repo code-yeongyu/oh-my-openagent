@@ -85,6 +85,56 @@ VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
 Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages, integration problems.
 **FAILURE TO DO HANDS-ON QA = INCOMPLETE WORK.**`
 
+const ORCHESTRATOR_DELEGATION_REQUIRED = `
+
+---
+
+⚠️⚠️⚠️ [CRITICAL SYSTEM DIRECTIVE - DELEGATION REQUIRED] ⚠️⚠️⚠️
+
+**STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
+
+You (orchestrator-sisyphus) are attempting to directly modify a file outside \`.sisyphus/\`.
+
+**Path attempted:** $FILE_PATH
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
+
+As an ORCHESTRATOR, you MUST:
+1. **DELEGATE** all implementation work via \`sisyphus_task\`
+2. **VERIFY** the work done by subagents (reading files is OK)
+3. **COORDINATE** - you orchestrate, you don't implement
+
+**ALLOWED direct file operations:**
+- Files inside \`.sisyphus/\` (plans, notepads, drafts)
+- Reading files for verification
+- Running diagnostics/tests
+
+**FORBIDDEN direct file operations:**
+- Writing/editing source code
+- Creating new files outside \`.sisyphus/\`
+- Any implementation work
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**IF THIS IS FOR VERIFICATION:**
+Proceed if you are verifying subagent work by making a small fix.
+But for any substantial changes, USE \`sisyphus_task\`.
+
+**CORRECT APPROACH:**
+\`\`\`
+sisyphus_task(
+  category="...",
+  prompt="[specific single task with clear acceptance criteria]"
+)
+\`\`\`
+
+⚠️⚠️⚠️ DELEGATE. DON'T IMPLEMENT. ⚠️⚠️⚠️
+
+---
+`
+
 const SINGLE_TASK_DIRECTIVE = `
 
 [SYSTEM DIRECTIVE - SINGLE TASK ONLY]
@@ -322,6 +372,7 @@ export function createSisyphusOrchestratorHook(
 ) {
   const backgroundManager = options?.backgroundManager
   const sessions = new Map<string, SessionState>()
+  const pendingFilePaths = new Map<string, string>()
 
   function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -491,20 +542,38 @@ export function createSisyphusOrchestratorHook(
       input: { tool: string; sessionID?: string; callID?: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      if (input.tool !== "sisyphus_task") {
-        return
-      }
-
       if (!isCallerOrchestrator(input.sessionID)) {
         return
       }
 
-      const prompt = output.args.prompt as string | undefined
-      if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - SINGLE TASK ONLY]")) {
-        output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
-        log(`[${HOOK_NAME}] Injected single-task directive to sisyphus_task`, {
-          sessionID: input.sessionID,
-        })
+      // Check Write/Edit tools for orchestrator - inject strong warning
+      if (WRITE_EDIT_TOOLS.includes(input.tool)) {
+        const filePath = (output.args.filePath ?? output.args.path ?? output.args.file) as string | undefined
+        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+          // Store filePath for use in tool.execute.after
+          if (input.callID) {
+            pendingFilePaths.set(input.callID, filePath)
+          }
+          const warning = ORCHESTRATOR_DELEGATION_REQUIRED.replace("$FILE_PATH", filePath)
+          output.message = (output.message || "") + warning
+          log(`[${HOOK_NAME}] Injected delegation warning for direct file modification`, {
+            sessionID: input.sessionID,
+            tool: input.tool,
+            filePath,
+          })
+        }
+        return
+      }
+
+      // Check sisyphus_task - inject single-task directive
+      if (input.tool === "sisyphus_task") {
+        const prompt = output.args.prompt as string | undefined
+        if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - SINGLE TASK ONLY]")) {
+          output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
+          log(`[${HOOK_NAME}] Injected single-task directive to sisyphus_task`, {
+            sessionID: input.sessionID,
+          })
+        }
       }
     },
 
@@ -517,7 +586,10 @@ export function createSisyphusOrchestratorHook(
       }
 
       if (WRITE_EDIT_TOOLS.includes(input.tool)) {
-        const filePath = output.metadata?.filePath as string | undefined
+        const filePath = input.callID ? pendingFilePaths.get(input.callID) : undefined
+        if (input.callID) {
+          pendingFilePaths.delete(input.callID)
+        }
         if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
           output.output = (output.output || "") + DIRECT_WORK_REMINDER
           log(`[${HOOK_NAME}] Direct work reminder appended`, {
