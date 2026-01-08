@@ -586,9 +586,12 @@ export function createSisyphusOrchestratorHook(
       }
 
       if (WRITE_EDIT_TOOLS.includes(input.tool)) {
-        const filePath = input.callID ? pendingFilePaths.get(input.callID) : undefined
+        let filePath = input.callID ? pendingFilePaths.get(input.callID) : undefined
         if (input.callID) {
           pendingFilePaths.delete(input.callID)
+        }
+        if (!filePath) {
+          filePath = output.metadata?.filePath as string | undefined
         }
         if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
           output.output = (output.output || "") + DIRECT_WORK_REMINDER

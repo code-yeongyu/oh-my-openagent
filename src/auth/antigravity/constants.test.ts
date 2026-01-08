@@ -7,22 +7,22 @@ import {
 
 describe("Antigravity Constants", () => {
   describe("ANTIGRAVITY_TOKEN_REFRESH_BUFFER_MS", () => {
-    it("should be 50 minutes (3,000,000ms) to match CLIProxyAPI", () => {
+    it("should be 60 seconds (60,000ms) to refresh before expiry", () => {
       // #given
-      const FIFTY_MINUTES_MS = 50 * 60 * 1000 // 3,000,000
+      const SIXTY_SECONDS_MS = 60 * 1000 // 60,000
 
       // #when
       const actual = ANTIGRAVITY_TOKEN_REFRESH_BUFFER_MS
 
       // #then
-      expect(actual).toBe(FIFTY_MINUTES_MS)
+      expect(actual).toBe(SIXTY_SECONDS_MS)
     })
   })
 
   describe("ANTIGRAVITY_ENDPOINT_FALLBACKS", () => {
-    it("should have exactly 2 endpoints (daily → prod)", () => {
+    it("should have exactly 3 endpoints (sandbox → daily → prod)", () => {
       // #given
-      const expectedCount = 2
+      const expectedCount = 3
 
       // #when
       const actual = ANTIGRAVITY_ENDPOINT_FALLBACKS
@@ -31,16 +31,23 @@ describe("Antigravity Constants", () => {
       expect(actual).toHaveLength(expectedCount)
     })
 
-    it("should have daily endpoint first", () => {
+    it("should have sandbox endpoint first", () => {
       // #then
       expect(ANTIGRAVITY_ENDPOINT_FALLBACKS[0]).toBe(
         "https://daily-cloudcode-pa.sandbox.googleapis.com"
       )
     })
 
-    it("should have prod endpoint second", () => {
+    it("should have daily endpoint second", () => {
       // #then
       expect(ANTIGRAVITY_ENDPOINT_FALLBACKS[1]).toBe(
+        "https://daily-cloudcode-pa.googleapis.com"
+      )
+    })
+
+    it("should have prod endpoint third", () => {
+      // #then
+      expect(ANTIGRAVITY_ENDPOINT_FALLBACKS[2]).toBe(
         "https://cloudcode-pa.googleapis.com"
       )
     })
