@@ -1,9 +1,12 @@
 > [!NOTE]
 >
-> *"I aim to spark a software revolution by creating a world where agent-generated code is indistinguishable from human code, yet capable of achieving vastly more. I have poured my personal time, passion, and funds into this journey, and I will continue to do so."*
+> [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png)](https://sisyphuslabs.ai)
+> > We're building a fully productized version of Sisyphus to define the future of frontier agents. Join the waitlist [here](https://sisyphuslabs.ai).
+
+> [!TIP]
 >
-> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
-> > **The Orchestrator is coming. This Week. [Get notified on X](https://x.com/justsisyphus/status/2006250634354548963)**
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
+> > **The Orchestrator is now available in beta. Use `oh-my-opencode@beta` to install it.**
 >
 > Be with us!
 >
