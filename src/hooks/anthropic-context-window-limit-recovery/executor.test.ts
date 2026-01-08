@@ -257,7 +257,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-5", auto: true },
       }),
     )
 
