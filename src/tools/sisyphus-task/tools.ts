@@ -384,29 +384,50 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        try {
-          await client.session.prompt({
-            path: { id: sessionID },
-            body: {
-              agent: agentToUse,
-              model: categoryModel,
-              system: systemContent,
-              tools: {
-                task: false,
-                sisyphus_task: false,
-              },
-              parts: [{ type: "text", text: args.prompt }],
+        // Use promptAsync to avoid changing main session's active state
+        let promptError: Error | undefined
+        await client.session.promptAsync({
+          path: { id: sessionID },
+          body: {
+            agent: agentToUse,
+            model: categoryModel,
+            system: systemContent,
+            tools: {
+              task: false,
+              sisyphus_task: false,
             },
-          })
-        } catch (promptError) {
+            parts: [{ type: "text", text: args.prompt }],
+          },
+        }).catch((error) => {
+          promptError = error instanceof Error ? error : new Error(String(error))
+        })
+
+        if (promptError) {
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }
-          const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+          const errorMessage = promptError.message
           if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
             return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
           }
           return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+        }
+
+        // Poll for session completion
+        const POLL_INTERVAL_MS = 500
+        const MAX_POLL_TIME_MS = 10 * 60 * 1000
+        const pollStart = Date.now()
+
+        while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+
+          const statusResult = await client.session.status()
+          const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+          const sessionStatus = allStatuses[sessionID]
+
+          if (sessionStatus?.type === "idle") {
+            break
+          }
         }
 
         const messagesResult = await client.session.messages({
