@@ -422,6 +422,11 @@ export function createSisyphusOrchestratorHook(
           return
         }
 
+        if (!isCallerOrchestrator(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: last agent is not orchestrator-sisyphus`, { sessionID })
+          return
+        }
+
         const progress = getPlanProgress(boulderState.active_plan)
         if (progress.isComplete) {
           log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })

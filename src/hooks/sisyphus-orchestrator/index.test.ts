@@ -517,6 +517,11 @@ describe("sisyphus-orchestrator hook", () => {
         getMainSessionID: () => MAIN_SESSION_ID,
         subagentSessions: new Set<string>(),
       }))
+      setupMessageStorage(MAIN_SESSION_ID, "orchestrator-sisyphus")
+    })
+
+    afterEach(() => {
+      cleanupMessageStorage(MAIN_SESSION_ID)
     })
 
     test("should inject continuation when boulder has incomplete tasks", async () => {
@@ -739,6 +744,38 @@ describe("sisyphus-orchestrator hook", () => {
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.body.parts[0].text).toContain("2/4 completed")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should not inject when last agent is not orchestrator-sisyphus", async () => {
+      // #given - boulder state with incomplete plan, but last agent is NOT orchestrator-sisyphus
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // #given - last agent is NOT orchestrator-sisyphus
+      cleanupMessageStorage(MAIN_SESSION_ID)
+      setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
+
+      const mockInput = createMockPluginInput()
+      const hook = createSisyphusOrchestratorHook(mockInput)
+
+      // #when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // #then - should NOT call prompt because agent is not orchestrator-sisyphus
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
     test("should cleanup on session.deleted", async () => {
