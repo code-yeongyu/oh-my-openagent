@@ -76,7 +76,7 @@ function getModelFamilyFromModelName(modelName: string): ModelFamily | null {
   const lower = modelName.toLowerCase()
   if (lower.includes("claude") || lower.includes("anthropic")) return "claude"
   if (lower.includes("flash")) return "gemini-flash"
-  if (lower.includes("gemini") || lower.includes("pro")) return "gemini-pro"
+  if (lower.includes("gemini")) return "gemini-pro"
   return null
 }
 

@@ -283,8 +283,8 @@ export async function createGoogleAntigravityAuthPlugin({
 
                 const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret, serverHandle.port)
 
-                // Validate refresh_token exists before proceeding
                 if (!tokens.refresh_token) {
+                  serverHandle.close()
                   if (process.env.ANTIGRAVITY_DEBUG === "1") {
                     console.error("[antigravity-plugin] OAuth response missing refresh_token")
                   }
@@ -391,6 +391,7 @@ export async function createGoogleAntigravityAuthPlugin({
                     )
 
                     if (!additionalTokens.refresh_token) {
+                      additionalServerHandle.close()
                       if (process.env.ANTIGRAVITY_DEBUG === "1") {
                         console.error("[antigravity-plugin] Additional account OAuth response missing refresh_token")
                       }
