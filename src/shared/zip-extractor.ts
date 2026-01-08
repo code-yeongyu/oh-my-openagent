@@ -49,27 +49,27 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
     switch (extractor) {
       case "tar":
         proc = spawn(["tar", "-xf", archivePath, "-C", destDir], {
-          stdout: "pipe",
+          stdout: "ignore",
           stderr: "pipe",
         })
         break
       case "pwsh":
         proc = spawn(["pwsh", "-Command", `Expand-Archive -Path '${escapePowerShellPath(archivePath)}' -DestinationPath '${escapePowerShellPath(destDir)}' -Force`], {
-          stdout: "pipe",
+          stdout: "ignore",
           stderr: "pipe",
         })
         break
       case "powershell":
       default:
         proc = spawn(["powershell", "-Command", `Expand-Archive -Path '${escapePowerShellPath(archivePath)}' -DestinationPath '${escapePowerShellPath(destDir)}' -Force`], {
-          stdout: "pipe",
+          stdout: "ignore",
           stderr: "pipe",
         })
         break
     }
   } else {
     proc = spawn(["unzip", "-o", archivePath, "-d", destDir], {
-      stdout: "pipe",
+      stdout: "ignore",
       stderr: "pipe",
     })
   }
