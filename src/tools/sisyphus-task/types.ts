@@ -3,7 +3,7 @@ export interface SisyphusTaskArgs {
   prompt: string
   category?: string
   subagent_type?: string
-  background: boolean
+  run_in_background: boolean
   resume?: string
   skills?: string[]
 }

@@ -119,16 +119,16 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       category: tool.schema.string().optional().describe(`Category name (e.g., ${CATEGORY_EXAMPLES}). Mutually exclusive with subagent_type.`),
       subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
-      background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
+      run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
       skills: tool.schema.array(tool.schema.string()).optional().describe("Array of skill names to prepend to the prompt. Skills will be resolved and their content prepended with a separator."),
     },
     async execute(args: SisyphusTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
-      if (args.background === undefined) {
-        return `❌ Invalid arguments: 'background' parameter is REQUIRED. Use background=false for task delegation, background=true only for parallel exploration.`
+      if (args.run_in_background === undefined) {
+        return `❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
       }
-      const runInBackground = args.background === true
+      const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
       if (args.skills && args.skills.length > 0) {
@@ -148,21 +148,22 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       // Handle resume case first
       if (args.resume) {
-        try {
-          const task = await manager.resume({
-            sessionId: args.resume,
-            prompt: args.prompt,
-            parentSessionID: ctx.sessionID,
-            parentMessageID: ctx.messageID,
-            parentModel,
-          })
+        if (runInBackground) {
+          try {
+            const task = await manager.resume({
+              sessionId: args.resume,
+              prompt: args.prompt,
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              parentModel,
+            })
 
-          ctx.metadata?.({
-            title: `Resume: ${task.description}`,
-            metadata: { sessionId: task.sessionID },
-          })
+            ctx.metadata?.({
+              title: `Resume: ${task.description}`,
+              metadata: { sessionId: task.sessionID },
+            })
 
-          return `Background task resumed.
+            return `Background task resumed.
 
 Task ID: ${task.id}
 Session ID: ${task.sessionID}
@@ -172,10 +173,90 @@ Status: ${task.status}
 
 Agent continues with full previous context preserved.
 Use \`background_output\` with task_id="${task.id}" to check progress.`
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          return `❌ Failed to resume task: ${message}`
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            return `❌ Failed to resume task: ${message}`
+          }
         }
+
+        const toastManager = getTaskToastManager()
+        const taskId = `resume_sync_${args.resume.slice(0, 8)}`
+        const startTime = new Date()
+
+        if (toastManager) {
+          toastManager.addTask({
+            id: taskId,
+            description: args.description,
+            agent: "resume",
+            isBackground: false,
+          })
+        }
+
+        ctx.metadata?.({
+          title: `Resume: ${args.description}`,
+          metadata: { sessionId: args.resume, sync: true },
+        })
+
+        try {
+          await client.session.prompt({
+            path: { id: args.resume },
+            body: {
+              tools: {
+                task: false,
+                sisyphus_task: false,
+              },
+              parts: [{ type: "text", text: args.prompt }],
+            },
+          })
+        } catch (promptError) {
+          if (toastManager) {
+            toastManager.removeTask(taskId)
+          }
+          const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+          return `❌ Failed to send resume prompt: ${errorMessage}\n\nSession ID: ${args.resume}`
+        }
+
+        const messagesResult = await client.session.messages({
+          path: { id: args.resume },
+        })
+
+        if (messagesResult.error) {
+          if (toastManager) {
+            toastManager.removeTask(taskId)
+          }
+          return `❌ Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.resume}`
+        }
+
+        const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
+          info?: { role?: string; time?: { created?: number } }
+          parts?: Array<{ type?: string; text?: string }>
+        }>
+
+        const assistantMessages = messages
+          .filter((m) => m.info?.role === "assistant")
+          .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+        const lastMessage = assistantMessages[0]
+
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
+
+        if (!lastMessage) {
+          return `❌ No assistant response found.\n\nSession ID: ${args.resume}`
+        }
+
+        const textParts = lastMessage?.parts?.filter((p) => p.type === "text") ?? []
+        const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+
+        const duration = formatDuration(startTime)
+
+        return `Task resumed and completed in ${duration}.
+
+Session ID: ${args.resume}
+
+---
+
+${textContent || "(No text output)"}`
       }
 
       if (args.category && args.subagent_type) {
