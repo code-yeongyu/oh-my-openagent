@@ -1,14 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
+import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
 export * from "./constants"
 
 function isAllowedFile(filePath: string): boolean {
-  return ALLOWED_EXTENSIONS.some(ext => filePath.endsWith(ext))
+  const hasAllowedExtension = ALLOWED_EXTENSIONS.some(ext => filePath.endsWith(ext))
+  const isInAllowedPath = filePath.includes(ALLOWED_PATH_PREFIX)
+  return hasAllowedExtension && isInAllowedPath
 }
 
 function getMessageDir(sessionID: string): string | null {
@@ -71,20 +73,20 @@ export function createPrometheusMdOnlyHook(_ctx: PluginInput) {
       }
 
       if (!isAllowedFile(filePath)) {
-        log(`[${HOOK_NAME}] Blocked: Prometheus can only write *.md files`, {
+        log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .sisyphus/*.md`, {
           sessionID: input.sessionID,
           tool: toolName,
           filePath,
           agent: agentName,
         })
         throw new Error(
-          `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files. ` +
+          `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files inside .sisyphus/ directory. ` +
           `Attempted to modify: ${filePath}. ` +
-          `Prometheus is a READ-ONLY planner for code. Use /start-work to execute the plan.`
+          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan.`
         )
       }
 
-      log(`[${HOOK_NAME}] Allowed: *.md write permitted`, {
+      log(`[${HOOK_NAME}] Allowed: .sisyphus/*.md write permitted`, {
         sessionID: input.sessionID,
         tool: toolName,
         filePath,
