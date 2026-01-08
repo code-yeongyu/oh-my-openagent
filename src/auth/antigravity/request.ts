@@ -10,6 +10,7 @@ import {
     ANTIGRAVITY_HEADERS,
     ANTIGRAVITY_SYSTEM_PROMPT,
     SKIP_THOUGHT_SIGNATURE_VALIDATOR,
+    alias2ModelName,
 } from "./constants"
 import type { AntigravityRequestBody } from "./types"
 
@@ -197,7 +198,7 @@ export function wrapRequestBody(
 
   const wrappedBody: AntigravityRequestBody = {
     project: projectId,
-    model: modelName,
+    model: alias2ModelName(modelName),
     userAgent: "antigravity",
     requestId: generateRequestId(),
     request: {

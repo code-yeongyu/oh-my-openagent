@@ -185,13 +185,13 @@ export const ANTIGRAVITY_MODEL_CONFIGS: Record<string, AntigravityModelConfig> =
     zeroAllowed: false,
     levels: ["minimal", "low", "medium", "high"],
   },
-  "gemini-claude-sonnet-4-5": {
+  "gemini-claude-sonnet-4-5-thinking": {
     thinkingType: "numeric",
     min: 1024,
     max: 200000,
     zeroAllowed: false,
   },
-  "gemini-claude-opus-4-5": {
+  "gemini-claude-opus-4-5-thinking": {
     thinkingType: "numeric",
     min: 1024,
     max: 200000,
@@ -235,4 +235,52 @@ export function normalizeModelId(model: string): string {
   normalized = normalized.replace(/-(high|low)$/, "")
 
   return normalized
+}
+
+export const ANTIGRAVITY_SUPPORTED_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-computer-use-preview-10-2025",
+  "gemini-3-pro-preview",
+  "gemini-3-flash-preview",
+  "gemini-claude-sonnet-4-5-thinking",
+  "gemini-claude-opus-4-5-thinking",
+] as const
+
+// ============================================================================
+// Model Alias Mapping (for Antigravity API)
+// ============================================================================
+
+/**
+ * Converts UI model names to Antigravity API model names.
+ * Required because Antigravity API expects different model IDs internally.
+ *
+ * From CLIProxyAPI antigravity_executor.go:alias2ModelName (lines 1328-1347)
+ *
+ * Examples:
+ * - "gemini-claude-sonnet-4-5" → "claude-sonnet-4-5"
+ * - "gemini-claude-sonnet-4-5-thinking" → "claude-sonnet-4-5-thinking"
+ * - "gemini-claude-opus-4-5-thinking" → "claude-opus-4-5-thinking"
+ * - "gemini-3-pro-preview" → "gemini-3-pro-high"
+ * - "gemini-3-flash-preview" → "gemini-3-flash"
+ */
+export function alias2ModelName(modelName: string): string {
+  switch (modelName) {
+    case "gemini-2.5-computer-use-preview-10-2025":
+      return "rev19-uic3-1p"
+    case "gemini-3-pro-image-preview":
+      return "gemini-3-pro-image"
+    case "gemini-3-pro-preview":
+      return "gemini-3-pro-high"
+    case "gemini-3-flash-preview":
+      return "gemini-3-flash"
+    case "gemini-claude-sonnet-4-5":
+      return "claude-sonnet-4-5"
+    case "gemini-claude-sonnet-4-5-thinking":
+      return "claude-sonnet-4-5-thinking"
+    case "gemini-claude-opus-4-5-thinking":
+      return "claude-opus-4-5-thinking"
+    default:
+      return modelName
+  }
 }
