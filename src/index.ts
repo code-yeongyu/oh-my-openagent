@@ -313,7 +313,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       hasExternalGeminiAgentsActive,
       disabledAgents: pluginConfig.disabled_agents,
       agentOverrides: Object.keys(pluginConfig.agents ?? {}),
-    });
+    keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
+  });
   }
 
   const googleAuthHooks =
