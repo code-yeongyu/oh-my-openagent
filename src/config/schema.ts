@@ -43,13 +43,13 @@ export const OverridableAgentNameSchema = z.enum([
   "Prometheus (Planner)",
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
+  "orchestrator-sisyphus",
   "oracle",
   "librarian",
   "explore",
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
-  "orchestrator-sisyphus",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -123,13 +123,13 @@ export const AgentOverridesSchema = z.object({
   "Prometheus (Planner)": AgentOverrideConfigSchema.optional(),
   "Metis (Plan Consultant)": AgentOverrideConfigSchema.optional(),
   "Momus (Plan Reviewer)": AgentOverrideConfigSchema.optional(),
+  "orchestrator-sisyphus": AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  "orchestrator-sisyphus": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
