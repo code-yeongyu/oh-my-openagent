@@ -151,5 +151,90 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).not.toContain("$TIMESTAMP")
       expect(output.parts[0].text).toMatch(/\d{4}-\d{2}-\d{2}T/)
     })
+
+    test("should auto-select when only one incomplete plan among multiple plans", async () => {
+      // #given - multiple plans but only one incomplete
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      // Plan 1: complete (all checked)
+      const plan1Path = join(plansDir, "plan-complete.md")
+      writeFileSync(plan1Path, "# Plan Complete\n- [x] Task 1\n- [x] Task 2")
+
+      // Plan 2: incomplete (has unchecked)
+      const plan2Path = join(plansDir, "plan-incomplete.md")
+      writeFileSync(plan2Path, "# Plan Incomplete\n- [ ] Task 1\n- [x] Task 2")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+      }
+
+      // #when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should auto-select the incomplete plan, not ask user
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(output.parts[0].text).toContain("plan-incomplete")
+      expect(output.parts[0].text).not.toContain("Multiple Plans Found")
+    })
+
+    test("should wrap multiple plans message in system-reminder tag", async () => {
+      // #given - multiple incomplete plans
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const plan1Path = join(plansDir, "plan-a.md")
+      writeFileSync(plan1Path, "# Plan A\n- [ ] Task 1")
+
+      const plan2Path = join(plansDir, "plan-b.md")
+      writeFileSync(plan2Path, "# Plan B\n- [ ] Task 2")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+      }
+
+      // #when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should use system-reminder tag format
+      expect(output.parts[0].text).toContain("<system-reminder>")
+      expect(output.parts[0].text).toContain("</system-reminder>")
+      expect(output.parts[0].text).toContain("Multiple Plans Found")
+    })
+
+    test("should use 'ask user' prompt style for multiple plans", async () => {
+      // #given - multiple incomplete plans
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const plan1Path = join(plansDir, "plan-x.md")
+      writeFileSync(plan1Path, "# Plan X\n- [ ] Task 1")
+
+      const plan2Path = join(plansDir, "plan-y.md")
+      writeFileSync(plan2Path, "# Plan Y\n- [ ] Task 2")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+      }
+
+      // #when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should prompt agent to ask user, not ask directly
+      expect(output.parts[0].text).toContain("Ask the user")
+      expect(output.parts[0].text).not.toContain("Which plan would you like to work on?")
+    })
   })
 })

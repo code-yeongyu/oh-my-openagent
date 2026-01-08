@@ -80,6 +80,7 @@ Looking for new plans...`
 
       if (!existingState || getPlanProgress(existingState.active_plan).isComplete) {
         const plans = findPrometheusPlans(ctx.directory)
+        const incompletePlans = plans.filter(p => !getPlanProgress(p).isComplete)
         
         if (plans.length === 0) {
           contextInfo += `
@@ -88,8 +89,14 @@ Looking for new plans...`
 
 No Prometheus plan files found at .sisyphus/plans/
 Use Prometheus to create a work plan first: /plan "your task"`
-        } else if (plans.length === 1) {
-          const planPath = plans[0]
+        } else if (incompletePlans.length === 0) {
+          contextInfo += `
+
+## All Plans Complete
+
+All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
+        } else if (incompletePlans.length === 1) {
+          const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
           const newState = createBoulderState(planPath, sessionId)
           writeBoulderState(ctx.directory, newState)
@@ -106,7 +113,7 @@ Use Prometheus to create a work plan first: /plan "your task"`
 
 boulder.json has been created. Read the plan and begin execution.`
         } else {
-          const planList = plans.map((p, i) => {
+          const planList = incompletePlans.map((p, i) => {
             const progress = getPlanProgress(p)
             const stat = require("node:fs").statSync(p)
             const modified = new Date(stat.mtimeMs).toISOString()
@@ -115,6 +122,7 @@ boulder.json has been created. Read the plan and begin execution.`
 
           contextInfo += `
 
+<system-reminder>
 ## Multiple Plans Found
 
 Current Time: ${timestamp}
@@ -122,7 +130,8 @@ Session ID: ${sessionId}
 
 ${planList}
 
-Which plan would you like to work on? Reply with the number or plan name.`
+Ask the user which plan to work on. Present the options above and wait for their response.
+</system-reminder>`
         }
       }
 
