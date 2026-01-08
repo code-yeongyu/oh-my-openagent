@@ -172,14 +172,8 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
     return `Error fetching messages: ${messagesResult.error}`
   }
 
-  // Handle both SDK response structures: direct array or wrapped in .data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
-    info?: { role?: string }
-    parts?: Array<{ type?: string; text?: string }>
-  }>
-
-  if (!Array.isArray(messages) || messages.length === 0) {
+  const messages = messagesResult.data
+  if (!messages || messages.length === 0) {
     return `Task Result
 
 Task ID: ${task.id}
@@ -192,11 +186,13 @@ Session ID: ${task.sessionID}
 (No messages found)`
   }
 
-  const assistantMessages = messages.filter(
-    (m) => m.info?.role === "assistant"
-  )
+  // Match sync pattern: filter by role, sort by time descending, take first
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastAssistantMessage = (messages as any[])
+    .filter((m) => m.info.role === "assistant")
+    .sort((a, b) => (b.info.time?.created || 0) - (a.info.time?.created || 0))[0]
 
-  if (assistantMessages.length === 0) {
+  if (!lastAssistantMessage) {
     return `Task Result
 
 Task ID: ${task.id}
@@ -209,14 +205,11 @@ Session ID: ${task.sessionID}
 (No assistant response found)`
   }
 
-  const lastMessage = assistantMessages[assistantMessages.length - 1]
-  const textParts = lastMessage?.parts?.filter(
-    (p) => p.type === "text"
-  ) ?? []
-  const textContent = textParts
-    .map((p) => p.text ?? "")
-    .filter((text) => text.length > 0)
-    .join("\n")
+  // Match sync pattern: direct property access, no optional chaining
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const textParts = lastAssistantMessage.parts.filter((p: any) => p.type === "text")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const textContent = textParts.map((p: any) => p.text).join("\n")
 
   const duration = formatDuration(task.startedAt, task.completedAt)
 

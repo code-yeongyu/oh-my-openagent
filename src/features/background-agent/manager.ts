@@ -343,43 +343,25 @@ export class BackgroundManager {
       }).catch(() => {})
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
+    log("[background-agent] Task completed silently:", { taskId: task.id, duration })
 
-    log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
+    // Release concurrency immediately but keep task in memory for output retrieval
+    if (task.model) {
+      this.concurrencyManager.release(task.model)
+    }
+    this.clearNotificationsForTask(task.id)
 
+    // Keep completed tasks for 5 minutes so background_output can retrieve results
+    // The pruneStaleTasksAndNotifications will clean up old tasks after TASK_TTL_MS
     const taskId = task.id
-    setTimeout(async () => {
-      if (task.model) {
-        this.concurrencyManager.release(task.model)
-      }
-
-      try {
-        const messageDir = getMessageDir(task.parentSessionID)
-        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-
-        const modelContext = task.parentModel ?? prevMessage?.model
-        const modelField = modelContext?.providerID && modelContext?.modelID
-          ? { providerID: modelContext.providerID, modelID: modelContext.modelID }
-          : undefined
-
-        await this.client.session.prompt({
-          path: { id: task.parentSessionID },
-          body: {
-            agent: prevMessage?.agent,
-            model: modelField,
-            parts: [{ type: "text", text: message }],
-          },
-          query: { directory: this.directory },
-        })
-        log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
-      } catch (error) {
-        log("[background-agent] prompt failed:", String(error))
-      } finally {
-        this.clearNotificationsForTask(taskId)
+    setTimeout(() => {
+      // Only delete if task still exists and is completed (not re-used)
+      const existingTask = this.tasks.get(taskId)
+      if (existingTask && existingTask.status === "completed") {
         this.tasks.delete(taskId)
-        log("[background-agent] Removed completed task from memory:", taskId)
+        log("[background-agent] Removed completed task from memory after retention:", taskId)
       }
-    }, 200)
+    }, 5 * 60 * 1000) // 5 minute retention for output retrieval
   }
 
   private formatDuration(start: Date, end?: Date): string {
