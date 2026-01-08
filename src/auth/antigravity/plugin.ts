@@ -41,6 +41,7 @@ import { formatTokenForStorage, parseStoredToken } from "./token"
 import { AccountManager } from "./accounts"
 import { loadAccounts } from "./storage"
 import { promptAddAnotherAccount, promptAccountTier } from "./cli"
+import { openBrowserURL } from "./browser"
 import type { AccountTier, AntigravityRefreshParts } from "./types"
 
 /**
@@ -249,10 +250,13 @@ export async function createGoogleAntigravityAuthPlugin({
           const serverHandle = startCallbackServer()
           const { url, verifier } = await buildAuthURL(undefined, cachedClientId, serverHandle.port)
 
+          const browserOpened = await openBrowserURL(url)
+
           return {
             url,
-            instructions:
-              "Complete the sign-in in your browser. We'll automatically detect when you're done.",
+            instructions: browserOpened
+              ? "Opening browser for sign-in. We'll automatically detect when you're done."
+              : "Please open the URL above in your browser to sign in.",
             method: "auto",
 
             callback: async () => {
@@ -345,14 +349,11 @@ export async function createGoogleAntigravityAuthPlugin({
                     additionalServerHandle.port
                   )
 
-                  const { default: open } = await import("open")
-                  try {
-                    await open(additionalUrl)
-                  } catch (openError) {
-                    console.error("[antigravity-plugin] Failed to open browser:", openError)
+                  const additionalBrowserOpened = await openBrowserURL(additionalUrl)
+                  if (!additionalBrowserOpened) {
                     await client.tui.showToast({
                       body: {
-                        message: `Failed to open browser. Please visit: ${additionalUrl}`,
+                        message: `Please open in browser: ${additionalUrl}`,
                         variant: "warning",
                       },
                     })
