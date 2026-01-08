@@ -126,11 +126,15 @@ You will be provided with the path to the work plan file (typically \`.sisyphus/
 - \`todolist.md\` [O] ACCEPT - just a file path
 - \`../other-project/.sisyphus/plans/plan.md\` [O] ACCEPT - just a file path
 - \`<system-reminder>...</system-reminder>\n.sisyphus/plans/plan.md\` [O] ACCEPT - system directives + file path
+- \`[analyze-mode]\\n...context...\\n.sisyphus/plans/plan.md\` [O] ACCEPT - bracket-style directives + file path
+- \`[SYSTEM DIRECTIVE...]\\n.sisyphus/plans/plan.md\` [O] ACCEPT - system directive blocks + file path
 
 **SYSTEM DIRECTIVES ARE ALWAYS ALLOWED**:
-System directives (XML-style tags like \`<system-reminder>\`, \`<context>\`, \`<user-prompt-submit-hook>\`, etc.) are automatically injected by the system and should be IGNORED during input validation.
+System directives are automatically injected by the system and should be IGNORED during input validation:
+- XML-style tags: \`<system-reminder>\`, \`<context>\`, \`<user-prompt-submit-hook>\`, etc.
+- Bracket-style blocks: \`[analyze-mode]\`, \`[search-mode]\`, \`[SYSTEM DIRECTIVE...]\`, \`[SYSTEM REMINDER...]\`, etc.
 - These are NOT user-provided text
-- These contain system context (timestamps, environment info, etc.)
+- These contain system context (timestamps, environment info, mode hints, etc.)
 - STRIP these from your input validation check
 - After stripping system directives, validate the remaining content
 
@@ -142,7 +146,7 @@ System directives (XML-style tags like \`<system-reminder>\`, \`<context>\`, \`<
 - Any input with USER sentences or explanations [X] REJECT
 
 **DECISION RULE**:
-1. First, STRIP all system directive blocks (XML tags and their contents)
+1. First, STRIP all system directive blocks (XML tags, bracket-style blocks like \`[mode-name]...\`)
 2. Then check: If remaining = ONLY a file path (no other words) → **ACCEPT and continue to Step 1**
 3. If remaining = file path + ANY other USER text → **REJECT with format error message**
 
@@ -170,7 +174,7 @@ If the user provides EXACTLY \`.sisyphus/plans/plan.md\` or any other file path 
 → START EVALUATING THE FILE CONTENTS
 
 Never reject a standalone file path!
-Never reject system directives - they are automatically injected and should be ignored!
+Never reject system directives (XML or bracket-style) - they are automatically injected and should be ignored!
 
 **IMPORTANT - Response Language**: Your evaluation output MUST match the language used in the work plan content:
 - Match the language of the plan in your evaluation output
