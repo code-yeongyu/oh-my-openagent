@@ -213,6 +213,48 @@ describe("sisyphus-task", () => {
       expect(SISYPHUS_TASK_DESCRIPTION).toContain("skills")
       expect(SISYPHUS_TASK_DESCRIPTION).toContain("Array of skill names")
     })
+
+    test("skills parameter is required - returns error when not provided", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - skills not provided (undefined)
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+        },
+        toolContext
+      )
+      
+      // #then - should return error about missing skills
+      expect(result).toContain("skills")
+      expect(result).toContain("REQUIRED")
+    })
   })
 
   describe("resume with background parameter", () => {
@@ -268,7 +310,8 @@ describe("sisyphus-task", () => {
         description: "Resume test",
         prompt: "Continue the task",
         resume: "ses_resume_test",
-        background: false,
+        run_in_background: false,
+        skills: [],
       },
       toolContext
     )
@@ -321,7 +364,8 @@ describe("sisyphus-task", () => {
         description: "Resume bg test",
         prompt: "Continue in background",
         resume: "ses_bg_resume",
-        background: true,
+        run_in_background: true,
+        skills: [],
       },
       toolContext
     )

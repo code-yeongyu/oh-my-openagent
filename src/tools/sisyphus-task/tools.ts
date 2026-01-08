@@ -121,17 +121,20 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
       run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
-      skills: tool.schema.array(tool.schema.string()).optional().describe("Array of skill names to prepend to the prompt. Skills will be resolved and their content prepended with a separator."),
+      skills: tool.schema.array(tool.schema.string()).describe("Array of skill names to prepend to the prompt. Use [] if no skills needed."),
     },
     async execute(args: SisyphusTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       if (args.run_in_background === undefined) {
         return `❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
       }
+      if (args.skills === undefined) {
+        return `❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills needed.`
+      }
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
-      if (args.skills && args.skills.length > 0) {
+      if (args.skills.length > 0) {
         const { resolved, notFound } = resolveMultipleSkills(args.skills)
         if (notFound.length > 0) {
           const available = createBuiltinSkills().map(s => s.name).join(", ")
