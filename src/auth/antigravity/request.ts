@@ -196,18 +196,34 @@ export function wrapRequestBody(
   const requestPayload = { ...body }
   delete requestPayload.model
 
-  const wrappedBody: AntigravityRequestBody = {
-    project: projectId,
-    model: alias2ModelName(modelName),
-    userAgent: "antigravity",
-    requestId: generateRequestId(),
-    request: {
-      ...requestPayload,
-      sessionId,
+  let normalizedModel = modelName
+  if (normalizedModel.startsWith("antigravity-")) {
+    normalizedModel = normalizedModel.substring("antigravity-".length)
+  }
+  const apiModel = alias2ModelName(normalizedModel)
+  debugLog(`[MODEL] input="${modelName}" → normalized="${normalizedModel}" → api="${apiModel}"`)
+
+  const requestObj = {
+    ...requestPayload,
+    sessionId,
+    toolConfig: {
+      ...(requestPayload.toolConfig as Record<string, unknown> || {}),
+      functionCallingConfig: {
+        mode: "VALIDATED",
+      },
     },
   }
+  delete (requestObj as Record<string, unknown>).safetySettings
 
-  // Inject Antigravity system prompt into request.systemInstruction
+  const wrappedBody: AntigravityRequestBody = {
+    project: projectId,
+    model: apiModel,
+    userAgent: "antigravity",
+    requestType: "agent",
+    requestId: generateRequestId(),
+    request: requestObj,
+  }
+
   injectSystemPrompt(wrappedBody)
 
   return wrappedBody

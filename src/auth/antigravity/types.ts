@@ -80,15 +80,11 @@ export interface AntigravityOnboardUserPayload {
  * Wraps the actual request with project and model context
  */
 export interface AntigravityRequestBody {
-  /** GCP project ID */
   project: string
-  /** Model identifier (e.g., "gemini-3-pro-preview") */
   model: string
-  /** User agent identifier */
   userAgent: string
-  /** Unique request ID */
+  requestType: string
   requestId: string
-  /** The actual request payload */
   request: Record<string, unknown>
 }
 
