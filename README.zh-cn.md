@@ -1,9 +1,12 @@
 > [!NOTE]
 >
-> *"我致力于引发一场软件革命，创造一个AI生成的代码与人类代码无法区分、却能实现更多的世界。我已经在这段旅程中投入了个人时间、热情和资金，并将继续这样做。"*
+> [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png)](https://sisyphuslabs.ai)
+> > 我们正在构建Sisyphus的完全产品化版本，定义前沿代理的未来。[点击此处](https://sisyphuslabs.ai)加入候补名单。
+
+> [!TIP]
 >
-> [![The Orchestrator is coming](./.github/assets/orchestrator-sisyphus.png)](https://x.com/justsisyphus/status/2006250634354548963)
-> > **编排器即将到来。就在本周。[在X上获取通知](https://x.com/justsisyphus/status/2006250634354548963)**
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
+> > **编排器现已推出测试版。使用`oh-my-opencode@beta`来安装。**
 >
 > 与我们同行！
 >
