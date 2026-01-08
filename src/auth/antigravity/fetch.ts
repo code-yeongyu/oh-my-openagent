@@ -357,7 +357,8 @@ export function createAntigravityFetch(
   const fetchInstanceId = crypto.randomUUID()
 
   return async (url: string, init: RequestInit = {}): Promise<Response> => {
-    debugLog(`Intercepting request to: ${url}`)
+    debugLog(`[NETWORK] Intercepting request to: ${url}`)
+    debugLog(`[NETWORK] This is an ACTUAL network request being made`)
 
     // Get current auth state
     const auth = await getAuth()

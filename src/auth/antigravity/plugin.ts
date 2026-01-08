@@ -91,6 +91,11 @@ export async function createGoogleAntigravityAuthPlugin({
      * Loader function called when auth is needed.
      * Reads credentials from provider.options and creates custom fetch.
      *
+     * This function is designed to be LAZY:
+     * - Only reads local auth state (no network calls)
+     * - Returns early if auth is not OAuth type
+     * - The returned fetch interceptor only makes API calls when actually invoked
+     *
      * @param auth - Function to retrieve current auth state
      * @param provider - Provider configuration including options
      * @returns Object with custom fetch function
@@ -99,23 +104,27 @@ export async function createGoogleAntigravityAuthPlugin({
       auth: () => Promise<Auth>,
       provider: Provider
     ): Promise<Record<string, unknown>> => {
+      if (process.env.ANTIGRAVITY_DEBUG === "1") {
+        console.log("[antigravity-plugin] loader called - reading auth state (no network)")
+        console.log("[antigravity-plugin] stack trace:", new Error().stack?.split("\n").slice(1, 5).join("\n"))
+      }
+
       const currentAuth = await auth()
       
       if (process.env.ANTIGRAVITY_DEBUG === "1") {
-        console.log("[antigravity-plugin] loader called")
         console.log("[antigravity-plugin] auth type:", currentAuth?.type)
         console.log("[antigravity-plugin] auth keys:", Object.keys(currentAuth || {}))
       }
       
       if (!isOAuthAuth(currentAuth)) {
         if (process.env.ANTIGRAVITY_DEBUG === "1") {
-          console.log("[antigravity-plugin] NOT OAuth auth, returning empty")
+          console.log("[antigravity-plugin] NOT OAuth auth, returning empty (no fetch interceptor created)")
         }
         return {}
       }
       
       if (process.env.ANTIGRAVITY_DEBUG === "1") {
-        console.log("[antigravity-plugin] OAuth auth detected, creating custom fetch")
+        console.log("[antigravity-plugin] OAuth auth detected, creating fetch interceptor (NO network calls yet)")
       }
 
       cachedClientId =
