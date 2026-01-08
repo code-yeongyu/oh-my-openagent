@@ -31,7 +31,7 @@ import {
   isStreamingResponse,
 } from "./response"
 import { normalizeToolsForGemini, type OpenAITool } from "./tools"
-import { extractThinkingBlocks, shouldIncludeThinking, transformResponseThinking } from "./thinking"
+import { extractThinkingBlocks, shouldIncludeThinking, transformResponseThinking, extractThinkingConfig, applyThinkingConfigToRequest } from "./thinking"
 import {
   getThoughtSignature,
   setThoughtSignature,
@@ -204,6 +204,23 @@ async function attemptFetch(
       endpointOverride: endpoint,
       thoughtSignature,
     })
+
+    // Apply thinking config from reasoning_effort (from think-mode hook)
+    const effectiveModel = modelName || transformed.body.model
+    const thinkingConfig = extractThinkingConfig(
+      parsedBody,
+      parsedBody.generationConfig as Record<string, unknown> | undefined,
+      parsedBody,
+    )
+    if (thinkingConfig) {
+      debugLog(`[THINKING] Applying thinking config for model: ${effectiveModel}`)
+      applyThinkingConfigToRequest(
+        transformed.body as unknown as Record<string, unknown>,
+        effectiveModel,
+        thinkingConfig,
+      )
+      debugLog(`[THINKING] Thinking config applied successfully`)
+    }
 
     debugLog(`[REQ] streaming=${transformed.streaming}, url=${transformed.url}`)
 
