@@ -362,6 +362,7 @@ export async function createGoogleAntigravityAuthPlugin({
                     const additionalResult = await additionalServerHandle.waitForCallback()
 
                     if (additionalResult.error || !additionalResult.code) {
+                      additionalServerHandle.close()
                       await client.tui.showToast({
                         body: {
                           message: "Skipping this account...",
@@ -373,6 +374,7 @@ export async function createGoogleAntigravityAuthPlugin({
 
                     const additionalState = decodeState(additionalResult.state)
                     if (additionalState.verifier !== additionalVerifier) {
+                      additionalServerHandle.close()
                       await client.tui.showToast({
                         body: {
                           message: "Verification failed, skipping...",
@@ -430,6 +432,8 @@ export async function createGoogleAntigravityAuthPlugin({
                       tier: additionalTier,
                       projectId: additionalProjectId,
                     })
+
+                    additionalServerHandle.close()
 
                     await client.tui.showToast({
                       body: {

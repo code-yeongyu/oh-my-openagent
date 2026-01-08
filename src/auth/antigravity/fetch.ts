@@ -255,11 +255,13 @@ async function attemptFetch(
           }
         }
         debugLog(`[429] Rate limited, retry-after: ${retryAfterMs}ms`)
+        await response.body?.cancel()
         return { type: "rate-limited" as const, retryAfterMs, status: 429 }
       }
 
       if (response.status >= 500 && response.status < 600) {
         debugLog(`[5xx] Server error ${response.status}, marking for rotation`)
+        await response.body?.cancel()
         return { type: "rate-limited" as const, retryAfterMs: 300000, status: response.status }
       }
 
@@ -432,13 +434,17 @@ export function createAntigravityFetch(
     let refreshParts = parseStoredToken(auth.refresh)
 
     if (!accountsLoaded && !manager && auth.refresh) {
-      const storedAccounts = await loadAccounts()
-      if (storedAccounts) {
-        manager = new AccountManager(
-          { refresh: auth.refresh, access: auth.access || "", expires: auth.expires || 0 },
-          storedAccounts
-        )
-        debugLog(`[ACCOUNTS] Loaded ${manager.getAccountCount()} accounts from storage`)
+      try {
+        const storedAccounts = await loadAccounts()
+        if (storedAccounts) {
+          manager = new AccountManager(
+            { refresh: auth.refresh, access: auth.access || "", expires: auth.expires || 0 },
+            storedAccounts
+          )
+          debugLog(`[ACCOUNTS] Loaded ${manager.getAccountCount()} accounts from storage`)
+        }
+      } catch (error) {
+        debugLog(`[ACCOUNTS] Failed to load accounts, falling back to single-account: ${error instanceof Error ? error.message : "Unknown"}`)
       }
       accountsLoaded = true
     }

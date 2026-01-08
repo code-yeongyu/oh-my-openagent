@@ -1,17 +1,10 @@
 import { promises as fs } from "node:fs"
 import { join, dirname } from "node:path"
-import { homedir } from "node:os"
 import type { AccountStorage } from "./types"
+import { getDataDir as getSharedDataDir } from "../../shared/data-path"
 
 export function getDataDir(): string {
-  const platform = process.platform
-
-  if (platform === "win32") {
-    return join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "opencode")
-  }
-
-  const xdgData = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
-  return join(xdgData, "opencode")
+  return join(getSharedDataDir(), "opencode")
 }
 
 export function getStoragePath(): string {

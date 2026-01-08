@@ -76,8 +76,10 @@ export async function removeAccount(indexOrEmail: string): Promise<number> {
   const removed = accounts.accounts[index]
   accounts.accounts.splice(index, 1)
 
-  if (accounts.activeIndex >= accounts.accounts.length) {
-    accounts.activeIndex = Math.max(0, accounts.accounts.length - 1)
+  if (accounts.accounts.length === 0) {
+    accounts.activeIndex = -1
+  } else if (accounts.activeIndex >= accounts.accounts.length) {
+    accounts.activeIndex = accounts.accounts.length - 1
   } else if (accounts.activeIndex > index) {
     accounts.activeIndex--
   }

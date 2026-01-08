@@ -295,22 +295,25 @@ describe("storage", () => {
       await fs.mkdir(readOnlyDir, { recursive: true })
       const readOnlyPath = join(readOnlyDir, "accounts.json")
 
-      // Create a file and make it read-only to simulate rename failure
       await fs.writeFile(readOnlyPath, "{}", "utf-8")
       await fs.chmod(readOnlyPath, 0o444)
 
-      // #when / #then
-      // The save should fail, but temp files should be cleaned up
+      // #when
+      let didThrow = false
       try {
         await saveAccounts(validStorage, readOnlyPath)
       } catch {
-        // Expected to fail
+        didThrow = true
       }
 
-      // Verify no temp files left behind
+      // #then
       const files = await fs.readdir(readOnlyDir)
       const tempFiles = files.filter((f) => f.includes(".tmp."))
       expect(tempFiles).toHaveLength(0)
+
+      if (!didThrow) {
+        console.log("[TEST SKIP] File permissions did not work as expected on this system")
+      }
 
       // Cleanup
       await fs.chmod(readOnlyPath, 0o644)
@@ -362,13 +365,20 @@ describe("storage", () => {
       await fs.writeFile(unreadablePath, JSON.stringify(validStorage), "utf-8")
       await fs.chmod(unreadablePath, 0o000)
 
-      // #when / #then
+      // #when
+      let thrownError: Error | null = null
+      let result: unknown = undefined
       try {
-        await loadAccounts(unreadablePath)
-        // If we get here on some systems, that's okay - permissions may not work as expected
+        result = await loadAccounts(unreadablePath)
       } catch (error) {
-        // Should throw EACCES or similar, not return null
-        expect((error as NodeJS.ErrnoException).code).not.toBe("ENOENT")
+        thrownError = error as Error
+      }
+
+      // #then
+      if (thrownError) {
+        expect((thrownError as NodeJS.ErrnoException).code).not.toBe("ENOENT")
+      } else {
+        console.log("[TEST SKIP] File permissions did not work as expected on this system, got result:", result)
       }
 
       // Cleanup
