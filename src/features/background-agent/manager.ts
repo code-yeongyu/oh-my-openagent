@@ -452,11 +452,13 @@ export class BackgroundManager {
         const sessionStatus = allStatuses[task.sessionID]
         
         if (!sessionStatus) {
-          log("[background-agent] Session not found in status:", task.sessionID)
-          continue
+          // Note: Background sessions may not appear in session.status()
+          // Don't skip - fall through to message-based stability detection
+          log("[background-agent] Session not found in status, checking via messages:", task.sessionID)
+          // Removed: early continue that skipped completion logic
         }
 
-        if (sessionStatus.type === "idle") {
+        if (sessionStatus?.type === "idle") {
           const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
           if (hasIncompleteTodos) {
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
@@ -504,6 +506,25 @@ export class BackgroundManager {
           if (!task.progress) {
             task.progress = { toolCalls: 0, lastUpdate: new Date() }
           }
+
+          // Stability detection: if message count unchanged for 3 polls, consider complete
+          const currentMsgCount = messages.length
+          const progress = task.progress as { stableCount?: number; lastMsgCount?: number }
+          if (progress.lastMsgCount === currentMsgCount && currentMsgCount > 0) {
+            progress.stableCount = (progress.stableCount ?? 0) + 1
+            if (progress.stableCount >= 3) {
+              log("[background-agent] Task completed via stability detection:", task.id)
+              task.status = "completed"
+              task.completedAt = new Date()
+              this.markForNotification(task)
+              this.notifyParentSession(task)
+              continue
+            }
+          } else {
+            progress.stableCount = 0
+          }
+          progress.lastMsgCount = currentMsgCount
+
           task.progress.toolCalls = toolCalls
           task.progress.lastTool = lastTool
           task.progress.lastUpdate = new Date()
