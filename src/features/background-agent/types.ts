@@ -10,6 +10,8 @@ export interface TaskProgress {
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
+  stableCount?: number
+  lastMsgCount?: number
 }
 
 export interface BackgroundTask {

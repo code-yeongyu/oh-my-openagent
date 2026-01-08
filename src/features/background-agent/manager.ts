@@ -509,8 +509,8 @@ export class BackgroundManager {
 
           // Stability detection: if message count unchanged for 3 polls, consider complete
           const currentMsgCount = messages.length
-          const progress = task.progress as { stableCount?: number; lastMsgCount?: number }
-          if (progress.lastMsgCount === currentMsgCount && currentMsgCount > 0) {
+          const progress = task.progress!
+          if (progress.lastMsgCount === currentMsgCount) {
             progress.stableCount = (progress.stableCount ?? 0) + 1
             if (progress.stableCount >= 3) {
               log("[background-agent] Task completed via stability detection:", task.id)
