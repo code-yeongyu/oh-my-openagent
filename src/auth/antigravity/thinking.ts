@@ -13,6 +13,13 @@
  * Note: This is Gemini-only. Claude models are NOT handled by Antigravity.
  */
 
+import {
+  normalizeModelId,
+  ANTIGRAVITY_MODEL_CONFIGS,
+  REASONING_EFFORT_BUDGET_MAP,
+  type AntigravityModelConfig,
+} from "./constants"
+
 /**
  * Represents a single thinking/reasoning block extracted from Gemini response
  */
@@ -496,6 +503,7 @@ export function normalizeThinkingConfig(config: unknown): ThinkingConfig | undef
  * Extract thinking configuration from request payload
  *
  * Supports both Gemini-style thinkingConfig and Anthropic-style thinking options.
+ * Also supports reasoning_effort parameter which maps to thinking budget/level.
  *
  * @param requestPayload - Request body
  * @param generationConfig - Generation config from request
@@ -506,7 +514,7 @@ export function extractThinkingConfig(
   requestPayload: Record<string, unknown>,
   generationConfig?: Record<string, unknown>,
   extraBody?: Record<string, unknown>,
-): ThinkingConfig | undefined {
+): ThinkingConfig | DeleteThinkingConfig | undefined {
   // Check for explicit thinkingConfig
   const thinkingConfig =
     generationConfig?.thinkingConfig ?? extraBody?.thinkingConfig ?? requestPayload.thinkingConfig
@@ -531,6 +539,22 @@ export function extractThinkingConfig(
           typeof thinking.budgetTokens === "number"
             ? thinking.budgetTokens
             : DEFAULT_THINKING_BUDGET,
+      }
+    }
+  }
+
+  // Extract reasoning_effort parameter (maps to thinking budget/level)
+  const reasoningEffort = requestPayload.reasoning_effort ?? extraBody?.reasoning_effort
+  if (reasoningEffort && typeof reasoningEffort === "string") {
+    const budget = REASONING_EFFORT_BUDGET_MAP[reasoningEffort]
+    if (budget !== undefined) {
+      if (reasoningEffort === "none") {
+        // Special marker: delete thinkingConfig entirely
+        return { deleteThinkingConfig: true }
+      }
+      return {
+        includeThoughts: true,
+        thinkingBudget: budget,
       }
     }
   }
@@ -568,4 +592,164 @@ export function resolveThinkingConfig(
   }
 
   return userConfig
+}
+
+// ============================================================================
+// Model Thinking Configuration (Task 2: reasoning_effort and Gemini 3 thinkingLevel)
+// ============================================================================
+
+/**
+ * Get thinking config for a model by normalized ID.
+ * Uses pattern matching fallback if exact match not found.
+ *
+ * @param model - Model identifier string (with or without provider prefix)
+ * @returns Thinking configuration or undefined if not found
+ */
+export function getModelThinkingConfig(
+  model: string,
+): AntigravityModelConfig | undefined {
+  const normalized = normalizeModelId(model)
+
+  // Exact match
+  if (ANTIGRAVITY_MODEL_CONFIGS[normalized]) {
+    return ANTIGRAVITY_MODEL_CONFIGS[normalized]
+  }
+
+  // Pattern matching fallback for Gemini 3
+  if (normalized.includes("gemini-3")) {
+    return {
+      thinkingType: "levels",
+      min: 128,
+      max: 32768,
+      zeroAllowed: false,
+      levels: ["low", "high"],
+    }
+  }
+
+  // Pattern matching fallback for Gemini 2.5
+  if (normalized.includes("gemini-2.5")) {
+    return {
+      thinkingType: "numeric",
+      min: 0,
+      max: 24576,
+      zeroAllowed: true,
+    }
+  }
+
+  // Pattern matching fallback for Claude via Antigravity
+  if (normalized.includes("claude")) {
+    return {
+      thinkingType: "numeric",
+      min: 1024,
+      max: 200000,
+      zeroAllowed: false,
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Type for the delete thinking config marker.
+ * Used when reasoning_effort is "none" to signal complete removal.
+ */
+export interface DeleteThinkingConfig {
+  deleteThinkingConfig: true
+}
+
+/**
+ * Union type for thinking configuration input.
+ */
+export type ThinkingConfigInput = ThinkingConfig | DeleteThinkingConfig
+
+/**
+ * Convert thinking budget to closest level string for Gemini 3 models.
+ *
+ * @param budget - Thinking budget in tokens
+ * @param model - Model identifier
+ * @returns Level string ("low", "high", etc.) or "medium" fallback
+ */
+export function budgetToLevel(budget: number, model: string): string {
+  const config = getModelThinkingConfig(model)
+
+  // Default fallback
+  if (!config?.levels) {
+    return "medium"
+  }
+
+  // Map budgets to levels
+  const budgetMap: Record<number, string> = {
+    512: "minimal",
+    1024: "low",
+    8192: "medium",
+    24576: "high",
+  }
+
+  // Return matching level or highest available
+  if (budgetMap[budget]) {
+    return budgetMap[budget]
+  }
+
+  return config.levels[config.levels.length - 1] || "high"
+}
+
+/**
+ * Apply thinking config to request body.
+ *
+ * CRITICAL: Sets request.generationConfig.thinkingConfig (NOT outer body!)
+ *
+ * Handles:
+ * - Gemini 3: Sets thinkingLevel (string)
+ * - Gemini 2.5: Sets thinkingBudget (number)
+ * - Delete marker: Removes thinkingConfig entirely
+ *
+ * @param requestBody - Request body to modify (mutates in place)
+ * @param model - Model identifier
+ * @param config - Thinking configuration or delete marker
+ */
+export function applyThinkingConfigToRequest(
+  requestBody: Record<string, unknown>,
+  model: string,
+  config: ThinkingConfigInput,
+): void {
+  // Handle delete marker
+  if ("deleteThinkingConfig" in config && config.deleteThinkingConfig) {
+    if (requestBody.request && typeof requestBody.request === "object") {
+      const req = requestBody.request as Record<string, unknown>
+      if (req.generationConfig && typeof req.generationConfig === "object") {
+        const genConfig = req.generationConfig as Record<string, unknown>
+        delete genConfig.thinkingConfig
+      }
+    }
+    return
+  }
+
+  const modelConfig = getModelThinkingConfig(model)
+  if (!modelConfig) {
+    return
+  }
+
+  // Ensure request.generationConfig.thinkingConfig exists
+  if (!requestBody.request || typeof requestBody.request !== "object") {
+    return
+  }
+  const req = requestBody.request as Record<string, unknown>
+  if (!req.generationConfig || typeof req.generationConfig !== "object") {
+    req.generationConfig = {}
+  }
+  const genConfig = req.generationConfig as Record<string, unknown>
+  genConfig.thinkingConfig = {}
+  const thinkingConfig = genConfig.thinkingConfig as Record<string, unknown>
+
+  thinkingConfig.include_thoughts = true
+
+  if (modelConfig.thinkingType === "numeric") {
+    thinkingConfig.thinkingBudget = (config as ThinkingConfig).thinkingBudget
+  } else if (modelConfig.thinkingType === "levels") {
+    const budget = (config as ThinkingConfig).thinkingBudget ?? DEFAULT_THINKING_BUDGET
+    let level = budgetToLevel(budget, model)
+    // Convert uppercase to lowercase (think-mode hook sends "HIGH")
+    level = level.toLowerCase()
+    thinkingConfig.thinkingLevel = level
+  }
 }
