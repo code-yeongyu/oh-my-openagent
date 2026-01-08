@@ -147,6 +147,7 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
             log("[claude-code-hooks] Detected keywords", {
               sessionID: input.sessionID,
               keywordCount: keywordMessages.length,
+              types: detectedKeywords.map((k) => k.type),
             })
           }
         }
