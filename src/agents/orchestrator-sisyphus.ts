@@ -5,6 +5,8 @@ import type { CategoryConfig } from "../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/sisyphus-task/constants"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+
 /**
  * Orchestrator Sisyphus - Master Orchestrator Agent
  *
@@ -1432,7 +1434,10 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
     .replace("{SKILLS_SECTION}", skillsSection)
 }
 
-export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): AgentConfig {
+export function createOrchestratorSisyphusAgent(
+  model: string = DEFAULT_MODEL,
+  ctx?: OrchestratorContext
+): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "task",
     "call_omo_agent",
@@ -1442,7 +1447,7 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     description:
       "Orchestrates work via sisyphus_task() to complete ALL tasks in a todo list until fully done",
     mode: "primary" as const,
-    model: "anthropic/claude-sonnet-4-5",
+    model,
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
