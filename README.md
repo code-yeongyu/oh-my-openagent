@@ -339,7 +339,7 @@ First, add the opencode-antigravity-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.2.7"
+    "opencode-antigravity-auth@1.2.8"
   ]
 }
 ```
