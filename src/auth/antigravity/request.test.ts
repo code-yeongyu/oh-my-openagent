@@ -195,7 +195,7 @@ describe("wrapRequestBody", () => {
 
     // #then
     expect(result).toHaveProperty("project", projectId)
-    expect(result).toHaveProperty("model", "gemini-3-pro-high") // alias2ModelName transforms this
+    expect(result).toHaveProperty("model", "gemini-3-pro-preview")
     expect(result).toHaveProperty("request")
     expect(result.request).toHaveProperty("sessionId", sessionId)
     expect(result.request).toHaveProperty("contents")

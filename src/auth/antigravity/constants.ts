@@ -253,34 +253,26 @@ export const ANTIGRAVITY_SUPPORTED_MODELS = [
 
 /**
  * Converts UI model names to Antigravity API model names.
- * Required because Antigravity API expects different model IDs internally.
  *
- * From CLIProxyAPI antigravity_executor.go:alias2ModelName (lines 1328-1347)
+ * NOTE: Most CLIProxyAPI alias mappings do NOT work with the public Antigravity API.
+ * Tested 2026-01-08: Only -preview suffix names work for Gemini 3.
+ * Claude models are NOT available via Antigravity API.
  *
- * Examples:
- * - "gemini-claude-sonnet-4-5" → "claude-sonnet-4-5"
- * - "gemini-claude-sonnet-4-5-thinking" → "claude-sonnet-4-5-thinking"
- * - "gemini-claude-opus-4-5-thinking" → "claude-opus-4-5-thinking"
- * - "gemini-3-pro-preview" → "gemini-3-pro-high"
- * - "gemini-3-flash-preview" → "gemini-3-flash"
+ * Working models (use as-is):
+ * - gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-pro
+ * - gemini-3-pro-preview, gemini-3-flash-preview
+ *
+ * NOT working (404):
+ * - gemini-3-pro-high, gemini-3-pro-low, gemini-3-flash (transformed names)
+ * - claude-* models (not available)
+ * - computer use models (not available)
  */
 export function alias2ModelName(modelName: string): string {
-  switch (modelName) {
-    case "gemini-2.5-computer-use-preview-10-2025":
-      return "rev19-uic3-1p"
-    case "gemini-3-pro-image-preview":
-      return "gemini-3-pro-image"
-    case "gemini-3-pro-preview":
-      return "gemini-3-pro-high"
-    case "gemini-3-flash-preview":
-      return "gemini-3-flash"
-    case "gemini-claude-sonnet-4-5":
-      return "claude-sonnet-4-5"
-    case "gemini-claude-sonnet-4-5-thinking":
-      return "claude-sonnet-4-5-thinking"
-    case "gemini-claude-opus-4-5-thinking":
-      return "claude-opus-4-5-thinking"
-    default:
-      return modelName
+  // Strip "gemini-" prefix from Claude model names (if Google ever enables them)
+  // e.g., "gemini-claude-sonnet-4-5" → "claude-sonnet-4-5"
+  if (modelName.startsWith("gemini-claude-")) {
+    return modelName.substring("gemini-".length)
   }
+
+  return modelName
 }
