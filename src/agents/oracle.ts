@@ -106,7 +106,7 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
 
   const base = {
     description:
-      "Expert technical advisor with deep reasoning for architecture decisions, code analysis, and engineering guidance.",
+      "Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design.",
     mode: "subagent" as const,
     model,
     temperature: 0.1,

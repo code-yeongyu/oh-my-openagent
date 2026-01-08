@@ -11,8 +11,11 @@ import { log } from "../shared/logger"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
+const DEFAULT_SKIP_AGENTS = ["Prometheus (Planner)"]
+
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
+  skipAgents?: string[]
 }
 
 export interface TodoContinuationEnforcer {
@@ -89,7 +92,7 @@ export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
 ): TodoContinuationEnforcer {
-  const { backgroundManager } = options
+  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS } = options
   const sessions = new Map<string, SessionState>()
 
   function getState(sessionID: string): SessionState {
@@ -184,34 +187,32 @@ export function createTodoContinuationEnforcer(
     const messageDir = getMessageDir(sessionID)
     const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
-    const hasWritePermission = !prevMessage?.tools ||
-      (prevMessage.tools.write !== false && prevMessage.tools.edit !== false)
+    const agentName = prevMessage?.agent
+    if (agentName && skipAgents.includes(agentName)) {
+      log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
+      return
+    }
 
+    const editPermission = prevMessage?.tools?.edit
+    const writePermission = prevMessage?.tools?.write
+    const hasWritePermission = !prevMessage?.tools ||
+      ((editPermission !== false && editPermission !== "deny") &&
+       (writePermission !== false && writePermission !== "deny"))
     if (!hasWritePermission) {
       log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
       return
     }
 
-    const agentName = prevMessage?.agent?.toLowerCase() ?? ""
-    if (agentName === "plan" || agentName === "planner-sisyphus") {
-      log(`[${HOOK_NAME}] Skipped: plan mode agent`, { sessionID, agent: prevMessage?.agent })
-      return
-    }
-
     const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
-    const modelField = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-      ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
-      : undefined
-
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, model: modelField, incompleteCount: freshIncompleteCount })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, incompleteCount: freshIncompleteCount })
 
+      // Don't pass model - let OpenCode use session's existing lastModel
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
           agent: prevMessage?.agent,
-          model: modelField,
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },
@@ -321,6 +322,28 @@ export function createTodoContinuationEnforcer(
       const incompleteCount = getIncompleteCount(todos)
       if (incompleteCount === 0) {
         log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
+        return
+      }
+
+      let agentName: string | undefined
+      try {
+        const messagesResp = await ctx.client.session.messages({
+          path: { id: sessionID },
+        })
+        const messages = (messagesResp.data ?? []) as Array<{ info?: { agent?: string } }>
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].info?.agent) {
+            agentName = messages[i].info?.agent
+            break
+          }
+        }
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(err) })
+      }
+
+      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName, skipAgents })
+      if (agentName && skipAgents.includes(agentName)) {
+        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
         return
       }
 

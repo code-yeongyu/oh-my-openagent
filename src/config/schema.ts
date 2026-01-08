@@ -24,10 +24,13 @@ export const BuiltinAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "Metis (Plan Consultant)",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
   "playwright",
+  "frontend-ui-ux",
+  "git-master",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -35,7 +38,8 @@ export const OverridableAgentNameSchema = z.enum([
   "plan",
   "Sisyphus",
   "OpenCode-Builder",
-  "Planner-Sisyphus",
+  "Prometheus (Planner)",
+  "Metis (Plan Consultant)",
   "oracle",
   "librarian",
   "explore",
@@ -75,14 +79,23 @@ export const HookNameSchema = z.enum([
   "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
+  "prometheus-md-only",
+  "start-work",
+  "sisyphus-orchestrator",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "start-work",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
+  /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  /** Category name to inherit model and other settings from CategoryConfig */
+  category: z.string().optional(),
+  /** Skill names to inject into agent prompt */
+  skills: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   prompt: z.string().optional(),
@@ -103,7 +116,8 @@ export const AgentOverridesSchema = z.object({
   plan: AgentOverrideConfigSchema.optional(),
   Sisyphus: AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  "Planner-Sisyphus": AgentOverrideConfigSchema.optional(),
+  "Prometheus (Planner)": AgentOverrideConfigSchema.optional(),
+  "Metis (Plan Consultant)": AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
@@ -128,6 +142,33 @@ export const SisyphusAgentConfigSchema = z.object({
   planner_enabled: z.boolean().optional(),
   replace_plan: z.boolean().optional(),
 })
+
+export const CategoryConfigSchema = z.object({
+  model: z.string(),
+  temperature: z.number().min(0).max(2).optional(),
+  top_p: z.number().min(0).max(1).optional(),
+  maxTokens: z.number().optional(),
+  thinking: z.object({
+    type: z.enum(["enabled", "disabled"]),
+    budgetTokens: z.number().optional(),
+  }).optional(),
+  reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+  textVerbosity: z.enum(["low", "medium", "high"]).optional(),
+  tools: z.record(z.string(), z.boolean()).optional(),
+  prompt_append: z.string().optional(),
+})
+
+export const BuiltinCategoryNameSchema = z.enum([
+  "visual-engineering",
+  "ultrabrain",
+  "artistry",
+  "quick",
+  "most-capable",
+  "writing",
+  "general",
+])
+
+export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)
 
 export const CommentCheckerConfigSchema = z.object({
   /** Custom prompt to replace the default warning message. Use {{comments}} placeholder for detected comments XML. */
@@ -243,6 +284,12 @@ export const NotificationConfigSchema = z.object({
   force_enable: z.boolean().optional(),
 })
 
+export const GitMasterConfigSchema = z.object({
+  /** Add "Ultraworked with Sisyphus" footer to commit messages (default: true) */
+  commit_footer: z.boolean().default(true),
+  /** Add "Co-authored-by: Sisyphus" trailer to commit messages (default: true) */
+  include_co_authored_by: z.boolean().default(true),
+})
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -251,6 +298,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_hooks: z.array(HookNameSchema).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   agents: AgentOverridesSchema.optional(),
+  categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   google_auth: z.boolean().optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
@@ -261,6 +309,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   ralph_loop: RalphLoopConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
+  git_master: GitMasterConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -279,5 +328,9 @@ export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
+export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
+export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
+export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
+export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
