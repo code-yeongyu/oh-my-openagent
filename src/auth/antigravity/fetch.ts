@@ -72,13 +72,31 @@ function isRetryableError(status: number): boolean {
   return false
 }
 
-/**
- * Detect model family from URL for rate limit tracking
- */
+function getModelFamilyFromModelName(modelName: string): ModelFamily | null {
+  const lower = modelName.toLowerCase()
+  if (lower.includes("claude") || lower.includes("anthropic")) return "claude"
+  if (lower.includes("flash")) return "gemini-flash"
+  if (lower.includes("gemini") || lower.includes("pro")) return "gemini-pro"
+  return null
+}
+
 function getModelFamilyFromUrl(url: string): ModelFamily {
   if (url.includes("claude")) return "claude"
   if (url.includes("flash")) return "gemini-flash"
   return "gemini-pro"
+}
+
+function getModelFamily(url: string, init?: RequestInit): ModelFamily {
+  if (init?.body && typeof init.body === "string") {
+    try {
+      const body = JSON.parse(init.body) as Record<string, unknown>
+      if (typeof body.model === "string") {
+        const fromModel = getModelFamilyFromModelName(body.model)
+        if (fromModel) return fromModel
+      }
+    } catch {}
+  }
+  return getModelFamilyFromUrl(url)
 }
 
 const GCP_PERMISSION_ERROR_PATTERNS = [
@@ -427,20 +445,20 @@ export function createAntigravityFetch(
 
     let currentAccount: ManagedAccount | null = null
     if (manager) {
-      const family = getModelFamilyFromUrl(url)
+      const family = getModelFamily(url, init)
       currentAccount = manager.getCurrentOrNextForFamily(family)
 
       if (currentAccount) {
         debugLog(`[ACCOUNTS] Using account ${currentAccount.index + 1}/${manager.getAccountCount()} for ${family}`)
 
-        // Clear cached project ID when account changes or first account introduced
         if (lastAccountIndex === null || lastAccountIndex !== currentAccount.index) {
           if (lastAccountIndex !== null) {
-            debugLog(`[ACCOUNTS] Account changed from ${lastAccountIndex + 1} to ${currentAccount.index + 1}, clearing cached project ID`)
+            debugLog(`[ACCOUNTS] Account changed from ${lastAccountIndex + 1} to ${currentAccount.index + 1}, clearing cached state`)
           } else if (cachedProjectId) {
-            debugLog(`[ACCOUNTS] First account introduced, clearing cached project ID`)
+            debugLog(`[ACCOUNTS] First account introduced, clearing cached state`)
           }
           cachedProjectId = null
+          cachedTokens = null
         }
         lastAccountIndex = currentAccount.index
 
@@ -672,7 +690,7 @@ export function createAntigravityFetch(
 
         if (response && typeof response === "object" && "type" in response && response.type === "rate-limited") {
           const rateLimitInfo = response as RateLimitInfo
-          const family = getModelFamilyFromUrl(url)
+          const family = getModelFamily(url, init)
 
           if (rateLimitInfo.retryAfterMs > 5000 && manager && currentAccount) {
             manager.markRateLimited(currentAccount, rateLimitInfo.retryAfterMs, family)

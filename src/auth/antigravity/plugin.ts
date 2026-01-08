@@ -283,6 +283,14 @@ export async function createGoogleAntigravityAuthPlugin({
 
                 const tokens = await exchangeCode(result.code, verifier, cachedClientId, cachedClientSecret, serverHandle.port)
 
+                // Validate refresh_token exists before proceeding
+                if (!tokens.refresh_token) {
+                  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                    console.error("[antigravity-plugin] OAuth response missing refresh_token")
+                  }
+                  return { type: "failed" as const }
+                }
+
                 let email: string | undefined
                 try {
                   const userInfo = await fetchUserInfo(tokens.access_token)
@@ -381,6 +389,19 @@ export async function createGoogleAntigravityAuthPlugin({
                       cachedClientSecret,
                       additionalServerHandle.port
                     )
+
+                    if (!additionalTokens.refresh_token) {
+                      if (process.env.ANTIGRAVITY_DEBUG === "1") {
+                        console.error("[antigravity-plugin] Additional account OAuth response missing refresh_token")
+                      }
+                      await client.tui.showToast({
+                        body: {
+                          message: "Account missing refresh token, skipping...",
+                          variant: "warning",
+                        },
+                      })
+                      continue
+                    }
 
                     let additionalEmail: string | undefined
                     try {
