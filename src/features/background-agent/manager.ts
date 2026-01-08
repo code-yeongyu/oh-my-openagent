@@ -348,6 +348,7 @@ export class BackgroundManager {
     // Release concurrency immediately but keep task in memory for output retrieval
     if (task.model) {
       this.concurrencyManager.release(task.model)
+      task.model = undefined // Prevent double-release by other handlers during retention
     }
     this.clearNotificationsForTask(task.id)
 
