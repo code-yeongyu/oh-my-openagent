@@ -80,15 +80,11 @@ export interface AntigravityOnboardUserPayload {
  * Wraps the actual request with project and model context
  */
 export interface AntigravityRequestBody {
-  /** GCP project ID */
   project: string
-  /** Model identifier (e.g., "gemini-3-pro-preview") */
   model: string
-  /** User agent identifier */
   userAgent: string
-  /** Unique request ID */
+  requestType: string
   requestId: string
-  /** The actual request payload */
   request: Record<string, unknown>
 }
 
@@ -210,4 +206,39 @@ export interface OAuthErrorPayload {
 export interface ParsedOAuthError {
   code?: string
   description?: string
+}
+
+/**
+ * Multi-account support types
+ */
+
+/** All model families for rate limit tracking */
+export const MODEL_FAMILIES = ["claude", "gemini-flash", "gemini-pro"] as const
+
+/** Model family for rate limit tracking */
+export type ModelFamily = (typeof MODEL_FAMILIES)[number]
+
+/** Account tier for prioritization */
+export type AccountTier = "free" | "paid"
+
+/** Rate limit state per model family (Unix timestamps in ms) */
+export type RateLimitState = Partial<Record<ModelFamily, number>>
+
+/** Account metadata for storage */
+export interface AccountMetadata {
+  email: string
+  tier: AccountTier
+  refreshToken: string
+  projectId: string
+  managedProjectId?: string
+  accessToken: string
+  expiresAt: number
+  rateLimits: RateLimitState
+}
+
+/** Storage schema for persisting multiple accounts */
+export interface AccountStorage {
+  version: number
+  accounts: AccountMetadata[]
+  activeIndex: number
 }
