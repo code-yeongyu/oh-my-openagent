@@ -370,6 +370,238 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
   })
 })
 
+describe("BackgroundManager.pollRunningTasks - stability detection", () => {
+  const MIN_STABILITY_TIME_MS = 10000 // Must match the constant in manager.ts
+
+  /**
+   * Simulates the stability detection logic from pollRunningTasks.
+   * This mirrors the actual implementation to test the algorithm in isolation.
+   */
+  function simulateStabilityCheck(
+    task: BackgroundTask,
+    currentMsgCount: number,
+    elapsedMs: number
+  ): { shouldComplete: boolean; stableCount: number } {
+    const progress = task.progress!
+
+    if (progress.lastMsgCount === currentMsgCount && elapsedMs >= MIN_STABILITY_TIME_MS) {
+      progress.stableCount = (progress.stableCount ?? 0) + 1
+      if (progress.stableCount >= 3) {
+        return { shouldComplete: true, stableCount: progress.stableCount }
+      }
+    } else {
+      progress.stableCount = 0
+    }
+    progress.lastMsgCount = currentMsgCount
+
+    return { shouldComplete: false, stableCount: progress.stableCount ?? 0 }
+  }
+
+  test("should complete task after 3 stable polls with messages", () => {
+    // #given - task running for 15 seconds with stable message count
+    const task = createMockTask({
+      id: "task-stable",
+      sessionID: "session-stable",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 15000), // 15 seconds ago
+      progress: { toolCalls: 5, lastUpdate: new Date() },
+    })
+
+    // #when - simulate polls with same message count
+    // Note: First poll sets lastMsgCount, stability counting starts from second poll
+    const elapsedMs = 15000
+    const msgCount = 10
+
+    // Poll 1 - sets lastMsgCount, stableCount stays 0
+    let result = simulateStabilityCheck(task, msgCount, elapsedMs)
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(0) // First poll: lastMsgCount was undefined
+
+    // Poll 2 - first stable poll
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 2000)
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(1)
+
+    // Poll 3 - second stable poll
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 4000)
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(2)
+
+    // Poll 4 - third stable poll
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 6000)
+
+    // #then - task should complete after 3 stable polls
+    expect(result.shouldComplete).toBe(true)
+    expect(result.stableCount).toBe(3)
+  })
+
+  test("should not prematurely complete slow-starting tasks (before MIN_STABILITY_TIME_MS)", () => {
+    // #given - task just started (only 5 seconds elapsed, below 10s threshold)
+    const task = createMockTask({
+      id: "task-new",
+      sessionID: "session-new",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 5000), // 5 seconds ago
+      progress: { toolCalls: 0, lastUpdate: new Date() },
+    })
+
+    // #when - simulate 5 polls with 0 messages (task still initializing)
+    const elapsedMs = 5000 // Below MIN_STABILITY_TIME_MS threshold
+    const msgCount = 0
+
+    for (let i = 0; i < 5; i++) {
+      const result = simulateStabilityCheck(task, msgCount, elapsedMs)
+      // #then - should never complete because elapsed time is below threshold
+      expect(result.shouldComplete).toBe(false)
+    }
+
+    // Stability counter should remain at 0 because elapsed < MIN_STABILITY_TIME_MS
+    expect(task.progress!.stableCount).toBe(0)
+  })
+
+  test("should handle tasks that complete with 0 messages after MIN_STABILITY_TIME_MS", () => {
+    // #given - task running for 15 seconds but no messages (error case or instant completion)
+    const task = createMockTask({
+      id: "task-zero-msgs",
+      sessionID: "session-zero",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 15000), // 15 seconds ago
+      progress: { toolCalls: 0, lastUpdate: new Date() },
+    })
+
+    // #when - simulate 4 polls with 0 messages after min time elapsed
+    // Note: First poll sets lastMsgCount, stability counting starts from second poll
+    const elapsedMs = 15000
+    const msgCount = 0
+
+    // Poll 1 - sets lastMsgCount
+    let result = simulateStabilityCheck(task, msgCount, elapsedMs)
+    expect(result.stableCount).toBe(0)
+
+    // Poll 2-4 - stable polls
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 2000)
+    expect(result.stableCount).toBe(1)
+
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 4000)
+    expect(result.stableCount).toBe(2)
+
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 6000)
+
+    // #then - task should complete even with 0 messages (this was the bug fix!)
+    expect(result.shouldComplete).toBe(true)
+    expect(result.stableCount).toBe(3)
+  })
+
+  test("should reset stability counter when message count changes", () => {
+    // #given - task running for 20 seconds
+    const task = createMockTask({
+      id: "task-active",
+      sessionID: "session-active",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 20000), // 20 seconds ago
+      progress: { toolCalls: 3, lastUpdate: new Date() },
+    })
+
+    const elapsedMs = 20000
+
+    // #when - poll with 5 messages (first sets baseline), then 5 again, then 7 (changed)
+    // Poll 1 - sets lastMsgCount
+    simulateStabilityCheck(task, 5, elapsedMs)
+    expect(task.progress!.stableCount).toBe(0)
+
+    // Poll 2 - stable
+    let result = simulateStabilityCheck(task, 5, elapsedMs + 2000)
+    expect(result.stableCount).toBe(1)
+
+    // Poll 3 - Message count changes - new activity detected
+    result = simulateStabilityCheck(task, 7, elapsedMs + 4000)
+
+    // #then - stability counter should reset to 0
+    expect(result.stableCount).toBe(0)
+    expect(result.shouldComplete).toBe(false)
+  })
+
+  test("should require exactly 3 stable polls to complete", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-threshold",
+      sessionID: "session-threshold",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 20000),
+      progress: { toolCalls: 2, lastUpdate: new Date() },
+    })
+
+    const elapsedMs = 20000
+    const msgCount = 8
+
+    // #when - poll 3 times (first sets baseline, next 2 are stable but not enough)
+    // Poll 1 - sets lastMsgCount
+    let result = simulateStabilityCheck(task, msgCount, elapsedMs)
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(0)
+
+    // Poll 2 - first stable
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 2000)
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(1)
+
+    // Poll 3 - second stable
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 4000)
+    // #then - should NOT complete after only 2 stable polls
+    expect(result.shouldComplete).toBe(false)
+    expect(result.stableCount).toBe(2)
+
+    // Poll 4 - third stable
+    result = simulateStabilityCheck(task, msgCount, elapsedMs + 6000)
+
+    // Now it should complete
+    expect(result.shouldComplete).toBe(true)
+    expect(result.stableCount).toBe(3)
+  })
+
+  test("should handle edge case: stability resets then builds up again", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-intermittent",
+      sessionID: "session-intermittent",
+      parentSessionID: "session-parent",
+      startedAt: new Date(Date.now() - 30000),
+      progress: { toolCalls: 1, lastUpdate: new Date() },
+    })
+
+    const elapsedMs = 30000
+
+    // #when - set baseline, build up to 2, then reset, then build to 3
+    // Poll 1 - sets lastMsgCount
+    simulateStabilityCheck(task, 3, elapsedMs)
+    expect(task.progress!.stableCount).toBe(0)
+
+    // Poll 2-3 - build stability
+    simulateStabilityCheck(task, 3, elapsedMs + 2000)
+    expect(task.progress!.stableCount).toBe(1)
+
+    simulateStabilityCheck(task, 3, elapsedMs + 4000)
+    expect(task.progress!.stableCount).toBe(2)
+
+    // Poll 4 - Activity detected - reset
+    simulateStabilityCheck(task, 5, elapsedMs + 6000)
+    expect(task.progress!.stableCount).toBe(0)
+
+    // Poll 5-7 - Build up again (first sets baseline, next 3 are stable)
+    simulateStabilityCheck(task, 5, elapsedMs + 8000)
+    expect(task.progress!.stableCount).toBe(1)
+
+    simulateStabilityCheck(task, 5, elapsedMs + 10000)
+    expect(task.progress!.stableCount).toBe(2)
+
+    const result = simulateStabilityCheck(task, 5, elapsedMs + 12000)
+
+    // #then - should complete after 3 new stable polls
+    expect(result.shouldComplete).toBe(true)
+    expect(result.stableCount).toBe(3)
+  })
+})
+
 describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
   let manager: MockBackgroundManager
 

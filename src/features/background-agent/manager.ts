@@ -491,9 +491,15 @@ export class BackgroundManager {
           }
 
           // Stability detection: if message count unchanged for 3 polls, consider complete
+          // Note: We intentionally allow currentMsgCount === 0 to handle edge cases like
+          // tasks that error immediately or complete synchronously before first poll.
+          // The minimum elapsed time check below prevents premature completion of slow-starting tasks.
           const currentMsgCount = messages.length
           const progress = task.progress!
-          if (progress.lastMsgCount === currentMsgCount && currentMsgCount > 0) {
+          const elapsedMs = Date.now() - task.startedAt.getTime()
+          const MIN_STABILITY_TIME_MS = 10000 // 10 seconds minimum before stability detection kicks in
+          
+          if (progress.lastMsgCount === currentMsgCount && elapsedMs >= MIN_STABILITY_TIME_MS) {
             progress.stableCount = (progress.stableCount ?? 0) + 1
             if (progress.stableCount >= 3) {
               log("[background-agent] Task completed via stability detection:", task.id)
