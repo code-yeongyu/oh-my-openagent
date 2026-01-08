@@ -1,5 +1,4 @@
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+
 import type { PluginInput } from "@opencode-ai/plugin"
 import type {
   BackgroundTask,
@@ -9,10 +8,7 @@ import type {
 import { log } from "../../shared/logger"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
-import {
-  findNearestMessageWithFields,
-  MESSAGE_STORAGE,
-} from "../hook-message-injector"
+
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 
@@ -42,20 +38,6 @@ interface Todo {
   status: string
   priority: string
   id: string
-}
-
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
 }
 
 export class BackgroundManager {
@@ -456,18 +438,15 @@ export class BackgroundManager {
       }
 
       try {
-        const messageDir = getMessageDir(task.parentSessionID)
-        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-
-        const modelContext = task.parentModel ?? prevMessage?.model
-        const modelField = modelContext?.providerID && modelContext?.modelID
-          ? { providerID: modelContext.providerID, modelID: modelContext.modelID }
+        // Use only parentModel - don't fallback to prevMessage.model
+        // This prevents accidentally changing parent session's model
+        const modelField = task.parentModel?.providerID && task.parentModel?.modelID
+          ? { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
           : undefined
 
         await this.client.session.prompt({
           path: { id: task.parentSessionID },
           body: {
-            agent: prevMessage?.agent,
             model: modelField,
             parts: [{ type: "text", text: message }],
           },
