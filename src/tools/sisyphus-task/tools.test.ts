@@ -215,7 +215,124 @@ describe("sisyphus-task", () => {
     })
   })
 
-  describe("buildSystemContent", () => {
+  describe("resume with background parameter", () => {
+  test("resume with background=false should wait for result and return content", async () => {
+    // #given
+    const { createSisyphusTask } = require("./tools")
+    
+    const mockTask = {
+      id: "task-123",
+      sessionID: "ses_resume_test",
+      description: "Resumed task",
+      agent: "explore",
+      status: "running",
+    }
+    
+    const mockManager = {
+      resume: async () => mockTask,
+      launch: async () => mockTask,
+    }
+    
+    const mockClient = {
+      session: {
+        prompt: async () => ({ data: {} }),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant", time: { created: Date.now() } },
+              parts: [{ type: "text", text: "This is the resumed task result" }],
+            },
+          ],
+        }),
+      },
+      app: {
+        agents: async () => ({ data: [] }),
+      },
+    }
+    
+    const tool = createSisyphusTask({
+      manager: mockManager,
+      client: mockClient,
+    })
+    
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "Sisyphus",
+      abort: new AbortController().signal,
+    }
+    
+    // #when
+    const result = await tool.execute(
+      {
+        description: "Resume test",
+        prompt: "Continue the task",
+        resume: "ses_resume_test",
+        background: false,
+      },
+      toolContext
+    )
+    
+    // #then - should contain actual result, not just "Background task resumed"
+    expect(result).toContain("This is the resumed task result")
+    expect(result).not.toContain("Background task resumed")
+  })
+
+  test("resume with background=true should return immediately without waiting", async () => {
+    // #given
+    const { createSisyphusTask } = require("./tools")
+    
+    const mockTask = {
+      id: "task-456",
+      sessionID: "ses_bg_resume",
+      description: "Background resumed task",
+      agent: "explore",
+      status: "running",
+    }
+    
+    const mockManager = {
+      resume: async () => mockTask,
+    }
+    
+    const mockClient = {
+      session: {
+        prompt: async () => ({ data: {} }),
+        messages: async () => ({
+          data: [],
+        }),
+      },
+    }
+    
+    const tool = createSisyphusTask({
+      manager: mockManager,
+      client: mockClient,
+    })
+    
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "Sisyphus",
+      abort: new AbortController().signal,
+    }
+    
+    // #when
+    const result = await tool.execute(
+      {
+        description: "Resume bg test",
+        prompt: "Continue in background",
+        resume: "ses_bg_resume",
+        background: true,
+      },
+      toolContext
+    )
+    
+    // #then - should return background message
+    expect(result).toContain("Background task resumed")
+    expect(result).toContain("task-456")
+  })
+})
+
+describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // #given
       const { buildSystemContent } = require("./tools")
