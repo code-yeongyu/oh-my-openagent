@@ -33,6 +33,7 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
+import { willHaveGeminiAgents } from "./agents";
 import {
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
@@ -122,7 +123,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
-    keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
   });
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery"
@@ -255,9 +255,32 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createAutoSlashCommandHook({ skills: mergedSkills })
     : null;
 
-  const googleAuthHooks = pluginConfig.google_auth !== false
-    ? await createGoogleAntigravityAuthPlugin(ctx)
-    : null;
+  // Only load Google auth plugin if:
+  // 1. google_auth is not explicitly disabled (google_auth !== false)
+  // 2. At least one Gemini-using agent is active
+  // This prevents unnecessary auth prompts when Gemini agents aren't being used
+  // See: https://github.com/code-yeongyu/oh-my-opencode/issues/525
+  const hasActiveGeminiAgents = willHaveGeminiAgents(
+    pluginConfig.disabled_agents,
+    pluginConfig.agents
+  );
+
+  if (process.env.ANTIGRAVITY_DEBUG === "1") {
+    log("[oh-my-opencode] Gemini agents active check", {
+      hasActiveGeminiAgents,
+      disabledAgents: pluginConfig.disabled_agents,
+      agentOverrides: Object.keys(pluginConfig.agents ?? {}),
+    });
+  }
+
+  const googleAuthHooks =
+    pluginConfig.google_auth !== false && hasActiveGeminiAgents
+      ? await createGoogleAntigravityAuthPlugin(ctx)
+      : null;
+
+  if (!hasActiveGeminiAgents && process.env.ANTIGRAVITY_DEBUG === "1") {
+    log("[oh-my-opencode] Google auth skipped - no Gemini agents active");
+  }
 
   const configHandler = createConfigHandler({
     ctx,
