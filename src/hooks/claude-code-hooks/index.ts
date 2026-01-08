@@ -138,14 +138,18 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
           return
         }
 
-        const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt), input.agent)
-        const keywordMessages = detectedKeywords.map((k) => k.message)
+        const keywordMessages: string[] = []
+        if (!config.keywordDetectorDisabled) {
+          const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt), input.agent)
+          keywordMessages.push(...detectedKeywords.map((k) => k.message))
 
-        if (keywordMessages.length > 0) {
-          log("[claude-code-hooks] Detected keywords", {
-            sessionID: input.sessionID,
-            types: detectedKeywords.map((k) => k.type),
-          })
+          if (keywordMessages.length > 0) {
+            log("[claude-code-hooks] Detected keywords", {
+              sessionID: input.sessionID,
+              keywordCount: keywordMessages.length,
+              types: detectedKeywords.map((k) => k.type),
+            })
+          }
         }
 
         const allMessages = [...keywordMessages, ...result.messages]

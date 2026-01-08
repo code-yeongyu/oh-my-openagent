@@ -122,6 +122,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(ctx, {
     disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+    keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
   });
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery"
