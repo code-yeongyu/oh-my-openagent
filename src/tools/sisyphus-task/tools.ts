@@ -38,19 +38,6 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-async function getParentAgentFromSdk(client: OpencodeClient, sessionID: string): Promise<string | undefined> {
-  try {
-    const messagesResp = await client.session.messages({ path: { id: sessionID } })
-    const messages = (messagesResp.data ?? []) as Array<{ info?: { agent?: string } }>
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].info?.agent) {
-        return messages[i].info?.agent
-      }
-    }
-  } catch {}
-  return undefined
-}
-
 function formatDuration(start: Date, end?: Date): string {
   const duration = (end ?? new Date()).getTime() - start.getTime()
   const seconds = Math.floor(duration / 1000)
@@ -157,10 +144,9 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
         skillContent = Array.from(resolved.values()).join("\n\n")
       }
 
-      const sdkParentAgent = await getParentAgentFromSdk(client, ctx.sessionID)
       const messageDir = getMessageDir(ctx.sessionID)
       const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      const parentAgent = sdkParentAgent ?? prevMessage?.agent
+      const parentAgent = ctx.agent ?? prevMessage?.agent
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
         ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
         : undefined
