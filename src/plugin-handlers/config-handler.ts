@@ -182,12 +182,18 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           : plannerSisyphusBase;
       }
 
+    // Filter OpenCode's config.agent to exclude agents already defined in builtinAgents
+    // This ensures oh-my-opencode's agent settings (including user overrides from pluginConfig.agents)
+    // take precedence over OpenCode's default agent definitions
+    const builtinAgentNames = new Set(Object.keys(builtinAgents));
     const filteredConfigAgents = configAgent
       ? Object.fromEntries(
           Object.entries(configAgent)
             .filter(([key]) => {
               if (key === "build") return false;
               if (key === "plan" && replacePlan) return false;
+              // Exclude agents already defined in builtinAgents to preserve OmO overrides
+              if (builtinAgentNames.has(key)) return false;
               return true;
             })
             .map(([key, value]) => [
@@ -218,12 +224,26 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
+      // When Sisyphus is disabled, still filter OpenCode's config.agent to exclude
+      // agents already defined in builtinAgents to preserve OmO overrides
+      const builtinAgentNamesForElse = new Set(Object.keys(builtinAgents));
+      const filteredConfigAgentForElse = configAgent
+        ? Object.fromEntries(
+            Object.entries(configAgent)
+              .filter(([key]) => !builtinAgentNamesForElse.has(key))
+              .map(([key, value]) => [
+                key,
+                value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+              ])
+          )
+        : {};
+
       config.agent = {
         ...builtinAgents,
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
-        ...configAgent,
+        ...filteredConfigAgentForElse,
       };
     }
 
