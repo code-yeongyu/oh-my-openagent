@@ -431,7 +431,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
           const sessionStatus = allStatuses[sessionID]
 
-          if (sessionStatus?.type === "idle") {
+          // Break if session is idle OR no longer in status (completed and removed)
+          if (!sessionStatus || sessionStatus.type === "idle") {
             break
           }
         }
