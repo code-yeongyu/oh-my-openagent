@@ -9,16 +9,16 @@ import type { AutoUpdateCheckerOptions } from "./types"
 
 const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
 
-function isPrereleaseVersion(version: string): boolean {
+export function isPrereleaseVersion(version: string): boolean {
   return version.includes("-")
 }
 
-function isDistTag(version: string): boolean {
+export function isDistTag(version: string): boolean {
   const startsWithDigit = /^\d/.test(version)
   return !startsWithDigit
 }
 
-function isPrereleaseOrDistTag(pinnedVersion: string | null): boolean {
+export function isPrereleaseOrDistTag(pinnedVersion: string | null): boolean {
   if (!pinnedVersion) return false
   return isPrereleaseVersion(pinnedVersion) || isDistTag(pinnedVersion)
 }

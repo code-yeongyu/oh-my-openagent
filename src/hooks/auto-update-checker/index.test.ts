@@ -1,18 +1,5 @@
 import { describe, test, expect } from "bun:test"
-
-const isPrereleaseVersion = (version: string): boolean => {
-  return version.includes("-")
-}
-
-const isDistTag = (version: string): boolean => {
-  const startsWithDigit = /^\d/.test(version)
-  return !startsWithDigit
-}
-
-const isPrereleaseOrDistTag = (pinnedVersion: string | null): boolean => {
-  if (!pinnedVersion) return false
-  return isPrereleaseVersion(pinnedVersion) || isDistTag(pinnedVersion)
-}
+import { isPrereleaseVersion, isDistTag, isPrereleaseOrDistTag } from "./index"
 
 describe("auto-update-checker", () => {
   describe("isPrereleaseVersion", () => {
