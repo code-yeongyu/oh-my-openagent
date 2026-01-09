@@ -7,8 +7,6 @@ import {
   isOpenCodeInstalled,
   getOpenCodeVersion,
   addAuthPlugins,
-  setupChatGPTHotfix,
-  runBunInstall,
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
@@ -48,10 +46,10 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Agent Configuration")))
   lines.push("")
 
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "big-pickle"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "big-pickle")
-  const librarianModel = config.hasClaude && config.isMax20 ? "claude-sonnet-4-5" : "big-pickle"
-  const frontendModel = config.hasGemini ? "gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "big-pickle")
+  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
+  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const librarianModel = "glm-4.7-free"
+  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
 
   lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
   lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
@@ -163,7 +161,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   const claude = await p.select({
     message: "Do you have a Claude Pro/Max subscription?",
     options: [
-      { value: "no" as const, label: "No", hint: "Will use opencode/big-pickle as fallback" },
+      { value: "no" as const, label: "No", hint: "Will use opencode/glm-4.7-free as fallback" },
       { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
       { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.5 for Librarian" },
     ],
@@ -279,26 +277,6 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     step += 2
   }
 
-  if (config.hasChatGPT) {
-    printStep(step++, totalSteps, "Setting up ChatGPT hotfix...")
-    const hotfixResult = setupChatGPTHotfix()
-    if (!hotfixResult.success) {
-      printError(`Failed: ${hotfixResult.error}`)
-      return 1
-    }
-    printSuccess(`Hotfix configured ${SYMBOLS.arrow} ${color.dim(hotfixResult.configPath)}`)
-
-    printInfo("Installing dependencies with bun...")
-    const bunSuccess = await runBunInstall()
-    if (bunSuccess) {
-      printSuccess("Dependencies installed")
-    } else {
-      printWarning("bun install failed - run manually: cd ~/.config/opencode && bun i")
-    }
-  } else {
-    step++
-  }
-
   printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
@@ -310,7 +288,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
-    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
+    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
@@ -330,6 +308,17 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
   console.log(`  Run ${color.cyan("opencode")} to start!`)
+  console.log()
+
+  printBox(
+    `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
+    `All features work like magic—parallel agents, background tasks,\n` +
+    `deep exploration, and relentless execution until completion.`,
+    "🪄 The Magic Word"
+  )
+
+  console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
+  console.log(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
@@ -399,25 +388,6 @@ export async function install(args: InstallArgs): Promise<number> {
     s.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
   }
 
-  if (config.hasChatGPT) {
-    s.start("Setting up ChatGPT hotfix")
-    const hotfixResult = setupChatGPTHotfix()
-    if (!hotfixResult.success) {
-      s.stop(`Failed to setup hotfix: ${hotfixResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    s.stop(`Hotfix configured in ${color.cyan(hotfixResult.configPath)}`)
-
-    s.start("Installing dependencies with bun")
-    const bunSuccess = await runBunInstall()
-    if (bunSuccess) {
-      s.stop("Dependencies installed")
-    } else {
-      s.stop(color.yellow("bun install failed - run manually: cd ~/.config/opencode && bun i"))
-    }
-  }
-
   s.start("Writing oh-my-opencode configuration")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
@@ -428,7 +398,7 @@ export async function install(args: InstallArgs): Promise<number> {
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
   if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
-    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
+    p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
@@ -449,6 +419,16 @@ export async function install(args: InstallArgs): Promise<number> {
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
+
+  p.note(
+    `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
+    `All features work like magic—parallel agents, background tasks,\n` +
+    `deep exploration, and relentless execution until completion.`,
+    "🪄 The Magic Word"
+  )
+
+  p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
+  p.log.message(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 

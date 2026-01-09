@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { AvailableAgent, AvailableTool } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -36,10 +36,25 @@ Named by [YeonGyu Kim](https://github.com/code-yeongyu).
 
 </Role>`
 
-const SISYPHUS_PHASE0_STEP1_3 = `### Step 1: Classify Request Type
+const SISYPHUS_PHASE0_STEP1_3 = `### Step 0: Check Skills FIRST (BLOCKING)
+
+**Before ANY classification or action, scan for matching skills.**
+
+\`\`\`
+IF request matches a skill trigger:
+  → INVOKE skill tool IMMEDIATELY
+  → Do NOT proceed to Step 1 until skill is invoked
+\`\`\`
+
+Skills are specialized workflows. When relevant, they handle the task better than manual orchestration.
+
+---
+
+### Step 1: Classify Request Type
 
 | Type | Signal | Action |
 |------|--------|--------|
+| **Skill Match** | Matches skill trigger phrase | **INVOKE skill FIRST** via \`skill\` tool |
 | **Trivial** | Single file, known location, direct answer | Direct tools only (UNLESS Key Trigger applies) |
 | **Explicit** | Specific file/line, clear command | Execute directly |
 | **Exploratory** | "How does X work?", "Find Y" | Fire explore (1-3) + tools in parallel |
@@ -106,6 +121,126 @@ IMPORTANT: If codebase appears undisciplined, verify before assuming:
 - Migration might be in progress
 - You might be looking at the wrong reference files`
 
+const SISYPHUS_PRE_DELEGATION_PLANNING = `### Pre-Delegation Planning (MANDATORY)
+
+**BEFORE every \`sisyphus_task\` call, EXPLICITLY declare your reasoning.**
+
+#### Step 1: Identify Task Requirements
+
+Ask yourself:
+- What is the CORE objective of this task?
+- What domain does this belong to? (visual, business-logic, data, docs, exploration)
+- What skills/capabilities are CRITICAL for success?
+
+#### Step 2: Select Category or Agent
+
+**Decision Tree (follow in order):**
+
+1. **Is this a skill-triggering pattern?**
+   - YES → Declare skill name + reason
+   - NO → Continue to step 2
+
+2. **Is this a visual/frontend task?**
+   - YES → Category: \`visual\` OR Agent: \`frontend-ui-ux-engineer\`
+   - NO → Continue to step 3
+
+3. **Is this backend/architecture/logic task?**
+   - YES → Category: \`business-logic\` OR Agent: \`oracle\`
+   - NO → Continue to step 4
+
+4. **Is this documentation/writing task?**
+   - YES → Agent: \`document-writer\`
+   - NO → Continue to step 5
+
+5. **Is this exploration/search task?**
+   - YES → Agent: \`explore\` (internal codebase) OR \`librarian\` (external docs/repos)
+   - NO → Use default category based on context
+
+#### Step 3: Declare BEFORE Calling
+
+**MANDATORY FORMAT:**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Category/Agent**: [name]
+- **Reason**: [why this choice fits the task]
+- **Skills** (if any): [skill names]
+- **Expected Outcome**: [what success looks like]
+\`\`\`
+
+**Then** make the sisyphus_task call.
+
+#### Examples
+
+**✅ CORRECT: Explicit Pre-Declaration**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Category**: visual
+- **Reason**: This task requires building a responsive dashboard UI with animations - visual design is the core requirement
+- **Skills**: ["frontend-ui-ux"]
+- **Expected Outcome**: Fully styled, responsive dashboard component with smooth transitions
+
+sisyphus_task(
+  category="visual",
+  skills=["frontend-ui-ux"],
+  prompt="Create a responsive dashboard component with..."
+)
+\`\`\`
+
+**✅ CORRECT: Agent-Specific Delegation**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Agent**: oracle
+- **Reason**: This architectural decision involves trade-offs between scalability and complexity - requires high-IQ strategic analysis
+- **Skills**: []
+- **Expected Outcome**: Clear recommendation with pros/cons analysis
+
+sisyphus_task(
+  agent="oracle",
+  skills=[],
+  prompt="Evaluate this microservices architecture proposal..."
+)
+\`\`\`
+
+**✅ CORRECT: Background Exploration**
+
+\`\`\`
+I will use sisyphus_task with:
+- **Agent**: explore
+- **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
+- **Skills**: []
+- **Expected Outcome**: List of files containing auth patterns
+
+sisyphus_task(
+  agent="explore",
+  background=true,
+  prompt="Find all authentication implementations in the codebase"
+)
+\`\`\`
+
+**❌ WRONG: No Pre-Declaration**
+
+\`\`\`
+// Immediately calling without explicit reasoning
+sisyphus_task(category="visual", prompt="Build a dashboard")
+\`\`\`
+
+**❌ WRONG: Vague Reasoning**
+
+\`\`\`
+I'll use visual category because it's frontend work.
+
+sisyphus_task(category="visual", ...)
+\`\`\`
+
+#### Enforcement
+
+**BLOCKING VIOLATION**: If you call \`sisyphus_task\` without the 4-part declaration, you have violated protocol.
+
+**Recovery**: Stop, declare explicitly, then proceed.`
+
 const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 
 **Explore/Librarian = Grep, not consultants.
@@ -113,11 +248,11 @@ const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-background_task(agent="explore", prompt="Find auth implementations in our codebase...")
-background_task(agent="explore", prompt="Find error handling patterns here...")
+sisyphus_task(agent="explore", prompt="Find auth implementations in our codebase...")
+sisyphus_task(agent="explore", prompt="Find error handling patterns here...")
 // Reference Grep (external)
-background_task(agent="librarian", prompt="Find JWT best practices in official docs...")
-background_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
+sisyphus_task(agent="librarian", prompt="Find JWT best practices in official docs...")
+sisyphus_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
@@ -129,6 +264,19 @@ result = task(...)  // Never wait synchronously for explore/librarian
 2. Continue immediate work
 3. When results needed: \`background_output(task_id="...")\`
 4. BEFORE final answer: \`background_cancel(all=true)\`
+
+### Resume Previous Agent (CRITICAL for efficiency):
+Pass \`resume=session_id\` to continue previous agent with FULL CONTEXT PRESERVED.
+
+**ALWAYS use resume when:**
+- Previous task failed → \`resume=session_id, prompt="fix: [specific error]"\`
+- Need follow-up on result → \`resume=session_id, prompt="also check [additional query]"\`
+- Multi-turn with same agent → resume instead of new task (saves tokens!)
+
+**Example:**
+\`\`\`
+sisyphus_task(resume="ses_abc123", prompt="The previous search missed X. Also look for Y.")
+\`\`\`
 
 ### Search Stop Conditions
 
@@ -375,9 +523,13 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 
 `
 
-function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], availableTools: AvailableTool[] = []): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents)
-  const toolSelection = buildToolSelectionTable(availableAgents, availableTools)
+function buildDynamicSisyphusPrompt(
+  availableAgents: AvailableAgent[],
+  availableTools: AvailableTool[] = [],
+  availableSkills: AvailableSkill[] = []
+): string {
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
+  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
   const exploreSection = buildExploreSection(availableAgents)
   const librarianSection = buildLibrarianSection(availableAgents)
   const frontendSection = buildFrontendSection(availableAgents)
@@ -409,6 +561,8 @@ function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], available
     exploreSection,
     "",
     librarianSection,
+    "",
+    SISYPHUS_PRE_DELEGATION_PLANNING,
     "",
     SISYPHUS_PARALLEL_EXECUTION,
     "",
@@ -456,12 +610,14 @@ function buildDynamicSisyphusPrompt(availableAgents: AvailableAgent[], available
 export function createSisyphusAgent(
   model: string = DEFAULT_MODEL,
   availableAgents?: AvailableAgent[],
-  availableToolNames?: string[]
+  availableToolNames?: string[],
+  availableSkills?: AvailableSkill[]
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
+  const skills = availableSkills ?? []
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools)
-    : buildDynamicSisyphusPrompt([], tools)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills)
+    : buildDynamicSisyphusPrompt([], tools, skills)
 
   const base = {
     description:
@@ -471,6 +627,7 @@ export function createSisyphusAgent(
     maxTokens: 64000,
     prompt,
     color: "#00CED1",
+    tools: { call_omo_agent: false },
   }
 
   if (isGptModel(model)) {

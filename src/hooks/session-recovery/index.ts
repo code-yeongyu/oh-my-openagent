@@ -122,7 +122,7 @@ function extractMessageIndex(error: unknown): number | null {
   return match ? parseInt(match[1], 10) : null
 }
 
-function detectErrorType(error: unknown): RecoveryErrorType {
+export function detectErrorType(error: unknown): RecoveryErrorType {
   const message = getErrorMessage(error)
 
   if (message.includes("tool_use") && message.includes("tool_result")) {
@@ -134,6 +134,8 @@ function detectErrorType(error: unknown): RecoveryErrorType {
     (message.includes("first block") ||
       message.includes("must start with") ||
       message.includes("preceeding") ||
+      message.includes("final block") ||
+      message.includes("cannot be thinking") ||
       (message.includes("expected") && message.includes("found")))
   ) {
     return "thinking_block_order"

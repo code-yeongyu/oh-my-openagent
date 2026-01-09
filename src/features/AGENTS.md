@@ -2,79 +2,65 @@
 
 ## OVERVIEW
 
-Claude Code compatibility layer and core feature modules. Enables Claude Code configs/commands/skills/MCPs/hooks to work seamlessly in OpenCode.
+Claude Code compatibility layer + core feature modules. Commands, skills, agents, MCPs, hooks from Claude Code work seamlessly.
 
 ## STRUCTURE
 
 ```
 features/
-├── background-agent/           # Background task management
-│   ├── manager.ts              # Task lifecycle, notifications
-│   ├── manager.test.ts
-│   └── types.ts
-├── builtin-commands/           # Built-in slash command definitions
-├── claude-code-agent-loader/   # Load agents from ~/.claude/agents/*.md
-├── claude-code-command-loader/ # Load commands from ~/.claude/commands/*.md
-├── claude-code-mcp-loader/     # Load MCPs from .mcp.json
+├── background-agent/           # Task lifecycle, notifications (460 lines)
+├── builtin-commands/           # Built-in slash commands
+├── builtin-skills/             # Built-in skills (playwright)
+├── claude-code-agent-loader/   # ~/.claude/agents/*.md
+├── claude-code-command-loader/ # ~/.claude/commands/*.md
+├── claude-code-mcp-loader/     # .mcp.json files
 │   └── env-expander.ts         # ${VAR} expansion
-├── claude-code-plugin-loader/  # Load external plugins from installed_plugins.json
+├── claude-code-plugin-loader/  # installed_plugins.json (484 lines)
 ├── claude-code-session-state/  # Session state persistence
-├── opencode-skill-loader/      # Load skills from OpenCode and Claude paths
+├── opencode-skill-loader/      # Skills from OpenCode + Claude paths
+├── skill-mcp-manager/          # MCP servers in skill YAML
 └── hook-message-injector/      # Inject messages into conversation
 ```
 
 ## LOADER PRIORITY
 
-Each loader reads from multiple directories (highest priority first):
-
-| Loader | Priority Order |
-|--------|---------------|
+| Loader | Priority (highest first) |
+|--------|--------------------------|
 | Commands | `.opencode/command/` > `~/.config/opencode/command/` > `.claude/commands/` > `~/.claude/commands/` |
 | Skills | `.opencode/skill/` > `~/.config/opencode/skill/` > `.claude/skills/` > `~/.claude/skills/` |
 | Agents | `.claude/agents/` > `~/.claude/agents/` |
 | MCPs | `.claude/.mcp.json` > `.mcp.json` > `~/.claude/.mcp.json` |
 
-## HOW TO ADD A LOADER
-
-1. Create directory: `src/features/claude-code-my-loader/`
-2. Create files:
-   - `loader.ts`: Main loader logic with `load()` function
-   - `types.ts`: TypeScript interfaces
-   - `index.ts`: Barrel export
-3. Pattern: Read from multiple dirs, merge with priority, return normalized config
-
-## BACKGROUND AGENT SPECIFICS
-
-- **Task lifecycle**: pending → running → completed/failed
-- **Notifications**: OS notification on task complete (configurable)
-- **Result retrieval**: `background_output` tool with task_id
-- **Cancellation**: `background_cancel` with task_id or all=true
-
 ## CONFIG TOGGLES
-
-Disable features in `oh-my-opencode.json`:
 
 ```json
 {
   "claude_code": {
-    "mcp": false,      // Skip .mcp.json loading
-    "commands": false, // Skip commands/*.md loading
-    "skills": false,   // Skip skills/*/SKILL.md loading
-    "agents": false,   // Skip agents/*.md loading
+    "mcp": false,      // Skip .mcp.json
+    "commands": false, // Skip commands/*.md
+    "skills": false,   // Skip skills/*/SKILL.md
+    "agents": false,   // Skip agents/*.md
     "hooks": false     // Skip settings.json hooks
   }
 }
 ```
 
-## HOOK MESSAGE INJECTOR
+## BACKGROUND AGENT
 
-- **Purpose**: Inject system messages into conversation at specific points
-- **Timing**: PreToolUse, PostToolUse, UserPromptSubmit, Stop
-- **Format**: Returns `{ messages: [{ role: "user", content: "..." }] }`
+- Lifecycle: pending → running → completed/failed
+- OS notification on complete
+- `background_output` to retrieve results
+- `background_cancel` with task_id or all=true
 
-## ANTI-PATTERNS (FEATURES)
+## SKILL MCP
 
-- **Blocking on load**: Loaders run at startup, keep them fast
-- **No error handling**: Always try/catch, log failures, return empty on error
-- **Ignoring priority**: Higher priority dirs must override lower
-- **Modifying user files**: Loaders read-only, never write to ~/.claude/
+- MCP servers embedded in skill YAML frontmatter
+- Lazy client loading, session-scoped cleanup
+- `skill_mcp` tool exposes capabilities
+
+## ANTI-PATTERNS
+
+- Blocking on load (loaders run at startup)
+- No error handling (always try/catch)
+- Ignoring priority order
+- Writing to ~/.claude/ (read-only)

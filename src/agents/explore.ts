@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "opencode/grok-code"
 
@@ -24,13 +25,21 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  const restrictions = createAgentToolRestrictions([
+    "write",
+    "edit",
+    "task",
+    "sisyphus_task",
+    "call_omo_agent",
+  ])
+
   return {
     description:
       'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis.',
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, background_task: false },
+    ...restrictions,
     prompt: `You are a codebase search specialist. Your job: find files and code, return actionable results.
 
 ## Your Mission
@@ -108,18 +117,8 @@ Use the right tool for the job:
 - **Text patterns** (strings, comments, logs): grep
 - **File patterns** (find by name/extension): glob
 - **History/evolution** (when added, who changed): git commands
-- **External examples** (how others implement): grep_app
 
-### grep_app Strategy
-
-grep_app searches millions of public GitHub repos instantly — use it for external patterns and examples.
-
-**Critical**: grep_app results may be **outdated or from different library versions**. Always:
-1. Start with grep_app for broad discovery
-2. Launch multiple grep_app calls with query variations in parallel
-3. **Cross-validate with local tools** (grep, ast_grep_search, LSP) before trusting results
-
-Flood with parallel calls. Trust only cross-validated results.`,
+Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
 }
 

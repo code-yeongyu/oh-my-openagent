@@ -1,18 +1,59 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
-import { parseJsonc } from "../shared"
+import {
+  parseJsonc,
+  getOpenCodeConfigPaths,
+  type OpenCodeBinaryType,
+  type OpenCodeConfigPaths,
+} from "../shared"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
-
-const OPENCODE_CONFIG_DIR = join(homedir(), ".config", "opencode")
-const OPENCODE_JSON = join(OPENCODE_CONFIG_DIR, "opencode.json")
-const OPENCODE_JSONC = join(OPENCODE_CONFIG_DIR, "opencode.jsonc")
-const OPENCODE_PACKAGE_JSON = join(OPENCODE_CONFIG_DIR, "package.json")
-const OMO_CONFIG = join(OPENCODE_CONFIG_DIR, "oh-my-opencode.json")
 
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
 
-const CHATGPT_HOTFIX_REPO = "code-yeongyu/opencode-openai-codex-auth#fix/orphaned-function-call-output-with-tools"
+interface ConfigContext {
+  binary: OpenCodeBinaryType
+  version: string | null
+  paths: OpenCodeConfigPaths
+}
+
+let configContext: ConfigContext | null = null
+
+export function initConfigContext(binary: OpenCodeBinaryType, version: string | null): void {
+  const paths = getOpenCodeConfigPaths({ binary, version })
+  configContext = { binary, version, paths }
+}
+
+export function getConfigContext(): ConfigContext {
+  if (!configContext) {
+    const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+    configContext = { binary: "opencode", version: null, paths }
+  }
+  return configContext
+}
+
+export function resetConfigContext(): void {
+  configContext = null
+}
+
+function getConfigDir(): string {
+  return getConfigContext().paths.configDir
+}
+
+function getConfigJson(): string {
+  return getConfigContext().paths.configJson
+}
+
+function getConfigJsonc(): string {
+  return getConfigContext().paths.configJsonc
+}
+
+function getPackageJson(): string {
+  return getConfigContext().paths.packageJson
+}
+
+function getOmoConfig(): string {
+  return getConfigContext().paths.omoConfig
+}
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
 const BUN_INSTALL_TIMEOUT_MS = BUN_INSTALL_TIMEOUT_SECONDS * 1000
@@ -76,13 +117,16 @@ interface OpenCodeConfig {
 }
 
 export function detectConfigFormat(): { format: ConfigFormat; path: string } {
-  if (existsSync(OPENCODE_JSONC)) {
-    return { format: "jsonc", path: OPENCODE_JSONC }
+  const configJsonc = getConfigJsonc()
+  const configJson = getConfigJson()
+
+  if (existsSync(configJsonc)) {
+    return { format: "jsonc", path: configJsonc }
   }
-  if (existsSync(OPENCODE_JSON)) {
-    return { format: "json", path: OPENCODE_JSON }
+  if (existsSync(configJson)) {
+    return { format: "json", path: configJson }
   }
-  return { format: "none", path: OPENCODE_JSON }
+  return { format: "none", path: configJson }
 }
 
 interface ParseConfigResult {
@@ -129,8 +173,9 @@ function parseConfigWithError(path: string): ParseConfigResult {
 }
 
 function ensureConfigDir(): void {
-  if (!existsSync(OPENCODE_CONFIG_DIR)) {
-    mkdirSync(OPENCODE_CONFIG_DIR, { recursive: true })
+  const configDir = getConfigDir()
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true })
   }
 }
 
@@ -138,7 +183,7 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
   try {
     ensureConfigDir()
   } catch (err) {
-    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
   }
 
   const { format, path } = detectConfigFormat()
@@ -229,31 +274,33 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   const agents: Record<string, Record<string, unknown>> = {}
 
   if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = { model: "opencode/big-pickle" }
+    agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
   }
 
+  agents["librarian"] = { model: "opencode/glm-4.7-free" }
+
+  // Gemini models use `antigravity-` prefix for explicit Antigravity quota routing
+  // @see ANTIGRAVITY_PROVIDER_CONFIG comments for rationale
   if (installConfig.hasGemini) {
-    agents["librarian"] = { model: "google/gemini-3-flash" }
-    agents["explore"] = { model: "google/gemini-3-flash" }
+    agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
   } else if (installConfig.hasClaude && installConfig.isMax20) {
     agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
   } else {
-    agents["librarian"] = { model: "opencode/big-pickle" }
-    agents["explore"] = { model: "opencode/big-pickle" }
+    agents["explore"] = { model: "opencode/glm-4.7-free" }
   }
 
   if (!installConfig.hasChatGPT) {
     agents["oracle"] = {
-      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/big-pickle",
+      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
     }
   }
 
   if (installConfig.hasGemini) {
-    agents["frontend-ui-ux-engineer"] = { model: "google/gemini-3-pro-high" }
-    agents["document-writer"] = { model: "google/gemini-3-flash" }
-    agents["multimodal-looker"] = { model: "google/gemini-3-flash" }
+    agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
+    agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
+    agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
   } else {
-    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/big-pickle"
+    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
     agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
     agents["document-writer"] = { model: fallbackModel }
     agents["multimodal-looker"] = { model: fallbackModel }
@@ -263,6 +310,15 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     config.agents = agents
   }
 
+  // Categories: override model for Antigravity auth (gemini-3-pro-preview → gemini-3-pro-high)
+  if (installConfig.hasGemini) {
+    config.categories = {
+      "visual-engineering": { model: "google/gemini-3-pro-high" },
+      artistry: { model: "google/gemini-3-pro-high" },
+      writing: { model: "google/gemini-3-flash-high" },
+    }
+  }
+
   return config
 }
 
@@ -270,50 +326,52 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
   try {
     ensureConfigDir()
   } catch (err) {
-    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
   }
+
+  const omoConfigPath = getOmoConfig()
 
   try {
     const newConfig = generateOmoConfig(installConfig)
 
-    if (existsSync(OMO_CONFIG)) {
+    if (existsSync(omoConfigPath)) {
       try {
-        const stat = statSync(OMO_CONFIG)
-        const content = readFileSync(OMO_CONFIG, "utf-8")
+        const stat = statSync(omoConfigPath)
+        const content = readFileSync(omoConfigPath, "utf-8")
 
         if (stat.size === 0 || isEmptyOrWhitespace(content)) {
-          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
-          return { success: true, configPath: OMO_CONFIG }
+          writeFileSync(omoConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: omoConfigPath }
         }
 
         const existing = parseJsonc<Record<string, unknown>>(content)
         if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
-          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
-          return { success: true, configPath: OMO_CONFIG }
+          writeFileSync(omoConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: omoConfigPath }
         }
 
         delete existing.agents
         const merged = deepMerge(existing, newConfig)
-        writeFileSync(OMO_CONFIG, JSON.stringify(merged, null, 2) + "\n")
+        writeFileSync(omoConfigPath, JSON.stringify(merged, null, 2) + "\n")
       } catch (parseErr) {
         if (parseErr instanceof SyntaxError) {
-          writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
-          return { success: true, configPath: OMO_CONFIG }
+          writeFileSync(omoConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
+          return { success: true, configPath: omoConfigPath }
         }
         throw parseErr
       }
     } else {
-      writeFileSync(OMO_CONFIG, JSON.stringify(newConfig, null, 2) + "\n")
+      writeFileSync(omoConfigPath, JSON.stringify(newConfig, null, 2) + "\n")
     }
 
-    return { success: true, configPath: OMO_CONFIG }
+    return { success: true, configPath: omoConfigPath }
   } catch (err) {
-    return { success: false, configPath: OMO_CONFIG, error: formatErrorWithSuggestion(err, "write oh-my-opencode config") }
+    return { success: false, configPath: omoConfigPath, error: formatErrorWithSuggestion(err, "write oh-my-opencode config") }
   }
 }
 
 interface OpenCodeBinaryResult {
-  binary: string
+  binary: OpenCodeBinaryType
   version: string
 }
 
@@ -327,7 +385,9 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
       const output = await new Response(proc.stdout).text()
       await proc.exited
       if (proc.exitCode === 0) {
-        return { binary, version: output.trim() }
+        const version = output.trim()
+        initConfigContext(binary, version)
+        return { binary, version }
       }
     } catch {
       continue
@@ -350,7 +410,7 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
   try {
     ensureConfigDir()
   } catch (err) {
-    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
   }
 
   const { format, path } = detectConfigFormat()
@@ -390,46 +450,6 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
   }
 }
 
-export function setupChatGPTHotfix(): ConfigMergeResult {
-  try {
-    ensureConfigDir()
-  } catch (err) {
-    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
-  }
-
-  try {
-    let packageJson: Record<string, unknown> = {}
-    if (existsSync(OPENCODE_PACKAGE_JSON)) {
-      try {
-        const stat = statSync(OPENCODE_PACKAGE_JSON)
-        const content = readFileSync(OPENCODE_PACKAGE_JSON, "utf-8")
-
-        if (stat.size > 0 && !isEmptyOrWhitespace(content)) {
-          packageJson = JSON.parse(content)
-          if (typeof packageJson !== "object" || packageJson === null || Array.isArray(packageJson)) {
-            packageJson = {}
-          }
-        }
-      } catch (parseErr) {
-        if (parseErr instanceof SyntaxError) {
-          packageJson = {}
-        } else {
-          throw parseErr
-        }
-      }
-    }
-
-    const deps = (packageJson.dependencies ?? {}) as Record<string, string>
-    deps["opencode-openai-codex-auth"] = CHATGPT_HOTFIX_REPO
-    packageJson.dependencies = deps
-
-    writeFileSync(OPENCODE_PACKAGE_JSON, JSON.stringify(packageJson, null, 2) + "\n")
-    return { success: true, configPath: OPENCODE_PACKAGE_JSON }
-  } catch (err) {
-    return { success: false, configPath: OPENCODE_PACKAGE_JSON, error: formatErrorWithSuggestion(err, "setup ChatGPT hotfix in package.json") }
-  }
-}
-
 export interface BunInstallResult {
   success: boolean
   timedOut?: boolean
@@ -444,7 +464,7 @@ export async function runBunInstall(): Promise<boolean> {
 export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   try {
     const proc = Bun.spawn(["bun", "install"], {
-      cwd: OPENCODE_CONFIG_DIR,
+      cwd: getConfigDir(),
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -488,41 +508,40 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   }
 }
 
+/**
+ * Antigravity Provider Configuration
+ *
+ * IMPORTANT: Model names MUST use `antigravity-` prefix for stability.
+ *
+ * The opencode-antigravity-auth plugin supports two naming conventions:
+ * - `antigravity-gemini-3-pro-high` (RECOMMENDED, explicit Antigravity quota routing)
+ * - `gemini-3-pro-high` (LEGACY, backward compatible but may break in future)
+ *
+ * Legacy names rely on Gemini CLI using `-preview` suffix for disambiguation.
+ * If Google removes `-preview`, legacy names may route to wrong quota.
+ *
+ * @see https://github.com/NoeFabris/opencode-antigravity-auth#migration-guide-v127
+ */
 export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
-    // NOTE: opencode-antigravity-auth expects full model specs (name/limit/modalities).
-    // If these are incomplete, models may appear but fail at runtime (e.g. 404).
     models: {
-      "gemini-3-pro-high": {
+      "antigravity-gemini-3-pro-high": {
         name: "Gemini 3 Pro High (Antigravity)",
         thinking: true,
         attachment: true,
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "gemini-3-pro-medium": {
-        name: "Gemini 3 Pro Medium (Antigravity)",
-        thinking: true,
-        attachment: true,
-        limit: { context: 1048576, output: 65535 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-      "gemini-3-pro-low": {
+      "antigravity-gemini-3-pro-low": {
         name: "Gemini 3 Pro Low (Antigravity)",
         thinking: true,
         attachment: true,
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "gemini-3-flash": {
+      "antigravity-gemini-3-flash": {
         name: "Gemini 3 Flash (Antigravity)",
-        attachment: true,
-        limit: { context: 1048576, output: 65536 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-      "gemini-3-flash-lite": {
-        name: "Gemini 3 Flash Lite (Antigravity)",
         attachment: true,
         limit: { context: 1048576, output: 65536 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
@@ -534,12 +553,48 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
 const CODEX_PROVIDER_CONFIG = {
   openai: {
     name: "OpenAI",
-    api: "codex",
+    options: {
+      reasoningEffort: "medium",
+      reasoningSummary: "auto",
+      textVerbosity: "medium",
+      include: ["reasoning.encrypted_content"],
+      store: false,
+    },
     models: {
-      "gpt-5.2": { name: "GPT-5.2" },
-      "o3": { name: "o3", thinking: true },
-      "o4-mini": { name: "o4-mini", thinking: true },
-      "codex-1": { name: "Codex-1" },
+      "gpt-5.2": {
+        name: "GPT 5.2 (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          none: { reasoningEffort: "none", reasoningSummary: "auto", textVerbosity: "medium" },
+          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
+      "gpt-5.2-codex": {
+        name: "GPT 5.2 Codex (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
+      "gpt-5.1-codex-max": {
+        name: "GPT 5.1 Codex Max (OAuth)",
+        limit: { context: 272000, output: 128000 },
+        modalities: { input: ["text", "image"], output: ["text"] },
+        variants: {
+          low: { reasoningEffort: "low", reasoningSummary: "detailed", textVerbosity: "medium" },
+          medium: { reasoningEffort: "medium", reasoningSummary: "detailed", textVerbosity: "medium" },
+          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
+          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
+        },
+      },
     },
   },
 }
@@ -548,7 +603,7 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   try {
     ensureConfigDir()
   } catch (err) {
-    return { success: false, configPath: OPENCODE_CONFIG_DIR, error: formatErrorWithSuggestion(err, "create config directory") }
+    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
   }
 
   const { format, path } = detectConfigFormat()
@@ -622,17 +677,18 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
   result.hasChatGPT = plugins.some((p) => p.startsWith("opencode-openai-codex-auth"))
 
-  if (!existsSync(OMO_CONFIG)) {
+  const omoConfigPath = getOmoConfig()
+  if (!existsSync(omoConfigPath)) {
     return result
   }
 
   try {
-    const stat = statSync(OMO_CONFIG)
+    const stat = statSync(omoConfigPath)
     if (stat.size === 0) {
       return result
     }
 
-    const content = readFileSync(OMO_CONFIG, "utf-8")
+    const content = readFileSync(omoConfigPath, "utf-8")
     if (isEmptyOrWhitespace(content)) {
       return result
     }
@@ -644,17 +700,17 @@ export function detectCurrentConfig(): DetectedConfig {
 
     const agents = omoConfig.agents ?? {}
 
-    if (agents["Sisyphus"]?.model === "opencode/big-pickle") {
+    if (agents["Sisyphus"]?.model === "opencode/glm-4.7-free") {
       result.hasClaude = false
       result.isMax20 = false
-    } else if (agents["librarian"]?.model === "opencode/big-pickle") {
+    } else if (agents["librarian"]?.model === "opencode/glm-4.7-free") {
       result.hasClaude = true
       result.isMax20 = false
     }
 
     if (agents["oracle"]?.model?.startsWith("anthropic/")) {
       result.hasChatGPT = false
-    } else if (agents["oracle"]?.model === "opencode/big-pickle") {
+    } else if (agents["oracle"]?.model === "opencode/glm-4.7-free") {
       result.hasChatGPT = false
     }
 

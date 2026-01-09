@@ -10,6 +10,8 @@ describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
   let promptCalls: Array<{ sessionID: string; text: string }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
+  let messagesCalls: Array<{ sessionID: string }>
+  let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
 
   function createMockPluginInput() {
     return {
@@ -21,6 +23,10 @@ describe("ralph-loop", () => {
               text: opts.body.parts[0].text,
             })
             return {}
+          },
+          messages: async (opts: { path: { id: string } }) => {
+            messagesCalls.push({ sessionID: opts.path.id })
+            return { data: mockSessionMessages }
           },
         },
         tui: {
@@ -35,12 +41,14 @@ describe("ralph-loop", () => {
         },
       },
       directory: TEST_DIR,
-    } as Parameters<typeof createRalphLoopHook>[0]
+    } as unknown as Parameters<typeof createRalphLoopHook>[0]
   }
 
   beforeEach(() => {
     promptCalls = []
     toastCalls = []
+    messagesCalls = []
+    mockSessionMessages = []
 
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
@@ -294,6 +302,77 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(0)
     })
 
+    test("should clear orphaned state when original session no longer exists", async () => {
+      // #given - state file exists from a previous session that no longer exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 3,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build something",
+        session_id: "orphaned-session-999", // This session no longer exists
+      }
+      writeState(TEST_DIR, state)
+
+      // Mock sessionExists to return false for the orphaned session
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        checkSessionExists: async (sessionID: string) => {
+          // Orphaned session doesn't exist, current session does
+          return sessionID !== "orphaned-session-999"
+        },
+      })
+
+      // #when - a new session goes idle (different from the orphaned session in state)
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "new-session-456" },
+        },
+      })
+
+      // #then - orphaned state should be cleared
+      expect(hook.getState()).toBeNull()
+      // #then - no continuation injected (state was cleared, not resumed)
+      expect(promptCalls.length).toBe(0)
+    })
+
+    test("should NOT clear state when original session still exists (different active session)", async () => {
+      // #given - state file exists from a session that still exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 2,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build something",
+        session_id: "active-session-123", // This session still exists
+      }
+      writeState(TEST_DIR, state)
+
+      // Mock sessionExists to return true for the active session
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        checkSessionExists: async (sessionID: string) => {
+          // Original session still exists
+          return sessionID === "active-session-123" || sessionID === "new-session-456"
+        },
+      })
+
+      // #when - a different session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "new-session-456" },
+        },
+      })
+
+      // #then - state should NOT be cleared (original session still active)
+      expect(hook.getState()).not.toBeNull()
+      expect(hook.getState()?.session_id).toBe("active-session-123")
+      // #then - no continuation injected (it's a different session's loop)
+      expect(promptCalls.length).toBe(0)
+    })
+
     test("should use default config values", () => {
       // #given - hook with config
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -351,6 +430,35 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
     })
 
+    test("should detect completion promise via session messages API", async () => {
+      // #given - active loop with assistant message containing completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "API_DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // #then - loop completed via API detection, no continuation
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+
+      // #then - messages API was called with correct session ID
+      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls[0].sessionID).toBe("session-123")
+    })
+
     test("should handle multiple iterations correctly", async () => {
       // #given - active loop
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -385,6 +493,163 @@ describe("ralph-loop", () => {
       // #then - continuation includes original task and promise
       expect(promptCalls[0].text).toContain("Create a calculator app")
       expect(promptCalls[0].text).toContain("<promise>CALCULATOR_DONE</promise>")
+    })
+
+    test("should clear loop state on user abort (MessageAbortedError)", async () => {
+      // #given - active loop
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      // #when - user aborts (Ctrl+C)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError", message: "User aborted" },
+          },
+        },
+      })
+
+      // #then - loop state should be cleared immediately
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should NOT set recovery mode on user abort", async () => {
+      // #given - active loop
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+
+      // #when - user aborts (Ctrl+C)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError" },
+          },
+        },
+      })
+
+      // Start a new loop
+      hook.startLoop("session-123", "New task")
+
+      // #when - session goes idle immediately (should work, no recovery mode)
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - continuation should be injected (not blocked by recovery)
+      expect(promptCalls.length).toBe(1)
+    })
+
+    test("should only check LAST assistant message for completion", async () => {
+      // #given - multiple assistant messages, only first has completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I'll work on it. <promise>DONE</promise>" }] },
+        { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Working on more features..." }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - loop should continue (last message has no completion promise)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should detect completion only in LAST assistant message", async () => {
+      // #given - last assistant message has completion promise
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Starting work..." }] },
+        { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Task complete! <promise>DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - loop should complete (last message has completion promise)
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should check transcript BEFORE API to optimize performance", async () => {
+      // #given - transcript has completion promise
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should complete via transcript (API not called when transcript succeeds)
+      expect(promptCalls.length).toBe(0)
+      expect(hook.getState()).toBeNull()
+      // API should NOT be called since transcript found completion
+      expect(messagesCalls.length).toBe(0)
+    })
+  })
+
+  describe("API timeout protection", () => {
+    test("should not hang when session.messages() times out", async () => {
+      // #given - slow API that takes longer than timeout
+      const slowMock = {
+        ...createMockPluginInput(),
+        client: {
+          ...createMockPluginInput().client,
+          session: {
+            ...createMockPluginInput().client.session,
+            messages: async () => {
+              // Simulate slow API (would hang without timeout)
+              await new Promise((resolve) => setTimeout(resolve, 10000))
+              return { data: [] }
+            },
+          },
+        },
+      }
+      const hook = createRalphLoopHook(slowMock as any, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        apiTimeout: 100, // 100ms timeout for test
+      })
+      hook.startLoop("session-123", "Build something")
+
+      // #when - session goes idle (API will timeout)
+      const startTime = Date.now()
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+      const elapsed = Date.now() - startTime
+
+      // #then - should complete within timeout + buffer (not hang for 10s)
+      expect(elapsed).toBeLessThan(500)
+      // #then - loop should continue (API timeout = no completion detected)
+      expect(promptCalls.length).toBe(1)
     })
   })
 })

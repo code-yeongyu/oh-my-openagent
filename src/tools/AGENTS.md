@@ -29,6 +29,8 @@ tools/
 │   ├── storage.ts      # File I/O operations
 │   ├── utils.ts        # Formatting, filtering
 │   └── tools.ts        # Tool implementations
+├── skill/              # Skill loading and execution
+├── skill-mcp/          # Skill-embedded MCP invocation
 ├── slashcommand/       # Slash command execution
 └── index.ts            # builtinTools export
 ```
@@ -41,10 +43,11 @@ tools/
 | AST | ast_grep_search, ast_grep_replace | Pattern-based code search/replace |
 | File Search | grep, glob | Content and file pattern matching |
 | Session | session_list, session_read, session_search, session_info | OpenCode session file management |
-| Background | background_task, background_output, background_cancel | Async agent orchestration |
+| Background | sisyphus_task, background_output, background_cancel | Async agent orchestration |
 | Multimodal | look_at | PDF/image analysis via Gemini |
 | Terminal | interactive_bash | Tmux session control |
 | Commands | slashcommand | Execute slash commands |
+| Skills | skill, skill_mcp | Load skills, invoke skill-embedded MCPs |
 | Agents | call_omo_agent | Spawn explore/librarian |
 
 ## HOW TO ADD A TOOL

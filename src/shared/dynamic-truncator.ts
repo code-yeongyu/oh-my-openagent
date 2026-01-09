@@ -1,6 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 
-const ANTHROPIC_ACTUAL_LIMIT = 200_000;
+const ANTHROPIC_ACTUAL_LIMIT =
+  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
 

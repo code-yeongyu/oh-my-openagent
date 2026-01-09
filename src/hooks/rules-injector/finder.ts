@@ -6,24 +6,24 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import {
+  GITHUB_INSTRUCTIONS_PATTERN,
   PROJECT_MARKERS,
+  PROJECT_RULE_FILES,
   PROJECT_RULE_SUBDIRS,
   RULE_EXTENSIONS,
   USER_RULE_DIR,
 } from "./constants";
+import type { RuleFileCandidate } from "./types";
 
-/**
- * Candidate rule file with metadata for filtering and sorting
- */
-export interface RuleFileCandidate {
-  /** Absolute path to the rule file */
-  path: string;
-  /** Real path after symlink resolution (for duplicate detection) */
-  realPath: string;
-  /** Whether this is a global/user-level rule */
-  isGlobal: boolean;
-  /** Directory distance from current file (9999 for global rules) */
-  distance: number;
+function isGitHubInstructionsDir(dir: string): boolean {
+  return dir.includes(".github/instructions") || dir.endsWith(".github/instructions");
+}
+
+function isValidRuleFile(fileName: string, dir: string): boolean {
+  if (isGitHubInstructionsDir(dir)) {
+    return GITHUB_INSTRUCTIONS_PATTERN.test(fileName);
+  }
+  return RULE_EXTENSIONS.some((ext) => fileName.endsWith(ext));
 }
 
 /**
@@ -76,10 +76,7 @@ function findRuleFilesRecursive(dir: string, results: string[]): void {
       if (entry.isDirectory()) {
         findRuleFilesRecursive(fullPath, results);
       } else if (entry.isFile()) {
-        const isRuleFile = RULE_EXTENSIONS.some((ext) =>
-          entry.name.endsWith(ext),
-        );
-        if (isRuleFile) {
+        if (isValidRuleFile(entry.name, dir)) {
           results.push(fullPath);
         }
       }
@@ -133,8 +130,10 @@ export function calculateDistance(
       return 9999;
     }
 
-    const ruleParts = ruleRel ? ruleRel.split("/") : [];
-    const currentParts = currentRel ? currentRel.split("/") : [];
+    // Split by both forward and back slashes for cross-platform compatibility
+    // path.relative() returns OS-native separators (backslashes on Windows)
+    const ruleParts = ruleRel ? ruleRel.split(/[/\\]/) : [];
+    const currentParts = currentRel ? currentRel.split(/[/\\]/) : [];
 
     // Find common prefix length
     let common = 0;
@@ -205,6 +204,33 @@ export function findRuleFiles(
     if (parentDir === currentDir) break;
     currentDir = parentDir;
     distance++;
+  }
+
+  // Check for single-file rules at project root (e.g., .github/copilot-instructions.md)
+  if (projectRoot) {
+    for (const ruleFile of PROJECT_RULE_FILES) {
+      const filePath = join(projectRoot, ruleFile);
+      if (existsSync(filePath)) {
+        try {
+          const stat = statSync(filePath);
+          if (stat.isFile()) {
+            const realPath = safeRealpathSync(filePath);
+            if (!seenRealPaths.has(realPath)) {
+              seenRealPaths.add(realPath);
+              candidates.push({
+                path: filePath,
+                realPath,
+                isGlobal: false,
+                distance: 0,
+                isSingleFile: true,
+              });
+            }
+          }
+        } catch {
+          // Skip if file can't be read
+        }
+      }
+    }
   }
 
   // Search user-level rule directory (~/.claude/rules)

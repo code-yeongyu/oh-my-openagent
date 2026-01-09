@@ -27,13 +27,18 @@ import { cacheToolInput, getToolInput } from "./tool-input-cache"
 import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
 import type { PluginConfig } from "./types"
 import { log, isHookDisabled } from "../../shared"
-import { injectHookMessage } from "../../features/hook-message-injector"
+import { detectKeywordsWithType, removeCodeBlocks } from "../keyword-detector"
+import type { ContextCollector } from "../../features/context-injector"
 
 const sessionFirstMessageProcessed = new Set<string>()
 const sessionErrorState = new Map<string, { hasError: boolean; errorMessage?: string }>()
 const sessionInterruptState = new Map<string, { interrupted: boolean }>()
 
-export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig = {}) {
+export function createClaudeCodeHooksHook(
+  ctx: PluginInput,
+  config: PluginConfig = {},
+  contextCollector?: ContextCollector
+) {
   return {
     "experimental.session.compacting": async (
       input: { sessionID: string },
@@ -112,11 +117,6 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
       const isFirstMessage = !sessionFirstMessageProcessed.has(input.sessionID)
       sessionFirstMessageProcessed.add(input.sessionID)
 
-      if (isFirstMessage) {
-        log("Skipping UserPromptSubmit hooks on first message for title generation", { sessionID: input.sessionID })
-        return
-      }
-
       if (!isHookDisabled(config, "UserPromptSubmit")) {
         const userPromptCtx: UserPromptSubmitContext = {
           sessionId: input.sessionID,
@@ -142,26 +142,58 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
           return
         }
 
-        if (result.messages.length > 0) {
-          const hookContent = result.messages.join("\n\n")
-          log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length })
-          const message = output.message as {
-            agent?: string
-            model?: { modelID?: string; providerID?: string }
-            path?: { cwd?: string; root?: string }
-            tools?: Record<string, boolean>
+        const keywordMessages: string[] = []
+        if (!config.keywordDetectorDisabled) {
+          const detectedKeywords = detectKeywordsWithType(removeCodeBlocks(prompt), input.agent)
+          keywordMessages.push(...detectedKeywords.map((k) => k.message))
+
+          if (keywordMessages.length > 0) {
+            log("[claude-code-hooks] Detected keywords", {
+              sessionID: input.sessionID,
+              keywordCount: keywordMessages.length,
+              types: detectedKeywords.map((k) => k.type),
+            })
           }
+        }
 
-          const success = injectHookMessage(input.sessionID, hookContent, {
-            agent: message.agent,
-            model: message.model,
-            path: message.path ?? { cwd: ctx.directory, root: "/" },
-            tools: message.tools,
-          })
+        const allMessages = [...keywordMessages, ...result.messages]
 
-          log(success ? "Hook message injected via file system" : "File injection failed", {
-            sessionID: input.sessionID,
-          })
+        if (allMessages.length > 0) {
+          const hookContent = allMessages.join("\n\n")
+          log(`[claude-code-hooks] Injecting ${allMessages.length} messages (${keywordMessages.length} keyword + ${result.messages.length} hook)`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
+
+          if (isFirstMessage) {
+            const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
+            if (idx >= 0) {
+              output.parts[idx].text = `${hookContent}\n\n${output.parts[idx].text ?? ""}`
+              log("UserPromptSubmit hooks prepended to first message parts directly", { sessionID: input.sessionID })
+            }
+          } else if (contextCollector) {
+            log("[DEBUG] Registering hook content to contextCollector", {
+              sessionID: input.sessionID,
+              contentLength: hookContent.length,
+              contentPreview: hookContent.slice(0, 100),
+            })
+            contextCollector.register(input.sessionID, {
+              id: "hook-context",
+              source: "custom",
+              content: hookContent,
+              priority: "high",
+            })
+
+            log("Hook content registered for synthetic message injection", {
+              sessionID: input.sessionID,
+              contentLength: hookContent.length,
+            })
+          } else {
+            const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
+            if (idx >= 0) {
+              output.parts[idx].text = `${hookContent}\n\n${output.parts[idx].text ?? ""}`
+              log("Hook content prepended to message (fallback)", {
+                sessionID: input.sessionID,
+              })
+            }
+          }
         }
       }
     },
@@ -218,7 +250,7 @@ export function createClaudeCodeHooksHook(ctx: PluginInput, config: PluginConfig
       const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
       // Use metadata if available and non-empty, otherwise wrap output.output in a structured object
-      // This ensures plugin tools (call_omo_agent, background_task, task) that return strings
+      // This ensures plugin tools (call_omo_agent, sisyphus_task, task) that return strings
       // get their results properly recorded in transcripts instead of empty {}
       const metadata = output.metadata as Record<string, unknown> | undefined
       const hasMetadata = metadata && typeof metadata === "object" && Object.keys(metadata).length > 0

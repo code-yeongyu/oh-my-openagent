@@ -48,7 +48,11 @@ interface MessageWrapper {
 }
 
 const CLAUDE_MODEL_PATTERN = /claude-(opus|sonnet|haiku)/i
-const CLAUDE_DEFAULT_CONTEXT_LIMIT = 200_000
+const CLAUDE_DEFAULT_CONTEXT_LIMIT =
+  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : 200_000
 
 function isSupportedModel(modelID: string): boolean {
   return CLAUDE_MODEL_PATTERN.test(modelID)
@@ -165,9 +169,10 @@ export function createPreemptiveCompactionHook(
         })
       }
 
+      const summarizeBody = { providerID, modelID, auto: true }
       await ctx.client.session.summarize({
         path: { id: sessionID },
-        body: { providerID, modelID },
+        body: summarizeBody as never,
         query: { directory: ctx.directory },
       })
 
@@ -183,22 +188,6 @@ export function createPreemptiveCompactionHook(
         .catch(() => {})
 
       state.compactionInProgress.delete(sessionID)
-
-      setTimeout(async () => {
-        try {
-          const messageDir = getMessageDir(sessionID)
-          const storedMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-
-          await ctx.client.session.promptAsync({
-            path: { id: sessionID },
-            body: {
-              agent: storedMessage?.agent,
-              parts: [{ type: "text", text: "Continue" }],
-            },
-            query: { directory: ctx.directory },
-          })
-        } catch {}
-      }, 500)
       return
     } catch (err) {
       log("[preemptive-compaction] compaction failed", { sessionID, error: err })

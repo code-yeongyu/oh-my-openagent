@@ -1,13 +1,19 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory } from "./types"
+import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
 import { createSisyphusAgent } from "./sisyphus"
-import { createOracleAgent } from "./oracle"
-import { createLibrarianAgent } from "./librarian"
-import { createExploreAgent } from "./explore"
-import { createFrontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
-import { createDocumentWriterAgent } from "./document-writer"
-import { createMultimodalLookerAgent } from "./multimodal-looker"
+import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
+import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
+import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
+import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
+import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
+import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
+import { metisAgent } from "./metis"
+import { createOrchestratorSisyphusAgent, orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
+import { momusAgent } from "./momus"
+import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
+import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
+import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -19,27 +25,65 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+  "Metis (Plan Consultant)": metisAgent,
+  "Momus (Plan Reviewer)": momusAgent,
+  "orchestrator-sisyphus": orchestratorSisyphusAgent,
+}
+
+/**
+ * Metadata for each agent, used to build Sisyphus's dynamic prompt sections
+ * (Delegation Table, Tool Selection, Key Triggers, etc.)
+ */
+const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
+  oracle: ORACLE_PROMPT_METADATA,
+  librarian: LIBRARIAN_PROMPT_METADATA,
+  explore: EXPLORE_PROMPT_METADATA,
+  "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
+  "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
+  "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
 }
 
-function buildAgent(source: AgentSource, model?: string): AgentConfig {
-  return isFactory(source) ? source(model) : source
+export function buildAgent(source: AgentSource, model?: string): AgentConfig {
+  const base = isFactory(source) ? source(model) : source
+
+  const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[] }
+  if (agentWithCategory.category) {
+    const categoryConfig = DEFAULT_CATEGORIES[agentWithCategory.category]
+    if (categoryConfig) {
+      if (!base.model) {
+        base.model = categoryConfig.model
+      }
+      if (base.temperature === undefined && categoryConfig.temperature !== undefined) {
+        base.temperature = categoryConfig.temperature
+      }
+    }
+  }
+
+  if (agentWithCategory.skills?.length) {
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills)
+    if (resolved.size > 0) {
+      const skillContent = Array.from(resolved.values()).join("\n\n")
+      base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
+    }
+  }
+
+  return base
 }
 
-export function createEnvContext(directory: string): string {
+/**
+ * Creates OmO-specific environment context (time, timezone, locale).
+ * Note: Working directory, platform, and date are already provided by OpenCode's system.ts,
+ * so we only include fields that OpenCode doesn't provide to avoid duplication.
+ * See: https://github.com/code-yeongyu/oh-my-opencode/issues/379
+ */
+export function createEnvContext(): string {
   const now = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
-
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
 
   const timeStr = now.toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -48,18 +92,12 @@ export function createEnvContext(directory: string): string {
     hour12: true,
   })
 
-  const platform = process.platform as "darwin" | "linux" | "win32" | string
-
   return `
-Here is some useful information about the environment you are running in:
-<env>
-  Working directory: ${directory}
-  Platform: ${platform}
-  Today's date: ${dateStr} (NOT 2024, NEVEREVER 2024)
+<omo-env>
   Current time: ${timeStr}
   Timezone: ${timezone}
   Locale: ${locale}
-</env>`
+</omo-env>`
 }
 
 function mergeAgentConfig(
@@ -83,21 +121,22 @@ export function createBuiltinAgents(
   systemDefaultModel?: string
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
+  const availableAgents: AvailableAgent[] = []
 
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
-    if (disabledAgents.includes(agentName)) {
-      continue
-    }
+    if (agentName === "Sisyphus") continue
+    if (agentName === "orchestrator-sisyphus") continue
+    if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
-    const model = override?.model ?? (agentName === "Sisyphus" ? systemDefaultModel : undefined)
+    const model = override?.model
 
     let config = buildAgent(source, model)
 
-    if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
-      const envContext = createEnvContext(directory)
+    if (agentName === "librarian" && directory && config.prompt) {
+      const envContext = createEnvContext()
       config = { ...config, prompt: config.prompt + envContext }
     }
 
@@ -106,6 +145,44 @@ export function createBuiltinAgents(
     }
 
     result[name] = config
+
+    const metadata = agentMetadata[agentName]
+    if (metadata) {
+      availableAgents.push({
+        name: agentName,
+        description: config.description ?? "",
+        metadata,
+      })
+    }
+  }
+
+  if (!disabledAgents.includes("Sisyphus")) {
+    const sisyphusOverride = agentOverrides["Sisyphus"]
+    const sisyphusModel = sisyphusOverride?.model ?? systemDefaultModel
+
+    let sisyphusConfig = createSisyphusAgent(sisyphusModel, availableAgents)
+
+    if (directory && sisyphusConfig.prompt) {
+      const envContext = createEnvContext()
+      sisyphusConfig = { ...sisyphusConfig, prompt: sisyphusConfig.prompt + envContext }
+    }
+
+    if (sisyphusOverride) {
+      sisyphusConfig = mergeAgentConfig(sisyphusConfig, sisyphusOverride)
+    }
+
+    result["Sisyphus"] = sisyphusConfig
+  }
+
+  if (!disabledAgents.includes("orchestrator-sisyphus")) {
+    const orchestratorOverride = agentOverrides["orchestrator-sisyphus"]
+    let orchestratorConfig = createOrchestratorSisyphusAgent({ availableAgents })
+
+    if (orchestratorOverride) {
+      orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
+    }
+
+    result["orchestrator-sisyphus"] = orchestratorConfig
   }
 
   return result

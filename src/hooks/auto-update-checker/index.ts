@@ -4,9 +4,24 @@ import { invalidatePackage } from "./cache"
 import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
+import { runBunInstall } from "../../cli/config-manager"
 import type { AutoUpdateCheckerOptions } from "./types"
 
 const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
+
+export function isPrereleaseVersion(version: string): boolean {
+  return version.includes("-")
+}
+
+export function isDistTag(version: string): boolean {
+  const startsWithDigit = /^\d/.test(version)
+  return !startsWithDigit
+}
+
+export function isPrereleaseOrDistTag(pinnedVersion: string | null): boolean {
+  if (!pinnedVersion) return false
+  return isPrereleaseVersion(pinnedVersion) || isDistTag(pinnedVersion)
+}
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
@@ -62,7 +77,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
 }
 
 async function runBackgroundUpdateCheck(
-  ctx: PluginInput, 
+  ctx: PluginInput,
   autoUpdate: boolean,
   getToastMessage: (isUpdate: boolean, latestVersion?: string) => string
 ): Promise<void> {
@@ -99,17 +114,40 @@ async function runBackgroundUpdateCheck(
   }
 
   if (pluginInfo.isPinned) {
-    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
-    if (updated) {
-      invalidatePackage(PACKAGE_NAME)
-      await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
-      log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
-    } else {
-      await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    if (isPrereleaseOrDistTag(pluginInfo.pinnedVersion)) {
+      log(`[auto-update-checker] Skipping auto-update for prerelease/dist-tag: ${pluginInfo.pinnedVersion}`)
+      return
     }
+
+    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
+    if (!updated) {
+      await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      log("[auto-update-checker] Failed to update pinned version in config")
+      return
+    }
+    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
+  }
+
+  invalidatePackage(PACKAGE_NAME)
+
+  const installSuccess = await runBunInstallSafe()
+
+  if (installSuccess) {
+    await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
+    log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
   } else {
-    invalidatePackage(PACKAGE_NAME)
     await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
+  }
+}
+
+async function runBunInstallSafe(): Promise<boolean> {
+  try {
+    return await runBunInstall()
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    log("[auto-update-checker] bun install error:", errorMessage)
+    return false
   }
 }
 
@@ -161,7 +199,7 @@ async function showSpinnerToast(ctx: PluginInput, version: string, message: stri
 }
 
 async function showUpdateAvailableToast(
-  ctx: PluginInput, 
+  ctx: PluginInput,
   latestVersion: string,
   getToastMessage: (isUpdate: boolean, latestVersion?: string) => string
 ): Promise<void> {

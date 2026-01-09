@@ -1,4 +1,5 @@
 # Dependencies
+.sisyphus/
 node_modules/
 
 # Build output

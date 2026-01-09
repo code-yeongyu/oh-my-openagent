@@ -200,4 +200,5 @@ export interface ClaudeCodeMessage {
 
 export interface PluginConfig {
   disabledHooks?: boolean | ClaudeHookEvent[]
+  keywordDetectorDisabled?: boolean
 }

@@ -60,12 +60,17 @@ export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
     let current = startDir;
 
     while (true) {
-      const agentsPath = join(current, AGENTS_FILENAME);
-      if (existsSync(agentsPath)) {
-        found.push(agentsPath);
+      // Skip root AGENTS.md - OpenCode's system.ts already loads it via custom()
+      // See: https://github.com/code-yeongyu/oh-my-opencode/issues/379
+      const isRootDir = current === ctx.directory;
+      if (!isRootDir) {
+        const agentsPath = join(current, AGENTS_FILENAME);
+        if (existsSync(agentsPath)) {
+          found.push(agentsPath);
+        }
       }
 
-      if (current === ctx.directory) break;
+      if (isRootDir) break;
       const parent = dirname(current);
       if (parent === current) break;
       if (!parent.startsWith(ctx.directory)) break;

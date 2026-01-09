@@ -1,18 +1,21 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../features/background-agent"
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
-  findNearestMessageWithFields,
-  MESSAGE_STORAGE,
+    findNearestMessageWithFields,
+    MESSAGE_STORAGE,
 } from "../features/hook-message-injector"
-import type { BackgroundManager } from "../features/background-agent"
 import { log } from "../shared/logger"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
+const DEFAULT_SKIP_AGENTS = ["Prometheus (Planner)"]
+
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
+  skipAgents?: string[]
 }
 
 export interface TodoContinuationEnforcer {
@@ -29,10 +32,10 @@ interface Todo {
 }
 
 interface SessionState {
-  lastErrorAt?: number
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
+  countdownStartedAt?: number
 }
 
 const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
@@ -45,7 +48,7 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
-const ERROR_COOLDOWN_MS = 3_000
+const COUNTDOWN_GRACE_PERIOD_MS = 500
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -61,36 +64,35 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-function isAbortError(error: unknown): boolean {
-  if (!error) return false
-  
-  if (typeof error === "object") {
-    const errObj = error as Record<string, unknown>
-    const name = errObj.name as string | undefined
-    const message = (errObj.message as string | undefined)?.toLowerCase() ?? ""
-    
-    if (name === "MessageAbortedError" || name === "AbortError") return true
-    if (name === "DOMException" && message.includes("abort")) return true
-    if (message.includes("aborted") || message.includes("cancelled") || message.includes("interrupted")) return true
-  }
-  
-  if (typeof error === "string") {
-    const lower = error.toLowerCase()
-    return lower.includes("abort") || lower.includes("cancel") || lower.includes("interrupt")
-  }
-  
-  return false
-}
-
 function getIncompleteCount(todos: Todo[]): number {
   return todos.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+}
+
+interface MessageInfo {
+  id?: string
+  role?: string
+  error?: { name?: string; data?: unknown }
+}
+
+function isLastAssistantMessageAborted(messages: Array<{ info?: MessageInfo }>): boolean {
+  if (!messages || messages.length === 0) return false
+
+  const assistantMessages = messages.filter(m => m.info?.role === "assistant")
+  if (assistantMessages.length === 0) return false
+
+  const lastAssistant = assistantMessages[assistantMessages.length - 1]
+  const errorName = lastAssistant.info?.error?.name
+
+  if (!errorName) return false
+
+  return errorName === "MessageAbortedError" || errorName === "AbortError"
 }
 
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
 ): TodoContinuationEnforcer {
-  const { backgroundManager } = options
+  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS } = options
   const sessions = new Map<string, SessionState>()
 
   function getState(sessionID: string): SessionState {
@@ -105,7 +107,7 @@ export function createTodoContinuationEnforcer(
   function cancelCountdown(sessionID: string): void {
     const state = sessions.get(sessionID)
     if (!state) return
-    
+
     if (state.countdownTimer) {
       clearTimeout(state.countdownTimer)
       state.countdownTimer = undefined
@@ -114,6 +116,7 @@ export function createTodoContinuationEnforcer(
       clearInterval(state.countdownInterval)
       state.countdownInterval = undefined
     }
+    state.countdownStartedAt = undefined
   }
 
   function cleanup(sessionID: string): void {
@@ -149,16 +152,13 @@ export function createTodoContinuationEnforcer(
 
   async function injectContinuation(sessionID: string, incompleteCount: number, total: number): Promise<void> {
     const state = sessions.get(sessionID)
-    
+
     if (state?.isRecovering) {
       log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
       return
     }
 
-    if (state?.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
-      log(`[${HOOK_NAME}] Skipped injection: recent error`, { sessionID })
-      return
-    }
+
 
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
@@ -187,17 +187,19 @@ export function createTodoContinuationEnforcer(
     const messageDir = getMessageDir(sessionID)
     const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 
-    const hasWritePermission = !prevMessage?.tools || 
-      (prevMessage.tools.write !== false && prevMessage.tools.edit !== false)
-    
-    if (!hasWritePermission) {
-      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
+    const agentName = prevMessage?.agent
+    if (agentName && skipAgents.includes(agentName)) {
+      log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
       return
     }
 
-    const agentName = prevMessage?.agent?.toLowerCase() ?? ""
-    if (agentName === "plan" || agentName === "planner-sisyphus") {
-      log(`[${HOOK_NAME}] Skipped: plan mode agent`, { sessionID, agent: prevMessage?.agent })
+    const editPermission = prevMessage?.tools?.edit
+    const writePermission = prevMessage?.tools?.write
+    const hasWritePermission = !prevMessage?.tools ||
+      ((editPermission !== false && editPermission !== "deny") &&
+       (writePermission !== false && writePermission !== "deny"))
+    if (!hasWritePermission) {
+      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
       return
     }
 
@@ -205,7 +207,8 @@ export function createTodoContinuationEnforcer(
 
     try {
       log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, incompleteCount: freshIncompleteCount })
-      
+
+      // Don't pass model - let OpenCode use session's existing lastModel
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
@@ -214,7 +217,7 @@ export function createTodoContinuationEnforcer(
         },
         query: { directory: ctx.directory },
       })
-      
+
       log(`[${HOOK_NAME}] Injection successful`, { sessionID })
     } catch (err) {
       log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(err) })
@@ -227,6 +230,7 @@ export function createTodoContinuationEnforcer(
 
     let secondsRemaining = COUNTDOWN_SECONDS
     showCountdownToast(secondsRemaining, incompleteCount)
+    state.countdownStartedAt = Date.now()
 
     state.countdownInterval = setInterval(() => {
       secondsRemaining--
@@ -250,11 +254,8 @@ export function createTodoContinuationEnforcer(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const state = getState(sessionID)
-      state.lastErrorAt = Date.now()
       cancelCountdown(sessionID)
-      
-      log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort: isAbortError(props?.error) })
+      log(`[${HOOK_NAME}] session.error`, { sessionID })
       return
     }
 
@@ -267,7 +268,7 @@ export function createTodoContinuationEnforcer(
       const mainSessionID = getMainSessionID()
       const isMainSession = sessionID === mainSessionID
       const isBackgroundTaskSession = subagentSessions.has(sessionID)
-      
+
       if (mainSessionID && !isMainSession && !isBackgroundTaskSession) {
         log(`[${HOOK_NAME}] Skipped: not main or background task session`, { sessionID })
         return
@@ -280,11 +281,6 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      if (state.lastErrorAt && Date.now() - state.lastErrorAt < ERROR_COOLDOWN_MS) {
-        log(`[${HOOK_NAME}] Skipped: recent error (cooldown)`, { sessionID })
-        return
-      }
-
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -292,6 +288,21 @@ export function createTodoContinuationEnforcer(
       if (hasRunningBgTasks) {
         log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
         return
+      }
+
+      try {
+        const messagesResp = await ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        })
+        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
+
+        if (isLastAssistantMessageAborted(messages)) {
+          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted`, { sessionID })
+          return
+        }
+      } catch (err) {
+        log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(err) })
       }
 
       let todos: Todo[] = []
@@ -314,6 +325,28 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      let agentName: string | undefined
+      try {
+        const messagesResp = await ctx.client.session.messages({
+          path: { id: sessionID },
+        })
+        const messages = (messagesResp.data ?? []) as Array<{ info?: { agent?: string } }>
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].info?.agent) {
+            agentName = messages[i].info?.agent
+            break
+          }
+        }
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(err) })
+      }
+
+      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName, skipAgents })
+      if (agentName && skipAgents.includes(agentName)) {
+        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
+        return
+      }
+
       startCountdown(sessionID, incompleteCount, todos.length)
       return
     }
@@ -327,11 +360,14 @@ export function createTodoContinuationEnforcer(
 
       if (role === "user") {
         const state = sessions.get(sessionID)
-        if (state) {
-          state.lastErrorAt = undefined
+        if (state?.countdownStartedAt) {
+          const elapsed = Date.now() - state.countdownStartedAt
+          if (elapsed < COUNTDOWN_GRACE_PERIOD_MS) {
+            log(`[${HOOK_NAME}] Ignoring user message in grace period`, { sessionID, elapsed })
+            return
+          }
         }
         cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] User message: cleared error state`, { sessionID })
       }
 
       if (role === "assistant") {

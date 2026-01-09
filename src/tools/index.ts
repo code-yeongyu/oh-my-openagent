@@ -19,7 +19,7 @@ import {
 
 import { grep } from "./grep"
 import { glob } from "./glob"
-import { slashcommand } from "./slashcommand"
+export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
 
 import {
   session_list,
@@ -28,12 +28,14 @@ import {
   session_info,
 } from "./session-manager"
 
+export { sessionExists } from "./session-manager/storage"
+
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
 export { createSkillTool } from "./skill"
 export { getTmuxPath } from "./interactive-bash/utils"
+export { createSkillMcpTool } from "./skill-mcp"
 
 import {
-  createBackgroundTask,
   createBackgroundOutput,
   createBackgroundCancel,
 } from "./background-task"
@@ -45,10 +47,10 @@ type OpencodeClient = PluginInput["client"]
 
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
+export { createSisyphusTask, type SisyphusTaskToolOptions, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./sisyphus-task"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   return {
-    background_task: createBackgroundTask(manager),
     background_output: createBackgroundOutput(manager, client),
     background_cancel: createBackgroundCancel(manager, client),
   }
@@ -70,7 +72,6 @@ export const builtinTools: Record<string, ToolDefinition> = {
   ast_grep_replace,
   grep,
   glob,
-  slashcommand,
   session_list,
   session_read,
   session_search,

@@ -1,21 +1,28 @@
-import { websearch_exa } from "./websearch-exa"
+import { websearch } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
 import type { McpName } from "./types"
 
 export { McpNameSchema, type McpName } from "./types"
 
-const allBuiltinMcps: Record<McpName, { type: "remote"; url: string; enabled: boolean }> = {
-  websearch_exa,
+type RemoteMcpConfig = {
+  type: "remote"
+  url: string
+  enabled: boolean
+  headers?: Record<string, string>
+}
+
+const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
+  websearch,
   context7,
   grep_app,
 }
 
-export function createBuiltinMcps(disabledMcps: McpName[] = []) {
-  const mcps: Record<string, { type: "remote"; url: string; enabled: boolean }> = {}
+export function createBuiltinMcps(disabledMcps: string[] = []) {
+  const mcps: Record<string, RemoteMcpConfig> = {}
 
   for (const [name, config] of Object.entries(allBuiltinMcps)) {
-    if (!disabledMcps.includes(name as McpName)) {
+    if (!disabledMcps.includes(name)) {
       mcps[name] = config
     }
   }

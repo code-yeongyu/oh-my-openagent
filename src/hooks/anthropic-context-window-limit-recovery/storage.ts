@@ -230,6 +230,10 @@ export function truncateUntilTargetTokens(
         toolName: truncateResult.toolName ?? result.toolName,
         originalSize: removedSize,
       })
+      
+      if (totalRemoved >= charsToReduce) {
+        break
+      }
     }
   }
 

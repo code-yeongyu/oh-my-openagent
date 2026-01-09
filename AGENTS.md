@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2025-12-28T19:26:00+09:00
-**Commit:** 122e918
+**Generated:** 2026-01-02T22:41:22+09:00
+**Commit:** d0694e5
 **Branch:** dev
 
 ## OVERVIEW
@@ -14,14 +14,15 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 oh-my-opencode/
 ├── src/
 │   ├── agents/        # AI agents (7): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker
-│   ├── hooks/         # 21 lifecycle hooks - see src/hooks/AGENTS.md
-│   ├── tools/         # LSP, AST-Grep, Grep, Glob, etc. - see src/tools/AGENTS.md
-│   ├── mcp/           # MCP servers: context7, websearch_exa, grep_app
-│   ├── features/      # Claude Code compatibility - see src/features/AGENTS.md
+│   ├── hooks/         # 22 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── tools/         # LSP, AST-Grep, Grep, Glob, session mgmt - see src/tools/AGENTS.md
+│   ├── features/      # Claude Code compat layer - see src/features/AGENTS.md
+│   ├── auth/          # Google Antigravity OAuth - see src/auth/AGENTS.md
+│   ├── shared/        # Cross-cutting utilities - see src/shared/AGENTS.md
+│   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
+│   ├── mcp/           # MCP configs: context7, grep_app
 │   ├── config/        # Zod schema, TypeScript types
-│   ├── auth/          # Google Antigravity OAuth (antigravity/)
-│   ├── shared/        # Utilities: deep-merge, pattern-matcher, logger, etc.
-│   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
+│   └── index.ts       # Main plugin entry (464 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
 └── dist/              # Build output (ESM + .d.ts)
@@ -34,25 +35,54 @@ oh-my-opencode/
 | Add agent | `src/agents/` | Create .ts, add to builtinAgents in index.ts, update types.ts |
 | Add hook | `src/hooks/` | Create dir with createXXXHook(), export from index.ts |
 | Add tool | `src/tools/` | Dir with index/types/constants/tools.ts, add to builtinTools |
-| Add MCP | `src/mcp/` | Create config, add to index.ts |
+| Add MCP | `src/mcp/` | Create config, add to index.ts and types.ts |
+| Add skill | `src/features/builtin-skills/` | Create skill dir with SKILL.md |
 | LSP behavior | `src/tools/lsp/` | client.ts (connection), tools.ts (handlers) |
 | AST-Grep | `src/tools/ast-grep/` | napi.ts for @ast-grep/napi binding |
-| Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google models |
+| Google OAuth | `src/auth/antigravity/` | OAuth plugin for Google/Gemini models |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` after changes |
 | Claude Code compat | `src/features/claude-code-*-loader/` | Command, skill, agent, mcp loaders |
 | Background agents | `src/features/background-agent/` | manager.ts for task management |
+| Skill MCP | `src/features/skill-mcp-manager/` | MCP servers embedded in skills |
 | Interactive terminal | `src/tools/interactive-bash/` | tmux session management |
+| CLI installer | `src/cli/install.ts` | Interactive TUI installation |
+| Doctor checks | `src/cli/doctor/checks/` | Health checks for environment |
+| Shared utilities | `src/shared/` | Cross-cutting utilities |
+| Slash commands | `src/hooks/auto-slash-command/` | Auto-detect and execute `/command` patterns |
+| Ralph Loop | `src/hooks/ralph-loop/` | Self-referential dev loop until completion |
+
+## TDD (Test-Driven Development)
+
+**MANDATORY for new features and bug fixes.** Follow RED-GREEN-REFACTOR:
+
+```
+1. RED    - Write failing test first (test MUST fail)
+2. GREEN  - Write MINIMAL code to pass (nothing more)
+3. REFACTOR - Clean up while tests stay GREEN
+4. REPEAT - Next test case
+```
+
+| Phase | Action | Verification |
+|-------|--------|--------------|
+| **RED** | Write test describing expected behavior | `bun test` → FAIL (expected) |
+| **GREEN** | Implement minimum code to pass | `bun test` → PASS |
+| **REFACTOR** | Improve code quality, remove duplication | `bun test` → PASS (must stay green) |
+
+**Rules:**
+- NEVER write implementation before test
+- NEVER delete failing tests to "pass" - fix the code
+- One test at a time - don't batch
+- Test file naming: `*.test.ts` alongside source
 
 ## CONVENTIONS
 
 - **Package manager**: Bun only (`bun run`, `bun build`, `bunx`)
 - **Types**: bun-types (not @types/node)
-- **Build**: Dual output - `bun build` (ESM) + `tsc --emitDeclarationOnly`
-- **Exports**: Barrel pattern - `export * from "./module"` in index.ts
-- **Directory naming**: kebab-case (`ast-grep/`, `claude-code-hooks/`)
-- **Tool structure**: index.ts, types.ts, constants.ts, tools.ts, utils.ts
-- **Hook pattern**: `createXXXHook(input: PluginInput)` returning event handlers
-- **Test style**: BDD comments `#given`, `#when`, `#then` (same as AAA)
+- **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
+- **Exports**: Barrel pattern in index.ts; explicit named exports for tools/hooks
+- **Naming**: kebab-case directories, createXXXHook/createXXXTool factories
+- **Testing**: BDD comments `#given`, `#when`, `#then` (same as AAA); TDD workflow (RED-GREEN-REFACTOR)
+- **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -64,6 +94,11 @@ oh-my-opencode/
 - **Year 2024**: NEVER use 2024 in code/prompts (use current year)
 - **Rush completion**: Never mark tasks complete without verification
 - **Over-exploration**: Stop searching when sufficient context found
+- **High temperature**: Don't use >0.3 for code-related agents
+- **Broad tool access**: Prefer explicit `include` over unrestricted access
+- **Sequential agent calls**: Use `sisyphus_task` for parallel execution
+- **Heavy PreToolUse logic**: Slows every tool call
+- **Self-planning for complex tasks**: Spawn planning agent (Prometheus) instead
 
 ## UNIQUE STYLES
 
@@ -74,13 +109,14 @@ oh-my-opencode/
 - **Agent tools**: `tools: { include: [...] }` or `tools: { exclude: [...] }`
 - **Temperature**: Most agents use `0.1` for consistency
 - **Hook naming**: `createXXXHook` function convention
+- **Factory pattern**: Components created via `createXXX()` functions
 
 ## AGENT MODELS
 
-| Agent | Model | Purpose |
+| Agent | Default Model | Purpose |
 |-------|-------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
-| oracle | openai/gpt-5.2 | Strategic advisor, code review |
+| oracle | openai/gpt-5.2 | Read-only consultation. High-IQ debugging, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs |
 | explore | opencode/grok-code | Fast codebase exploration |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
@@ -109,13 +145,30 @@ bun test               # Run tests
 
 ## CI PIPELINE
 
-- **ci.yml**: Parallel test/typecheck, build verification, auto-commit schema on master
+- **ci.yml**: Parallel test/typecheck, build verification, auto-commit schema on master, rolling `next` draft release
 - **publish.yml**: Manual workflow_dispatch, version bump, changelog, OIDC npm publish
+- **sisyphus-agent.yml**: Agent-in-CI for automated issue handling via `@sisyphus-dev-ai` mentions
+
+## COMPLEXITY HOTSPOTS
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `src/index.ts` | 464 | Main plugin, all hook/tool init |
+| `src/cli/config-manager.ts` | 669 | JSONC parsing, env detection |
+| `src/auth/antigravity/fetch.ts` | 621 | Token refresh, URL rewriting |
+| `src/tools/lsp/client.ts` | 611 | LSP protocol, JSON-RPC |
+| `src/auth/antigravity/response.ts` | 598 | Response transformation, streaming |
+| `src/auth/antigravity/thinking.ts` | 571 | Thinking block extraction/transformation |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 564 | Multi-stage recovery |
+| `src/agents/sisyphus.ts` | 504 | Orchestrator prompt |
 
 ## NOTES
 
-- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`
+- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`, 360+ tests
 - **OpenCode**: Requires >= 1.0.150
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
+- **JSONC support**: Config files support comments (`// comment`, `/* block */`) and trailing commas
+- **Claude Code Compat**: Full compatibility layer for settings.json hooks, commands, skills, agents, MCPs
+- **Skill MCP**: Skills can embed MCP server configs in YAML frontmatter

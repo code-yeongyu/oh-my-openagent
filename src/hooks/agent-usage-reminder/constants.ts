@@ -17,13 +17,14 @@ export const TARGET_TOOLS = new Set([
   "context7_resolve-library-id",
   "context7_query-docs",
   "websearch_exa_web_search_exa",
+  "context7_get-library-docs",
   "grep_app_searchgithub",
 ]);
 
 export const AGENT_TOOLS = new Set([
   "task",
   "call_omo_agent",
-  "background_task",
+  "sisyphus_task",
 ]);
 
 export const REMINDER_MESSAGE = `
@@ -31,13 +32,13 @@ export const REMINDER_MESSAGE = `
 
 You called a search/fetch tool directly without leveraging specialized agents.
 
-RECOMMENDED: Use background_task with explore/librarian agents for better results:
+RECOMMENDED: Use sisyphus_task with explore/librarian agents for better results:
 
 \`\`\`
 // Parallel exploration - fire multiple agents simultaneously
-background_task(agent="explore", prompt="Find all files matching pattern X")
-background_task(agent="explore", prompt="Search for implementation of Y") 
-background_task(agent="librarian", prompt="Lookup documentation for Z")
+sisyphus_task(agent="explore", prompt="Find all files matching pattern X")
+sisyphus_task(agent="explore", prompt="Search for implementation of Y") 
+sisyphus_task(agent="librarian", prompt="Lookup documentation for Z")
 
 // Then continue your work while they run in background
 // System will notify you when each completes
@@ -49,5 +50,5 @@ WHY:
 - Specialized agents have domain expertise
 - Reduces context window usage in main session
 
-ALWAYS prefer: Multiple parallel background_task calls > Direct tool calls
+ALWAYS prefer: Multiple parallel sisyphus_task calls > Direct tool calls
 `;

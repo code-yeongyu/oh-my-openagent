@@ -17,6 +17,26 @@
  */
 
 /**
+ * Extracts provider-specific prefix from model ID (if present).
+ * Custom providers may use prefixes for routing (e.g., vertex_ai/, openai/).
+ *
+ * @example
+ * extractModelPrefix("vertex_ai/claude-sonnet-4-5") // { prefix: "vertex_ai/", base: "claude-sonnet-4-5" }
+ * extractModelPrefix("claude-sonnet-4-5") // { prefix: "", base: "claude-sonnet-4-5" }
+ * extractModelPrefix("openai/gpt-5.2") // { prefix: "openai/", base: "gpt-5.2" }
+ */
+function extractModelPrefix(modelID: string): { prefix: string; base: string } {
+  const slashIndex = modelID.indexOf("/")
+  if (slashIndex === -1) {
+    return { prefix: "", base: modelID }
+  }
+  return {
+    prefix: modelID.slice(0, slashIndex + 1),
+    base: modelID.slice(slashIndex + 1),
+  }
+}
+
+/**
  * Normalizes model IDs to use consistent hyphen formatting.
  * GitHub Copilot may use dots (claude-opus-4.5) but our maps use hyphens (claude-opus-4-5).
  * This ensures lookups work regardless of format.
@@ -25,6 +45,7 @@
  * normalizeModelID("claude-opus-4.5") // "claude-opus-4-5"
  * normalizeModelID("gemini-3.5-pro") // "gemini-3-5-pro"
  * normalizeModelID("gpt-5.2") // "gpt-5-2"
+ * normalizeModelID("vertex_ai/claude-opus-4.5") // "vertex_ai/claude-opus-4-5"
  */
 function normalizeModelID(modelID: string): string {
   // Replace dots with hyphens when followed by a digit
@@ -142,16 +163,27 @@ const THINKING_CAPABLE_MODELS = {
 
 export function getHighVariant(modelID: string): string | null {
   const normalized = normalizeModelID(modelID)
+  const { prefix, base } = extractModelPrefix(normalized)
 
-  if (ALREADY_HIGH.has(normalized)) {
+  // Check if already high variant (with or without prefix)
+  if (ALREADY_HIGH.has(base) || base.endsWith("-high")) {
     return null
   }
-  return HIGH_VARIANT_MAP[normalized] ?? null
+
+  // Look up high variant for base model
+  const highBase = HIGH_VARIANT_MAP[base]
+  if (!highBase) {
+    return null
+  }
+
+  // Preserve prefix in the high variant
+  return prefix + highBase
 }
 
 export function isAlreadyHighVariant(modelID: string): boolean {
   const normalized = normalizeModelID(modelID)
-  return ALREADY_HIGH.has(normalized) || normalized.endsWith("-high")
+  const { base } = extractModelPrefix(normalized)
+  return ALREADY_HIGH.has(base) || base.endsWith("-high")
 }
 
 type ThinkingProvider = keyof typeof THINKING_CONFIGS
@@ -165,6 +197,7 @@ export function getThinkingConfig(
   modelID: string
 ): Record<string, unknown> | null {
   const normalized = normalizeModelID(modelID)
+  const { base } = extractModelPrefix(normalized)
 
   if (isAlreadyHighVariant(normalized)) {
     return null
@@ -179,9 +212,10 @@ export function getThinkingConfig(
   const config = THINKING_CONFIGS[resolvedProvider]
   const capablePatterns = THINKING_CAPABLE_MODELS[resolvedProvider]
 
-  const modelLower = normalized.toLowerCase()
+  // Check capability using base model name (without prefix)
+  const baseLower = base.toLowerCase()
   const isCapable = capablePatterns.some((pattern) =>
-    modelLower.includes(pattern.toLowerCase())
+    baseLower.includes(pattern.toLowerCase())
   )
 
   return isCapable ? config : null

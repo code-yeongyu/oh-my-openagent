@@ -1,34 +1,31 @@
-export interface FrontmatterResult<T = Record<string, string>> {
+import yaml from "js-yaml"
+
+export interface FrontmatterResult<T = Record<string, unknown>> {
   data: T
   body: string
+  hadFrontmatter: boolean
+  parseError: boolean
 }
 
-export function parseFrontmatter<T = Record<string, string>>(
+export function parseFrontmatter<T = Record<string, unknown>>(
   content: string
 ): FrontmatterResult<T> {
-  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/
+  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n?---\r?\n([\s\S]*)$/
   const match = content.match(frontmatterRegex)
 
   if (!match) {
-    return { data: {} as T, body: content }
+    return { data: {} as T, body: content, hadFrontmatter: false, parseError: false }
   }
 
   const yamlContent = match[1]
   const body = match[2]
 
-  const data: Record<string, string | boolean> = {}
-  for (const line of yamlContent.split("\n")) {
-    const colonIndex = line.indexOf(":")
-    if (colonIndex !== -1) {
-      const key = line.slice(0, colonIndex).trim()
-      let value: string | boolean = line.slice(colonIndex + 1).trim()
-
-      if (value === "true") value = true
-      else if (value === "false") value = false
-
-      data[key] = value
-    }
+  try {
+    // Use JSON_SCHEMA for security - prevents code execution via YAML tags
+    const parsed = yaml.load(yamlContent, { schema: yaml.JSON_SCHEMA })
+    const data = (parsed ?? {}) as T
+    return { data, body, hadFrontmatter: true, parseError: false }
+  } catch {
+    return { data: {} as T, body, hadFrontmatter: true, parseError: true }
   }
-
-  return { data: data as T, body }
 }

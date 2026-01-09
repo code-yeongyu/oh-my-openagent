@@ -26,8 +26,22 @@ const TOKEN_LIMIT_KEYWORDS = [
   "context length",
   "too many tokens",
   "non-empty content",
-  "invalid_request_error",
 ]
+
+// Patterns that indicate thinking block structure errors (NOT token limit errors)
+// These should be handled by session-recovery hook, not compaction
+const THINKING_BLOCK_ERROR_PATTERNS = [
+  /thinking.*first block/i,
+  /first block.*thinking/i,
+  /must.*start.*thinking/i,
+  /thinking.*redacted_thinking/i,
+  /expected.*thinking.*found/i,
+  /thinking.*disabled.*cannot.*contain/i,
+]
+
+function isThinkingBlockError(text: string): boolean {
+  return THINKING_BLOCK_ERROR_PATTERNS.some((pattern) => pattern.test(text))
+}
 
 const MESSAGE_INDEX_PATTERN = /messages\.(\d+)/
 
@@ -52,6 +66,9 @@ function extractMessageIndex(text: string): number | undefined {
 }
 
 function isTokenLimitError(text: string): boolean {
+  if (isThinkingBlockError(text)) {
+    return false
+  }
   const lower = text.toLowerCase()
   return TOKEN_LIMIT_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))
 }

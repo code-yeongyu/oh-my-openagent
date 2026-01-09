@@ -18,6 +18,17 @@ interface SessionState {
   isRecovering?: boolean
 }
 
+interface OpenCodeSessionMessage {
+  info?: {
+    role?: string
+  }
+  parts?: Array<{
+    type: string
+    text?: string
+    [key: string]: unknown
+  }>
+}
+
 const CONTINUATION_PROMPT = `[RALPH LOOP - ITERATION {{ITERATION}}/{{MAX}}]
 
 Your previous attempt did not output the completion promise. Continue working on the task.
@@ -42,6 +53,8 @@ export interface RalphLoopHook {
   getState: () => RalphLoopState | null
 }
 
+const DEFAULT_API_TIMEOUT = 3000
+
 export function createRalphLoopHook(
   ctx: PluginInput,
   options?: RalphLoopOptions
@@ -50,6 +63,8 @@ export function createRalphLoopHook(
   const config = options?.config
   const stateDir = config?.state_dir
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
+  const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
+  const checkSessionExists = options?.checkSessionExists
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -79,6 +94,43 @@ export function createRalphLoopHook(
 
   function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  }
+
+  async function detectCompletionInSessionMessages(
+    sessionID: string,
+    promise: string
+  ): Promise<boolean> {
+    try {
+      const response = await Promise.race([
+        ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("API timeout")), apiTimeout)
+        ),
+      ])
+
+      const messages = (response as { data?: unknown[] }).data ?? []
+      if (!Array.isArray(messages)) return false
+
+      const assistantMessages = (messages as OpenCodeSessionMessage[]).filter(
+        (msg) => msg.info?.role === "assistant"
+      )
+      const lastAssistant = assistantMessages[assistantMessages.length - 1]
+      if (!lastAssistant?.parts) return false
+
+      const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
+      const responseText = lastAssistant.parts
+        .filter((p) => p.type === "text")
+        .map((p) => p.text ?? "")
+        .join("\n")
+
+      return pattern.test(responseText)
+    } catch (err) {
+      log(`[${HOOK_NAME}] Session messages check failed`, { sessionID, error: String(err) })
+      return false
+    }
   }
 
   const startLoop = (
@@ -148,17 +200,40 @@ export function createRalphLoopHook(
       }
 
       if (state.session_id && state.session_id !== sessionID) {
+        if (checkSessionExists) {
+          try {
+            const originalSessionExists = await checkSessionExists(state.session_id)
+            if (!originalSessionExists) {
+              clearState(ctx.directory, stateDir)
+              log(`[${HOOK_NAME}] Cleared orphaned state from deleted session`, {
+                orphanedSessionId: state.session_id,
+                currentSessionId: sessionID,
+              })
+              return
+            }
+          } catch (err) {
+            log(`[${HOOK_NAME}] Failed to check session existence`, {
+              sessionId: state.session_id,
+              error: String(err),
+            })
+          }
+        }
         return
       }
 
-      // Generate transcript path from sessionID - OpenCode doesn't pass it in event properties
       const transcriptPath = getTranscriptPath(sessionID)
+      const completionDetectedViaTranscript = detectCompletionPromise(transcriptPath, state.completion_promise)
 
-      if (detectCompletionPromise(transcriptPath, state.completion_promise)) {
+      const completionDetectedViaApi = completionDetectedViaTranscript
+        ? false
+        : await detectCompletionInSessionMessages(sessionID, state.completion_promise)
+
+      if (completionDetectedViaTranscript || completionDetectedViaApi) {
         log(`[${HOOK_NAME}] Completion detected!`, {
           sessionID,
           iteration: state.iteration,
           promise: state.completion_promise,
+          detectedVia: completionDetectedViaTranscript ? "transcript_file" : "session_messages_api",
         })
         clearState(ctx.directory, stateDir)
 
@@ -256,6 +331,20 @@ export function createRalphLoopHook(
 
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
+      const error = props?.error as { name?: string } | undefined
+
+      if (error?.name === "MessageAbortedError") {
+        if (sessionID) {
+          const state = readState(ctx.directory, stateDir)
+          if (state?.session_id === sessionID) {
+            clearState(ctx.directory, stateDir)
+            log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
+          }
+          sessions.delete(sessionID)
+        }
+        return
+      }
+
       if (sessionID) {
         const sessionState = getSessionState(sessionID)
         sessionState.isRecovering = true
