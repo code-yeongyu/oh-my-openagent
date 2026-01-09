@@ -6,7 +6,7 @@
 > [!TIP]
 >
 > [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **The Orchestrator is now available in beta. Use `oh-my-opencode@beta` to install it.**
+> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.1` to install it.**
 >
 > Be with us!
 >
