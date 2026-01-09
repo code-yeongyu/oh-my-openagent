@@ -85,6 +85,45 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
     expect(agents.Sisyphus.temperature).toBe(0.5)
   })
+
+  test("orchestrator-sisyphus with default model", () => {
+    // #given - no overrides
+
+    // #when
+    const agents = createBuiltinAgents()
+
+    // #then
+    expect(agents["orchestrator-sisyphus"].model).toBe("anthropic/claude-sonnet-4-5")
+    expect(agents["orchestrator-sisyphus"].thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+  })
+
+  test("orchestrator-sisyphus with model override", () => {
+    // #given
+    const overrides = {
+      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents["orchestrator-sisyphus"].model).toBe("anthropic/claude-opus-4-5")
+    expect(agents["orchestrator-sisyphus"].thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+  })
+
+  test("orchestrator-sisyphus with non-model overrides applied", () => {
+    // #given
+    const overrides = {
+      "orchestrator-sisyphus": { model: "openai/gpt-5.2", temperature: 0.3 },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides)
+
+    // #then
+    expect(agents["orchestrator-sisyphus"].model).toBe("openai/gpt-5.2")
+    expect(agents["orchestrator-sisyphus"].temperature).toBe(0.3)
+  })
 })
 
 describe("buildAgent with category and skills", () => {

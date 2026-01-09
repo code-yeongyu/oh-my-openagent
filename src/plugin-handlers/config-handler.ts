@@ -20,7 +20,7 @@ import {
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
-import type { OhMyOpenCodeConfig } from "../config";
+import type { OhMyOpenCodeConfig, AgentOverrideConfig } from "../config";
 import { log } from "../shared";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
@@ -90,9 +90,18 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
+    const normalizedAgentOverrides = pluginConfig.agents
+      ? ({
+          ...pluginConfig.agents,
+          "orchestrator-sisyphus":
+            pluginConfig.agents["orchestrator-sisyphus"] ??
+            (pluginConfig.agents as Record<string, AgentOverrideConfig | undefined>)["Orchestrator-Sisyphus"],
+        } as typeof pluginConfig.agents)
+      : undefined;
+
     const builtinAgents = createBuiltinAgents(
       pluginConfig.disabled_agents,
-      pluginConfig.agents,
+      normalizedAgentOverrides,
       ctx.directory,
       config.model as string | undefined
     );
