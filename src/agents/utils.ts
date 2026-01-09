@@ -7,9 +7,9 @@ import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
-import { metisAgent } from "./metis"
+import { createMetisAgent } from "./metis"
 import { createOrchestratorSisyphusAgent, orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
-import { momusAgent } from "./momus"
+import { createMomusAgent } from "./momus"
 import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
 import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
@@ -25,8 +25,8 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
-  "Metis (Plan Consultant)": metisAgent,
-  "Momus (Plan Reviewer)": momusAgent,
+  "Metis (Plan Consultant)": createMetisAgent,
+  "Momus (Plan Reviewer)": createMomusAgent,
   "orchestrator-sisyphus": orchestratorSisyphusAgent,
 }
 
