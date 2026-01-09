@@ -13,6 +13,7 @@ import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 
 const TASK_TTL_MS = 30 * 60 * 1000
+const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
 
 type OpencodeClient = PluginInput["client"]
 
@@ -40,9 +41,18 @@ interface Todo {
   id: string
 }
 
+export interface PendingNotification {
+  taskId: string
+  description: string
+  duration: string
+  status: "completed" | "error"
+  error?: string
+}
+
 export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
+  private pendingNotifications: Map<string, PendingNotification[]>
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
@@ -51,6 +61,7 @@ export class BackgroundManager {
   constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
     this.tasks = new Map()
     this.notifications = new Map()
+    this.pendingNotifications = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
@@ -380,8 +391,19 @@ export class BackgroundManager {
     return this.notifications.get(sessionID) ?? []
   }
 
-  clearNotifications(sessionID: string): void {
+clearNotifications(sessionID: string): void {
     this.notifications.delete(sessionID)
+  }
+
+  hasPendingNotifications(sessionID: string): boolean {
+    const pending = this.pendingNotifications.get(sessionID)
+    return pending !== undefined && pending.length > 0
+  }
+
+  consumePendingNotifications(sessionID: string): PendingNotification[] {
+    const pending = this.pendingNotifications.get(sessionID) ?? []
+    this.pendingNotifications.delete(sessionID)
+    return pending
   }
 
   private clearNotificationsForTask(taskId: string): void {
@@ -411,13 +433,14 @@ export class BackgroundManager {
     }
   }
 
-  cleanup(): void {
+cleanup(): void {
     this.stopPolling()
     this.tasks.clear()
     this.notifications.clear()
+    this.pendingNotifications.clear()
   }
 
-  private notifyParentSession(task: BackgroundTask): void {
+private notifyParentSession(task: BackgroundTask): void {
     const duration = this.formatDuration(task.startedAt, task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
@@ -431,47 +454,34 @@ export class BackgroundManager {
       })
     }
 
-    const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
+    // Store notification for silent injection via tool.execute.after hook
+    const notification: PendingNotification = {
+      taskId: task.id,
+      description: task.description,
+      duration,
+      status: task.status === "error" ? "error" : "completed",
+      error: task.error,
+    }
 
-    log("[background-agent] Sending notification to parent session:", { parentSessionID: task.parentSessionID })
+    const existing = this.pendingNotifications.get(task.parentSessionID) ?? []
+    existing.push(notification)
+    this.pendingNotifications.set(task.parentSessionID, existing)
+
+    log("[background-agent] Stored pending notification for parent session:", { 
+      parentSessionID: task.parentSessionID,
+      taskId: task.id 
+    })
 
     const taskId = task.id
-    setTimeout(async () => {
+    setTimeout(() => {
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
       }
-
-      try {
-        const body: {
-          agent?: string
-          model?: { providerID: string; modelID: string }
-          parts: Array<{ type: "text"; text: string }>
-        } = {
-          parts: [{ type: "text", text: message }],
-        }
-
-        if (task.parentAgent !== undefined) {
-          body.agent = task.parentAgent
-        }
-
-        if (task.parentModel?.providerID && task.parentModel?.modelID) {
-          body.model = { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
-        }
-
-        await this.client.session.prompt({
-          path: { id: task.parentSessionID },
-          body,
-          query: { directory: this.directory },
-        })
-        log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
-      } catch (error) {
-        log("[background-agent] prompt failed:", String(error))
-      } finally {
-        this.clearNotificationsForTask(taskId)
-        this.tasks.delete(taskId)
-        log("[background-agent] Removed completed task from memory:", taskId)
-      }
-    }, 200)
+      this.clearNotificationsForTask(taskId)
+      this.tasks.delete(taskId)
+      log("[background-agent] Removed completed task from memory:", taskId)
+    }, 5 * 60 * 1000)  // 5 minutes retention for background_output retrieval
   }
 
   private formatDuration(start: Date, end?: Date): string {
@@ -540,15 +550,11 @@ export class BackgroundManager {
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
 
-      try {
+try {
         const sessionStatus = allStatuses[task.sessionID]
         
-        if (!sessionStatus) {
-          log("[background-agent] Session not found in status:", task.sessionID)
-          continue
-        }
-
-        if (sessionStatus.type === "idle") {
+        // Don't skip if session not in status - fall through to message-based detection
+        if (sessionStatus?.type === "idle") {
           const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
           if (hasIncompleteTodos) {
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
@@ -599,10 +605,34 @@ export class BackgroundManager {
           task.progress.toolCalls = toolCalls
           task.progress.lastTool = lastTool
           task.progress.lastUpdate = new Date()
-          if (lastMessage) {
+if (lastMessage) {
             task.progress.lastMessage = lastMessage
             task.progress.lastMessageAt = new Date()
           }
+
+          // Stability detection: complete when message count unchanged for 3 polls
+          const currentMsgCount = messages.length
+          const elapsedMs = Date.now() - task.startedAt.getTime()
+
+          if (elapsedMs >= MIN_STABILITY_TIME_MS) {
+            if (task.lastMsgCount === currentMsgCount) {
+              task.stablePolls = (task.stablePolls ?? 0) + 1
+              if (task.stablePolls >= 3) {
+                const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+                if (!hasIncompleteTodos) {
+                  task.status = "completed"
+                  task.completedAt = new Date()
+                  this.markForNotification(task)
+                  this.notifyParentSession(task)
+                  log("[background-agent] Task completed via stability detection:", task.id)
+                  continue
+                }
+              }
+            } else {
+              task.stablePolls = 0
+            }
+          }
+          task.lastMsgCount = currentMsgCount
         }
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })

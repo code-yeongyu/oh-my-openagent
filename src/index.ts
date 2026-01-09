@@ -522,9 +522,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
-      await editErrorRecovery?.["tool.execute.after"](input, output);
+await editErrorRecovery?.["tool.execute.after"](input, output);
       await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
+      await backgroundNotificationHook?.["tool.execute.after"]?.(input, output);
     },
   };
 };

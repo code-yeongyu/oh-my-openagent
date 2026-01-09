@@ -193,7 +193,7 @@ Session ID: ${task.sessionID}
 (No messages found)`
   }
 
-  const assistantMessages = messages.filter(
+const assistantMessages = messages.filter(
     (m) => m.info?.role === "assistant"
   )
 
@@ -210,8 +210,15 @@ Session ID: ${task.sessionID}
 (No assistant response found)`
   }
 
-  const lastMessage = assistantMessages[assistantMessages.length - 1]
-  const textParts = lastMessage?.parts?.filter(
+  // Sort by time descending (newest first), take first result - matches sync pattern
+  const sortedMessages = [...assistantMessages].sort((a, b) => {
+    const timeA = String((a as { info?: { time?: string } }).info?.time ?? "")
+    const timeB = String((b as { info?: { time?: string } }).info?.time ?? "")
+    return timeB.localeCompare(timeA)
+  })
+  
+  const lastMessage = sortedMessages[0]
+  const textParts = lastMessage.parts?.filter(
     (p) => p.type === "text"
   ) ?? []
   const textContent = textParts
