@@ -278,16 +278,22 @@ const metisRestrictions = createAgentToolRestrictions([
   "sisyphus_task",
 ])
 
-export const metisAgent: AgentConfig = {
-  description:
-    "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
-  mode: "subagent" as const,
-  model: "anthropic/claude-opus-4-5",
-  temperature: 0.3,
-  ...metisRestrictions,
-  prompt: METIS_SYSTEM_PROMPT,
-  thinking: { type: "enabled", budgetTokens: 32000 },
-} as AgentConfig
+const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
+
+export function createMetisAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  return {
+    description:
+      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
+    mode: "subagent" as const,
+    model,
+    temperature: 0.3,
+    ...metisRestrictions,
+    prompt: METIS_SYSTEM_PROMPT,
+    thinking: { type: "enabled", budgetTokens: 32000 },
+  } as AgentConfig
+}
+
+export const metisAgent: AgentConfig = createMetisAgent()
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
