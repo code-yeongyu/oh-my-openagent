@@ -113,6 +113,12 @@ async function runBackgroundUpdateCheck(
     return
   }
 
+  // Check if current version is a prerelease - don't auto-downgrade prerelease to stable
+  if (isPrereleaseVersion(currentVersion)) {
+    log(`[auto-update-checker] Skipping auto-update for prerelease version: ${currentVersion}`)
+    return
+  }
+
   if (pluginInfo.isPinned) {
     if (isPrereleaseOrDistTag(pluginInfo.pinnedVersion)) {
       log(`[auto-update-checker] Skipping auto-update for prerelease/dist-tag: ${pluginInfo.pinnedVersion}`)
