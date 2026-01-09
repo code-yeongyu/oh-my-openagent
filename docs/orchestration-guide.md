@@ -6,7 +6,7 @@
 |------------|----------|-------------|
 | **Simple** | Just prompt | Simple tasks, quick fixes, single-file changes |
 | **Complex + Lazy** | Just type `ulw` or `ultrawork` | Complex tasks where explaining context is tedious. Agent figures it out. |
-| **Complex + Precise** | `/plan` → `/start-work` | Precise, multi-step work requiring true orchestration. Prometheus plans, Sisyphus executes. |
+| **Complex + Precise** | `@plan` → `/start-work` | Precise, multi-step work requiring true orchestration. Prometheus plans, Sisyphus executes. |
 
 **Decision Flow:**
 ```
@@ -15,7 +15,7 @@ Is it a quick fix or simple task?
   └─ NO  → Is explaining the full context tedious?
              └─ YES → Type "ulw" and let the agent figure it out
              └─ NO  → Do you need precise, verifiable execution?
-                        └─ YES → Use /plan for Prometheus planning, then /start-work
+                        └─ YES → Use @plan for Prometheus planning, then /start-work
                         └─ NO  → Just use "ulw"
 ```
 
@@ -114,9 +114,9 @@ When the user enters `/start-work`, the execution phase begins.
 
 ## 5. Commands and Usage
 
-### `/plan [request]`
+### `@plan [request]`
 Invokes Prometheus to start a planning session.
-- Example: `/plan "I want to refactor the authentication system to NextAuth"`
+- Example: `@plan "I want to refactor the authentication system to NextAuth"`
 
 ### `/start-work`
 Executes the generated plan.
