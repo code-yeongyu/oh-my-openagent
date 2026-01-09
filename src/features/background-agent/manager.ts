@@ -249,6 +249,11 @@ export class BackgroundManager {
     subagentSessions.add(input.sessionID)
     this.startPolling()
 
+    // Track for batched notifications (external tasks need tracking too)
+    const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+    pending.add(task.id)
+    this.pendingByParent.set(input.parentSessionID, pending)
+
     log("[background-agent] Registered external task:", { taskId: task.id, sessionID: input.sessionID })
 
     return task
@@ -275,6 +280,11 @@ export class BackgroundManager {
 
     this.startPolling()
     subagentSessions.add(existingTask.sessionID)
+
+    // Track for batched notifications (P2 fix: resumed tasks need tracking too)
+    const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+    pending.add(existingTask.id)
+    this.pendingByParent.set(input.parentSessionID, pending)
 
     const toastManager = getTaskToastManager()
     if (toastManager) {
@@ -471,14 +481,18 @@ export class BackgroundManager {
       const hasContent = messages.some((m: any) => {
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
-        return parts.some((p: { type?: string; text?: string }) => 
-          // Text content (final output)
-          (p.type === "text" && p.text && p.text.trim().length > 0) ||
-          // Reasoning content (thinking blocks)
-          (p.type === "reasoning" && p.text && p.text.trim().length > 0) ||
-          // Tool calls (indicates work was done)
-          p.type === "tool"
-        )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return parts.some((p: any) => 
+        // Text content (final output)
+        (p.type === "text" && p.text && p.text.trim().length > 0) ||
+        // Reasoning content (thinking blocks)
+        (p.type === "reasoning" && p.text && p.text.trim().length > 0) ||
+        // Tool calls (indicates work was done)
+        p.type === "tool" ||
+        // Tool results (output from executed tools) - important for tool-only tasks
+        (p.type === "tool_result" && p.content && 
+          (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
+      )
       })
 
       if (!hasContent) {
