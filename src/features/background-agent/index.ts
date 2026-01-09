@@ -1,3 +1,3 @@
 export * from "./types"
-export { BackgroundManager, type PendingNotification } from "./manager"
+export { BackgroundManager } from "./manager"
 export { ConcurrencyManager } from "./concurrency"

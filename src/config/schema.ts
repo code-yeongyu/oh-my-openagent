@@ -296,6 +296,7 @@ export const GitMasterConfigSchema = z.object({
   /** Add "Co-authored-by: Sisyphus" trailer to commit messages (default: true) */
   include_co_authored_by: z.boolean().default(true),
 })
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
