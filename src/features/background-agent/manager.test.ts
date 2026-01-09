@@ -766,3 +766,161 @@ function buildNotificationPromptBody(task: BackgroundTask): Record<string, unkno
 
   return body
 }
+
+describe("LaunchInput.model", () => {
+  test("model should be optional in LaunchInput type", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+    }
+
+    // #when / #then - should compile without model
+    expect(input.model).toBeUndefined()
+  })
+
+  test("model can be provided in LaunchInput", () => {
+    // #given
+    const input: import("./types").LaunchInput = {
+      description: "test",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      model: { providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" },
+    }
+
+    // #when / #then
+    expect(input.model).toEqual({ providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" })
+  })
+
+  test("model should be stored in BackgroundTask", () => {
+    // #given
+    const task: import("./types").BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      description: "test task",
+      prompt: "test prompt",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+      model: { providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" },
+    }
+
+    // #when / #then
+    expect(task.model).toEqual({ providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" })
+  })
+})
+
+describe("BackgroundManager.launch - model propagation", () => {
+  test("should pass model to promptAsync when launching background task", async () => {
+    // #given
+    let capturedBody: Record<string, unknown> | undefined
+
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "test-session-id" } }),
+        promptAsync: async (args: { body: Record<string, unknown> }) => {
+          capturedBody = args.body
+          return Promise.resolve()
+        },
+        status: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+        prompt: async () => Promise.resolve(),
+      },
+    }
+
+    const mockCtx = {
+      client: mockClient,
+      directory: "/test",
+    }
+
+    const { BackgroundManager } = await import("./manager")
+    const manager = new BackgroundManager(mockCtx as never)
+
+    // #when
+    await manager.launch({
+      description: "test task",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      model: { providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" },
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // #then
+    expect(capturedBody).toBeDefined()
+    expect(capturedBody?.model).toEqual({ providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" })
+  })
+
+  test("should pass model to promptAsync when resuming background task", async () => {
+    // #given
+    let capturedBody: Record<string, unknown> | undefined
+    let createCallCount = 0
+
+    const mockClient = {
+      session: {
+        create: async () => {
+          createCallCount++
+          return { data: { id: `test-session-${createCallCount}` } }
+        },
+        promptAsync: async (args: { body: Record<string, unknown> }) => {
+          capturedBody = args.body
+          return Promise.resolve()
+        },
+        status: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+        prompt: async () => Promise.resolve(),
+      },
+    }
+
+    const mockCtx = {
+      client: mockClient,
+      directory: "/test",
+    }
+
+    const { BackgroundManager } = await import("./manager")
+    const manager = new BackgroundManager(mockCtx as never)
+
+    // First launch a task with a model
+    const task = await manager.launch({
+      description: "test task",
+      prompt: "initial prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-msg",
+      model: { providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" },
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // #when - resume the task
+    let resumeCapturedBody: Record<string, unknown> | undefined
+    mockClient.session.promptAsync = async (args: { body: Record<string, unknown> }) => {
+      resumeCapturedBody = args.body
+      return Promise.resolve()
+    }
+
+    await manager.resume({
+      sessionId: task.sessionID,
+      prompt: "continue the work",
+      parentSessionID: "new-parent-session",
+      parentMessageID: "new-parent-msg",
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // #then - model should be passed from existing task
+    expect(resumeCapturedBody).toBeDefined()
+    expect(resumeCapturedBody?.model).toEqual({ providerID: "cliproxy", modelID: "gemini-claude-sonnet-4-5" })
+  })
+})
