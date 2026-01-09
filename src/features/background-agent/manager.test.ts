@@ -674,3 +674,95 @@ describe("LaunchInput.skillContent", () => {
     expect(input.skillContent).toBe("You are a playwright expert")
   })
 })
+
+describe("BackgroundManager.notifyParentSession - agent context preservation", () => {
+  test("should not pass agent field when parentAgent is undefined", async () => {
+    // #given
+    const task: BackgroundTask = {
+      id: "task-no-agent",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task without agent context",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: undefined,
+      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task)
+
+    // #then
+    expect("agent" in promptBody).toBe(false)
+    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
+  })
+
+  test("should include agent field when parentAgent is defined", async () => {
+    // #given
+    const task: BackgroundTask = {
+      id: "task-with-agent",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with agent context",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "Sisyphus",
+      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task)
+
+    // #then
+    expect(promptBody.agent).toBe("Sisyphus")
+  })
+
+  test("should not pass model field when parentModel is undefined", async () => {
+    // #given
+    const task: BackgroundTask = {
+      id: "task-no-model",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task without model context",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "Sisyphus",
+      parentModel: undefined,
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task)
+
+    // #then
+    expect("model" in promptBody).toBe(false)
+    expect(promptBody.agent).toBe("Sisyphus")
+  })
+})
+
+function buildNotificationPromptBody(task: BackgroundTask): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    parts: [{ type: "text", text: `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished.` }],
+  }
+
+  if (task.parentAgent !== undefined) {
+    body.agent = task.parentAgent
+  }
+
+  if (task.parentModel?.providerID && task.parentModel?.modelID) {
+    body.model = { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
+  }
+
+  return body
+}
