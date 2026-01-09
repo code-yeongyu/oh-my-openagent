@@ -1,5 +1,26 @@
 # Oh-My-OpenCode Orchestration Guide
 
+## TL;DR - When to Use What
+
+| Complexity | Approach | When to Use |
+|------------|----------|-------------|
+| **Simple** | Just prompt | Simple tasks, quick fixes, single-file changes |
+| **Complex + Lazy** | Just type `ulw` or `ultrawork` | Complex tasks where explaining context is tedious. Agent figures it out. |
+| **Complex + Precise** | `/plan` → `/start-work` | Precise, multi-step work requiring true orchestration. Prometheus plans, Sisyphus executes. |
+
+**Decision Flow:**
+```
+Is it a quick fix or simple task?
+  └─ YES → Just prompt normally
+  └─ NO  → Is explaining the full context tedious?
+             └─ YES → Type "ulw" and let the agent figure it out
+             └─ NO  → Do you need precise, verifiable execution?
+                        └─ YES → Use /plan for Prometheus planning, then /start-work
+                        └─ NO  → Just use "ulw"
+```
+
+---
+
 This document provides a comprehensive guide to the orchestration system that implements Oh-My-OpenCode's core philosophy: **"Separation of Planning and Execution"**.
 
 ## 1. Overview
