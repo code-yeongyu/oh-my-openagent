@@ -13,6 +13,7 @@ import { createAgentToolRestrictions } from "../shared/permission-compat"
  */
 
 export interface OrchestratorContext {
+  model?: string
   availableAgents?: AvailableAgent[]
   availableSkills?: AvailableSkill[]
   userCategories?: Record<string, CategoryConfig>
@@ -1432,6 +1433,8 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
     .replace("{SKILLS_SECTION}", skillsSection)
 }
 
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+
 export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "task",
@@ -1442,7 +1445,7 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     description:
       "Orchestrates work via sisyphus_task() to complete ALL tasks in a todo list until fully done",
     mode: "primary" as const,
-    model: "anthropic/claude-sonnet-4-5",
+    model: ctx?.model ?? DEFAULT_MODEL,
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
