@@ -9,16 +9,20 @@ CLI for oh-my-opencode: interactive installer, health diagnostics (doctor), runt
 ```
 cli/
 ├── index.ts              # Commander.js entry, subcommand routing
-├── install.ts            # Interactive TUI installer (477 lines)
-├── config-manager.ts     # JSONC parsing, env detection (669 lines)
+├── install.ts            # Interactive TUI installer (436 lines)
+├── config-manager.ts     # JSONC parsing, env detection (725 lines)
 ├── types.ts              # CLI-specific types
+├── commands/             # CLI subcommands
 ├── doctor/               # Health check system
 │   ├── index.ts          # Doctor command entry
+│   ├── runner.ts         # Health check orchestration
 │   ├── constants.ts      # Check categories
 │   ├── types.ts          # Check result interfaces
-│   └── checks/           # 17+ individual checks
+│   └── checks/           # 17+ individual checks (auth, config, dependencies, gh, lsp, mcp, opencode, plugin, version)
 ├── get-local-version/    # Version detection
 └── run/                  # OpenCode session launcher
+    ├── completion.ts     # Completion logic
+    └── events.ts         # Event handling
 ```
 
 ## CLI COMMANDS

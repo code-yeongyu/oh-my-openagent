@@ -19,9 +19,10 @@ tools/
 ├── interactive-bash/   # Tmux session management
 ├── look-at/            # Multimodal analysis (PDF, images)
 ├── lsp/                # 11 LSP tools
-│   ├── client.ts       # LSP connection lifecycle
+│   ├── client.ts       # LSP connection lifecycle (612 lines)
+│   ├── utils.ts        # LSP utilities (461 lines)
 │   ├── config.ts       # Server configurations
-│   ├── tools.ts        # Tool implementations
+│   ├── tools.ts        # Tool implementations (405 lines)
 │   └── types.ts
 ├── session-manager/    # OpenCode session file management
 │   ├── constants.ts    # Storage paths, descriptions
@@ -29,6 +30,7 @@ tools/
 │   ├── storage.ts      # File I/O operations
 │   ├── utils.ts        # Formatting, filtering
 │   └── tools.ts        # Tool implementations
+├── sisyphus-task/      # Category-based task delegation (493 lines)
 ├── skill/              # Skill loading and execution
 ├── skill-mcp/          # Skill-embedded MCP invocation
 ├── slashcommand/       # Slash command execution
