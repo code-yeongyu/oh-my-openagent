@@ -202,6 +202,18 @@ export function createClaudeCodeHooksHook(
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> }
     ): Promise<void> => {
+      if (input.tool === "todowrite" && typeof output.args.todos === "string") {
+        try {
+          const parsed = JSON.parse(output.args.todos as string)
+          if (Array.isArray(parsed)) {
+            output.args.todos = parsed
+            log("todowrite: parsed todos string to array", { sessionID: input.sessionID })
+          }
+        } catch (e) {
+          log("todowrite: failed to parse todos string", { sessionID: input.sessionID, error: String(e) })
+        }
+      }
+
       const claudeConfig = await loadClaudeHooksConfig()
       const extendedConfig = await loadPluginExtendedConfig()
 
