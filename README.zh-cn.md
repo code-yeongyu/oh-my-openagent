@@ -6,7 +6,7 @@
 > [!TIP]
 >
 > [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **编排器现已推出测试版。使用`oh-my-opencode@beta`来安装。**
+> > **编排器现已推出测试版。使用`oh-my-opencode@3.0.0-beta.1`来安装。**
 >
 > 与我们同行！
 >
