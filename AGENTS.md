@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-02T22:41:22+09:00
-**Commit:** d0694e5
+**Generated:** 2026-01-09T15:38:00+09:00
+**Commit:** 0581793
 **Branch:** dev
 
 ## OVERVIEW
@@ -22,7 +22,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # MCP configs: context7, grep_app
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (464 lines)
+│   └── index.ts       # Main plugin entry (548 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
 └── dist/              # Build output (ESM + .d.ts)
@@ -50,6 +50,7 @@ oh-my-opencode/
 | Shared utilities | `src/shared/` | Cross-cutting utilities |
 | Slash commands | `src/hooks/auto-slash-command/` | Auto-detect and execute `/command` patterns |
 | Ralph Loop | `src/hooks/ralph-loop/` | Self-referential dev loop until completion |
+| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (660 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -64,15 +65,16 @@ oh-my-opencode/
 
 | Phase | Action | Verification |
 |-------|--------|--------------|
-| **RED** | Write test describing expected behavior | `bun test` → FAIL (expected) |
-| **GREEN** | Implement minimum code to pass | `bun test` → PASS |
-| **REFACTOR** | Improve code quality, remove duplication | `bun test` → PASS (must stay green) |
+| **RED** | Write test describing expected behavior | `bun test` -> FAIL (expected) |
+| **GREEN** | Implement minimum code to pass | `bun test` -> PASS |
+| **REFACTOR** | Improve code quality, remove duplication | `bun test` -> PASS (must stay green) |
 
 **Rules:**
 - NEVER write implementation before test
 - NEVER delete failing tests to "pass" - fix the code
 - One test at a time - don't batch
 - Test file naming: `*.test.ts` alongside source
+- BDD comments: `#given`, `#when`, `#then` (same as AAA)
 
 ## CONVENTIONS
 
@@ -81,7 +83,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern in index.ts; explicit named exports for tools/hooks
 - **Naming**: kebab-case directories, createXXXHook/createXXXTool factories
-- **Testing**: BDD comments `#given`, `#when`, `#then` (same as AAA); TDD workflow (RED-GREEN-REFACTOR)
+- **Testing**: BDD comments `#given/#when/#then`, TDD workflow (RED-GREEN-REFACTOR)
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS (THIS PROJECT)
@@ -99,6 +101,11 @@ oh-my-opencode/
 - **Sequential agent calls**: Use `sisyphus_task` for parallel execution
 - **Heavy PreToolUse logic**: Slows every tool call
 - **Self-planning for complex tasks**: Spawn planning agent (Prometheus) instead
+- **Trust agent self-reports**: ALWAYS verify results independently
+- **Skip TODO creation**: Multi-step tasks MUST have todos first
+- **Batch completions**: Mark TODOs complete immediately, don't group
+- **Giant commits**: 3+ files = 2+ commits minimum
+- **Separate test from impl**: Same commit always
 
 ## UNIQUE STYLES
 
@@ -114,7 +121,7 @@ oh-my-opencode/
 ## AGENT MODELS
 
 | Agent | Default Model | Purpose |
-|-------|-------|---------|
+|-------|---------------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
 | oracle | openai/gpt-5.2 | Read-only consultation. High-IQ debugging, architecture |
 | librarian | anthropic/claude-sonnet-4-5 | Multi-repo analysis, docs |
@@ -130,7 +137,7 @@ bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
 bun run build:schema   # Schema only
-bun test               # Run tests
+bun test               # Run tests (76 test files, 2559+ BDD assertions)
 ```
 
 ## DEPLOYMENT
@@ -153,18 +160,23 @@ bun test               # Run tests
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/index.ts` | 464 | Main plugin, all hook/tool init |
-| `src/cli/config-manager.ts` | 669 | JSONC parsing, env detection |
-| `src/auth/antigravity/fetch.ts` | 621 | Token refresh, URL rewriting |
-| `src/tools/lsp/client.ts` | 611 | LSP protocol, JSON-RPC |
-| `src/auth/antigravity/response.ts` | 598 | Response transformation, streaming |
-| `src/auth/antigravity/thinking.ts` | 571 | Thinking block extraction/transformation |
-| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 564 | Multi-stage recovery |
-| `src/agents/sisyphus.ts` | 504 | Orchestrator prompt |
+| `src/agents/orchestrator-sisyphus.ts` | 1484 | Orchestrator agent, complex delegation |
+| `src/features/builtin-skills/skills.ts` | 1230 | Skill definitions (frontend-ui-ux, playwright) |
+| `src/agents/prometheus-prompt.ts` | 982 | Planning agent system prompt |
+| `src/auth/antigravity/fetch.ts` | 798 | Token refresh, URL rewriting |
+| `src/auth/antigravity/thinking.ts` | 755 | Thinking block extraction |
+| `src/cli/config-manager.ts` | 725 | JSONC parsing, env detection |
+| `src/hooks/sisyphus-orchestrator/index.ts` | 660 | Orchestrator hook impl |
+| `src/agents/sisyphus.ts` | 641 | Main Sisyphus prompt |
+| `src/tools/lsp/client.ts` | 612 | LSP protocol, JSON-RPC |
+| `src/features/background-agent/manager.ts` | 608 | Task lifecycle |
+| `src/auth/antigravity/response.ts` | 599 | Response transformation, streaming |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 556 | Multi-stage recovery |
+| `src/index.ts` | 548 | Main plugin, all hook/tool init |
 
 ## NOTES
 
-- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`, 360+ tests
+- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`, 76 test files
 - **OpenCode**: Requires >= 1.0.150
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)

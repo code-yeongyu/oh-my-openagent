@@ -2,35 +2,42 @@
 
 ## OVERVIEW
 
-22 lifecycle hooks intercepting/modifying agent behavior. Context injection, error recovery, output control, notifications.
+22+ lifecycle hooks intercepting/modifying agent behavior. Context injection, error recovery, output control, notifications.
 
 ## STRUCTURE
 
 ```
 hooks/
-├── anthropic-context-window-limit-recovery/  # Auto-compact at token limit (554 lines)
+├── anthropic-context-window-limit-recovery/  # Auto-compact at token limit (556 lines)
 ├── auto-slash-command/         # Detect and execute /command patterns
 ├── auto-update-checker/        # Version notifications, startup toast
 ├── background-notification/    # OS notify on task complete
-├── claude-code-hooks/          # settings.json PreToolUse/PostToolUse/etc
+├── claude-code-hooks/          # settings.json PreToolUse/PostToolUse/etc (408 lines)
 ├── comment-checker/            # Prevent excessive AI comments
-│   └── filters/                # docstring, directive, bdd, etc
+│   ├── filters/                # docstring, directive, bdd, shebang
+│   └── output/                 # XML builder, formatter
 ├── compaction-context-injector/ # Preserve context during compaction
 ├── directory-agents-injector/  # Auto-inject AGENTS.md
 ├── directory-readme-injector/  # Auto-inject README.md
+├── edit-error-recovery/        # Recover from edit failures
 ├── empty-message-sanitizer/    # Sanitize empty messages
 ├── interactive-bash-session/   # Tmux session management
 ├── keyword-detector/           # ultrawork/search keyword activation
 ├── non-interactive-env/        # CI/headless handling
 ├── preemptive-compaction/      # Pre-emptive at 85% usage
+├── prometheus-md-only/         # Restrict prometheus to read-only
 ├── ralph-loop/                 # Self-referential dev loop
 ├── rules-injector/             # Conditional rules from .claude/rules/
-├── session-recovery/           # Recover from errors (430 lines)
+├── session-recovery/           # Recover from errors (432 lines)
+├── sisyphus-orchestrator/      # Main orchestration hook (660 lines)
+├── start-work/                 # Initialize Sisyphus work session
+├── task-resume-info/           # Track task resume state
 ├── think-mode/                 # Auto-detect thinking triggers
+├── thinking-block-validator/   # Validate thinking block format
 ├── agent-usage-reminder/       # Remind to use specialists
 ├── context-window-monitor.ts   # Monitor usage (standalone)
 ├── session-notification.ts     # OS notify on idle
-├── todo-continuation-enforcer.ts # Force TODO completion
+├── todo-continuation-enforcer.ts # Force TODO completion (413 lines)
 └── tool-output-truncator.ts    # Truncate verbose outputs
 ```
 

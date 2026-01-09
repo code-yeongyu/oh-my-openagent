@@ -9,16 +9,20 @@ Google Antigravity OAuth for Gemini models. Token management, fetch interception
 ```
 auth/
 └── antigravity/
-    ├── plugin.ts         # Main export, hooks registration
+    ├── plugin.ts         # Main export, hooks registration (554 lines)
     ├── oauth.ts          # OAuth flow, token acquisition
     ├── token.ts          # Token storage, refresh logic
-    ├── fetch.ts          # Fetch interceptor (621 lines)
-    ├── response.ts       # Response transformation (598 lines)
-    ├── thinking.ts       # Thinking block extraction (571 lines)
+    ├── fetch.ts          # Fetch interceptor (798 lines)
+    ├── response.ts       # Response transformation (599 lines)
+    ├── thinking.ts       # Thinking block extraction (755 lines)
     ├── thought-signature-store.ts  # Signature caching
     ├── message-converter.ts        # Format conversion
+    ├── accounts.ts       # Multi-account management
+    ├── browser.ts        # Browser automation for OAuth
+    ├── cli.ts            # CLI interaction
     ├── request.ts        # Request building
     ├── project.ts        # Project ID management
+    ├── storage.ts        # Token persistence
     ├── tools.ts          # OAuth tool registration
     ├── constants.ts      # API endpoints, model mappings
     └── types.ts
