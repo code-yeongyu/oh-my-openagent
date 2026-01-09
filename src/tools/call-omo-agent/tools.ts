@@ -188,9 +188,9 @@ async function executeSync(
   // Sort by time ascending (oldest first) to process messages in order
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sortedMessages = [...relevantMessages].sort((a: any, b: any) => {
-    const timeA = String(a.info?.time ?? "")
-    const timeB = String(b.info?.time ?? "")
-    return timeA.localeCompare(timeB)
+    const timeA = a.info?.time?.created ?? 0
+    const timeB = b.info?.time?.created ?? 0
+    return timeA - timeB
   })
 
   // Extract content from ALL messages, not just the last one

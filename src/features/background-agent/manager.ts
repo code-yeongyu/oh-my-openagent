@@ -134,7 +134,7 @@ export class BackgroundManager {
       })
     }
 
-    log("[background-agent] Calling promptAsync for launch with:", {
+    log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
       sessionID,
       agent: input.agent,
       model: input.model,
@@ -142,12 +142,13 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Note: Don't pass model in body - use agent's configured model instead
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
+    // Include model if caller provided one (e.g., from Sisyphus category configs)
     this.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: input.agent,
+        ...(input.model ? { model: input.model } : {}),
         system: input.skillContent,
         tools: {
           task: false,
@@ -298,7 +299,7 @@ export class BackgroundManager {
 
     log("[background-agent] Resuming task:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
 
-    log("[background-agent] Resuming task - calling promptAsync with:", {
+    log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
       sessionID: existingTask.sessionID,
       agent: existingTask.agent,
       promptLength: input.prompt.length,

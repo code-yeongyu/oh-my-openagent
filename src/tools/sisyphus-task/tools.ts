@@ -463,6 +463,20 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
           await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
 
+          // Check for async errors that may have occurred after the initial 100ms delay
+          // TypeScript doesn't understand async mutation, so we cast to check
+          const asyncError = promptError as Error | undefined
+          if (asyncError) {
+            if (toastManager && taskId !== undefined) {
+              toastManager.removeTask(taskId)
+            }
+            const errorMessage = asyncError.message
+            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+              return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
+            }
+            return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+          }
+
           const statusResult = await client.session.status()
           const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
           const sessionStatus = allStatuses[sessionID]
