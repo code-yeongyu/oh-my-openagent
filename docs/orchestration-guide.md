@@ -45,7 +45,7 @@ graph TD
         Metis --> Prometheus
         Prometheus --> Momus[Momus<br>Reviewer]
         Momus --> Prometheus
-        Prometheus --> PlanFile[/.sisyphus/plans/*.md]
+        Prometheus --> PlanFile["/.sisyphus/plans/{name}.md"]
     end
     
     PlanFile --> StartWork[/start-work]
