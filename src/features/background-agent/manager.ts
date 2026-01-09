@@ -199,6 +199,7 @@ export class BackgroundManager {
     parentSessionID: string
     description: string
     agent?: string
+    parentAgent?: string
   }): BackgroundTask {
     const task: BackgroundTask = {
       id: input.taskId,
@@ -214,6 +215,7 @@ export class BackgroundManager {
         toolCalls: 0,
         lastUpdate: new Date(),
       },
+      parentAgent: input.parentAgent,
     }
 
     this.tasks.set(task.id, task)
@@ -440,19 +442,25 @@ export class BackgroundManager {
       }
 
       try {
-        // Use only parentModel/parentAgent - don't fallback to prevMessage
-        // This prevents accidentally changing parent session's model/agent
-        const modelField = task.parentModel?.providerID && task.parentModel?.modelID
-          ? { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
-          : undefined
+        const body: {
+          agent?: string
+          model?: { providerID: string; modelID: string }
+          parts: Array<{ type: "text"; text: string }>
+        } = {
+          parts: [{ type: "text", text: message }],
+        }
+
+        if (task.parentAgent !== undefined) {
+          body.agent = task.parentAgent
+        }
+
+        if (task.parentModel?.providerID && task.parentModel?.modelID) {
+          body.model = { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
+        }
 
         await this.client.session.prompt({
           path: { id: task.parentSessionID },
-          body: {
-            agent: task.parentAgent,
-            model: modelField,
-            parts: [{ type: "text", text: message }],
-          },
+          body,
           query: { directory: this.directory },
         })
         log("[background-agent] Successfully sent prompt to parent session:", { parentSessionID: task.parentSessionID })
