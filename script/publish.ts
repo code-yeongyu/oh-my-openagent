@@ -106,13 +106,22 @@ async function getContributors(previous: string): Promise<string[]> {
   return notes
 }
 
-async function buildAndPublish(): Promise<void> {
+function getDistTag(version: string): string | null {
+  if (!version.includes("-")) return null
+  const prerelease = version.split("-")[1]
+  const tag = prerelease?.split(".")[0]
+  return tag || "next"
+}
+
+async function buildAndPublish(version: string): Promise<void> {
   console.log("\nPublishing to npm...")
-  // --ignore-scripts: workflow에서 이미 빌드 완료, prepublishOnly 재실행 방지
+  const distTag = getDistTag(version)
+  const tagArgs = distTag ? ["--tag", distTag] : []
+  
   if (process.env.CI) {
-    await $`npm publish --access public --provenance --ignore-scripts`
+    await $`npm publish --access public --provenance --ignore-scripts ${tagArgs}`
   } else {
-    await $`npm publish --access public --ignore-scripts`
+    await $`npm publish --access public --ignore-scripts ${tagArgs}`
   }
 }
 
@@ -174,7 +183,7 @@ async function main() {
   const contributors = await getContributors(previous)
   const notes = [...changelog, ...contributors]
 
-  await buildAndPublish()
+  await buildAndPublish(newVersion)
   await gitTagAndRelease(newVersion, notes)
 
   console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} ===`)

@@ -8,17 +8,23 @@ Claude Code compatibility layer + core feature modules. Commands, skills, agents
 
 ```
 features/
-├── background-agent/           # Task lifecycle, notifications (460 lines)
+├── background-agent/           # Task lifecycle, notifications (608 lines)
+├── boulder-state/              # Boulder state persistence
 ├── builtin-commands/           # Built-in slash commands
-├── builtin-skills/             # Built-in skills (playwright)
+│   └── templates/              # start-work, refactor, init-deep, ralph-loop
+├── builtin-skills/             # Built-in skills
+│   ├── git-master/             # Atomic commits, rebase, history search
+│   └── frontend-ui-ux/         # Designer-turned-developer skill
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # .mcp.json files
 │   └── env-expander.ts         # ${VAR} expansion
-├── claude-code-plugin-loader/  # installed_plugins.json (484 lines)
+├── claude-code-plugin-loader/  # installed_plugins.json (486 lines)
 ├── claude-code-session-state/  # Session state persistence
+├── context-injector/           # Context collection and injection
 ├── opencode-skill-loader/      # Skills from OpenCode + Claude paths
 ├── skill-mcp-manager/          # MCP servers in skill YAML
+├── task-toast-manager/         # Task toast notifications
 └── hook-message-injector/      # Inject messages into conversation
 ```
 

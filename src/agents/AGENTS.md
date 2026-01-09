@@ -8,13 +8,18 @@ AI agent definitions for multi-model orchestration. 7 specialized agents: Sisyph
 
 ```
 agents/
-├── sisyphus.ts              # Primary orchestrator (Claude Opus 4.5)
+├── orchestrator-sisyphus.ts # Orchestrator agent (1484 lines) - complex delegation
+├── sisyphus.ts              # Main Sisyphus prompt (641 lines)
+├── sisyphus-junior.ts       # Junior variant for delegated tasks
 ├── oracle.ts                # Strategic advisor (GPT-5.2)
 ├── librarian.ts             # Multi-repo research (Claude Sonnet 4.5)
 ├── explore.ts               # Fast codebase grep (Grok Code)
 ├── frontend-ui-ux-engineer.ts  # UI generation (Gemini 3 Pro)
-├── document-writer.ts       # Technical docs (Gemini 3 Flash)
+├── document-writer.ts       # Technical docs (Gemini 3 Pro)
 ├── multimodal-looker.ts     # PDF/image analysis (Gemini 3 Flash)
+├── prometheus-prompt.ts     # Planning agent prompt (982 lines)
+├── metis.ts                 # Plan Consultant agent (404 lines)
+├── momus.ts                 # Plan Reviewer agent (404 lines)
 ├── build-prompt.ts          # Shared build agent prompt
 ├── plan-prompt.ts           # Shared plan agent prompt
 ├── types.ts                 # AgentModelConfig interface
