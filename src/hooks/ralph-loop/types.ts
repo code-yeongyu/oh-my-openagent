@@ -1,4 +1,7 @@
 import type { RalphLoopConfig } from "../../config"
+import type { TokenTracker } from "../../features/observability/TokenTracker"
+import type { DecisionJournal } from "../../features/observability/DecisionJournal"
+import type { SemanticMemory } from "../../features/semantic-memory"
 
 export interface RalphLoopState {
   active: boolean
@@ -15,4 +18,7 @@ export interface RalphLoopOptions {
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  tokenTracker?: TokenTracker
+  decisionJournal?: DecisionJournal
+  semanticMemory?: SemanticMemory
 }

@@ -1,0 +1,18 @@
+{
+  "google_auth": false,
+  "plugin": ["opencode-antigravity-auth"],
+  "agents": {
+    "explore": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "librarian": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "document-writer": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "oracle": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "Sisyphus": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" }
+  },
+  "categories": {
+    "visual-engineering": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "artistry": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" },
+    "writing": { "model": "google/antigravity-gemini-claude-opus-4-5-thinking" }
+  }
+}
