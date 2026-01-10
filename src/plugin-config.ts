@@ -16,7 +16,8 @@ export function loadConfigFromPath(
   ctx: unknown
 ): OhMyOpenCodeConfig | null {
   try {
-    if (fs.existsSync(configPath)) {
+    const exists = fs.existsSync(configPath);
+    if (exists) {
       const content = fs.readFileSync(configPath, "utf-8");
       const rawConfig = parseJsonc<Record<string, unknown>>(content);
 
@@ -94,12 +95,16 @@ export function loadPluginConfig(
   ctx: unknown
 ): OhMyOpenCodeConfig {
   // User-level config path (OS-specific) - prefer .jsonc over .json
+  const userConfigDir = getUserConfigDir();
+
   const userBasePath = path.join(
-    getUserConfigDir(),
+    userConfigDir,
     "opencode",
     "oh-my-opencode"
   );
+
   const userDetected = detectConfigFile(userBasePath);
+
   const userConfigPath =
     userDetected.format !== "none"
       ? userDetected.path

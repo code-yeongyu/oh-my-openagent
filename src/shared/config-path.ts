@@ -13,16 +13,20 @@ import * as fs from "fs"
 export function getUserConfigDir(): string {
   if (process.platform === "win32") {
     const crossPlatformDir = path.join(os.homedir(), ".config")
-    const crossPlatformConfigPath = path.join(crossPlatformDir, "opencode", "oh-my-opencode.json")
+    const crossPlatformConfigJson = path.join(crossPlatformDir, "opencode", "oh-my-opencode.json")
+    const crossPlatformConfigJsonc = path.join(crossPlatformDir, "opencode", "oh-my-opencode.jsonc")
 
     const appdataDir = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
-    const appdataConfigPath = path.join(appdataDir, "opencode", "oh-my-opencode.json")
+    const appdataConfigJson = path.join(appdataDir, "opencode", "oh-my-opencode.json")
+    const appdataConfigJsonc = path.join(appdataDir, "opencode", "oh-my-opencode.jsonc")
 
-    if (fs.existsSync(crossPlatformConfigPath)) {
+    // Check cross-platform location first (both .jsonc and .json)
+    if (fs.existsSync(crossPlatformConfigJsonc) || fs.existsSync(crossPlatformConfigJson)) {
       return crossPlatformDir
     }
 
-    if (fs.existsSync(appdataConfigPath)) {
+    // Check APPDATA location (both .jsonc and .json)
+    if (fs.existsSync(appdataConfigJsonc) || fs.existsSync(appdataConfigJson)) {
       return appdataDir
     }
 

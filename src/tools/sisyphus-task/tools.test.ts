@@ -260,6 +260,7 @@ describe("sisyphus-task", () => {
   describe("resume with background parameter", () => {
   test("resume with background=false should wait for result and return content", async () => {
     // #given
+    // Note: Sync resume requires MIN_STABILITY_TIME_MS (5s) + polling, so needs longer timeout
     const { createSisyphusTask } = require("./tools")
     
     const mockTask = {
@@ -319,7 +320,7 @@ describe("sisyphus-task", () => {
     // #then - should contain actual result, not just "Background task resumed"
     expect(result).toContain("This is the resumed task result")
     expect(result).not.toContain("Background task resumed")
-  })
+  }, 10000)
 
   test("resume with background=true should return immediately without waiting", async () => {
     // #given

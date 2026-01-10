@@ -203,6 +203,8 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
+          // Note: Sync resume doesn't have access to model config - uses agent's configured model
+          // For model override on resume, use background=true which stores model from original task
           await client.session.prompt({
             path: { id: args.resume },
             body: {
@@ -319,6 +321,9 @@ ${textContent || "(No text output)"}`
           return `❌ Agent name cannot be empty.`
         }
 
+        // Note: Don't look up model here - agent's configured model is already set in config-handler.ts
+        // User can override agent models via agents.<name>.model or agents.<name>.category in oh-my-opencode.json
+
         // Validate agent exists and is callable (not a primary agent)
         try {
           const agentsResult = await client.app.agents()
@@ -419,12 +424,13 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         })
 
         // Use fire-and-forget prompt() - awaiting causes JSON parse errors with thinking models
-        // Note: Don't pass model in body - use agent's configured model instead
+        // Pass model from category config if available (fixes sync mode model override)
         let promptError: Error | undefined
         client.session.prompt({
           path: { id: sessionID },
           body: {
             agent: agentToUse,
+            ...(categoryModel ? { model: categoryModel } : {}),
             system: systemContent,
             tools: {
               task: false,

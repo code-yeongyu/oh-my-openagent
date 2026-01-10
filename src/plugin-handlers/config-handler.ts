@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgent } from "../agents/sisyphus-junior";
 import {

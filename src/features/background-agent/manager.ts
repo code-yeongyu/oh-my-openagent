@@ -330,7 +330,7 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Note: Don't pass model in body - use agent's configured model instead
+    // Note: Don't pass model in body - use agent's configured model instead (see PR #638)
     // Use prompt() instead of promptAsync() to properly initialize agent loop
     this.client.session.prompt({
       path: { id: existingTask.sessionID },
