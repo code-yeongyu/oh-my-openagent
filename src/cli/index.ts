@@ -9,9 +9,10 @@ import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import { getRuntimeVersionCached } from "../shared/version"
 
-const packageJson = await import("../../package.json")
-const VERSION = packageJson.version
+// Use runtime version resolution to avoid build-time bundling issues
+const VERSION = getRuntimeVersionCached().version
 
 const program = new Command()
 

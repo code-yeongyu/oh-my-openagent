@@ -1,16 +1,23 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getCachedVersion, getLocalDevVersion, findPluginEntry, getLatestVersion, updatePinnedVersion } from "./checker"
+import { findPluginEntry, updatePinnedVersion } from "./checker"
 import { invalidatePackage } from "./cache"
-import { PACKAGE_NAME } from "./constants"
+import { PACKAGE_NAME, CACHE_DIR } from "./constants"
 import { log } from "../../shared/logger"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
 import { runBunInstall } from "../../cli/config-manager"
 import type { AutoUpdateCheckerOptions } from "./types"
+import {
+  checkVersion,
+  detectChannel,
+  isPrerelease,
+  getChannelLabel,
+  type VersionCheckResult,
+} from "../../shared/version"
 
 const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
 
 export function isPrereleaseVersion(version: string): boolean {
-  return version.includes("-")
+  return isPrerelease(version)
 }
 
 export function isDistTag(version: string): boolean {
@@ -26,14 +33,15 @@ export function isPrereleaseOrDistTag(pinnedVersion: string | null): boolean {
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
 
-  const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
+  const getToastMessage = (isUpdate: boolean, latestVersion?: string, channel?: string): string => {
+    const channelNote = channel && channel !== "stable" ? ` (${channel})` : ""
     if (isSisyphusEnabled) {
       return isUpdate
-        ? `Sisyphus on steroids is steering OpenCode.\nv${latestVersion} available. Restart to apply.`
+        ? `Sisyphus on steroids is steering OpenCode.\nv${latestVersion}${channelNote} available. Restart to apply.`
         : `Sisyphus on steroids is steering OpenCode.`
     }
     return isUpdate
-      ? `OpenCode is now on Steroids. oMoMoMoMo...\nv${latestVersion} available. Restart OpenCode to apply.`
+      ? `OpenCode is now on Steroids. oMoMoMoMo...\nv${latestVersion}${channelNote} available. Restart OpenCode to apply.`
       : `OpenCode is now on Steroids. oMoMoMoMo...`
   }
 
@@ -50,13 +58,17 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
       hasChecked = true
 
       setTimeout(async () => {
-        const cachedVersion = getCachedVersion()
-        const localDevVersion = getLocalDevVersion(ctx.directory)
-        const displayVersion = localDevVersion ?? cachedVersion
-
         await showConfigErrorsIfAny(ctx)
 
-        if (localDevVersion) {
+        // Use new version checking system
+        const versionResult = await checkVersion({ cacheDir: CACHE_DIR })
+        const displayVersion = versionResult.currentVersion
+
+        // Check for local dev mode
+        const pluginInfo = findPluginEntry(ctx.directory)
+        const isLocalDev = pluginInfo?.entry.startsWith("file://") ?? false
+
+        if (isLocalDev) {
           if (showStartupToast) {
             showLocalDevToast(ctx, displayVersion, isSisyphusEnabled).catch(() => {})
           }
@@ -68,7 +80,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
           showVersionToast(ctx, displayVersion, getToastMessage(false)).catch(() => {})
         }
 
-        runBackgroundUpdateCheck(ctx, autoUpdate, getToastMessage).catch(err => {
+        runBackgroundUpdateCheckV2(ctx, autoUpdate, versionResult, getToastMessage).catch(err => {
           log("[auto-update-checker] Background update check failed:", err)
         })
       }, 0)
@@ -76,10 +88,18 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
   }
 }
 
-async function runBackgroundUpdateCheck(
+/**
+ * New version-aware update check using the shared version module
+ * 
+ * The version module already determines the best version to offer:
+ * - Stable users: only stable updates
+ * - Beta users: whichever is newer (beta or stable)
+ */
+async function runBackgroundUpdateCheckV2(
   ctx: PluginInput,
   autoUpdate: boolean,
-  getToastMessage: (isUpdate: boolean, latestVersion?: string) => string
+  versionResult: VersionCheckResult,
+  getToastMessage: (isUpdate: boolean, latestVersion?: string, channel?: string) => string
 ): Promise<void> {
   const pluginInfo = findPluginEntry(ctx.directory)
   if (!pluginInfo) {
@@ -87,51 +107,47 @@ async function runBackgroundUpdateCheck(
     return
   }
 
-  const cachedVersion = getCachedVersion()
-  const currentVersion = cachedVersion ?? pluginInfo.pinnedVersion
-  if (!currentVersion) {
-    log("[auto-update-checker] No version found (cached or pinned)")
+  const { currentVersion, currentChannel, latestForChannel, needsUpdate, updateType } = versionResult
+
+  if (!needsUpdate || !latestForChannel) {
+    log(`[auto-update-checker] No update needed (${currentVersion} ${currentChannel})`)
     return
   }
 
-  const latestVersion = await getLatestVersion()
-  if (!latestVersion) {
-    log("[auto-update-checker] Failed to fetch latest version")
-    return
-  }
+  const targetChannel = detectChannel(latestForChannel)
+  log(`[auto-update-checker] Update available: ${currentVersion} (${currentChannel}) → ${latestForChannel} (${targetChannel})`)
 
-  if (currentVersion === latestVersion) {
-    log("[auto-update-checker] Already on latest version")
-    return
-  }
-
-  log(`[auto-update-checker] Update available: ${currentVersion} → ${latestVersion}`)
-
+  // Show notification for all updates
   if (!autoUpdate) {
-    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    await showUpdateAvailableToast(ctx, latestForChannel, (isUpdate, version) => 
+      getToastMessage(isUpdate, version, targetChannel !== "stable" ? getChannelLabel(targetChannel) : undefined)
+    )
     log("[auto-update-checker] Auto-update disabled, notification only")
     return
   }
 
-  // Check if current version is a prerelease - don't auto-downgrade prerelease to stable
-  if (isPrereleaseVersion(currentVersion)) {
-    log(`[auto-update-checker] Skipping auto-update for prerelease version: ${currentVersion}`)
-    return
-  }
-
+  // Handle pinned versions - only auto-update if pinned to a dist-tag (like "beta")
+  // Don't auto-update if pinned to a specific version like "3.0.0-beta.2"
   if (pluginInfo.isPinned) {
-    if (isPrereleaseOrDistTag(pluginInfo.pinnedVersion)) {
-      log(`[auto-update-checker] Skipping auto-update for prerelease/dist-tag: ${pluginInfo.pinnedVersion}`)
+    // If pinned to a dist-tag (e.g., "beta", "latest"), we can update
+    // If pinned to a specific version, skip auto-update
+    if (!isDistTag(pluginInfo.pinnedVersion ?? "")) {
+      log(`[auto-update-checker] Skipping auto-update for pinned version: ${pluginInfo.pinnedVersion}`)
+      await showUpdateAvailableToast(ctx, latestForChannel, (isUpdate, version) => 
+        getToastMessage(isUpdate, version, targetChannel !== "stable" ? getChannelLabel(targetChannel) : undefined)
+      )
       return
     }
 
-    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
+    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestForChannel)
     if (!updated) {
-      await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      await showUpdateAvailableToast(ctx, latestForChannel, (isUpdate, version) => 
+        getToastMessage(isUpdate, version, targetChannel !== "stable" ? getChannelLabel(targetChannel) : undefined)
+      )
       log("[auto-update-checker] Failed to update pinned version in config")
       return
     }
-    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
+    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestForChannel}`)
   }
 
   invalidatePackage(PACKAGE_NAME)
@@ -139,10 +155,12 @@ async function runBackgroundUpdateCheck(
   const installSuccess = await runBunInstallSafe()
 
   if (installSuccess) {
-    await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
-    log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
+    await showAutoUpdatedToast(ctx, currentVersion, latestForChannel)
+    log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestForChannel} (${updateType})`)
   } else {
-    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    await showUpdateAvailableToast(ctx, latestForChannel, (isUpdate, version) => 
+      getToastMessage(isUpdate, version, targetChannel !== "stable" ? getChannelLabel(targetChannel) : undefined)
+    )
     log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
   }
 }
