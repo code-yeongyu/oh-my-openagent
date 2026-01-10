@@ -24,12 +24,22 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
+import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants";
 import type { ModelCacheState } from "../plugin-state";
+import type { CategoryConfig } from "../config/schema";
 
 export interface ConfigHandlerDeps {
   ctx: { directory: string };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+}
+
+function resolveModelFromCategoryWithUserOverride(
+  categoryName: string,
+  userCategories?: Record<string, CategoryConfig>
+): string | undefined {
+  const categoryConfig = userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName];
+  return categoryConfig?.model;
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
@@ -173,10 +183,25 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           planConfigWithoutName as Record<string, unknown>
         );
         const prometheusOverride =
-          pluginConfig.agents?.["Prometheus (Planner)"];
+          pluginConfig.agents?.["Prometheus (Planner)"] as
+            | (Record<string, unknown> & { category?: string; model?: string })
+            | undefined;
         const defaultModel = config.model as string | undefined;
+
+        const resolvedModelFromCategory =
+          prometheusOverride?.category && !prometheusOverride?.model
+            ? resolveModelFromCategoryWithUserOverride(
+                prometheusOverride.category,
+                pluginConfig.categories
+              )
+            : undefined;
+
         const prometheusBase = {
-          model: defaultModel ?? "anthropic/claude-opus-4-5",
+          model:
+            prometheusOverride?.model ??
+            resolvedModelFromCategory ??
+            defaultModel ??
+            "anthropic/claude-opus-4-5",
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
