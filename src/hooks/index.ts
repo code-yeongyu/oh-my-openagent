@@ -14,6 +14,7 @@ export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
+export { createBackgroundCompactionHook } from "./background-compaction"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
