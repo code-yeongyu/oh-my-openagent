@@ -1,6 +1,10 @@
 import { describe, test, expect } from "bun:test"
 import { MOMUS_SYSTEM_PROMPT } from "./momus"
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
   test("should treat SYSTEM DIRECTIVE as ignorable/stripped", () => {
     // #given
@@ -30,7 +34,10 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
     // #when / #then
     // In RED phase, this will FAIL because current prompt explicitly lists this as INVALID
     const invalidExample = "Please review .sisyphus/plans/plan.md"
-    const rejectionTeaching = new RegExp(`reject.*${invalidExample}`, "i")
+    const rejectionTeaching = new RegExp(
+      `reject.*${escapeRegExp(invalidExample)}`,
+      "i",
+    )
     
     // We want the prompt to NOT reject this anymore. 
     // If it's still in the "INVALID" list, this test should fail.
