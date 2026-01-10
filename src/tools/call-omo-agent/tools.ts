@@ -170,23 +170,59 @@ async function executeSync(
   const messages = messagesResult.data
   log(`[call_omo_agent] Got ${messages.length} messages`)
 
+  // Include both assistant messages AND tool messages
+  // Tool results (grep, glob, bash output) come from role "tool"
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lastAssistantMessage = messages
-    .filter((m: any) => m.info.role === "assistant")
-    .sort((a: any, b: any) => (b.info.time?.created || 0) - (a.info.time?.created || 0))[0]
+  const relevantMessages = messages.filter(
+    (m: any) => m.info?.role === "assistant" || m.info?.role === "tool"
+  )
 
-  if (!lastAssistantMessage) {
-    log(`[call_omo_agent] No assistant message found`)
+  if (relevantMessages.length === 0) {
+    log(`[call_omo_agent] No assistant or tool messages found`)
     log(`[call_omo_agent] All messages:`, JSON.stringify(messages, null, 2))
-    return `Error: No assistant response found\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+    return `Error: No assistant or tool response found\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
   }
 
-  log(`[call_omo_agent] Found assistant message with ${lastAssistantMessage.parts.length} parts`)
+  log(`[call_omo_agent] Found ${relevantMessages.length} relevant messages`)
 
+  // Sort by time ascending (oldest first) to process messages in order
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const textParts = lastAssistantMessage.parts.filter((p: any) => p.type === "text")
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const responseText = textParts.map((p: any) => p.text).join("\n")
+  const sortedMessages = [...relevantMessages].sort((a: any, b: any) => {
+    const timeA = a.info?.time?.created ?? 0
+    const timeB = b.info?.time?.created ?? 0
+    return timeA - timeB
+  })
+
+  // Extract content from ALL messages, not just the last one
+  // Tool results may be in earlier messages while the final message is empty
+  const extractedContent: string[] = []
+
+  for (const message of sortedMessages) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const part of (message as any).parts ?? []) {
+      // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
+      if ((part.type === "text" || part.type === "reasoning") && part.text) {
+        extractedContent.push(part.text)
+      } else if (part.type === "tool_result") {
+        // Tool results contain the actual output from tool calls
+        const toolResult = part as { content?: string | Array<{ type: string; text?: string }> }
+        if (typeof toolResult.content === "string" && toolResult.content) {
+          extractedContent.push(toolResult.content)
+        } else if (Array.isArray(toolResult.content)) {
+          // Handle array of content blocks
+          for (const block of toolResult.content) {
+            if ((block.type === "text" || block.type === "reasoning") && block.text) {
+              extractedContent.push(block.text)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const responseText = extractedContent
+    .filter((text) => text.length > 0)
+    .join("\n\n")
 
   log(`[call_omo_agent] Got response, length: ${responseText.length}`)
 
