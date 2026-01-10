@@ -32,6 +32,10 @@ export interface BackgroundTask {
   concurrencyKey?: string
   /** Parent session's agent name for notification */
   parentAgent?: string
+  /** Last message count for stability detection */
+  lastMsgCount?: number
+  /** Number of consecutive polls with stable message count */
+  stablePolls?: number
 }
 
 export interface LaunchInput {

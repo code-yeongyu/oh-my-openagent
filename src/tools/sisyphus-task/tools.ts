@@ -221,6 +221,33 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           return `❌ Failed to send resume prompt: ${errorMessage}\n\nSession ID: ${args.resume}`
         }
 
+        // Wait for message stability after prompt completes
+        const POLL_INTERVAL_MS = 500
+        const MIN_STABILITY_TIME_MS = 5000
+        const STABILITY_POLLS_REQUIRED = 3
+        const pollStart = Date.now()
+        let lastMsgCount = 0
+        let stablePolls = 0
+
+        while (Date.now() - pollStart < 60000) {
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+          
+          const elapsed = Date.now() - pollStart
+          if (elapsed < MIN_STABILITY_TIME_MS) continue
+
+          const messagesCheck = await client.session.messages({ path: { id: args.resume } })
+          const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+          const currentMsgCount = msgs.length
+
+          if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
+            stablePolls++
+            if (stablePolls >= STABILITY_POLLS_REQUIRED) break
+          } else {
+            stablePolls = 0
+            lastMsgCount = currentMsgCount
+          }
+        }
+
         const messagesResult = await client.session.messages({
           path: { id: args.resume },
         })
@@ -250,7 +277,8 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           return `❌ No assistant response found.\n\nSession ID: ${args.resume}`
         }
 
-        const textParts = lastMessage?.parts?.filter((p) => p.type === "text") ?? []
+        // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
+        const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
         const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
 
         const duration = formatDuration(startTime)
@@ -390,13 +418,13 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        // Use promptAsync to avoid changing main session's active state
+        // Use fire-and-forget prompt() - awaiting causes JSON parse errors with thinking models
+        // Note: Don't pass model in body - use agent's configured model instead
         let promptError: Error | undefined
-        await client.session.promptAsync({
+        client.session.prompt({
           path: { id: sessionID },
           body: {
             agent: agentToUse,
-            model: categoryModel,
             system: systemContent,
             tools: {
               task: false,
@@ -407,6 +435,9 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         }).catch((error) => {
           promptError = error instanceof Error ? error : new Error(String(error))
         })
+
+        // Small delay to let the prompt start
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         if (promptError) {
           if (toastManager && taskId !== undefined) {
@@ -419,21 +450,63 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
         }
 
-        // Poll for session completion
+        // Poll for session completion with stability detection
+        // The session may show as "idle" before messages appear, so we also check message stability
         const POLL_INTERVAL_MS = 500
         const MAX_POLL_TIME_MS = 10 * 60 * 1000
+        const MIN_STABILITY_TIME_MS = 10000  // Minimum 10s before accepting completion
+        const STABILITY_POLLS_REQUIRED = 3
         const pollStart = Date.now()
+        let lastMsgCount = 0
+        let stablePolls = 0
 
         while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
           await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+
+          // Check for async errors that may have occurred after the initial 100ms delay
+          // TypeScript doesn't understand async mutation, so we cast to check
+          const asyncError = promptError as Error | undefined
+          if (asyncError) {
+            if (toastManager && taskId !== undefined) {
+              toastManager.removeTask(taskId)
+            }
+            const errorMessage = asyncError.message
+            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+              return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
+            }
+            return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+          }
 
           const statusResult = await client.session.status()
           const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
           const sessionStatus = allStatuses[sessionID]
 
-          // Break if session is idle OR no longer in status (completed and removed)
-          if (!sessionStatus || sessionStatus.type === "idle") {
-            break
+          // If session is actively running, reset stability
+          if (sessionStatus && sessionStatus.type !== "idle") {
+            stablePolls = 0
+            lastMsgCount = 0
+            continue
+          }
+
+          // Session is idle or not in status - check message stability
+          const elapsed = Date.now() - pollStart
+          if (elapsed < MIN_STABILITY_TIME_MS) {
+            continue  // Don't accept completion too early
+          }
+
+          // Get current message count
+          const messagesCheck = await client.session.messages({ path: { id: sessionID } })
+          const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+          const currentMsgCount = msgs.length
+
+          if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
+            stablePolls++
+            if (stablePolls >= STABILITY_POLLS_REQUIRED) {
+              break  // Messages stable for 3 polls - task complete
+            }
+          } else {
+            stablePolls = 0
+            lastMsgCount = currentMsgCount
           }
         }
 
@@ -459,7 +532,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           return `❌ No assistant response found.\n\nSession ID: ${sessionID}`
         }
         
-        const textParts = lastMessage?.parts?.filter((p) => p.type === "text") ?? []
+        // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
+        const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
         const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
 
         const duration = formatDuration(startTime)
