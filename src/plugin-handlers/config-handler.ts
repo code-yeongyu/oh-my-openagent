@@ -34,12 +34,11 @@ export interface ConfigHandlerDeps {
   modelCacheState: ModelCacheState;
 }
 
-export function resolveModelFromCategoryWithUserOverride(
+export function resolveCategoryConfig(
   categoryName: string,
   userCategories?: Record<string, CategoryConfig>
-): string | undefined {
-  const categoryConfig = userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName];
-  return categoryConfig?.model;
+): CategoryConfig | undefined {
+  return userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName];
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
@@ -188,18 +187,20 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             | undefined;
         const defaultModel = config.model as string | undefined;
 
-        const resolvedModelFromCategory =
-          prometheusOverride?.category && !prometheusOverride?.model
-            ? resolveModelFromCategoryWithUserOverride(
-                prometheusOverride.category,
-                pluginConfig.categories
-              )
-            : undefined;
+        // Resolve full category config (model, temperature, top_p, tools, etc.)
+        // Apply all category properties when category is specified, but explicit
+        // overrides (model, temperature, etc.) will take precedence during merge
+        const categoryConfig = prometheusOverride?.category
+          ? resolveCategoryConfig(
+              prometheusOverride.category,
+              pluginConfig.categories
+            )
+          : undefined;
 
         const prometheusBase = {
           model:
             prometheusOverride?.model ??
-            resolvedModelFromCategory ??
+            categoryConfig?.model ??
             defaultModel ??
             "anthropic/claude-opus-4-5",
           mode: "primary" as const,
@@ -207,6 +208,24 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
           color: (configAgent?.plan?.color as string) ?? "#FF6347",
+          // Apply category properties (temperature, top_p, tools, etc.)
+          ...(categoryConfig?.temperature !== undefined
+            ? { temperature: categoryConfig.temperature }
+            : {}),
+          ...(categoryConfig?.top_p !== undefined
+            ? { top_p: categoryConfig.top_p }
+            : {}),
+          ...(categoryConfig?.maxTokens !== undefined
+            ? { maxTokens: categoryConfig.maxTokens }
+            : {}),
+          ...(categoryConfig?.tools ? { tools: categoryConfig.tools } : {}),
+          ...(categoryConfig?.thinking ? { thinking: categoryConfig.thinking } : {}),
+          ...(categoryConfig?.reasoningEffort !== undefined
+            ? { reasoningEffort: categoryConfig.reasoningEffort }
+            : {}),
+          ...(categoryConfig?.textVerbosity !== undefined
+            ? { textVerbosity: categoryConfig.textVerbosity }
+            : {}),
         };
 
         agentConfig["Prometheus (Planner)"] = prometheusOverride
