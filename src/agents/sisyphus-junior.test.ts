@@ -223,6 +223,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // #then
       const baseEndIndex = result.prompt!.indexOf("Dense > verbose.")
       const appendIndex = result.prompt!.indexOf("CUSTOM_MARKER_FOR_TEST")
+      expect(baseEndIndex).not.toBe(-1) // Guard: anchor text must exist in base prompt
       expect(appendIndex).toBeGreaterThan(baseEndIndex)
     })
   })
