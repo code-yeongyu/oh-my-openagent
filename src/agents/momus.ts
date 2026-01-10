@@ -17,7 +17,7 @@ import { createAgentToolRestrictions } from "../shared/permission-compat"
  * implementation.
  */
 
-const DEFAULT_MODEL = "opencode/grok-code"
+const DEFAULT_MODEL = "openai/gpt-5.2"
 
 export const MOMUS_SYSTEM_PROMPT = `You are a work plan review expert. You review the provided work plan (.sisyphus/plans/{name}.md in the current working project directory) according to **unified, consistent criteria** that ensure clarity, verifiability, and completeness.
 
