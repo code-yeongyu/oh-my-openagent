@@ -63,7 +63,7 @@ async function loadSkillFromPath(
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
-    const { data } = parseFrontmatter<SkillMetadata>(content)
+    const { data, body } = parseFrontmatter<SkillMetadata>(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -73,14 +73,7 @@ async function loadSkillFromPath(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
-    const lazyContent: LazyContentLoader = {
-      loaded: false,
-      content: undefined,
-      load: async () => {
-        if (!lazyContent.loaded) {
-          const fileContent = await fs.readFile(skillPath, "utf-8")
-          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
-          lazyContent.content = `<skill-instruction>
+    const wrappedTemplate = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -90,6 +83,13 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
+
+    const lazyContent: LazyContentLoader = {
+      loaded: false,
+      content: undefined,
+      load: async () => {
+        if (!lazyContent.loaded) {
+          lazyContent.content = wrappedTemplate
           lazyContent.loaded = true
         }
         return lazyContent.content!
@@ -99,7 +99,7 @@ $ARGUMENTS
     const definition: CommandDefinition = {
       name: skillName,
       description: formattedDescription,
-      template: "",
+      template: wrappedTemplate,
       model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
       agent: data.agent,
       subtask: data.subtask,
