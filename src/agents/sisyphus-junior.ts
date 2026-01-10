@@ -1,9 +1,10 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { CategoryConfig } from "../config/schema"
+import type { AgentOverrideConfig, CategoryConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   migrateAgentConfig,
+  supportsNewPermissionSystem,
 } from "../shared/permission-compat"
 
 const SISYPHUS_JUNIOR_PROMPT = `<Role>
@@ -76,6 +77,71 @@ function buildSisyphusJuniorPrompt(promptAppend?: string): string {
 
 // Core tools that Sisyphus-Junior must NEVER have access to
 const BLOCKED_TOOLS = ["task", "sisyphus_task", "call_omo_agent"]
+
+export const SISYPHUS_JUNIOR_DEFAULTS = {
+  model: "anthropic/claude-sonnet-4-5",
+  temperature: 0.1,
+} as const
+
+export function createSisyphusJuniorAgentWithOverrides(
+  override: AgentOverrideConfig | undefined
+): AgentConfig {
+  if (override?.disable) {
+    override = undefined
+  }
+
+  const model = override?.model ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
+
+  const promptAppend = override?.prompt_append
+  const prompt = buildSisyphusJuniorPrompt(promptAppend)
+
+  const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
+
+  let toolsConfig: Record<string, unknown> = {}
+  if (supportsNewPermissionSystem()) {
+    const userPermission = (override?.permission ?? {}) as Record<string, string>
+    const basePermission = (baseRestrictions as { permission: Record<string, string> }).permission
+    const merged: Record<string, string> = { ...userPermission }
+    for (const tool of BLOCKED_TOOLS) {
+      merged[tool] = "deny"
+    }
+    toolsConfig = { permission: { ...merged, ...basePermission } }
+  } else {
+    const userTools = override?.tools ?? {}
+    const baseTools = (baseRestrictions as { tools: Record<string, boolean> }).tools
+    const merged: Record<string, boolean> = { ...userTools }
+    for (const tool of BLOCKED_TOOLS) {
+      merged[tool] = false
+    }
+    toolsConfig = { tools: { ...merged, ...baseTools } }
+  }
+
+  const base: AgentConfig = {
+    description: override?.description ??
+      "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
+    mode: "subagent" as const,
+    model,
+    temperature,
+    maxTokens: 64000,
+    prompt,
+    color: override?.color ?? "#20B2AA",
+    ...toolsConfig,
+  }
+
+  if (override?.top_p !== undefined) {
+    base.top_p = override.top_p
+  }
+
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium" } as AgentConfig
+  }
+
+  return {
+    ...base,
+    thinking: { type: "enabled", budgetTokens: 32000 },
+  } as AgentConfig
+}
 
 export function createSisyphusJuniorAgent(
   categoryConfig: CategoryConfig,

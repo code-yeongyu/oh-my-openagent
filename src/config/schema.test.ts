@@ -315,3 +315,76 @@ describe("BuiltinCategoryNameSchema", () => {
     }
   })
 })
+
+describe("Sisyphus-Junior agent override", () => {
+  test("schema accepts agents['Sisyphus-Junior'] and retains the key after parsing", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          model: "openai/gpt-5.2",
+          temperature: 0.2,
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]).toBeDefined()
+      expect(result.data.agents?.["Sisyphus-Junior"]?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.["Sisyphus-Junior"]?.temperature).toBe(0.2)
+    }
+  })
+
+  test("schema accepts Sisyphus-Junior with prompt_append", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          prompt_append: "Additional instructions for Sisyphus-Junior",
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]?.prompt_append).toBe(
+        "Additional instructions for Sisyphus-Junior"
+      )
+    }
+  })
+
+  test("schema accepts Sisyphus-Junior with tools override", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          tools: {
+            read: true,
+            write: false,
+          },
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]?.tools).toEqual({
+        read: true,
+        write: false,
+      })
+    }
+  })
+})
