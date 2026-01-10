@@ -9,7 +9,9 @@ export * from "./constants"
 
 function isAllowedFile(filePath: string): boolean {
   const hasAllowedExtension = ALLOWED_EXTENSIONS.some(ext => filePath.endsWith(ext))
-  const isInAllowedPath = filePath.includes(ALLOWED_PATH_PREFIX)
+  // Normalize path separators for cross-platform compatibility (Windows uses backslashes)
+  const normalizedPath = filePath.replace(/\\/g, "/")
+  const isInAllowedPath = normalizedPath.includes(ALLOWED_PATH_PREFIX)
   return hasAllowedExtension && isInAllowedPath
 }
 
