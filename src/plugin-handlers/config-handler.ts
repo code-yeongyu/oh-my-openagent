@@ -34,7 +34,7 @@ export interface ConfigHandlerDeps {
   modelCacheState: ModelCacheState;
 }
 
-function resolveModelFromCategoryWithUserOverride(
+export function resolveModelFromCategoryWithUserOverride(
   categoryName: string,
   userCategories?: Record<string, CategoryConfig>
 ): string | undefined {

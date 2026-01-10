@@ -1,14 +1,6 @@
 import { describe, test, expect } from "bun:test"
-import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
+import { resolveModelFromCategoryWithUserOverride } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
-
-function resolveModelFromCategoryWithUserOverride(
-  categoryName: string,
-  userCategories?: Record<string, CategoryConfig>
-): string | undefined {
-  const categoryConfig = userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName]
-  return categoryConfig?.model
-}
 
 describe("Prometheus category model resolution", () => {
   test("resolves ultrabrain category to openai/gpt-5.2", () => {
