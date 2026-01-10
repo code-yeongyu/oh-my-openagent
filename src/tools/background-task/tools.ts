@@ -176,8 +176,13 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
   // Handle both SDK response structures: direct array or wrapped in .data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
-    info?: { role?: string }
-    parts?: Array<{ type?: string; text?: string }>
+    info?: { role?: string; time?: string }
+    parts?: Array<{ 
+      type?: string
+      text?: string
+      content?: string | Array<{ type: string; text?: string }>
+      name?: string
+    }>
   }>
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -193,11 +198,13 @@ Session ID: ${task.sessionID}
 (No messages found)`
   }
 
-  const assistantMessages = messages.filter(
-    (m) => m.info?.role === "assistant"
+  // Include both assistant messages AND tool messages
+  // Tool results (grep, glob, bash output) come from role "tool"
+  const relevantMessages = messages.filter(
+    (m) => m.info?.role === "assistant" || m.info?.role === "tool"
   )
 
-  if (assistantMessages.length === 0) {
+  if (relevantMessages.length === 0) {
     return `Task Result
 
 Task ID: ${task.id}
@@ -207,17 +214,46 @@ Session ID: ${task.sessionID}
 
 ---
 
-(No assistant response found)`
+(No assistant or tool response found)`
   }
 
-  const lastMessage = assistantMessages[assistantMessages.length - 1]
-  const textParts = lastMessage?.parts?.filter(
-    (p) => p.type === "text"
-  ) ?? []
-  const textContent = textParts
-    .map((p) => p.text ?? "")
+  // Sort by time ascending (oldest first) to process messages in order
+  const sortedMessages = [...relevantMessages].sort((a, b) => {
+    const timeA = String((a as { info?: { time?: string } }).info?.time ?? "")
+    const timeB = String((b as { info?: { time?: string } }).info?.time ?? "")
+    return timeA.localeCompare(timeB)
+  })
+  
+  // Extract content from ALL messages, not just the last one
+  // Tool results may be in earlier messages while the final message is empty
+  const extractedContent: string[] = []
+  
+  for (const message of sortedMessages) {
+    for (const part of message.parts ?? []) {
+      // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
+      if ((part.type === "text" || part.type === "reasoning") && part.text) {
+        extractedContent.push(part.text)
+      } else if (part.type === "tool_result") {
+        // Tool results contain the actual output from tool calls
+        const toolResult = part as { content?: string | Array<{ type: string; text?: string }> }
+        if (typeof toolResult.content === "string" && toolResult.content) {
+          extractedContent.push(toolResult.content)
+        } else if (Array.isArray(toolResult.content)) {
+          // Handle array of content blocks
+          for (const block of toolResult.content) {
+            // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
+            if ((block.type === "text" || block.type === "reasoning") && block.text) {
+              extractedContent.push(block.text)
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  const textContent = extractedContent
     .filter((text) => text.length > 0)
-    .join("\n")
+    .join("\n\n")
 
   const duration = formatDuration(task.startedAt, task.completedAt)
 

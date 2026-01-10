@@ -194,4 +194,4 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   })
 }
 
-export const skill = createSkillTool()
+export const skill: ToolDefinition = createSkillTool()
