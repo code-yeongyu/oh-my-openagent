@@ -315,7 +315,7 @@ ${textContent || "(No text output)"}`
       }
 
       let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string } | undefined
+      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
 
       if (args.category) {
@@ -325,7 +325,12 @@ ${textContent || "(No text output)"}`
         }
 
         agentToUse = SISYPHUS_JUNIOR_AGENT
-        categoryModel = parseModelString(resolved.config.model)
+        const parsedModel = parseModelString(resolved.config.model)
+        categoryModel = parsedModel
+          ? (resolved.config.variant
+            ? { ...parsedModel, variant: resolved.config.variant }
+            : parsedModel)
+          : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
       } else {
         agentToUse = args.subagent_type!.trim()

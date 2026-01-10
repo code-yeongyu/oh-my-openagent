@@ -97,6 +97,7 @@ export const BuiltinCommandNameSchema = z.enum([
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
   /** Skill names to inject into agent prompt */
@@ -153,6 +154,7 @@ export const SisyphusAgentConfigSchema = z.object({
 
 export const CategoryConfigSchema = z.object({
   model: z.string(),
+  variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
