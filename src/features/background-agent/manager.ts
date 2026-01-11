@@ -14,6 +14,12 @@ import { getTaskToastManager } from "../task-toast-manager"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
+// MIN_IDLE_TIME_MS: Minimum time before accepting session.idle as completion
+// This prevents false positives when SDK emits idle before agent fully starts
+const MIN_IDLE_TIME_MS = 5000
+// MAX_RUN_TIME_MS: Global timeout to prevent tasks from running forever
+// Reference: kdcokenny/opencode-background-agents uses 15 minutes
+const MAX_RUN_TIME_MS = 15 * 60 * 1000
 
 type OpencodeClient = PluginInput["client"]
 
@@ -177,6 +183,25 @@ export class BackgroundManager {
         })
       }
     })
+
+    // Global timeout: Prevent tasks from running forever (15 min max)
+    // Reference: kdcokenny/opencode-background-agents uses same pattern
+    setTimeout(() => {
+      const currentTask = this.tasks.get(task.id)
+      if (currentTask && currentTask.status === "running") {
+        log("[background-agent] Task timed out after 15 minutes:", task.id)
+        currentTask.status = "error"
+        currentTask.error = `Task timed out after ${MAX_RUN_TIME_MS / 1000 / 60} minutes`
+        currentTask.completedAt = new Date()
+        if (currentTask.concurrencyKey) {
+          this.concurrencyManager.release(currentTask.concurrencyKey)
+        }
+        this.markForNotification(currentTask)
+        this.notifyParentSession(currentTask).catch(err => {
+          log("[background-agent] Failed to notify on timeout:", err)
+        })
+      }
+    }, MAX_RUN_TIME_MS)
 
     return task
   }
@@ -383,33 +408,21 @@ export class BackgroundManager {
 
       // Edge guard: Require minimum elapsed time (5 seconds) before accepting idle
       const elapsedMs = Date.now() - task.startedAt.getTime()
-      const MIN_IDLE_TIME_MS = 5000
       if (elapsedMs < MIN_IDLE_TIME_MS) {
         log("[background-agent] Ignoring early session.idle, elapsed:", { elapsedMs, taskId: task.id })
         return
       }
 
-      // Edge guard: Verify session has actual assistant output before completing
-      this.validateSessionHasOutput(sessionID).then(async (hasValidOutput) => {
-        if (!hasValidOutput) {
-          log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
-          return
-        }
-
-        const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-        if (hasIncompleteTodos) {
-          log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
-          return
-        }
-
-        task.status = "completed"
-        task.completedAt = new Date()
-        this.markForNotification(task)
-        await this.notifyParentSession(task)
-        log("[background-agent] Task completed via session.idle event:", task.id)
-      }).catch(err => {
-        log("[background-agent] Error in session.idle handler:", err)
+      // SIMPLIFIED: Mark complete immediately on session.idle (after min time)
+      // Reference: kdcokenny/opencode-background-agents uses same pattern
+      // Previous guards (validateSessionHasOutput, checkSessionTodos) were causing stuck tasks
+      task.status = "completed"
+      task.completedAt = new Date()
+      this.markForNotification(task)
+      this.notifyParentSession(task).catch(err => {
+        log("[background-agent] Error notifying parent on completion:", err)
       })
+      log("[background-agent] Task completed via session.idle event:", task.id)
     }
 
     if (event.type === "session.deleted") {

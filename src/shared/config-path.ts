@@ -13,16 +13,20 @@ import * as fs from "fs"
 export function getUserConfigDir(): string {
   if (process.platform === "win32") {
     const crossPlatformDir = path.join(os.homedir(), ".config")
-    const crossPlatformConfigPath = path.join(crossPlatformDir, "opencode", "oh-my-opencode.json")
+    // Check JSONC first, then JSON
+    const crossPlatformConfigPathJsonc = path.join(crossPlatformDir, "opencode", "oh-my-opencode.jsonc")
+    const crossPlatformConfigPathJson = path.join(crossPlatformDir, "opencode", "oh-my-opencode.json")
 
     const appdataDir = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming")
-    const appdataConfigPath = path.join(appdataDir, "opencode", "oh-my-opencode.json")
+    const appdataConfigPathJsonc = path.join(appdataDir, "opencode", "oh-my-opencode.jsonc")
+    const appdataConfigPathJson = path.join(appdataDir, "opencode", "oh-my-opencode.json")
 
-    if (fs.existsSync(crossPlatformConfigPath)) {
+    // Priority: ~/.config (JSONC > JSON) > %APPDATA% (JSONC > JSON)
+    if (fs.existsSync(crossPlatformConfigPathJsonc) || fs.existsSync(crossPlatformConfigPathJson)) {
       return crossPlatformDir
     }
 
-    if (fs.existsSync(appdataConfigPath)) {
+    if (fs.existsSync(appdataConfigPathJsonc) || fs.existsSync(appdataConfigPathJson)) {
       return appdataDir
     }
 
@@ -34,14 +38,26 @@ export function getUserConfigDir(): string {
 
 /**
  * Returns the full path to the user-level oh-my-opencode config file.
+ * Checks for .jsonc first, then .json
  */
 export function getUserConfigPath(): string {
-  return path.join(getUserConfigDir(), "opencode", "oh-my-opencode.json")
+  const dir = path.join(getUserConfigDir(), "opencode")
+  const jsoncPath = path.join(dir, "oh-my-opencode.jsonc")
+  if (fs.existsSync(jsoncPath)) {
+    return jsoncPath
+  }
+  return path.join(dir, "oh-my-opencode.json")
 }
 
 /**
  * Returns the full path to the project-level oh-my-opencode config file.
+ * Checks for .jsonc first, then .json
  */
 export function getProjectConfigPath(directory: string): string {
-  return path.join(directory, ".opencode", "oh-my-opencode.json")
+  const dir = path.join(directory, ".opencode")
+  const jsoncPath = path.join(dir, "oh-my-opencode.jsonc")
+  if (fs.existsSync(jsoncPath)) {
+    return jsoncPath
+  }
+  return path.join(dir, "oh-my-opencode.json")
 }

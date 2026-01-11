@@ -419,21 +419,30 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        try {
-          await client.session.prompt({
-            path: { id: sessionID },
-            body: {
-              agent: agentToUse,
-              system: systemContent,
-              tools: {
-                task: false,
-                sisyphus_task: false,
-              },
-              parts: [{ type: "text", text: args.prompt }],
-              ...(categoryModel ? { model: categoryModel } : {}),
+        // Use fire-and-forget prompt() - awaiting causes JSON parse errors with thinking models
+        // For category-based tasks, pass the model from category config
+        // For agent-based tasks, use agent's configured model (don't pass model in body)
+        let promptError: Error | undefined
+        client.session.prompt({
+          path: { id: sessionID },
+          body: {
+            agent: agentToUse,
+            system: systemContent,
+            tools: {
+              task: false,
+              sisyphus_task: false,
             },
-          })
-        } catch (promptError) {
+            parts: [{ type: "text", text: args.prompt }],
+            ...(categoryModel ? { model: categoryModel } : {}),
+          },
+        }).catch((error) => {
+          promptError = error instanceof Error ? error : new Error(String(error))
+        })
+
+        // Small delay to let the prompt start
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        if (promptError) {
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }

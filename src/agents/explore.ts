@@ -39,6 +39,7 @@ export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
     mode: "subagent" as const,
     model,
     temperature: 0.1,
+    max_steps: 25,
     ...restrictions,
     prompt: `You are a codebase search specialist. Your job: find files and code, return actionable results.
 
