@@ -186,15 +186,18 @@ export class BackgroundManager {
 
     // Global timeout: Prevent tasks from running forever (15 min max)
     // Reference: kdcokenny/opencode-background-agents uses same pattern
-    task.timeoutTimer = setTimeout(() => {
+    const timeout = setTimeout(() => {
       const currentTask = this.tasks.get(task.id)
       if (currentTask && currentTask.status === "running") {
         log("[background-agent] Task timed out after 15 minutes:", task.id)
         currentTask.status = "error"
         currentTask.error = `Task timed out after ${MAX_RUN_TIME_MS / 1000 / 60} minutes`
         currentTask.completedAt = new Date()
+        // Clear timeout timer first to prevent double-release
+        currentTask.timeoutTimer = undefined
         if (currentTask.concurrencyKey) {
           this.concurrencyManager.release(currentTask.concurrencyKey)
+          currentTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(currentTask)
         this.notifyParentSession(currentTask).catch(err => {
@@ -202,6 +205,9 @@ export class BackgroundManager {
         })
       }
     }, MAX_RUN_TIME_MS)
+    // Prevent timeout from keeping the event loop alive
+    timeout.unref?.()
+    task.timeoutTimer = timeout
 
     return task
   }
@@ -298,6 +304,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    // P2 fix: Reset startedAt on resume to prevent immediate completion
+    // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
+    existingTask.startedAt = new Date()
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
