@@ -420,7 +420,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         })
 
         // Use fire-and-forget prompt() - awaiting causes JSON parse errors with thinking models
-        // Note: Don't pass model in body - use agent's configured model instead
+        // For category-based tasks, pass the model from category config
+        // For agent-based tasks, use agent's configured model (don't pass model in body)
         let promptError: Error | undefined
         client.session.prompt({
           path: { id: sessionID },
@@ -432,6 +433,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               sisyphus_task: false,
             },
             parts: [{ type: "text", text: args.prompt }],
+            ...(categoryModel ? { model: categoryModel } : {}),
           },
         }).catch((error) => {
           promptError = error instanceof Error ? error : new Error(String(error))

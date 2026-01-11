@@ -27,7 +27,8 @@ export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, background_task: false },
+    max_steps: 30,
+    tools: { write: false, edit: false, background_task: false, task: false, sisyphus_task: false, call_omo_agent: false },
     prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.
