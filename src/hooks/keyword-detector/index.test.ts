@@ -1,7 +1,95 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { createKeywordDetectorHook } from "./index"
 import { setMainSession } from "../../features/claude-code-session-state"
+import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
+import * as sessionState from "../../features/claude-code-session-state"
+
+describe("keyword-detector registers to ContextCollector", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+  let getMainSessionSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+  })
+
+  function createMockPluginInput() {
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+      },
+    } as any
+  }
+
+  test("should register ultrawork keyword to ContextCollector", async () => {
+    // #given - a fresh ContextCollector and keyword-detector hook
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-123"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork do something" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - ultrawork context should be registered in collector
+    expect(collector.hasPending(sessionID)).toBe(true)
+    const pending = collector.getPending(sessionID)
+    expect(pending.entries.length).toBeGreaterThan(0)
+    expect(pending.entries[0].source).toBe("keyword-detector")
+    expect(pending.entries[0].id).toBe("keyword-ultrawork")
+  })
+
+  test("should register search keyword to ContextCollector", async () => {
+    // #given - mock getMainSessionID to return our session (isolate from global state)
+    const collector = new ContextCollector()
+    const sessionID = "search-test-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the bug" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - search context should be registered in collector
+    expect(collector.hasPending(sessionID)).toBe(true)
+    const pending = collector.getPending(sessionID)
+    expect(pending.entries.some((e) => e.id === "keyword-search")).toBe(true)
+  })
+
+  test("should NOT register to collector when no keywords detected", async () => {
+    // #given - no keywords in message
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "just a normal message" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - nothing should be registered
+    expect(collector.hasPending(sessionID)).toBe(false)
+  })
+})
 
 describe("keyword-detector session filtering", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
