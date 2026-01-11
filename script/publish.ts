@@ -114,6 +114,9 @@ function getDistTag(version: string): string | null {
 }
 
 async function buildAndPublish(version: string): Promise<void> {
+  console.log("\nBuilding before publish...")
+  await $`bun run clean && bun run build`
+
   console.log("\nPublishing to npm...")
   const distTag = getDistTag(version)
   const tagArgs = distTag ? ["--tag", distTag] : []
