@@ -384,6 +384,16 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      // Clean up timeout timer created for this resume
+      if (existingTask.timeoutTimer) {
+        clearTimeout(existingTask.timeoutTimer)
+        existingTask.timeoutTimer = undefined
+      }
+      // Release concurrency key to unblock queued tasks
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
