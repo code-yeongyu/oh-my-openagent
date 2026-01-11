@@ -135,6 +135,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
     - [MCPs](#mcps)
     - [LSP](#lsp)
     - [Experimental](#experimental)
+    - [Environment Variables](#environment-variables)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
   - [Loved by professionals at](#loved-by-professionals-at)
@@ -1180,6 +1181,12 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `dcp_for_compaction`              | `false` | Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded. Prunes duplicate tool calls and old tool outputs before running compaction.                       |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OPENCODE_CONFIG_DIR` | Override the OpenCode configuration directory. Useful for profile isolation with tools like [OCX](https://github.com/kdcokenny/ocx) ghost mode. |
 
 
 ## Author's Note
