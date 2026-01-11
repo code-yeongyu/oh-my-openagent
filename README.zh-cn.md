@@ -419,7 +419,7 @@ opencode auth login
 
 **除非用户明确要求，否则不要更改模型设置或禁用功能（智能体、钩子、MCP）。**
 
-该插件默认情况下运行良好。除了推荐的 `google_auth: true` 设置外，不要在没有明确请求的情况下更改其他设置或关闭功能。
+该插件默认情况下运行良好。未使用外部 Antigravity 插件时保持 `google_auth: true`；如果按上方说明接入 `opencode-antigravity-auth`，请将 `google_auth` 设为 `false` 并覆盖智能体模型。除此之外，不要在没有明确请求的情况下更改其他设置或关闭功能。
 
 ### 验证安装
 
@@ -568,7 +568,7 @@ gh repo star code-yeongyu/oh-my-opencode
 
 这些工具使智能体能够引用之前的对话并在会话之间保持连续性。
 
-#### 上下文就是你徐雅蝶一切
+#### 上下文就是一切
 - **目录 AGENTS.md / README.md 注入器**：读取文件时自动注入 `AGENTS.md` 和 `README.md`。从文件目录向上遍历到项目根目录，收集路径上的**所有** `AGENTS.md` 文件。支持嵌套的目录特定说明：
   ```
   project/
