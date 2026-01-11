@@ -54,7 +54,9 @@ export async function getLocalVersion(options: GetLocalVersionOptions = {}): Pro
       return 1
     }
 
-    const latestVersion = await getLatestVersion()
+    const { extractChannel } = await import("../../hooks/auto-update-checker/index")
+    const channel = extractChannel(pluginInfo?.pinnedVersion ?? currentVersion)
+    const latestVersion = await getLatestVersion(channel)
     
     if (!latestVersion) {
       const info: VersionInfo = {
