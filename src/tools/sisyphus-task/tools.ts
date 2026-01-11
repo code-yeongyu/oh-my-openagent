@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { SisyphusTaskArgs } from "./types"
-import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
+import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
 import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
@@ -89,6 +89,7 @@ export interface SisyphusTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
   userCategories?: CategoriesConfig
+  gitMasterConfig?: GitMasterConfig
 }
 
 export interface BuildSystemContentInput {
@@ -111,7 +112,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
-  const { manager, client, userCategories } = options
+  const { manager, client, userCategories, gitMasterConfig } = options
 
   return tool({
     description: SISYPHUS_TASK_DESCRIPTION,
@@ -136,7 +137,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       let skillContent: string | undefined
       if (args.skills.length > 0) {
-        const { resolved, notFound } = resolveMultipleSkills(args.skills)
+        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig })
         if (notFound.length > 0) {
           const available = createBuiltinSkills().map(s => s.name).join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
