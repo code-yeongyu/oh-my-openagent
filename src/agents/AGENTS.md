@@ -33,7 +33,7 @@ agents/
 |-------|---------------|----------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | - | Primary orchestrator with extended thinking |
 | oracle | openai/gpt-5.2 | - | Read-only consultation. High-IQ debugging, architecture |
-| librarian | anthropic/claude-sonnet-4-5 | google/gemini-3-flash | Docs, OSS research, GitHub examples |
+| librarian | opencode/glm-4.7-free | - | Docs, OSS research, GitHub examples |
 | explore | opencode/grok-code | google/gemini-3-flash, anthropic/claude-haiku-4-5 | Fast contextual grep |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | UI/UX code generation |
 | document-writer | google/gemini-3-pro-preview | - | Technical writing |
