@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
 
@@ -47,6 +47,11 @@ function getTauriConfigDir(identifier: string): string {
 }
 
 function getCliConfigDir(): string {
+  const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (envConfigDir) {
+    return resolve(envConfigDir)
+  }
+
   if (process.platform === "win32") {
     const crossPlatformDir = join(homedir(), ".config", "opencode")
     const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
@@ -107,6 +112,11 @@ export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenC
 
 export function detectExistingConfigDir(binary: OpenCodeBinaryType, version?: string | null): string | null {
   const locations: string[] = []
+
+  const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (envConfigDir) {
+    locations.push(resolve(envConfigDir))
+  }
 
   if (binary === "opencode-desktop") {
     const identifier = isDevBuild(version) ? TAURI_APP_IDENTIFIER_DEV : TAURI_APP_IDENTIFIER
