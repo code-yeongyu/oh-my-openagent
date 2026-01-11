@@ -176,6 +176,7 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
+          existingTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
@@ -333,6 +334,32 @@ export class BackgroundManager {
 
     log("[background-agent] Resuming task:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
 
+    // Clear any existing timeout and create a new one for the resumed task
+    if (existingTask.timeoutTimer) {
+      clearTimeout(existingTask.timeoutTimer)
+      existingTask.timeoutTimer = undefined
+    }
+    const timeout = setTimeout(() => {
+      const currentTask = this.tasks.get(existingTask.id)
+      if (currentTask && currentTask.status === "running") {
+        log("[background-agent] Resumed task timed out after 15 minutes:", existingTask.id)
+        currentTask.status = "error"
+        currentTask.error = `Task timed out after ${MAX_RUN_TIME_MS / 1000 / 60} minutes`
+        currentTask.completedAt = new Date()
+        currentTask.timeoutTimer = undefined
+        if (currentTask.concurrencyKey) {
+          this.concurrencyManager.release(currentTask.concurrencyKey)
+          currentTask.concurrencyKey = undefined
+        }
+        this.markForNotification(currentTask)
+        this.notifyParentSession(currentTask).catch(err => {
+          log("[background-agent] Failed to notify on resume timeout:", err)
+        })
+      }
+    }, MAX_RUN_TIME_MS)
+    timeout.unref?.()
+    existingTask.timeoutTimer = timeout
+
     log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
       sessionID: existingTask.sessionID,
       agent: existingTask.agent,
@@ -454,6 +481,7 @@ export class BackgroundManager {
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
       }
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
@@ -710,6 +738,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
         }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
