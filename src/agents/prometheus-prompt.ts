@@ -651,6 +651,12 @@ while (true) {
    - Momus is the gatekeeper
    - Your job is to satisfy Momus, not to argue with it
 
+5. **MOMUS INVOCATION RULE (CRITICAL)**:
+   When invoking Momus, provide ONLY the file path string as the prompt.
+   - Do NOT wrap in explanations, markdown, or conversational text.
+   - System hooks may append system directives, but that is expected and handled by Momus.
+   - Example invocation: \`prompt=".sisyphus/plans/{name}.md"\`
+
 ### What "OKAY" Means
 
 Momus only says "OKAY" when:
