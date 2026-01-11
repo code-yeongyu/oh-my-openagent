@@ -231,7 +231,7 @@ export function updatePinnedVersion(configPath: string, oldEntry: string, newVer
   }
 }
 
-export async function getLatestVersion(): Promise<string | null> {
+export async function getLatestVersion(channel: string = "latest"): Promise<string | null> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), NPM_FETCH_TIMEOUT)
 
@@ -244,7 +244,7 @@ export async function getLatestVersion(): Promise<string | null> {
     if (!response.ok) return null
 
     const data = (await response.json()) as NpmDistTags
-    return data.latest ?? null
+    return data[channel] ?? data.latest ?? null
   } catch {
     return null
   } finally {
@@ -264,24 +264,21 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
     return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false, isPinned: false }
   }
 
-  if (pluginInfo.isPinned) {
-    log(`[auto-update-checker] Version pinned to ${pluginInfo.pinnedVersion}, skipping update check`)
-    return { needsUpdate: false, currentVersion: pluginInfo.pinnedVersion, latestVersion: null, isLocalDev: false, isPinned: true }
-  }
-
-  const currentVersion = getCachedVersion()
+  const currentVersion = getCachedVersion() ?? pluginInfo.pinnedVersion
   if (!currentVersion) {
     log("[auto-update-checker] No cached version found")
     return { needsUpdate: false, currentVersion: null, latestVersion: null, isLocalDev: false, isPinned: false }
   }
 
-  const latestVersion = await getLatestVersion()
+  const { extractChannel } = await import("./index")
+  const channel = extractChannel(pluginInfo.pinnedVersion ?? currentVersion)
+  const latestVersion = await getLatestVersion(channel)
   if (!latestVersion) {
-    log("[auto-update-checker] Failed to fetch latest version")
-    return { needsUpdate: false, currentVersion, latestVersion: null, isLocalDev: false, isPinned: false }
+    log("[auto-update-checker] Failed to fetch latest version for channel:", channel)
+    return { needsUpdate: false, currentVersion, latestVersion: null, isLocalDev: false, isPinned: pluginInfo.isPinned }
   }
 
   const needsUpdate = currentVersion !== latestVersion
-  log(`[auto-update-checker] Current: ${currentVersion}, Latest: ${latestVersion}, NeedsUpdate: ${needsUpdate}`)
-  return { needsUpdate, currentVersion, latestVersion, isLocalDev: false, isPinned: false }
+  log(`[auto-update-checker] Current: ${currentVersion}, Latest (${channel}): ${latestVersion}, NeedsUpdate: ${needsUpdate}`)
+  return { needsUpdate, currentVersion, latestVersion, isLocalDev: false, isPinned: pluginInfo.isPinned }
 }
