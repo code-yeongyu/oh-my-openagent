@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
+import { getSessionAgent } from "../claude-code-session-state"
 
 export interface StoredMessage {
   agent?: string
@@ -109,7 +110,7 @@ export function injectHookMessage(
   const messageID = generateMessageId()
   const partID = generatePartId()
 
-  const resolvedAgent = originalMessage.agent ?? fallback?.agent ?? "general"
+  const resolvedAgent = originalMessage.agent ?? fallback?.agent ?? getSessionAgent(sessionID) ?? "general"
   const resolvedModel =
     originalMessage.model?.providerID && originalMessage.model?.modelID
       ? { providerID: originalMessage.model.providerID, modelID: originalMessage.model.modelID }
