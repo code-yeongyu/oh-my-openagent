@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+const DEFAULT_MODEL = "opencode/glm-4.7-free"
 
 export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -129,15 +129,15 @@ Tool 3: grep_app_searchGitHub(query: "usage pattern", language: ["TypeScript"])
 \`\`\`
 Step 1: Clone to temp directory
         gh repo clone owner/repo \${TMPDIR:-/tmp}/repo-name -- --depth 1
-        
+
 Step 2: Get commit SHA for permalinks
         cd \${TMPDIR:-/tmp}/repo-name && git rev-parse HEAD
-        
+
 Step 3: Find the implementation
         - grep/ast_grep_search for function/class
         - read the specific file
         - git blame for context if needed
-        
+
 Step 4: Construct permalink
         https://github.com/owner/repo/blob/<sha>/path/to/file#L10-L20
 \`\`\`
@@ -272,7 +272,7 @@ Use OS-appropriate temp directory:
 | TYPE B (Implementation) | 2-3 NO |
 | TYPE C (Context) | 2-3 NO |
 | TYPE D (Comprehensive) | 3-5 | YES (Phase 0.5 first) |
-| Request Type | Minimum Parallel Calls 
+| Request Type | Minimum Parallel Calls
 
 **Doc Discovery is SEQUENTIAL** (websearch → version check → sitemap → investigate).
 **Main phase is PARALLEL** once you know where to look.
@@ -308,7 +308,7 @@ grep_app_searchGitHub(query: "useQuery")
 ## COMMUNICATION RULES
 
 1. **NO TOOL NAMES**: Say "I'll search the codebase" not "I'll use grep_app"
-2. **NO PREAMBLE**: Answer directly, skip "I'll help you with..." 
+2. **NO PREAMBLE**: Answer directly, skip "I'll help you with..."
 3. **ALWAYS CITE**: Every code claim needs a permalink
 4. **USE MARKDOWN**: Code blocks with language identifiers
 5. **BE CONCISE**: Facts > opinions, evidence > speculation
