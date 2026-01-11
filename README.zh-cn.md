@@ -28,9 +28,7 @@
 > 装上 `oh-my-opencode`，编程体验直接起飞。后台跑着一堆 Agent，随时呼叫 Oracle、Librarian、Frontend Engineer 这些专家。精心打磨的 LSP/AST 工具、精选 MCP、完美的 Claude Code 兼容层——一行配置，全套带走。
 
 这里没有为了显摆而疯狂烧 Token 的臃肿 Subagent。没有垃圾工具。
-
-**这是烧了 24,000 美元 Token 换来的、真正经过生产环境验证、测试、靠谱的 Harness。**
-**拿着你的 ChatGPT、Claude、Gemini 订阅直接就能用。我们全包圆了。**
+**注意：请勿为 librarian 使用昂贵的模型。这不仅对你没有帮助,还会给 LLM 提供商带来负担。请使用 Claude Haiku、Gemini Flash、GLM 4.7 或 MiniMax 等模型。**
 
 <div align="center">
 
@@ -78,6 +76,7 @@
 - [Oh My OpenCode](#oh-my-opencode)
   - [太长不看？(TL;DR)](#太长不看tldr)
     - [现在是 Agent 的时代](#现在是-agent-的时代)
+    - [🪄 魔法口令：`ultrawork`](#-魔法口令ultrawork)
     - [如果你真的想读读看：认识西西弗斯](#如果你真的想读读看认识西西弗斯)
       - [闭眼装就行](#闭眼装就行)
   - [安装](#安装)
@@ -90,10 +89,15 @@
     - [步骤 4：搞定认证](#步骤-4搞定认证)
       - [4.1 Anthropic (Claude)](#41-anthropic-claude)
       - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
+        - [模型配置](#模型配置)
+        - [oh-my-opencode Agent 模型覆盖](#oh-my-opencode-agent-模型覆盖)
       - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
+        - [模型配置](#模型配置-1)
     - [⚠️ 注意](#️-注意)
     - [检查作业](#检查作业)
     - [跟用户说"恭喜！🎉"](#跟用户说恭喜)
+    - [免费广告](#免费广告)
+    - [求个 Star ⭐](#求个-star-)
     - [太麻烦了？](#太麻烦了)
   - [卸载](#卸载)
   - [功能](#功能)
@@ -101,6 +105,7 @@
     - [后台 Agent：像真正的团队一样干活](#后台-agent像真正的团队一样干活)
     - [工具：给队友配点好的](#工具给队友配点好的)
       - [凭什么只有你能用 IDE？](#凭什么只有你能用-ide)
+      - [会话管理 (Session Management)](#会话管理-session-management)
       - [上下文就是一切 (Context is all you need)](#上下文就是一切-context-is-all-you-need)
       - [多模态全开，Token 省着用](#多模态全开token-省着用)
       - [根本停不下来的 Agent Loop](#根本停不下来的-agent-loop)
@@ -111,16 +116,20 @@
       - [兼容性开关](#兼容性开关)
     - [不只是为了 Agent，也是为了你](#不只是为了-agent也是为了你)
   - [配置](#配置)
+    - [JSONC 支持](#jsonc-支持)
     - [Google Auth](#google-auth)
     - [Agents](#agents)
       - [权限选项](#权限选项)
     - [Sisyphus Agent](#sisyphus-agent)
+    - [Background Tasks（后台任务）](#background-tasks后台任务)
     - [Hooks](#hooks)
     - [MCPs](#mcps)
     - [LSP](#lsp)
     - [Experimental](#experimental)
   - [作者的话](#作者的话)
   - [注意事项](#注意事项)
+  - [以下企业的专业人士都在用](#以下企业的专业人士都在用)
+  - [赞助者](#赞助者)
 
 # Oh My OpenCode
 
@@ -722,10 +731,10 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 1. `.opencode/oh-my-opencode.json`（项目级）
 2. 用户配置（按平台）：
 
-| 平台 | 用户配置路径 |
-|----------|------------------|
-| **Windows** | `~/.config/opencode/oh-my-opencode.json` (首选) 或 `%APPDATA%\opencode\oh-my-opencode.json` (备选) |
-| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
+| 平台            | 用户配置路径                                                                                       |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| **Windows**     | `~/.config/opencode/oh-my-opencode.json` (首选) 或 `%APPDATA%\opencode\oh-my-opencode.json` (备选) |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                           |
 
 支持 Schema 自动补全：
 
@@ -749,10 +758,10 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 ```jsonc
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  
+
   // 通过 Antigravity OAuth 启用 Google Gemini
   "google_auth": false,
-  
+
   /* Agent 覆盖 - 为特定任务自定义模型 */
   "agents": {
     "oracle": {
@@ -842,13 +851,13 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 }
 ```
 
-| Permission           | 说明                     | 值                                                                   |
-| -------------------- | ------------------------ | -------------------------------------------------------------------- |
-| `edit`               | 改文件                   | `ask` / `allow` / `deny`                                             |
-| `bash`               | 跑 Bash 命令             | `ask` / `allow` / `deny` 或按命令：`{ "git": "allow", "rm": "deny" }` |
-| `webfetch`           | 上网                     | `ask` / `allow` / `deny`                                             |
-| `doom_loop`          | 覆盖无限循环检测         | `ask` / `allow` / `deny`                                             |
-| `external_directory` | 访问根目录外面的文件     | `ask` / `allow` / `deny`                                             |
+| Permission           | 说明                 | 值                                                                    |
+| -------------------- | -------------------- | --------------------------------------------------------------------- |
+| `edit`               | 改文件               | `ask` / `allow` / `deny`                                              |
+| `bash`               | 跑 Bash 命令         | `ask` / `allow` / `deny` 或按命令：`{ "git": "allow", "rm": "deny" }` |
+| `webfetch`           | 上网                 | `ask` / `allow` / `deny`                                              |
+| `doom_loop`          | 覆盖无限循环检测     | `ask` / `allow` / `deny`                                              |
+| `external_directory` | 访问根目录外面的文件 | `ask` / `allow` / `deny`                                              |
 
 或者在 `~/.config/opencode/oh-my-opencode.json` 或 `.opencode/oh-my-opencode.json` 的 `disabled_agents` 里直接禁了：
 
@@ -926,12 +935,12 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-| 选项                        | 默认值   | 说明                                                                                                                                              |
-| --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `disabled`                  | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                                                              |
-| `default_builder_enabled`   | `false` | 设为 `true` 就启用 OpenCode-Builder Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。                                                           |
-| `planner_enabled`           | `true`  | 设为 `true` 就启用 Prometheus (Planner) Agent（含 work-planner 方法论）。默认启用。                                                                         |
-| `replace_plan`              | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Prometheus (Planner) 和默认计划。                                                      |
+| 选项                      | 默认值  | 说明                                                                                                            |
+| ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `disabled`                | `false` | 设为 `true` 就禁用所有 Sisyphus 编排，恢复原来的 build/plan。                                                   |
+| `default_builder_enabled` | `false` | 设为 `true` 就启用 OpenCode-Builder Agent（与 OpenCode build 相同，因 SDK 限制仅改名）。默认禁用。              |
+| `planner_enabled`         | `true`  | 设为 `true` 就启用 Prometheus (Planner) Agent（含 work-planner 方法论）。默认启用。                             |
+| `replace_plan`            | `true`  | 设为 `true` 就把默认计划 Agent 降级为子 Agent 模式。设为 `false` 可以同时保留 Prometheus (Planner) 和默认计划。 |
 
 ### Background Tasks（后台任务）
 
@@ -954,11 +963,11 @@ Sisyphus Agent 也能自定义：
 }
 ```
 
-| 选项                  | 默认值 | 说明                                                                                                           |
-| --------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
-| `defaultConcurrency`  | -      | 所有提供商/模型的默认最大并发后台任务数                                                                        |
-| `providerConcurrency` | -      | 按提供商设置并发限制。键是提供商名称（例如：`anthropic`、`openai`、`google`）                                  |
-| `modelConcurrency`    | -      | 按模型设置并发限制。键是完整的模型名称（例如：`anthropic/claude-opus-4-5`）。会覆盖提供商级别的限制。          |
+| 选项                  | 默认值 | 说明                                                                                                  |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -      | 所有提供商/模型的默认最大并发后台任务数                                                               |
+| `providerConcurrency` | -      | 按提供商设置并发限制。键是提供商名称（例如：`anthropic`、`openai`、`google`）                         |
+| `modelConcurrency`    | -      | 按模型设置并发限制。键是完整的模型名称（例如：`anthropic/claude-opus-4-5`）。会覆盖提供商级别的限制。 |
 
 **优先级顺序**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
 
@@ -1036,13 +1045,13 @@ Oh My OpenCode 送你重构工具（重命名、代码操作）。
 }
 ```
 
-| 选项                              | 默认值  | 说明                                                                                                                                           |
-| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction_threshold` | `0.85`  | 触发预防性压缩的阈值比例（0.5-0.95）。`preemptive-compaction` 钩子默认启用；此选项用于自定义阈值。                                                     |
-| `truncate_all_tool_outputs`       | `false` | 截断所有工具输出，而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。Tool output truncator 默认启用 - 使用 `disabled_hooks` 禁用。                    |
-| `aggressive_truncation`           | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                                     |
-| `auto_resume`                     | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                                     |
-| `dcp_for_compaction`              | `false` | 启用压缩用 DCP（动态上下文剪枝）- 在超出 token 限制时首先执行。在压缩前清理重复的工具调用和旧的工具输出。                                            |
+| 选项                              | 默认值  | 说明                                                                                                                               |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `preemptive_compaction_threshold` | `0.85`  | 触发预防性压缩的阈值比例（0.5-0.95）。`preemptive-compaction` 钩子默认启用；此选项用于自定义阈值。                                 |
+| `truncate_all_tool_outputs`       | `false` | 截断所有工具输出，而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。Tool output truncator 默认启用 - 使用 `disabled_hooks` 禁用。 |
+| `aggressive_truncation`           | `false` | 超出 token 限制时，激进地截断工具输出以适应限制。比默认截断更激进。不够的话会回退到摘要/恢复。                                     |
+| `auto_resume`                     | `false` | 从 thinking block 错误或 thinking disabled violation 成功恢复后，自动恢复会话。提取最后一条用户消息继续执行。                      |
+| `dcp_for_compaction`              | `false` | 启用压缩用 DCP（动态上下文剪枝）- 在超出 token 限制时首先执行。在压缩前清理重复的工具调用和旧的工具输出。                          |
 
 **警告**：这些功能是实验性的，可能会导致意外行为。只有在理解其影响的情况下才启用。
 
