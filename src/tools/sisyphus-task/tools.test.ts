@@ -491,5 +491,349 @@ describe("buildSystemContent", () => {
       expect(result).toContain(categoryPromptAppend)
       expect(result).toContain("\n\n")
     })
+
+    test("includes workdir context when workdir is provided", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const workdir = "/path/to/worktree"
+
+      // #when
+      const result = buildSystemContent({ workdir })
+
+      // #then
+      expect(result).toContain("<Workdir_Context>")
+      expect(result).toContain(workdir)
+      expect(result).toContain("WORKING DIRECTORY:")
+      expect(result).toContain("CRITICAL CONSTRAINTS")
+    })
+
+    test("combines workdir with skill content and category promptAppend", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const skillContent = "You are a playwright expert"
+      const categoryPromptAppend = "Focus on visual design"
+      const workdir = "/path/to/worktree"
+
+      // #when
+      const result = buildSystemContent({ skillContent, categoryPromptAppend, workdir })
+
+      // #then
+      expect(result).toContain(skillContent)
+      expect(result).toContain(categoryPromptAppend)
+      expect(result).toContain("<Workdir_Context>")
+      expect(result).toContain(workdir)
+      // Should have separators between all parts
+      const parts = result.split("\n\n")
+      expect(parts.length).toBeGreaterThanOrEqual(3)
+    })
+  })
+
+  describe("workdir validation", () => {
+    test("returns error when workdir does not exist", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "general",
+          run_in_background: false,
+          skills: [],
+          workdir: "/nonexistent/path/that/does/not/exist",
+        },
+        toolContext
+      )
+      
+      // #then
+      expect(result).toContain("does not exist")
+      expect(result).toContain("workdir")
+    })
+
+    test("returns error when workdir is not an absolute path", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "general",
+          run_in_background: false,
+          skills: [],
+          workdir: "relative/path",
+        },
+        toolContext
+      )
+      
+      // #then
+      expect(result).toContain("must be an absolute path")
+      expect(result).toContain("workdir")
+    })
+
+    test("returns error when workdir is not a directory", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      const fs = require("node:fs")
+      const path = require("node:path")
+      const os = require("node:os")
+      
+      // Create a temporary file (not a directory)
+      const tmpFile = path.join(os.tmpdir(), `test-file-${Date.now()}`)
+      fs.writeFileSync(tmpFile, "test")
+      
+      try {
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
+        
+        const tool = createSisyphusTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+        
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "Sisyphus",
+          abort: new AbortController().signal,
+        }
+        
+        // #when
+        const result = await tool.execute(
+          {
+            description: "Test task",
+            prompt: "Do something",
+            category: "general",
+            run_in_background: false,
+            skills: [],
+            workdir: tmpFile,
+          },
+          toolContext
+        )
+        
+        // #then
+        expect(result).toContain("not a directory")
+        expect(result).toContain("workdir")
+      } finally {
+        // Cleanup
+        if (fs.existsSync(tmpFile)) {
+          fs.unlinkSync(tmpFile)
+        }
+      }
+    })
+  })
+
+  describe("workdir injection in background launch", () => {
+    test("background launch includes workdir in skillContent", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      const fs = require("node:fs")
+      const os = require("node:os")
+      const path = require("node:path")
+      
+      const workdir = path.join(os.tmpdir(), `test-workdir-${Date.now()}`)
+      fs.mkdirSync(workdir, { recursive: true })
+      
+      try {
+        let launchInput: any
+
+        const mockManager = {
+          launch: async (input: any) => {
+            launchInput = input
+            return {
+              id: "task-workdir",
+              sessionID: "session-workdir",
+              description: "Workdir task",
+              agent: "Sisyphus-Junior",
+              status: "running",
+            }
+          },
+        }
+
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          session: {
+            create: async () => ({ data: { id: "test-session" } }),
+            prompt: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+          },
+        }
+
+        const tool = createSisyphusTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "Sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // #when
+        await tool.execute(
+          {
+            description: "Workdir task",
+            prompt: "Do something",
+            category: "general",
+            run_in_background: true,
+            skills: [],
+            workdir,
+          },
+          toolContext
+        )
+
+        // #then
+        expect(launchInput.skillContent).toContain("<Workdir_Context>")
+        expect(launchInput.skillContent).toContain(workdir)
+      } finally {
+        // Cleanup
+        if (fs.existsSync(workdir)) {
+          fs.rmSync(workdir, { recursive: true, force: true })
+        }
+      }
+    })
+  })
+
+  describe("workdir injection in sync execution", () => {
+    test("sync execution includes workdir in system content", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      const fs = require("node:fs")
+      const os = require("node:os")
+      const path = require("node:path")
+      
+      const workdir = path.join(os.tmpdir(), `test-workdir-sync-${Date.now()}`)
+      fs.mkdirSync(workdir, { recursive: true })
+      
+      try {
+        let promptInput: any
+        const sessionId = "test-session-sync"
+        let pollCount = 0
+
+        const mockManager = { launch: async () => ({}) }
+        const mockClient = {
+          app: { agents: async () => ({ data: [] }) },
+          session: {
+            create: async () => ({ data: { id: sessionId } }),
+            prompt: async (input: any) => {
+              promptInput = input
+              return { data: {} }
+            },
+            messages: async () => {
+              // Return consistent message count to allow stability detection
+              return {
+                data: [
+                  {
+                    info: { role: "assistant", time: { created: Date.now() } },
+                    parts: [{ type: "text", text: "Task completed" }],
+                  },
+                ],
+              }
+            },
+            status: async () => {
+              // After initial polls, return idle to allow completion
+              pollCount++
+              return {
+                data: {
+                  [sessionId]: {
+                    type: pollCount > 5 ? "idle" : "running",
+                  },
+                },
+              }
+            },
+          },
+        }
+
+        const tool = createSisyphusTask({
+          manager: mockManager,
+          client: mockClient,
+        })
+
+        const toolContext = {
+          sessionID: "parent-session",
+          messageID: "parent-message",
+          agent: "Sisyphus",
+          abort: new AbortController().signal,
+        }
+
+        // #when
+        const result = await tool.execute(
+          {
+            description: "Sync workdir task",
+            prompt: "Do something",
+            category: "general",
+            run_in_background: false,
+            skills: [],
+            workdir,
+          },
+          toolContext
+        )
+
+        // #then
+        expect(promptInput.body.system).toContain("<Workdir_Context>")
+        expect(promptInput.body.system).toContain(workdir)
+        expect(result).toBeDefined()
+      } finally {
+        // Cleanup
+        if (fs.existsSync(workdir)) {
+          fs.rmSync(workdir, { recursive: true, force: true })
+        }
+      }
+    }, { timeout: 15000 })
   })
 })
