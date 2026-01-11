@@ -327,9 +327,9 @@ opencode auth login
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
+    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
 ```
@@ -775,9 +775,9 @@ Agent 爽了，你自然也爽。但我还想直接让你爽。
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
+    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
 ```

@@ -361,9 +361,9 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
+    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
 ```
@@ -830,9 +830,9 @@ When using `opencode-antigravity-auth`, disable the built-in auth and override a
 {
   "google_auth": false,
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/gemini-3-pro-high" },
-    "document-writer": { "model": "google/gemini-3-flash" },
-    "multimodal-looker": { "model": "google/gemini-3-flash" }
+    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
+    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
+    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
 ```
@@ -1092,7 +1092,7 @@ Add custom categories in `oh-my-opencode.json`:
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
     "visual": {
-      "model": "google/gemini-3-pro-high",
+      "model": "google/gemini-3-pro-preview",
       "prompt_append": "Use shadcn/ui components and Tailwind CSS."
     }
   }
