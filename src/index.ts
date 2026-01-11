@@ -165,7 +165,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
-    ? createKeywordDetectorHook(ctx)
+    ? createKeywordDetectorHook(ctx, contextCollector)
     : null;
   const contextInjector = createContextInjectorHook(contextCollector);
   const contextInjectorMessagesTransform =
@@ -313,9 +313,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "chat.message": async (input, output) => {
-      await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
       await contextInjector["chat.message"]?.(input, output);
+      await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
 
