@@ -237,6 +237,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     manager: backgroundManager,
     client: ctx.client,
     userCategories: pluginConfig.categories,
+    gitMasterConfig: pluginConfig.git_master,
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
