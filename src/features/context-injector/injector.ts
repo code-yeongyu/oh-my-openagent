@@ -52,10 +52,16 @@ interface ChatMessageOutput {
 export function createContextInjectorHook(collector: ContextCollector) {
   return {
     "chat.message": async (
-      _input: ChatMessageInput,
-      _output: ChatMessageOutput
+      input: ChatMessageInput,
+      output: ChatMessageOutput
     ): Promise<void> => {
-      void collector
+      const result = injectPendingContext(collector, input.sessionID, output.parts)
+      if (result.injected) {
+        log("[context-injector] Injected pending context via chat.message", {
+          sessionID: input.sessionID,
+          contextLength: result.contextLength,
+        })
+      }
     },
   }
 }

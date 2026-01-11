@@ -2,12 +2,13 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
 import { log } from "../../shared"
 import { getMainSessionID } from "../../features/claude-code-session-state"
+import type { ContextCollector } from "../../features/context-injector"
 
 export * from "./detector"
 export * from "./constants"
 export * from "./types"
 
-export function createKeywordDetectorHook(ctx: PluginInput) {
+export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextCollector) {
   return {
     "chat.message": async (
       input: {
@@ -28,8 +29,6 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
         return
       }
 
-      // Only ultrawork keywords work in non-main sessions
-      // Other keywords (search, analyze, etc.) only work in main sessions
       const mainSessionID = getMainSessionID()
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
@@ -62,6 +61,17 @@ export function createKeywordDetectorHook(ctx: PluginInput) {
           .catch((err) =>
             log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID })
           )
+      }
+
+      if (collector) {
+        for (const keyword of detectedKeywords) {
+          collector.register(input.sessionID, {
+            id: `keyword-${keyword.type}`,
+            source: "keyword-detector",
+            content: keyword.message,
+            priority: keyword.type === "ultrawork" ? "critical" : "high",
+          })
+        }
       }
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
