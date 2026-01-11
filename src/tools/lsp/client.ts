@@ -182,6 +182,26 @@ class LSPServerManager {
       this.cleanupInterval = null
     }
   }
+
+  async cleanupTempDirectoryClients(): Promise<void> {
+    const keysToRemove: string[] = []
+    for (const [key, managed] of this.clients.entries()) {
+      const isTempDir = key.startsWith("/tmp/") || key.startsWith("/var/folders/")
+      const isIdle = managed.refCount === 0
+      if (isTempDir && isIdle) {
+        keysToRemove.push(key)
+      }
+    }
+    for (const key of keysToRemove) {
+      const managed = this.clients.get(key)
+      if (managed) {
+        this.clients.delete(key)
+        try {
+          await managed.client.stop()
+        } catch {}
+      }
+    }
+  }
 }
 
 export const lspManager = LSPServerManager.getInstance()

@@ -10,7 +10,10 @@ import {
   lsp_rename,
   lsp_code_actions,
   lsp_code_action_resolve,
+  lspManager,
 } from "./lsp"
+
+export { lspManager }
 
 import {
   ast_grep_search,

@@ -63,6 +63,7 @@ import {
   createSisyphusTask,
   interactive_bash,
   startTmuxCheck,
+  lspManager,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
@@ -427,6 +428,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
         if (sessionInfo?.id) {
           await skillMcpManager.disconnectSession(sessionInfo.id);
+          await lspManager.cleanupTempDirectoryClients();
         }
       }
 
