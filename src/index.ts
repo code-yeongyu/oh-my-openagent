@@ -33,7 +33,6 @@ import {
 } from "./hooks";
 import {
   contextCollector,
-  createContextInjectorHook,
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
@@ -167,7 +166,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const keywordDetector = isHookEnabled("keyword-detector")
     ? createKeywordDetectorHook(ctx, contextCollector)
     : null;
-  const contextInjector = createContextInjectorHook(contextCollector);
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
@@ -314,7 +312,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       await keywordDetector?.["chat.message"]?.(input, output);
-      await contextInjector["chat.message"]?.(input, output);
+      // NOTE: context injection moved to messages.transform to avoid mutating UI
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
