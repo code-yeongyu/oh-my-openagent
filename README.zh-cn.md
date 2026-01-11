@@ -396,7 +396,7 @@ opencode auth login
 
 **除非用户特别要求，否则别乱动模型设置，也别关功能（Agent、Hook、MCP）。**
 
-插件默认配置就是最佳实践。除了推荐开个 `google_auth: true`，其他的没让改就别手贱。
+该插件默认情况下运行良好。未使用外部 Antigravity 插件时保持 `google_auth: true`；如果按上方说明接入 `opencode-antigravity-auth`，请将 `google_auth` 设为 `false` 并覆盖智能体模型。除此之外，不要在没有明确请求的情况下更改其他设置或关闭功能。
 
 ### 检查作业
 
@@ -545,8 +545,8 @@ OhMyOpenCode 让这些成为可能。
 
 这些工具使 Agent 能够引用之前的对话并保持跨会话的连续性。
 
-#### 上下文就是一切 (Context is all you need)
-- **Directory AGENTS.md / README.md 注入器**：读文件时自动把 `AGENTS.md` 和 `README.md` 塞进去。从当前目录一路往上找，路径上**所有** `AGENTS.md` 全都带上。支持嵌套指令：
+#### 上下文就是一切
+- **目录 AGENTS.md / README.md 注入器**：读取文件时自动注入 `AGENTS.md` 和 `README.md`。从文件目录向上遍历到项目根目录，收集路径上的**所有** `AGENTS.md` 文件。支持嵌套的目录特定说明：
   ```
   project/
   ├── AGENTS.md              # 项目级规矩
