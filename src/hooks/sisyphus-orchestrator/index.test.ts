@@ -506,6 +506,90 @@ describe("sisyphus-orchestrator hook", () => {
         // #then
         expect(output.output).toBe(originalOutput)
       })
+
+      describe("cross-platform path validation (Windows support)", () => {
+        test("should NOT append reminder when orchestrator writes inside .sisyphus\\ (Windows backslash)", async () => {
+          // #given
+          const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+          const originalOutput = "File written successfully"
+          const output = {
+            title: "Write",
+            output: originalOutput,
+            metadata: { filePath: ".sisyphus\\plans\\work-plan.md" },
+          }
+
+          // #when
+          await hook["tool.execute.after"](
+            { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+            output
+          )
+
+          // #then
+          expect(output.output).toBe(originalOutput)
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
+        })
+
+        test("should NOT append reminder when orchestrator writes inside .sisyphus with mixed separators", async () => {
+          // #given
+          const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+          const originalOutput = "File written successfully"
+          const output = {
+            title: "Write",
+            output: originalOutput,
+            metadata: { filePath: ".sisyphus\\plans/work-plan.md" },
+          }
+
+          // #when
+          await hook["tool.execute.after"](
+            { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+            output
+          )
+
+          // #then
+          expect(output.output).toBe(originalOutput)
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
+        })
+
+        test("should NOT append reminder for absolute Windows path inside .sisyphus\\", async () => {
+          // #given
+          const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+          const originalOutput = "File written successfully"
+          const output = {
+            title: "Write",
+            output: originalOutput,
+            metadata: { filePath: "C:\\Users\\test\\project\\.sisyphus\\plans\\x.md" },
+          }
+
+          // #when
+          await hook["tool.execute.after"](
+            { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+            output
+          )
+
+          // #then
+          expect(output.output).toBe(originalOutput)
+          expect(output.output).not.toContain("DELEGATION REQUIRED")
+        })
+
+        test("should append reminder for Windows path outside .sisyphus\\", async () => {
+          // #given
+          const hook = createSisyphusOrchestratorHook(createMockPluginInput())
+          const output = {
+            title: "Write",
+            output: "File written successfully",
+            metadata: { filePath: "C:\\Users\\test\\project\\src\\code.ts" },
+          }
+
+          // #when
+          await hook["tool.execute.after"](
+            { tool: "Write", sessionID: ORCHESTRATOR_SESSION },
+            output
+          )
+
+          // #then
+          expect(output.output).toContain("DELEGATION REQUIRED")
+        })
+      })
     })
   })
 

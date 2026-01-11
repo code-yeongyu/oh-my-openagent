@@ -14,7 +14,14 @@ import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "sisyphus-orchestrator"
 
-const ALLOWED_PATH_PREFIX = ".sisyphus/"
+/**
+ * Cross-platform check if a path is inside .sisyphus/ directory.
+ * Handles both forward slashes (Unix) and backslashes (Windows).
+ */
+function isSisyphusPath(filePath: string): boolean {
+  return /\.sisyphus[/\\]/.test(filePath)
+}
+
 const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
 
 const DIRECT_WORK_REMINDER = `
@@ -549,7 +556,7 @@ export function createSisyphusOrchestratorHook(
       // Check Write/Edit tools for orchestrator - inject strong warning
       if (WRITE_EDIT_TOOLS.includes(input.tool)) {
         const filePath = (output.args.filePath ?? output.args.path ?? output.args.file) as string | undefined
-        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+        if (filePath && !isSisyphusPath(filePath)) {
           // Store filePath for use in tool.execute.after
           if (input.callID) {
             pendingFilePaths.set(input.callID, filePath)
@@ -593,7 +600,7 @@ export function createSisyphusOrchestratorHook(
         if (!filePath) {
           filePath = output.metadata?.filePath as string | undefined
         }
-        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+        if (filePath && !isSisyphusPath(filePath)) {
           output.output = (output.output || "") + DIRECT_WORK_REMINDER
           log(`[${HOOK_NAME}] Direct work reminder appended`, {
             sessionID: input.sessionID,
