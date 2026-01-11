@@ -14,6 +14,7 @@ export * from "./constants"
  * - Mixed separators (e.g., .sisyphus\\plans/x.md)
  * - Case-insensitive directory/extension matching
  * - Workspace confinement (blocks paths outside root or via traversal)
+ * - Nested project paths (e.g., parent/.sisyphus/... when ctx.directory is parent)
  */
 function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
   // 1. Resolve to absolute path
@@ -27,10 +28,9 @@ function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
     return false
   }
 
-  // 4. Split by both separators and check first segment matches ALLOWED_PATH_PREFIX (case-insensitive)
-  // Guard: if rel is empty (filePath === workspaceRoot), segments[0] would be "" — reject
-  const segments = rel.split(/[/\\]/)
-  if (!segments[0] || segments[0].toLowerCase() !== ALLOWED_PATH_PREFIX.toLowerCase()) {
+  // 4. Check if .sisyphus/ or .sisyphus\ exists anywhere in the path (case-insensitive)
+  // This handles both direct paths (.sisyphus/x.md) and nested paths (project/.sisyphus/x.md)
+  if (!/\.sisyphus[/\\]/i.test(rel)) {
     return false
   }
 
