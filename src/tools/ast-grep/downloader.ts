@@ -1,8 +1,8 @@
-import { spawn } from "bun"
 import { existsSync, mkdirSync, chmodSync, unlinkSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
 import { createRequire } from "module"
+import { extractZip } from "../../shared"
 
 const REPO = "ast-grep/ast-grep"
 
@@ -56,30 +56,7 @@ export function getCachedBinaryPath(): string | null {
   return existsSync(binaryPath) ? binaryPath : null
 }
 
-async function extractZip(archivePath: string, destDir: string): Promise<void> {
-  const proc =
-    process.platform === "win32"
-      ? spawn(
-          [
-            "powershell",
-            "-command",
-            `Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force`,
-          ],
-          { stdout: "pipe", stderr: "pipe" }
-        )
-      : spawn(["unzip", "-o", archivePath, "-d", destDir], { stdout: "pipe", stderr: "pipe" })
 
-  const exitCode = await proc.exited
-
-  if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text()
-    const toolHint =
-      process.platform === "win32"
-        ? "Ensure PowerShell is available on your system."
-        : "Please install 'unzip' (e.g., apt install unzip, brew install unzip)."
-    throw new Error(`zip extraction failed (exit ${exitCode}): ${stderr}\n\n${toolHint}`)
-  }
-}
 
 export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promise<string | null> {
   const platformKey = `${process.platform}-${process.arch}`
