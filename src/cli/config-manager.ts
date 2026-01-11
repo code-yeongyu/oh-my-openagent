@@ -109,6 +109,40 @@ export async function fetchLatestVersion(packageName: string): Promise<string | 
   }
 }
 
+interface NpmDistTags {
+  latest?: string
+  beta?: string
+  next?: string
+  [tag: string]: string | undefined
+}
+
+export async function fetchNpmDistTags(packageName: string): Promise<NpmDistTags | null> {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/-/package/${packageName}/dist-tags`)
+    if (!res.ok) return null
+    const data = await res.json() as NpmDistTags
+    return data
+  } catch {
+    return null
+  }
+}
+
+const PACKAGE_NAME = "oh-my-opencode"
+
+export async function getPluginNameWithVersion(currentVersion: string): Promise<string> {
+  const distTags = await fetchNpmDistTags(PACKAGE_NAME)
+
+  if (distTags) {
+    for (const [tag, tagVersion] of Object.entries(distTags)) {
+      if (tagVersion === currentVersion) {
+        return `${PACKAGE_NAME}@${tag}`
+      }
+    }
+  }
+
+  return `${PACKAGE_NAME}@${currentVersion}`
+}
+
 type ConfigFormat = "json" | "jsonc" | "none"
 
 interface OpenCodeConfig {
@@ -179,7 +213,7 @@ function ensureConfigDir(): void {
   }
 }
 
-export function addPluginToOpenCodeConfig(): ConfigMergeResult {
+export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
     ensureConfigDir()
   } catch (err) {
@@ -187,11 +221,11 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
   }
 
   const { format, path } = detectConfigFormat()
-  const pluginName = "oh-my-opencode"
+  const pluginEntry = await getPluginNameWithVersion(currentVersion)
 
   try {
     if (format === "none") {
-      const config: OpenCodeConfig = { plugin: [pluginName] }
+      const config: OpenCodeConfig = { plugin: [pluginEntry] }
       writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
       return { success: true, configPath: path }
     }
@@ -203,11 +237,11 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
 
     const config = parseResult.config
     const plugins = config.plugin ?? []
-    if (plugins.some((p) => p.startsWith(pluginName))) {
+    if (plugins.some((p) => p.startsWith(PACKAGE_NAME))) {
       return { success: true, configPath: path }
     }
 
-    config.plugin = [...plugins, pluginName]
+    config.plugin = [...plugins, pluginEntry]
 
     if (format === "jsonc") {
       const content = readFileSync(path, "utf-8")
@@ -217,12 +251,12 @@ export function addPluginToOpenCodeConfig(): ConfigMergeResult {
       if (match) {
         const arrayContent = match[1].trim()
         const newArrayContent = arrayContent
-          ? `${arrayContent},\n    "${pluginName}"`
-          : `"${pluginName}"`
+          ? `${arrayContent},\n    "${pluginEntry}"`
+          : `"${pluginEntry}"`
         const newContent = content.replace(pluginArrayRegex, `"plugin": [\n    ${newArrayContent}\n  ]`)
         writeFileSync(path, newContent)
       } else {
-        const newContent = content.replace(/^(\s*\{)/, `$1\n  "plugin": ["${pluginName}"],`)
+        const newContent = content.replace(/^(\s*\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)
         writeFileSync(path, newContent)
       }
     } else {

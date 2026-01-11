@@ -11,6 +11,9 @@ import {
   detectCurrentConfig,
 } from "./config-manager"
 
+const packageJson = await import("../../package.json")
+const VERSION = packageJson.version
+
 const SYMBOLS = {
   check: color.green("✓"),
   cross: color.red("✗"),
@@ -250,7 +253,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   const config = argsToConfig(args)
 
   printStep(step++, totalSteps, "Adding oh-my-opencode plugin...")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
     return 1
@@ -360,7 +363,7 @@ export async function install(args: InstallArgs): Promise<number> {
   if (!config) return 1
 
   s.start("Adding oh-my-opencode to OpenCode config")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     s.stop(`Failed to add plugin: ${pluginResult.error}`)
     p.outro(color.red("Installation failed."))
