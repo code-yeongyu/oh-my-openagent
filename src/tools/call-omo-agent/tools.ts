@@ -1,8 +1,26 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
+}
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -60,12 +78,29 @@ async function executeBackground(
   manager: BackgroundManager
 ): Promise<string> {
   try {
+    const messageDir = getMessageDir(toolContext.sessionID)
+    const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+    const sessionAgent = getSessionAgent(toolContext.sessionID)
+    const parentAgent = toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+    
+    log("[call_omo_agent] parentAgent resolution", {
+      sessionID: toolContext.sessionID,
+      messageDir,
+      ctxAgent: toolContext.agent,
+      sessionAgent,
+      firstMessageAgent,
+      prevMessageAgent: prevMessage?.agent,
+      resolvedParentAgent: parentAgent,
+    })
+
     const task = await manager.launch({
       description: args.description,
       prompt: args.prompt,
       agent: args.subagent_type,
       parentSessionID: toolContext.sessionID,
       parentMessageID: toolContext.messageID,
+      parentAgent,
     })
 
     toolContext.metadata?.({
