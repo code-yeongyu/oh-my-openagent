@@ -237,11 +237,18 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const config = parseResult.config
     const plugins = config.plugin ?? []
-    if (plugins.some((p) => p.startsWith(PACKAGE_NAME))) {
-      return { success: true, configPath: path }
+    const existingIndex = plugins.findIndex((p) => p === PACKAGE_NAME || p.startsWith(`${PACKAGE_NAME}@`))
+
+    if (existingIndex !== -1) {
+      if (plugins[existingIndex] === pluginEntry) {
+        return { success: true, configPath: path }
+      }
+      plugins[existingIndex] = pluginEntry
+    } else {
+      plugins.push(pluginEntry)
     }
 
-    config.plugin = [...plugins, pluginEntry]
+    config.plugin = plugins
 
     if (format === "jsonc") {
       const content = readFileSync(path, "utf-8")
@@ -249,11 +256,8 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
       const match = content.match(pluginArrayRegex)
 
       if (match) {
-        const arrayContent = match[1].trim()
-        const newArrayContent = arrayContent
-          ? `${arrayContent},\n    "${pluginEntry}"`
-          : `"${pluginEntry}"`
-        const newContent = content.replace(pluginArrayRegex, `"plugin": [\n    ${newArrayContent}\n  ]`)
+        const formattedPlugins = plugins.map((p) => `"${p}"`).join(",\n    ")
+        const newContent = content.replace(pluginArrayRegex, `"plugin": [\n    ${formattedPlugins}\n  ]`)
         writeFileSync(path, newContent)
       } else {
         const newContent = content.replace(/^(\s*\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)
