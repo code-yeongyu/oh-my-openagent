@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "2.14.1",
+  "version": "3.0.0-beta.3",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
