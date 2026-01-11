@@ -37,7 +37,7 @@ Oh-My-OpenCode solves this by clearly separating two roles:
 ## 2. Overall Architecture
 
 ```mermaid
-graph TD
+flowchart TD
     User[User Request] --> Prometheus
     
     subgraph Planning Phase
@@ -48,7 +48,7 @@ graph TD
         Prometheus --> PlanFile["/.sisyphus/plans/{name}.md"]
     end
     
-    PlanFile --> StartWork[/start-work]
+    PlanFile --> StartWork[//start-work/]
     StartWork --> BoulderState[boulder.json]
     
     subgraph Execution Phase
