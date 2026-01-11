@@ -186,7 +186,7 @@ export class BackgroundManager {
 
     // Global timeout: Prevent tasks from running forever (15 min max)
     // Reference: kdcokenny/opencode-background-agents uses same pattern
-    setTimeout(() => {
+    task.timeoutTimer = setTimeout(() => {
       const currentTask = this.tasks.get(task.id)
       if (currentTask && currentTask.status === "running") {
         log("[background-agent] Task timed out after 15 minutes:", task.id)
@@ -416,6 +416,10 @@ export class BackgroundManager {
       // SIMPLIFIED: Mark complete immediately on session.idle (after min time)
       // Reference: kdcokenny/opencode-background-agents uses same pattern
       // Previous guards (validateSessionHasOutput, checkSessionTodos) were causing stuck tasks
+      if (task.timeoutTimer) {
+        clearTimeout(task.timeoutTimer)
+        task.timeoutTimer = undefined
+      }
       task.status = "completed"
       task.completedAt = new Date()
       this.markForNotification(task)

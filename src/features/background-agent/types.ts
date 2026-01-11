@@ -36,6 +36,8 @@ export interface BackgroundTask {
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Timeout timer reference for cleanup on completion */
+  timeoutTimer?: ReturnType<typeof setTimeout>
 }
 
 export interface LaunchInput {
