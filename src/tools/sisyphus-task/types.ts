@@ -6,4 +6,5 @@ export interface SisyphusTaskArgs {
   run_in_background: boolean
   resume?: string
   skills: string[]
+  workdir?: string
 }

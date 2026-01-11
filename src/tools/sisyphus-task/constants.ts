@@ -245,6 +245,7 @@ MUTUALLY EXCLUSIVE: Provide EITHER category OR agent, not both (unless resuming)
 - background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
 - resume: Session ID to resume (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
 - skills: Array of skill names to prepend to prompt (e.g., ["playwright", "frontend-ui-ux"]). Skills will be resolved and their content prepended with a separator. Empty array = no prepending.
+- workdir: Absolute directory path for the spawned agent. If provided, we inject a strict workdir constraint block into the agent's system/prompt to keep it working only within this directory. The directory must exist and be a valid directory path. Useful for git worktrees or when delegating tasks to specific project subdirectories.
 
 **WHEN TO USE resume:**
 - Task failed/incomplete → resume with "fix: [specific issue]"

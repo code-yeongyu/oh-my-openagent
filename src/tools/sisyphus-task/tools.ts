@@ -1,6 +1,6 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, readdirSync, statSync } from "node:fs"
+import { isAbsolute, join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { SisyphusTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
@@ -95,20 +95,53 @@ export interface SisyphusTaskToolOptions {
 export interface BuildSystemContentInput {
   skillContent?: string
   categoryPromptAppend?: string
+  workdir?: string
+}
+
+function buildWorkdirContext(workdir: string): string {
+  return `<Workdir_Context>
+WORKING DIRECTORY: ${workdir}
+
+**CRITICAL CONSTRAINTS:**
+- You MUST treat "${workdir}" as your repository root and working directory
+- All file read/write operations MUST be relative to "${workdir}" or use absolute paths under this directory
+- When using terminal/shell tools, ALWAYS change to "${workdir}" first (e.g., \`cd "${workdir}" && <command>\`)
+- Do NOT operate on files outside of "${workdir}"
+- All paths you reference should either be absolute (starting with "${workdir}") or relative to "${workdir}"
+
+This directory is your workspace boundary - stay within it.
+</Workdir_Context>`
+}
+
+function buildPromptWithWorkdir(prompt: string, workdir?: string): string {
+  if (!workdir) {
+    return prompt
+  }
+  return `${buildWorkdirContext(workdir)}\n\n${prompt}`
 }
 
 export function buildSystemContent(input: BuildSystemContentInput): string | undefined {
-  const { skillContent, categoryPromptAppend } = input
+  const { skillContent, categoryPromptAppend, workdir } = input
 
-  if (!skillContent && !categoryPromptAppend) {
+  const parts: string[] = []
+  
+  if (skillContent) {
+    parts.push(skillContent)
+  }
+  
+  if (categoryPromptAppend) {
+    parts.push(categoryPromptAppend)
+  }
+  
+  if (workdir) {
+    parts.push(buildWorkdirContext(workdir))
+  }
+
+  if (parts.length === 0) {
     return undefined
   }
 
-  if (skillContent && categoryPromptAppend) {
-    return `${skillContent}\n\n${categoryPromptAppend}`
-  }
-
-  return skillContent || categoryPromptAppend
+  return parts.join("\n\n")
 }
 
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
@@ -124,6 +157,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
       skills: tool.schema.array(tool.schema.string()).describe("Array of skill names to prepend to the prompt. Use [] if no skills needed."),
+      workdir: tool.schema.string().optional().describe("Working directory boundary for the spawned agent. If provided, instructions are injected into the agent's system/prompt to constrain it to this directory. Must be an absolute path to an existing directory."),
     },
     async execute(args: SisyphusTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
@@ -133,6 +167,26 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       if (args.skills === undefined) {
         return `❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills needed.`
       }
+      
+      // Validate workdir if provided
+      if (args.workdir) {
+        if (!isAbsolute(args.workdir)) {
+          return `❌ Invalid workdir: "${args.workdir}" must be an absolute path.`
+        }
+        if (!existsSync(args.workdir)) {
+          return `❌ Invalid workdir: "${args.workdir}" does not exist.`
+        }
+        try {
+          const stats = statSync(args.workdir)
+          if (!stats.isDirectory()) {
+            return `❌ Invalid workdir: "${args.workdir}" is not a directory.`
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          return `❌ Error validating workdir: ${message}`
+        }
+      }
+      
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
@@ -157,7 +211,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
           try {
             const task = await manager.resume({
               sessionId: args.resume,
-              prompt: args.prompt,
+              prompt: buildPromptWithWorkdir(args.prompt, args.workdir),
               parentSessionID: ctx.sessionID,
               parentMessageID: ctx.messageID,
               parentModel,
@@ -211,7 +265,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
                 task: false,
                 sisyphus_task: false,
               },
-              parts: [{ type: "text", text: args.prompt }],
+              parts: [{ type: "text", text: buildPromptWithWorkdir(args.prompt, args.workdir) }],
             },
           })
         } catch (promptError) {
@@ -345,7 +399,7 @@ ${textContent || "(No text output)"}`
         }
       }
 
-      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, workdir: args.workdir })
 
       if (runInBackground) {
         try {
