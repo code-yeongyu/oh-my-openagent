@@ -163,7 +163,7 @@ export const CategoryConfigSchema = z.object({
     type: z.enum(["enabled", "disabled"]),
     budgetTokens: z.number().optional(),
   }).optional(),
-  reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+  reasoningEffort: z.enum(["none", "low", "medium", "high", "xhigh"]).optional(),
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),

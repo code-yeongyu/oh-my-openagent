@@ -459,6 +459,33 @@ describe("agent overrides schema", () => {
     //#then
     expect(result.success).toBe(true)
   })
+})
+
+describe("category schema", () => {
+  test("should accept reasoningEffort on categories", () => {
+    //#given
+    const config = {
+      categories: {
+        general: {
+          model: "openai/gpt-5.2-codex",
+          reasoningEffort: "xhigh",
+        },
+        quick: {
+          model: "openai/gpt-5.2-codex",
+          reasoningEffort: "none",
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+})
+
+describe("agent overrides schema", () => {
 
   test("should reject invalid reasoningEffort values", () => {
     //#given
