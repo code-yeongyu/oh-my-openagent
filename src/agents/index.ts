@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+
 import { sisyphusAgent } from "./sisyphus"
 import { oracleAgent } from "./oracle"
 import { librarianAgent } from "./librarian"
@@ -6,10 +7,12 @@ import { exploreAgent } from "./explore"
 import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
 import { documentWriterAgent } from "./document-writer"
 import { multimodalLookerAgent } from "./multimodal-looker"
+import { commanderAgent } from "./commander"   // ⭐ 关键新增
 
 export const builtinAgents: Record<string, AgentConfig> = {
   Sisyphus: sisyphusAgent,
   oracle: oracleAgent,
+  commander: commanderAgent,                   // ⭐ 关键新增
   librarian: librarianAgent,
   explore: exploreAgent,
   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,

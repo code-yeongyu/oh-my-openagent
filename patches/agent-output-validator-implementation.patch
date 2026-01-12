@@ -1,0 +1,226 @@
+diff --git a/src/agents/index.ts b/src/agents/index.ts
+index b10ee26..f44b5bb 100644
+--- a/src/agents/index.ts
++++ b/src/agents/index.ts
+@@ -1,4 +1,5 @@
+ import type { AgentConfig } from "@opencode-ai/sdk"
++
+ import { sisyphusAgent } from "./sisyphus"
+ import { oracleAgent } from "./oracle"
+ import { librarianAgent } from "./librarian"
+@@ -6,10 +7,12 @@ import { exploreAgent } from "./explore"
+ import { frontendUiUxEngineerAgent } from "./frontend-ui-ux-engineer"
+ import { documentWriterAgent } from "./document-writer"
+ import { multimodalLookerAgent } from "./multimodal-looker"
++import { commanderAgent } from "./commander"   // ⭐ 关键新增
+ 
+ export const builtinAgents: Record<string, AgentConfig> = {
+   Sisyphus: sisyphusAgent,
+   oracle: oracleAgent,
++  commander: commanderAgent,                   // ⭐ 关键新增
+   librarian: librarianAgent,
+   explore: exploreAgent,
+   "frontend-ui-ux-engineer": frontendUiUxEngineerAgent,
+diff --git a/src/agents/oracle.ts b/src/agents/oracle.ts
+index 7d067a7..d17656b 100644
+--- a/src/agents/oracle.ts
++++ b/src/agents/oracle.ts
+@@ -60,7 +60,7 @@ Apply pragmatic minimalism in all recommendations:
+ 
+ **Match depth to complexity**: Quick questions get quick answers. Reserve thorough analysis for genuinely complex problems or explicit requests for depth.
+ 
+-**Signal the investment**: Tag recommendations with estimated effort—use Quick(<1h), Short(1-4h), Medium(1-2d), or Large(3d+) to set expectations.
++**Signal effort investment**: Tag recommendations with estimated effort—use Quick(<1h), Short(1-4h), Medium(1-2d), or Large(3d+) to set expectations.
+ 
+ **Know when to stop**: "Working well" beats "theoretically optimal." Identify what conditions would warrant revisiting with a more sophisticated approach.
+ 
+@@ -83,19 +83,62 @@ Organize your final answer in three tiers:
+ 
+ **Edge cases** (only when genuinely applicable):
+ - **Escalation triggers**: Specific conditions that would justify a more complex solution
+-- **Alternative sketch**: High-level outline of the advanced path (not a full design)
++- **Alternative sketch**: High-level outline of advanced path (not a full design)
+ 
+ ## Guiding Principles
+ 
+ - Deliver actionable insight, not exhaustive analysis
+-- For code reviews: surface the critical issues, not every nitpick
++- For code reviews: surface critical issues, not every nitpick
+ - For planning: map the minimal path to the goal
+ - Support claims briefly; save deep exploration for when it's requested
+ - Dense and useful beats long and thorough
+ 
+ ## Critical Note
+ 
+-Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`
++Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.
++
++---
++
++## AGENT RESPONSIBILITY RESTRICTIONS
++
++You are **PROHIBITED** from:
++
++1. **Implementing code directly**
++   - Do NOT write, edit, or modify any files
++   - Do NOT use write(), edit(), filesystem_write(), sed, awk, or any file modification tools
++   - Do NOT use bash(), run(), or any command execution tools
++   - Do NOT provide complete implementation code blocks
++
++2. **Making system changes**
++   - Do NOT execute npm, git, or build commands
++   - Do NOT install dependencies or modify package files
++   - Do NOT run tests or build scripts
++
++**You MUST**:
++
++1. **Provide structured reviews only**
++   - Output MUST start with: VERDICT: [PASS|FAIL]
++   - Output MUST include: CRITERIA CHECK table with format:
++     | # | Criteria | Met | Notes |
++     |---|----------|-----|-------|
++     | 1 | [criterion name] | [Yes/No] | [brief note] |
++   - Output SHOULD include: RISK POINTS section (max 5 items)
++   - Output SHOULD include: MISSING TESTS section (max 5 items)
++
++2. **Report issues without fixing them**
++   - Identify problems, but do NOT provide solutions
++   - Suggest tests, but do NOT write test code
++   - Recommend improvements, but do NOT implement them
++
++3. **Follow output format strictly**
++   - VERDICT must be PASS or FAIL
++   - CRITERIA CHECK table must have at least one row
++   - Use Markdown table format for CRITERIA CHECK
++
++**Implementation must be done by**: GLM-4.7 (Build agent)
++
++**Your role is review and analysis ONLY, not implementation.**
++`
+ 
+ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
+   const restrictions = createAgentToolRestrictions([
+@@ -123,3 +166,4 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
+ }
+ 
+ export const oracleAgent = createOracleAgent()
++
+diff --git a/src/config/schema.ts b/src/config/schema.ts
+index 6f2097c..0626db0 100644
+--- a/src/config/schema.ts
++++ b/src/config/schema.ts
+@@ -75,6 +75,7 @@ export const HookNameSchema = z.enum([
+   "claude-code-hooks",
+   "auto-slash-command",
+   "edit-error-recovery",
++  "agent-output-validator",
+ ])
+ 
+ export const BuiltinCommandNameSchema = z.enum([
+diff --git a/src/features/builtin-commands/commands.ts b/src/features/builtin-commands/commands.ts
+index 30b03fc..0977118 100644
+--- a/src/features/builtin-commands/commands.ts
++++ b/src/features/builtin-commands/commands.ts
+@@ -3,6 +3,7 @@ import type { BuiltinCommandName, BuiltinCommands } from "./types"
+ import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
+ import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
+ import { REFACTOR_TEMPLATE } from "./templates/refactor"
++import { COMMANDER_TEMPLATE } from "./templates/commander"
+ 
+ const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
+   "init-deep": {
+@@ -38,9 +39,29 @@ ${CANCEL_RALPH_TEMPLATE}
+       "(builtin) Intelligent refactoring command with LSP, AST-grep, architecture analysis, codemap, and TDD verification.",
+     template: `<command-instruction>
+ ${REFACTOR_TEMPLATE}
+-</command-instruction>`,
++</command-instruction>
++
++<user-request>
++$ARGUMENTS
++</user-request>`,
+     argumentHint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]",
+   },
++  commander: {
++    description: "(builtin) Call Commander agent for architecture and planning tasks",
++    template: `<command-instruction>
++Use task tool with subagent_type="commander" to invoke Commander agent.
++
++Task will call Commander with the following system prompt:
++${COMMANDER_TEMPLATE}
++
++Provide your architecture/planning request:
++</command-instruction>
++
++<user-task>
++$ARGUMENTS
++</user-task>`,
++    argumentHint: '"architecture or planning request"',
++  },
+ }
+ 
+ export function loadBuiltinCommands(
+diff --git a/src/features/builtin-commands/types.ts b/src/features/builtin-commands/types.ts
+index 3df5b77..b58022f 100644
+--- a/src/features/builtin-commands/types.ts
++++ b/src/features/builtin-commands/types.ts
+@@ -1,6 +1,6 @@
+ import type { CommandDefinition } from "../claude-code-command-loader"
+ 
+-export type BuiltinCommandName = "init-deep" | "ralph-loop" | "cancel-ralph" | "refactor"
++export type BuiltinCommandName = "init-deep" | "ralph-loop" | "cancel-ralph" | "refactor" | "commander"
+ 
+ export interface BuiltinCommandConfig {
+   disabled_commands?: BuiltinCommandName[]
+diff --git a/src/hooks/index.ts b/src/hooks/index.ts
+index 36ea9c4..310601d 100644
+--- a/src/hooks/index.ts
++++ b/src/hooks/index.ts
+@@ -24,4 +24,5 @@ export { createEmptyMessageSanitizerHook } from "./empty-message-sanitizer";
+ export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+ export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
+ export { createAutoSlashCommandHook } from "./auto-slash-command";
+-export { createEditErrorRecoveryHook } from "./edit-error-recovery";
++export { createEditErrorRecoveryHook } from "./edit-error-recovery"
++export { createAgentOutputValidatorHook } from "./agent-output-validator";
+diff --git a/src/index.ts b/src/index.ts
+index df4e248..cbc26d4 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -26,6 +26,7 @@ import {
+   createRalphLoopHook,
+   createAutoSlashCommandHook,
+   createEditErrorRecoveryHook,
++  createAgentOutputValidatorHook,
+ } from "./hooks";
+ import {
+   contextCollector,
+@@ -174,6 +175,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+     ? createEditErrorRecoveryHook(ctx)
+     : null;
+ 
++  const agentOutputValidator = isHookEnabled("agent-output-validator")
++    ? createAgentOutputValidatorHook(ctx)
++    : null;
++
+   const backgroundManager = new BackgroundManager(ctx);
+ 
+   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
+@@ -472,6 +477,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+       await agentUsageReminder?.["tool.execute.after"](input, output);
+       await interactiveBashSession?.["tool.execute.after"](input, output);
+       await editErrorRecovery?.["tool.execute.after"](input, output);
++      await agentOutputValidator?.["tool.execute.after"](input, output);
+     },
+   };
+ };
+diff --git a/src/shared/index.ts b/src/shared/index.ts
+index 3c3f25e..a4c94ef 100644
+--- a/src/shared/index.ts
++++ b/src/shared/index.ts
+@@ -19,3 +19,5 @@ export * from "./migration"
+ export * from "./opencode-config-dir"
+ export * from "./opencode-version"
+ export * from "./permission-compat"
++export * from "./commander-validator"
++export * from "./reviewer-validator"

@@ -26,6 +26,7 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createAgentOutputValidatorHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -172,6 +173,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
+    : null;
+
+  const agentOutputValidator = isHookEnabled("agent-output-validator")
+    ? createAgentOutputValidatorHook(ctx)
     : null;
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -472,6 +477,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
       await editErrorRecovery?.["tool.execute.after"](input, output);
+      await agentOutputValidator?.["tool.execute.after"](input, output);
     },
   };
 };

@@ -3,6 +3,7 @@ import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
+import { COMMANDER_TEMPLATE } from "./templates/commander"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -38,8 +39,28 @@ ${CANCEL_RALPH_TEMPLATE}
       "(builtin) Intelligent refactoring command with LSP, AST-grep, architecture analysis, codemap, and TDD verification.",
     template: `<command-instruction>
 ${REFACTOR_TEMPLATE}
-</command-instruction>`,
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
     argumentHint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]",
+  },
+  commander: {
+    description: "(builtin) Call Commander agent for architecture and planning tasks",
+    template: `<command-instruction>
+Use task tool with subagent_type="commander" to invoke Commander agent.
+
+Task will call Commander with the following system prompt:
+${COMMANDER_TEMPLATE}
+
+Provide your architecture/planning request:
+</command-instruction>
+
+<user-task>
+$ARGUMENTS
+</user-task>`,
+    argumentHint: '"architecture or planning request"',
   },
 }
 
