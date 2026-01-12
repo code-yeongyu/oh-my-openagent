@@ -9,7 +9,7 @@ import { log } from "../../shared/logger"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
 
-import { subagentSessions } from "../claude-code-session-state"
+import { subagentSessions, clearSessionAgent } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -468,6 +468,17 @@ export class BackgroundManager {
       }
       task.status = "completed"
       task.completedAt = new Date()
+      
+      // Release concurrency key immediately on completion to free up slots
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
+      }
+      
+      // Clean up session tracking to prevent memory leaks
+      subagentSessions.delete(sessionID)
+      clearSessionAgent(sessionID)
+      
       this.markForNotification(task)
       this.notifyParentSession(task).catch(err => {
         log("[background-agent] Error notifying parent on completion:", err)
@@ -496,6 +507,7 @@ export class BackgroundManager {
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
+      clearSessionAgent(sessionID)
     }
   }
 
@@ -516,6 +528,9 @@ export class BackgroundManager {
   /**
    * Validates that a session has actual assistant/tool output before marking complete.
    * Prevents premature completion when session.idle fires before agent responds.
+   * 
+   * NOTE: This is used in pollRunningTasks() but NOT in session.idle handler.
+   * Using it in session.idle was causing stuck tasks due to timing issues.
    */
   private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
     try {
@@ -546,18 +561,18 @@ export class BackgroundManager {
       const hasContent = messages.some((m: any) => {
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) => 
-        // Text content (final output)
-        (p.type === "text" && p.text && p.text.trim().length > 0) ||
-        // Reasoning content (thinking blocks)
-        (p.type === "reasoning" && p.text && p.text.trim().length > 0) ||
-        // Tool calls (indicates work was done)
-        p.type === "tool" ||
-        // Tool results (output from executed tools) - important for tool-only tasks
-        (p.type === "tool_result" && p.content && 
-          (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
-      )
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return parts.some((p: any) => 
+          // Text content (final output)
+          (p.type === "text" && p.text && p.text.trim().length > 0) ||
+          // Reasoning content (thinking blocks)
+          (p.type === "reasoning" && p.text && p.text.trim().length > 0) ||
+          // Tool calls (indicates work was done)
+          p.type === "tool" ||
+          // Tool results (output from executed tools) - important for tool-only tasks
+          (p.type === "tool_result" && p.content && 
+            (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
+        )
       })
 
       if (!hasContent) {
