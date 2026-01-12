@@ -377,7 +377,221 @@ describe("sisyphus-task", () => {
   })
 })
 
-describe("buildSystemContent", () => {
+  describe("sync mode new task (run_in_background=false)", () => {
+    test("sync mode prompt error returns error message immediately", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = {
+        launch: async () => ({}),
+      }
+      
+      const mockClient = {
+        session: {
+          create: async () => ({ data: { id: "ses_sync_error_test" } }),
+          prompt: async () => {
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+        app: {
+          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when
+      const result = await tool.execute(
+        {
+          description: "Sync error test",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should return error message with the prompt error
+      expect(result).toContain("❌")
+      expect(result).toContain("Failed to send prompt")
+      expect(result).toContain("JSON Parse error")
+    })
+
+    test("sync mode success returns task result with content", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = {
+        launch: async () => ({}),
+      }
+      
+      const mockClient = {
+        session: {
+          create: async () => ({ data: { id: "ses_sync_success" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "assistant", time: { created: Date.now() } },
+                parts: [{ type: "text", text: "Sync task completed successfully" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
+        },
+        app: {
+          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when
+      const result = await tool.execute(
+        {
+          description: "Sync success test",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should return the task result content
+      expect(result).toContain("Sync task completed successfully")
+      expect(result).toContain("Task completed")
+    }, { timeout: 20000 })
+
+    test("sync mode agent not found returns helpful error", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = {
+        launch: async () => ({}),
+      }
+      
+      const mockClient = {
+        session: {
+          create: async () => ({ data: { id: "ses_agent_notfound" } }),
+          prompt: async () => {
+            throw new Error("Cannot read property 'name' of undefined agent.name")
+          },
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+        app: {
+          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when
+      const result = await tool.execute(
+        {
+          description: "Agent not found test",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should return agent not found error
+      expect(result).toContain("❌")
+      expect(result).toContain("not found")
+      expect(result).toContain("registered")
+    })
+
+    test("sync mode passes category model to prompt", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        session: {
+          create: async () => ({ data: { id: "ses_sync_model" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+        app: { agents: async () => ({ data: [] }) },
+      }
+
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "custom-cat": { model: "provider/custom-model" }
+        }
+      })
+
+      const toolContext = {
+        sessionID: "parent",
+        messageID: "msg",
+        agent: "Sisyphus",
+        abort: new AbortController().signal
+      }
+
+      // #when
+      await tool.execute({
+        description: "Sync model test",
+        prompt: "test",
+        category: "custom-cat",
+        run_in_background: false,
+        skills: []
+      }, toolContext)
+
+      // #then
+      expect(promptBody.model).toEqual({
+        providerID: "provider",
+        modelID: "custom-model"
+      })
+    }, { timeout: 20000 })
+  })
+
+  describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // #given
       const { buildSystemContent } = require("./tools")
