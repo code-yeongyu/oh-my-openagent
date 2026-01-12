@@ -89,15 +89,15 @@ jobs:
             echo "Installing OpenCode..."
             curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
             
-            # Try default installer first, fallback to pinned version if it fails
+            # Try default installer first, fallback to re-download if it fails
             if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
               if ! bash /tmp/opencode-install.sh 2>&1; then
-                echo "Default installer failed, trying with pinned version..."
-                bash /tmp/opencode-install.sh --version 1.0.204
+                echo "Default installer failed, trying direct install..."
+                bash <(curl -fsSL https://opencode.ai/install)
               fi
             else
-              echo "Download corrupted, trying direct install with pinned version..."
-              bash <(curl -fsSL https://opencode.ai/install) --version 1.0.204
+              echo "Download corrupted, trying direct install..."
+              bash <(curl -fsSL https://opencode.ai/install)
             fi
           fi
           opencode --version
