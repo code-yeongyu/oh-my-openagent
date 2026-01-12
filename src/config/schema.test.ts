@@ -483,6 +483,17 @@ describe("category schema", () => {
     //#then
     expect(result.success).toBe(true)
   })
+
+  test("schema JSON should include full reasoningEffort enum", () => {
+    //#given
+    const schema = JSON.parse(readFileSync("assets/oh-my-opencode.schema.json", "utf8"))
+
+    //#when
+    const enumValues = schema.properties?.categories?.additionalProperties?.properties?.reasoningEffort?.enum
+
+    //#then
+    expect(enumValues).toEqual(["none", "low", "medium", "high", "xhigh"])
+  })
 })
 
 describe("agent overrides schema", () => {
