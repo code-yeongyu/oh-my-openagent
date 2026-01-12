@@ -11,6 +11,51 @@ import type {
   ToolResultProps,
 } from "./types"
 
+export function serializeError(error: unknown): string {
+  if (!error) return "Unknown error"
+
+  if (error instanceof Error) {
+    const parts = [error.message]
+    if (error.cause) {
+      parts.push(`Cause: ${serializeError(error.cause)}`)
+    }
+    return parts.join(" | ")
+  }
+
+  if (typeof error === "string") {
+    return error
+  }
+
+  if (typeof error === "object") {
+    const obj = error as Record<string, unknown>
+
+    const messagePaths = [
+      obj.message,
+      obj.error,
+      (obj.data as Record<string, unknown>)?.message,
+      (obj.data as Record<string, unknown>)?.error,
+      (obj.error as Record<string, unknown>)?.message,
+    ]
+
+    for (const msg of messagePaths) {
+      if (typeof msg === "string" && msg.length > 0) {
+        return msg
+      }
+    }
+
+    try {
+      const json = JSON.stringify(error, null, 2)
+      if (json !== "{}") {
+        return json
+      }
+    } catch (_) {
+      void _
+    }
+  }
+
+  return String(error)
+}
+
 export interface EventState {
   mainSessionIdle: boolean
   mainSessionError: boolean
@@ -125,6 +170,13 @@ function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
       break
     }
 
+    case "session.error": {
+      const errorProps = props as SessionErrorProps | undefined
+      const errorMsg = serializeError(errorProps?.error)
+      console.error(pc.red(`${sessionTag} ❌ SESSION.ERROR: ${errorMsg}`))
+      break
+    }
+
     default:
       console.error(pc.dim(`${sessionTag} ${payload.type}`))
   }
@@ -166,9 +218,7 @@ function handleSessionError(
   const props = payload.properties as SessionErrorProps | undefined
   if (props?.sessionID === ctx.sessionID) {
     state.mainSessionError = true
-    state.lastError = props?.error
-      ? String(props.error instanceof Error ? props.error.message : props.error)
-      : "Unknown error"
+    state.lastError = serializeError(props?.error)
     console.error(pc.red(`\n[session.error] ${state.lastError}`))
   }
 }
