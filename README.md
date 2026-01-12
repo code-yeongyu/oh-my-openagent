@@ -1058,7 +1058,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
 
 ### Categories
 
-Categories enable domain-specific task delegation via the `sisyphus_task` tool. Each category pre-configures a specialized `Sisyphus-Junior-{category}` agent with optimized model settings and prompts.
+Categories enable domain-specific task delegation via the `sisyphus_task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
 
 **Default Categories:**
 
