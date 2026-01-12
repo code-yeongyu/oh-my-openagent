@@ -5,6 +5,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { listAccounts, removeAccount } from "./commands/auth"
+import { configureAgents, listAgentModels } from "./commands/config"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -171,6 +172,44 @@ Note:
 `)
   .action(async (indexOrEmail: string) => {
     const exitCode = await removeAccount(indexOrEmail)
+    process.exit(exitCode)
+  })
+
+const configCommand = program
+  .command("config")
+  .description("Manage oh-my-opencode configuration")
+
+configCommand
+  .command("agents")
+  .description("Configure agent models interactively")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode config agents
+
+Allows you to:
+  - Select an agent (Sisyphus, oracle, librarian, etc.)
+  - Choose a model from available providers
+  - Save the configuration to oh-my-opencode.json
+`)
+  .action(async () => {
+    const exitCode = await configureAgents()
+    process.exit(exitCode)
+  })
+
+configCommand
+  .command("list")
+  .description("List current agent model configuration")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode config list
+
+Shows:
+  - All configurable agents
+  - Their current model assignments
+  - Default models if not configured
+`)
+  .action(async () => {
+    const exitCode = await listAgentModels()
     process.exit(exitCode)
   })
 
