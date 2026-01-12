@@ -1,5 +1,5 @@
 import { createBuiltinAgents } from "../agents";
-import { createSisyphusJuniorAgent } from "../agents/sisyphus-junior";
+import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -152,10 +152,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         Sisyphus: builtinAgents.Sisyphus,
       };
 
-      agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgent({
-        model: "anthropic/claude-sonnet-4-5",
-        temperature: 0.1,
-      });
+      agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
+        pluginConfig.agents?.["Sisyphus-Junior"]
+      );
 
       if (builderEnabled) {
         const { name: _buildName, ...buildConfigWithoutName } =
