@@ -2,7 +2,7 @@ import { createOpencode } from "@opencode-ai/sdk"
 import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
 import { checkCompletionConditions } from "./completion"
-import { createEventState, processEvents } from "./events"
+import { createEventState, processEvents, serializeError } from "./events"
 
 const POLL_INTERVAL_MS = 500
 const DEFAULT_TIMEOUT_MS = 0
@@ -115,7 +115,7 @@ export async function run(options: RunOptions): Promise<number> {
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
-    console.error(pc.red(`Error: ${err}`))
+    console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
   }
 }
