@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-09T15:38:00+09:00
-**Commit:** 0581793
+**Generated:** 2026-01-13T14:45:00+09:00
+**Commit:** e47b5514
 **Branch:** dev
 
 ## OVERVIEW
@@ -13,16 +13,16 @@ OpenCode plugin implementing Claude Code/AmpCode features. Multi-model agent orc
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (7): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker
-│   ├── hooks/         # 22 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── agents/        # AI agents (7+): Sisyphus, oracle, librarian, explore, frontend, document-writer, multimodal-looker, prometheus, metis, momus
+│   ├── hooks/         # 22+ lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # LSP, AST-Grep, Grep, Glob, session mgmt - see src/tools/AGENTS.md
 │   ├── features/      # Claude Code compat layer - see src/features/AGENTS.md
 │   ├── auth/          # Google Antigravity OAuth - see src/auth/AGENTS.md
 │   ├── shared/        # Cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
-│   ├── mcp/           # MCP configs: context7, grep_app
-│   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (548 lines)
+│   ├── mcp/           # MCP configs: context7, grep_app, websearch
+│   ├── config/        # Zod schema (12k lines), TypeScript types
+│   └── index.ts       # Main plugin entry (563 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
 └── dist/              # Build output (ESM + .d.ts)
@@ -50,7 +50,7 @@ oh-my-opencode/
 | Shared utilities | `src/shared/` | Cross-cutting utilities |
 | Slash commands | `src/hooks/auto-slash-command/` | Auto-detect and execute `/command` patterns |
 | Ralph Loop | `src/hooks/ralph-loop/` | Self-referential dev loop until completion |
-| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (660 lines) |
+| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (677 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -83,7 +83,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern in index.ts; explicit named exports for tools/hooks
 - **Naming**: kebab-case directories, createXXXHook/createXXXTool factories
-- **Testing**: BDD comments `#given/#when/#then`, TDD workflow (RED-GREEN-REFACTOR)
+- **Testing**: BDD comments `#given/#when/#then`, TDD workflow (RED-GREEN-REFACTOR), 82 test files
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS (THIS PROJECT)
@@ -122,13 +122,16 @@ oh-my-opencode/
 
 | Agent | Default Model | Purpose |
 |-------|---------------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
+| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator with extended thinking |
 | oracle | openai/gpt-5.2 | Read-only consultation. High-IQ debugging, architecture |
 | librarian | opencode/glm-4.7-free | Multi-repo analysis, docs |
 | explore | opencode/grok-code | Fast codebase exploration |
 | frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation |
 | document-writer | google/gemini-3-pro-preview | Technical docs |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
+| Prometheus (Planner) | anthropic/claude-opus-4-5 | Strategic planning, interview-driven |
+| Metis (Plan Consultant) | anthropic/claude-sonnet-4-5 | Pre-planning analysis |
+| Momus (Plan Reviewer) | anthropic/claude-sonnet-4-5 | Plan validation |
 
 ## COMMANDS
 
@@ -137,7 +140,7 @@ bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
 bun run build:schema   # Schema only
-bun test               # Run tests (76 test files, 2559+ BDD assertions)
+bun test               # Run tests (82 test files, 2559+ BDD assertions)
 ```
 
 ## DEPLOYMENT
@@ -160,23 +163,38 @@ bun test               # Run tests (76 test files, 2559+ BDD assertions)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/agents/orchestrator-sisyphus.ts` | 1484 | Orchestrator agent, complex delegation |
+| `src/agents/orchestrator-sisyphus.ts` | 1486 | Orchestrator agent, 7-section delegation, accumulated wisdom |
 | `src/features/builtin-skills/skills.ts` | 1230 | Skill definitions (frontend-ui-ux, playwright) |
-| `src/agents/prometheus-prompt.ts` | 982 | Planning agent system prompt |
-| `src/auth/antigravity/fetch.ts` | 798 | Token refresh, URL rewriting |
-| `src/auth/antigravity/thinking.ts` | 755 | Thinking block extraction |
-| `src/cli/config-manager.ts` | 725 | JSONC parsing, env detection |
-| `src/hooks/sisyphus-orchestrator/index.ts` | 660 | Orchestrator hook impl |
-| `src/agents/sisyphus.ts` | 641 | Main Sisyphus prompt |
-| `src/tools/lsp/client.ts` | 612 | LSP protocol, JSON-RPC |
-| `src/features/background-agent/manager.ts` | 608 | Task lifecycle |
-| `src/auth/antigravity/response.ts` | 599 | Response transformation, streaming |
-| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 556 | Multi-stage recovery |
-| `src/index.ts` | 548 | Main plugin, all hook/tool init |
+| `src/agents/prometheus-prompt.ts` | 988 | Planning agent, interview mode, multi-agent validation |
+| `src/auth/antigravity/fetch.ts` | 798 | Token refresh, multi-account rotation, endpoint fallback |
+| `src/auth/antigravity/thinking.ts` | 755 | Thinking block extraction, signature management |
+| `src/cli/config-manager.ts` | 725 | JSONC parsing, multi-level config, env detection |
+| `src/hooks/sisyphus-orchestrator/index.ts` | 677 | Orchestrator hook impl |
+| `src/agents/sisyphus.ts` | 643 | Main Sisyphus prompt |
+| `src/tools/lsp/client.ts` | 632 | LSP protocol, JSON-RPC |
+| `src/features/background-agent/manager.ts` | 825 | Task lifecycle, concurrency |
+| `src/auth/antigravity/response.ts` | 598 | Response transformation, streaming |
+| `src/tools/sisyphus-task/tools.ts` | 583 | Category-based task delegation |
+| `src/index.ts` | 563 | Main plugin, all hook/tool init |
+| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 555 | Multi-stage recovery |
+
+## MCP ARCHITECTURE
+
+Three-tier MCP system:
+1. **Built-in**: `websearch` (Exa), `context7` (docs), `grep_app` (GitHub search)
+2. **Claude Code compatible**: `.mcp.json` files with `${VAR}` expansion
+3. **Skill-embedded**: YAML frontmatter in skills (e.g., playwright)
+
+## CONFIG SYSTEM
+
+- **Zod validation**: `src/config/schema.ts` (12k lines)
+- **JSONC support**: Comments and trailing commas
+- **Multi-level**: User (`~/.config/opencode/`) → Project (`.opencode/`)
+- **CLI doctor**: Validates config and reports errors
 
 ## NOTES
 
-- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`, 76 test files
+- **Testing**: Bun native test (`bun test`), BDD-style `#given/#when/#then`, 82 test files
 - **OpenCode**: Requires >= 1.0.150
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)

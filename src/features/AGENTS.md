@@ -1,35 +1,34 @@
 # FEATURES KNOWLEDGE BASE
 
 ## OVERVIEW
-
 Claude Code compatibility layer + core feature modules. Commands, skills, agents, MCPs, hooks from Claude Code work seamlessly.
 
 ## STRUCTURE
-
 ```
 features/
-├── background-agent/           # Task lifecycle, notifications (608 lines)
+├── background-agent/           # Task lifecycle, notifications (825 lines manager.ts)
 ├── boulder-state/              # Boulder state persistence
 ├── builtin-commands/           # Built-in slash commands
 │   └── templates/              # start-work, refactor, init-deep, ralph-loop
-├── builtin-skills/             # Built-in skills
+├── builtin-skills/             # Built-in skills (1230 lines skills.ts)
 │   ├── git-master/             # Atomic commits, rebase, history search
+│   ├── playwright/             # Browser automation skill
 │   └── frontend-ui-ux/         # Designer-turned-developer skill
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # .mcp.json files
 │   └── env-expander.ts         # ${VAR} expansion
-├── claude-code-plugin-loader/  # installed_plugins.json (486 lines)
+├── claude-code-plugin-loader/  # installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
 ├── context-injector/           # Context collection and injection
 ├── opencode-skill-loader/      # Skills from OpenCode + Claude paths
 ├── skill-mcp-manager/          # MCP servers in skill YAML
 ├── task-toast-manager/         # Task toast notifications
-└── hook-message-injector/      # Inject messages into conversation
+├── hook-message-injector/      # Inject messages into conversation
+└── context-injector/           # Context collection and injection
 ```
 
 ## LOADER PRIORITY
-
 | Loader | Priority (highest first) |
 |--------|--------------------------|
 | Commands | `.opencode/command/` > `~/.config/opencode/command/` > `.claude/commands/` > `~/.claude/commands/` |
@@ -38,7 +37,6 @@ features/
 | MCPs | `.claude/.mcp.json` > `.mcp.json` > `~/.claude/.mcp.json` |
 
 ## CONFIG TOGGLES
-
 ```json
 {
   "claude_code": {
@@ -52,21 +50,19 @@ features/
 ```
 
 ## BACKGROUND AGENT
-
 - Lifecycle: pending → running → completed/failed
-- OS notification on complete
-- `background_output` to retrieve results
-- `background_cancel` with task_id or all=true
+- Concurrency limits per provider/model (manager.ts)
+- `background_output` to retrieve results, `background_cancel` for cleanup
+- Automatic task expiration and cleanup logic
 
 ## SKILL MCP
-
 - MCP servers embedded in skill YAML frontmatter
-- Lazy client loading, session-scoped cleanup
-- `skill_mcp` tool exposes capabilities
+- Lazy client loading via `skill-mcp-manager`
+- `skill_mcp` tool for cross-skill tool discovery
+- Session-scoped MCP server lifecycle management
 
 ## ANTI-PATTERNS
-
-- Blocking on load (loaders run at startup)
-- No error handling (always try/catch)
-- Ignoring priority order
-- Writing to ~/.claude/ (read-only)
+- Sequential execution for independent tasks (use `sisyphus_task`)
+- Trusting agent self-reports without verification
+- Blocking main thread during loader initialization
+- Manual version bumping in `package.json`
