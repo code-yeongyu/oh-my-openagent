@@ -84,7 +84,10 @@ ${body.trim()}
 $ARGUMENTS
 </user-request>`
 
-    const lazyContent: LazyContentLoader = {
+    // RATIONALE: We read the file eagerly to ensure atomic consistency between
+    // metadata and body. We maintain the LazyContentLoader interface for
+    // compatibility, but the state is effectively eager.
+    const eagerLoader: LazyContentLoader = {
       loaded: true,
       content: templateContent,
       load: async () => templateContent,
@@ -111,7 +114,7 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
-      lazyContent,
+      lazyContent: eagerLoader,
     }
   } catch {
     return null
