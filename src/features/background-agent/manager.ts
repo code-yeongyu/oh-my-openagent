@@ -45,6 +45,7 @@ export class BackgroundManager {
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
   private pendingByParent: Map<string, Set<string>>  // Track pending tasks per parent for batching
+  private deletionTimeouts: Map<string, ReturnType<typeof setTimeout>>  // Track scheduled session deletions
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
@@ -54,6 +55,7 @@ export class BackgroundManager {
     this.tasks = new Map()
     this.notifications = new Map()
     this.pendingByParent = new Map()
+    this.deletionTimeouts = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
@@ -571,6 +573,11 @@ export class BackgroundManager {
 
 cleanup(): void {
     this.stopPolling()
+    // Clear all pending deletion timeouts to prevent orphaned timers
+    for (const timeout of this.deletionTimeouts.values()) {
+      clearTimeout(timeout)
+    }
+    this.deletionTimeouts.clear()
     this.tasks.clear()
     this.notifications.clear()
     this.pendingByParent.clear()
@@ -673,12 +680,28 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     // Cleanup after retention period
     const taskId = task.id
-    setTimeout(() => {
-      // Concurrency already released at completion - just cleanup notifications and task
-      this.clearNotificationsForTask(taskId)
-      this.tasks.delete(taskId)
-      log("[background-agent] Removed completed task from memory:", taskId)
+    const sessionID = task.sessionID
+    const deletionTimeout = setTimeout(() => {
+      // Guard: Check task still exists and wasn't resumed (sessionID unchanged, status not running)
+      const currentTask = this.tasks.get(taskId)
+      if (currentTask && currentTask.sessionID === sessionID && currentTask.status !== "running") {
+        // Delete the background session to free resources (prevents memory leak)
+        if (sessionID) {
+          this.client.session.delete({ path: { id: sessionID } }).catch(err => {
+            log("[background-agent] Failed to delete session:", err)
+          })
+        }
+        // Concurrency already released at completion - just cleanup notifications and task
+        this.clearNotificationsForTask(taskId)
+        this.tasks.delete(taskId)
+        subagentSessions.delete(sessionID)
+        log("[background-agent] Removed completed task from memory:", taskId)
+      } else if (currentTask?.status === "running") {
+        log("[background-agent] Skipping deletion - task was resumed:", taskId)
+      }
+      this.deletionTimeouts.delete(taskId)
     }, 5 * 60 * 1000)
+    this.deletionTimeouts.set(taskId, deletionTimeout)
   }
 
   private formatDuration(start: Date, end?: Date): string {
@@ -707,7 +730,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     for (const [taskId, task] of this.tasks.entries()) {
       const age = now - task.startedAt.getTime()
-      if (age > TASK_TTL_MS) {
+      // Only prune tasks that are still running (prevents race with completion cleanup)
+      if (task.status === "running" && age > TASK_TTL_MS) {
         log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
         task.status = "error"
         task.error = "Task timed out after 30 minutes"
@@ -725,6 +749,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               this.pendingByParent.delete(task.parentSessionID)
             }
           }
+        }
+        // Delete the background session to free resources (prevents memory leak)
+        if (task.sessionID) {
+          this.client.session.delete({ path: { id: task.sessionID } }).catch(err => {
+            log("[background-agent] Failed to delete stale session:", err)
+          })
         }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
