@@ -183,6 +183,7 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
+          existingTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
@@ -340,6 +341,11 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      // Release concurrency on resume error (matches launch error handler)
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined  // Prevent double-release
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
@@ -731,6 +737,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined  // Prevent double-release
+        }
+        // Clean up pendingByParent to prevent stale entries
+        if (task.parentSessionID) {
+          const pending = this.pendingByParent.get(task.parentSessionID)
+          if (pending) {
+            pending.delete(task.id)
+            if (pending.size === 0) {
+              this.pendingByParent.delete(task.parentSessionID)
+            }
+          }
         }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
