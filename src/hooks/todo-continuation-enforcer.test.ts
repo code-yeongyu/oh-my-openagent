@@ -548,4 +548,263 @@ describe("todo-continuation-enforcer", () => {
     // #then - no continuation (abort error detected)
     expect(promptCalls).toHaveLength(0)
   })
+
+  test("should skip injection when abort detected via session.error event (event-based, primary)", async () => {
+    // #given - session with incomplete todos
+    const sessionID = "main-event-abort"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error event fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - session goes idle immediately after
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - no continuation (abort detected via event)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should skip injection when AbortError detected via session.error event", async () => {
+    // #given - session with incomplete todos
+    const sessionID = "main-event-abort-dom"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - AbortError event fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "AbortError" } },
+      },
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - no continuation (abort detected via event)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should inject when abort flag is stale (>3s old)", async () => {
+    // #given - session with incomplete todos and old abort timestamp
+    const sessionID = "main-stale-abort"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - wait >3s then idle fires
+    await new Promise(r => setTimeout(r, 3100))
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - continuation injected (abort flag is stale)
+    expect(promptCalls.length).toBeGreaterThan(0)
+  }, 10000)
+
+  test("should clear abort flag on user message activity", async () => {
+    // #given - session with abort detected
+    const sessionID = "main-clear-on-user"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - user sends new message (clears abort flag)
+    await new Promise(r => setTimeout(r, 600))
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } },
+      },
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - continuation injected (abort flag was cleared by user activity)
+    expect(promptCalls.length).toBeGreaterThan(0)
+  })
+
+  test("should clear abort flag on assistant message activity", async () => {
+    // #given - session with abort detected
+    const sessionID = "main-clear-on-assistant"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - assistant starts responding (clears abort flag)
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - continuation injected (abort flag was cleared by assistant activity)
+    expect(promptCalls.length).toBeGreaterThan(0)
+  })
+
+  test("should clear abort flag on tool execution", async () => {
+    // #given - session with abort detected
+    const sessionID = "main-clear-on-tool"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - tool executes (clears abort flag)
+    await hook.handler({
+      event: {
+        type: "tool.execute.before",
+        properties: { sessionID },
+      },
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - continuation injected (abort flag was cleared by tool execution)
+    expect(promptCalls.length).toBeGreaterThan(0)
+  })
+
+  test("should use event-based detection even when API indicates no abort (event wins)", async () => {
+    // #given - session with abort event but API shows no error
+    const sessionID = "main-event-wins"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - abort error event fires (but API doesn't have it yet)
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - no continuation (event-based detection wins over API)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should use API fallback when event is missed but API shows abort", async () => {
+    // #given - session where event was missed but API shows abort
+    const sessionID = "main-api-fallback"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant", error: { name: "MessageAbortedError" } } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - session goes idle without prior session.error event
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    // #then - no continuation (API fallback detected the abort)
+    expect(promptCalls).toHaveLength(0)
+  })
 })
