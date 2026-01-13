@@ -1441,8 +1441,6 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     "task",
     "call_omo_agent",
   ])
-  const questionPermission = { question: "allow" } as AgentConfig["permission"]
-
   return {
     description:
       "Orchestrates work via sisyphus_task() to complete ALL tasks in a todo list until fully done",
@@ -1451,7 +1449,7 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
-    permission: { ...((restrictions as { permission?: Record<string, string> }).permission || {}), ...questionPermission },
+    ...restrictions,
   } as AgentConfig
 }
 
