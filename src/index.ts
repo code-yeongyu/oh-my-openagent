@@ -316,10 +316,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "chat.message": async (input, output) => {
+      // autoSlashCommand must run first, before any hook prepends content to the message.
+      // Otherwise, slash commands like "/preflight" won't be detected because the text
+      // no longer starts with "/" after claudeCodeHooks prepends hook content.
+      await autoSlashCommand?.["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await contextInjector["chat.message"]?.(input, output);
-      await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
