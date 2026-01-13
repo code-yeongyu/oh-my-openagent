@@ -673,10 +673,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     // Cleanup after retention period
     const taskId = task.id
+    const sessionID = task.sessionID
     setTimeout(() => {
+      // Delete the background session to free resources (prevents memory leak)
+      this.client.session.delete({ path: { id: sessionID } }).catch(err => {
+        log("[background-agent] Failed to delete session:", err)
+      })
       // Concurrency already released at completion - just cleanup notifications and task
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
+      subagentSessions.delete(sessionID)
       log("[background-agent] Removed completed task from memory:", taskId)
     }, 5 * 60 * 1000)
   }
@@ -726,6 +732,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             }
           }
         }
+        // Delete the background session to free resources (prevents memory leak)
+        this.client.session.delete({ path: { id: task.sessionID } }).catch(err => {
+          log("[background-agent] Failed to delete stale session:", err)
+        })
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
