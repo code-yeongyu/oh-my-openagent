@@ -240,6 +240,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const sisyphusTask = createSisyphusTask({
     manager: backgroundManager,
     client: ctx.client,
+    directory: ctx.directory,
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
   });
