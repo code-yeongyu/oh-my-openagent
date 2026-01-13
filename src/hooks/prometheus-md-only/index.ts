@@ -2,7 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
 import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 export * from "./constants"
@@ -61,10 +62,14 @@ function getMessageDir(sessionID: string): string | null {
 
 const TASK_TOOLS = ["sisyphus_task", "task", "call_omo_agent"]
 
-function getAgentFromSession(sessionID: string): string | undefined {
+function getAgentFromMessageFiles(sessionID: string): string | undefined {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return undefined
-  return findNearestMessageWithFields(messageDir)?.agent
+  return findFirstMessageWithAgent(messageDir) ?? findNearestMessageWithFields(messageDir)?.agent
+}
+
+function getAgentFromSession(sessionID: string): string | undefined {
+  return getSessionAgent(sessionID) ?? getAgentFromMessageFiles(sessionID)
 }
 
 export function createPrometheusMdOnlyHook(ctx: PluginInput) {
