@@ -410,6 +410,16 @@ export class BackgroundManager {
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined  // Prevent double-release
         }
+        // Clean up pendingByParent to prevent stale entries
+        if (task.parentSessionID) {
+          const pending = this.pendingByParent.get(task.parentSessionID)
+          if (pending) {
+            pending.delete(task.id)
+            if (pending.size === 0) {
+              this.pendingByParent.delete(task.parentSessionID)
+            }
+          }
+        }
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -437,11 +447,13 @@ export class BackgroundManager {
         task.concurrencyKey = undefined  // Prevent double-release
       }
       // Clean up pendingByParent to prevent stale entries
-      const pending = this.pendingByParent.get(task.parentSessionID)
-      if (pending) {
-        pending.delete(task.id)
-        if (pending.size === 0) {
-          this.pendingByParent.delete(task.parentSessionID)
+      if (task.parentSessionID) {
+        const pending = this.pendingByParent.get(task.parentSessionID)
+        if (pending) {
+          pending.delete(task.id)
+          if (pending.size === 0) {
+            this.pendingByParent.delete(task.parentSessionID)
+          }
         }
       }
       this.tasks.delete(task.id)
@@ -656,10 +668,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     // Cleanup after retention period
     const taskId = task.id
     setTimeout(() => {
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
+      // Concurrency already released at completion - just cleanup notifications and task
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
       log("[background-agent] Removed completed task from memory:", taskId)
@@ -699,6 +708,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
         }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
@@ -756,6 +766,16 @@ try {
           if (task.concurrencyKey) {
             this.concurrencyManager.release(task.concurrencyKey)
             task.concurrencyKey = undefined  // Prevent double-release
+          }
+          // Clean up pendingByParent to prevent stale entries
+          if (task.parentSessionID) {
+            const pending = this.pendingByParent.get(task.parentSessionID)
+            if (pending) {
+              pending.delete(task.id)
+              if (pending.size === 0) {
+                this.pendingByParent.delete(task.parentSessionID)
+              }
+            }
           }
           this.markForNotification(task)
           await this.notifyParentSession(task)
@@ -827,6 +847,16 @@ if (lastMessage) {
                   if (task.concurrencyKey) {
                     this.concurrencyManager.release(task.concurrencyKey)
                     task.concurrencyKey = undefined  // Prevent double-release
+                  }
+                  // Clean up pendingByParent to prevent stale entries
+                  if (task.parentSessionID) {
+                    const pending = this.pendingByParent.get(task.parentSessionID)
+                    if (pending) {
+                      pending.delete(task.id)
+                      if (pending.size === 0) {
+                        this.pendingByParent.delete(task.parentSessionID)
+                      }
+                    }
                   }
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
