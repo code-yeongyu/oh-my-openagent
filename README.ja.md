@@ -327,11 +327,10 @@ opencode auth login
 
 #### 4.2.2 oh-my-opencode エージェントモデルのオーバーライド
 
-`opencode-antigravity-auth` プラグインは内蔵 Google auth と異なるモデル名を使用します。`oh-my-opencode.json`（または `.opencode/oh-my-opencode.json`）でエージェントモデルをオーバーライドし、内蔵 `google_auth` を無効化してください：
+`opencode-antigravity-auth` プラグインは特定のモデル名を使用します。エージェントモデルを `oh-my-opencode.json`（または `.opencode/oh-my-opencode.json`）でオーバーライドしてください：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -393,7 +392,7 @@ opencode auth login
 
 **ユーザーが明示的に要求しない限り、モデル設定を変更したり、機能（エージェント、フック、MCP）を無効化しないでください。**
 
-プラグインはデフォルトで完璧に動作します。推奨される `google_auth: true` 設定を除き、明示的な要求なしに他の設定を変更したり機能をオフにしないでください。
+プラグインはデフォルトで完璧に動作します。`opencode-antigravity-auth` を使用する場合は、上記の通りエージェントモデルをオーバーライドしてください。明示的な要求なしに他の設定を変更したり機能をオフにしないでください。
 
 ### セットアップの確認
 
@@ -760,9 +759,6 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
 
-  // Antigravity OAuth 経由で Google Gemini を有効にする
-  "google_auth": false,
-
   /* エージェントのオーバーライド - 特定のタスクに合わせてモデルをカスタマイズ */
   "agents": {
     "oracle": {
@@ -779,24 +775,15 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 **推奨**: 外部の [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) プラグインを使用してください。マルチアカウントロードバランシング、より多くのモデル（Antigravity 経由の Claude を含む）、活発なメンテナンスを提供します。[インストール > Google Gemini](#42-google-gemini-antigravity-oauth) を参照。
 
-`opencode-antigravity-auth` 使用時は内蔵 auth を無効化し、`oh-my-opencode.json` でエージェントモデルをオーバーライドしてください：
+`opencode-antigravity-auth` 使用時は `oh-my-opencode.json` でエージェントモデルをオーバーライドしてください：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
-}
-```
-
-**代替案**: 内蔵 Antigravity OAuth を有効化（単一アカウント、Gemini モデルのみ）：
-
-```json
-{
-  "google_auth": true
 }
 ```
 
