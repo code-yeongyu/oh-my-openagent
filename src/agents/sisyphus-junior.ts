@@ -149,12 +149,12 @@ export function createSisyphusJuniorAgent(
 ): AgentConfig {
   const prompt = buildSisyphusJuniorPrompt(promptAppend)
   const model = categoryConfig.model
-
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
   const mergedConfig = migrateAgentConfig({
     ...baseRestrictions,
     ...(categoryConfig.tools ? { tools: categoryConfig.tools } : {}),
   })
+
 
   const base: AgentConfig = {
     description:
