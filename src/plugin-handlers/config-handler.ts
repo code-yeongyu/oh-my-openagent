@@ -1,5 +1,5 @@
 import { createBuiltinAgents } from "../agents";
-import { createSisyphusJuniorAgent } from "../agents/sisyphus-junior";
+import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -103,7 +103,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.disabled_agents,
       pluginConfig.agents,
       ctx.directory,
-      config.model as string | undefined
+      config.model as string | undefined,
+      pluginConfig.categories
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -152,10 +153,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         Sisyphus: builtinAgents.Sisyphus,
       };
 
-      agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgent({
-        model: "anthropic/claude-sonnet-4-5",
-        temperature: 0.1,
-      });
+      agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
+        pluginConfig.agents?.["Sisyphus-Junior"]
+      );
 
       if (builderEnabled) {
         const { name: _buildName, ...buildConfigWithoutName } =
@@ -283,6 +283,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     config.tools = {
       ...(config.tools as Record<string, unknown>),
       "grep_app_*": false,
+      call_omo_agent: false,
     };
 
     if (agentResult.explore) {

@@ -1,5 +1,7 @@
 import { supportsNewPermissionSystem } from "./opencode-version"
 
+export { supportsNewPermissionSystem }
+
 export type PermissionValue = "ask" | "allow" | "deny"
 
 export interface LegacyToolsFormat {

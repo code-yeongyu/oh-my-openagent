@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, OhMyOpenCodeConfigSchema } from "./schema"
+import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, CategoryConfigSchema, OhMyOpenCodeConfigSchema } from "./schema"
 
 describe("disabled_mcps schema", () => {
   test("should accept built-in MCP names", () => {
@@ -174,6 +174,33 @@ describe("AgentOverrideConfigSchema", () => {
     })
   })
 
+  describe("variant field", () => {
+    test("accepts variant as optional string", () => {
+      // #given
+      const config = { variant: "high" }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.variant).toBe("high")
+      }
+    })
+
+    test("rejects non-string variant", () => {
+      // #given
+      const config = { variant: 123 }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(false)
+    })
+  })
+
   describe("skills field", () => {
     test("accepts skills as optional string array", () => {
       // #given
@@ -303,6 +330,33 @@ describe("AgentOverrideConfigSchema", () => {
   })
 })
 
+describe("CategoryConfigSchema", () => {
+  test("accepts variant as optional string", () => {
+    // #given
+    const config = { model: "openai/gpt-5.2", variant: "xhigh" }
+
+    // #when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.variant).toBe("xhigh")
+    }
+  })
+
+  test("rejects non-string variant", () => {
+    // #given
+    const config = { model: "openai/gpt-5.2", variant: 123 }
+
+    // #when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("BuiltinCategoryNameSchema", () => {
   test("accepts all builtin category names", () => {
     // #given
@@ -312,6 +366,79 @@ describe("BuiltinCategoryNameSchema", () => {
     for (const cat of categories) {
       const result = BuiltinCategoryNameSchema.safeParse(cat)
       expect(result.success).toBe(true)
+    }
+  })
+})
+
+describe("Sisyphus-Junior agent override", () => {
+  test("schema accepts agents['Sisyphus-Junior'] and retains the key after parsing", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          model: "openai/gpt-5.2",
+          temperature: 0.2,
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]).toBeDefined()
+      expect(result.data.agents?.["Sisyphus-Junior"]?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.["Sisyphus-Junior"]?.temperature).toBe(0.2)
+    }
+  })
+
+  test("schema accepts Sisyphus-Junior with prompt_append", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          prompt_append: "Additional instructions for Sisyphus-Junior",
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]?.prompt_append).toBe(
+        "Additional instructions for Sisyphus-Junior"
+      )
+    }
+  })
+
+  test("schema accepts Sisyphus-Junior with tools override", () => {
+    // #given
+    const config = {
+      agents: {
+        "Sisyphus-Junior": {
+          tools: {
+            read: true,
+            write: false,
+          },
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["Sisyphus-Junior"]?.tools).toEqual({
+        read: true,
+        write: false,
+      })
     }
   })
 })

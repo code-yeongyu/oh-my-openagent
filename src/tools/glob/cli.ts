@@ -22,7 +22,8 @@ function buildRgArgs(options: GlobOptions): string[] {
     `--max-depth=${Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)}`,
   ]
 
-  if (options.hidden) args.push("--hidden")
+  if (options.hidden !== false) args.push("--hidden")
+  if (options.follow !== false) args.push("--follow")
   if (options.noIgnore) args.push("--no-ignore")
 
   args.push(`--glob=${options.pattern}`)
@@ -31,7 +32,13 @@ function buildRgArgs(options: GlobOptions): string[] {
 }
 
 function buildFindArgs(options: GlobOptions): string[] {
-  const args: string[] = ["."]
+  const args: string[] = []
+
+  if (options.follow !== false) {
+    args.push("-L")
+  }
+
+  args.push(".")
 
   const maxDepth = Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)
   args.push("-maxdepth", String(maxDepth))
@@ -39,7 +46,7 @@ function buildFindArgs(options: GlobOptions): string[] {
   args.push("-type", "f")
   args.push("-name", options.pattern)
 
-  if (!options.hidden) {
+  if (options.hidden === false) {
     args.push("-not", "-path", "*/.*")
   }
 
@@ -56,9 +63,14 @@ function buildPowerShellCommand(options: GlobOptions): string[] {
 
   let psCommand = `Get-ChildItem -Path '${escapedPath}' -File -Recurse -Depth ${maxDepth - 1} -Filter '${escapedPattern}'`
 
-  if (options.hidden) {
+  if (options.hidden !== false) {
     psCommand += " -Force"
   }
+
+  // NOTE: Symlink following (-FollowSymlink) is NOT supported in PowerShell backend.
+  // -FollowSymlink was introduced in PowerShell Core 6.0+ and is unavailable in
+  // Windows PowerShell 5.1 (default on Windows). OpenCode auto-downloads ripgrep
+  // which handles symlinks via --follow. This fallback rarely triggers in practice.
 
   psCommand += " -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName"
 
@@ -73,6 +85,8 @@ async function getFileMtime(filePath: string): Promise<number> {
     return 0
   }
 }
+
+export { buildRgArgs, buildFindArgs, buildPowerShellCommand }
 
 export async function runRgFiles(
   options: GlobOptions,

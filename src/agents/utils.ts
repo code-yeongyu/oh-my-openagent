@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
+import type { CategoriesConfig, CategoryConfig } from "../config/schema"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
@@ -47,18 +48,28 @@ function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
 }
 
-export function buildAgent(source: AgentSource, model?: string): AgentConfig {
+export function buildAgent(
+  source: AgentSource,
+  model?: string,
+  categories?: CategoriesConfig
+): AgentConfig {
   const base = isFactory(source) ? source(model) : source
+  const categoryConfigs: Record<string, CategoryConfig> = categories
+    ? { ...DEFAULT_CATEGORIES, ...categories }
+    : DEFAULT_CATEGORIES
 
-  const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[] }
+  const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[]; variant?: string }
   if (agentWithCategory.category) {
-    const categoryConfig = DEFAULT_CATEGORIES[agentWithCategory.category]
+    const categoryConfig = categoryConfigs[agentWithCategory.category]
     if (categoryConfig) {
       if (!base.model) {
         base.model = categoryConfig.model
       }
       if (base.temperature === undefined && categoryConfig.temperature !== undefined) {
         base.temperature = categoryConfig.temperature
+      }
+      if (base.variant === undefined && categoryConfig.variant !== undefined) {
+        base.variant = categoryConfig.variant
       }
     }
   }
@@ -118,10 +129,15 @@ export function createBuiltinAgents(
   disabledAgents: BuiltinAgentName[] = [],
   agentOverrides: AgentOverrides = {},
   directory?: string,
-  systemDefaultModel?: string
+  systemDefaultModel?: string,
+  categories?: CategoriesConfig
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
+
+  const mergedCategories = categories
+    ? { ...DEFAULT_CATEGORIES, ...categories }
+    : DEFAULT_CATEGORIES
 
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
@@ -133,7 +149,7 @@ export function createBuiltinAgents(
     const override = agentOverrides[agentName]
     const model = override?.model
 
-    let config = buildAgent(source, model)
+    let config = buildAgent(source, model, mergedCategories)
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()
