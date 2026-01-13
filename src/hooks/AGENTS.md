@@ -1,73 +1,54 @@
 # HOOKS KNOWLEDGE BASE
 
 ## OVERVIEW
-
-22+ lifecycle hooks intercepting/modifying agent behavior. Context injection, error recovery, output control, notifications.
+22+ lifecycle hooks intercepting/modifying agent behavior via PreToolUse, PostToolUse, UserPromptSubmit, and more.
 
 ## STRUCTURE
-
 ```
 hooks/
-├── anthropic-context-window-limit-recovery/  # Auto-compact at token limit (556 lines)
-├── auto-slash-command/         # Detect and execute /command patterns
-├── auto-update-checker/        # Version notifications, startup toast
-├── background-notification/    # OS notify on task complete
-├── claude-code-hooks/          # settings.json PreToolUse/PostToolUse/etc (408 lines)
-├── comment-checker/            # Prevent excessive AI comments
-│   ├── filters/                # docstring, directive, bdd, shebang
-│   └── output/                 # XML builder, formatter
-├── compaction-context-injector/ # Preserve context during compaction
-├── directory-agents-injector/  # Auto-inject AGENTS.md
-├── directory-readme-injector/  # Auto-inject README.md
-├── edit-error-recovery/        # Recover from edit failures
-├── empty-message-sanitizer/    # Sanitize empty messages
-├── interactive-bash-session/   # Tmux session management
-├── keyword-detector/           # ultrawork/search keyword activation
-├── non-interactive-env/        # CI/headless handling
-├── preemptive-compaction/      # Pre-emptive at 85% usage
-├── prometheus-md-only/         # Restrict prometheus to read-only
-├── ralph-loop/                 # Self-referential dev loop
+├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit (555 lines)
+├── sisyphus-orchestrator/      # Main orchestration & agent delegation (677 lines)
+├── ralph-loop/                 # Self-referential dev loop (364 lines)
+├── claude-code-hooks/          # settings.json hook compatibility layer
+├── comment-checker/            # Prevents AI slop/excessive comments
+├── auto-slash-command/         # Detects and executes /command patterns
 ├── rules-injector/             # Conditional rules from .claude/rules/
-├── session-recovery/           # Recover from errors (432 lines)
-├── sisyphus-orchestrator/      # Main orchestration hook (660 lines)
-├── start-work/                 # Initialize Sisyphus work session
-├── task-resume-info/           # Track task resume state
-├── think-mode/                 # Auto-detect thinking triggers
-├── thinking-block-validator/   # Validate thinking block format
-├── agent-usage-reminder/       # Remind to use specialists
-├── context-window-monitor.ts   # Monitor usage (standalone)
-├── session-notification.ts     # OS notify on idle
-├── todo-continuation-enforcer.ts # Force TODO completion (413 lines)
-└── tool-output-truncator.ts    # Truncate verbose outputs
+├── directory-agents-injector/  # Auto-injects local AGENTS.md files
+├── directory-readme-injector/  # Auto-injects local README.md files
+├── preemptive-compaction/      # Triggers summary at 85% usage
+├── edit-error-recovery/        # Recovers from tool execution failures
+├── thinking-block-validator/   # Ensures valid <thinking> format
+├── context-window-monitor.ts   # Reminds agents of remaining headroom
+├── session-recovery/           # Auto-recovers from session crashes
+├── start-work/                 # Initializes work sessions (ulw/ulw)
+├── think-mode/                 # Dynamic thinking budget adjustment
+├── background-notification/    # OS notification on task completion
+├── todo-continuation-enforcer.ts # Force completion of [ ] items
+└── tool-output-truncator.ts    # Prevents context bloat from verbose tools
 ```
 
 ## HOOK EVENTS
-
-| Event | Timing | Can Block | Use Case |
-|-------|--------|-----------|----------|
-| PreToolUse | Before tool | Yes | Validate, modify input |
-| PostToolUse | After tool | No | Add context, warnings |
-| UserPromptSubmit | On prompt | Yes | Inject messages, block |
-| Stop | Session idle | No | Inject follow-ups |
-| onSummarize | Compaction | No | Preserve context |
+| Event | Timing | Can Block | Description |
+|-------|--------|-----------|-------------|
+| PreToolUse | Before tool | Yes | Validate/modify inputs (e.g., directory-agents-injector) |
+| PostToolUse | After tool | No | Append context/warnings (e.g., edit-error-recovery) |
+| UserPromptSubmit | On prompt | Yes | Filter/modify user input (e.g., keyword-detector) |
+| Stop | Session idle | No | Auto-continue tasks (e.g., todo-continuation-enforcer) |
+| onSummarize | Compaction | No | State preservation (e.g., compaction-context-injector) |
 
 ## HOW TO ADD
-
-1. Create `src/hooks/my-hook/`
-2. Files: `index.ts` (createMyHook), `constants.ts`, `types.ts` (optional)
-3. Return: `{ PreToolUse?, PostToolUse?, UserPromptSubmit?, Stop?, onSummarize? }`
-4. Export from `src/hooks/index.ts`
+1. Create `src/hooks/name/` with `index.ts` factory (e.g., `createMyHook`).
+2. Implement `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, or `onSummarize`.
+3. Register in `src/hooks/index.ts`.
 
 ## PATTERNS
-
-- **Storage**: JSON file for persistent state across sessions
-- **Once-per-session**: Track injected paths in Set
-- **Message injection**: Return `{ messages: [...] }`
-- **Blocking**: Return `{ blocked: true, message: "..." }` from PreToolUse
+- **Context Injection**: Use `PreToolUse` to prepend instructions to tool inputs.
+- **Resilience**: Implement `edit-error-recovery` style logic to retry failed tools.
+- **Telegraphic UI**: Use `PostToolUse` to add brief warnings without bloating transcript.
+- **Statelessness**: Prefer local file storage for state that must persist across sessions.
 
 ## ANTI-PATTERNS
-
-- Heavy computation in PreToolUse (slows every tool call)
-- Blocking without actionable message
-- Duplicate injection (track what's injected)
-- Missing try/catch (don't crash session)
+- **Blocking**: Avoid blocking tools unless critical (use warnings in `PostToolUse` instead).
+- **Latency**: No heavy computation in `PreToolUse`; it slows every interaction.
+- **Redundancy**: Don't inject the same file multiple times; track state in session storage.
+- **Prose**: Never use verbose prose in hook outputs; keep it technical and brief.

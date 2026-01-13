@@ -1,11 +1,9 @@
 # SHARED UTILITIES KNOWLEDGE BASE
 
 ## OVERVIEW
-
-Cross-cutting utilities: path resolution, config management, text processing, Claude Code compatibility helpers.
+Cross-cutting utilities for path resolution, config management, text processing, and Claude Code compatibility.
 
 ## STRUCTURE
-
 ```
 shared/
 ├── index.ts              # Barrel export
@@ -30,7 +28,6 @@ shared/
 ```
 
 ## WHEN TO USE
-
 | Task | Utility |
 |------|---------|
 | Find ~/.claude | `getClaudeConfigDir()` |
@@ -43,21 +40,19 @@ shared/
 | Legacy names | `migrateLegacyAgentNames()` |
 
 ## CRITICAL PATTERNS
-
 ```typescript
-// Dynamic truncation
+// Dynamic truncation with context budget
 const output = dynamicTruncate(result, remainingTokens, 0.5)
 
-// Deep merge priority
+// Config resolution priority
 const final = deepMerge(deepMerge(defaults, userConfig), projectConfig)
 
-// Safe JSONC
+// Safe JSONC parsing for user-edited files
 const { config, error } = parseJsoncSafe(content)
 ```
 
 ## ANTI-PATTERNS
-
-- Hardcoding paths (use getClaudeConfigDir, getUserConfigPath)
-- JSON.parse for user files (use parseJsonc)
-- Ignoring truncation (large outputs MUST use dynamicTruncate)
-- Direct string concat for configs (use deepMerge)
+- Hardcoding paths (use `getClaudeConfigDir`, `getUserConfigPath`)
+- Using `JSON.parse` for user configs (always use `parseJsonc`)
+- Ignoring output size (large tool outputs MUST use `dynamicTruncate`)
+- Manual case conversion (use `toSnakeCase`, `normalizeToolName`)
