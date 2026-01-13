@@ -37,6 +37,8 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
+import { applyAgentVariant, resolveAgentVariant } from "./shared/agent-variant";
+import { createFirstMessageVariantGate } from "./shared/first-message-variant";
 import {
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
@@ -82,6 +84,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+  const firstMessageVariantGate = createFirstMessageVariantGate();
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
   const modelCacheState = createModelCacheState();
@@ -316,6 +319,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "chat.message": async (input, output) => {
+      const message = (output as { message: { variant?: string } }).message
+      if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
+        const variant = resolveAgentVariant(pluginConfig, input.agent)
+        if (variant !== undefined) {
+          message.variant = variant
+        }
+        firstMessageVariantGate.markApplied(input.sessionID)
+      } else {
+        applyAgentVariant(pluginConfig, input.agent, message)
+      }
+
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await contextInjector["chat.message"]?.(input, output);
@@ -422,6 +436,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         if (!sessionInfo?.parentID) {
           setMainSession(sessionInfo?.id);
         }
+        firstMessageVariantGate.markSessionCreated(sessionInfo);
       }
 
       if (event.type === "session.deleted") {
@@ -431,6 +446,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
         if (sessionInfo?.id) {
           clearSessionAgent(sessionInfo.id);
+          firstMessageVariantGate.clear(sessionInfo.id);
           await skillMcpManager.disconnectSession(sessionInfo.id);
           await lspManager.cleanupTempDirectoryClients();
         }
