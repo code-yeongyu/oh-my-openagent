@@ -175,8 +175,8 @@ describe("sisyphus-orchestrator hook", () => {
         output
       )
 
-      // #then - output should be transformed (original output replaced)
-      expect(output.output).not.toContain("Task completed successfully")
+      // #then - output should be transformed (original output preserved for debugging)
+      expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
       expect(output.output).toContain("SUBAGENTS LIE")
