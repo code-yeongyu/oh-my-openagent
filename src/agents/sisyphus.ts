@@ -1,5 +1,4 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { isGptModel } from "./types"
 import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
 import {
@@ -622,7 +621,6 @@ export function createSisyphusAgent(
   // Note: question permission allows agent to ask user questions via OpenCode's QuestionTool
   // SDK type doesn't include 'question' yet, but OpenCode runtime supports it
   const permission = { question: "allow" } as AgentConfig["permission"]
-  const restrictions = createAgentToolRestrictions(["call_omo_agent"])
   const base = {
     description:
       "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
@@ -632,7 +630,7 @@ export function createSisyphusAgent(
     prompt,
     color: "#00CED1",
     permission,
-    ...restrictions,
+    tools: { call_omo_agent: false },
   }
 
   if (isGptModel(model)) {
