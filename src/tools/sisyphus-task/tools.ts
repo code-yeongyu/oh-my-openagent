@@ -263,6 +263,40 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           }
         }
 
+        // Check if we hit the 60s timeout for resume
+        if (Date.now() - pollStart >= 60000) {
+          log("[sisyphus_task] Resume poll timeout reached", { sessionID: args.resume, lastMsgCount, stablePolls })
+          
+          if (toastManager) {
+            toastManager.removeTask(taskId)
+          }
+
+          // Try to fetch any partial response
+          const partialResult = await client.session.messages({ path: { id: args.resume } })
+          const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
+            info?: { role?: string; time?: { created?: number } }
+            parts?: Array<{ type?: string; text?: string }>
+          }>
+          const partialAssistant = partialMsgs
+            .filter((m) => m.info?.role === "assistant")
+            .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+          const partialMessage = partialAssistant[0]
+          const partialText = partialMessage?.parts
+            ?.filter((p) => p.type === "text" || p.type === "reasoning")
+            .map((p) => p.text ?? "")
+            .filter(Boolean)
+            .join("\n")
+
+          const duration = formatDuration(startTime)
+          return `⏱️ Resume timed out after ${duration} (max 60 seconds).
+
+Session ID: ${args.resume}
+
+The resumed session did not complete within the time limit.
+
+${partialText ? `---\n\n**Partial response:**\n\n${partialText.slice(0, 2000)}${partialText.length > 2000 ? "\n\n(truncated)" : ""}` : "No partial response captured."}`
+        }
+
         const messagesResult = await client.session.messages({
           path: { id: args.resume },
         })
@@ -531,6 +565,37 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
         if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
           log("[sisyphus_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
+          
+          if (toastManager && taskId) {
+            toastManager.removeTask(taskId)
+          }
+          subagentSessions.delete(sessionID)
+
+          // Try to fetch any partial response before returning timeout error
+          const partialResult = await client.session.messages({ path: { id: sessionID } })
+          const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
+            info?: { role?: string; time?: { created?: number } }
+            parts?: Array<{ type?: string; text?: string }>
+          }>
+          const partialAssistant = partialMsgs
+            .filter((m) => m.info?.role === "assistant")
+            .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+          const partialMessage = partialAssistant[0]
+          const partialText = partialMessage?.parts
+            ?.filter((p) => p.type === "text" || p.type === "reasoning")
+            .map((p) => p.text ?? "")
+            .filter(Boolean)
+            .join("\n")
+
+          const duration = formatDuration(startTime)
+          return `⏱️ Task timed out after ${duration} (max 10 minutes).
+
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Session ID: ${sessionID}
+
+The agent did not complete within the time limit. This may happen with complex prompts or slow model responses.
+
+${partialText ? `---\n\n**Partial response:**\n\n${partialText.slice(0, 2000)}${partialText.length > 2000 ? "\n\n(truncated)" : ""}` : "No partial response captured."}`
         }
 
         const messagesResult = await client.session.messages({
