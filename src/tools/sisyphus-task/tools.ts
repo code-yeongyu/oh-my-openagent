@@ -471,41 +471,64 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
+        let pollCount = 0
+
+        log("[sisyphus_task] Starting poll loop", { sessionID, agentToUse })
 
         while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
+          if (ctx.abort?.aborted) {
+            log("[sisyphus_task] Aborted by user", { sessionID })
+            if (toastManager && taskId) toastManager.removeTask(taskId)
+            return `Task aborted.\n\nSession ID: ${sessionID}`
+          }
+
           await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+          pollCount++
 
           const statusResult = await client.session.status()
           const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
           const sessionStatus = allStatuses[sessionID]
 
-          // If session is actively running, reset stability
+          if (pollCount % 10 === 0) {
+            log("[sisyphus_task] Poll status", {
+              sessionID,
+              pollCount,
+              elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
+              sessionStatus: sessionStatus?.type ?? "not_in_status",
+              stablePolls,
+              lastMsgCount,
+            })
+          }
+
           if (sessionStatus && sessionStatus.type !== "idle") {
             stablePolls = 0
             lastMsgCount = 0
             continue
           }
 
-          // Session is idle or not in status - check message stability
           const elapsed = Date.now() - pollStart
           if (elapsed < MIN_STABILITY_TIME_MS) {
-            continue  // Don't accept completion too early
+            continue
           }
 
-          // Get current message count
           const messagesCheck = await client.session.messages({ path: { id: sessionID } })
           const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
           const currentMsgCount = msgs.length
 
-          if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
+          if (currentMsgCount === lastMsgCount) {
             stablePolls++
             if (stablePolls >= STABILITY_POLLS_REQUIRED) {
-              break  // Messages stable for 3 polls - task complete
+              log("[sisyphus_task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
+              break
             }
           } else {
             stablePolls = 0
             lastMsgCount = currentMsgCount
           }
+        }
+
+        if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
+          log("[sisyphus_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
         }
 
         const messagesResult = await client.session.messages({
