@@ -26,7 +26,9 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createJsonErrorRecoveryHook,
   createTaskResumeInfoHook,
+
   createStartWorkHook,
   createSisyphusOrchestratorHook,
   createPrometheusMdOnlyHook,
@@ -202,7 +204,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
+  const jsonErrorRecovery = isHookEnabled("json-error-recovery")
+    ? createJsonErrorRecoveryHook(ctx)
+    : null;
+
   const startWork = isHookEnabled("start-work")
+
     ? createStartWorkHook(ctx)
     : null;
 
@@ -555,7 +562,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
       await editErrorRecovery?.["tool.execute.after"](input, output);
+      await jsonErrorRecovery?.["tool.execute.after"](input, output);
       await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
+
       await taskResumeInfo["tool.execute.after"](input, output);
     },
   };
