@@ -223,6 +223,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
               tools: {
                 task: false,
                 sisyphus_task: false,
+                call_omo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
@@ -446,6 +447,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               tools: {
                 task: false,
                 sisyphus_task: false,
+                call_omo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
               ...(categoryModel ? { model: categoryModel } : {}),
