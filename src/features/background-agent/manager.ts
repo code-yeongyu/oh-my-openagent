@@ -556,6 +556,11 @@ cleanup(): void {
   }
 
 private async notifyParentSession(task: BackgroundTask): Promise<void> {
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
     const duration = this.formatDuration(task.startedAt, task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
@@ -636,13 +641,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log("[background-agent] Failed to send notification:", error)
     }
 
-    // Cleanup after retention period
     const taskId = task.id
     setTimeout(() => {
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
       log("[background-agent] Removed completed task from memory:", taskId)
