@@ -354,11 +354,10 @@ Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/
 
 ##### oh-my-opencode Agent Model Override
 
-The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`) and disable the built-in `google_auth`:
+The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`):
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -420,7 +419,7 @@ opencode auth login
 
 **Unless the user explicitly requests it, do not change model settings or disable features (agents, hooks, MCPs).**
 
-The plugin works perfectly by default. Except for the recommended `google_auth: true` setting, do not change other settings or turn off features without an explicit request.
+The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
 ### Verify the setup
 
@@ -804,9 +803,6 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
 
-  // Enable Google Gemini via Antigravity OAuth
-  "google_auth": false,
-
   /* Agent overrides - customize models for specific tasks */
   "agents": {
     "oracle": {
@@ -821,28 +817,7 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 
 ### Google Auth
 
-**Recommended**: Use the external [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
-
-When using `opencode-antigravity-auth`, disable the built-in auth and override agent models in `oh-my-opencode.json`:
-
-```json
-{
-  "google_auth": false,
-  "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
-    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
-  }
-}
-```
-
-**Alternative**: Enable built-in Antigravity OAuth (single account, Gemini models only):
-
-```json
-{
-  "google_auth": true
-}
-```
+**Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
 
 ### Agents
 

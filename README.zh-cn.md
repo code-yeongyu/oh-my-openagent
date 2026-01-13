@@ -353,11 +353,10 @@ opencode auth login
 
 ##### oh-my-opencode 智能体模型覆盖
 
-`opencode-antigravity-auth` 插件使用与内置 Google 认证不同的模型名称。在 `oh-my-opencode.json`（或 `.opencode/oh-my-opencode.json`）中覆盖智能体模型，并禁用内置的 `google_auth`：
+`opencode-antigravity-auth` 插件使用特定的模型名称。在 `oh-my-opencode.json`（或 `.opencode/oh-my-opencode.json`）中覆盖智能体模型：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -419,7 +418,7 @@ opencode auth login
 
 **除非用户明确要求，否则不要更改模型设置或禁用功能（智能体、钩子、MCP）。**
 
-该插件默认情况下运行良好。未使用外部 Antigravity 插件时保持 `google_auth: true`；如果按上方说明接入 `opencode-antigravity-auth`，请将 `google_auth` 设为 `false` 并覆盖智能体模型。除此之外，不要在没有明确请求的情况下更改其他设置或关闭功能。
+该插件默认情况下运行良好。如果使用 `opencode-antigravity-auth`，请按上方说明覆盖智能体模型。除此之外，不要在没有明确请求的情况下更改其他设置或关闭功能。
 
 ### 验证安装
 
@@ -803,9 +802,6 @@ Oh My OpenCode 从以下位置读取和执行钩子：
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
 
-  // 通过 Antigravity OAuth 启用 Google Gemini
-  "google_auth": false,
-
   /* 智能体覆盖 - 为特定任务自定义模型 */
   "agents": {
     "oracle": {
@@ -820,26 +816,17 @@ Oh My OpenCode 从以下位置读取和执行钩子：
 
 ### Google 认证
 
-**推荐**：使用外部 [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) 插件。它提供多账号负载均衡、更多模型（包括通过 Antigravity 的 Claude）和积极的维护。参见[安装 > Google Gemini](#google-gemini-antigravity-oauth)。
+使用外部 [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) 插件进行 Google 认证。它提供多账号负载均衡、更多模型（包括通过 Antigravity 的 Claude）和积极的维护。参见[安装 > Google Gemini](#google-gemini-antigravity-oauth)。
 
-使用 `opencode-antigravity-auth` 时，禁用内置认证并在 `oh-my-opencode.json` 中覆盖智能体模型：
+使用 `opencode-antigravity-auth` 时，在 `oh-my-opencode.json` 中覆盖智能体模型：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
-}
-```
-
-**替代方案**：启用内置 Antigravity OAuth（单账号，仅 Gemini 模型）：
-
-```json
-{
-  "google_auth": true
 }
 ```
 
