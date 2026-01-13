@@ -75,10 +75,22 @@ export class BackgroundManager {
 
     await this.concurrencyManager.acquire(concurrencyKey)
 
+    const parentSession = await this.client.session.get({
+      path: { id: input.parentSessionID },
+    }).catch((err) => {
+      log(`[background-agent] Failed to get parent session: ${err}`)
+      return null
+    })
+    const parentDirectory = parentSession?.data?.directory ?? this.directory
+    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     }).catch((error) => {
       this.concurrencyManager.release(concurrencyKey)
