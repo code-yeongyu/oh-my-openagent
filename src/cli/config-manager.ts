@@ -267,10 +267,6 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   }
 
-  if (installConfig.hasGemini) {
-    config.google_auth = false
-  }
-
   const agents: Record<string, Record<string, unknown>> = {}
 
   if (!installConfig.hasClaude) {
@@ -642,7 +638,6 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 }
 
 interface OmoConfigData {
-  google_auth?: boolean
   agents?: Record<string, { model?: string }>
 }
 
@@ -713,9 +708,6 @@ export function detectCurrentConfig(): DetectedConfig {
       result.hasChatGPT = false
     }
 
-    if (omoConfig.google_auth === false) {
-      result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
-    }
   } catch {
     /* intentionally empty - malformed omo config returns defaults from opencode config detection */
   }
