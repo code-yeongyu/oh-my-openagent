@@ -210,4 +210,26 @@ describe("keyword-detector session filtering", () => {
     expect(output.message.variant).toBe("max")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
+
+  test("should not override existing variant", async () => {
+    // #given - main session set with pre-existing variant
+    setMainSession("main-123")
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: { variant: "low" } as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork mode" }],
+    }
+
+    // #when - ultrawork keyword triggers
+    await hook["chat.message"](
+      { sessionID: "main-123" },
+      output
+    )
+
+    // #then - existing variant should remain
+    expect(output.message.variant).toBe("low")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
 })
