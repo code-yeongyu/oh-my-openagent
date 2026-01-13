@@ -642,6 +642,54 @@ describe("BackgroundManager.resume", () => {
     // #then
     expect(result.progress?.toolCalls).toBe(42)
   })
+
+  test("resume should pass existing task model to session.prompt", async () => {
+    // #given
+    const { BackgroundManager } = require("./manager")
+
+    const promptCalls: any[] = []
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "session-a" } }),
+        prompt: async (input: any) => {
+          promptCalls.push(input)
+          return { data: {} }
+        },
+      },
+    }
+
+    const realManager = new BackgroundManager({
+      client: mockClient,
+      directory: "/tmp",
+    })
+
+    try {
+      const model = { providerID: "google", modelID: "antigravity-gemini-3-flash" }
+
+      const task = await realManager.launch({
+        description: "Launch with model",
+        prompt: "do work",
+        agent: "Sisyphus-Junior",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+        model,
+      })
+
+      // #when
+      await realManager.resume({
+        sessionId: task.sessionID,
+        prompt: "resume",
+        parentSessionID: "parent-2",
+        parentMessageID: "msg-2",
+      })
+
+      // #then
+      expect(promptCalls.length).toBeGreaterThanOrEqual(2)
+      expect(promptCalls[1].body.model).toEqual(model)
+    } finally {
+      realManager.cleanup()
+    }
+  })
 })
 
 describe("LaunchInput.skillContent", () => {

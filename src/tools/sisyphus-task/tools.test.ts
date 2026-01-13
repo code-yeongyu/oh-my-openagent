@@ -439,6 +439,144 @@ describe("sisyphus-task", () => {
     expect(result).toContain("Background task resumed")
     expect(result).toContain("task-456")
   })
+
+  test("sync resume passes original session agent to session.prompt", async () => {
+    // #given
+    const { createSisyphusTask } = require("./tools")
+    const { setSessionAgent } = require("../../features/claude-code-session-state")
+    
+    const sessionIdToResume = "ses_agent_preserve_test"
+    const originalAgent = "oracle"
+    
+    setSessionAgent(sessionIdToResume, originalAgent)
+    
+    let promptBody: any
+    
+    const mockManager = {
+      resume: async () => ({})
+    }
+    
+    const mockClient = {
+      session: {
+        prompt: async (input: any) => {
+          promptBody = input.body
+          return { data: {} }
+        },
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant", time: { created: Date.now() } },
+              parts: [{ type: "text", text: "Result from oracle agent" }],
+            },
+          ],
+        }),
+      },
+    }
+    
+    const tool = createSisyphusTask({
+      manager: mockManager,
+      client: mockClient,
+    })
+    
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "Sisyphus",
+      abort: new AbortController().signal,
+    }
+    
+    // #when
+    await tool.execute(
+      {
+        description: "Resume agent test",
+        prompt: "Continue with original agent",
+        resume: sessionIdToResume,
+        run_in_background: false,
+        skills: [],
+      },
+      toolContext
+    )
+    
+    // #then - session.prompt should include the original agent
+    expect(promptBody.agent).toBe(originalAgent)
+  }, { timeout: 10000 })
+
+  test("sync resume passes original session model to session.prompt when available", async () => {
+    // #given
+    const { createSisyphusTask } = require("./tools")
+    const { MESSAGE_STORAGE } = require("../../features/hook-message-injector")
+    const { join } = require("node:path")
+    const { mkdir, writeFile, rm } = require("node:fs/promises")
+
+    const sessionIdToResume = "ses_model_preserve_test"
+    const messageDir = join(MESSAGE_STORAGE, sessionIdToResume)
+
+    await mkdir(messageDir, { recursive: true })
+
+    try {
+      await writeFile(
+        join(messageDir, "000.json"),
+        JSON.stringify({
+          agent: "Sisyphus-Junior",
+          model: { providerID: "google", modelID: "antigravity-gemini-3-flash" },
+        }),
+        "utf-8"
+      )
+
+      let promptBody: any
+
+      const mockManager = {
+        resume: async () => ({}),
+      }
+
+      const mockClient = {
+        session: {
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "assistant", time: { created: Date.now() } },
+                parts: [{ type: "text", text: "Result" }],
+              },
+            ],
+          }),
+        },
+      }
+
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when
+      await tool.execute(
+        {
+          description: "Resume model test",
+          prompt: "Continue with original model",
+          resume: sessionIdToResume,
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+
+      // #then
+      expect(promptBody.agent).toBe("Sisyphus-Junior")
+      expect(promptBody.model).toEqual({ providerID: "google", modelID: "antigravity-gemini-3-flash" })
+    } finally {
+      await rm(messageDir, { recursive: true, force: true })
+    }
+  }, { timeout: 10000 })
 })
 
   describe("sync mode new task (run_in_background=false)", () => {

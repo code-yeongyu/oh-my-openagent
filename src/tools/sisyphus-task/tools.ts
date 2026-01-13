@@ -202,11 +202,25 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         const taskId = `resume_sync_${args.resume.slice(0, 8)}`
         const startTime = new Date()
 
+        const resumeMessageDir = getMessageDir(args.resume)
+        const resumePrevMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+        const resumeFirstMessageAgent = resumeMessageDir ? findFirstMessageWithAgent(resumeMessageDir) : null
+
+        const originalSessionAgent =
+          getSessionAgent(args.resume) ??
+          resumeFirstMessageAgent ??
+          resumePrevMessage?.agent
+
+        const originalSessionModel =
+          resumePrevMessage?.model?.providerID && resumePrevMessage?.model?.modelID
+            ? { providerID: resumePrevMessage.model.providerID, modelID: resumePrevMessage.model.modelID }
+            : undefined
+
         if (toastManager) {
           toastManager.addTask({
             id: taskId,
             description: args.description,
-            agent: "resume",
+            agent: originalSessionAgent ?? "resume",
             isBackground: false,
           })
         }
@@ -217,17 +231,19 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
-          await client.session.prompt({
-            path: { id: args.resume },
-            body: {
-              tools: {
-                task: false,
-                sisyphus_task: false,
-                call_omo_agent: true,
+            await client.session.prompt({
+              path: { id: args.resume },
+              body: {
+                ...(originalSessionAgent ? { agent: originalSessionAgent } : {}),
+                ...(originalSessionModel ? { model: originalSessionModel } : {}),
+                tools: {
+                  task: false,
+                  sisyphus_task: false,
+                  call_omo_agent: true,
+                },
+                parts: [{ type: "text", text: args.prompt }],
               },
-              parts: [{ type: "text", text: args.prompt }],
-            },
-          })
+            })
         } catch (promptError) {
           if (toastManager) {
             toastManager.removeTask(taskId)
