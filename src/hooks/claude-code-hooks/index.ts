@@ -192,7 +192,7 @@ export function createClaudeCodeHooksHook(
         } catch (e) {
           throw new Error(
             `[todowrite ERROR] Failed to parse todos string as JSON. ` +
-            `Received: ${output.args.todos.slice(0, 100)}... ` +
+            `Received: ${output.args.todos.length > 100 ? output.args.todos.slice(0, 100) + '...' : output.args.todos} ` +
             `Expected: Valid JSON array. Pass todos as an array, not a string.`
           )
         }
