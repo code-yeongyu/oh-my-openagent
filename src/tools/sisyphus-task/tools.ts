@@ -407,9 +407,9 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
       let syncSessionID: string | undefined
 
       try {
-        const parentSession = await client.session.get({
-          path: { id: ctx.sessionID },
-        }).catch(() => null)
+        const parentSession = client.session.get
+          ? await client.session.get({ path: { id: ctx.sessionID } }).catch(() => null)
+          : null
         const parentDirectory = parentSession?.data?.directory ?? directory
 
         const createResult = await client.session.create({
