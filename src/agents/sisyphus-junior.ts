@@ -82,7 +82,7 @@ export function createSisyphusJuniorAgent(
   promptAppend?: string
 ): AgentConfig {
   const prompt = buildSisyphusJuniorPrompt(promptAppend)
-  const model = categoryConfig.model
+  const model = categoryConfig.model ?? "anthropic/claude-sonnet-4-5"
 
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
   const mergedConfig = migrateAgentConfig({

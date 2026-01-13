@@ -69,10 +69,15 @@ function resolveCategoryConfig(
     return null
   }
 
+  let model = userConfig?.model ?? defaultConfig?.model
+  if (categoryName === "general" && !userConfig?.model) {
+    model = undefined
+  }
+
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model,
   }
 
   let promptAppend = defaultPromptAppend
@@ -312,7 +317,7 @@ ${textContent || "(No text output)"}`
         }
 
         agentToUse = SISYPHUS_JUNIOR_AGENT
-        categoryModel = parseModelString(resolved.config.model)
+        categoryModel = resolved.config.model ? parseModelString(resolved.config.model) : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
       } else {
         agentToUse = args.subagent_type!.trim()
