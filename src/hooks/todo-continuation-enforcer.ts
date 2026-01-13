@@ -65,7 +65,15 @@ function getMessageDir(sessionID: string): string | null {
 }
 
 function getIncompleteCount(todos: Todo[]): number {
-  return todos.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+  return todos.filter(t => 
+    t.status !== "completed" && 
+    t.status !== "cancelled" &&
+    t.status !== "awaiting_input"
+  ).length
+}
+
+function getAwaitingInputCount(todos: Todo[]): number {
+  return todos.filter(t => t.status === "awaiting_input").length
 }
 
 interface MessageInfo {
@@ -320,6 +328,13 @@ export function createTodoContinuationEnforcer(
       }
 
       const incompleteCount = getIncompleteCount(todos)
+      const awaitingInputCount = getAwaitingInputCount(todos)
+      
+      if (awaitingInputCount > 0) {
+        log(`[${HOOK_NAME}] Skipped: ${awaitingInputCount} task(s) awaiting user input`, { sessionID, awaitingInputCount })
+        return
+      }
+      
       if (incompleteCount === 0) {
         log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
         return
