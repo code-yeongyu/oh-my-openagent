@@ -89,6 +89,7 @@ function resolveCategoryConfig(
 export interface SisyphusTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
+  directory: string
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
 }
@@ -113,7 +114,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
-  const { manager, client, userCategories, gitMasterConfig } = options
+  const { manager, client, directory, userCategories, gitMasterConfig } = options
 
   return tool({
     description: SISYPHUS_TASK_DESCRIPTION,
@@ -406,10 +407,18 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
       let syncSessionID: string | undefined
 
       try {
+        const parentSession = await client.session.get({
+          path: { id: ctx.sessionID },
+        }).catch(() => null)
+        const parentDirectory = parentSession?.data?.directory ?? directory
+
         const createResult = await client.session.create({
           body: {
             parentID: ctx.sessionID,
             title: `Task: ${args.description}`,
+          },
+          query: {
+            directory: parentDirectory,
           },
         })
 
