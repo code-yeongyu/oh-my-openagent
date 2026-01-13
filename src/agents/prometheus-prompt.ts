@@ -980,9 +980,11 @@ This will:
 /**
  * Prometheus planner permission configuration.
  * Allows write/edit for plan files (.md only, enforced by prometheus-md-only hook).
+ * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
  */
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
+  question: "allow" as const,
 }
