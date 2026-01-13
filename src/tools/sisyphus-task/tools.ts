@@ -9,6 +9,7 @@ import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAG
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
+import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
@@ -60,7 +61,8 @@ type ToolContextWithMetadata = {
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: CategoriesConfig
+  userCategories?: CategoriesConfig,
+  parentModelString?: string
 ): { config: CategoryConfig; promptAppend: string } | null {
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -70,10 +72,12 @@ function resolveCategoryConfig(
     return null
   }
 
+  // Model priority: user override > parent model (inherit) > category default > hardcoded fallback
+  // Parent model takes precedence over category default so custom providers work out-of-box
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model: userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
   }
 
   let promptAppend = defaultPromptAppend
@@ -329,10 +333,25 @@ ${textContent || "(No text output)"}`
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
 
+      const parentModelString = parentModel
+        ? `${parentModel.providerID}/${parentModel.modelID}`
+        : undefined
+
+      let modelInfo: ModelFallbackInfo | undefined
+
       if (args.category) {
-        const resolved = resolveCategoryConfig(args.category, userCategories)
+        const resolved = resolveCategoryConfig(args.category, userCategories, parentModelString)
         if (!resolved) {
           return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
+        }
+
+        const userHasDefinedCategory = userCategories?.[args.category]?.model !== undefined
+        if (userHasDefinedCategory) {
+          modelInfo = { model: resolved.config.model, type: "user-defined" }
+        } else if (parentModelString) {
+          modelInfo = { model: parentModelString, type: "inherited" }
+        } else if (DEFAULT_CATEGORIES[args.category]?.model) {
+          modelInfo = { model: DEFAULT_CATEGORIES[args.category].model, type: "default" }
         }
 
         agentToUse = SISYPHUS_JUNIOR_AGENT
@@ -448,6 +467,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             agent: agentToUse,
             isBackground: false,
             skills: args.skills,
+            modelInfo,
           })
         }
 
