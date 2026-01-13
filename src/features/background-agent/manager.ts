@@ -286,6 +286,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    // Reset startedAt on resume to prevent immediate completion
+    // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
+    existingTask.startedAt = new Date()
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -418,6 +421,11 @@ export class BackgroundManager {
 
         task.status = "completed"
         task.completedAt = new Date()
+        // Release concurrency immediately on completion
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
+        }
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -442,6 +450,15 @@ export class BackgroundManager {
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
+      }
+      // Clean up pendingByParent to prevent stale entries
+      const pending = this.pendingByParent.get(task.parentSessionID)
+      if (pending) {
+        pending.delete(task.id)
+        if (pending.size === 0) {
+          this.pendingByParent.delete(task.parentSessionID)
+        }
       }
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
@@ -753,6 +770,11 @@ try {
 
           task.status = "completed"
           task.completedAt = new Date()
+          // Release concurrency immediately on completion
+          if (task.concurrencyKey) {
+            this.concurrencyManager.release(task.concurrencyKey)
+            task.concurrencyKey = undefined  // Prevent double-release
+          }
           this.markForNotification(task)
           await this.notifyParentSession(task)
           log("[background-agent] Task completed via polling:", task.id)
@@ -819,6 +841,11 @@ if (lastMessage) {
                 if (!hasIncompleteTodos) {
                   task.status = "completed"
                   task.completedAt = new Date()
+                  // Release concurrency immediately on completion
+                  if (task.concurrencyKey) {
+                    this.concurrencyManager.release(task.concurrencyKey)
+                    task.concurrencyKey = undefined  // Prevent double-release
+                  }
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
                   log("[background-agent] Task completed via stability detection:", task.id)
