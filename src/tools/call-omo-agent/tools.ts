@@ -145,10 +145,22 @@ async function executeSync(
     sessionID = args.session_id
   } else {
     log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
+    const parentSession = await ctx.client.session.get({
+      path: { id: toolContext.sessionID },
+    }).catch((err) => {
+      log(`[call_omo_agent] Failed to get parent session:`, err)
+      return null
+    })
+    log(`[call_omo_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
+    const parentDirectory = parentSession?.data?.directory ?? ctx.directory
+
     const createResult = await ctx.client.session.create({
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     })
 
