@@ -1,0 +1,49 @@
+{
+  "changeName": "skill-alignment",
+  "description": "Align subagent-driven-development, executing-plans, and wave-parallel-execution skills with Implementer Agent",
+  "archivedAt": "2026-01-13T10:15:00+08:00",
+  "executionMode": "manual",
+  "commits": [
+    {
+      "sha": "97d6e64",
+      "message": "feat(skills): register wave-parallel-execution and executing-plans skills",
+      "files": [
+        "src/features/builtin-skills/skills.ts",
+        "src/features/builtin-skills/executing-plans/SKILL.md",
+        "src/features/builtin-skills/executing-plans/reference.md",
+        "src/features/builtin-skills/wave-parallel-execution/SKILL.md",
+        "src/features/builtin-skills/wave-parallel-execution/wave-dispatch.md"
+      ]
+    }
+  ],
+  "externalChanges": [
+    {
+      "repo": "superpowers-fusion",
+      "path": "skills/subagent-driven-development/reference/implementer-prompt.md",
+      "description": "Updated to align with Implementer Agent workflow"
+    },
+    {
+      "repo": "superpowers-fusion",
+      "path": "skills/subagent-driven-development/reference/spec-reviewer-prompt.md",
+      "description": "Updated to use oracle agent for review"
+    },
+    {
+      "repo": "superpowers-fusion",
+      "path": "skills/subagent-driven-development/reference/code-quality-reviewer-prompt.md",
+      "description": "Updated to use oracle agent for review"
+    }
+  ],
+  "summary": {
+    "problem": "subagent-driven-development skill had incomplete reference templates that didn't align with Implementer Agent's actual workflow",
+    "solution": [
+      "Updated implementer-prompt.md with ImplementerTaskContext structure, 5-step workflow, Risk Tier, Codex phases",
+      "Updated spec-reviewer-prompt.md to use sisyphus_task(agent='oracle')",
+      "Updated code-quality-reviewer-prompt.md to use sisyphus_task(agent='oracle')",
+      "Modified executing-plans skill to dispatch Implementer agent directly",
+      "Modified wave-parallel-execution skill to dispatch Implementer agent directly",
+      "Registered both skills in skills.ts"
+    ]
+  },
+  "branch": "dev",
+  "mergedTo": null
+}
