@@ -452,6 +452,7 @@ describe("sisyphus-task", () => {
       
       const mockClient = {
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_error_test" } }),
           prompt: async () => {
             throw new Error("JSON Parse error: Unexpected EOF")
@@ -504,6 +505,7 @@ describe("sisyphus-task", () => {
       
       const mockClient = {
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_success" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({
@@ -560,6 +562,7 @@ describe("sisyphus-task", () => {
       
       const mockClient = {
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_agent_notfound" } }),
           prompt: async () => {
             throw new Error("Cannot read property 'name' of undefined agent.name")
@@ -610,6 +613,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_model" } }),
           prompt: async (input: any) => {
             promptBody = input.body
