@@ -1,11 +1,9 @@
 # AUTH KNOWLEDGE BASE
 
 ## OVERVIEW
-
 Google Antigravity OAuth for Gemini models. Token management, fetch interception, thinking block extraction.
 
 ## STRUCTURE
-
 ```
 auth/
 └── antigravity/
@@ -13,11 +11,11 @@ auth/
     ├── oauth.ts          # OAuth flow, token acquisition
     ├── token.ts          # Token storage, refresh logic
     ├── fetch.ts          # Fetch interceptor (798 lines)
-    ├── response.ts       # Response transformation (599 lines)
+    ├── response.ts       # Response transformation (598 lines)
     ├── thinking.ts       # Thinking block extraction (755 lines)
     ├── thought-signature-store.ts  # Signature caching
     ├── message-converter.ts        # Format conversion
-    ├── accounts.ts       # Multi-account management
+    ├── accounts.ts       # Multi-account management (up to 10 accounts)
     ├── browser.ts        # Browser automation for OAuth
     ├── cli.ts            # CLI interaction
     ├── request.ts        # Request building
@@ -29,33 +27,29 @@ auth/
 ```
 
 ## KEY COMPONENTS
-
 | File | Purpose |
 |------|---------|
-| fetch.ts | URL rewriting, token injection, retries |
-| thinking.ts | Extract `<antThinking>` blocks |
-| response.ts | Streaming SSE parsing |
-| oauth.ts | Browser-based OAuth flow |
-| token.ts | Token persistence, expiry |
+| fetch.ts | URL rewriting, multi-account rotation, endpoint fallback |
+| thinking.ts | Thinking block extraction, signature management, budget mapping |
+| response.ts | Streaming SSE parsing and response transformation |
+| accounts.ts | Load balancing across up to 10 Google accounts |
+| thought-signature-store.ts | Caching signatures for multi-turn thinking conversations |
 
 ## HOW IT WORKS
-
-1. **Intercept**: fetch.ts intercepts Anthropic/Google requests
-2. **Rewrite**: URLs → Antigravity proxy endpoints
-3. **Auth**: Bearer token from stored OAuth credentials
-4. **Response**: Streaming parsed, thinking blocks extracted
-5. **Transform**: Normalized for OpenCode
+1. **Intercept**: `fetch.ts` intercepts Anthropic/Google requests.
+2. **Route**: Rotates accounts and selects best endpoint (daily → autopush → prod).
+3. **Auth**: Injects Bearer tokens from `token.ts` persistence.
+4. **Process**: `response.ts` parses SSE; `thinking.ts` manages thought blocks.
+5. **Recovery**: Detects GCP permission errors and triggers recovery/rotation.
 
 ## FEATURES
-
-- Multi-account (up to 10 Google accounts)
-- Auto-fallback on rate limit
-- Thinking blocks preserved
-- Antigravity proxy for AI Studio access
+- Multi-account load balancing (up to 10 accounts)
+- Strategic endpoint fallback: daily → autopush → prod
+- Persistent thought signatures for continuity in thinking models
+- Automated GCP permission error recovery
 
 ## ANTI-PATTERNS
-
-- Direct API calls (use fetch interceptor)
-- Tokens in code (use token.ts storage)
-- Ignoring refresh (check expiry first)
-- Blocking on OAuth (always async)
+- Hardcoding endpoints: Use `constants.ts` or let `fetch.ts` route.
+- Manual token handling: Use `token.ts` and `storage.ts` abstraction.
+- Sync OAuth calls: All auth flows must be non-blocking/async.
+- Ignoring account rotation: Let `fetch.ts` handle load balancing.
