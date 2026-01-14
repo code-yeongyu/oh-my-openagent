@@ -93,16 +93,18 @@ describe("keyword-detector registers to ContextCollector", () => {
 
 describe("keyword-detector session filtering", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     setMainSession(undefined)
     logCalls = []
-    spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
 
   afterEach(() => {
+    logSpy?.mockRestore()
     setMainSession(undefined)
   })
 
@@ -236,16 +238,18 @@ describe("keyword-detector session filtering", () => {
 
 describe("keyword-detector word boundary", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     setMainSession(undefined)
     logCalls = []
-    spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
 
   afterEach(() => {
+    logSpy?.mockRestore()
     setMainSession(undefined)
   })
 
