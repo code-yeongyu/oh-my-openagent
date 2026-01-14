@@ -22,6 +22,21 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "multimodal-looker": "multimodal-looker",
 }
 
+export const BUILTIN_AGENT_NAMES = new Set([
+  "Sisyphus",
+  "oracle",
+  "librarian",
+  "explore",
+  "frontend-ui-ux-engineer",
+  "document-writer",
+  "multimodal-looker",
+  "Metis (Plan Consultant)",
+  "Momus (Plan Reviewer)",
+  "Prometheus (Planner)",
+  "orchestrator-sisyphus",
+  "build",
+])
+
 // Migration map: old hook names → new hook names (for backward compatibility)
 export const HOOK_NAME_MAP: Record<string, string> = {
   // Legacy names (backward compatibility)
@@ -117,21 +132,7 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
   }
 
-  if (rawConfig.agents && typeof rawConfig.agents === "object") {
-    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
-    for (const [name, config] of Object.entries(agents)) {
-      const { migrated, changed } = migrateAgentConfigToCategory(config)
-      if (changed) {
-        const category = migrated.category as string
-        if (shouldDeleteAgentConfig(migrated, category)) {
-          delete agents[name]
-        } else {
-          agents[name] = migrated
-        }
-        needsWrite = true
-      }
-    }
-  }
+
 
   if (rawConfig.omo_agent) {
     rawConfig.sisyphus_agent = rawConfig.omo_agent
