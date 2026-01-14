@@ -44,6 +44,13 @@ function isPrivateIP(ip: string): boolean {
     if (lowerIp.startsWith('fc') || lowerIp.startsWith('fd')) return true;
     // fe80::/10 (link-local)
     if (lowerIp.startsWith('fe8') || lowerIp.startsWith('fe9') || lowerIp.startsWith('fea') || lowerIp.startsWith('feb')) return true;
+
+    // Handle IPv6-mapped IPv4 addresses (e.g., ::ffff:127.0.0.1)
+    const ipv6MappedMatch = lowerIp.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (ipv6MappedMatch) {
+      // Recursively check the embedded IPv4 address
+      return isPrivateIP(ipv6MappedMatch[1]);
+    }
   }
   return false;
 }
@@ -74,8 +81,8 @@ async function validateSources(sources: string[]): Promise<void> {
           }
         }
       } catch (dnsError) {
-        // If DNS lookup fails, hostname checks passed, so continue
-        // Could log warning here if needed
+        // DNS resolution failed - cannot verify IP is not private, reject for security
+        throw new Error(`Cannot verify IP addresses for ${hostname} (DNS error: ${dnsError instanceof Error ? dnsError.message : String(dnsError)})`);
       }
     } catch (error) {
       throw new Error(`Invalid source URL "${source}": ${error instanceof Error ? error.message : String(error)}`)
