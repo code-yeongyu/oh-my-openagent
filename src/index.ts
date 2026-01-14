@@ -70,6 +70,7 @@ import {
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
+import { createLibrarianLocalIndex } from "./features/librarian-local-index";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { type HookName } from "./config";
 import { log, detectExternalNotificationPlugin, getNotificationConflictWarning } from "./shared";
@@ -237,6 +238,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
+  const librarianLocalIndex = createLibrarianLocalIndex(ctx, backgroundManager);
   const sisyphusTask = createSisyphusTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -305,6 +307,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
+      librarian_local_index: librarianLocalIndex,
       sisyphus_task: sisyphusTask,
       skill: skillTool,
       skill_mcp: skillMcpTool,
