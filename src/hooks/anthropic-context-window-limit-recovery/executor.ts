@@ -320,7 +320,6 @@ export async function executeCompact(
           "todowrite",
           "todoread",
           "lsp_rename",
-          "lsp_code_action_resolve",
         ],
       };
 

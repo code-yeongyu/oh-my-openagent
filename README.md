@@ -549,17 +549,13 @@ Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now a
 The features in your editor? Other agents can't touch them.
 Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
 
-- **lsp_hover**: Type info, docs, signatures at position
 - **lsp_goto_definition**: Jump to symbol definition
 - **lsp_find_references**: Find all usages across workspace
-- **lsp_document_symbols**: Get file symbol outline
-- **lsp_workspace_symbols**: Search symbols by name across project
+- **lsp_symbols**: Get symbols from file (scope='document') or search across workspace (scope='workspace')
 - **lsp_diagnostics**: Get errors/warnings before build
 - **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
 - **lsp_rename**: Rename symbol across workspace
-- **lsp_code_actions**: Get available quick fixes/refactorings
-- **lsp_code_action_resolve**: Apply code action
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 - **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
