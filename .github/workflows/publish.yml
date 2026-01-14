@@ -8,12 +8,13 @@ on:
         description: "Bump major, minor, or patch"
         required: true
         type: choice
+        default: patch
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
       version:
-        description: "Override version (optional)"
+        description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
         required: false
         type: string
 
