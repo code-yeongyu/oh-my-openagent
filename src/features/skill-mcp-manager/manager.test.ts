@@ -3,11 +3,29 @@ import { SkillMcpManager } from "./manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 
+// Mock the MCP SDK transports to avoid network calls
+const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
+const mockHttpClose = mock(() => Promise.resolve())
+
+mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
+  StreamableHTTPClientTransport: class MockStreamableHTTPClientTransport {
+    constructor(public url: URL, public options?: { requestInit?: RequestInit }) {}
+    async start() {
+      await mockHttpConnect()
+    }
+    async close() {
+      await mockHttpClose()
+    }
+  },
+}))
+
 describe("SkillMcpManager", () => {
   let manager: SkillMcpManager
 
   beforeEach(() => {
     manager = new SkillMcpManager()
+    mockHttpConnect.mockClear()
+    mockHttpClose.mockClear()
   })
 
   afterEach(async () => {
@@ -225,6 +243,30 @@ describe("SkillMcpManager", () => {
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Hints[\s\S]*Verify the URL[\s\S]*authentication headers[\s\S]*MCP over HTTP/
         )
+      })
+
+      it("calls mocked transport connect for HTTP connections", async () => {
+        // #given
+        const info: SkillMcpClientInfo = {
+          serverName: "mock-test-server",
+          skillName: "test-skill",
+          sessionID: "session-1",
+        }
+        const config: ClaudeCodeMcpServer = {
+          url: "https://example.com/mcp",
+        }
+
+        // #when
+        try {
+          await manager.getOrCreateClient(info, config)
+        } catch {
+          // Expected to fail
+        }
+
+        // #then - verify mock was called (transport was instantiated)
+        // The connection attempt happens through the Client.connect() which
+        // internally calls transport.start()
+        expect(mockHttpConnect).toHaveBeenCalled()
       })
     })
 
