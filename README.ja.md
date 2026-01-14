@@ -526,17 +526,13 @@ Ask @explore for the policy on this feature
 あなたがエディタで使っているその機能、他のエージェントは触ることができません。
 最高の同僚に最高の道具を渡してください。これでリファクタリングも、ナビゲーションも、分析も、エージェントが適切に行えるようになります。
 
-- **lsp_hover**: その位置の型情報、ドキュメント、シグネチャを取得
 - **lsp_goto_definition**: シンボル定義へジャンプ
 - **lsp_find_references**: ワークスペース全体で使用箇所を検索
-- **lsp_document_symbols**: ファイルのシンボルアウトラインを取得
-- **lsp_workspace_symbols**: プロジェクト全体から名前でシンボルを検索
+- **lsp_symbols**: ファイルからシンボルを取得 (scope='document') またはワークスペース全体を検索 (scope='workspace')
 - **lsp_diagnostics**: ビルド前にエラー/警告を取得
 - **lsp_servers**: 利用可能な LSP サーバー一覧
 - **lsp_prepare_rename**: 名前変更操作の検証
 - **lsp_rename**: ワークスペース全体でシンボル名を変更
-- **lsp_code_actions**: 利用可能なクイックフィックス/リファクタリングを取得
-- **lsp_code_action_resolve**: コードアクションを適用
 - **ast_grep_search**: AST 認識コードパターン検索 (25言語対応)
 - **ast_grep_replace**: AST 認識コード置換
 

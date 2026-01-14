@@ -117,13 +117,13 @@ If \`--create-new\`: Read all existing first (preserve context) → then delete 
 lsp_servers()  # Check availability
 
 # Entry points (parallel)
-lsp_document_symbols(filePath="src/index.ts")
-lsp_document_symbols(filePath="main.py")
+lsp_symbols(filePath="src/index.ts", scope="document")
+lsp_symbols(filePath="main.py", scope="document")
 
 # Key symbols (parallel)
-lsp_workspace_symbols(filePath=".", query="class")
-lsp_workspace_symbols(filePath=".", query="interface")
-lsp_workspace_symbols(filePath=".", query="function")
+lsp_symbols(filePath=".", scope="workspace", query="class")
+lsp_symbols(filePath=".", scope="workspace", query="interface")
+lsp_symbols(filePath=".", scope="workspace", query="function")
 
 # Centrality for top exports
 lsp_find_references(filePath="...", line=X, character=Y)

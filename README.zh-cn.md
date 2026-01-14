@@ -548,17 +548,13 @@ gh repo star code-yeongyu/oh-my-opencode
 你编辑器中的功能？其他智能体无法触及。
 把你最好的工具交给你最好的同事。现在它们可以正确地重构、导航和分析。
 
-- **lsp_hover**：位置处的类型信息、文档、签名
 - **lsp_goto_definition**：跳转到符号定义
 - **lsp_find_references**：查找工作区中的所有使用
-- **lsp_document_symbols**：获取文件符号概览
-- **lsp_workspace_symbols**：按名称在项目中搜索符号
+- **lsp_symbols**：从文件获取符号 (scope='document') 或在工作区中搜索 (scope='workspace')
 - **lsp_diagnostics**：在构建前获取错误/警告
 - **lsp_servers**：列出可用的 LSP 服务器
 - **lsp_prepare_rename**：验证重命名操作
 - **lsp_rename**：在工作区中重命名符号
-- **lsp_code_actions**：获取可用的快速修复/重构
-- **lsp_code_action_resolve**：应用代码操作
 - **ast_grep_search**：AST 感知的代码模式搜索（25 种语言）
 - **ast_grep_replace**：AST 感知的代码替换
 - **call_omo_agent**：生成专业的 explore/librarian 智能体。支持 `run_in_background` 参数进行异步执行。

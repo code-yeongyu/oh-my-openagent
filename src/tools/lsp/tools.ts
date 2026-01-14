@@ -7,19 +7,16 @@ import {
 } from "./constants"
 import {
   withLspClient,
-  formatHoverResult,
   formatLocation,
   formatDocumentSymbol,
   formatSymbolInfo,
   formatDiagnostic,
   filterDiagnosticsBySeverity,
   formatPrepareRenameResult,
-  formatCodeActions,
   applyWorkspaceEdit,
   formatApplyResult,
 } from "./utils"
 import type {
-  HoverResult,
   Location,
   LocationLink,
   DocumentSymbol,
@@ -28,32 +25,9 @@ import type {
   PrepareRenameResult,
   PrepareRenameDefaultBehavior,
   WorkspaceEdit,
-  CodeAction,
-  Command,
 } from "./types"
 
 
-
-export const lsp_hover: ToolDefinition = tool({
-  description: "Get type info, docs, and signature for a symbol at position.",
-  args: {
-    filePath: tool.schema.string(),
-    line: tool.schema.number().min(1).describe("1-based"),
-    character: tool.schema.number().min(0).describe("0-based"),
-  },
-  execute: async (args, context) => {
-    try {
-      const result = await withLspClient(args.filePath, async (client) => {
-        return (await client.hover(args.filePath, args.line, args.character)) as HoverResult | null
-      })
-      const output = formatHoverResult(result)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
-    }
-  },
-})
 
 export const lsp_goto_definition: ToolDefinition = tool({
   description: "Jump to symbol definition. Find WHERE something is defined.",
@@ -129,75 +103,68 @@ export const lsp_find_references: ToolDefinition = tool({
   },
 })
 
-export const lsp_document_symbols: ToolDefinition = tool({
-  description: "Get hierarchical outline of all symbols in a file.",
+export const lsp_symbols: ToolDefinition = tool({
+  description: "Get symbols from file (document) or search across workspace. Use scope='document' for file outline, scope='workspace' for project-wide symbol search.",
   args: {
-    filePath: tool.schema.string(),
+    filePath: tool.schema.string().describe("File path for LSP context"),
+    scope: tool.schema.enum(["document", "workspace"]).default("document").describe("'document' for file symbols, 'workspace' for project-wide search"),
+    query: tool.schema.string().optional().describe("Symbol name to search (required for workspace scope)"),
+    limit: tool.schema.number().optional().describe("Max results (default 50)"),
   },
   execute: async (args, context) => {
     try {
-      const result = await withLspClient(args.filePath, async (client) => {
-        return (await client.documentSymbols(args.filePath)) as DocumentSymbol[] | SymbolInfo[] | null
-      })
+      const scope = args.scope ?? "document"
+      
+      if (scope === "workspace") {
+        if (!args.query) {
+          return "Error: 'query' is required for workspace scope"
+        }
+        
+        const result = await withLspClient(args.filePath, async (client) => {
+          return (await client.workspaceSymbols(args.query!)) as SymbolInfo[] | null
+        })
 
-      if (!result || result.length === 0) {
-        const output = "No symbols found"
-        return output
-      }
+        if (!result || result.length === 0) {
+          return "No symbols found"
+        }
 
-      const total = result.length
-      const truncated = total > DEFAULT_MAX_SYMBOLS
-      const limited = truncated ? result.slice(0, DEFAULT_MAX_SYMBOLS) : result
-
-      const lines: string[] = []
-      if (truncated) {
-        lines.push(`Found ${total} symbols (showing first ${DEFAULT_MAX_SYMBOLS}):`)
-      }
-
-      if ("range" in limited[0]) {
-        lines.push(...(limited as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)))
+        const total = result.length
+        const limit = Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS)
+        const truncated = total > limit
+        const limited = result.slice(0, limit)
+        const lines = limited.map(formatSymbolInfo)
+        if (truncated) {
+          lines.unshift(`Found ${total} symbols (showing first ${limit}):`)
+        }
+        return lines.join("\n")
       } else {
-        lines.push(...(limited as SymbolInfo[]).map(formatSymbolInfo))
+        const result = await withLspClient(args.filePath, async (client) => {
+          return (await client.documentSymbols(args.filePath)) as DocumentSymbol[] | SymbolInfo[] | null
+        })
+
+        if (!result || result.length === 0) {
+          return "No symbols found"
+        }
+
+        const total = result.length
+        const limit = Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS)
+        const truncated = total > limit
+        const limited = truncated ? result.slice(0, limit) : result
+
+        const lines: string[] = []
+        if (truncated) {
+          lines.push(`Found ${total} symbols (showing first ${limit}):`)
+        }
+
+        if ("range" in limited[0]) {
+          lines.push(...(limited as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)))
+        } else {
+          lines.push(...(limited as SymbolInfo[]).map(formatSymbolInfo))
+        }
+        return lines.join("\n")
       }
-      return lines.join("\n")
     } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
-    }
-  },
-})
-
-export const lsp_workspace_symbols: ToolDefinition = tool({
-  description: "Search symbols by name across ENTIRE workspace.",
-  args: {
-    filePath: tool.schema.string(),
-    query: tool.schema.string().describe("Symbol name (fuzzy match)"),
-    limit: tool.schema.number().optional().describe("Max results"),
-  },
-  execute: async (args, context) => {
-    try {
-      const result = await withLspClient(args.filePath, async (client) => {
-        return (await client.workspaceSymbols(args.query)) as SymbolInfo[] | null
-      })
-
-      if (!result || result.length === 0) {
-        const output = "No symbols found"
-        return output
-      }
-
-      const total = result.length
-      const limit = Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS)
-      const truncated = total > limit
-      const limited = result.slice(0, limit)
-      const lines = limited.map(formatSymbolInfo)
-      if (truncated) {
-        lines.unshift(`Found ${total} symbols (showing first ${limit}):`)
-      }
-      const output = lines.join("\n")
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
+      return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
   },
 })
@@ -310,92 +277,6 @@ export const lsp_rename: ToolDefinition = tool({
       })
       const result = applyWorkspaceEdit(edit)
       const output = formatApplyResult(result)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
-    }
-  },
-})
-
-export const lsp_code_actions: ToolDefinition = tool({
-  description: "Get available quick fixes, refactorings, and source actions (organize imports, fix all).",
-  args: {
-    filePath: tool.schema.string(),
-    startLine: tool.schema.number().min(1).describe("1-based"),
-    startCharacter: tool.schema.number().min(0).describe("0-based"),
-    endLine: tool.schema.number().min(1).describe("1-based"),
-    endCharacter: tool.schema.number().min(0).describe("0-based"),
-    kind: tool.schema
-      .enum([
-        "quickfix",
-        "refactor",
-        "refactor.extract",
-        "refactor.inline",
-        "refactor.rewrite",
-        "source",
-        "source.organizeImports",
-        "source.fixAll",
-      ])
-      .optional()
-      .describe("Filter by code action kind"),
-  },
-  execute: async (args, context) => {
-    try {
-      const only = args.kind ? [args.kind] : undefined
-      const result = await withLspClient(args.filePath, async (client) => {
-        return (await client.codeAction(
-          args.filePath,
-          args.startLine,
-          args.startCharacter,
-          args.endLine,
-          args.endCharacter,
-          only
-        )) as (CodeAction | Command)[] | null
-      })
-      const output = formatCodeActions(result)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
-    }
-  },
-})
-
-export const lsp_code_action_resolve: ToolDefinition = tool({
-  description: "Resolve and APPLY a code action from lsp_code_actions.",
-  args: {
-    filePath: tool.schema.string(),
-    codeAction: tool.schema.string().describe("Code action JSON from lsp_code_actions"),
-  },
-  execute: async (args, context) => {
-    try {
-      const codeAction = JSON.parse(args.codeAction) as CodeAction
-      const resolved = await withLspClient(args.filePath, async (client) => {
-        return (await client.codeActionResolve(codeAction)) as CodeAction | null
-      })
-
-      if (!resolved) {
-        const output = "Failed to resolve code action"
-        return output
-      }
-
-      const lines: string[] = []
-      lines.push(`Action: ${resolved.title}`)
-      if (resolved.kind) lines.push(`Kind: ${resolved.kind}`)
-
-      if (resolved.edit) {
-        const result = applyWorkspaceEdit(resolved.edit)
-        lines.push(formatApplyResult(result))
-      } else {
-        lines.push("No edit to apply")
-      }
-
-      if (resolved.command) {
-        lines.push(`Command: ${resolved.command.title} (${resolved.command.command}) - not executed`)
-      }
-
-      const output = lines.join("\n")
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
