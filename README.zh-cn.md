@@ -30,14 +30,31 @@
 
 # Claude OAuth 访问通知
 
+## TL;DR
+
+> Q. 我可以使用 oh-my-opencode 吗？
+
+可以。
+
+> Q. 我可以用 Claude Code 订阅来使用它吗？
+
+技术上可以，但我不建议这样做。
+
+> Q. 你们提供处理 OAuth 登录的选项吗？
+
+不，本项目没有任何此类实现。
+
+## 详细说明
+
 > 自2026年1月起，Anthropic 以违反服务条款为由限制了第三方 OAuth 访问。
+>
 > [**Anthropic 将本项目 oh-my-opencode 作为封锁 opencode 的理由。**](https://x.com/thdxr/status/2010149530486911014)
+>
 > 事实上，社区中确实存在一些伪造 Claude Code OAuth 请求签名的插件。
+>
 > 无论技术上是否可检测，这些工具可能都能正常工作，但用户应注意服务条款的相关影响，我个人不建议使用这些工具。
 >
 > 本项目对使用非官方工具产生的任何问题概不负责，**我们没有任何这些 OAuth 系统的自定义实现。**
-
-**注意：请勿为 librarian 使用昂贵的模型。这不仅对你没有帮助，还会增加 LLM 服务商的负担。请使用 Claude Haiku、Gemini Flash、GLM 4.7 或 MiniMax 等模型。**
 
 
 <div align="center">
