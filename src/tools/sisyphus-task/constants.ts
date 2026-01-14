@@ -185,31 +185,38 @@ The more explicit your prompt, the better the results.
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": {
-    model: "google/gemini-3-pro-preview",
-    temperature: 0.7,
+    model: "a-llm-nextologies/gemini-3-pro-preview",
+    fallback: ["a-llm-nextologies/claude-sonnet-4-5", "a-llm-nextologies/gemini-3-flash-preview"],
+    temperature: 0.5,
   },
   ultrabrain: {
-    model: "openai/gpt-5.2",
+    model: "a-llm-nextologies/gpt-5.2",
+    fallback: ["a-llm-nextologies/deepseek-r1", "a-llm-nextologies/claude-opus-4-5"],
     temperature: 0.1,
   },
   artistry: {
-    model: "google/gemini-3-pro-preview",
+    model: "a-llm-nextologies/gemini-3-pro-preview",
+    fallback: ["a-llm-nextologies/claude-sonnet-4-5"],
     temperature: 0.9,
   },
   quick: {
-    model: "anthropic/claude-haiku-4-5",
-    temperature: 0.3,
+    model: "a-llm-nextologies/gemini-3-flash-preview",
+    fallback: ["a-llm-nextologies/gemini-2.5-flash", "a-llm-nextologies/deepseek-v3.2"],
+    temperature: 0.2,
   },
   "most-capable": {
-    model: "anthropic/claude-opus-4-5",
+    model: "a-llm-nextologies/claude-opus-4-5",
+    fallback: ["a-llm-nextologies/gpt-5.2", "a-llm-nextologies/claude-sonnet-4-5"],
     temperature: 0.1,
   },
   writing: {
-    model: "google/gemini-3-flash-preview",
+    model: "a-llm-nextologies/gemini-3-flash-preview",
+    fallback: ["a-llm-nextologies/deepseek-v3.2", "a-llm-nextologies/claude-haiku-4-5"],
     temperature: 0.5,
   },
   general: {
-    model: "anthropic/claude-sonnet-4-5",
+    model: "a-llm-nextologies/deepseek-v3.2",
+    fallback: ["a-llm-nextologies/claude-haiku-4-5", "a-llm-nextologies/gemini-3-flash-preview"],
     temperature: 0.3,
   },
 }
