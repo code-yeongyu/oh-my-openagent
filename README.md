@@ -6,7 +6,7 @@
 > [!TIP]
 >
 > [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.1` to install it.**
+> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.6` to install it.**
 >
 > Be with us!
 >
@@ -28,8 +28,14 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+# Claude OAuth Access Notice
 
-**Notice: Do not use expensive models for librarian. This is not only unhelpful to you, but also burdens LLM providers. Use models like Claude Haiku, Gemini Flash, GLM 4.7, or MiniMax instead.**
+> As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
+> [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
+> Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
+> These tools may work regardless of technical detectability, but users should be aware of ToS implications, and I personally cannot recommend to use those.
+>
+> This project is not responsible for any issues arising from the use of unofficial tools, and **we do not have any custom implementations of those oauth systems.**
 
 
 <div align="center">
@@ -76,6 +82,9 @@
 
 ## Contents
 
+- [Claude OAuth Access Notice](#claude-oauth-access-notice)
+  - [Reviews](#reviews)
+  - [Contents](#contents)
 - [Oh My OpenCode](#oh-my-opencode)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
@@ -94,7 +103,9 @@
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [Model Configuration](#model-configuration)
         - [oh-my-opencode Agent Model Override](#oh-my-opencode-agent-model-override)
-
+      - [GitHub Copilot (Fallback Provider)](#github-copilot-fallback-provider)
+        - [Model Mappings](#model-mappings)
+        - [Setup](#setup)
     - [⚠️ Warning](#️-warning)
     - [Verify the setup](#verify-the-setup)
     - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
@@ -390,12 +401,12 @@ GitHub Copilot is supported as a **fallback provider** when native providers (Cl
 
 When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
 
-| Agent | Model |
-|-------|-------|
-| **Sisyphus** | `github-copilot/claude-opus-4.5` |
-| **Oracle** | `github-copilot/gpt-5.2` |
-| **Explore** | `grok code` (default) |
-| **Librarian** | `glm 4.7 free` (default) |
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `github-copilot/claude-opus-4.5` |
+| **Oracle**    | `github-copilot/gpt-5.2`         |
+| **Explore**   | `grok code` (default)            |
+| **Librarian** | `glm 4.7 free` (default)         |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
 
