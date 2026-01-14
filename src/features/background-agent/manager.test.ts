@@ -675,9 +675,9 @@ describe("LaunchInput.skillContent", () => {
   })
 })
 
-describe("BackgroundManager.notifyParentSession - model/agent context preservation", () => {
-  test("should include model field in session.prompt when parentModel is defined", async () => {
-    // #given
+describe("BackgroundManager.notifyParentSession - agent context preservation", () => {
+  test("should never pass model field - let OpenCode use session's lastModel", async () => {
+    // #given - task with parentModel defined
     const task: BackgroundTask = {
       id: "task-with-model",
       sessionID: "session-child",
@@ -696,8 +696,8 @@ describe("BackgroundManager.notifyParentSession - model/agent context preservati
     // #when
     const promptBody = buildNotificationPromptBody(task)
 
-    // #then - model MUST be included when parentModel is defined
-    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    // #then - model MUST NOT be passed (OpenCode uses session's lastModel)
+    expect("model" in promptBody).toBe(false)
     expect(promptBody.agent).toBe("Sisyphus")
   })
 
@@ -721,9 +721,9 @@ describe("BackgroundManager.notifyParentSession - model/agent context preservati
     // #when
     const promptBody = buildNotificationPromptBody(task)
 
-    // #then
+    // #then - no agent, no model (let OpenCode handle)
     expect("agent" in promptBody).toBe(false)
-    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
+    expect("model" in promptBody).toBe(false)
   })
 
   test("should include agent field when parentAgent is defined", async () => {
@@ -748,9 +748,10 @@ describe("BackgroundManager.notifyParentSession - model/agent context preservati
 
     // #then
     expect(promptBody.agent).toBe("Sisyphus")
+    expect("model" in promptBody).toBe(false)
   })
 
-  test("should not pass model field when parentModel is undefined", async () => {
+  test("should not pass model field even when parentModel is undefined", async () => {
     // #given
     const task: BackgroundTask = {
       id: "task-no-model",
@@ -770,7 +771,7 @@ describe("BackgroundManager.notifyParentSession - model/agent context preservati
     // #when
     const promptBody = buildNotificationPromptBody(task)
 
-    // #then
+    // #then - model never passed regardless of parentModel
     expect("model" in promptBody).toBe(false)
     expect(promptBody.agent).toBe("Sisyphus")
   })
@@ -785,9 +786,8 @@ function buildNotificationPromptBody(task: BackgroundTask): Record<string, unkno
     body.agent = task.parentAgent
   }
 
-  if (task.parentModel?.providerID && task.parentModel?.modelID) {
-    body.model = { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
-  }
+  // Don't pass model - let OpenCode use session's existing lastModel
+  // This prevents model switching when parentModel is undefined or different
 
   return body
 }
