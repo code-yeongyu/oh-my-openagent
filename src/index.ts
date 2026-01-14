@@ -26,6 +26,7 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
+  createSisyphusTaskRetryHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createSisyphusOrchestratorHook,
@@ -199,6 +200,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
+    : null;
+
+  const sisyphusTaskRetry = isHookEnabled("sisyphus-task-retry")
+    ? createSisyphusTaskRetryHook(ctx)
     : null;
 
   const startWork = isHookEnabled("start-work")
@@ -548,8 +553,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
-      await editErrorRecovery?.["tool.execute.after"](input, output);
-      await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
+await editErrorRecovery?.["tool.execute.after"](input, output);
+        await sisyphusTaskRetry?.["tool.execute.after"](input, output);
+        await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
     },
   };
