@@ -28,6 +28,7 @@ export interface BackgroundTask {
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
   model?: { providerID: string; modelID: string; variant?: string }
+  modelChain?: Array<{ providerID: string; modelID: string; variant?: string }>
   /** Agent name used for concurrency tracking */
   concurrencyKey?: string
   /** Parent session's agent name for notification */
@@ -47,6 +48,7 @@ export interface LaunchInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   model?: { providerID: string; modelID: string; variant?: string }
+  modelChain?: Array<{ providerID: string; modelID: string; variant?: string }>
   skills?: string[]
   skillContent?: string
 }

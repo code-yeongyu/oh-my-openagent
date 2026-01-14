@@ -80,26 +80,51 @@ export class BackgroundManager {
     }).catch((err) => {
       log(`[background-agent] Failed to get parent session: ${err}`)
       return null
+    log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
+      sessionID,
+      agent: input.agent,
+      model: input.model,
+      modelChainLength: input.modelChain?.length,
+      hasSkillContent: !!input.skillContent,
+      promptLength: input.prompt.length,
     })
-    const parentDirectory = parentSession?.data?.directory ?? this.directory
-    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
-    const createResult = await this.client.session.create({
+    // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
+    // Include model or modelChain if provided by caller (e.g., from Sisyphus category configs)
+    this.client.session.prompt({
+      path: { id: sessionID },
       body: {
-        parentID: input.parentSessionID,
-        title: `Background: ${input.description}`,
-      },
-      query: {
-        directory: parentDirectory,
+        agent: input.agent,
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.modelChain && input.modelChain.length > 0 ? { modelChain: input.modelChain } : {}),
+        system: input.skillContent,
+        tools: {
+          task: false,
+          sisyphus_task: false,
+          call_omo_agent: true,
+        },
+        parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
-      this.concurrencyManager.release(concurrencyKey)
-      throw error
-    })
-
-    if (createResult.error) {
-      this.concurrencyManager.release(concurrencyKey)
-      throw new Error(`Failed to create background session: ${createResult.error}`)
+      log("[background-agent] promptAsync error:", error)
+      const existingTask = this.findBySession(sessionID)
+      if (existingTask) {
+        existingTask.status = "error"
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes("agent.name")) {
+          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+        } else {
+          existingTask.error = errorMessage
+        }
+        existingTask.completedAt = new Date()
+        if (existingTask.concurrencyKey) {
+          this.concurrencyManager.release(existingTask.concurrencyKey)
+        }
+        this.markForNotification(existingTask)
+        this.notifyParentSession(existingTask).catch(err => {
+          log("[background-agent] Failed to notify on error:", err)
+        })
+      }
     }
 
     const sessionID = createResult.data.id
@@ -122,6 +147,7 @@ export class BackgroundManager {
       parentModel: input.parentModel,
       parentAgent: input.parentAgent,
       model: input.model,
+      modelChain: input.modelChain,
       concurrencyKey,
     }
 

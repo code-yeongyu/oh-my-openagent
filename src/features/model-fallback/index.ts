@@ -67,13 +67,16 @@ export async function withModelFallback<T>(
   operation: (model: ModelSpec) => Promise<T>,
   options?: { retryConfig?: RetryConfig; logPrefix?: string }
 ): Promise<RetryResult<T>> {
-  const maxAttempts = options?.retryConfig?.maxAttempts ?? modelChain.length
+  const maxAttempts = Math.max(1, options?.retryConfig?.maxAttempts ?? modelChain.length)
   const delayMs = options?.retryConfig?.delayMs ?? 1000
   const prefix = options?.logPrefix ?? "[model-fallback]"
   const errors: Array<{ model: string; error: string }> = []
 
   if (modelChain.length === 0) {
     return { success: false, attempts: 0, errors: [{ model: "none", error: "No models configured" }] }
+  }
+  if (modelChain.length < maxAttempts) {
+    log(`${prefix} Warning: maxAttempts (${maxAttempts}) exceeds available models (${modelChain.length})`, { level: "warn" })
   }
 
   for (let i = 0; i < Math.min(maxAttempts, modelChain.length); i++) {
