@@ -244,15 +244,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
 
-  // Load plugin skills (needed for sisyphusTask)
-  const pluginLoadResult = await discoverInstalledPlugins();
-  const pluginSkillCommands = loadPluginSkillsAsCommands(pluginLoadResult.plugins);
-  const pluginSkills: LoadedSkill[] = Object.entries(pluginSkillCommands).map(([name, definition]) => ({
-    name,
-    definition,
-    scope: "plugin" as const,
-  }));
-  const pluginSkillsMap = new Map(pluginSkills.map((s) => [s.name, s]));
+  // Load plugin skills (needed for sisyphusTask and mergeSkills)
+  // Note: config-handler.ts also loads plugin skills for createBuiltinAgents
+  let pluginSkillsArray: LoadedSkill[] | undefined;
+  let pluginSkillsMap: Map<string, LoadedSkill> | undefined;
+  try {
+    const pluginLoadResult = await discoverInstalledPlugins();
+    const pluginSkillCommands = loadPluginSkillsAsCommands(pluginLoadResult.plugins);
+    pluginSkillsArray = Object.entries(pluginSkillCommands).map(([name, definition]) => ({
+      name,
+      definition,
+      scope: "plugin" as const,
+    }));
+    pluginSkillsMap = new Map(pluginSkillsArray.map((s) => [s.name, s]));
+  } catch (error) {
+    console.error("Failed to load plugin skills:", error);
+  }
 
   const sisyphusTask = createSisyphusTask({
     manager: backgroundManager,
@@ -288,7 +295,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     globalSkills,
     projectSkills,
     opencodeProjectSkills,
-    { pluginSkills }
+    { pluginSkills: pluginSkillsArray }
   );
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
