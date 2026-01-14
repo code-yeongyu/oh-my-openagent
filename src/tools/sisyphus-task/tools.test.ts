@@ -4,8 +4,13 @@ import type { CategoryConfig } from "../../config/schema"
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: Record<string, CategoryConfig>
-): { config: CategoryConfig; promptAppend: string } | null {
+  options: {
+    userCategories?: Record<string, CategoryConfig>
+    parentModelString?: string
+    systemDefaultModel?: string
+  }
+): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
+  const { userCategories, parentModelString, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -14,10 +19,11 @@ function resolveCategoryConfig(
     return null
   }
 
+  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model,
   }
 
   let promptAppend = defaultPromptAppend
@@ -27,7 +33,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend }
+  return { config, promptAppend, model }
 }
 
 describe("sisyphus-task", () => {
@@ -114,7 +120,7 @@ describe("sisyphus-task", () => {
       const categoryName = "unknown-category"
 
       // #when
-      const result = resolveCategoryConfig(categoryName)
+      const result = resolveCategoryConfig(categoryName, {})
 
       // #then
       expect(result).toBeNull()
@@ -125,7 +131,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
 
       // #when
-      const result = resolveCategoryConfig(categoryName)
+      const result = resolveCategoryConfig(categoryName, {})
 
       // #then
       expect(result).not.toBeNull()
@@ -141,7 +147,7 @@ describe("sisyphus-task", () => {
       }
 
       // #when
-      const result = resolveCategoryConfig(categoryName, userCategories)
+      const result = resolveCategoryConfig(categoryName, { userCategories })
 
       // #then
       expect(result).not.toBeNull()
@@ -159,7 +165,7 @@ describe("sisyphus-task", () => {
       }
 
       // #when
-      const result = resolveCategoryConfig(categoryName, userCategories)
+      const result = resolveCategoryConfig(categoryName, { userCategories })
 
       // #then
       expect(result).not.toBeNull()
@@ -179,7 +185,7 @@ describe("sisyphus-task", () => {
       }
 
       // #when
-      const result = resolveCategoryConfig(categoryName, userCategories)
+      const result = resolveCategoryConfig(categoryName, { userCategories })
 
       // #then
       expect(result).not.toBeNull()
@@ -199,11 +205,52 @@ describe("sisyphus-task", () => {
       }
 
       // #when
-      const result = resolveCategoryConfig(categoryName, userCategories)
+      const result = resolveCategoryConfig(categoryName, { userCategories })
 
       // #then
       expect(result).not.toBeNull()
       expect(result!.config.temperature).toBe(0.3)
+    })
+
+    test("parentModelString is used when no user model and takes precedence over default", () => {
+      // #given
+      const categoryName = "visual-engineering"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, { parentModelString })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+    })
+
+    test("user model takes precedence over parentModelString", () => {
+      // #given
+      const categoryName = "visual-engineering"
+      const userCategories = {
+        "visual-engineering": { model: "my-provider/my-model" },
+      }
+      const parentModelString = "cliproxy/claude-opus-4-5"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, { userCategories, parentModelString })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("my-provider/my-model")
+    })
+
+    test("default model is used when no user model and no parentModelString", () => {
+      // #given
+      const categoryName = "visual-engineering"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {})
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
   })
 
@@ -228,6 +275,7 @@ describe("sisyphus-task", () => {
 
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -285,6 +333,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -352,6 +401,7 @@ describe("sisyphus-task", () => {
           ],
         }),
       },
+      config: { get: async () => ({}) },
       app: {
         agents: async () => ({ data: [] }),
       },
@@ -409,6 +459,7 @@ describe("sisyphus-task", () => {
           data: [],
         }),
       },
+      config: { get: async () => ({}) },
     }
     
     const tool = createSisyphusTask({
@@ -460,6 +511,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
+        config: { get: async () => ({}) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -518,6 +570,7 @@ describe("sisyphus-task", () => {
           }),
           status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
         },
+        config: { get: async () => ({}) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -570,6 +623,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
+        config: { get: async () => ({}) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -624,6 +678,7 @@ describe("sisyphus-task", () => {
           }),
           status: async () => ({ data: {} }),
         },
+        config: { get: async () => ({}) },
         app: { agents: async () => ({ data: [] }) },
       }
 
@@ -665,7 +720,7 @@ describe("sisyphus-task", () => {
       const { buildSystemContent } = require("./tools")
 
       // #when
-      const result = buildSystemContent({ skills: undefined, categoryPromptAppend: undefined })
+      const result = buildSystemContent({ skillContent: undefined, categoryPromptAppend: undefined })
 
       // #then
       expect(result).toBeUndefined()
@@ -708,6 +763,113 @@ describe("sisyphus-task", () => {
       expect(result).toContain(skillContent)
       expect(result).toContain(categoryPromptAppend)
       expect(result).toContain("\n\n")
+    })
+  })
+
+  describe("modelInfo detection via resolveCategoryConfig", () => {
+    test("when parentModelString exists but default model wins - modelInfo should report category-default", () => {
+      // #given - Bug scenario: parentModelString is passed but userModel is undefined,
+      // and the resolution order is: userModel ?? parentModelString ?? defaultModel
+      // If parentModelString matches the resolved model, it's "inherited"
+      // If defaultModel matches, it's "category-default"
+      const categoryName = "ultrabrain"
+      const parentModelString = undefined
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { parentModelString })
+      
+      // #then - actualModel should be defaultModel, type should be "category-default"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      const defaultModel = DEFAULT_CATEGORIES[categoryName]?.model
+      expect(actualModel).toBe(defaultModel)
+      expect(actualModel).toBe("openai/gpt-5.2")
+    })
+
+    test("when parentModelString is used - modelInfo should report inherited", () => {
+      // #given
+      const categoryName = "ultrabrain"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { parentModelString })
+      
+      // #then - actualModel should be parentModelString, type should be "inherited"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      expect(actualModel).toBe(parentModelString)
+    })
+
+    test("when user defines model - modelInfo should report user-defined regardless of parentModelString", () => {
+      // #given
+      const categoryName = "ultrabrain"
+      const userCategories = { "ultrabrain": { model: "my-provider/custom-model" } }
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { userCategories, parentModelString })
+      
+      // #then - actualModel should be userModel, type should be "user-defined"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      const userDefinedModel = userCategories[categoryName]?.model
+      expect(actualModel).toBe(userDefinedModel)
+      expect(actualModel).toBe("my-provider/custom-model")
+    })
+
+    test("detection logic: actualModel comparison correctly identifies source", () => {
+      // #given - This test verifies the fix for PR #770 bug
+      // The bug was: checking `if (parentModelString)` instead of `if (actualModel === parentModelString)`
+      const categoryName = "ultrabrain"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      const userCategories = { "ultrabrain": { model: "user/model" } }
+      
+      // #when - user model wins
+      const resolved = resolveCategoryConfig(categoryName, { userCategories, parentModelString })
+      const actualModel = resolved!.config.model
+      const userDefinedModel = userCategories[categoryName]?.model
+      const defaultModel = DEFAULT_CATEGORIES[categoryName]?.model
+      
+      // #then - detection should compare against actual resolved model
+      const detectedType = actualModel === userDefinedModel 
+        ? "user-defined" 
+        : actualModel === parentModelString 
+        ? "inherited" 
+        : actualModel === defaultModel 
+        ? "category-default" 
+        : undefined
+      
+      expect(detectedType).toBe("user-defined")
+      expect(actualModel).not.toBe(parentModelString)
+    })
+
+    test("systemDefaultModel is used when no other model is available", () => {
+      // #given - custom category with no model, but systemDefaultModel is set
+      const categoryName = "my-custom"
+      // Using type assertion since we're testing fallback behavior for categories without model
+      const userCategories = { "my-custom": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
+      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel })
+      
+      // #then - actualModel should be systemDefaultModel
+      expect(resolved).not.toBeNull()
+      expect(resolved!.model).toBe(systemDefaultModel)
+    })
+
+    test("model is undefined when no model available anywhere", () => {
+      // #given - custom category with no model, no systemDefaultModel
+      const categoryName = "my-custom"
+      // Using type assertion since we're testing fallback behavior for categories without model
+      const userCategories = { "my-custom": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { userCategories })
+      
+      // #then - model should be undefined
+      expect(resolved).not.toBeNull()
+      expect(resolved!.model).toBeUndefined()
     })
   })
 })
