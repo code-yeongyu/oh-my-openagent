@@ -1,7 +1,7 @@
 # TOOLS KNOWLEDGE BASE
 
 ## OVERVIEW
-Custom tools extending agent capabilities: LSP (11 tools), AST-aware search/replace, background tasks, and multimodal analysis.
+Custom tools extending agent capabilities: LSP (7 tools), AST-aware search/replace, background tasks, and multimodal analysis.
 
 ## STRUCTURE
 ```

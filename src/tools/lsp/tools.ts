@@ -147,7 +147,7 @@ export const lsp_symbols: ToolDefinition = tool({
         }
 
         const total = result.length
-        const limit = Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS)
+        const limit = Math.max(1, Math.min(args.limit ?? DEFAULT_MAX_SYMBOLS, DEFAULT_MAX_SYMBOLS))
         const truncated = total > limit
         const limited = truncated ? result.slice(0, limit) : result
 
@@ -156,9 +156,9 @@ export const lsp_symbols: ToolDefinition = tool({
           lines.push(`Found ${total} symbols (showing first ${limit}):`)
         }
 
-        if ("range" in limited[0]) {
+        if (limited.length > 0 && "range" in limited[0]) {
           lines.push(...(limited as DocumentSymbol[]).map((s) => formatDocumentSymbol(s)))
-        } else {
+        } else if (limited.length > 0) {
           lines.push(...(limited as SymbolInfo[]).map(formatSymbolInfo))
         }
         return lines.join("\n")

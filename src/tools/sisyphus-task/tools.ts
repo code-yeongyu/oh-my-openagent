@@ -30,6 +30,11 @@ function parseModelString(model: string): { providerID: string; modelID: string 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
+  // Validate sessionID to prevent path traversal
+  if (!sessionID || sessionID.includes("..") || sessionID.includes("/") || sessionID.includes("\\")) {
+    return null
+  }
+
   const directPath = join(MESSAGE_STORAGE, sessionID)
   if (existsSync(directPath)) return directPath
 

@@ -186,30 +186,37 @@ The more explicit your prompt, the better the results.
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": {
     model: "google/gemini-3-pro-preview",
+    fallback: ["anthropic/claude-sonnet-4-5", "google/gemini-3-flash-preview"],
     temperature: 0.7,
   },
   ultrabrain: {
     model: "openai/gpt-5.2",
+    fallback: ["anthropic/claude-opus-4-5", "anthropic/claude-sonnet-4-5"],
     temperature: 0.1,
   },
   artistry: {
     model: "google/gemini-3-pro-preview",
+    fallback: ["anthropic/claude-sonnet-4-5"],
     temperature: 0.9,
   },
   quick: {
     model: "anthropic/claude-haiku-4-5",
+    fallback: ["google/gemini-3-flash-preview", "anthropic/claude-sonnet-4-5"],
     temperature: 0.3,
   },
   "most-capable": {
     model: "anthropic/claude-opus-4-5",
+    fallback: ["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"],
     temperature: 0.1,
   },
   writing: {
     model: "google/gemini-3-flash-preview",
+    fallback: ["anthropic/claude-haiku-4-5"],
     temperature: 0.5,
   },
   general: {
     model: "anthropic/claude-sonnet-4-5",
+    fallback: ["anthropic/claude-haiku-4-5", "google/gemini-3-flash-preview"],
     temperature: 0.3,
   },
 }
