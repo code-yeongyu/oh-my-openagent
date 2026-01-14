@@ -412,21 +412,27 @@ describe("model-fallback", () => {
       expect(operation).toHaveBeenCalledTimes(2)
     })
 
-    test("handles NaN maxAttempts by using chain length", async () => {
-      // #given
-      const chain = buildModelChain("anthropic/claude-opus-4-5", ["openai/gpt-5.2"])
-      const operation = mock(async (model: ModelSpec) => `success:${model.modelID}`)
+    test("handles NaN maxAttempts by falling back to chain length", async () => {
+      // #given - chain with 3 models, all fail with retryable error
+      const chain = buildModelChain("anthropic/claude-opus-4-5", [
+        "openai/gpt-5.2",
+        "google/gemini-3-flash",
+      ])
+      const operation = mock(async (_model: ModelSpec) => {
+        throw new Error("Rate limit exceeded")
+      })
 
-      // #when
+      // #when - NaN maxAttempts should fall back to chain.length (3)
       const result = await withModelFallback(chain, operation, {
         retryConfig: { maxAttempts: NaN, delayMs: 10 },
       })
 
-      // #then
-      expect(result.success).toBe(true)
-      expect(result.attempts).toBe(1)
+      // #then - all 3 models should be tried (proves maxAttempts=3, not 1)
+      expect(result.success).toBe(false)
+      expect(result.attempts).toBe(3)
       expect(Number.isNaN(result.attempts)).toBe(false)
-      expect(operation).toHaveBeenCalledTimes(1)
+      expect(operation).toHaveBeenCalledTimes(3)
+      expect(result.errors).toHaveLength(3)
     })
 
     test("returns error for empty model chain", async () => {
