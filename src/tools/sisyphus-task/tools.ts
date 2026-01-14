@@ -25,6 +25,62 @@ function parseModelString(model: string): { providerID: string; modelID: string 
   return undefined
 }
 
+/**
+ * Extract partial response text from a session messages result.
+ * Handles error results and non-array responses gracefully.
+ */
+function extractPartialResponseText(
+  messagesResult: unknown
+): string {
+  // Guard against error result or non-array response
+  if (
+    messagesResult &&
+    typeof messagesResult === "object" &&
+    "error" in messagesResult
+  ) {
+    return ""
+  }
+
+  const data = (messagesResult as { data?: unknown }).data ?? messagesResult
+  if (!Array.isArray(data)) {
+    return ""
+  }
+
+  const messages = data as Array<{
+    info?: { role?: string; time?: { created?: number } }
+    parts?: Array<{ type?: string; text?: string }>
+  }>
+
+  const assistantMessages = messages
+    .filter((m) => m.info?.role === "assistant")
+    .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+
+  const lastMessage = assistantMessages[0]
+  if (!lastMessage?.parts) {
+    return ""
+  }
+
+  return (
+    lastMessage.parts
+      .filter((p) => p.type === "text" || p.type === "reasoning")
+      .map((p) => p.text ?? "")
+      .filter(Boolean)
+      .join("\n") ?? ""
+  )
+}
+
+/**
+ * Format partial response text for display in timeout messages.
+ */
+function formatPartialResponse(partialText: string): string {
+  if (!partialText) {
+    return "No partial response captured."
+  }
+  const truncated = partialText.slice(0, 2000)
+  const suffix = partialText.length > 2000 ? "\n\n(truncated)" : ""
+  return `---\n\n**Partial response:**\n\n${truncated}${suffix}`
+}
+
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
@@ -273,28 +329,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
           // Try to fetch any partial response
           const partialResult = await client.session.messages({ path: { id: args.resume } })
-
-          // Guard against error result or non-array response
-          let partialText = ""
-          if (
-            !("error" in partialResult) &&
-            Array.isArray((partialResult as { data?: unknown }).data ?? partialResult)
-          ) {
-            const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
-              info?: { role?: string; time?: { created?: number } }
-              parts?: Array<{ type?: string; text?: string }>
-            }>
-            const partialAssistant = partialMsgs
-              .filter((m) => m.info?.role === "assistant")
-              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-            const partialMessage = partialAssistant[0]
-            partialText =
-              partialMessage?.parts
-                ?.filter((p) => p.type === "text" || p.type === "reasoning")
-                .map((p) => p.text ?? "")
-                .filter(Boolean)
-                .join("\n") ?? ""
-          }
+          const partialText = extractPartialResponseText(partialResult)
 
           const duration = formatDuration(startTime)
           return `⏱️ Resume timed out after ${duration} (max 60 seconds).
@@ -303,7 +338,7 @@ Session ID: ${args.resume}
 
 The resumed session did not complete within the time limit.
 
-${partialText ? `---\n\n**Partial response:**\n\n${partialText.slice(0, 2000)}${partialText.length > 2000 ? "\n\n(truncated)" : ""}` : "No partial response captured."}`
+${formatPartialResponse(partialText)}`
         }
 
         const messagesResult = await client.session.messages({
@@ -582,28 +617,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
           // Try to fetch any partial response before returning timeout error
           const partialResult = await client.session.messages({ path: { id: sessionID } })
-
-          // Guard against error result or non-array response
-          let partialText = ""
-          if (
-            !("error" in partialResult) &&
-            Array.isArray((partialResult as { data?: unknown }).data ?? partialResult)
-          ) {
-            const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
-              info?: { role?: string; time?: { created?: number } }
-              parts?: Array<{ type?: string; text?: string }>
-            }>
-            const partialAssistant = partialMsgs
-              .filter((m) => m.info?.role === "assistant")
-              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-            const partialMessage = partialAssistant[0]
-            partialText =
-              partialMessage?.parts
-                ?.filter((p) => p.type === "text" || p.type === "reasoning")
-                .map((p) => p.text ?? "")
-                .filter(Boolean)
-                .join("\n") ?? ""
-          }
+          const partialText = extractPartialResponseText(partialResult)
 
           const duration = formatDuration(startTime)
           return `⏱️ Task timed out after ${duration} (max 10 minutes).
@@ -613,7 +627,7 @@ Session ID: ${sessionID}
 
 The agent did not complete within the time limit. This may happen with complex prompts or slow model responses.
 
-${partialText ? `---\n\n**Partial response:**\n\n${partialText.slice(0, 2000)}${partialText.length > 2000 ? "\n\n(truncated)" : ""}` : "No partial response captured."}`
+${formatPartialResponse(partialText)}`
         }
 
         const messagesResult = await client.session.messages({
