@@ -80,6 +80,7 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
   tinymist: "See https://github.com/Myriad-Dreamin/tinymist",
   "haskell-language-server": "ghcup install hls",
   bash: "npm install -g bash-language-server",
+  "kotlin-ls": "See https://github.com/Kotlin/kotlin-lsp",
 }
 
 // Synced with OpenCode's server.ts
@@ -245,6 +246,10 @@ export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
   "haskell-language-server": {
     command: ["haskell-language-server-wrapper", "--lsp"],
     extensions: [".hs", ".lhs"],
+  },
+  "kotlin-ls": {
+    command: ["kotlin-lsp"],
+    extensions: [".kt", ".kts"],
   },
 }
 
