@@ -85,11 +85,16 @@ function resolveCategoryConfig(
   }
 
   const fallbackList = userConfig?.fallback ?? defaultConfig?.fallback
-  const modelChain = buildModelChain(config.model, fallbackList)
+  let modelChain = buildModelChain(config.model, fallbackList)
+
+  // Preserve variant on primary model if configured
+  if (config.variant && modelChain.length > 0) {
+    modelChain = [{ ...modelChain[0], variant: config.variant }, ...modelChain.slice(1)]
+  }
 
   const retryConfig: RetryConfig = {
     delayMs: userConfig?.fallbackDelayMs ?? defaultConfig?.fallbackDelayMs ?? 1000,
-    maxAttempts: userConfig?.fallbackRetryCount ?? defaultConfig?.fallbackRetryCount ?? modelChain.length,
+    maxAttempts: userConfig?.fallbackRetryCount ?? defaultConfig?.fallbackRetryCount ?? Math.max(modelChain.length, 1),
   }
 
   let promptAppend = defaultPromptAppend
@@ -336,7 +341,7 @@ ${textContent || "(No text output)"}`
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
       let modelChain: ModelSpec[] = []
-      let retryConfig: RetryConfig = { delayMs: 1000 }
+      let retryConfig: RetryConfig = { delayMs: 1000, maxAttempts: 1 }
 
       if (args.category) {
         const resolved = resolveCategoryConfig(args.category, userCategories)
@@ -511,6 +516,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               if (toastManager && taskId !== undefined) {
                 toastManager.removeTask(taskId)
               }
+              subagentSessions.delete(sessionID)
               return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
             }
             
@@ -519,6 +525,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               if (toastManager && taskId !== undefined) {
                 toastManager.removeTask(taskId)
               }
+              subagentSessions.delete(sessionID)
               const allErrors = failedModels.map((f, i) => `  ${i + 1}. ${f.model}: ${f.error}`).join("\n")
               return `❌ Failed to send prompt (tried ${failedModels.length} model${failedModels.length > 1 ? "s" : ""}):\n${allErrors}\n\nSession ID: ${sessionID}`
             }
@@ -532,6 +539,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }
+          subagentSessions.delete(sessionID)
           return `❌ All models failed.\n\nSession ID: ${sessionID}`
         }
 

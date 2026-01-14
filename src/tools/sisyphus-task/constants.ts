@@ -63,9 +63,9 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-⚠️ THIS CATEGORY USES A LESS CAPABLE MODEL (claude-haiku-4-5).
+⚠️ THIS CATEGORY USES A FAST/CHEAP MODEL (Gemini Flash or similar).
 
-The model executing this task has LIMITED reasoning capacity. Your prompt MUST be:
+The model executing this task prioritizes SPEED over deep reasoning. Your prompt MUST be:
 
 **EXHAUSTIVELY EXPLICIT** - Leave NOTHING to interpretation:
 1. MUST DO: List every required action as atomic, numbered steps
@@ -146,7 +146,7 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-⚠️ THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-5).
+⚠️ THIS CATEGORY USES A BALANCED MODEL (DeepSeek V3.2 or similar).
 
 While capable, this model benefits significantly from EXPLICIT instructions.
 
