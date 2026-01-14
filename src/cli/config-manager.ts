@@ -436,11 +436,7 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
       }
     }
 
-    if (config.hasChatGPT) {
-      if (!plugins.some((p) => p.startsWith("opencode-openai-codex-auth"))) {
-        plugins.push("opencode-openai-codex-auth")
-      }
-    }
+
 
     const newConfig = { ...(existingConfig ?? {}), plugin: plugins }
     writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
@@ -550,54 +546,7 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
   },
 }
 
-const CODEX_PROVIDER_CONFIG = {
-  openai: {
-    name: "OpenAI",
-    options: {
-      reasoningEffort: "medium",
-      reasoningSummary: "auto",
-      textVerbosity: "medium",
-      include: ["reasoning.encrypted_content"],
-      store: false,
-    },
-    models: {
-      "gpt-5.2": {
-        name: "GPT 5.2 (OAuth)",
-        limit: { context: 272000, output: 128000 },
-        modalities: { input: ["text", "image"], output: ["text"] },
-        variants: {
-          none: { reasoningEffort: "none", reasoningSummary: "auto", textVerbosity: "medium" },
-          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
-          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
-          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
-          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
-        },
-      },
-      "gpt-5.2-codex": {
-        name: "GPT 5.2 Codex (OAuth)",
-        limit: { context: 272000, output: 128000 },
-        modalities: { input: ["text", "image"], output: ["text"] },
-        variants: {
-          low: { reasoningEffort: "low", reasoningSummary: "auto", textVerbosity: "medium" },
-          medium: { reasoningEffort: "medium", reasoningSummary: "auto", textVerbosity: "medium" },
-          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
-          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
-        },
-      },
-      "gpt-5.1-codex-max": {
-        name: "GPT 5.1 Codex Max (OAuth)",
-        limit: { context: 272000, output: 128000 },
-        modalities: { input: ["text", "image"], output: ["text"] },
-        variants: {
-          low: { reasoningEffort: "low", reasoningSummary: "detailed", textVerbosity: "medium" },
-          medium: { reasoningEffort: "medium", reasoningSummary: "detailed", textVerbosity: "medium" },
-          high: { reasoningEffort: "high", reasoningSummary: "detailed", textVerbosity: "medium" },
-          xhigh: { reasoningEffort: "xhigh", reasoningSummary: "detailed", textVerbosity: "medium" },
-        },
-      },
-    },
-  },
-}
+
 
 export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   try {
@@ -625,10 +574,6 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 
     if (config.hasGemini) {
       providers.google = ANTIGRAVITY_PROVIDER_CONFIG.google
-    }
-
-    if (config.hasChatGPT) {
-      providers.openai = CODEX_PROVIDER_CONFIG.openai
     }
 
     if (Object.keys(providers).length > 0) {
@@ -675,7 +620,6 @@ export function detectCurrentConfig(): DetectedConfig {
   }
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
-  result.hasChatGPT = plugins.some((p) => p.startsWith("opencode-openai-codex-auth"))
 
   const omoConfigPath = getOmoConfig()
   if (!existsSync(omoConfigPath)) {

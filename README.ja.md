@@ -91,8 +91,7 @@
       - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
       - [4.2.1 モデル設定](#421-モデル設定)
       - [4.2.2 oh-my-opencode エージェントモデルのオーバーライド](#422-oh-my-opencode-エージェントモデルのオーバーライド)
-      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
-        - [モデル設定](#モデル設定)
+
     - [⚠️ 注意](#️-注意)
     - [セットアップの確認](#セットアップの確認)
     - [ユーザーに「おめでとうございます！🎉」と伝える](#ユーザーにおめでとうございますと伝える)

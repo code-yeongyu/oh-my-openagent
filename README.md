@@ -94,8 +94,7 @@
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [Model Configuration](#model-configuration)
         - [oh-my-opencode Agent Model Override](#oh-my-opencode-agent-model-override)
-      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
-        - [Model Configuration](#model-configuration-1)
+
     - [⚠️ Warning](#️-warning)
     - [Verify the setup](#verify-the-setup)
     - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
