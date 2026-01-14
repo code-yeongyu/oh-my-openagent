@@ -11,6 +11,7 @@ import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { isModelError, type ModelSpec, type RetryConfig, buildModelChain } from "../../features/model-fallback"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -58,10 +59,17 @@ type ToolContextWithMetadata = {
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
 }
 
+interface ResolvedCategoryConfig {
+  config: CategoryConfig
+  promptAppend: string
+  modelChain: ModelSpec[]
+  retryConfig: RetryConfig
+}
+
 function resolveCategoryConfig(
   categoryName: string,
   userCategories?: CategoriesConfig
-): { config: CategoryConfig; promptAppend: string } | null {
+): ResolvedCategoryConfig | null {
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -76,6 +84,14 @@ function resolveCategoryConfig(
     model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
   }
 
+  const fallbackList = userConfig?.fallback ?? defaultConfig?.fallback
+  const modelChain = buildModelChain(config.model, fallbackList)
+
+  const retryConfig: RetryConfig = {
+    delayMs: userConfig?.fallbackDelayMs ?? defaultConfig?.fallbackDelayMs ?? 1000,
+    maxAttempts: userConfig?.fallbackRetryCount ?? defaultConfig?.fallbackRetryCount ?? modelChain.length,
+  }
+
   let promptAppend = defaultPromptAppend
   if (userConfig?.prompt_append) {
     promptAppend = defaultPromptAppend
@@ -83,7 +99,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend }
+  return { config, promptAppend, modelChain, retryConfig }
 }
 
 export interface SisyphusTaskToolOptions {
@@ -319,6 +335,8 @@ ${textContent || "(No text output)"}`
       let agentToUse: string
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
+      let modelChain: ModelSpec[] = []
+      let retryConfig: RetryConfig = { delayMs: 1000 }
 
       if (args.category) {
         const resolved = resolveCategoryConfig(args.category, userCategories)
@@ -334,6 +352,8 @@ ${textContent || "(No text output)"}`
             : parsedModel)
           : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
+        modelChain = resolved.modelChain
+        retryConfig = resolved.retryConfig
       } else {
         agentToUse = args.subagent_type!.trim()
         if (!agentToUse) {
@@ -447,30 +467,72 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        try {
-          await client.session.prompt({
-            path: { id: sessionID },
-            body: {
-              agent: agentToUse,
-              system: systemContent,
-              tools: {
-                task: false,
-                sisyphus_task: false,
-                call_omo_agent: true,
+        const modelsToTry = modelChain.length > 0 ? modelChain : (categoryModel ? [categoryModel] : [])
+        const maxAttempts = retryConfig.maxAttempts ?? modelsToTry.length
+        const delayMs = retryConfig.delayMs ?? 1000
+        let promptSuccess = false
+        let usedModel: ModelSpec | undefined = categoryModel
+        const failedModels: Array<{ model: string; error: string }> = []
+
+        for (let attempt = 0; attempt < Math.min(Math.max(modelsToTry.length, 1), maxAttempts); attempt++) {
+          const currentModel = modelsToTry[attempt]
+          const modelStr = currentModel ? `${currentModel.providerID}/${currentModel.modelID}` : "default"
+          
+          try {
+            if (attempt > 0) {
+              log(`[sisyphus_task] Retrying with fallback model: ${modelStr}`, { attempt: attempt + 1, sessionID })
+            }
+            
+            await client.session.prompt({
+              path: { id: sessionID },
+              body: {
+                agent: agentToUse,
+                system: systemContent,
+                tools: {
+                  task: false,
+                  sisyphus_task: false,
+                  call_omo_agent: true,
+                },
+                parts: [{ type: "text", text: args.prompt }],
+                ...(currentModel ? { model: currentModel } : {}),
               },
-              parts: [{ type: "text", text: args.prompt }],
-              ...(categoryModel ? { model: categoryModel } : {}),
-            },
-          })
-        } catch (promptError) {
+            })
+            promptSuccess = true
+            usedModel = currentModel
+            if (attempt > 0) {
+              log(`[sisyphus_task] Fallback succeeded with: ${modelStr}`, { attempt: attempt + 1 })
+            }
+            break
+          } catch (promptError) {
+            const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+            failedModels.push({ model: modelStr, error: errorMessage })
+            
+            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+              if (toastManager && taskId !== undefined) {
+                toastManager.removeTask(taskId)
+              }
+              return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
+            }
+            
+            const attemptsRemaining = Math.min(modelsToTry.length, maxAttempts) - attempt - 1
+            if (!isModelError(promptError) || attemptsRemaining <= 0) {
+              if (toastManager && taskId !== undefined) {
+                toastManager.removeTask(taskId)
+              }
+              const allErrors = failedModels.map((f, i) => `  ${i + 1}. ${f.model}: ${f.error}`).join("\n")
+              return `❌ Failed to send prompt (tried ${failedModels.length} model${failedModels.length > 1 ? "s" : ""}):\n${allErrors}\n\nSession ID: ${sessionID}`
+            }
+            
+            log(`[sisyphus_task] Model ${modelStr} failed, trying fallback...`, { error: errorMessage })
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+          }
+        }
+
+        if (!promptSuccess) {
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }
-          const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-          if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-            return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
-          }
-          return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+          return `❌ All models failed.\n\nSession ID: ${sessionID}`
         }
 
         // Poll for session completion with stability detection
@@ -576,9 +638,15 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
         subagentSessions.delete(sessionID)
 
+        const usedModelStr = usedModel ? `${usedModel.providerID}/${usedModel.modelID}` : "default"
+        const fallbackNote = failedModels.length > 0
+          ? `\n⚠️ Model fallback occurred: Primary model failed, used ${usedModelStr} instead.\n   Failed models: ${failedModels.map(f => f.model).join(", ")}`
+          : ""
+
         return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Model: ${usedModelStr}${fallbackNote}
 Session ID: ${sessionID}
 
 ---
