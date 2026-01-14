@@ -9,7 +9,12 @@ export interface ModelSpec {
 export function parseModelString(model: string): ModelSpec | undefined {
   const parts = model.split("/")
   if (parts.length >= 2) {
-    return { providerID: parts[0], modelID: parts.slice(1).join("/") }
+    const providerID = parts[0].trim()
+    const modelID = parts.slice(1).join("/").trim()
+    if (providerID.length === 0 || modelID.length === 0) {
+      return undefined
+    }
+    return { providerID, modelID }
   }
   return undefined
 }

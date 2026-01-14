@@ -11,6 +11,9 @@ import type { BackgroundTaskConfig } from "../../config/schema"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-injector"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
@@ -63,6 +66,7 @@ export class BackgroundManager {
     log("[background-agent] launch() called with:", {
       agent: input.agent,
       model: input.model,
+      modelChainLength: input.modelChain?.length,
       description: input.description,
       parentSessionID: input.parentSessionID,
     })
@@ -80,51 +84,26 @@ export class BackgroundManager {
     }).catch((err) => {
       log(`[background-agent] Failed to get parent session: ${err}`)
       return null
-    log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
-      sessionID,
-      agent: input.agent,
-      model: input.model,
-      modelChainLength: input.modelChain?.length,
-      hasSkillContent: !!input.skillContent,
-      promptLength: input.prompt.length,
     })
+    const parentDirectory = parentSession?.data?.directory ?? this.directory
+    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
-    // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
-    // Include model or modelChain if provided by caller (e.g., from Sisyphus category configs)
-    this.client.session.prompt({
-      path: { id: sessionID },
+    const createResult = await this.client.session.create({
       body: {
-        agent: input.agent,
-        ...(input.model ? { model: input.model } : {}),
-        ...(input.modelChain && input.modelChain.length > 0 ? { modelChain: input.modelChain } : {}),
-        system: input.skillContent,
-        tools: {
-          task: false,
-          sisyphus_task: false,
-          call_omo_agent: true,
-        },
-        parts: [{ type: "text", text: input.prompt }],
+        parentID: input.parentSessionID,
+        title: `Background: ${input.description}`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
-      const existingTask = this.findBySession(sessionID)
-      if (existingTask) {
-        existingTask.status = "error"
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name")) {
-          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-        } else {
-          existingTask.error = errorMessage
-        }
-        existingTask.completedAt = new Date()
-        if (existingTask.concurrencyKey) {
-          this.concurrencyManager.release(existingTask.concurrencyKey)
-        }
-        this.markForNotification(existingTask)
-        this.notifyParentSession(existingTask).catch(err => {
-          log("[background-agent] Failed to notify on error:", err)
-        })
-      }
+      this.concurrencyManager.release(concurrencyKey)
+      throw error
+    })
+
+    if (createResult.error) {
+      this.concurrencyManager.release(concurrencyKey)
+      throw new Error(`Failed to create background session: ${createResult.error}`)
     }
 
     const sessionID = createResult.data.id
@@ -176,17 +155,19 @@ export class BackgroundManager {
       sessionID,
       agent: input.agent,
       model: input.model,
+      modelChainLength: input.modelChain?.length,
       hasSkillContent: !!input.skillContent,
       promptLength: input.prompt.length,
     })
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
-    // Include model if caller provided one (e.g., from Sisyphus category configs)
+    // Include model or modelChain if caller provided one (e.g., from Sisyphus category configs)
     this.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: input.agent,
         ...(input.model ? { model: input.model } : {}),
+        ...(input.modelChain && input.modelChain.length > 0 ? { modelChain: input.modelChain } : {}),
         system: input.skillContent,
         tools: {
           task: false,
@@ -201,7 +182,7 @@ export class BackgroundManager {
       if (existingTask) {
         existingTask.status = "error"
         const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        if (errorMessage.includes("agent.name")) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
         } else {
           existingTask.error = errorMessage
@@ -209,6 +190,7 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
+          existingTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
@@ -312,6 +294,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    // Reset startedAt on resume to prevent immediate completion
+    // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
+    existingTask.startedAt = new Date()
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -363,6 +348,11 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      // Release concurrency on resume error (matches launch error handler)
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined  // Prevent double-release
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
@@ -444,6 +434,13 @@ export class BackgroundManager {
 
         task.status = "completed"
         task.completedAt = new Date()
+        // Release concurrency immediately on completion
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
+        }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -468,7 +465,10 @@ export class BackgroundManager {
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
       }
+      // Clean up pendingByParent to prevent stale entries
+      this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
@@ -556,6 +556,21 @@ export class BackgroundManager {
         this.notifications.delete(sessionID)
       } else {
         this.notifications.set(sessionID, filtered)
+      }
+    }
+  }
+
+  /**
+   * Remove task from pending tracking for its parent session.
+   * Cleans up the parent entry if no pending tasks remain.
+   */
+  private cleanupPendingByParent(task: BackgroundTask): void {
+    if (!task.parentSessionID) return
+    const pending = this.pendingByParent.get(task.parentSessionID)
+    if (pending) {
+      pending.delete(task.id)
+      if (pending.size === 0) {
+        this.pendingByParent.delete(task.parentSessionID)
       }
     }
   }
@@ -664,13 +679,32 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 </system-reminder>`
     }
 
-    // Inject notification via session.prompt with noReply
+    // Dynamically lookup the parent session's current message context
+    // This ensures we use the CURRENT model/agent, not the stale one from task creation time
+    const messageDir = getMessageDir(task.parentSessionID)
+    const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
+    const agent = currentMessage?.agent ?? task.parentAgent
+    const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+      ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+      : undefined
+
+    log("[background-agent] notifyParentSession context:", {
+      taskId: task.id,
+      messageDir: !!messageDir,
+      currentAgent: currentMessage?.agent,
+      currentModel: currentMessage?.model,
+      resolvedAgent: agent,
+      resolvedModel: model,
+    })
+
     try {
       await this.client.session.prompt({
         path: { id: task.parentSessionID },
         body: {
-          noReply: !allComplete,  // Silent unless all complete
-          agent: task.parentAgent,
+          noReply: !allComplete,
+          ...(agent !== undefined ? { agent } : {}),
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: notification }],
         },
       })
@@ -685,6 +719,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     const taskId = task.id
     setTimeout(() => {
+      // Concurrency already released at completion - just cleanup notifications and task
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
       log("[background-agent] Removed completed task from memory:", taskId)
@@ -724,7 +759,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
         }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
@@ -777,6 +815,13 @@ try {
 
           task.status = "completed"
           task.completedAt = new Date()
+          // Release concurrency immediately on completion
+          if (task.concurrencyKey) {
+            this.concurrencyManager.release(task.concurrencyKey)
+            task.concurrencyKey = undefined  // Prevent double-release
+          }
+          // Clean up pendingByParent to prevent stale entries
+          this.cleanupPendingByParent(task)
           this.markForNotification(task)
           await this.notifyParentSession(task)
           log("[background-agent] Task completed via polling:", task.id)
@@ -843,6 +888,13 @@ if (lastMessage) {
                 if (!hasIncompleteTodos) {
                   task.status = "completed"
                   task.completedAt = new Date()
+                  // Release concurrency immediately on completion
+                  if (task.concurrencyKey) {
+                    this.concurrencyManager.release(task.concurrencyKey)
+                    task.concurrencyKey = undefined  // Prevent double-release
+                  }
+                  // Clean up pendingByParent to prevent stale entries
+                  this.cleanupPendingByParent(task)
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
                   log("[background-agent] Task completed via stability detection:", task.id)
@@ -864,4 +916,17 @@ if (lastMessage) {
       this.stopPolling()
     }
   }
+}
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+  return null
 }
