@@ -270,7 +270,9 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   const agents: Record<string, Record<string, unknown>> = {}
 
   if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
+    agents["Sisyphus"] = {
+      model: installConfig.hasCopilot ? "github-copilot/claude-opus-4.5" : "opencode/glm-4.7-free",
+    }
   }
 
   agents["librarian"] = { model: "opencode/glm-4.7-free" }
@@ -286,9 +288,12 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   }
 
   if (!installConfig.hasChatGPT) {
-    agents["oracle"] = {
-      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
-    }
+    const oracleFallback = installConfig.hasCopilot
+      ? "github-copilot/gpt-5.2"
+      : installConfig.hasClaude
+        ? "anthropic/claude-opus-4-5"
+        : "opencode/glm-4.7-free"
+    agents["oracle"] = { model: oracleFallback }
   }
 
   if (installConfig.hasGemini) {
@@ -648,6 +653,7 @@ export function detectCurrentConfig(): DetectedConfig {
     isMax20: true,
     hasChatGPT: true,
     hasGemini: false,
+    hasCopilot: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -707,6 +713,11 @@ export function detectCurrentConfig(): DetectedConfig {
     } else if (agents["oracle"]?.model === "opencode/glm-4.7-free") {
       result.hasChatGPT = false
     }
+
+    const hasAnyCopilotModel = Object.values(agents).some(
+      (agent) => agent?.model?.startsWith("github-copilot/")
+    )
+    result.hasCopilot = hasAnyCopilotModel
 
   } catch {
     /* intentionally empty - malformed omo config returns defaults from opencode config detection */
