@@ -211,12 +211,28 @@ interface GitFileStat {
   status: "modified" | "added" | "deleted"
 }
 
+function isGitRepo(directory: string): boolean {
+  try {
+    execSync("git rev-parse --git-dir", {
+      cwd: directory,
+      stdio: "ignore",
+      timeout: 1000,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function getGitDiffStats(directory: string): GitFileStat[] {
   try {
+    if (!isGitRepo(directory)) return []
+
     const output = execSync("git diff --numstat HEAD", {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
     }).trim()
 
     if (!output) return []
@@ -225,6 +241,7 @@ function getGitDiffStats(directory: string): GitFileStat[] {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
     }).trim()
 
     const statusMap = new Map<string, "modified" | "added" | "deleted">()

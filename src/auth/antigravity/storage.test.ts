@@ -264,6 +264,13 @@ describe("storage", () => {
       // #given
       // testStoragePath is ready
 
+      if (process.platform === "win32") {
+        console.log(
+          "[TEST SKIP] Windows does not reliably support POSIX mode bits like 0o600; skipping permission assertion"
+        )
+        return
+      }
+
       // #when
       await saveAccounts(validStorage, testStoragePath)
 

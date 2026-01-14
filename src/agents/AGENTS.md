@@ -18,6 +18,7 @@ agents/
 ├── prometheus-prompt.ts     # Planning agent prompt (988 lines) - interview mode
 ├── metis.ts                 # Plan Consultant agent - pre-planning analysis
 ├── momus.ts                 # Plan Reviewer agent - plan validation
+├── sherlock.ts              # Hypothesis-driven debugger (GPT-5.2)
 ├── build-prompt.ts          # Shared build agent prompt
 ├── plan-prompt.ts           # Shared plan agent prompt
 ├── types.ts                 # AgentModelConfig interface
@@ -37,6 +38,7 @@ agents/
 | Prometheus | claude-opus-4-5 | Strategic planner. Interview mode, orchestrates Metis/Momus. |
 | Metis | claude-sonnet-4-5 | Plan Consultant. Pre-planning risk/requirement analysis. |
 | Momus | claude-sonnet-4-5 | Plan Reviewer. Validation and quality enforcement. |
+| sherlock | openai/gpt-5.2 | Hypothesis-driven debugger. Runtime evidence-based bug diagnosis. |
 
 ## HOW TO ADD AN AGENT
 1. Create `src/agents/my-agent.ts` exporting `AgentConfig`.
