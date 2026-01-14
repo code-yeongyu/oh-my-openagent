@@ -1,8 +1,10 @@
 import { createBuiltinSkills } from "../builtin-skills/skills"
 import type { GitMasterConfig } from "../../config/schema"
+import type { LoadedSkill } from "./types"
 
 export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
+	pluginSkills?: Map<string, LoadedSkill>
 }
 
 function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
@@ -24,6 +26,11 @@ function injectGitMasterConfig(template: string, config?: GitMasterConfig): stri
 }
 
 export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
+	if (options?.pluginSkills?.has(skillName)) {
+		const pluginSkill = options.pluginSkills.get(skillName)!
+		return pluginSkill.definition.template ?? null
+	}
+
 	const skills = createBuiltinSkills()
 	const skill = skills.find((s) => s.name === skillName)
 	if (!skill) return null
@@ -46,6 +53,17 @@ export function resolveMultipleSkills(skillNames: string[], options?: SkillResol
 	const notFound: string[] = []
 
 	for (const name of skillNames) {
+		if (options?.pluginSkills?.has(name)) {
+			const pluginSkill = options.pluginSkills.get(name)!
+			const template = pluginSkill.definition.template
+			if (template) {
+				resolved.set(name, template)
+			} else {
+				notFound.push(name)
+			}
+			continue
+		}
+
 		const template = skillMap.get(name)
 		if (template) {
 			if (name === "git-master" && options?.gitMasterConfig) {

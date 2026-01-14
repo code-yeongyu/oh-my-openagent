@@ -10,12 +10,13 @@ import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { deepMerge } from "../../shared/deep-merge"
 
 const SCOPE_PRIORITY: Record<SkillScope, number> = {
-  builtin: 1,
-  config: 2,
-  user: 3,
-  opencode: 4,
-  project: 5,
-  "opencode-project": 6,
+	builtin: 1,
+	config: 2,
+	user: 3,
+	opencode: 4,
+	project: 5,
+	"opencode-project": 6,
+	plugin: 7,
 }
 
 function builtinToLoaded(builtin: BuiltinSkill): LoadedSkill {
@@ -181,7 +182,8 @@ function mergeSkillDefinitions(base: LoadedSkill, patch: SkillDefinition): Loade
 }
 
 export interface MergeSkillsOptions {
-  configDir?: string
+	configDir?: string
+	pluginSkills?: LoadedSkill[]
 }
 
 export function mergeSkills(
@@ -250,9 +252,18 @@ export function mergeSkills(
     }
   }
 
-  for (const name of normalizedConfig.disable) {
-    skillMap.delete(name)
-  }
+	for (const name of normalizedConfig.disable) {
+		skillMap.delete(name)
+	}
+
+	if (options.pluginSkills) {
+		for (const skill of options.pluginSkills) {
+			const existing = skillMap.get(skill.name)
+			if (!existing || SCOPE_PRIORITY[skill.scope] > SCOPE_PRIORITY[existing.scope]) {
+				skillMap.set(skill.name, skill)
+			}
+		}
+	}
 
   if (normalizedConfig.enable.length > 0) {
     const enableSet = new Set(normalizedConfig.enable)
