@@ -102,6 +102,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -223,6 +226,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -348,6 +354,135 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
+              "type": "string"
+            },
+            "tools": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "disable": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "subagent",
+                "primary",
+                "all"
+              ]
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "permission": {
+              "type": "object",
+              "properties": {
+                "edit": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "bash": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "webfetch": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "doom_loop": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "external_directory": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "Sisyphus-Junior": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -469,6 +604,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -594,6 +732,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -715,6 +856,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -840,6 +984,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -961,6 +1108,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -1086,6 +1236,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -1207,6 +1360,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -1332,6 +1488,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -1453,6 +1612,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -1578,6 +1740,9 @@
             "model": {
               "type": "string"
             },
+            "variant": {
+              "type": "string"
+            },
             "category": {
               "type": "string"
             },
@@ -1699,6 +1864,9 @@
           "type": "object",
           "properties": {
             "model": {
+              "type": "string"
+            },
+            "variant": {
               "type": "string"
             },
             "category": {
@@ -1831,6 +1999,9 @@
           "model": {
             "type": "string"
           },
+          "variant": {
+            "type": "string"
+          },
           "temperature": {
             "type": "number",
             "minimum": 0,
@@ -1928,9 +2099,6 @@
         }
       }
     },
-    "google_auth": {
-      "type": "boolean"
-    },
     "sisyphus_agent": {
       "type": "object",
       "properties": {
@@ -2013,7 +2181,6 @@
                 "todowrite",
                 "todoread",
                 "lsp_rename",
-                "lsp_code_action_resolve",
                 "session_read",
                 "session_write",
                 "session_search"

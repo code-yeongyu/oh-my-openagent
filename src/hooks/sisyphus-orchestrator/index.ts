@@ -14,7 +14,14 @@ import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "sisyphus-orchestrator"
 
-const ALLOWED_PATH_PREFIX = ".sisyphus/"
+/**
+ * Cross-platform check if a path is inside .sisyphus/ directory.
+ * Handles both forward slashes (Unix) and backslashes (Windows).
+ */
+function isSisyphusPath(filePath: string): boolean {
+  return /\.sisyphus[/\\]/.test(filePath)
+}
+
 const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
 
 const DIRECT_WORK_REMINDER = `
@@ -400,10 +407,17 @@ export function createSisyphusOrchestratorHook(
     try {
       log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
+      const messageDir = getMessageDir(sessionID)
+      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+      const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+        : undefined
+
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
           agent: "orchestrator-sisyphus",
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },
@@ -549,7 +563,7 @@ export function createSisyphusOrchestratorHook(
       // Check Write/Edit tools for orchestrator - inject strong warning
       if (WRITE_EDIT_TOOLS.includes(input.tool)) {
         const filePath = (output.args.filePath ?? output.args.path ?? output.args.file) as string | undefined
-        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+        if (filePath && !isSisyphusPath(filePath)) {
           // Store filePath for use in tool.execute.after
           if (input.callID) {
             pendingFilePaths.set(input.callID, filePath)
@@ -593,7 +607,7 @@ export function createSisyphusOrchestratorHook(
         if (!filePath) {
           filePath = output.metadata?.filePath as string | undefined
         }
-        if (filePath && !filePath.includes(ALLOWED_PATH_PREFIX)) {
+        if (filePath && !isSisyphusPath(filePath)) {
           output.output = (output.output || "") + DIRECT_WORK_REMINDER
           log(`[${HOOK_NAME}] Direct work reminder appended`, {
             sessionID: input.sessionID,
@@ -633,10 +647,20 @@ export function createSisyphusOrchestratorHook(
             })
           }
 
+          // Preserve original subagent response - critical for debugging failed tasks
+          const originalResponse = output.output
+
           output.output = `
 ## SUBAGENT WORK COMPLETED
 
 ${fileChanges}
+
+---
+
+**Subagent Response:**
+
+${originalResponse}
+
 <system-reminder>
 ${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)}
 </system-reminder>`

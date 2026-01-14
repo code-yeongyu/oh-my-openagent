@@ -11,6 +11,9 @@ import type { BackgroundTaskConfig } from "../../config/schema"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-injector"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
@@ -75,10 +78,22 @@ export class BackgroundManager {
 
     await this.concurrencyManager.acquire(concurrencyKey)
 
+    const parentSession = await this.client.session.get({
+      path: { id: input.parentSessionID },
+    }).catch((err) => {
+      log(`[background-agent] Failed to get parent session: ${err}`)
+      return null
+    })
+    const parentDirectory = parentSession?.data?.directory ?? this.directory
+    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     }).catch((error) => {
       this.concurrencyManager.release(concurrencyKey)
@@ -152,7 +167,8 @@ export class BackgroundManager {
         system: input.skillContent,
         tools: {
           task: false,
-          call_omo_agent: false,
+          sisyphus_task: false,
+          call_omo_agent: true,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -170,6 +186,7 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
+          existingTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
@@ -273,6 +290,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    // Reset startedAt on resume to prevent immediate completion
+    // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
+    existingTask.startedAt = new Date()
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -313,7 +333,8 @@ export class BackgroundManager {
         agent: existingTask.agent,
         tools: {
           task: false,
-          call_omo_agent: false,
+          sisyphus_task: false,
+          call_omo_agent: true,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -323,6 +344,11 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      // Release concurrency on resume error (matches launch error handler)
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined  // Prevent double-release
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
@@ -404,6 +430,13 @@ export class BackgroundManager {
 
         task.status = "completed"
         task.completedAt = new Date()
+        // Release concurrency immediately on completion
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
+        }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -428,7 +461,10 @@ export class BackgroundManager {
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
       }
+      // Clean up pendingByParent to prevent stale entries
+      this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
@@ -520,6 +556,21 @@ export class BackgroundManager {
     }
   }
 
+  /**
+   * Remove task from pending tracking for its parent session.
+   * Cleans up the parent entry if no pending tasks remain.
+   */
+  private cleanupPendingByParent(task: BackgroundTask): void {
+    if (!task.parentSessionID) return
+    const pending = this.pendingByParent.get(task.parentSessionID)
+    if (pending) {
+      pending.delete(task.id)
+      if (pending.size === 0) {
+        this.pendingByParent.delete(task.parentSessionID)
+      }
+    }
+  }
+
   private startPolling(): void {
     if (this.pollingInterval) return
 
@@ -558,6 +609,11 @@ cleanup(): void {
   }
 
 private async notifyParentSession(task: BackgroundTask): Promise<void> {
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
     const duration = this.formatDuration(task.startedAt, task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
@@ -619,13 +675,32 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 </system-reminder>`
     }
 
-    // Inject notification via session.prompt with noReply
+    // Dynamically lookup the parent session's current message context
+    // This ensures we use the CURRENT model/agent, not the stale one from task creation time
+    const messageDir = getMessageDir(task.parentSessionID)
+    const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+
+    const agent = currentMessage?.agent ?? task.parentAgent
+    const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+      ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+      : undefined
+
+    log("[background-agent] notifyParentSession context:", {
+      taskId: task.id,
+      messageDir: !!messageDir,
+      currentAgent: currentMessage?.agent,
+      currentModel: currentMessage?.model,
+      resolvedAgent: agent,
+      resolvedModel: model,
+    })
+
     try {
       await this.client.session.prompt({
         path: { id: task.parentSessionID },
         body: {
-          noReply: !allComplete,  // Silent unless all complete
-          agent: task.parentAgent,
+          noReply: !allComplete,
+          ...(agent !== undefined ? { agent } : {}),
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: notification }],
         },
       })
@@ -638,13 +713,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log("[background-agent] Failed to send notification:", error)
     }
 
-    // Cleanup after retention period
     const taskId = task.id
     setTimeout(() => {
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
+      // Concurrency already released at completion - just cleanup notifications and task
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
       log("[background-agent] Removed completed task from memory:", taskId)
@@ -684,7 +755,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
         }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
@@ -737,6 +811,13 @@ try {
 
           task.status = "completed"
           task.completedAt = new Date()
+          // Release concurrency immediately on completion
+          if (task.concurrencyKey) {
+            this.concurrencyManager.release(task.concurrencyKey)
+            task.concurrencyKey = undefined  // Prevent double-release
+          }
+          // Clean up pendingByParent to prevent stale entries
+          this.cleanupPendingByParent(task)
           this.markForNotification(task)
           await this.notifyParentSession(task)
           log("[background-agent] Task completed via polling:", task.id)
@@ -803,6 +884,13 @@ if (lastMessage) {
                 if (!hasIncompleteTodos) {
                   task.status = "completed"
                   task.completedAt = new Date()
+                  // Release concurrency immediately on completion
+                  if (task.concurrencyKey) {
+                    this.concurrencyManager.release(task.concurrencyKey)
+                    task.concurrencyKey = undefined  // Prevent double-release
+                  }
+                  // Clean up pendingByParent to prevent stale entries
+                  this.cleanupPendingByParent(task)
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
                   log("[background-agent] Task completed via stability detection:", task.id)
@@ -824,4 +912,17 @@ if (lastMessage) {
       this.stopPolling()
     }
   }
+}
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+  return null
 }

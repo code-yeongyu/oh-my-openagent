@@ -3,6 +3,6 @@ export interface SkillMcpArgs {
   tool_name?: string
   resource_name?: string
   prompt_name?: string
-  arguments?: string
+  arguments?: string | Record<string, unknown>
   grep?: string
 }
