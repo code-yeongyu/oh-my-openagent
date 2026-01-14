@@ -20,6 +20,7 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "frontend-ui-ux-engineer": "frontend-ui-ux-engineer",
   "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
+  "orchestrator-sisyphus": "orchestrator-sisyphus",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
