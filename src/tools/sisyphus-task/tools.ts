@@ -218,9 +218,18 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
+          const resumeMessageDir = getMessageDir(args.resume)
+          const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+          const resumeAgent = resumeMessage?.agent
+          const resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
+            ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+            : undefined
+
           await client.session.prompt({
             path: { id: args.resume },
             body: {
+              ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+              ...(resumeModel !== undefined ? { model: resumeModel } : {}),
               tools: {
                 task: false,
                 sisyphus_task: false,
