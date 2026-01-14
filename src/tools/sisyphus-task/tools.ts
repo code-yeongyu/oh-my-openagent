@@ -74,7 +74,7 @@ function resolveCategoryConfig(
     parentModelString?: string
     systemDefaultModel?: string
   }
-): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
+): { config: CategoryConfig; promptAppend: string; model: string | undefined; modelChain: ModelSpec[]; retryConfig: RetryConfig } | null {
   const { userCategories, parentModelString, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -113,7 +113,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, model }
+  return { config, promptAppend, model, modelChain, retryConfig }
 }
 
 export interface SisyphusTaskToolOptions {
