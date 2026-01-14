@@ -16,6 +16,34 @@ import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-i
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
+// Debug logging imports
+import {
+  logSpawnStart,
+  logSessionCreated,
+  logPromptSent,
+  logSpawnComplete,
+  logSpawnError,
+  logResumeStart,
+  logResumePromptSent,
+  logResumeComplete,
+  logResumeError,
+  logSessionIdle,
+  logSessionIdleIgnored,
+  logSessionCompleted,
+  logSessionDeleted,
+  logPollingTick,
+  logPollingStatus,
+  logStabilityCheck,
+  logOutputValidation,
+  logTodoCheck,
+  logConcurrencyAcquired,
+  logConcurrencyReleased,
+  logAuthStatus,
+  logClientCreated,
+  logTaskPruned,
+  logNotificationSent,
+} from "./debug-logger"
+
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
 
@@ -90,11 +118,19 @@ export class BackgroundManager {
     // This ensures all background agent HTTP requests include proper auth headers
     // Use serverUrl from PluginInput (the actual running server URL)
     const serverUrl = ctx.serverUrl.toString()
+    const hasPassword = !!process.env.OPENCODE_SERVER_PASSWORD
+    const username = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
+    
+    // Debug: Log auth status
+    logAuthStatus(hasPassword, username, serverUrl)
+    
     this.client = createOpencodeClient({
       baseUrl: serverUrl,
       fetch: createAuthenticatedFetch(),
     })
     
+    // Debug: Log client created
+    logClientCreated(serverUrl)
     log("[background-agent] Created authenticated client for:", { serverUrl })
   }
 
@@ -106,6 +142,10 @@ export class BackgroundManager {
       parentSessionID: input.parentSessionID,
     })
 
+    // Debug: Log spawn start
+    const tempTaskId = `bg_${crypto.randomUUID().slice(0, 8)}`
+    logSpawnStart(input, tempTaskId)
+
     if (!input.agent || input.agent.trim() === "") {
       throw new Error("Agent parameter is required")
     }
@@ -113,6 +153,7 @@ export class BackgroundManager {
     const concurrencyKey = input.agent
 
     await this.concurrencyManager.acquire(concurrencyKey)
+    logConcurrencyAcquired(tempTaskId, concurrencyKey)
 
     const parentSession = await this.client.session.get({
       path: { id: input.parentSessionID },
@@ -133,19 +174,26 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       this.concurrencyManager.release(concurrencyKey)
+      logConcurrencyReleased(tempTaskId, concurrencyKey)
+      logSpawnError(tempTaskId, undefined, error, { phase: "session_create" })
       throw error
     })
 
     if (createResult.error) {
       this.concurrencyManager.release(concurrencyKey)
+      logConcurrencyReleased(tempTaskId, concurrencyKey)
+      logSpawnError(tempTaskId, undefined, createResult.error, { phase: "session_create_result" })
       throw new Error(`Failed to create background session: ${createResult.error}`)
     }
 
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
+    
+    // Debug: Log session created
+    logSessionCreated(tempTaskId, sessionID, input.parentSessionID, parentDirectory)
 
     const task: BackgroundTask = {
-      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+      id: tempTaskId,
       sessionID,
       parentSessionID: input.parentSessionID,
       parentMessageID: input.parentMessageID,
@@ -193,6 +241,9 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
+    // Debug: Log prompt sent
+    logPromptSent(task.id, sessionID, input.agent, input.model, input.prompt.length)
+
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
     // Include model if caller provided one (e.g., from Sisyphus category configs)
     this.client.session.prompt({
@@ -210,6 +261,7 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       log("[background-agent] promptAsync error:", error)
+      logSpawnError(task.id, sessionID, error, { phase: "prompt_send" })
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
