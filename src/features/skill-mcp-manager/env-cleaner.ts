@@ -13,7 +13,7 @@ export function createCleanMcpEnvironment(
   const cleanEnv: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(process.env)) {
-    if (value === undefined) continue
+    if (value === undefined || value === "undefined") continue
 
     const shouldExclude = EXCLUDED_ENV_PATTERNS.some((pattern) => pattern.test(key))
     if (!shouldExclude) {
