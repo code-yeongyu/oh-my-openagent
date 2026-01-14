@@ -63,6 +63,7 @@ type ToolContextWithMetadata = {
 interface ResolvedCategoryConfig {
   config: CategoryConfig
   promptAppend: string
+  model: string | undefined
   modelChain: ModelSpec[]
   retryConfig: RetryConfig
 }
@@ -108,7 +109,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, modelChain, retryConfig }
+  return { config, promptAppend, model, modelChain, retryConfig }
 }
 
 export interface SisyphusTaskToolOptions {
