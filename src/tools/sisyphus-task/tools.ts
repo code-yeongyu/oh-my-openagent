@@ -273,19 +273,28 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
           // Try to fetch any partial response
           const partialResult = await client.session.messages({ path: { id: args.resume } })
-          const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
-            info?: { role?: string; time?: { created?: number } }
-            parts?: Array<{ type?: string; text?: string }>
-          }>
-          const partialAssistant = partialMsgs
-            .filter((m) => m.info?.role === "assistant")
-            .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-          const partialMessage = partialAssistant[0]
-          const partialText = partialMessage?.parts
-            ?.filter((p) => p.type === "text" || p.type === "reasoning")
-            .map((p) => p.text ?? "")
-            .filter(Boolean)
-            .join("\n")
+
+          // Guard against error result or non-array response
+          let partialText = ""
+          if (
+            !("error" in partialResult) &&
+            Array.isArray((partialResult as { data?: unknown }).data ?? partialResult)
+          ) {
+            const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
+              info?: { role?: string; time?: { created?: number } }
+              parts?: Array<{ type?: string; text?: string }>
+            }>
+            const partialAssistant = partialMsgs
+              .filter((m) => m.info?.role === "assistant")
+              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+            const partialMessage = partialAssistant[0]
+            partialText =
+              partialMessage?.parts
+                ?.filter((p) => p.type === "text" || p.type === "reasoning")
+                .map((p) => p.text ?? "")
+                .filter(Boolean)
+                .join("\n") ?? ""
+          }
 
           const duration = formatDuration(startTime)
           return `⏱️ Resume timed out after ${duration} (max 60 seconds).
@@ -573,19 +582,28 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
           // Try to fetch any partial response before returning timeout error
           const partialResult = await client.session.messages({ path: { id: sessionID } })
-          const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
-            info?: { role?: string; time?: { created?: number } }
-            parts?: Array<{ type?: string; text?: string }>
-          }>
-          const partialAssistant = partialMsgs
-            .filter((m) => m.info?.role === "assistant")
-            .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-          const partialMessage = partialAssistant[0]
-          const partialText = partialMessage?.parts
-            ?.filter((p) => p.type === "text" || p.type === "reasoning")
-            .map((p) => p.text ?? "")
-            .filter(Boolean)
-            .join("\n")
+
+          // Guard against error result or non-array response
+          let partialText = ""
+          if (
+            !("error" in partialResult) &&
+            Array.isArray((partialResult as { data?: unknown }).data ?? partialResult)
+          ) {
+            const partialMsgs = ((partialResult as { data?: unknown }).data ?? partialResult) as Array<{
+              info?: { role?: string; time?: { created?: number } }
+              parts?: Array<{ type?: string; text?: string }>
+            }>
+            const partialAssistant = partialMsgs
+              .filter((m) => m.info?.role === "assistant")
+              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+            const partialMessage = partialAssistant[0]
+            partialText =
+              partialMessage?.parts
+                ?.filter((p) => p.type === "text" || p.type === "reasoning")
+                .map((p) => p.text ?? "")
+                .filter(Boolean)
+                .join("\n") ?? ""
+          }
 
           const duration = formatDuration(startTime)
           return `⏱️ Task timed out after ${duration} (max 10 minutes).
