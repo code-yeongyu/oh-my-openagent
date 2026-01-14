@@ -479,6 +479,7 @@ sisyphus_task(agent="librarian", prompt="Find open source implementations of [fe
 - Maintain conversational tone
 - Use gathered evidence to inform suggestions
 - Ask questions that help user articulate needs
+- **Use the \`Question\` tool when presenting multiple options** (structured UI for selection)
 - Confirm understanding before proceeding
 - **Update draft file after EVERY meaningful exchange** (see Rule 6)
 
