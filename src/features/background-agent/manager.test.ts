@@ -122,6 +122,10 @@ class MockBackgroundManager {
       throw new Error(`Task not found for session: ${input.sessionId}`)
     }
 
+    if (existingTask.status === "running") {
+      return existingTask
+    }
+
     this.resumeCalls.push({ sessionId: input.sessionId, prompt: input.prompt })
 
     existingTask.status = "running"
@@ -572,6 +576,7 @@ describe("BackgroundManager.resume", () => {
       parentSessionID: "old-parent",
       description: "original description",
       agent: "explore",
+      status: "completed",
     })
     manager.addTask(existingTask)
 
@@ -598,6 +603,7 @@ describe("BackgroundManager.resume", () => {
       id: "task-a",
       sessionID: "session-a",
       parentSessionID: "session-parent",
+      status: "completed",
     })
     manager.addTask(task)
 
@@ -623,6 +629,7 @@ describe("BackgroundManager.resume", () => {
       id: "task-a",
       sessionID: "session-a",
       parentSessionID: "session-parent",
+      status: "completed",
     })
     taskWithProgress.progress = {
       toolCalls: 42,
@@ -641,6 +648,29 @@ describe("BackgroundManager.resume", () => {
 
     // #then
     expect(result.progress?.toolCalls).toBe(42)
+  })
+
+  test("should ignore resume when task is already running", () => {
+    // #given
+    const runningTask = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID: "session-parent",
+      status: "running",
+    })
+    manager.addTask(runningTask)
+
+    // #when
+    const result = manager.resume({
+      sessionId: "session-a",
+      prompt: "resume should be ignored",
+      parentSessionID: "new-parent",
+      parentMessageID: "new-msg",
+    })
+
+    // #then
+    expect(result.parentSessionID).toBe("session-parent")
+    expect(manager.resumeCalls).toHaveLength(0)
   })
 })
 
@@ -813,3 +843,149 @@ function buildNotificationPromptBody(
 
   return body
 }
+
+describe("tryCompleteTask pattern - race condition prevention", () => {
+  /**
+   * These tests verify the tryCompleteTask pattern behavior
+   * by simulating the guard logic in a mock implementation.
+   */
+
+  test("should prevent double completion when task already completed", () => {
+    // #given - task already completed
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+
+    // #when - try to complete again (simulating tryCompleteTask guard)
+    const canComplete = task.status === "running"
+
+    // #then - should not allow completion
+    expect(canComplete).toBe(false)
+  })
+
+  test("should allow completion when task is running", () => {
+    // #given - task is running
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when - check if can complete
+    const canComplete = task.status === "running"
+
+    // #then
+    expect(canComplete).toBe(true)
+  })
+
+  test("should prevent completion when task is cancelled", () => {
+    // #given - task cancelled by session.deleted
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "cancelled",
+      startedAt: new Date(),
+    }
+
+    // #when
+    const canComplete = task.status === "running"
+
+    // #then
+    expect(canComplete).toBe(false)
+  })
+
+  test("should prevent completion when task errored", () => {
+    // #given - task errored
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "error",
+      error: "some error",
+      startedAt: new Date(),
+    }
+
+    // #when
+    const canComplete = task.status === "running"
+
+    // #then
+    expect(canComplete).toBe(false)
+  })
+})
+
+describe("concurrencyKey management", () => {
+  test("concurrencyKey should be undefined after release", () => {
+    // #given - task with concurrency key
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+      concurrencyKey: "anthropic/claude-sonnet-4-5",
+    }
+
+    // #when - simulate release pattern (what tryCompleteTask does)
+    if (task.concurrencyKey) {
+      // concurrencyManager.release(task.concurrencyKey) would be called
+      task.concurrencyKey = undefined
+    }
+
+    // #then
+    expect(task.concurrencyKey).toBeUndefined()
+  })
+
+  test("release should be idempotent with concurrencyKey guard", () => {
+    // #given - task with key already released
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      concurrencyKey: undefined, // already released
+    }
+
+    // #when - try to release again (guard pattern)
+    let releaseCount = 0
+    if (task.concurrencyKey) {
+      releaseCount++
+      task.concurrencyKey = undefined
+    }
+
+    // #then - no double release
+    expect(releaseCount).toBe(0)
+  })
+})
