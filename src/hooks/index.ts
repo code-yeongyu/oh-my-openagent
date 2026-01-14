@@ -14,6 +14,7 @@ export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
+export { createBackgroundCompactionHook } from "./background-compaction"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
@@ -25,3 +26,7 @@ export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
+export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
+export { createTaskResumeInfoHook } from "./task-resume-info";
+export { createStartWorkHook } from "./start-work";
+export { createSisyphusOrchestratorHook } from "./sisyphus-orchestrator";

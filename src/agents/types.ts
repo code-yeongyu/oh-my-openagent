@@ -64,6 +64,9 @@ export type BuiltinAgentName =
   | "frontend-ui-ux-engineer"
   | "document-writer"
   | "multimodal-looker"
+  | "Metis (Plan Consultant)"
+  | "Momus (Plan Reviewer)"
+  | "orchestrator-sisyphus"
 
 export type OverridableAgentName =
   | "build"
@@ -73,6 +76,7 @@ export type AgentName = BuiltinAgentName
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string
+  variant?: string
 }
 
 export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>
