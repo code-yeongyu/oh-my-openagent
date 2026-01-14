@@ -349,3 +349,70 @@ describe("ConcurrencyManager.acquire/release", () => {
     await waitPromise
   })
 })
+
+describe("ConcurrencyManager.cleanup", () => {
+  test("cancelWaiters should reject all pending acquires", async () => {
+    // #given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire("model-a")
+
+    // Queue waiters
+    const errors: Error[] = []
+    const p1 = manager.acquire("model-a").catch(e => errors.push(e))
+    const p2 = manager.acquire("model-a").catch(e => errors.push(e))
+
+    // #when
+    manager.cancelWaiters("model-a")
+    await Promise.all([p1, p2])
+
+    // #then
+    expect(errors.length).toBe(2)
+    expect(errors[0].message).toContain("cancelled")
+  })
+
+  test("clear should cancel all models and reset state", async () => {
+    // #given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire("model-a")
+    await manager.acquire("model-b")
+
+    const errors: Error[] = []
+    const p1 = manager.acquire("model-a").catch(e => errors.push(e))
+    const p2 = manager.acquire("model-b").catch(e => errors.push(e))
+
+    // #when
+    manager.clear()
+    await Promise.all([p1, p2])
+
+    // #then
+    expect(errors.length).toBe(2)
+    expect(manager.getCount("model-a")).toBe(0)
+    expect(manager.getCount("model-b")).toBe(0)
+  })
+
+  test("getCount and getQueueLength should return correct values", async () => {
+    // #given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 2 }
+    const manager = new ConcurrencyManager(config)
+
+    // #when
+    await manager.acquire("model-a")
+    expect(manager.getCount("model-a")).toBe(1)
+    expect(manager.getQueueLength("model-a")).toBe(0)
+
+    await manager.acquire("model-a")
+    expect(manager.getCount("model-a")).toBe(2)
+
+    // Queue one more
+    const p = manager.acquire("model-a").catch(() => {})
+    await Promise.resolve() // let it queue
+
+    expect(manager.getQueueLength("model-a")).toBe(1)
+
+    // Cleanup
+    manager.cancelWaiters("model-a")
+    await p
+  })
+})
