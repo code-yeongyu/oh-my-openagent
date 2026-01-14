@@ -433,15 +433,7 @@ export class BackgroundManager {
           task.concurrencyKey = undefined  // Prevent double-release
         }
         // Clean up pendingByParent to prevent stale entries
-        if (task.parentSessionID) {
-          const pending = this.pendingByParent.get(task.parentSessionID)
-          if (pending) {
-            pending.delete(task.id)
-            if (pending.size === 0) {
-              this.pendingByParent.delete(task.parentSessionID)
-            }
-          }
-        }
+        this.cleanupPendingByParent(task)
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -469,15 +461,7 @@ export class BackgroundManager {
         task.concurrencyKey = undefined  // Prevent double-release
       }
       // Clean up pendingByParent to prevent stale entries
-      if (task.parentSessionID) {
-        const pending = this.pendingByParent.get(task.parentSessionID)
-        if (pending) {
-          pending.delete(task.id)
-          if (pending.size === 0) {
-            this.pendingByParent.delete(task.parentSessionID)
-          }
-        }
-      }
+      this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
@@ -565,6 +549,21 @@ export class BackgroundManager {
         this.notifications.delete(sessionID)
       } else {
         this.notifications.set(sessionID, filtered)
+      }
+    }
+  }
+
+  /**
+   * Remove task from pending tracking for its parent session.
+   * Cleans up the parent entry if no pending tasks remain.
+   */
+  private cleanupPendingByParent(task: BackgroundTask): void {
+    if (!task.parentSessionID) return
+    const pending = this.pendingByParent.get(task.parentSessionID)
+    if (pending) {
+      pending.delete(task.id)
+      if (pending.size === 0) {
+        this.pendingByParent.delete(task.parentSessionID)
       }
     }
   }
@@ -739,15 +738,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           task.concurrencyKey = undefined  // Prevent double-release
         }
         // Clean up pendingByParent to prevent stale entries
-        if (task.parentSessionID) {
-          const pending = this.pendingByParent.get(task.parentSessionID)
-          if (pending) {
-            pending.delete(task.id)
-            if (pending.size === 0) {
-              this.pendingByParent.delete(task.parentSessionID)
-            }
-          }
-        }
+        this.cleanupPendingByParent(task)
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
@@ -806,15 +797,7 @@ try {
             task.concurrencyKey = undefined  // Prevent double-release
           }
           // Clean up pendingByParent to prevent stale entries
-          if (task.parentSessionID) {
-            const pending = this.pendingByParent.get(task.parentSessionID)
-            if (pending) {
-              pending.delete(task.id)
-              if (pending.size === 0) {
-                this.pendingByParent.delete(task.parentSessionID)
-              }
-            }
-          }
+          this.cleanupPendingByParent(task)
           this.markForNotification(task)
           await this.notifyParentSession(task)
           log("[background-agent] Task completed via polling:", task.id)
@@ -887,15 +870,7 @@ if (lastMessage) {
                     task.concurrencyKey = undefined  // Prevent double-release
                   }
                   // Clean up pendingByParent to prevent stale entries
-                  if (task.parentSessionID) {
-                    const pending = this.pendingByParent.get(task.parentSessionID)
-                    if (pending) {
-                      pending.delete(task.id)
-                      if (pending.size === 0) {
-                        this.pendingByParent.delete(task.parentSessionID)
-                      }
-                    }
-                  }
+                  this.cleanupPendingByParent(task)
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
                   log("[background-agent] Task completed via stability detection:", task.id)
