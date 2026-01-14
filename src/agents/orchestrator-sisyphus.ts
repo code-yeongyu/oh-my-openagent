@@ -1449,6 +1449,7 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
+    color: "#10B981",
     ...restrictions,
   } as AgentConfig
 }
