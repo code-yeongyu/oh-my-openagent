@@ -475,15 +475,13 @@ describe("SkillMcpManager", () => {
       // Headers are passed through to the transport
       await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
         /Failed to connect/
+      )
 
       // Verify headers were forwarded to transport
       expect(lastTransportInstance.options?.requestInit?.headers).toEqual({
         Authorization: "Bearer test-token",
         "X-Custom-Header": "custom-value",
       })
-
-
-      )
     })
 
     it("works without headers (optional)", async () => {
