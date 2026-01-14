@@ -233,6 +233,11 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 ### For Humans
 
+> **⚠️ Prerequisite: Bun is required**
+>
+> This tool **requires [Bun](https://bun.sh/) to be installed** on your system.
+> Even if you use `npx` to run the installer, the underlying runtime depends on Bun.
+
 Run the interactive installer:
 
 ```bash
