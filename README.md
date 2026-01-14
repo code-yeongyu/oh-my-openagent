@@ -30,9 +30,28 @@
 
 # Claude OAuth Access Notice
 
+## TL;DR
+
+> Q. Can I use oh-my-opencode?
+
+Yes.
+
+> Q. Can I use it with my claude code subscription?
+
+Technically yes, but i cannot recommend.
+
+> Q. Do you offer those options to handle oauth login?
+
+No this project doesn't have any of such implementation.
+
+## FULL
+
 > As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
+> 
 > [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
+>
 > Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
+>
 > These tools may work regardless of technical detectability, but users should be aware of ToS implications, and I personally cannot recommend to use those.
 >
 > This project is not responsible for any issues arising from the use of unofficial tools, and **we do not have any custom implementations of those oauth systems.**
