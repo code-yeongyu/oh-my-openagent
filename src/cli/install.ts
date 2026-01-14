@@ -38,6 +38,7 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
   lines.push(formatProvider("ChatGPT", config.hasChatGPT))
   lines.push(formatProvider("Gemini", config.hasGemini))
+  lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback provider"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -46,8 +47,8 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Agent Configuration")))
   lines.push("")
 
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
+  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : (config.hasCopilot ? "github-copilot/claude-opus-4.5" : "glm-4.7-free")
+  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasCopilot ? "github-copilot/gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"))
   const librarianModel = "glm-4.7-free"
   const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
 
@@ -130,6 +131,12 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
   }
 
+  if (args.copilot === undefined) {
+    errors.push("--copilot is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.copilot)) {
+    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -139,10 +146,11 @@ function argsToConfig(args: InstallArgs): InstallConfig {
     isMax20: args.claude === "max20",
     hasChatGPT: args.chatgpt === "yes",
     hasGemini: args.gemini === "yes",
+    hasCopilot: args.copilot === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg; copilot: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -152,6 +160,7 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
     claude,
     chatgpt: detected.hasChatGPT ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
+    copilot: detected.hasCopilot ? "yes" : "no",
   }
 }
 
@@ -201,11 +210,26 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
+  const copilot = await p.select({
+    message: "Do you have a GitHub Copilot subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Only native providers will be used" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
+    ],
+    initialValue: initial.copilot,
+  })
+
+  if (p.isCancel(copilot)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
     hasChatGPT: chatgpt === "yes",
     hasGemini: gemini === "yes",
+    hasCopilot: copilot === "yes",
   }
 }
 
@@ -218,7 +242,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes>")
+    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes> --copilot=<no|yes>")
     console.log()
     return 1
   }
