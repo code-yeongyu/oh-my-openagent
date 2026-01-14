@@ -8,12 +8,13 @@ on:
         description: "Bump major, minor, or patch"
         required: true
         type: choice
+        default: patch
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
       version:
-        description: "Override version (optional)"
+        description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
         required: false
         type: string
 
@@ -104,9 +105,9 @@ jobs:
       - name: Build
         run: |
           echo "=== Running bun build (main) ==="
-          bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi
+          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
           echo "=== Running bun build (CLI) ==="
-          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm
+          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
           echo "=== Running tsc ==="
           tsc --emitDeclarationOnly
           echo "=== Running build:schema ==="
