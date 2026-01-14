@@ -281,7 +281,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   }
   printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -392,7 +392,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     s.start("Adding auth plugins (fetching latest versions)")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {

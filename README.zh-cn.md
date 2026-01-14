@@ -93,8 +93,7 @@
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [模型配置](#模型配置)
         - [oh-my-opencode 智能体模型覆盖](#oh-my-opencode-智能体模型覆盖)
-      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
-        - [模型配置](#模型配置-1)
+
     - [⚠️ 警告](#️-警告)
     - [验证安装](#验证安装)
     - [向用户说 '恭喜！🎉'](#向用户说-恭喜)
