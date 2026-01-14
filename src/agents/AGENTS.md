@@ -1,21 +1,23 @@
 # AGENTS KNOWLEDGE BASE
 
 ## OVERVIEW
-
-7 AI agents for multi-model orchestration. Sisyphus orchestrates, specialists handle domains.
+AI agent definitions for multi-model orchestration, delegating tasks to specialized experts.
 
 ## STRUCTURE
-
 ```
 agents/
-├── sisyphus.ts              # Primary orchestrator (504 lines)
-├── oracle.ts                # Strategic advisor
-├── librarian.ts             # Multi-repo research
-├── explore.ts               # Fast codebase grep
-├── frontend-ui-ux-engineer.ts  # UI generation
-├── document-writer.ts       # Technical docs
-├── multimodal-looker.ts     # PDF/image analysis
-├── sisyphus-prompt-builder.ts  # Sisyphus prompt construction
+├── orchestrator-sisyphus.ts # Orchestrator agent (1486 lines) - 7-section delegation, wisdom
+├── sisyphus.ts              # Main Sisyphus prompt (643 lines)
+├── sisyphus-junior.ts       # Junior variant for delegated tasks
+├── oracle.ts                # Strategic advisor (GPT-5.2)
+├── librarian.ts             # Multi-repo research (GLM-4.7-free)
+├── explore.ts               # Fast codebase grep (Grok Code)
+├── frontend-ui-ux-engineer.ts  # UI generation (Gemini 3 Pro)
+├── document-writer.ts       # Technical docs (Gemini 3 Pro)
+├── multimodal-looker.ts     # PDF/image analysis (Gemini 3 Flash)
+├── prometheus-prompt.ts     # Planning agent prompt (988 lines) - interview mode
+├── metis.ts                 # Plan Consultant agent - pre-planning analysis
+├── momus.ts                 # Plan Reviewer agent - plan validation
 ├── build-prompt.ts          # Shared build agent prompt
 ├── plan-prompt.ts           # Shared plan agent prompt
 ├── types.ts                 # AgentModelConfig interface
@@ -24,41 +26,35 @@ agents/
 ```
 
 ## AGENT MODELS
+| Agent | Default Model | Purpose |
+|-------|---------------|---------|
+| Sisyphus | claude-opus-4-5 | Primary orchestrator. 32k extended thinking budget. |
+| oracle | openai/gpt-5.2 | High-IQ debugging, architecture, strategic consultation. |
+| librarian | glm-4.7-free | Multi-repo analysis, docs research, GitHub examples. |
+| explore | grok-code | Fast contextual grep. Fallbacks: Gemini-3-Flash, Haiku-4-5. |
+| frontend-ui-ux | gemini-3-pro | Production-grade UI/UX generation and styling. |
+| document-writer | gemini-3-pro | Technical writing, guides, API documentation. |
+| Prometheus | claude-opus-4-5 | Strategic planner. Interview mode, orchestrates Metis/Momus. |
+| Metis | claude-sonnet-4-5 | Plan Consultant. Pre-planning risk/requirement analysis. |
+| Momus | claude-sonnet-4-5 | Plan Reviewer. Validation and quality enforcement. |
 
-| Agent | Model | Fallback | Purpose |
-|-------|-------|----------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | - | Orchestrator with extended thinking |
-| oracle | openai/gpt-5.2 | - | Architecture, debugging, review |
-| librarian | anthropic/claude-sonnet-4-5 | google/gemini-3-flash | Docs, GitHub research |
-| explore | opencode/grok-code | gemini-3-flash, haiku-4-5 | Contextual grep |
-| frontend-ui-ux-engineer | google/gemini-3-pro-preview | - | Beautiful UI code |
-| document-writer | google/gemini-3-pro-preview | - | Technical writing |
-| multimodal-looker | google/gemini-3-flash | - | Visual analysis |
+## HOW TO ADD AN AGENT
+1. Create `src/agents/my-agent.ts` exporting `AgentConfig`.
+2. Add to `builtinAgents` in `src/agents/index.ts`.
+3. Update `types.ts` if adding new config interfaces.
 
-## HOW TO ADD
-
-1. Create `src/agents/my-agent.ts`:
-   ```typescript
-   export const myAgent: AgentConfig = {
-     model: "provider/model-name",
-     temperature: 0.1,
-     system: "...",
-     tools: { include: ["tool1"] },
-   }
-   ```
-2. Add to `builtinAgents` in index.ts
-3. Update types.ts if new config options
-
-## MODEL FALLBACK
-
-`createBuiltinAgents()` handles fallback:
-1. User config override
-2. Installer settings (claude max20, gemini antigravity)
-3. Default model
+## MODEL FALLBACK LOGIC
+`createBuiltinAgents()` handles resolution:
+1. User config override (`agents.{name}.model`).
+2. Environment-specific settings (max20, antigravity).
+3. Hardcoded defaults in `index.ts`.
 
 ## ANTI-PATTERNS
+- **Trusting reports**: NEVER trust subagent self-reports; always verify outputs.
+- **High temp**: Don't use >0.3 for code agents (Sisyphus/Prometheus use 0.1).
+- **Sequential calls**: Prefer `sisyphus_task` with `run_in_background` for parallelism.
 
-- High temperature (>0.3) for code agents
-- Broad tool access (prefer explicit `include`)
-- Monolithic prompts (delegate to specialists)
-- Missing fallbacks for rate-limited models
+## SHARED PROMPTS
+- **build-prompt.ts**: Unified base for Sisyphus and Builder variants.
+- **plan-prompt.ts**: Core planning logic shared across planning agents.
+- **orchestrator-sisyphus.ts**: Uses a 7-section prompt structure and "wisdom notepad" to preserve learnings across turns.

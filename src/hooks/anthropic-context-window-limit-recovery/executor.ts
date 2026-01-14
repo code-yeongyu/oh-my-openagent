@@ -320,7 +320,6 @@ export async function executeCompact(
           "todowrite",
           "todoread",
           "lsp_rename",
-          "lsp_code_action_resolve",
         ],
       };
 
@@ -409,7 +408,7 @@ export async function executeCompact(
             try {
               await (client as Client).session.prompt_async({
                 path: { id: sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
+                body: { auto: true } as never,
                 query: { directory },
               });
             } catch {}
@@ -497,21 +496,12 @@ export async function executeCompact(
             })
             .catch(() => {});
 
+          const summarizeBody = { providerID, modelID, auto: true }
           await (client as Client).session.summarize({
             path: { id: sessionID },
-            body: { providerID, modelID },
+            body: summarizeBody as never,
             query: { directory },
           });
-
-          setTimeout(async () => {
-            try {
-              await (client as Client).session.prompt_async({
-                path: { id: sessionID },
-                body: { parts: [{ type: "text", text: "Continue" }] },
-                query: { directory },
-              });
-            } catch {}
-          }, 500);
           return;
         } catch {
           const delay =

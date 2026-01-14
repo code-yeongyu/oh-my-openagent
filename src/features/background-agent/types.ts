@@ -27,7 +27,15 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
-  model?: string
+  model?: { providerID: string; modelID: string; variant?: string }
+  /** Agent name used for concurrency tracking */
+  concurrencyKey?: string
+  /** Parent session's agent name for notification */
+  parentAgent?: string
+  /** Last message count for stability detection */
+  lastMsgCount?: number
+  /** Number of consecutive polls with stable message count */
+  stablePolls?: number
 }
 
 export interface LaunchInput {
@@ -37,4 +45,17 @@ export interface LaunchInput {
   parentSessionID: string
   parentMessageID: string
   parentModel?: { providerID: string; modelID: string }
+  parentAgent?: string
+  model?: { providerID: string; modelID: string; variant?: string }
+  skills?: string[]
+  skillContent?: string
+}
+
+export interface ResumeInput {
+  sessionId: string
+  prompt: string
+  parentSessionID: string
+  parentMessageID: string
+  parentModel?: { providerID: string; modelID: string }
+  parentAgent?: string
 }
