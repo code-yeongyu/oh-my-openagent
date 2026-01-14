@@ -354,37 +354,46 @@ opencode auth login
 
 **マルチアカウントロードバランシング**: プラグインは最大10個の Google アカウントをサポートします。1つのアカウントがレートリミットに達すると、自動的に次のアカウントに切り替わります。
 
-#### 4.3 OpenAI (ChatGPT Plus/Pro)
+#### 4.3 GitHub Copilot（フォールバックプロバイダー）
 
-まず、opencode-openai-codex-auth プラグインを追加します：
+GitHub Copilot は、ネイティブプロバイダー（Claude、ChatGPT、Gemini）が利用できない場合の**フォールバックプロバイダー**としてサポートされています。インストーラーは、Copilot をネイティブプロバイダーより低い優先度で構成します。
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode",
-    "opencode-openai-codex-auth@4.3.0"
-  ]
-}
+**優先度**: ネイティブプロバイダー (Claude/ChatGPT/Gemini) > GitHub Copilot > 無料モデル
+
+##### モデルマッピング
+
+GitHub Copilot が有効な場合、oh-my-opencode は以下のモデル割り当てを使用します：
+
+| エージェント | モデル |
+|--------------|--------|
+| **Sisyphus** | `github-copilot/claude-opus-4.5` |
+| **Oracle** | `github-copilot/gpt-5.2` |
+| **Explore** | `grok code`（デフォルト） |
+| **Librarian** | `glm 4.7 free`（デフォルト） |
+
+GitHub Copilot はプロキシプロバイダーとして機能し、サブスクリプションに基づいて基盤となるモデルにリクエストをルーティングします。
+
+##### セットアップ
+
+インストーラーを実行し、GitHub Copilot で「はい」を選択します：
+
+```bash
+bunx oh-my-opencode install
+# サブスクリプション（Claude、ChatGPT、Gemini）を選択
+# プロンプトが表示されたら: "Do you have a GitHub Copilot subscription?" → 「はい」を選択
 ```
 
-##### モデル設定
+または、非対話モードを使用します：
 
-`opencode.json` に完全なモデル設定も構成する必要があります。
-[opencode-openai-codex-auth ドキュメント](https://github.com/numman-ali/opencode-openai-codex-auth)を読み、[`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json)（OpenCode v1.0.210+）または [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json)（旧バージョン）から provider/models 設定をコピーして、ユーザーの既存のセットアップを壊さないよう慎重にマージしてください。
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+```
 
-**利用可能なモデル**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
-
-**Variants** (OpenCode v1.0.210+): `--variant=<none|low|medium|high|xhigh>` オプションで推論強度を制御できます。
-
-その後、認証を行います：
+その後、GitHub で認証します：
 
 ```bash
 opencode auth login
-# Provider: OpenAI を選択
-# Login method: ChatGPT Plus/Pro (Codex Subscription) を選択
-# ユーザーにブラウザでの OAuth フロー完了を案内
-# 完了まで待機
-# 成功を確認し、ユーザーに報告
+# 選択: GitHub → OAuth 経由で認証
 ```
 
 
