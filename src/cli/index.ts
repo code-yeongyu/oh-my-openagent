@@ -4,7 +4,6 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
-import { listAccounts, removeAccount } from "./commands/auth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -132,45 +131,6 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
-    process.exit(exitCode)
-  })
-
-const authCommand = program
-  .command("auth")
-  .description("Manage Google Antigravity accounts")
-
-authCommand
-  .command("list")
-  .description("List all Google Antigravity accounts")
-  .addHelpText("after", `
-Examples:
-  $ bunx oh-my-opencode auth list
-
-Shows:
-  - Account index and email
-  - Account tier (free/paid)
-  - Active account (marked with *)
-  - Rate limit status per model family
-`)
-  .action(async () => {
-    const exitCode = await listAccounts()
-    process.exit(exitCode)
-  })
-
-authCommand
-  .command("remove <index-or-email>")
-  .description("Remove an account by index or email")
-  .addHelpText("after", `
-Examples:
-  $ bunx oh-my-opencode auth remove 0
-  $ bunx oh-my-opencode auth remove user@example.com
-
-Note:
-  - Use 'auth list' to see account indices
-  - Removing the active account will switch to the next available account
-`)
-  .action(async (indexOrEmail: string) => {
-    const exitCode = await removeAccount(indexOrEmail)
     process.exit(exitCode)
   })
 

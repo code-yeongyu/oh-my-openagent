@@ -479,6 +479,7 @@ sisyphus_task(agent="librarian", prompt="Find open source implementations of [fe
 - Maintain conversational tone
 - Use gathered evidence to inform suggestions
 - Ask questions that help user articulate needs
+- **Use the \`Question\` tool when presenting multiple options** (structured UI for selection)
 - Confirm understanding before proceeding
 - **Update draft file after EVERY meaningful exchange** (see Rule 6)
 
@@ -980,9 +981,11 @@ This will:
 /**
  * Prometheus planner permission configuration.
  * Allows write/edit for plan files (.md only, enforced by prometheus-md-only hook).
+ * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
  */
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
+  question: "allow" as const,
 }

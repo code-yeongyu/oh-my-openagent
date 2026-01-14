@@ -457,13 +457,13 @@ describe("migrateConfigFile with backup", () => {
     })
   })
 
-  test("creates backup file with timestamp when migration needed", () => {
-    // #given: Config file path and config needing migration
+  test("creates backup file with timestamp when legacy migration needed", () => {
+    // #given: Config file path with legacy agent names needing migration
     const testConfigPath = "/tmp/test-config-migration.json"
-    const testConfigContent = globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2)
+    const testConfigContent = globalThis.JSON.stringify({ agents: { omo: { model: "test" } } }, null, 2)
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: { model: "openai/gpt-5.2" },
+        omo: { model: "test" },
       },
     }
 
@@ -492,70 +492,54 @@ describe("migrateConfigFile with backup", () => {
     expect(backupContent).toBe(testConfigContent)
   })
 
-  test("deletes agent config when all fields match category defaults", () => {
-    // #given: Config with agent matching category defaults
-    const testConfigPath = "/tmp/test-config-delete.json"
+  test("preserves model setting without auto-conversion to category", () => {
+    // #given: Config with model setting (should NOT be converted to category)
+    const testConfigPath = "/tmp/test-config-preserve-model.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: {
-          model: "openai/gpt-5.2",
-          temperature: 0.1,
-        },
+        "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
+        oracle: { model: "openai/gpt-5.2" },
+        "my-custom-agent": { model: "google/gemini-3-pro-preview" },
       },
     }
 
-    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2))
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
     cleanupPaths.push(testConfigPath)
 
     // #when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // #then: Agent should be deleted (matches strategic category defaults)
-    expect(needsWrite).toBe(true)
+    // #then: No migration needed - model settings should be preserved as-is
+    expect(needsWrite).toBe(false)
 
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    expect(migratedConfig.agents).toEqual({})
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
+    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+    expect(agents["multimodal-looker"].model).toBe("anthropic/claude-haiku-4-5")
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    expect(agents["my-custom-agent"].model).toBe("google/gemini-3-pro-preview")
   })
 
-  test("keeps agent config with category when fields differ from defaults", () => {
-    // #given: Config with agent having custom temperature override
-    const testConfigPath = "/tmp/test-config-keep.json"
+  test("preserves category setting when explicitly set", () => {
+    // #given: Config with explicit category setting
+    const testConfigPath = "/tmp/test-config-preserve-category.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: {
-          model: "openai/gpt-5.2",
-          temperature: 0.5,
-        },
+        "multimodal-looker": { category: "quick" },
+        oracle: { category: "ultrabrain" },
       },
     }
 
-    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2))
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
     cleanupPaths.push(testConfigPath)
 
     // #when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // #then: Agent should be kept with category and custom override
-    expect(needsWrite).toBe(true)
+    // #then: No migration needed - category settings should be preserved as-is
+    expect(needsWrite).toBe(false)
 
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    const agents = migratedConfig.agents as Record<string, unknown>
-    expect(agents.oracle).toBeDefined()
-    expect((agents.oracle as Record<string, unknown>).category).toBe("ultrabrain")
-    expect((agents.oracle as Record<string, unknown>).temperature).toBe(0.5)
-    expect((agents.oracle as Record<string, unknown>).model).toBeUndefined()
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
+    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+    expect(agents["multimodal-looker"].category).toBe("quick")
+    expect(agents.oracle.category).toBe("ultrabrain")
   })
 
   test("does not write when no migration needed", () => {
@@ -583,56 +567,5 @@ describe("migrateConfigFile with backup", () => {
     expect(backupFiles.length).toBe(0)
   })
 
-  test("handles multiple agent migrations correctly", () => {
-    // #given: Config with multiple agents needing migration
-    const testConfigPath = "/tmp/test-config-multi-agent.json"
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "openai/gpt-5.2" },
-        librarian: { model: "anthropic/claude-sonnet-4-5" },
-        frontend: {
-          model: "google/gemini-3-pro-preview",
-          temperature: 0.9,
-        },
-      },
-    }
 
-    fs.writeFileSync(
-      testConfigPath,
-      globalThis.JSON.stringify(
-        {
-          agents: {
-            oracle: { model: "openai/gpt-5.2" },
-            librarian: { model: "anthropic/claude-sonnet-4-5" },
-            frontend: { model: "google/gemini-3-pro-preview" },
-          },
-        },
-        null,
-        2,
-      ),
-    )
-    cleanupPaths.push(testConfigPath)
-
-    // #when: Migrate config file
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
-
-    // #then: Should migrate correctly
-    expect(needsWrite).toBe(true)
-
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    const agents = migratedConfig.agents as Record<string, unknown>
-
-    expect(agents.oracle).toBeUndefined()
-    expect(agents.librarian).toBeUndefined()
-
-    expect(agents.frontend).toBeDefined()
-    expect((agents.frontend as Record<string, unknown>).category).toBe("visual-engineering")
-    expect((agents.frontend as Record<string, unknown>).temperature).toBe(0.9)
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
-  })
 })

@@ -354,11 +354,10 @@ Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/
 
 ##### oh-my-opencode Agent Model Override
 
-The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`) and disable the built-in `google_auth`:
+The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`):
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -382,37 +381,46 @@ opencode auth login
 
 **Multi-Account Load Balancing**: The plugin supports up to 10 Google accounts. When one account hits rate limits, it automatically switches to the next available account.
 
-#### OpenAI (ChatGPT Plus/Pro)
+#### GitHub Copilot (Fallback Provider)
 
-First, add the opencode-openai-codex-auth plugin:
+GitHub Copilot is supported as a **fallback provider** when native providers (Claude, ChatGPT, Gemini) are unavailable. The installer configures Copilot with lower priority than native providers.
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode",
-    "opencode-openai-codex-auth@4.3.0"
-  ]
-}
+**Priority**: Native providers (Claude/ChatGPT/Gemini) > GitHub Copilot > Free models
+
+##### Model Mappings
+
+When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
+
+| Agent | Model |
+|-------|-------|
+| **Sisyphus** | `github-copilot/claude-opus-4.5` |
+| **Oracle** | `github-copilot/gpt-5.2` |
+| **Explore** | `grok code` (default) |
+| **Librarian** | `glm 4.7 free` (default) |
+
+GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
+
+##### Setup
+
+Run the installer and select "Yes" for GitHub Copilot:
+
+```bash
+bunx oh-my-opencode install
+# Select your subscriptions (Claude, ChatGPT, Gemini)
+# When prompted: "Do you have a GitHub Copilot subscription?" → Select "Yes"
 ```
 
-##### Model Configuration
+Or use non-interactive mode:
 
-You'll also need full model settings in `opencode.json`.
-Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json) (for OpenCode v1.0.210+) or [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json) (for older versions), and merge carefully to avoid breaking the user's existing setup.
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+```
 
-**Available models**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
-
-**Variants** (OpenCode v1.0.210+): Use `--variant=<none|low|medium|high|xhigh>` for reasoning effort control.
-
-Then authenticate:
+Then authenticate with GitHub:
 
 ```bash
 opencode auth login
-# Interactive Terminal: Provider: Select OpenAI
-# Interactive Terminal: Login method: Select ChatGPT Plus/Pro (Codex Subscription)
-# Interactive Terminal: Guide user through OAuth flow in browser
-# Wait for completion
-# Verify success and confirm with user
+# Select: GitHub → Authenticate via OAuth
 ```
 
 
@@ -420,7 +428,7 @@ opencode auth login
 
 **Unless the user explicitly requests it, do not change model settings or disable features (agents, hooks, MCPs).**
 
-The plugin works perfectly by default. Except for the recommended `google_auth: true` setting, do not change other settings or turn off features without an explicit request.
+The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
 ### Verify the setup
 
@@ -804,9 +812,6 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
 
-  // Enable Google Gemini via Antigravity OAuth
-  "google_auth": false,
-
   /* Agent overrides - customize models for specific tasks */
   "agents": {
     "oracle": {
@@ -821,28 +826,7 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 
 ### Google Auth
 
-**Recommended**: Use the external [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
-
-When using `opencode-antigravity-auth`, disable the built-in auth and override agent models in `oh-my-opencode.json`:
-
-```json
-{
-  "google_auth": false,
-  "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
-    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
-  }
-}
-```
-
-**Alternative**: Enable built-in Antigravity OAuth (single account, Gemini models only):
-
-```json
-{
-  "google_auth": true
-}
-```
+**Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
 
 ### Agents
 

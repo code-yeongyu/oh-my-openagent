@@ -253,7 +253,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan
-        ? { mode: "subagent" as const, hidden: true }
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
@@ -283,19 +283,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     config.tools = {
       ...(config.tools as Record<string, unknown>),
       "grep_app_*": false,
-      call_omo_agent: false,
     };
 
-    if (agentResult.explore) {
-      agentResult.explore.tools = {
-        ...agentResult.explore.tools,
-        call_omo_agent: false,
-      };
-    }
     if (agentResult.librarian) {
       agentResult.librarian.tools = {
         ...agentResult.librarian.tools,
-        call_omo_agent: false,
         "grep_app_*": true,
       };
     }
@@ -303,7 +295,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult["multimodal-looker"].tools = {
         ...agentResult["multimodal-looker"].tools,
         task: false,
-        call_omo_agent: false,
         look_at: false,
       };
     }
@@ -311,6 +302,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult["orchestrator-sisyphus"].tools = {
         ...agentResult["orchestrator-sisyphus"].tools,
         task: false,
+        call_omo_agent: false,
+      };
+    }
+    if (agentResult["Prometheus (Planner)"]) {
+      (agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools = {
+        ...(agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools,
         call_omo_agent: false,
       };
     }

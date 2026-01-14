@@ -1441,7 +1441,6 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     "task",
     "call_omo_agent",
   ])
-
   return {
     description:
       "Orchestrates work via sisyphus_task() to complete ALL tasks in a todo list until fully done",

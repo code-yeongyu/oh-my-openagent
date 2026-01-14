@@ -267,14 +267,12 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   }
 
-  if (installConfig.hasGemini) {
-    config.google_auth = false
-  }
-
   const agents: Record<string, Record<string, unknown>> = {}
 
   if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = { model: "opencode/glm-4.7-free" }
+    agents["Sisyphus"] = {
+      model: installConfig.hasCopilot ? "github-copilot/claude-opus-4.5" : "opencode/glm-4.7-free",
+    }
   }
 
   agents["librarian"] = { model: "opencode/glm-4.7-free" }
@@ -290,9 +288,12 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
   }
 
   if (!installConfig.hasChatGPT) {
-    agents["oracle"] = {
-      model: installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free",
-    }
+    const oracleFallback = installConfig.hasCopilot
+      ? "github-copilot/gpt-5.2"
+      : installConfig.hasClaude
+        ? "anthropic/claude-opus-4-5"
+        : "opencode/glm-4.7-free"
+    agents["oracle"] = { model: oracleFallback }
   }
 
   if (installConfig.hasGemini) {
@@ -350,7 +351,6 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
           return { success: true, configPath: omoConfigPath }
         }
 
-        delete existing.agents
         const merged = deepMerge(existing, newConfig)
         writeFileSync(omoConfigPath, JSON.stringify(merged, null, 2) + "\n")
       } catch (parseErr) {
@@ -643,7 +643,6 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 }
 
 interface OmoConfigData {
-  google_auth?: boolean
   agents?: Record<string, { model?: string }>
 }
 
@@ -654,6 +653,7 @@ export function detectCurrentConfig(): DetectedConfig {
     isMax20: true,
     hasChatGPT: true,
     hasGemini: false,
+    hasCopilot: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -714,9 +714,11 @@ export function detectCurrentConfig(): DetectedConfig {
       result.hasChatGPT = false
     }
 
-    if (omoConfig.google_auth === false) {
-      result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
-    }
+    const hasAnyCopilotModel = Object.values(agents).some(
+      (agent) => agent?.model?.startsWith("github-copilot/")
+    )
+    result.hasCopilot = hasAnyCopilotModel
+
   } catch {
     /* intentionally empty - malformed omo config returns defaults from opencode config detection */
   }
