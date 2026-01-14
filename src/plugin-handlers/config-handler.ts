@@ -154,7 +154,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       };
 
       agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
-        pluginConfig.agents?.["Sisyphus-Junior"]
+        pluginConfig.agents?.["Sisyphus-Junior"],
+        config.model as string | undefined
       );
 
       if (builderEnabled) {
@@ -253,7 +254,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan
-        ? { mode: "subagent" as const, hidden: true }
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
@@ -302,6 +303,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult["orchestrator-sisyphus"].tools = {
         ...agentResult["orchestrator-sisyphus"].tools,
         task: false,
+        call_omo_agent: false,
+      };
+    }
+    if (agentResult["Prometheus (Planner)"]) {
+      (agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools = {
+        ...(agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools,
         call_omo_agent: false,
       };
     }

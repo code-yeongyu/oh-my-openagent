@@ -6,7 +6,7 @@
 > [!TIP]
 >
 > [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.1` to install it.**
+> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.6` to install it.**
 >
 > Be with us!
 >
@@ -28,8 +28,29 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+# Claude OAuth Access Notice
 
-**Notice: Do not use expensive models for librarian. This is not only unhelpful to you, but also burdens LLM providers. Use models like Claude Haiku, Gemini Flash, GLM 4.7, or MiniMax instead.**
+## TL;DR
+
+> Q. Can I use oh-my-opencode?
+
+Yes.
+
+> Q. Can I use it with my Claude Code subscription?
+
+Yes, technically possible. But I cannot recommend using it.
+
+## FULL
+
+> As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
+> 
+> [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
+>
+> Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
+>
+> These tools may work regardless of technical detectability, but users should be aware of ToS implications, and I personally cannot recommend to use those.
+>
+> This project is not responsible for any issues arising from the use of unofficial tools, and **we do not have any custom implementations of those oauth systems.**
 
 
 <div align="center">
@@ -76,6 +97,9 @@
 
 ## Contents
 
+- [Claude OAuth Access Notice](#claude-oauth-access-notice)
+  - [Reviews](#reviews)
+  - [Contents](#contents)
 - [Oh My OpenCode](#oh-my-opencode)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
@@ -94,8 +118,9 @@
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [Model Configuration](#model-configuration)
         - [oh-my-opencode Agent Model Override](#oh-my-opencode-agent-model-override)
-      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
-        - [Model Configuration](#model-configuration-1)
+      - [GitHub Copilot (Fallback Provider)](#github-copilot-fallback-provider)
+        - [Model Mappings](#model-mappings)
+        - [Setup](#setup)
     - [⚠️ Warning](#️-warning)
     - [Verify the setup](#verify-the-setup)
     - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
@@ -232,6 +257,11 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 
 ### For Humans
+
+> **⚠️ Prerequisite: Bun is required**
+>
+> This tool **requires [Bun](https://bun.sh/) to be installed** on your system.
+> Even if you use `npx` to run the installer, the underlying runtime depends on Bun.
 
 Run the interactive installer:
 
@@ -391,12 +421,12 @@ GitHub Copilot is supported as a **fallback provider** when native providers (Cl
 
 When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
 
-| Agent | Model |
-|-------|-------|
-| **Sisyphus** | `github-copilot/claude-opus-4.5` |
-| **Oracle** | `github-copilot/gpt-5.2` |
-| **Explore** | `grok code` (default) |
-| **Librarian** | `glm 4.7 free` (default) |
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `github-copilot/claude-opus-4.5` |
+| **Oracle**    | `github-copilot/gpt-5.2`         |
+| **Explore**   | `grok code` (default)            |
+| **Librarian** | `glm 4.7 free` (default)         |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
 
@@ -550,17 +580,13 @@ Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now a
 The features in your editor? Other agents can't touch them.
 Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
 
-- **lsp_hover**: Type info, docs, signatures at position
 - **lsp_goto_definition**: Jump to symbol definition
 - **lsp_find_references**: Find all usages across workspace
-- **lsp_document_symbols**: Get file symbol outline
-- **lsp_workspace_symbols**: Search symbols by name across project
+- **lsp_symbols**: Get symbols from file (scope='document') or search across workspace (scope='workspace')
 - **lsp_diagnostics**: Get errors/warnings before build
 - **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
 - **lsp_rename**: Rename symbol across workspace
-- **lsp_code_actions**: Get available quick fixes/refactorings
-- **lsp_code_action_resolve**: Apply code action
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 - **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.

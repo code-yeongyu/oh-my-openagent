@@ -28,8 +28,29 @@
 
 > 这是开挂级别的编程——`oh-my-opencode` 实战效果。运行后台智能体，调用专业智能体如 oracle、librarian 和前端工程师。使用精心设计的 LSP/AST 工具、精选的 MCP，以及完整的 Claude Code 兼容层。
 
+# Claude OAuth 访问通知
 
-**注意：请勿为 librarian 使用昂贵的模型。这不仅对你没有帮助，还会增加 LLM 服务商的负担。请使用 Claude Haiku、Gemini Flash、GLM 4.7 或 MiniMax 等模型。**
+## TL;DR
+
+> Q. 我可以使用 oh-my-opencode 吗？
+
+可以。
+
+> Q. 我可以用 Claude Code 订阅来使用它吗？
+
+是的，技术上可以。但我不建议使用。
+
+## 详细说明
+
+> 自2026年1月起，Anthropic 以违反服务条款为由限制了第三方 OAuth 访问。
+>
+> [**Anthropic 将本项目 oh-my-opencode 作为封锁 opencode 的理由。**](https://x.com/thdxr/status/2010149530486911014)
+>
+> 事实上，社区中确实存在一些伪造 Claude Code OAuth 请求签名的插件。
+>
+> 无论技术上是否可检测，这些工具可能都能正常工作，但用户应注意服务条款的相关影响，我个人不建议使用这些工具。
+>
+> 本项目对使用非官方工具产生的任何问题概不负责，**我们没有任何这些 OAuth 系统的自定义实现。**
 
 
 <div align="center">
@@ -93,8 +114,7 @@
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [模型配置](#模型配置)
         - [oh-my-opencode 智能体模型覆盖](#oh-my-opencode-智能体模型覆盖)
-      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
-        - [模型配置](#模型配置-1)
+
     - [⚠️ 警告](#️-警告)
     - [验证安装](#验证安装)
     - [向用户说 '恭喜！🎉'](#向用户说-恭喜)
@@ -231,6 +251,11 @@
 
 
 ### 面向人类用户
+
+> **⚠️ 先决条件：需要安装 Bun**
+>
+> 此工具**需要系统中已安装 [Bun](https://bun.sh/)** 才能运行。
+> 即使使用 `npx` 运行安装程序，底层运行时仍依赖于 Bun。
 
 运行交互式安装程序：
 
@@ -549,17 +574,13 @@ gh repo star code-yeongyu/oh-my-opencode
 你编辑器中的功能？其他智能体无法触及。
 把你最好的工具交给你最好的同事。现在它们可以正确地重构、导航和分析。
 
-- **lsp_hover**：位置处的类型信息、文档、签名
 - **lsp_goto_definition**：跳转到符号定义
 - **lsp_find_references**：查找工作区中的所有使用
-- **lsp_document_symbols**：获取文件符号概览
-- **lsp_workspace_symbols**：按名称在项目中搜索符号
+- **lsp_symbols**：从文件获取符号 (scope='document') 或在工作区中搜索 (scope='workspace')
 - **lsp_diagnostics**：在构建前获取错误/警告
 - **lsp_servers**：列出可用的 LSP 服务器
 - **lsp_prepare_rename**：验证重命名操作
 - **lsp_rename**：在工作区中重命名符号
-- **lsp_code_actions**：获取可用的快速修复/重构
-- **lsp_code_action_resolve**：应用代码操作
 - **ast_grep_search**：AST 感知的代码模式搜索（25 种语言）
 - **ast_grep_replace**：AST 感知的代码替换
 - **call_omo_agent**：生成专业的 explore/librarian 智能体。支持 `run_in_background` 参数进行异步执行。

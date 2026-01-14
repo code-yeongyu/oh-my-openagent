@@ -84,6 +84,7 @@ export const HookNameSchema = z.enum([
   "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
+  "sisyphus-task-retry",
   "prometheus-md-only",
   "start-work",
   "sisyphus-orchestrator",
@@ -201,7 +202,7 @@ export const DynamicContextPruningConfigSchema = z.object({
   /** Tools that should never be pruned */
   protected_tools: z.array(z.string()).default([
     "task", "todowrite", "todoread",
-    "lsp_rename", "lsp_code_action_resolve",
+    "lsp_rename",
     "session_read", "session_write", "session_search",
   ]),
   /** Pruning strategies configuration */

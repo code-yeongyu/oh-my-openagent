@@ -9,6 +9,7 @@ import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAG
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
+import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { isModelError, type ModelSpec, type RetryConfig, buildModelChain } from "../../features/model-fallback"
@@ -68,8 +69,13 @@ interface ResolvedCategoryConfig {
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: CategoriesConfig
-): ResolvedCategoryConfig | null {
+  options: {
+    userCategories?: CategoriesConfig
+    parentModelString?: string
+    systemDefaultModel?: string
+  }
+): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
+  const { userCategories, parentModelString, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -78,10 +84,13 @@ function resolveCategoryConfig(
     return null
   }
 
+  // Model priority: user override > parent model (inherit) > category default > system default
+  // Parent model takes precedence over category default so custom providers work out-of-box
+  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model,
   }
 
   const fallbackList = userConfig?.fallback ?? defaultConfig?.fallback
@@ -104,7 +113,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, modelChain, retryConfig }
+  return { config, promptAppend, model }
 }
 
 export interface SisyphusTaskToolOptions {
@@ -239,9 +248,18 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
+          const resumeMessageDir = getMessageDir(args.resume)
+          const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+          const resumeAgent = resumeMessage?.agent
+          const resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
+            ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+            : undefined
+
           await client.session.prompt({
             path: { id: args.resume },
             body: {
+              ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+              ...(resumeModel !== undefined ? { model: resumeModel } : {}),
               tools: {
                 task: false,
                 sisyphus_task: false,
@@ -337,20 +355,68 @@ ${textContent || "(No text output)"}`
         return `❌ Invalid arguments: Must provide either category or subagent_type.`
       }
 
+      // Fetch OpenCode config at boundary to get system default model
+      let systemDefaultModel: string | undefined
+      try {
+        const openCodeConfig = await client.config.get()
+        systemDefaultModel = (openCodeConfig as { model?: string })?.model
+      } catch {
+        // Config fetch failed, proceed without system default
+        systemDefaultModel = undefined
+      }
+
       let agentToUse: string
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
       let modelChain: ModelSpec[] = []
       let retryConfig: RetryConfig = { delayMs: 1000, maxAttempts: 1 }
 
+      const parentModelString = parentModel
+        ? `${parentModel.providerID}/${parentModel.modelID}`
+        : undefined
+
+      let modelInfo: ModelFallbackInfo | undefined
+
       if (args.category) {
-        const resolved = resolveCategoryConfig(args.category, userCategories)
+        const resolved = resolveCategoryConfig(args.category, {
+          userCategories,
+          parentModelString,
+          systemDefaultModel,
+        })
         if (!resolved) {
           return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
+        // Determine model source by comparing against the actual resolved model
+        const actualModel = resolved.model
+        const userDefinedModel = userCategories?.[args.category]?.model
+        const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
+
+        if (!actualModel) {
+          return `❌ No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
+        }
+
+        if (!parseModelString(actualModel)) {
+          return `❌ Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+        }
+
+        switch (actualModel) {
+          case userDefinedModel:
+            modelInfo = { model: actualModel, type: "user-defined" }
+            break
+          case parentModelString:
+            modelInfo = { model: actualModel, type: "inherited" }
+            break
+          case categoryDefaultModel:
+            modelInfo = { model: actualModel, type: "category-default" }
+            break
+          case systemDefaultModel:
+            modelInfo = { model: actualModel, type: "system-default" }
+            break
+        }
+
         agentToUse = SISYPHUS_JUNIOR_AGENT
-        const parsedModel = parseModelString(resolved.config.model)
+        const parsedModel = parseModelString(actualModel)
         categoryModel = parsedModel
           ? (resolved.config.variant
             ? { ...parsedModel, variant: resolved.config.variant }
@@ -360,10 +426,11 @@ ${textContent || "(No text output)"}`
         modelChain = resolved.modelChain
         retryConfig = resolved.retryConfig
       } else {
-        agentToUse = args.subagent_type!.trim()
-        if (!agentToUse) {
+        if (!args.subagent_type?.trim()) {
           return `❌ Agent name cannot be empty.`
         }
+        const agentName = args.subagent_type.trim()
+        agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
         try {
@@ -465,6 +532,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             agent: agentToUse,
             isBackground: false,
             skills: args.skills,
+            modelInfo,
           })
         }
 

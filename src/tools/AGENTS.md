@@ -30,7 +30,7 @@ tools/
 ## TOOL CATEGORIES
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| LSP | lsp_hover, lsp_goto_definition, lsp_find_references, lsp_diagnostics, lsp_rename, etc. | IDE-grade code intelligence (11 tools) |
+| LSP | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_rename, etc. | IDE-grade code intelligence (7 tools) |
 | AST | ast_grep_search, ast_grep_replace | Structural pattern matching/rewriting |
 | Search | grep, glob | Timeout-safe file and content search |
 | Session | session_list, session_read, session_search, session_info | History navigation and retrieval |
