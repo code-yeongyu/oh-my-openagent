@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { log } from "../../shared/logger"
 import { readState, writeState, clearState, incrementIteration } from "./storage"
 import {
@@ -9,6 +10,18 @@ import {
 } from "./constants"
 import type { RalphLoopState, RalphLoopOptions } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+  return null
+}
 
 export * from "./types"
 export * from "./constants"
@@ -302,9 +315,18 @@ export function createRalphLoopHook(
         .catch(() => {})
 
       try {
+        const messageDir = getMessageDir(sessionID)
+        const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        const agent = currentMessage?.agent
+        const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+          ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+          : undefined
+
         await ctx.client.session.prompt({
           path: { id: sessionID },
           body: {
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
             parts: [{ type: "text", text: continuationPrompt }],
           },
           query: { directory: ctx.directory },

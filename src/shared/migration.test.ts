@@ -55,6 +55,7 @@ describe("migrateAgentNames", () => {
     const agents = {
       SISYPHUS: { model: "test" },
       "planner-sisyphus": { prompt: "test" },
+      "Orchestrator-Sisyphus": { model: "openai/gpt-5.2" },
     }
 
     // #when: Migrate agent names
@@ -63,6 +64,7 @@ describe("migrateAgentNames", () => {
     // #then: Case-insensitive lookup should migrate correctly
     expect(migrated["Sisyphus"]).toEqual({ model: "test" })
     expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
+    expect(migrated["orchestrator-sisyphus"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {

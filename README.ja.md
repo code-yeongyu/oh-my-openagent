@@ -28,7 +28,29 @@
 
 > `oh-my-opencode` をインストールして、ドーピングしたかのようにコーディングしましょう。バックグラウンドでエージェントを走らせ、oracle、librarian、frontend engineer のような専門エージェントを呼び出してください。丹精込めて作られた LSP/AST ツール、厳選された MCP、そして完全な Claude Code 互換レイヤーを、たった一行で手に入れましょう。
 
-**注意: librarianには高価なモデルを使用しないでください。これはあなたにとって役に立たないだけでなく、LLMプロバイダーにも負担をかけます。代わりにClaude Haiku、Gemini Flash、GLM 4.7、MiniMaxなどのモデルを使用してください。**
+# Claude OAuth アクセスに関するお知らせ
+
+## TL;DR
+
+> Q. oh-my-opencodeを使用できますか？
+
+はい。
+
+> Q. Claude Codeのサブスクリプションで使用できますか？
+
+はい、技術的には可能です。ただし、使用を推奨することはできません。
+
+## 詳細
+
+> 2026年1月より、AnthropicはToS違反を理由にサードパーティのOAuthアクセスを制限しました。
+>
+> [**Anthropicはこのプロジェクト oh-my-opencode を、opencodeをブロックする正当化の根拠として挙げています。**](https://x.com/thdxr/status/2010149530486911014)
+>
+> 実際、Claude CodeのOAuthリクエストシグネチャを偽装するプラグインがコミュニティに存在します。
+>
+> これらのツールは技術的な検出可能性に関わらず動作する可能性がありますが、ユーザーはToSへの影響を認識すべきであり、私個人としてはそれらの使用を推奨できません。
+>
+> このプロジェクトは非公式ツールの使用に起因するいかなる問題についても責任を負いません。また、**私たちはそれらのOAuthシステムのカスタム実装を一切持っていません。**
 
 <div align="center">
 
@@ -91,8 +113,7 @@
       - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
       - [4.2.1 モデル設定](#421-モデル設定)
       - [4.2.2 oh-my-opencode エージェントモデルのオーバーライド](#422-oh-my-opencode-エージェントモデルのオーバーライド)
-      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
-        - [モデル設定](#モデル設定)
+
     - [⚠️ 注意](#️-注意)
     - [セットアップの確認](#セットアップの確認)
     - [ユーザーに「おめでとうございます！🎉」と伝える](#ユーザーにおめでとうございますと伝える)
@@ -527,17 +548,13 @@ Ask @explore for the policy on this feature
 あなたがエディタで使っているその機能、他のエージェントは触ることができません。
 最高の同僚に最高の道具を渡してください。これでリファクタリングも、ナビゲーションも、分析も、エージェントが適切に行えるようになります。
 
-- **lsp_hover**: その位置の型情報、ドキュメント、シグネチャを取得
 - **lsp_goto_definition**: シンボル定義へジャンプ
 - **lsp_find_references**: ワークスペース全体で使用箇所を検索
-- **lsp_document_symbols**: ファイルのシンボルアウトラインを取得
-- **lsp_workspace_symbols**: プロジェクト全体から名前でシンボルを検索
+- **lsp_symbols**: ファイルからシンボルを取得 (scope='document') またはワークスペース全体を検索 (scope='workspace')
 - **lsp_diagnostics**: ビルド前にエラー/警告を取得
 - **lsp_servers**: 利用可能な LSP サーバー一覧
 - **lsp_prepare_rename**: 名前変更操作の検証
 - **lsp_rename**: ワークスペース全体でシンボル名を変更
-- **lsp_code_actions**: 利用可能なクイックフィックス/リファクタリングを取得
-- **lsp_code_action_resolve**: コードアクションを適用
 - **ast_grep_search**: AST 認識コードパターン検索 (25言語対応)
 - **ast_grep_replace**: AST 認識コード置換
 
