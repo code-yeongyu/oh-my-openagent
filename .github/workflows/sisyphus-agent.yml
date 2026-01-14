@@ -430,6 +430,10 @@ jobs:
           2. **CREATE TODOS IMMEDIATELY**: Right after reading, create your todo list using todo tools.
              - First todo: "Summarize issue/PR context and requirements"
              - Break down ALL work into atomic, verifiable steps
+             - **GIT WORKFLOW (MANDATORY for implementation tasks)**: ALWAYS include these final todos:
+               - "Create new branch from origin/BRANCH_PLACEHOLDER (NEVER push directly to BRANCH_PLACEHOLDER)"
+               - "Commit changes"
+               - "Create PR to BRANCH_PLACEHOLDER branch"
              - Plan everything BEFORE starting any work
 
           ---
