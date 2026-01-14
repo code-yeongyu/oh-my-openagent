@@ -102,6 +102,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -227,6 +243,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -354,6 +386,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -479,6 +527,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -606,6 +670,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -731,6 +811,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -858,6 +954,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -983,6 +1095,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -1110,6 +1238,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -1235,6 +1379,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -1362,6 +1522,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -1487,6 +1663,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -1614,6 +1806,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -1740,6 +1948,22 @@
             "model": {
               "type": "string"
             },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
             "variant": {
               "type": "string"
             },
@@ -1865,6 +2089,22 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fallbackDelayMs": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000
+            },
+            "fallbackRetryCount": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
             },
             "variant": {
               "type": "string"
@@ -1998,6 +2238,22 @@
         "properties": {
           "model": {
             "type": "string"
+          },
+          "fallback": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fallbackDelayMs": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 30000
+          },
+          "fallbackRetryCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
           },
           "variant": {
             "type": "string"
