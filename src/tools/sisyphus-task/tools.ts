@@ -61,9 +61,13 @@ type ToolContextWithMetadata = {
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: CategoriesConfig,
-  parentModelString?: string
-): { config: CategoryConfig; promptAppend: string } | null {
+  options: {
+    userCategories?: CategoriesConfig
+    parentModelString?: string
+    systemDefaultModel?: string
+  }
+): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
+  const { userCategories, parentModelString, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -72,12 +76,13 @@ function resolveCategoryConfig(
     return null
   }
 
-  // Model priority: user override > parent model (inherit) > category default > hardcoded fallback
+  // Model priority: user override > parent model (inherit) > category default > system default
   // Parent model takes precedence over category default so custom providers work out-of-box
+  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model,
   }
 
   let promptAppend = defaultPromptAppend
@@ -87,7 +92,7 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend }
+  return { config, promptAppend, model }
 }
 
 export interface SisyphusTaskToolOptions {
@@ -329,6 +334,16 @@ ${textContent || "(No text output)"}`
         return `❌ Invalid arguments: Must provide either category or subagent_type.`
       }
 
+      // Fetch OpenCode config at boundary to get system default model
+      let systemDefaultModel: string | undefined
+      try {
+        const openCodeConfig = await client.config.get()
+        systemDefaultModel = (openCodeConfig as { model?: string })?.model
+      } catch {
+        // Config fetch failed, proceed without system default
+        systemDefaultModel = undefined
+      }
+
       let agentToUse: string
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
@@ -340,26 +355,45 @@ ${textContent || "(No text output)"}`
       let modelInfo: ModelFallbackInfo | undefined
 
       if (args.category) {
-        const resolved = resolveCategoryConfig(args.category, userCategories, parentModelString)
+        const resolved = resolveCategoryConfig(args.category, {
+          userCategories,
+          parentModelString,
+          systemDefaultModel,
+        })
         if (!resolved) {
           return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
         // Determine model source by comparing against the actual resolved model
-        const actualModel = resolved.config.model
+        const actualModel = resolved.model
         const userDefinedModel = userCategories?.[args.category]?.model
-        const defaultModel = DEFAULT_CATEGORIES[args.category]?.model
+        const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
 
-        if (actualModel === userDefinedModel) {
-          modelInfo = { model: actualModel, type: "user-defined" }
-        } else if (actualModel === parentModelString) {
-          modelInfo = { model: actualModel, type: "inherited" }
-        } else if (actualModel === defaultModel) {
-          modelInfo = { model: actualModel, type: "default" }
+        if (!actualModel) {
+          return `❌ No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
+        }
+
+        if (!parseModelString(actualModel)) {
+          return `❌ Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+        }
+
+        switch (actualModel) {
+          case userDefinedModel:
+            modelInfo = { model: actualModel, type: "user-defined" }
+            break
+          case parentModelString:
+            modelInfo = { model: actualModel, type: "inherited" }
+            break
+          case categoryDefaultModel:
+            modelInfo = { model: actualModel, type: "category-default" }
+            break
+          case systemDefaultModel:
+            modelInfo = { model: actualModel, type: "system-default" }
+            break
         }
 
         agentToUse = SISYPHUS_JUNIOR_AGENT
-        const parsedModel = parseModelString(resolved.config.model)
+        const parsedModel = parseModelString(actualModel)
         categoryModel = parsedModel
           ? (resolved.config.variant
             ? { ...parsedModel, variant: resolved.config.variant }
@@ -367,10 +401,11 @@ ${textContent || "(No text output)"}`
           : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
       } else {
-        agentToUse = args.subagent_type!.trim()
-        if (!agentToUse) {
+        if (!args.subagent_type?.trim()) {
           return `❌ Agent name cannot be empty.`
         }
+        const agentName = args.subagent_type.trim()
+        agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
         try {

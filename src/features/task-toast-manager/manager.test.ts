@@ -144,14 +144,35 @@ describe("TaskToastManager", () => {
   })
 
   describe("model fallback info in toast message", () => {
-    test("should display warning when model falls back to default", () => {
-      // #given - a task with model fallback to default
+    test("should display warning when model falls back to category-default", () => {
+      // #given - a task with model fallback to category-default
       const task = {
         id: "task_1",
-        description: "Task with default model",
+        description: "Task with category default model",
         agent: "Sisyphus-Junior",
         isBackground: false,
-        modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "default" as const },
+        modelInfo: { model: "google/gemini-3-pro-preview", type: "category-default" as const },
+      }
+
+      // #when - addTask is called
+      toastManager.addTask(task)
+
+      // #then - toast should show warning with model info
+      expect(mockClient.tui.showToast).toHaveBeenCalled()
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("⚠️")
+      expect(call.body.message).toContain("google/gemini-3-pro-preview")
+      expect(call.body.message).toContain("(category default)")
+    })
+
+    test("should display warning when model falls back to system-default", () => {
+      // #given - a task with model fallback to system-default
+      const task = {
+        id: "task_1b",
+        description: "Task with system default model",
+        agent: "Sisyphus-Junior",
+        isBackground: false,
+        modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
       }
 
       // #when - addTask is called
@@ -162,7 +183,7 @@ describe("TaskToastManager", () => {
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("⚠️")
       expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
-      expect(call.body.message).toContain("(default)")
+      expect(call.body.message).toContain("(system default)")
     })
 
     test("should display warning when model is inherited from parent", () => {
@@ -204,7 +225,8 @@ describe("TaskToastManager", () => {
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("⚠️ Model:")
       expect(call.body.message).not.toContain("(inherited)")
-      expect(call.body.message).not.toContain("(default)")
+      expect(call.body.message).not.toContain("(category default)")
+      expect(call.body.message).not.toContain("(system default)")
     })
 
     test("should not display model info when not provided", () => {

@@ -2,7 +2,7 @@ export type TaskStatus = "running" | "queued" | "completed" | "error"
 
 export interface ModelFallbackInfo {
   model: string
-  type: "user-defined" | "inherited" | "default"
+  type: "user-defined" | "inherited" | "category-default" | "system-default"
 }
 
 export interface TrackedTask {
