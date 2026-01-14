@@ -107,7 +107,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       scope: "plugin" as const,
     }));
     const pluginSkillsMap = new Map(pluginSkills.map((s) => [s.name, s]));
-    config.pluginSkillsMap = pluginSkillsMap;
 
     const builtinAgents = createBuiltinAgents(
       pluginConfig.disabled_agents,
