@@ -542,7 +542,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         })
 
         const modelsToTry = modelChain.length > 0 ? modelChain : (categoryModel ? [categoryModel] : [])
-        const maxAttempts = retryConfig.maxAttempts ?? modelsToTry.length
+        const maxAttempts = Math.max(1, retryConfig.maxAttempts ?? modelsToTry.length)
         const delayMs = retryConfig.delayMs ?? 1000
         let promptSuccess = false
         let usedModel: ModelSpec | undefined = categoryModel
@@ -581,10 +581,11 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
             failedModels.push({ model: modelStr, error: errorMessage })
             
-            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+            if (errorMessage.includes("agent.name")) {
               if (toastManager && taskId !== undefined) {
                 toastManager.removeTask(taskId)
               }
+              subagentSessions.delete(sessionID)
               return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
             }
             
@@ -593,6 +594,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               if (toastManager && taskId !== undefined) {
                 toastManager.removeTask(taskId)
               }
+              subagentSessions.delete(sessionID)
               const allErrors = failedModels.map((f, i) => `  ${i + 1}. ${f.model}: ${f.error}`).join("\n")
               return `❌ Failed to send prompt (tried ${failedModels.length} model${failedModels.length > 1 ? "s" : ""}):\n${allErrors}\n\nSession ID: ${sessionID}`
             }
@@ -606,6 +608,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }
+          subagentSessions.delete(sessionID)
           return `❌ All models failed.\n\nSession ID: ${sessionID}`
         }
 
