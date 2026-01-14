@@ -1,5 +1,6 @@
 
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createOpencodeClient } from "@opencode-ai/sdk"
 import type {
   BackgroundTask,
   LaunchInput,
@@ -19,6 +20,31 @@ const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
 
 type OpencodeClient = PluginInput["client"]
+
+/**
+ * Creates a fetch wrapper that adds HTTP Basic Auth headers.
+ * Password is read lazily at first use (after OpenCode sets it post-plugin-init).
+ */
+function createAuthenticatedFetch(): (input: string | URL | Request, init?: RequestInit) => Promise<Response> {
+  const username = process.env.OPENCODE_SERVER_USERNAME ?? "opencode"
+  
+  return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    // Read password lazily - OpenCode sets it after plugin initialization
+    const password = process.env.OPENCODE_SERVER_PASSWORD ?? ""
+    
+    const headers = new Headers(init?.headers)
+    
+    if (password) {
+      const credentials = Buffer.from(`${username}:${password}`).toString("base64")
+      headers.set("Authorization", `Basic ${credentials}`)
+    }
+    
+    return fetch(input, {
+      ...init,
+      headers,
+    })
+  }
+}
 
 interface MessagePartInfo {
   sessionID?: string
@@ -57,9 +83,19 @@ export class BackgroundManager {
     this.tasks = new Map()
     this.notifications = new Map()
     this.pendingByParent = new Map()
-    this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
+
+    // Create authenticated client using SDK's createOpencodeClient with custom fetch
+    // This ensures all background agent HTTP requests include proper auth headers
+    // Use serverUrl from PluginInput (the actual running server URL)
+    const serverUrl = ctx.serverUrl.toString()
+    this.client = createOpencodeClient({
+      baseUrl: serverUrl,
+      fetch: createAuthenticatedFetch(),
+    })
+    
+    log("[background-agent] Created authenticated client for:", { serverUrl })
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
