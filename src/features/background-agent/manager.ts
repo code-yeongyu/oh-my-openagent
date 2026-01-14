@@ -186,6 +186,7 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
+          existingTask.concurrencyKey = undefined  // Prevent double-release
         }
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
@@ -289,6 +290,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    // Reset startedAt on resume to prevent immediate completion
+    // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
+    existingTask.startedAt = new Date()
 
     existingTask.progress = {
       toolCalls: existingTask.progress?.toolCalls ?? 0,
@@ -340,6 +344,11 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      // Release concurrency on resume error (matches launch error handler)
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined  // Prevent double-release
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
@@ -421,6 +430,13 @@ export class BackgroundManager {
 
         task.status = "completed"
         task.completedAt = new Date()
+        // Release concurrency immediately on completion
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
+        }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.markForNotification(task)
         await this.notifyParentSession(task)
         log("[background-agent] Task completed via session.idle event:", task.id)
@@ -445,7 +461,10 @@ export class BackgroundManager {
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined  // Prevent double-release
       }
+      // Clean up pendingByParent to prevent stale entries
+      this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
@@ -533,6 +552,21 @@ export class BackgroundManager {
         this.notifications.delete(sessionID)
       } else {
         this.notifications.set(sessionID, filtered)
+      }
+    }
+  }
+
+  /**
+   * Remove task from pending tracking for its parent session.
+   * Cleans up the parent entry if no pending tasks remain.
+   */
+  private cleanupPendingByParent(task: BackgroundTask): void {
+    if (!task.parentSessionID) return
+    const pending = this.pendingByParent.get(task.parentSessionID)
+    if (pending) {
+      pending.delete(task.id)
+      if (pending.size === 0) {
+        this.pendingByParent.delete(task.parentSessionID)
       }
     }
   }
@@ -681,6 +715,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     const taskId = task.id
     setTimeout(() => {
+      // Concurrency already released at completion - just cleanup notifications and task
       this.clearNotificationsForTask(taskId)
       this.tasks.delete(taskId)
       log("[background-agent] Removed completed task from memory:", taskId)
@@ -720,7 +755,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined  // Prevent double-release
         }
+        // Clean up pendingByParent to prevent stale entries
+        this.cleanupPendingByParent(task)
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
@@ -773,6 +811,13 @@ try {
 
           task.status = "completed"
           task.completedAt = new Date()
+          // Release concurrency immediately on completion
+          if (task.concurrencyKey) {
+            this.concurrencyManager.release(task.concurrencyKey)
+            task.concurrencyKey = undefined  // Prevent double-release
+          }
+          // Clean up pendingByParent to prevent stale entries
+          this.cleanupPendingByParent(task)
           this.markForNotification(task)
           await this.notifyParentSession(task)
           log("[background-agent] Task completed via polling:", task.id)
@@ -839,6 +884,13 @@ if (lastMessage) {
                 if (!hasIncompleteTodos) {
                   task.status = "completed"
                   task.completedAt = new Date()
+                  // Release concurrency immediately on completion
+                  if (task.concurrencyKey) {
+                    this.concurrencyManager.release(task.concurrencyKey)
+                    task.concurrencyKey = undefined  // Prevent double-release
+                  }
+                  // Clean up pendingByParent to prevent stale entries
+                  this.cleanupPendingByParent(task)
                   this.markForNotification(task)
                   await this.notifyParentSession(task)
                   log("[background-agent] Task completed via stability detection:", task.id)
