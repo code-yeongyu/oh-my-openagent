@@ -1,5 +1,10 @@
 export type TaskStatus = "running" | "queued" | "completed" | "error"
 
+export interface ModelFallbackInfo {
+  model: string
+  type: "user-defined" | "inherited" | "category-default" | "system-default"
+}
+
 export interface TrackedTask {
   id: string
   description: string
@@ -8,6 +13,7 @@ export interface TrackedTask {
   startedAt: Date
   isBackground: boolean
   skills?: string[]
+  modelInfo?: ModelFallbackInfo
 }
 
 export interface TaskToastOptions {
