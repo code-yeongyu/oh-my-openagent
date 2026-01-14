@@ -133,7 +133,7 @@ describe("createContextInjectorHook", () => {
   })
 
   describe("chat.message handler", () => {
-    it("is a no-op (context injection moved to messages transform)", async () => {
+    it("injects pending context into output parts", async () => {
       // #given
       const hook = createContextInjectorHook(collector)
       const sessionID = "ses_hook1"
@@ -152,8 +152,9 @@ describe("createContextInjectorHook", () => {
       await hook["chat.message"](input, output)
 
       // #then
-      expect(output.parts[0].text).toBe("User message")
-      expect(collector.hasPending(sessionID)).toBe(true)
+      expect(output.parts[0].text).toContain("Hook context")
+      expect(output.parts[0].text).toContain("User message")
+      expect(collector.hasPending(sessionID)).toBe(false)
     })
 
     it("does nothing when no pending context", async () => {
@@ -207,7 +208,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     ],
   })
 
-  it("inserts synthetic message before last user message", async () => {
+  it("prepends context to last user message", async () => {
     // #given
     const hook = createContextInjectorMessagesTransformHook(collector)
     const sessionID = "ses_transform1"
@@ -228,10 +229,8 @@ describe("createContextInjectorMessagesTransformHook", () => {
     await hook["experimental.chat.messages.transform"]!({}, output)
 
     // #then
-    expect(output.messages.length).toBe(4)
-    expect(output.messages[2].parts[0].text).toBe("Ultrawork context")
-    expect(output.messages[2].parts[0].synthetic).toBe(true)
-    expect(output.messages[3].parts[0].text).toBe("Second message")
+    expect(output.messages.length).toBe(3)
+    expect(output.messages[2].parts[0].text).toBe("Ultrawork context\n\n---\n\nSecond message")
   })
 
   it("does nothing when no pending context", async () => {

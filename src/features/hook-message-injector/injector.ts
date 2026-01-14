@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
-import type { MessageMeta, OriginalMessageContext, TextPart } from "./types"
+import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 
 export interface StoredMessage {
   agent?: string
   model?: { providerID?: string; modelID?: string }
-  tools?: Record<string, boolean>
+  tools?: Record<string, ToolPermission>
 }
 
 export function findNearestMessageWithFields(messageDir: string): StoredMessage | null {
@@ -16,12 +16,56 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
       .sort()
       .reverse()
 
+    // First pass: find message with ALL fields (ideal)
     for (const file of files) {
       try {
         const content = readFileSync(join(messageDir, file), "utf-8")
         const msg = JSON.parse(content) as StoredMessage
         if (msg.agent && msg.model?.providerID && msg.model?.modelID) {
           return msg
+        }
+      } catch {
+        continue
+      }
+    }
+
+    // Second pass: find message with ANY useful field (fallback)
+    // This ensures agent info isn't lost when model info is missing
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(messageDir, file), "utf-8")
+        const msg = JSON.parse(content) as StoredMessage
+        if (msg.agent || (msg.model?.providerID && msg.model?.modelID)) {
+          return msg
+        }
+      } catch {
+        continue
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+/**
+ * Finds the FIRST (oldest) message in the session with agent field.
+ * This is used to get the original agent that started the session,
+ * avoiding issues where newer messages may have a different agent
+ * due to OpenCode's internal agent switching.
+ */
+export function findFirstMessageWithAgent(messageDir: string): string | null {
+  try {
+    const files = readdirSync(messageDir)
+      .filter((f) => f.endsWith(".json"))
+      .sort() // Oldest first (no reverse)
+
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(messageDir, file), "utf-8")
+        const msg = JSON.parse(content) as StoredMessage
+        if (msg.agent) {
+          return msg.agent
         }
       } catch {
         continue

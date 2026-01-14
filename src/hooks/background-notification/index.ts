@@ -9,6 +9,12 @@ interface EventInput {
   event: Event
 }
 
+/**
+ * Background notification hook - handles event routing to BackgroundManager.
+ * 
+ * Notifications are now delivered directly via session.prompt({ noReply }) 
+ * from the manager, so this hook only needs to handle event routing.
+ */
 export function createBackgroundNotificationHook(manager: BackgroundManager) {
   const eventHandler = async ({ event }: EventInput) => {
     manager.handleEvent(event)

@@ -591,6 +591,73 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
     })
 
+    test("should allow starting new loop while previous loop is active (different session)", async () => {
+      // #given - active loop in session A
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-A", "First task", { maxIterations: 10 })
+      expect(hook.getState()?.session_id).toBe("session-A")
+      expect(hook.getState()?.prompt).toBe("First task")
+
+      // #when - start new loop in session B (without completing A)
+      hook.startLoop("session-B", "Second task", { maxIterations: 20 })
+
+      // #then - state should be overwritten with session B's loop
+      expect(hook.getState()?.session_id).toBe("session-B")
+      expect(hook.getState()?.prompt).toBe("Second task")
+      expect(hook.getState()?.max_iterations).toBe(20)
+      expect(hook.getState()?.iteration).toBe(1)
+
+      // #when - session B goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-B" } },
+      })
+
+      // #then - continuation should be injected for session B
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-B")
+      expect(promptCalls[0].text).toContain("Second task")
+      expect(promptCalls[0].text).toContain("2/20")
+
+      // #then - iteration incremented
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should allow starting new loop in same session (restart)", async () => {
+      // #given - active loop in session A at iteration 5
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-A", "First task", { maxIterations: 10 })
+      
+      // Simulate some iterations
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-A" } },
+      })
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-A" } },
+      })
+      expect(hook.getState()?.iteration).toBe(3)
+      expect(promptCalls.length).toBe(2)
+
+      // #when - start NEW loop in same session (restart)
+      hook.startLoop("session-A", "Restarted task", { maxIterations: 50 })
+
+      // #then - state should be reset to iteration 1 with new prompt
+      expect(hook.getState()?.session_id).toBe("session-A")
+      expect(hook.getState()?.prompt).toBe("Restarted task")
+      expect(hook.getState()?.max_iterations).toBe(50)
+      expect(hook.getState()?.iteration).toBe(1)
+
+      // #when - session goes idle
+      promptCalls = [] // Reset to check new continuation
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-A" } },
+      })
+
+      // #then - continuation should use new task
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("Restarted task")
+      expect(promptCalls[0].text).toContain("2/50")
+    })
+
     test("should check transcript BEFORE API to optimize performance", async () => {
       // #given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")

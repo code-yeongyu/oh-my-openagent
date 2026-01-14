@@ -50,7 +50,9 @@ export async function getVersionInfo(): Promise<VersionCheckInfo> {
   }
 
   const currentVersion = getCachedVersion()
-  const latestVersion = await getLatestVersion()
+  const { extractChannel } = await import("../../../hooks/auto-update-checker/index")
+  const channel = extractChannel(pluginInfo?.pinnedVersion ?? currentVersion)
+  const latestVersion = await getLatestVersion(channel)
 
   const isUpToDate =
     !currentVersion ||
