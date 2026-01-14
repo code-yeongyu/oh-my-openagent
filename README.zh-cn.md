@@ -380,37 +380,46 @@ opencode auth login
 
 **多账号负载均衡**：该插件支持最多 10 个 Google 账号。当一个账号达到速率限制时，它会自动切换到下一个可用账号。
 
-#### OpenAI (ChatGPT Plus/Pro)
+#### GitHub Copilot（备用提供商）
 
-首先，添加 opencode-openai-codex-auth 插件：
+GitHub Copilot 作为**备用提供商**受支持，当原生提供商（Claude、ChatGPT、Gemini）不可用时使用。安装程序将 Copilot 配置为低于原生提供商的优先级。
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode",
-    "opencode-openai-codex-auth@4.3.0"
-  ]
-}
+**优先级**：原生提供商 (Claude/ChatGPT/Gemini) > GitHub Copilot > 免费模型
+
+##### 模型映射
+
+启用 GitHub Copilot 后，oh-my-opencode 使用以下模型分配：
+
+| 代理 | 模型 |
+|------|------|
+| **Sisyphus** | `github-copilot/claude-opus-4.5` |
+| **Oracle** | `github-copilot/gpt-5.2` |
+| **Explore** | `grok code`（默认） |
+| **Librarian** | `glm 4.7 free`（默认） |
+
+GitHub Copilot 作为代理提供商，根据你的订阅将请求路由到底层模型。
+
+##### 设置
+
+运行安装程序并为 GitHub Copilot 选择"是"：
+
+```bash
+bunx oh-my-opencode install
+# 选择你的订阅（Claude、ChatGPT、Gemini）
+# 出现提示时："Do you have a GitHub Copilot subscription?" → 选择"是"
 ```
 
-##### 模型配置
+或使用非交互模式：
 
-你还需要在 `opencode.json` 中配置完整的模型设置。
-阅读 [opencode-openai-codex-auth 文档](https://github.com/numman-ali/opencode-openai-codex-auth)，从 [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json)（适用于 OpenCode v1.0.210+）或 [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json)（适用于旧版本）复制 provider/models 配置，并仔细合并以避免破坏用户现有的设置。
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+```
 
-**可用模型**：`openai/gpt-5.2`、`openai/gpt-5.2-codex`、`openai/gpt-5.1-codex-max`、`openai/gpt-5.1-codex`、`openai/gpt-5.1-codex-mini`、`openai/gpt-5.1`
-
-**变体**（OpenCode v1.0.210+）：使用 `--variant=<none|low|medium|high|xhigh>` 控制推理力度。
-
-然后进行认证：
+然后使用 GitHub 进行身份验证：
 
 ```bash
 opencode auth login
-# 交互式终端：Provider：选择 OpenAI
-# 交互式终端：Login method：选择 ChatGPT Plus/Pro (Codex Subscription)
-# 交互式终端：引导用户在浏览器中完成 OAuth 流程
-# 等待完成
-# 验证成功并向用户确认
+# 选择：GitHub → 通过 OAuth 进行身份验证
 ```
 
 
