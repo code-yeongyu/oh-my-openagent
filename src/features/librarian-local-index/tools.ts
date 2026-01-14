@@ -23,8 +23,19 @@ function validateSources(sources: string[]): void {
       if (url.protocol !== 'http:' && url.protocol !== 'https:') {
         throw new Error(`Invalid protocol: ${url.protocol}`)
       }
+<<<<<<< Updated upstream
       if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.')) {
         throw new Error(`Local/private host not allowed: ${url.hostname}`)
+=======
+      const hostname = url.hostname.toLowerCase();
+      // Block localhost and private IPs
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
+          hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+          hostname.startsWith('fc') || hostname.startsWith('fd') || // IPv6 private
+          hostname === 'metadata.google.internal' || hostname.endsWith('.internal')) {
+        throw new Error(`Local/private host not allowed: ${hostname}`)
+>>>>>>> Stashed changes
       }
     } catch (error) {
       throw new Error(`Invalid source URL "${source}": ${error instanceof Error ? error.message : String(error)}`)

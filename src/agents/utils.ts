@@ -40,6 +40,21 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
 const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
+  "enhanced-librarian": {
+    category: "utility",
+    cost: "CHEAP",
+    promptAlias: "Enhanced Librarian",
+    keyTrigger: "Local library indexing or offline documentation queries",
+    triggers: [
+      { domain: "Enhanced Librarian", trigger: "Queries for local documentation index, offline library searches" },
+    ],
+    useWhen: [
+      "Search local documentation index",
+      "Query tagged documentation",
+      "Pull docs from URLs to local index",
+      "Build or manage local library index",
+    ],
+  },
   explore: EXPLORE_PROMPT_METADATA,
   "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
   "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,

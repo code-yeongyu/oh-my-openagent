@@ -64,8 +64,8 @@ export class LibraryManager {
       id: sanitizedId,
       title: options.title,
       source: options.source,
-      created_at: options.overwrite ? 
-        this.getDocument(id)?.createdAt || now : 
+      created_at: options.overwrite ?
+        (this.getDocument(sanitizedId)?.createdAt?.toISOString() || now) :
         now,
       updated_at: now,
       tags: options.tags || [],
