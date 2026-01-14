@@ -36,13 +36,9 @@
 
 Yes.
 
-> Q. Can I use it with my claude code subscription?
+> Q. Can I use it with my Claude Code subscription?
 
-Technically yes, but i cannot recommend.
-
-> Q. Do you offer those options to handle oauth login?
-
-No this project doesn't have any of such implementation.
+Yes, technically possible. But I cannot recommend using it.
 
 ## FULL
 
