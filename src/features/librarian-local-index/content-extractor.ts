@@ -129,10 +129,11 @@ function extractTitle(html: string): string {
  * Extract meta description from HTML
  */
 function extractMetaDescription(html: string): string | null {
-  // Standard meta description
-  const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
+  // Standard meta description - handle both attribute orders
+  const descMatch = html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']|<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
   if (descMatch) {
-    return stripHtmlTags(descMatch[1]).trim()
+    const content = descMatch[1] || descMatch[2]
+    return stripHtmlTags(content).trim()
   }
 
   // OpenGraph description
@@ -263,15 +264,22 @@ function extractBySelector(html: string, selector: string): string | null {
  * Strip HTML tags from a string
  */
 function stripHtmlTags(html: string): string {
-  return html
+  let result = html
     .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+
+  // Decode HTML entities (do it twice for double-encoded entities)
+  for (let i = 0; i < 2; i++) {
+    result = result
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+  }
+
+  return result
 }
 
 /**
@@ -325,7 +333,7 @@ export function extractTagsFromUrl(url: string): string[] {
     else if (lowerHost.includes("typescript")) tags.push("typescript")
     else if (lowerHost.includes("python")) tags.push("python")
     else if (lowerHost.includes("rust")) tags.push("rust")
-    else if (lowerHost.includes("go") || lowerHost.includes("golang")) tags.push("go")
+    else if (hostname === 'golang.org' || hostname === 'go.dev' || hostname === 'pkg.go.dev' || hostname.endsWith('.golang.org')) tags.push("go")
 
     // Extract version if present in URL
     const versionMatch = lowerPath.match(/\/v?(\d+(?:\.\d+)?(?:\.\d+)?)\b/)

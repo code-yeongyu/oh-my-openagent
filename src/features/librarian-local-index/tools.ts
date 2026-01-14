@@ -6,6 +6,32 @@ import type { LibrarianLocalIndexArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
 
+function validateLibraryName(library: string): string {
+  // Sanitize library name to prevent path traversal
+  return library.replace(/[/\\]/g, '_').replace(/\.\./g, '').trim()
+}
+
+function validateFileName(fileName: string): string {
+  // Sanitize file name to prevent path traversal
+  return fileName.replace(/[/\\]/g, '_').replace(/\.\./g, '').trim()
+}
+
+function validateSources(sources: string[]): void {
+  for (const source of sources) {
+    try {
+      const url = new URL(source)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error(`Invalid protocol: ${url.protocol}`)
+      }
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.')) {
+        throw new Error(`Local/private host not allowed: ${url.hostname}`)
+      }
+    } catch (error) {
+      throw new Error(`Invalid source URL "${source}": ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+
 export function createLibrarianLocalIndex(
   ctx: PluginInput,
   backgroundManager: BackgroundManager
@@ -48,19 +74,24 @@ export function createLibrarianLocalIndex(
             if (!args.library || !args.content) {
               return "❌ Error: 'library' and 'content' parameters are required for add-doc action"
             }
-            return await executeAddDoc(indexer, args.library, args.content, args.frontmatter, args.fileName)
+            const safeLibrary = validateLibraryName(args.library)
+            const safeFileName = args.fileName ? validateFileName(args.fileName) : undefined
+            return await executeAddDoc(indexer, safeLibrary, args.content, args.frontmatter, safeFileName)
 
           case "pull-docs":
             if (!args.library || !args.sources || args.sources.length === 0) {
               return "❌ Error: 'library' and 'sources' parameters are required for pull-docs action"
             }
-            return await executePullDocs(indexer, args.library, args.sources)
+            validateSources(args.sources)
+            const safeLibrary = validateLibraryName(args.library)
+            return await executePullDocs(indexer, safeLibrary, args.sources)
 
           case "get-docs":
             if (!args.library) {
               return "❌ Error: 'library' parameter is required for get-docs action"
             }
-            return await executeGetDocs(indexer, args.library)
+            const safeLibrary = validateLibraryName(args.library)
+            return await executeGetDocs(indexer, safeLibrary)
 
           case "build-index":
             return await executeBuildIndex(indexer)

@@ -4,6 +4,7 @@ import type { CategoriesConfig, CategoryConfig } from "../config/schema"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
+import { enhancedLibrarianAgent } from "./enhanced-librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
@@ -22,6 +23,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   Sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
+  "enhanced-librarian": enhancedLibrarianAgent,
   explore: createExploreAgent,
   "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
   "document-writer": createDocumentWriterAgent,

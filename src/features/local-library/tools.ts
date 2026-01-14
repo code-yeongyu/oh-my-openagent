@@ -2,14 +2,14 @@ import { ToolHandler } from "@opencode-ai/sdk";
 import { LibraryManager } from "./manager";
 import type { LibraryDoc } from "./index";
 
-// Global instance to manage library
-let libraryManager: LibraryManager | null = null;
+// Map to manage library instances per path
+const libraryManagers = new Map<string, LibraryManager>();
 
-function getLibraryManager(path?: string): LibraryManager {
-  if (!libraryManager) {
-    libraryManager = new LibraryManager(path);
+function getLibraryManager(path: string = "./library"): LibraryManager {
+  if (!libraryManagers.has(path)) {
+    libraryManagers.set(path, new LibraryManager(path));
   }
-  return libraryManager;
+  return libraryManagers.get(path)!;
 }
 
 export const library_init: ToolHandler = async ({ args }) => {

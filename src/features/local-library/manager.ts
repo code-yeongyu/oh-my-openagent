@@ -34,6 +34,12 @@ export class LibraryManager {
     try {
       const existingIndex = await fs.readFile(this.indexPath, 'utf-8');
       this.index = JSON.parse(existingIndex);
+      // Hydrate date fields
+      this.index.documents = this.index.documents.map(doc => ({
+        ...doc,
+        createdAt: new Date(doc.createdAt as string),
+        updatedAt: new Date(doc.updatedAt as string),
+      }));
     } catch (error) {
       await this.saveIndex();
     }
@@ -50,11 +56,12 @@ export class LibraryManager {
     
     // Generate ID from title or use provided
     const id = options.id || this.generateId(options.title);
-    const filePath = path.join(this.docsPath, `${id}.md`);
+    const sanitizedId = path.basename(id.replace(/[/\\]/g, '_'));
+    const filePath = path.join(this.docsPath, `${sanitizedId}.md`);
 
     // Create frontmatter
     const frontmatter: FrontmatterType = {
-      id,
+      id: sanitizedId,
       title: options.title,
       source: options.source,
       created_at: options.overwrite ? 
@@ -72,16 +79,24 @@ export class LibraryManager {
 
     // Write markdown file with frontmatter
     const markdown = this.createMarkdownWithFrontmatter(content, validated);
-    
-    if (options.overwrite) {
-      await fs.writeFile(filePath, markdown, 'utf-8');
-    } else {
-      await fs.writeFile(filePath, markdown, 'utf-8');
+
+    if (!options.overwrite) {
+      // Check if file exists
+      try {
+        await fs.access(filePath);
+        throw new Error(`Document with id "${sanitizedId}" already exists. Use overwrite=true to replace it.`);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
     }
+
+    await fs.writeFile(filePath, markdown, 'utf-8');
 
     // Create document object
     const doc: LibraryDoc = {
-      id,
+      id: sanitizedId,
       title: validated.title,
       source: validated.source,
       createdAt: new Date(validated.created_at),

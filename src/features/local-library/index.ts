@@ -82,7 +82,7 @@ export interface AddDocOptions {
 export const FrontmatterSchema = z.object({
   id: z.string(),
   title: z.string(),
-  source: z.string().url(),
+  source: z.string(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
   tags: z.array(z.string()),
