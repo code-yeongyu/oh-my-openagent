@@ -69,8 +69,14 @@ function formatAvailableMcps(skills: LoadedSkill[]): string {
   return mcps.length > 0 ? mcps.join("\n") : "  (none found)"
 }
 
-function parseArguments(argsJson: string | undefined): Record<string, unknown> {
+function parseArguments(argsJson: string | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!argsJson) return {}
+  
+  // Handle case when argsJson is already an object (from tool calling pipeline)
+  if (typeof argsJson === "object" && argsJson !== null) {
+    return argsJson
+  }
+  
   try {
     const parsed = JSON.parse(argsJson)
     if (typeof parsed !== "object" || parsed === null) {

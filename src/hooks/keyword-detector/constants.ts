@@ -192,7 +192,7 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
   {
-    pattern: /(ultrawork|ulw)/i,
+    pattern: /\b(ultrawork|ulw)\b/i,
     message: getUltraworkMessage,
   },
   // SEARCH: EN/KO/JP/CN/VN

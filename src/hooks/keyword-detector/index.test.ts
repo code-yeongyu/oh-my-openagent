@@ -123,3 +123,98 @@ describe("keyword-detector session filtering", () => {
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
+
+describe("keyword-detector word boundary", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+
+  beforeEach(() => {
+    setMainSession(undefined)
+    logCalls = []
+    spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    setMainSession(undefined)
+  })
+
+  function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
+    const toastCalls = options.toastCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async (opts: any) => {
+            toastCalls.push(opts.body.title)
+          },
+        },
+      },
+    } as any
+  }
+
+  test("should NOT trigger ultrawork on partial matches like 'StatefulWidget' containing 'ulw'", async () => {
+    // #given - text contains 'ulw' as part of another word (StatefulWidget)
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "refactor the StatefulWidget component" }],
+    }
+
+    // #when - message with partial 'ulw' match is processed
+    await hook["chat.message"](
+      { sessionID: "any-session" },
+      output
+    )
+
+    // #then - ultrawork should NOT be triggered
+    expect(output.message.variant).toBeUndefined()
+    expect(toastCalls).not.toContain("Ultrawork Mode Activated")
+  })
+
+  test("should trigger ultrawork on standalone 'ulw' keyword", async () => {
+    // #given - text contains standalone 'ulw'
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw do this task" }],
+    }
+
+    // #when - message with standalone 'ulw' is processed
+    await hook["chat.message"](
+      { sessionID: "any-session" },
+      output
+    )
+
+    // #then - ultrawork should be triggered
+    expect(output.message.variant).toBe("max")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
+
+  test("should NOT trigger ultrawork on file references containing 'ulw' substring", async () => {
+    // #given - file reference contains 'ulw' as substring
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "@StatefulWidget.tsx please review this file" }],
+    }
+
+    // #when - message referencing file with 'ulw' substring is processed
+    await hook["chat.message"](
+      { sessionID: "any-session" },
+      output
+    )
+
+    // #then - ultrawork should NOT be triggered
+    expect(output.message.variant).toBeUndefined()
+    expect(toastCalls).not.toContain("Ultrawork Mode Activated")
+  })
+})
