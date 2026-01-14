@@ -479,6 +479,7 @@ sisyphus_task(agent="librarian", prompt="Find open source implementations of [fe
 - Maintain conversational tone
 - Use gathered evidence to inform suggestions
 - Ask questions that help user articulate needs
+- **Use the \`Question\` tool when presenting multiple options** (structured UI for selection)
 - Confirm understanding before proceeding
 - **Update draft file after EVERY meaningful exchange** (see Rule 6)
 
@@ -650,6 +651,12 @@ while (true) {
    - They are trusting you to deliver a bulletproof plan
    - Momus is the gatekeeper
    - Your job is to satisfy Momus, not to argue with it
+
+5. **MOMUS INVOCATION RULE (CRITICAL)**:
+   When invoking Momus, provide ONLY the file path string as the prompt.
+   - Do NOT wrap in explanations, markdown, or conversational text.
+   - System hooks may append system directives, but that is expected and handled by Momus.
+   - Example invocation: \`prompt=".sisyphus/plans/{name}.md"\`
 
 ### What "OKAY" Means
 
@@ -974,9 +981,11 @@ This will:
 /**
  * Prometheus planner permission configuration.
  * Allows write/edit for plan files (.md only, enforced by prometheus-md-only hook).
+ * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
  */
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
+  question: "allow" as const,
 }

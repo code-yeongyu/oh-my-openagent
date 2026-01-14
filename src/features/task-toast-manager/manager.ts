@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TrackedTask, TaskStatus } from "./types"
+import type { TrackedTask, TaskStatus, ModelFallbackInfo } from "./types"
 import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
@@ -25,6 +25,7 @@ export class TaskToastManager {
     isBackground: boolean
     status?: TaskStatus
     skills?: string[]
+    modelInfo?: ModelFallbackInfo
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
@@ -34,6 +35,7 @@ export class TaskToastManager {
       startedAt: new Date(),
       isBackground: task.isBackground,
       skills: task.skills,
+      modelInfo: task.modelInfo,
     }
 
     this.tasks.set(task.id, trackedTask)
@@ -104,6 +106,19 @@ export class TaskToastManager {
     const concurrencyInfo = this.getConcurrencyInfo()
 
     const lines: string[] = []
+
+    // Show model fallback warning for the new task if applicable
+    if (newTask.modelInfo && newTask.modelInfo.type !== "user-defined") {
+      const icon = "⚠️"
+      const suffixMap: Partial<Record<ModelFallbackInfo["type"], string>> = {
+        inherited: " (inherited)",
+        "category-default": " (category default)",
+        "system-default": " (system default)",
+      }
+      const suffix = suffixMap[newTask.modelInfo.type] ?? ""
+      lines.push(`${icon} Model: ${newTask.modelInfo.model}${suffix}`)
+      lines.push("")
+    }
 
     if (running.length > 0) {
       lines.push(`Running (${running.length}):${concurrencyInfo}`)

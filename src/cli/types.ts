@@ -6,6 +6,7 @@ export interface InstallArgs {
   claude?: ClaudeSubscription
   chatgpt?: BooleanArg
   gemini?: BooleanArg
+  copilot?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -14,6 +15,7 @@ export interface InstallConfig {
   isMax20: boolean
   hasChatGPT: boolean
   hasGemini: boolean
+  hasCopilot: boolean
 }
 
 export interface ConfigMergeResult {
@@ -28,4 +30,5 @@ export interface DetectedConfig {
   isMax20: boolean
   hasChatGPT: boolean
   hasGemini: boolean
+  hasCopilot: boolean
 }

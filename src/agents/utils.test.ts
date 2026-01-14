@@ -127,6 +127,31 @@ describe("buildAgent with category and skills", () => {
     expect(agent.temperature).toBe(0.7)
   })
 
+  test("agent with category inherits variant", () => {
+    // #given
+    const source = {
+      "test-agent": () =>
+        ({
+          description: "Test agent",
+          category: "custom-category",
+        }) as AgentConfig,
+    }
+
+    const categories = {
+      "custom-category": {
+        model: "openai/gpt-5.2",
+        variant: "xhigh",
+      },
+    }
+
+    // #when
+    const agent = buildAgent(source["test-agent"], undefined, categories)
+
+    // #then
+    expect(agent.model).toBe("openai/gpt-5.2")
+    expect(agent.variant).toBe("xhigh")
+  })
+
   test("agent with skills has content prepended to prompt", () => {
     // #given
     const source = {

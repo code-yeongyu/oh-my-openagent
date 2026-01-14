@@ -14,6 +14,7 @@ export interface GlobOptions {
   pattern: string
   paths?: string[]
   hidden?: boolean
+  follow?: boolean
   noIgnore?: boolean
   maxDepth?: number
   timeout?: number

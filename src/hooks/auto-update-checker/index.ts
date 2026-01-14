@@ -23,6 +23,26 @@ export function isPrereleaseOrDistTag(pinnedVersion: string | null): boolean {
   return isPrereleaseVersion(pinnedVersion) || isDistTag(pinnedVersion)
 }
 
+export function extractChannel(version: string | null): string {
+  if (!version) return "latest"
+  
+  if (isDistTag(version)) {
+    return version
+  }
+  
+  if (isPrereleaseVersion(version)) {
+    const prereleasePart = version.split("-")[1]
+    if (prereleasePart) {
+      const channelMatch = prereleasePart.match(/^(alpha|beta|rc|canary|next)/)
+      if (channelMatch) {
+        return channelMatch[1]
+      }
+    }
+  }
+  
+  return "latest"
+}
+
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
 
@@ -94,18 +114,19 @@ async function runBackgroundUpdateCheck(
     return
   }
 
-  const latestVersion = await getLatestVersion()
+  const channel = extractChannel(pluginInfo.pinnedVersion ?? currentVersion)
+  const latestVersion = await getLatestVersion(channel)
   if (!latestVersion) {
-    log("[auto-update-checker] Failed to fetch latest version")
+    log("[auto-update-checker] Failed to fetch latest version for channel:", channel)
     return
   }
 
   if (currentVersion === latestVersion) {
-    log("[auto-update-checker] Already on latest version")
+    log("[auto-update-checker] Already on latest version for channel:", channel)
     return
   }
 
-  log(`[auto-update-checker] Update available: ${currentVersion} → ${latestVersion}`)
+  log(`[auto-update-checker] Update available (${channel}): ${currentVersion} → ${latestVersion}`)
 
   if (!autoUpdate) {
     await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
@@ -113,18 +134,7 @@ async function runBackgroundUpdateCheck(
     return
   }
 
-  // Check if current version is a prerelease - don't auto-downgrade prerelease to stable
-  if (isPrereleaseVersion(currentVersion)) {
-    log(`[auto-update-checker] Skipping auto-update for prerelease version: ${currentVersion}`)
-    return
-  }
-
   if (pluginInfo.isPinned) {
-    if (isPrereleaseOrDistTag(pluginInfo.pinnedVersion)) {
-      log(`[auto-update-checker] Skipping auto-update for prerelease/dist-tag: ${pluginInfo.pinnedVersion}`)
-      return
-    }
-
     const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
     if (!updated) {
       await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)

@@ -47,7 +47,9 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       if (hasUltrawork) {
         log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
 
-        output.message.variant = "max"
+        if (output.message.variant === undefined) {
+          output.message.variant = "max"
+        }
 
         ctx.client.tui
           .showToast({
