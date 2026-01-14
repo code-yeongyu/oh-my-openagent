@@ -1,16 +1,60 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
 import { createCleanMcpEnvironment } from "./env-cleaner"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 
-interface ManagedClient {
+/**
+ * Connection type for a managed MCP client.
+ * - "stdio": Local process via stdin/stdout
+ * - "http": Remote server via HTTP (Streamable HTTP transport)
+ */
+type ConnectionType = "stdio" | "http"
+
+interface ManagedClientBase {
   client: Client
-  transport: StdioClientTransport
   skillName: string
   lastUsedAt: number
+  connectionType: ConnectionType
+}
+
+interface ManagedStdioClient extends ManagedClientBase {
+  connectionType: "stdio"
+  transport: StdioClientTransport
+}
+
+interface ManagedHttpClient extends ManagedClientBase {
+  connectionType: "http"
+  transport: StreamableHTTPClientTransport
+}
+
+type ManagedClient = ManagedStdioClient | ManagedHttpClient
+
+/**
+ * Determines connection type from MCP server configuration.
+ * Priority: explicit type field > url presence > command presence
+ */
+function getConnectionType(config: ClaudeCodeMcpServer): ConnectionType | null {
+  // Explicit type takes priority
+  if (config.type === "http" || config.type === "sse") {
+    return "http"
+  }
+  if (config.type === "stdio") {
+    return "stdio"
+  }
+
+  // Infer from available fields
+  if (config.url) {
+    return "http"
+  }
+  if (config.command) {
+    return "stdio"
+  }
+
+  return null
 }
 
 export class SkillMcpManager {
@@ -99,17 +143,124 @@ export class SkillMcpManager {
     info: SkillMcpClientInfo,
     config: ClaudeCodeMcpServer
   ): Promise<Client> {
+    const connectionType = getConnectionType(config)
+
+    if (!connectionType) {
+      throw new Error(
+        `MCP server "${info.serverName}" has no valid connection configuration.\n\n` +
+        `The MCP configuration in skill "${info.skillName}" must specify either:\n` +
+        `  - A URL for HTTP connection (remote MCP server)\n` +
+        `  - A command for stdio connection (local MCP process)\n\n` +
+        `Examples:\n` +
+        `  HTTP:\n` +
+        `    mcp:\n` +
+        `      ${info.serverName}:\n` +
+        `        url: https://mcp.example.com/mcp\n` +
+        `        headers:\n` +
+        `          Authorization: Bearer \${API_KEY}\n\n` +
+        `  Stdio:\n` +
+        `    mcp:\n` +
+        `      ${info.serverName}:\n` +
+        `        command: npx\n` +
+        `        args: [-y, @some/mcp-server]`
+      )
+    }
+
+    if (connectionType === "http") {
+      return this.createHttpClient(info, config)
+    } else {
+      return this.createStdioClient(info, config)
+    }
+  }
+
+  /**
+   * Create an HTTP-based MCP client using StreamableHTTPClientTransport.
+   * Supports remote MCP servers with optional authentication headers.
+   */
+  private async createHttpClient(
+    info: SkillMcpClientInfo,
+    config: ClaudeCodeMcpServer
+  ): Promise<Client> {
+    const key = this.getClientKey(info)
+
+    if (!config.url) {
+      throw new Error(
+        `MCP server "${info.serverName}" is configured for HTTP but missing 'url' field.`
+      )
+    }
+
+    let url: URL
+    try {
+      url = new URL(config.url)
+    } catch {
+      throw new Error(
+        `MCP server "${info.serverName}" has invalid URL: ${config.url}\n\n` +
+        `Expected a valid URL like: https://mcp.example.com/mcp`
+      )
+    }
+
+    this.registerProcessCleanup()
+
+    // Build request init with headers if provided
+    const requestInit: RequestInit = {}
+    if (config.headers && Object.keys(config.headers).length > 0) {
+      requestInit.headers = config.headers
+    }
+
+    const transport = new StreamableHTTPClientTransport(url, {
+      requestInit: Object.keys(requestInit).length > 0 ? requestInit : undefined,
+    })
+
+    const client = new Client(
+      { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
+      { capabilities: {} }
+    )
+
+    try {
+      await client.connect(transport)
+    } catch (error) {
+      try {
+        await transport.close()
+      } catch {
+        // Transport may already be closed
+      }
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `Failed to connect to MCP server "${info.serverName}".\n\n` +
+        `URL: ${config.url}\n` +
+        `Reason: ${errorMessage}\n\n` +
+        `Hints:\n` +
+        `  - Verify the URL is correct and the server is running\n` +
+        `  - Check if authentication headers are required\n` +
+        `  - Ensure the server supports MCP over HTTP`
+      )
+    }
+
+    const managedClient: ManagedHttpClient = {
+      client,
+      transport,
+      skillName: info.skillName,
+      lastUsedAt: Date.now(),
+      connectionType: "http",
+    }
+    this.clients.set(key, managedClient)
+    this.startCleanupTimer()
+    return client
+  }
+
+  /**
+   * Create a stdio-based MCP client using StdioClientTransport.
+   * Spawns a local process and communicates via stdin/stdout.
+   */
+  private async createStdioClient(
+    info: SkillMcpClientInfo,
+    config: ClaudeCodeMcpServer
+  ): Promise<Client> {
     const key = this.getClientKey(info)
 
     if (!config.command) {
       throw new Error(
-        `MCP server "${info.serverName}" is missing required 'command' field.\n\n` +
-        `The MCP configuration in skill "${info.skillName}" must specify a command to execute.\n\n` +
-        `Example:\n` +
-        `  mcp:\n` +
-        `    ${info.serverName}:\n` +
-        `      command: npx\n` +
-        `      args: [-y, @some/mcp-server]`
+        `MCP server "${info.serverName}" is configured for stdio but missing 'command' field.`
       )
     }
 
@@ -153,7 +304,14 @@ export class SkillMcpManager {
       )
     }
 
-    this.clients.set(key, { client, transport, skillName: info.skillName, lastUsedAt: Date.now() })
+    const managedClient: ManagedStdioClient = {
+      client,
+      transport,
+      skillName: info.skillName,
+      lastUsedAt: Date.now(),
+      connectionType: "stdio",
+    }
+    this.clients.set(key, managedClient)
     this.startCleanupTimer()
     return client
   }
