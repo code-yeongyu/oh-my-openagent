@@ -1,5 +1,6 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { join } from "node:path"
+import { lookup } from "node:dns/promises"
 import { createLibraryIndexer } from "./indexer"
 import { LIBRARIAN_LOCAL_INDEX_DESCRIPTION } from "./constants"
 import type { LibrarianLocalIndexArgs } from "./types"
@@ -16,17 +17,44 @@ function validateFileName(fileName: string): string {
   return fileName.replace(/[/\\]/g, '_').replace(/\.\./g, '').trim()
 }
 
-function validateSources(sources: string[]): void {
+function isPrivateIP(ip: string): boolean {
+  // IPv4 checks
+  if (ip.includes('.')) {
+    const parts = ip.split('.').map(Number);
+    if (parts.length === 4 && parts.every(p => p >= 0 && p <= 255)) {
+      const [a, b] = parts;
+      // 127.0.0.0/8 (loopback)
+      if (a === 127) return true;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return true;
+      // 10.0.0.0/8
+      if (a === 10) return true;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      // 169.254.0.0/16 (link-local)
+      if (a === 169 && b === 254) return true;
+    }
+  }
+  // IPv6 checks
+  else if (ip.includes(':')) {
+    const lowerIp = ip.toLowerCase();
+    // ::1 (loopback)
+    if (lowerIp === '::1') return true;
+    // fc00::/7 (private)
+    if (lowerIp.startsWith('fc') || lowerIp.startsWith('fd')) return true;
+    // fe80::/10 (link-local)
+    if (lowerIp.startsWith('fe8') || lowerIp.startsWith('fe9') || lowerIp.startsWith('fea') || lowerIp.startsWith('feb')) return true;
+  }
+  return false;
+}
+
+async function validateSources(sources: string[]): Promise<void> {
   for (const source of sources) {
     try {
       const url = new URL(source)
       if (url.protocol !== 'http:' && url.protocol !== 'https:') {
         throw new Error(`Invalid protocol: ${url.protocol}`)
       }
-<<<<<<< Updated upstream
-      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.')) {
-        throw new Error(`Local/private host not allowed: ${url.hostname}`)
-=======
       const hostname = url.hostname.toLowerCase();
       // Block localhost and private IPs
       if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
@@ -35,7 +63,19 @@ function validateSources(sources: string[]): void {
           hostname.startsWith('fc') || hostname.startsWith('fd') || // IPv6 private
           hostname === 'metadata.google.internal' || hostname.endsWith('.internal')) {
         throw new Error(`Local/private host not allowed: ${hostname}`)
->>>>>>> Stashed changes
+      }
+
+      // Resolve hostname to IP addresses to check for SSRF
+      try {
+        const addresses = await lookup(hostname, { all: true });
+        for (const addr of addresses) {
+          if (isPrivateIP(addr.address)) {
+            throw new Error(`Resolved IP ${addr.address} is private/local (SSRF protection)`);
+          }
+        }
+      } catch (dnsError) {
+        // If DNS lookup fails, hostname checks passed, so continue
+        // Could log warning here if needed
       }
     } catch (error) {
       throw new Error(`Invalid source URL "${source}": ${error instanceof Error ? error.message : String(error)}`)
@@ -81,28 +121,31 @@ export function createLibrarianLocalIndex(
             }
             return await executeQueryByTags(indexer, args.tags, args.operator)
 
-          case "add-doc":
+          case "add-doc": {
             if (!args.library || !args.content) {
               return "❌ Error: 'library' and 'content' parameters are required for add-doc action"
             }
             const safeLibrary = validateLibraryName(args.library)
             const safeFileName = args.fileName ? validateFileName(args.fileName) : undefined
             return await executeAddDoc(indexer, safeLibrary, args.content, args.frontmatter, safeFileName)
+          }
 
-          case "pull-docs":
+          case "pull-docs": {
             if (!args.library || !args.sources || args.sources.length === 0) {
               return "❌ Error: 'library' and 'sources' parameters are required for pull-docs action"
             }
-            validateSources(args.sources)
+            await validateSources(args.sources)
             const safeLibrary = validateLibraryName(args.library)
             return await executePullDocs(indexer, safeLibrary, args.sources)
+          }
 
-          case "get-docs":
+          case "get-docs": {
             if (!args.library) {
               return "❌ Error: 'library' parameter is required for get-docs action"
             }
             const safeLibrary = validateLibraryName(args.library)
             return await executeGetDocs(indexer, safeLibrary)
+          }
 
           case "build-index":
             return await executeBuildIndex(indexer)
