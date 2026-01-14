@@ -345,13 +345,17 @@ ${textContent || "(No text output)"}`
           return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
-        const userHasDefinedCategory = userCategories?.[args.category]?.model !== undefined
-        if (userHasDefinedCategory) {
-          modelInfo = { model: resolved.config.model, type: "user-defined" }
-        } else if (parentModelString) {
-          modelInfo = { model: parentModelString, type: "inherited" }
-        } else if (DEFAULT_CATEGORIES[args.category]?.model) {
-          modelInfo = { model: DEFAULT_CATEGORIES[args.category].model, type: "default" }
+        // Determine model source by comparing against the actual resolved model
+        const actualModel = resolved.config.model
+        const userDefinedModel = userCategories?.[args.category]?.model
+        const defaultModel = DEFAULT_CATEGORIES[args.category]?.model
+
+        if (actualModel === userDefinedModel) {
+          modelInfo = { model: actualModel, type: "user-defined" }
+        } else if (actualModel === parentModelString) {
+          modelInfo = { model: actualModel, type: "inherited" }
+        } else if (actualModel === defaultModel) {
+          modelInfo = { model: actualModel, type: "default" }
         }
 
         agentToUse = SISYPHUS_JUNIOR_AGENT

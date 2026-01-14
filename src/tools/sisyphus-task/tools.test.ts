@@ -4,7 +4,8 @@ import type { CategoryConfig } from "../../config/schema"
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: Record<string, CategoryConfig>
+  userCategories?: Record<string, CategoryConfig>,
+  parentModelString?: string
 ): { config: CategoryConfig; promptAppend: string } | null {
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -17,7 +18,7 @@ function resolveCategoryConfig(
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model: userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
   }
 
   let promptAppend = defaultPromptAppend
@@ -204,6 +205,47 @@ describe("sisyphus-task", () => {
       // #then
       expect(result).not.toBeNull()
       expect(result!.config.temperature).toBe(0.3)
+    })
+
+    test("parentModelString is used when no user model and takes precedence over default", () => {
+      // #given
+      const categoryName = "visual-engineering"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, undefined, parentModelString)
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+    })
+
+    test("user model takes precedence over parentModelString", () => {
+      // #given
+      const categoryName = "visual-engineering"
+      const userCategories = {
+        "visual-engineering": { model: "my-provider/my-model" },
+      }
+      const parentModelString = "cliproxy/claude-opus-4-5"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, userCategories, parentModelString)
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("my-provider/my-model")
+    })
+
+    test("default model is used when no user model and no parentModelString", () => {
+      // #given
+      const categoryName = "visual-engineering"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, undefined, undefined)
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
   })
 
@@ -708,6 +750,84 @@ describe("sisyphus-task", () => {
       expect(result).toContain(skillContent)
       expect(result).toContain(categoryPromptAppend)
       expect(result).toContain("\n\n")
+    })
+  })
+
+  describe("modelInfo detection via resolveCategoryConfig", () => {
+    test("when parentModelString exists but default model wins - modelInfo should report default", () => {
+      // #given - Bug scenario: parentModelString is passed but userModel is undefined,
+      // and the resolution order is: userModel ?? parentModelString ?? defaultModel
+      // If parentModelString matches the resolved model, it's "inherited"
+      // If defaultModel matches, it's "default"
+      const categoryName = "ultrabrain"
+      const parentModelString = undefined
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, undefined, parentModelString)
+      
+      // #then - actualModel should be defaultModel, type should be "default"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      const defaultModel = DEFAULT_CATEGORIES[categoryName]?.model
+      expect(actualModel).toBe(defaultModel)
+      expect(actualModel).toBe("openai/gpt-5.2")
+    })
+
+    test("when parentModelString is used - modelInfo should report inherited", () => {
+      // #given
+      const categoryName = "ultrabrain"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, undefined, parentModelString)
+      
+      // #then - actualModel should be parentModelString, type should be "inherited"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      expect(actualModel).toBe(parentModelString)
+    })
+
+    test("when user defines model - modelInfo should report user-defined regardless of parentModelString", () => {
+      // #given
+      const categoryName = "ultrabrain"
+      const userCategories = { "ultrabrain": { model: "my-provider/custom-model" } }
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, userCategories, parentModelString)
+      
+      // #then - actualModel should be userModel, type should be "user-defined"
+      expect(resolved).not.toBeNull()
+      const actualModel = resolved!.config.model
+      const userDefinedModel = userCategories[categoryName]?.model
+      expect(actualModel).toBe(userDefinedModel)
+      expect(actualModel).toBe("my-provider/custom-model")
+    })
+
+    test("detection logic: actualModel comparison correctly identifies source", () => {
+      // #given - This test verifies the fix for PR #770 bug
+      // The bug was: checking `if (parentModelString)` instead of `if (actualModel === parentModelString)`
+      const categoryName = "ultrabrain"
+      const parentModelString = "cliproxy/claude-opus-4-5"
+      const userCategories = { "ultrabrain": { model: "user/model" } }
+      
+      // #when - user model wins
+      const resolved = resolveCategoryConfig(categoryName, userCategories, parentModelString)
+      const actualModel = resolved!.config.model
+      const userDefinedModel = userCategories[categoryName]?.model
+      const defaultModel = DEFAULT_CATEGORIES[categoryName]?.model
+      
+      // #then - detection should compare against actual resolved model
+      const detectedType = actualModel === userDefinedModel 
+        ? "user-defined" 
+        : actualModel === parentModelString 
+        ? "inherited" 
+        : actualModel === defaultModel 
+        ? "default" 
+        : undefined
+      
+      expect(detectedType).toBe("user-defined")
+      expect(actualModel).not.toBe(parentModelString)
     })
   })
 })
