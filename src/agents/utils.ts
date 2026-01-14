@@ -192,7 +192,7 @@ export function createBuiltinAgents(
 
   if (!disabledAgents.includes("orchestrator-sisyphus")) {
     const orchestratorOverride = agentOverrides["orchestrator-sisyphus"]
-    const orchestratorModel = orchestratorOverride?.model
+    const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
     let orchestratorConfig = createOrchestratorSisyphusAgent({
       model: orchestratorModel,
       availableAgents,
