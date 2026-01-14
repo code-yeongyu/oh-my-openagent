@@ -253,7 +253,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan
-        ? { mode: "subagent" as const, hidden: true }
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
