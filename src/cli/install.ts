@@ -311,23 +311,8 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasCopilot) {
     printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
-  }
-
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    console.log(color.bold("Next Steps - Authenticate your providers:"))
-    console.log()
-    if (config.hasClaude) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    console.log()
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
@@ -346,6 +331,17 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
+
+  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    printBox(
+      `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
+      (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasChatGPT ? `  ${SYMBOLS.bullet} OpenAI ${color.gray("→ ChatGPT Plus/Pro")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      "🔐 Authenticate Your Providers"
+    )
+  }
 
   return 0
 }
@@ -421,25 +417,11 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasCopilot) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
-
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    const steps: string[] = []
-    if (config.hasClaude) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    p.note(steps.join("\n"), "Next Steps - Authenticate your providers")
-  }
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
@@ -455,6 +437,23 @@ export async function install(args: InstallArgs): Promise<number> {
   p.log.message(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
+
+  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    const providers: string[] = []
+    if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (config.hasChatGPT) providers.push(`OpenAI ${color.gray("→ ChatGPT Plus/Pro")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+
+    console.log()
+    console.log(color.bold("🔐 Authenticate Your Providers"))
+    console.log()
+    console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
+    for (const provider of providers) {
+      console.log(`   ${SYMBOLS.bullet} ${provider}`)
+    }
+    console.log()
+  }
 
   return 0
 }

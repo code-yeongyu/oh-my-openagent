@@ -283,6 +283,8 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
   } else if (installConfig.hasClaude && installConfig.isMax20) {
     agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
+  } else if (installConfig.hasCopilot) {
+    agents["explore"] = { model: "github-copilot/grok-code-fast-1" }
   } else {
     agents["explore"] = { model: "opencode/glm-4.7-free" }
   }
@@ -300,23 +302,36 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
     agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
     agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
+  } else if (installConfig.hasClaude) {
+    agents["frontend-ui-ux-engineer"] = { model: "anthropic/claude-opus-4-5" }
+    agents["document-writer"] = { model: "anthropic/claude-opus-4-5" }
+    agents["multimodal-looker"] = { model: "anthropic/claude-opus-4-5" }
+  } else if (installConfig.hasCopilot) {
+    agents["frontend-ui-ux-engineer"] = { model: "github-copilot/gemini-3-pro-preview" }
+    agents["document-writer"] = { model: "github-copilot/gemini-3-flash-preview" }
+    agents["multimodal-looker"] = { model: "github-copilot/gemini-3-flash-preview" }
   } else {
-    const fallbackModel = installConfig.hasClaude ? "anthropic/claude-opus-4-5" : "opencode/glm-4.7-free"
-    agents["frontend-ui-ux-engineer"] = { model: fallbackModel }
-    agents["document-writer"] = { model: fallbackModel }
-    agents["multimodal-looker"] = { model: fallbackModel }
+    agents["frontend-ui-ux-engineer"] = { model: "opencode/glm-4.7-free" }
+    agents["document-writer"] = { model: "opencode/glm-4.7-free" }
+    agents["multimodal-looker"] = { model: "opencode/glm-4.7-free" }
   }
 
   if (Object.keys(agents).length > 0) {
     config.agents = agents
   }
 
-  // Categories: override model for Antigravity auth (gemini-3-pro-preview → gemini-3-pro-high)
+  // Categories: override model for Antigravity auth or GitHub Copilot fallback
   if (installConfig.hasGemini) {
     config.categories = {
       "visual-engineering": { model: "google/gemini-3-pro-high" },
       artistry: { model: "google/gemini-3-pro-high" },
       writing: { model: "google/gemini-3-flash-high" },
+    }
+  } else if (installConfig.hasCopilot) {
+    config.categories = {
+      "visual-engineering": { model: "github-copilot/gemini-3-pro-preview" },
+      artistry: { model: "github-copilot/gemini-3-pro-preview" },
+      writing: { model: "github-copilot/gemini-3-flash-preview" },
     }
   }
 
