@@ -675,7 +675,32 @@ describe("LaunchInput.skillContent", () => {
   })
 })
 
-describe("BackgroundManager.notifyParentSession - agent context preservation", () => {
+describe("BackgroundManager.notifyParentSession - model/agent context preservation", () => {
+  test("should include model field in session.prompt when parentModel is defined", async () => {
+    // #given
+    const task: BackgroundTask = {
+      id: "task-with-model",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with model context",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "Sisyphus",
+      parentModel: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task)
+
+    // #then - model MUST be included when parentModel is defined
+    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    expect(promptBody.agent).toBe("Sisyphus")
+  })
+
   test("should not pass agent field when parentAgent is undefined", async () => {
     // #given
     const task: BackgroundTask = {

@@ -639,12 +639,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     }
 
     // Inject notification via session.prompt with noReply
+    // Preserve parent session's model/agent context to prevent model switching
     try {
       await this.client.session.prompt({
         path: { id: task.parentSessionID },
         body: {
-          noReply: !allComplete,  // Silent unless all complete
-          agent: task.parentAgent,
+          noReply: !allComplete,
+          ...(task.parentAgent !== undefined ? { agent: task.parentAgent } : {}),
+          ...(task.parentModel?.providerID && task.parentModel?.modelID
+            ? { model: { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID } }
+            : {}),
           parts: [{ type: "text", text: notification }],
         },
       })
