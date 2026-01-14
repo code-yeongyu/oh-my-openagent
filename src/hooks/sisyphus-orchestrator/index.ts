@@ -407,10 +407,17 @@ export function createSisyphusOrchestratorHook(
     try {
       log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
+      const messageDir = getMessageDir(sessionID)
+      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+      const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+        : undefined
+
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
           agent: "orchestrator-sisyphus",
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },
