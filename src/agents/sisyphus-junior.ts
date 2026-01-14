@@ -1,9 +1,10 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { CategoryConfig } from "../config/schema"
+import type { AgentOverrideConfig, CategoryConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   migrateAgentConfig,
+  supportsNewPermissionSystem,
 } from "../shared/permission-compat"
 
 const SISYPHUS_JUNIOR_PROMPT = `<Role>
@@ -14,11 +15,10 @@ Execute tasks directly. NEVER delegate or spawn other agents.
 <Critical_Constraints>
 BLOCKED ACTIONS (will fail if attempted):
 - task tool: BLOCKED
-- sisyphus_task tool: BLOCKED  
-- sisyphus_task tool: BLOCKED (already blocked above, but explicit)
-- call_omo_agent tool: BLOCKED
+- sisyphus_task tool: BLOCKED
 
-You work ALONE. No delegation. No background tasks. Execute directly.
+ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
+You work ALONE for implementation. No delegation of implementation tasks.
 </Critical_Constraints>
 
 <Work_Context>
@@ -75,7 +75,76 @@ function buildSisyphusJuniorPrompt(promptAppend?: string): string {
 }
 
 // Core tools that Sisyphus-Junior must NEVER have access to
-const BLOCKED_TOOLS = ["task", "sisyphus_task", "call_omo_agent"]
+// Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
+const BLOCKED_TOOLS = ["task", "sisyphus_task"]
+
+export const SISYPHUS_JUNIOR_DEFAULTS = {
+  model: "anthropic/claude-sonnet-4-5",
+  temperature: 0.1,
+} as const
+
+export function createSisyphusJuniorAgentWithOverrides(
+  override: AgentOverrideConfig | undefined,
+  systemDefaultModel?: string
+): AgentConfig {
+  if (override?.disable) {
+    override = undefined
+  }
+
+  const model = override?.model ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
+
+  const promptAppend = override?.prompt_append
+  const prompt = buildSisyphusJuniorPrompt(promptAppend)
+
+  const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
+
+  let toolsConfig: Record<string, unknown> = {}
+  if (supportsNewPermissionSystem()) {
+    const userPermission = (override?.permission ?? {}) as Record<string, string>
+    const basePermission = (baseRestrictions as { permission: Record<string, string> }).permission
+    const merged: Record<string, string> = { ...userPermission }
+    for (const tool of BLOCKED_TOOLS) {
+      merged[tool] = "deny"
+    }
+    merged.call_omo_agent = "allow"
+    toolsConfig = { permission: { ...merged, ...basePermission } }
+  } else {
+    const userTools = override?.tools ?? {}
+    const baseTools = (baseRestrictions as { tools: Record<string, boolean> }).tools
+    const merged: Record<string, boolean> = { ...userTools }
+    for (const tool of BLOCKED_TOOLS) {
+      merged[tool] = false
+    }
+    merged.call_omo_agent = true
+    toolsConfig = { tools: { ...merged, ...baseTools } }
+  }
+
+  const base: AgentConfig = {
+    description: override?.description ??
+      "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
+    mode: "subagent" as const,
+    model,
+    temperature,
+    maxTokens: 64000,
+    prompt,
+    color: override?.color ?? "#20B2AA",
+    ...toolsConfig,
+  }
+
+  if (override?.top_p !== undefined) {
+    base.top_p = override.top_p
+  }
+
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium" } as AgentConfig
+  }
+
+  return {
+    ...base,
+    thinking: { type: "enabled", budgetTokens: 32000 },
+  } as AgentConfig
+}
 
 export function createSisyphusJuniorAgent(
   categoryConfig: CategoryConfig,
@@ -83,12 +152,12 @@ export function createSisyphusJuniorAgent(
 ): AgentConfig {
   const prompt = buildSisyphusJuniorPrompt(promptAppend)
   const model = categoryConfig.model
-
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
   const mergedConfig = migrateAgentConfig({
     ...baseRestrictions,
     ...(categoryConfig.tools ? { tools: categoryConfig.tools } : {}),
   })
+
 
   const base: AgentConfig = {
     description:

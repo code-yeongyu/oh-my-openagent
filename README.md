@@ -6,7 +6,7 @@
 > [!TIP]
 >
 > [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.1` to install it.**
+> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.6` to install it.**
 >
 > Be with us!
 >
@@ -28,11 +28,29 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+# Claude OAuth Access Notice
 
-No stupid token consumption massive subagents here. No bloat tools here.
+## TL;DR
 
-**Certified, Verified, Tested, Actually Useful Harness in Production, after $24,000 worth of tokens spent.**
-**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+> Q. Can I use oh-my-opencode?
+
+Yes.
+
+> Q. Can I use it with my Claude Code subscription?
+
+Yes, technically possible. But I cannot recommend using it.
+
+## FULL
+
+> As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
+> 
+> [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
+>
+> Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
+>
+> These tools may work regardless of technical detectability, but users should be aware of ToS implications, and I personally cannot recommend to use those.
+>
+> This project is not responsible for any issues arising from the use of unofficial tools, and **we do not have any custom implementations of those oauth systems.**
 
 
 <div align="center">
@@ -79,6 +97,9 @@ No stupid token consumption massive subagents here. No bloat tools here.
 
 ## Contents
 
+- [Claude OAuth Access Notice](#claude-oauth-access-notice)
+  - [Reviews](#reviews)
+  - [Contents](#contents)
 - [Oh My OpenCode](#oh-my-opencode)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
@@ -97,8 +118,9 @@ No stupid token consumption massive subagents here. No bloat tools here.
       - [Google Gemini (Antigravity OAuth)](#google-gemini-antigravity-oauth)
         - [Model Configuration](#model-configuration)
         - [oh-my-opencode Agent Model Override](#oh-my-opencode-agent-model-override)
-      - [OpenAI (ChatGPT Plus/Pro)](#openai-chatgpt-pluspro)
-        - [Model Configuration](#model-configuration-1)
+      - [GitHub Copilot (Fallback Provider)](#github-copilot-fallback-provider)
+        - [Model Mappings](#model-mappings)
+        - [Setup](#setup)
     - [⚠️ Warning](#️-warning)
     - [Verify the setup](#verify-the-setup)
     - [Say 'Congratulations! 🎉' to the user](#say-congratulations--to-the-user)
@@ -128,6 +150,7 @@ No stupid token consumption massive subagents here. No bloat tools here.
     - [Agents](#agents)
       - [Permission Options](#permission-options)
     - [Built-in Skills](#built-in-skills)
+    - [Git Master](#git-master)
     - [Sisyphus Agent](#sisyphus-agent)
     - [Background Tasks](#background-tasks)
     - [Categories](#categories)
@@ -234,6 +257,11 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 
 ### For Humans
+
+> **⚠️ Prerequisite: Bun is required**
+>
+> This tool **requires [Bun](https://bun.sh/) to be installed** on your system.
+> Even if you use `npx` to run the installer, the underlying runtime depends on Bun.
 
 Run the interactive installer:
 
@@ -356,11 +384,10 @@ Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/
 
 ##### oh-my-opencode Agent Model Override
 
-The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`) and disable the built-in `google_auth`:
+The `opencode-antigravity-auth` plugin uses different model names than the built-in Google auth. Override the agent models in `oh-my-opencode.json` (or `.opencode/oh-my-opencode.json`):
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -384,37 +411,46 @@ opencode auth login
 
 **Multi-Account Load Balancing**: The plugin supports up to 10 Google accounts. When one account hits rate limits, it automatically switches to the next available account.
 
-#### OpenAI (ChatGPT Plus/Pro)
+#### GitHub Copilot (Fallback Provider)
 
-First, add the opencode-openai-codex-auth plugin:
+GitHub Copilot is supported as a **fallback provider** when native providers (Claude, ChatGPT, Gemini) are unavailable. The installer configures Copilot with lower priority than native providers.
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode",
-    "opencode-openai-codex-auth@4.3.0"
-  ]
-}
+**Priority**: Native providers (Claude/ChatGPT/Gemini) > GitHub Copilot > Free models
+
+##### Model Mappings
+
+When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
+
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `github-copilot/claude-opus-4.5` |
+| **Oracle**    | `github-copilot/gpt-5.2`         |
+| **Explore**   | `grok code` (default)            |
+| **Librarian** | `glm 4.7 free` (default)         |
+
+GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
+
+##### Setup
+
+Run the installer and select "Yes" for GitHub Copilot:
+
+```bash
+bunx oh-my-opencode install
+# Select your subscriptions (Claude, ChatGPT, Gemini)
+# When prompted: "Do you have a GitHub Copilot subscription?" → Select "Yes"
 ```
 
-##### Model Configuration
+Or use non-interactive mode:
 
-You'll also need full model settings in `opencode.json`.
-Read the [opencode-openai-codex-auth documentation](https://github.com/numman-ali/opencode-openai-codex-auth), copy provider/models config from [`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json) (for OpenCode v1.0.210+) or [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json) (for older versions), and merge carefully to avoid breaking the user's existing setup.
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+```
 
-**Available models**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
-
-**Variants** (OpenCode v1.0.210+): Use `--variant=<none|low|medium|high|xhigh>` for reasoning effort control.
-
-Then authenticate:
+Then authenticate with GitHub:
 
 ```bash
 opencode auth login
-# Interactive Terminal: Provider: Select OpenAI
-# Interactive Terminal: Login method: Select ChatGPT Plus/Pro (Codex Subscription)
-# Interactive Terminal: Guide user through OAuth flow in browser
-# Wait for completion
-# Verify success and confirm with user
+# Select: GitHub → Authenticate via OAuth
 ```
 
 
@@ -422,7 +458,7 @@ opencode auth login
 
 **Unless the user explicitly requests it, do not change model settings or disable features (agents, hooks, MCPs).**
 
-The plugin works perfectly by default. Except for the recommended `google_auth: true` setting, do not change other settings or turn off features without an explicit request.
+The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
 ### Verify the setup
 
@@ -544,17 +580,13 @@ Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now a
 The features in your editor? Other agents can't touch them.
 Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
 
-- **lsp_hover**: Type info, docs, signatures at position
 - **lsp_goto_definition**: Jump to symbol definition
 - **lsp_find_references**: Find all usages across workspace
-- **lsp_document_symbols**: Get file symbol outline
-- **lsp_workspace_symbols**: Search symbols by name across project
+- **lsp_symbols**: Get symbols from file (scope='document') or search across workspace (scope='workspace')
 - **lsp_diagnostics**: Get errors/warnings before build
 - **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
 - **lsp_rename**: Rename symbol across workspace
-- **lsp_code_actions**: Get available quick fixes/refactorings
-- **lsp_code_action_resolve**: Apply code action
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 - **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
@@ -806,9 +838,6 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
 
-  // Enable Google Gemini via Antigravity OAuth
-  "google_auth": false,
-
   /* Agent overrides - customize models for specific tasks */
   "agents": {
     "oracle": {
@@ -823,28 +852,7 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 
 ### Google Auth
 
-**Recommended**: Use the external [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
-
-When using `opencode-antigravity-auth`, disable the built-in auth and override agent models in `oh-my-opencode.json`:
-
-```json
-{
-  "google_auth": false,
-  "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
-    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
-  }
-}
-```
-
-**Alternative**: Enable built-in Antigravity OAuth (single account, Gemini models only):
-
-```json
-{
-  "google_auth": true
-}
-```
+**Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin. It provides multi-account load balancing, more models (including Claude via Antigravity), and active maintenance. See [Installation > Google Gemini](#google-gemini-antigravity-oauth).
 
 ### Agents
 
@@ -946,10 +954,10 @@ Configure git-master skill behavior:
 }
 ```
 
-| Option | Default | Description |
-| ------ | ------- | ----------- |
-| `commit_footer` | `true` | Adds "Ultraworked with Sisyphus" footer to commit messages. |
-| `include_co_authored_by` | `true` | Adds `Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>` trailer to commits. |
+| Option                   | Default | Description                                                                      |
+| ------------------------ | ------- | -------------------------------------------------------------------------------- |
+| `commit_footer`          | `true`  | Adds "Ultraworked with Sisyphus" footer to commit messages.                      |
+| `include_co_authored_by` | `true`  | Adds `Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>` trailer to commits. |
 
 ### Sisyphus Agent
 
@@ -1017,12 +1025,12 @@ You can also customize Sisyphus agents like other agents:
 }
 ```
 
-| Option                      | Default | Description                                                                                                                                         |
-| --------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `disabled`                  | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                                       |
-| `default_builder_enabled`   | `false` | When `true`, enables OpenCode-Builder agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.                         |
-| `planner_enabled`           | `true`  | When `true`, enables Prometheus (Planner) agent with work-planner methodology. Enabled by default.                                                 |
-| `replace_plan`              | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Prometheus (Planner) and default plan available.             |
+| Option                    | Default | Description                                                                                                                            |
+| ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`                | `false` | When `true`, disables all Sisyphus orchestration and restores original build/plan as primary.                                          |
+| `default_builder_enabled` | `false` | When `true`, enables OpenCode-Builder agent (same as OpenCode build, renamed due to SDK limitations). Disabled by default.             |
+| `planner_enabled`         | `true`  | When `true`, enables Prometheus (Planner) agent with work-planner methodology. Enabled by default.                                     |
+| `replace_plan`            | `true`  | When `true`, demotes default plan agent to subagent mode. Set to `false` to keep both Prometheus (Planner) and default plan available. |
 
 ### Background Tasks
 
@@ -1060,14 +1068,14 @@ Configure concurrency limits for background agent tasks. This controls how many 
 
 ### Categories
 
-Categories enable domain-specific task delegation via the `sisyphus_task` tool. Each category pre-configures a specialized `Sisyphus-Junior-{category}` agent with optimized model settings and prompts.
+Categories enable domain-specific task delegation via the `sisyphus_task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
 
 **Default Categories:**
 
-| Category | Model | Description |
-|----------|-------|-------------|
-| `visual` | `google/gemini-3-pro-preview` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7). |
-| `business-logic` | `openai/gpt-5.2` | Backend logic, architecture, strategic reasoning. Low creativity (temp 0.1). |
+| Category         | Model                         | Description                                                                  |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `visual`         | `google/gemini-3-pro-preview` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7).           |
+| `business-logic` | `openai/gpt-5.2`              | Backend logic, architecture, strategic reasoning. Low creativity (temp 0.1). |
 
 **Usage:**
 
@@ -1184,8 +1192,8 @@ Opt-in experimental features that may change or be removed in future versions. U
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
+| Variable              | Description                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override the OpenCode configuration directory. Useful for profile isolation with tools like [OCX](https://github.com/kdcokenny/ocx) ghost mode. |
 
 

@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.0.0-beta.3",
+  "version": "3.0.0-beta.7",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,14 +16,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./google-auth": {
-      "types": "./dist/google-auth.d.ts",
-      "import": "./dist/google-auth.js"
-    },
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
     "build:schema": "bun run script/build-schema.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "bun run clean && bun run build",
@@ -56,8 +52,8 @@
     "@code-yeongyu/comment-checker": "^0.6.1",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "@openauthjs/openauth": "^0.4.3",
-    "@opencode-ai/plugin": "^1.1.1",
-    "@opencode-ai/sdk": "^1.1.1",
+    "@opencode-ai/plugin": "^1.1.19",
+    "@opencode-ai/sdk": "^1.1.19",
     "commander": "^14.0.2",
     "hono": "^4.10.4",
     "js-yaml": "^4.1.1",

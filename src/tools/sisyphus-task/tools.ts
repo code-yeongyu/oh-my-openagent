@@ -3,13 +3,15 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { SisyphusTaskArgs } from "./types"
-import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
+import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
 import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
+import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
+import { log } from "../../shared/logger"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -59,8 +61,13 @@ type ToolContextWithMetadata = {
 
 function resolveCategoryConfig(
   categoryName: string,
-  userCategories?: CategoriesConfig
-): { config: CategoryConfig; promptAppend: string } | null {
+  options: {
+    userCategories?: CategoriesConfig
+    parentModelString?: string
+    systemDefaultModel?: string
+  }
+): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
+  const { userCategories, parentModelString, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -69,10 +76,13 @@ function resolveCategoryConfig(
     return null
   }
 
+  // Model priority: user override > parent model (inherit) > category default > system default
+  // Parent model takes precedence over category default so custom providers work out-of-box
+  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
-    model: userConfig?.model ?? defaultConfig?.model ?? "anthropic/claude-sonnet-4-5",
+    model,
   }
 
   let promptAppend = defaultPromptAppend
@@ -82,13 +92,15 @@ function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend }
+  return { config, promptAppend, model }
 }
 
 export interface SisyphusTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
+  directory: string
   userCategories?: CategoriesConfig
+  gitMasterConfig?: GitMasterConfig
 }
 
 export interface BuildSystemContentInput {
@@ -111,7 +123,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
-  const { manager, client, userCategories } = options
+  const { manager, client, directory, userCategories, gitMasterConfig } = options
 
   return tool({
     description: SISYPHUS_TASK_DESCRIPTION,
@@ -136,7 +148,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       let skillContent: string | undefined
       if (args.skills.length > 0) {
-        const { resolved, notFound } = resolveMultipleSkills(args.skills)
+        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig })
         if (notFound.length > 0) {
           const available = createBuiltinSkills().map(s => s.name).join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
@@ -146,7 +158,19 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       const messageDir = getMessageDir(ctx.sessionID)
       const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      const parentAgent = ctx.agent ?? prevMessage?.agent
+      const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+      const sessionAgent = getSessionAgent(ctx.sessionID)
+      const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+      
+      log("[sisyphus_task] parentAgent resolution", {
+        sessionID: ctx.sessionID,
+        messageDir,
+        ctxAgent: ctx.agent,
+        sessionAgent,
+        firstMessageAgent,
+        prevMessageAgent: prevMessage?.agent,
+        resolvedParentAgent: parentAgent,
+      })
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
         ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
         : undefined
@@ -203,12 +227,22 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
+          const resumeMessageDir = getMessageDir(args.resume)
+          const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+          const resumeAgent = resumeMessage?.agent
+          const resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
+            ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+            : undefined
+
           await client.session.prompt({
             path: { id: args.resume },
             body: {
+              ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+              ...(resumeModel !== undefined ? { model: resumeModel } : {}),
               tools: {
                 task: false,
                 sisyphus_task: false,
+                call_omo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
@@ -300,24 +334,78 @@ ${textContent || "(No text output)"}`
         return `❌ Invalid arguments: Must provide either category or subagent_type.`
       }
 
+      // Fetch OpenCode config at boundary to get system default model
+      let systemDefaultModel: string | undefined
+      try {
+        const openCodeConfig = await client.config.get()
+        systemDefaultModel = (openCodeConfig as { model?: string })?.model
+      } catch {
+        // Config fetch failed, proceed without system default
+        systemDefaultModel = undefined
+      }
+
       let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string } | undefined
+      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
 
+      const parentModelString = parentModel
+        ? `${parentModel.providerID}/${parentModel.modelID}`
+        : undefined
+
+      let modelInfo: ModelFallbackInfo | undefined
+
       if (args.category) {
-        const resolved = resolveCategoryConfig(args.category, userCategories)
+        const resolved = resolveCategoryConfig(args.category, {
+          userCategories,
+          parentModelString,
+          systemDefaultModel,
+        })
         if (!resolved) {
           return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
+        // Determine model source by comparing against the actual resolved model
+        const actualModel = resolved.model
+        const userDefinedModel = userCategories?.[args.category]?.model
+        const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
+
+        if (!actualModel) {
+          return `❌ No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
+        }
+
+        if (!parseModelString(actualModel)) {
+          return `❌ Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+        }
+
+        switch (actualModel) {
+          case userDefinedModel:
+            modelInfo = { model: actualModel, type: "user-defined" }
+            break
+          case parentModelString:
+            modelInfo = { model: actualModel, type: "inherited" }
+            break
+          case categoryDefaultModel:
+            modelInfo = { model: actualModel, type: "category-default" }
+            break
+          case systemDefaultModel:
+            modelInfo = { model: actualModel, type: "system-default" }
+            break
+        }
+
         agentToUse = SISYPHUS_JUNIOR_AGENT
-        categoryModel = parseModelString(resolved.config.model)
+        const parsedModel = parseModelString(actualModel)
+        categoryModel = parsedModel
+          ? (resolved.config.variant
+            ? { ...parsedModel, variant: resolved.config.variant }
+            : parsedModel)
+          : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
       } else {
-        agentToUse = args.subagent_type!.trim()
-        if (!agentToUse) {
+        if (!args.subagent_type?.trim()) {
           return `❌ Agent name cannot be empty.`
         }
+        const agentName = args.subagent_type.trim()
+        agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
         try {
@@ -386,10 +474,18 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
       let syncSessionID: string | undefined
 
       try {
+        const parentSession = client.session.get
+          ? await client.session.get({ path: { id: ctx.sessionID } }).catch(() => null)
+          : null
+        const parentDirectory = parentSession?.data?.directory ?? directory
+
         const createResult = await client.session.create({
           body: {
             parentID: ctx.sessionID,
             title: `Task: ${args.description}`,
+          },
+          query: {
+            directory: parentDirectory,
           },
         })
 
@@ -410,6 +506,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             agent: agentToUse,
             isBackground: false,
             skills: args.skills,
+            modelInfo,
           })
         }
 
@@ -418,32 +515,26 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           metadata: { sessionId: sessionID, category: args.category, sync: true },
         })
 
-        // Use fire-and-forget prompt() - awaiting causes JSON parse errors with thinking models
-        // Note: Don't pass model in body - use agent's configured model instead
-        let promptError: Error | undefined
-        client.session.prompt({
-          path: { id: sessionID },
-          body: {
-            agent: agentToUse,
-            system: systemContent,
-            tools: {
-              task: false,
-              sisyphus_task: false,
+        try {
+          await client.session.prompt({
+            path: { id: sessionID },
+            body: {
+              agent: agentToUse,
+              system: systemContent,
+              tools: {
+                task: false,
+                sisyphus_task: false,
+                call_omo_agent: true,
+              },
+              parts: [{ type: "text", text: args.prompt }],
+              ...(categoryModel ? { model: categoryModel } : {}),
             },
-            parts: [{ type: "text", text: args.prompt }],
-          },
-        }).catch((error) => {
-          promptError = error instanceof Error ? error : new Error(String(error))
-        })
-
-        // Small delay to let the prompt start
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        if (promptError) {
+          })
+        } catch (promptError) {
           if (toastManager && taskId !== undefined) {
             toastManager.removeTask(taskId)
           }
-          const errorMessage = promptError.message
+          const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
           if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
             return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
           }
@@ -459,55 +550,64 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
+        let pollCount = 0
+
+        log("[sisyphus_task] Starting poll loop", { sessionID, agentToUse })
 
         while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
-          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
-
-          // Check for async errors that may have occurred after the initial 100ms delay
-          // TypeScript doesn't understand async mutation, so we cast to check
-          const asyncError = promptError as Error | undefined
-          if (asyncError) {
-            if (toastManager && taskId !== undefined) {
-              toastManager.removeTask(taskId)
-            }
-            const errorMessage = asyncError.message
-            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-              return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
-            }
-            return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+          if (ctx.abort?.aborted) {
+            log("[sisyphus_task] Aborted by user", { sessionID })
+            if (toastManager && taskId) toastManager.removeTask(taskId)
+            return `Task aborted.\n\nSession ID: ${sessionID}`
           }
+
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+          pollCount++
 
           const statusResult = await client.session.status()
           const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
           const sessionStatus = allStatuses[sessionID]
 
-          // If session is actively running, reset stability
+          if (pollCount % 10 === 0) {
+            log("[sisyphus_task] Poll status", {
+              sessionID,
+              pollCount,
+              elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
+              sessionStatus: sessionStatus?.type ?? "not_in_status",
+              stablePolls,
+              lastMsgCount,
+            })
+          }
+
           if (sessionStatus && sessionStatus.type !== "idle") {
             stablePolls = 0
             lastMsgCount = 0
             continue
           }
 
-          // Session is idle or not in status - check message stability
           const elapsed = Date.now() - pollStart
           if (elapsed < MIN_STABILITY_TIME_MS) {
-            continue  // Don't accept completion too early
+            continue
           }
 
-          // Get current message count
           const messagesCheck = await client.session.messages({ path: { id: sessionID } })
           const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
           const currentMsgCount = msgs.length
 
-          if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
+          if (currentMsgCount === lastMsgCount) {
             stablePolls++
             if (stablePolls >= STABILITY_POLLS_REQUIRED) {
-              break  // Messages stable for 3 polls - task complete
+              log("[sisyphus_task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
+              break
             }
           } else {
             stablePolls = 0
             lastMsgCount = currentMsgCount
           }
+        }
+
+        if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
+          log("[sisyphus_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
         }
 
         const messagesResult = await client.session.messages({

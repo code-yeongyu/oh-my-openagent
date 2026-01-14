@@ -28,7 +28,29 @@
 
 > `oh-my-opencode` をインストールして、ドーピングしたかのようにコーディングしましょう。バックグラウンドでエージェントを走らせ、oracle、librarian、frontend engineer のような専門エージェントを呼び出してください。丹精込めて作られた LSP/AST ツール、厳選された MCP、そして完全な Claude Code 互換レイヤーを、たった一行で手に入れましょう。
 
-**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプションで使えます。**
+# Claude OAuth アクセスに関するお知らせ
+
+## TL;DR
+
+> Q. oh-my-opencodeを使用できますか？
+
+はい。
+
+> Q. Claude Codeのサブスクリプションで使用できますか？
+
+はい、技術的には可能です。ただし、使用を推奨することはできません。
+
+## 詳細
+
+> 2026年1月より、AnthropicはToS違反を理由にサードパーティのOAuthアクセスを制限しました。
+>
+> [**Anthropicはこのプロジェクト oh-my-opencode を、opencodeをブロックする正当化の根拠として挙げています。**](https://x.com/thdxr/status/2010149530486911014)
+>
+> 実際、Claude CodeのOAuthリクエストシグネチャを偽装するプラグインがコミュニティに存在します。
+>
+> これらのツールは技術的な検出可能性に関わらず動作する可能性がありますが、ユーザーはToSへの影響を認識すべきであり、私個人としてはそれらの使用を推奨できません。
+>
+> このプロジェクトは非公式ツールの使用に起因するいかなる問題についても責任を負いません。また、**私たちはそれらのOAuthシステムのカスタム実装を一切持っていません。**
 
 <div align="center">
 
@@ -76,6 +98,7 @@
 - [Oh My OpenCode](#oh-my-opencode)
   - [この Readme は読まなくていいです](#この-readme-は読まなくていいです)
     - [エージェントの時代ですから](#エージェントの時代ですから)
+    - [🪄 魔法の言葉：`ultrawork`](#-魔法の言葉ultrawork)
     - [読みたい方のために：シジフォスに会う](#読みたい方のためにシジフォスに会う)
       - [インストールするだけで。](#インストールするだけで)
   - [インストール](#インストール)
@@ -88,10 +111,14 @@
     - [ステップ 4: 認証情報の設定](#ステップ-4-認証情報の設定)
       - [4.1 Anthropic (Claude)](#41-anthropic-claude)
       - [4.2 Google Gemini (Antigravity OAuth)](#42-google-gemini-antigravity-oauth)
-      - [4.3 OpenAI (ChatGPT Plus/Pro)](#43-openai-chatgpt-pluspro)
+      - [4.2.1 モデル設定](#421-モデル設定)
+      - [4.2.2 oh-my-opencode エージェントモデルのオーバーライド](#422-oh-my-opencode-エージェントモデルのオーバーライド)
+
     - [⚠️ 注意](#️-注意)
     - [セットアップの確認](#セットアップの確認)
     - [ユーザーに「おめでとうございます！🎉」と伝える](#ユーザーにおめでとうございますと伝える)
+    - [無料広告](#無料広告)
+    - [スターをお願いする ⭐](#スターをお願いする-)
     - [複雑すぎますか？](#複雑すぎますか)
   - [アンインストール](#アンインストール)
   - [機能](#機能)
@@ -99,7 +126,8 @@
     - [バックグラウンドエージェント: 本当のチームのように働く](#バックグラウンドエージェント-本当のチームのように働く)
     - [ツール: 同僚にはもっと良い道具を](#ツール-同僚にはもっと良い道具を)
       - [なぜあなただけ IDE を使っているのですか？](#なぜあなただけ-ide-を使っているのですか)
-      - [Context is all you need.](#context-is-all-you-need)
+      - [セッション管理](#セッション管理)
+      - [Context Is All You Need](#context-is-all-you-need)
       - [マルチモーダルを活用し、トークンは節約する](#マルチモーダルを活用しトークンは節約する)
       - [止まらないエージェントループ](#止まらないエージェントループ)
     - [Claude Code 互換性: さらば Claude Code、ようこそ OpenCode](#claude-code-互換性-さらば-claude-codeようこそ-opencode)
@@ -109,16 +137,20 @@
       - [互換性トグル](#互換性トグル)
     - [エージェントのためだけでなく、あなたのために](#エージェントのためだけでなくあなたのために)
   - [設定](#設定)
+    - [JSONC のサポート](#jsonc-のサポート)
     - [Google Auth](#google-auth)
     - [Agents](#agents)
       - [Permission オプション](#permission-オプション)
     - [Sisyphus Agent](#sisyphus-agent)
+    - [Background Tasks](#background-tasks)
     - [Hooks](#hooks)
     - [MCPs](#mcps)
     - [LSP](#lsp)
     - [Experimental](#experimental)
   - [作者のノート](#作者のノート)
   - [注意](#注意)
+  - [こちらの企業の専門家にご愛用いただいています](#こちらの企業の専門家にご愛用いただいています)
+  - [スポンサー](#スポンサー)
 
 # Oh My OpenCode
 
@@ -316,11 +348,10 @@ opencode auth login
 
 #### 4.2.2 oh-my-opencode エージェントモデルのオーバーライド
 
-`opencode-antigravity-auth` プラグインは内蔵 Google auth と異なるモデル名を使用します。`oh-my-opencode.json`（または `.opencode/oh-my-opencode.json`）でエージェントモデルをオーバーライドし、内蔵 `google_auth` を無効化してください：
+`opencode-antigravity-auth` プラグインは特定のモデル名を使用します。エージェントモデルを `oh-my-opencode.json`（または `.opencode/oh-my-opencode.json`）でオーバーライドしてください：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
@@ -344,37 +375,46 @@ opencode auth login
 
 **マルチアカウントロードバランシング**: プラグインは最大10個の Google アカウントをサポートします。1つのアカウントがレートリミットに達すると、自動的に次のアカウントに切り替わります。
 
-#### 4.3 OpenAI (ChatGPT Plus/Pro)
+#### 4.3 GitHub Copilot（フォールバックプロバイダー）
 
-まず、opencode-openai-codex-auth プラグインを追加します：
+GitHub Copilot は、ネイティブプロバイダー（Claude、ChatGPT、Gemini）が利用できない場合の**フォールバックプロバイダー**としてサポートされています。インストーラーは、Copilot をネイティブプロバイダーより低い優先度で構成します。
 
-```json
-{
-  "plugin": [
-    "oh-my-opencode",
-    "opencode-openai-codex-auth@4.3.0"
-  ]
-}
+**優先度**: ネイティブプロバイダー (Claude/ChatGPT/Gemini) > GitHub Copilot > 無料モデル
+
+##### モデルマッピング
+
+GitHub Copilot が有効な場合、oh-my-opencode は以下のモデル割り当てを使用します：
+
+| エージェント | モデル |
+|--------------|--------|
+| **Sisyphus** | `github-copilot/claude-opus-4.5` |
+| **Oracle** | `github-copilot/gpt-5.2` |
+| **Explore** | `grok code`（デフォルト） |
+| **Librarian** | `glm 4.7 free`（デフォルト） |
+
+GitHub Copilot はプロキシプロバイダーとして機能し、サブスクリプションに基づいて基盤となるモデルにリクエストをルーティングします。
+
+##### セットアップ
+
+インストーラーを実行し、GitHub Copilot で「はい」を選択します：
+
+```bash
+bunx oh-my-opencode install
+# サブスクリプション（Claude、ChatGPT、Gemini）を選択
+# プロンプトが表示されたら: "Do you have a GitHub Copilot subscription?" → 「はい」を選択
 ```
 
-##### モデル設定
+または、非対話モードを使用します：
 
-`opencode.json` に完全なモデル設定も構成する必要があります。
-[opencode-openai-codex-auth ドキュメント](https://github.com/numman-ali/opencode-openai-codex-auth)を読み、[`config/opencode-modern.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-modern.json)（OpenCode v1.0.210+）または [`config/opencode-legacy.json`](https://github.com/numman-ali/opencode-openai-codex-auth/blob/main/config/opencode-legacy.json)（旧バージョン）から provider/models 設定をコピーして、ユーザーの既存のセットアップを壊さないよう慎重にマージしてください。
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+```
 
-**利用可能なモデル**: `openai/gpt-5.2`, `openai/gpt-5.2-codex`, `openai/gpt-5.1-codex-max`, `openai/gpt-5.1-codex`, `openai/gpt-5.1-codex-mini`, `openai/gpt-5.1`
-
-**Variants** (OpenCode v1.0.210+): `--variant=<none|low|medium|high|xhigh>` オプションで推論強度を制御できます。
-
-その後、認証を行います：
+その後、GitHub で認証します：
 
 ```bash
 opencode auth login
-# Provider: OpenAI を選択
-# Login method: ChatGPT Plus/Pro (Codex Subscription) を選択
-# ユーザーにブラウザでの OAuth フロー完了を案内
-# 完了まで待機
-# 成功を確認し、ユーザーに報告
+# 選択: GitHub → OAuth 経由で認証
 ```
 
 
@@ -382,7 +422,7 @@ opencode auth login
 
 **ユーザーが明示的に要求しない限り、モデル設定を変更したり、機能（エージェント、フック、MCP）を無効化しないでください。**
 
-プラグインはデフォルトで完璧に動作します。推奨される `google_auth: true` 設定を除き、明示的な要求なしに他の設定を変更したり機能をオフにしないでください。
+プラグインはデフォルトで完璧に動作します。`opencode-antigravity-auth` を使用する場合は、上記の通りエージェントモデルをオーバーライドしてください。明示的な要求なしに他の設定を変更したり機能をオフにしないでください。
 
 ### セットアップの確認
 
@@ -508,17 +548,13 @@ Ask @explore for the policy on this feature
 あなたがエディタで使っているその機能、他のエージェントは触ることができません。
 最高の同僚に最高の道具を渡してください。これでリファクタリングも、ナビゲーションも、分析も、エージェントが適切に行えるようになります。
 
-- **lsp_hover**: その位置の型情報、ドキュメント、シグネチャを取得
 - **lsp_goto_definition**: シンボル定義へジャンプ
 - **lsp_find_references**: ワークスペース全体で使用箇所を検索
-- **lsp_document_symbols**: ファイルのシンボルアウトラインを取得
-- **lsp_workspace_symbols**: プロジェクト全体から名前でシンボルを検索
+- **lsp_symbols**: ファイルからシンボルを取得 (scope='document') またはワークスペース全体を検索 (scope='workspace')
 - **lsp_diagnostics**: ビルド前にエラー/警告を取得
 - **lsp_servers**: 利用可能な LSP サーバー一覧
 - **lsp_prepare_rename**: 名前変更操作の検証
 - **lsp_rename**: ワークスペース全体でシンボル名を変更
-- **lsp_code_actions**: 利用可能なクイックフィックス/リファクタリングを取得
-- **lsp_code_action_resolve**: コードアクションを適用
 - **ast_grep_search**: AST 認識コードパターン検索 (25言語対応)
 - **ast_grep_replace**: AST 認識コード置換
 
@@ -721,10 +757,10 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 1. `.opencode/oh-my-opencode.json` (プロジェクト)
 2. ユーザー設定（プラットフォーム別）：
 
-| プラットフォーム | ユーザー設定パス |
-|------------------|------------------|
-| **Windows** | `~/.config/opencode/oh-my-opencode.json` (推奨) または `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
-| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json` |
+| プラットフォーム | ユーザー設定パス                                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Windows**      | `~/.config/opencode/oh-my-opencode.json` (推奨) または `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
+| **macOS/Linux**  | `~/.config/opencode/oh-my-opencode.json`                                                                   |
 
 スキーマ自動補完がサポートされています：
 
@@ -748,10 +784,7 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 ```jsonc
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  
-  // Antigravity OAuth 経由で Google Gemini を有効にする
-  "google_auth": false,
-  
+
   /* エージェントのオーバーライド - 特定のタスクに合わせてモデルをカスタマイズ */
   "agents": {
     "oracle": {
@@ -768,24 +801,15 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 
 **推奨**: 外部の [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) プラグインを使用してください。マルチアカウントロードバランシング、より多くのモデル（Antigravity 経由の Claude を含む）、活発なメンテナンスを提供します。[インストール > Google Gemini](#42-google-gemini-antigravity-oauth) を参照。
 
-`opencode-antigravity-auth` 使用時は内蔵 auth を無効化し、`oh-my-opencode.json` でエージェントモデルをオーバーライドしてください：
+`opencode-antigravity-auth` 使用時は `oh-my-opencode.json` でエージェントモデルをオーバーライドしてください：
 
 ```json
 {
-  "google_auth": false,
   "agents": {
     "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
     "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
-}
-```
-
-**代替案**: 内蔵 Antigravity OAuth を有効化（単一アカウント、Gemini モデルのみ）：
-
-```json
-{
-  "google_auth": true
 }
 ```
 
@@ -841,13 +865,13 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-| Permission | 説明 | 値 |
-|------------|------|----|
-| `edit` | ファイル編集権限 | `ask` / `allow` / `deny` |
-| `bash` | Bash コマンド実行権限 | `ask` / `allow` / `deny` またはコマンド別: `{ "git": "allow", "rm": "deny" }` |
-| `webfetch` | ウェブアクセス権限 | `ask` / `allow` / `deny` |
-| `doom_loop` | 無限ループ検知のオーバーライド許可 | `ask` / `allow` / `deny` |
-| `external_directory` | プロジェクトルート外へのファイルアクセス | `ask` / `allow` / `deny` |
+| Permission           | 説明                                     | 値                                                                            |
+| -------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `edit`               | ファイル編集権限                         | `ask` / `allow` / `deny`                                                      |
+| `bash`               | Bash コマンド実行権限                    | `ask` / `allow` / `deny` またはコマンド別: `{ "git": "allow", "rm": "deny" }` |
+| `webfetch`           | ウェブアクセス権限                       | `ask` / `allow` / `deny`                                                      |
+| `doom_loop`          | 無限ループ検知のオーバーライド許可       | `ask` / `allow` / `deny`                                                      |
+| `external_directory` | プロジェクトルート外へのファイルアクセス | `ask` / `allow` / `deny`                                                      |
 
 または `~/.config/opencode/oh-my-opencode.json` か `.opencode/oh-my-opencode.json` の `disabled_agents` を使用して無効化できます：
 
@@ -925,12 +949,12 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-| オプション                  | デフォルト | 説明                                                                                                                                                         |
-| --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `disabled`                  | `false` | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                                       |
-| `default_builder_enabled`   | `false` | `true` の場合、OpenCode-Builder エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                                   |
-| `planner_enabled`           | `true`  | `true` の場合、Prometheus (Planner) エージェントを有効化します（work-planner 方法論を含む）。デフォルトで有効です。                                                                   |
-| `replace_plan`              | `true`  | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Prometheus (Planner) とデフォルトのプランの両方を利用できます。                             |
+| オプション                | デフォルト | 説明                                                                                                                                                                       |
+| ------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`                | `false`    | `true` の場合、すべての Sisyphus オーケストレーションを無効化し、元の build/plan をプライマリとして復元します。                                                            |
+| `default_builder_enabled` | `false`    | `true` の場合、OpenCode-Builder エージェントを有効化します（OpenCode build と同じ、SDK 制限により名前変更）。デフォルトでは無効です。                                      |
+| `planner_enabled`         | `true`     | `true` の場合、Prometheus (Planner) エージェントを有効化します（work-planner 方法論を含む）。デフォルトで有効です。                                                        |
+| `replace_plan`            | `true`     | `true` の場合、デフォルトのプランエージェントをサブエージェントモードに降格させます。`false` に設定すると、Prometheus (Planner) とデフォルトのプランの両方を利用できます。 |
 
 ### Background Tasks
 
@@ -953,10 +977,10 @@ Oh My OpenCode は以下の場所からフックを読み込んで実行しま�
 }
 ```
 
-| オプション            | デフォルト | 説明                                                                                                           |
-| --------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
-| `defaultConcurrency`  | -          | すべてのプロバイダー/モデルに対するデフォルトの最大同時バックグラウンドタスク数                                 |
-| `providerConcurrency` | -          | プロバイダーごとの同時実行制限。キーはプロバイダー名（例：`anthropic`、`openai`、`google`）                     |
+| オプション            | デフォルト | 説明                                                                                                                  |
+| --------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `defaultConcurrency`  | -          | すべてのプロバイダー/モデルに対するデフォルトの最大同時バックグラウンドタスク数                                       |
+| `providerConcurrency` | -          | プロバイダーごとの同時実行制限。キーはプロバイダー名（例：`anthropic`、`openai`、`google`）                           |
 | `modelConcurrency`    | -          | モデルごとの同時実行制限。キーは完全なモデル名（例：`anthropic/claude-opus-4-5`）。プロバイダー制限より優先されます。 |
 
 **優先順位**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
@@ -1035,13 +1059,13 @@ OpenCode でサポートされるすべての LSP 構成およびカスタム設
 }
 ```
 
-| オプション                        | デフォルト | 説明                                                                                                                                                                   |
-| --------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction_threshold` | `0.85`     | プリエンプティブコンパクションをトリガーする閾値（0.5-0.95）。`preemptive-compaction` フックはデフォルトで有効です。このオプションで閾値をカスタマイズできます。                 |
+| オプション                        | デフォルト | 説明                                                                                                                                                                               |
+| --------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preemptive_compaction_threshold` | `0.85`     | プリエンプティブコンパクションをトリガーする閾値（0.5-0.95）。`preemptive-compaction` フックはデフォルトで有効です。このオプションで閾値をカスタマイズできます。                   |
 | `truncate_all_tool_outputs`       | `false`    | ホワイトリストのツール（Grep、Glob、LSP、AST-grep）だけでなく、すべてのツール出力を切り詰めます。Tool output truncator はデフォルトで有効です - `disabled_hooks`で無効化できます。 |
-| `aggressive_truncation`           | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                 |
-| `auto_resume`                     | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                        |
-| `dcp_for_compaction`              | `false`    | コンパクション用DCP（動的コンテキスト整理）を有効化 - トークン制限超過時に最初に実行されます。コンパクション前に重複したツール呼び出しと古いツール出力を整理します。                |
+| `aggressive_truncation`           | `false`    | トークン制限を超えた場合、ツール出力を積極的に切り詰めて制限内に収めます。デフォルトの切り詰めより積極的です。不十分な場合は要約/復元にフォールバックします。                      |
+| `auto_resume`                     | `false`    | thinking block エラーや thinking disabled violation からの回復成功後、自動的にセッションを再開します。最後のユーザーメッセージを抽出して続行します。                               |
+| `dcp_for_compaction`              | `false`    | コンパクション用DCP（動的コンテキスト整理）を有効化 - トークン制限超過時に最初に実行されます。コンパクション前に重複したツール呼び出しと古いツール出力を整理します。               |
 
 **警告**：これらの機能は実験的であり、予期しない動作を引き起こす可能性があります。影響を理解した場合にのみ有効にしてください。
 

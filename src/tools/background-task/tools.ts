@@ -4,7 +4,9 @@ import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+import { log } from "../../shared/logger"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -63,6 +65,19 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
       try {
         const messageDir = getMessageDir(ctx.sessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+        const sessionAgent = getSessionAgent(ctx.sessionID)
+        const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+        
+        log("[background_task] parentAgent resolution", {
+          sessionID: ctx.sessionID,
+          ctxAgent: ctx.agent,
+          sessionAgent,
+          firstMessageAgent,
+          prevMessageAgent: prevMessage?.agent,
+          resolvedParentAgent: parentAgent,
+        })
+        
         const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
           ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
           : undefined
@@ -74,7 +89,7 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           parentSessionID: ctx.sessionID,
           parentMessageID: ctx.messageID,
           parentModel,
-          parentAgent: ctx.agent ?? prevMessage?.agent,
+          parentAgent,
         })
 
         ctx.metadata?.({

@@ -1,8 +1,26 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+
+  return null
+}
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -60,12 +78,29 @@ async function executeBackground(
   manager: BackgroundManager
 ): Promise<string> {
   try {
+    const messageDir = getMessageDir(toolContext.sessionID)
+    const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+    const sessionAgent = getSessionAgent(toolContext.sessionID)
+    const parentAgent = toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+    
+    log("[call_omo_agent] parentAgent resolution", {
+      sessionID: toolContext.sessionID,
+      messageDir,
+      ctxAgent: toolContext.agent,
+      sessionAgent,
+      firstMessageAgent,
+      prevMessageAgent: prevMessage?.agent,
+      resolvedParentAgent: parentAgent,
+    })
+
     const task = await manager.launch({
       description: args.description,
       prompt: args.prompt,
       agent: args.subagent_type,
       parentSessionID: toolContext.sessionID,
       parentMessageID: toolContext.messageID,
+      parentAgent,
     })
 
     toolContext.metadata?.({
@@ -110,10 +145,22 @@ async function executeSync(
     sessionID = args.session_id
   } else {
     log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
+    const parentSession = await ctx.client.session.get({
+      path: { id: toolContext.sessionID },
+    }).catch((err) => {
+      log(`[call_omo_agent] Failed to get parent session:`, err)
+      return null
+    })
+    log(`[call_omo_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
+    const parentDirectory = parentSession?.data?.directory ?? ctx.directory
+
     const createResult = await ctx.client.session.create({
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     })
 
@@ -141,7 +188,6 @@ async function executeSync(
         agent: args.subagent_type,
         tools: {
           task: false,
-          call_omo_agent: false,
           sisyphus_task: false,
         },
         parts: [{ type: "text", text: args.prompt }],
@@ -156,7 +202,58 @@ async function executeSync(
     return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
   }
 
-  log(`[call_omo_agent] Prompt sent, fetching messages...`)
+  log(`[call_omo_agent] Prompt sent, polling for completion...`)
+
+  // Poll for session completion
+  const POLL_INTERVAL_MS = 500
+  const MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes max
+  const pollStart = Date.now()
+  let lastMsgCount = 0
+  let stablePolls = 0
+  const STABILITY_REQUIRED = 3
+
+  while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
+    // Check if aborted
+    if (toolContext.abort?.aborted) {
+      log(`[call_omo_agent] Aborted by user`)
+      return `Task aborted.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+    }
+
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+
+    // Check session status
+    const statusResult = await ctx.client.session.status()
+    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const sessionStatus = allStatuses[sessionID]
+
+    // If session is actively running, reset stability counter
+    if (sessionStatus && sessionStatus.type !== "idle") {
+      stablePolls = 0
+      lastMsgCount = 0
+      continue
+    }
+
+    // Session is idle - check message stability
+    const messagesCheck = await ctx.client.session.messages({ path: { id: sessionID } })
+    const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+    const currentMsgCount = msgs.length
+
+    if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
+      stablePolls++
+      if (stablePolls >= STABILITY_REQUIRED) {
+        log(`[call_omo_agent] Session complete, ${currentMsgCount} messages`)
+        break
+      }
+    } else {
+      stablePolls = 0
+      lastMsgCount = currentMsgCount
+    }
+  }
+
+  if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
+    log(`[call_omo_agent] Timeout reached`)
+    return `Error: Agent task timed out after 5 minutes.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+  }
 
   const messagesResult = await ctx.client.session.messages({
     path: { id: sessionID },

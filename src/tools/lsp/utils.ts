@@ -30,12 +30,14 @@ export function findWorkspaceRoot(filePath: string): string {
 
   const markers = [".git", "package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml", "build.gradle"]
 
-  while (dir !== "/") {
+  let prevDir = ""
+  while (dir !== prevDir) {
     for (const marker of markers) {
       if (existsSync(require("path").join(dir, marker))) {
         return dir
       }
     }
+    prevDir = dir
     dir = require("path").dirname(dir)
   }
 

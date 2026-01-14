@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { isPrereleaseVersion, isDistTag, isPrereleaseOrDistTag } from "./index"
+import { isPrereleaseVersion, isDistTag, isPrereleaseOrDistTag, extractChannel } from "./index"
 
 describe("auto-update-checker", () => {
   describe("isPrereleaseVersion", () => {
@@ -148,6 +148,107 @@ describe("auto-update-checker", () => {
 
       // #then returns false
       expect(result).toBe(false)
+    })
+  })
+
+  describe("extractChannel", () => {
+    test("extracts beta from dist-tag", () => {
+      // #given beta dist-tag
+      const version = "beta"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns beta
+      expect(result).toBe("beta")
+    })
+
+    test("extracts next from dist-tag", () => {
+      // #given next dist-tag
+      const version = "next"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns next
+      expect(result).toBe("next")
+    })
+
+    test("extracts canary from dist-tag", () => {
+      // #given canary dist-tag
+      const version = "canary"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns canary
+      expect(result).toBe("canary")
+    })
+
+    test("extracts beta from prerelease version", () => {
+      // #given beta prerelease version
+      const version = "3.0.0-beta.1"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns beta
+      expect(result).toBe("beta")
+    })
+
+    test("extracts alpha from prerelease version", () => {
+      // #given alpha prerelease version
+      const version = "1.0.0-alpha"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns alpha
+      expect(result).toBe("alpha")
+    })
+
+    test("extracts rc from prerelease version", () => {
+      // #given rc prerelease version
+      const version = "2.0.0-rc.1"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns rc
+      expect(result).toBe("rc")
+    })
+
+    test("returns latest for stable version", () => {
+      // #given stable version
+      const version = "2.14.0"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns latest
+      expect(result).toBe("latest")
+    })
+
+    test("returns latest for null", () => {
+      // #given null version
+      const version = null
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns latest
+      expect(result).toBe("latest")
+    })
+
+    test("handles complex prerelease identifiers", () => {
+      // #given complex prerelease
+      const version = "3.0.0-beta.1.experimental"
+
+      // #when extracting channel
+      const result = extractChannel(version)
+
+      // #then returns beta
+      expect(result).toBe("beta")
     })
   })
 })

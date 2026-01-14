@@ -675,93 +675,140 @@ describe("LaunchInput.skillContent", () => {
   })
 })
 
-describe("BackgroundManager.notifyParentSession - agent context preservation", () => {
-  test("should not pass agent field when parentAgent is undefined", async () => {
-    // #given
+interface CurrentMessage {
+  agent?: string
+  model?: { providerID?: string; modelID?: string }
+}
+
+describe("BackgroundManager.notifyParentSession - dynamic message lookup", () => {
+  test("should use currentMessage model/agent when available", async () => {
+    // #given - currentMessage has model and agent
     const task: BackgroundTask = {
-      id: "task-no-agent",
+      id: "task-1",
       sessionID: "session-child",
       parentSessionID: "session-parent",
       parentMessageID: "msg-parent",
-      description: "task without agent context",
+      description: "task with dynamic lookup",
       prompt: "test",
       agent: "explore",
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: undefined,
-      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+      parentAgent: "OldAgent",
+      parentModel: { providerID: "old", modelID: "old-model" },
+    }
+    const currentMessage: CurrentMessage = {
+      agent: "Sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
     }
 
     // #when
-    const promptBody = buildNotificationPromptBody(task)
+    const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // #then
-    expect("agent" in promptBody).toBe(false)
-    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus" })
-  })
-
-  test("should include agent field when parentAgent is defined", async () => {
-    // #given
-    const task: BackgroundTask = {
-      id: "task-with-agent",
-      sessionID: "session-child",
-      parentSessionID: "session-parent",
-      parentMessageID: "msg-parent",
-      description: "task with agent context",
-      prompt: "test",
-      agent: "explore",
-      status: "completed",
-      startedAt: new Date(),
-      completedAt: new Date(),
-      parentAgent: "Sisyphus",
-      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
-    }
-
-    // #when
-    const promptBody = buildNotificationPromptBody(task)
-
-    // #then
+    // #then - uses currentMessage values, not task.parentModel/parentAgent
     expect(promptBody.agent).toBe("Sisyphus")
+    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
   })
 
-  test("should not pass model field when parentModel is undefined", async () => {
+  test("should fallback to parentAgent when currentMessage.agent is undefined", async () => {
     // #given
     const task: BackgroundTask = {
-      id: "task-no-model",
+      id: "task-2",
       sessionID: "session-child",
       parentSessionID: "session-parent",
       parentMessageID: "msg-parent",
-      description: "task without model context",
+      description: "task fallback agent",
       prompt: "test",
       agent: "explore",
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: "Sisyphus",
+      parentAgent: "FallbackAgent",
       parentModel: undefined,
     }
+    const currentMessage: CurrentMessage = { agent: undefined, model: undefined }
 
     // #when
-    const promptBody = buildNotificationPromptBody(task)
+    const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // #then
+    // #then - falls back to task.parentAgent
+    expect(promptBody.agent).toBe("FallbackAgent")
     expect("model" in promptBody).toBe(false)
+  })
+
+  test("should not pass model when currentMessage.model is incomplete", async () => {
+    // #given - model missing modelID
+    const task: BackgroundTask = {
+      id: "task-3",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task incomplete model",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "Sisyphus",
+      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+    }
+    const currentMessage: CurrentMessage = {
+      agent: "Sisyphus",
+      model: { providerID: "anthropic" },
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task, currentMessage)
+
+    // #then - model not passed due to incomplete data
     expect(promptBody.agent).toBe("Sisyphus")
+    expect("model" in promptBody).toBe(false)
+  })
+
+  test("should handle null currentMessage gracefully", async () => {
+    // #given - no message found (messageDir lookup failed)
+    const task: BackgroundTask = {
+      id: "task-4",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task no message",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "Sisyphus",
+      parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+    }
+
+    // #when
+    const promptBody = buildNotificationPromptBody(task, null)
+
+    // #then - falls back to task.parentAgent, no model
+    expect(promptBody.agent).toBe("Sisyphus")
+    expect("model" in promptBody).toBe(false)
   })
 })
 
-function buildNotificationPromptBody(task: BackgroundTask): Record<string, unknown> {
+function buildNotificationPromptBody(
+  task: BackgroundTask,
+  currentMessage: CurrentMessage | null
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     parts: [{ type: "text", text: `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished.` }],
   }
 
-  if (task.parentAgent !== undefined) {
-    body.agent = task.parentAgent
-  }
+  const agent = currentMessage?.agent ?? task.parentAgent
+  const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+    ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+    : undefined
 
-  if (task.parentModel?.providerID && task.parentModel?.modelID) {
-    body.model = { providerID: task.parentModel.providerID, modelID: task.parentModel.modelID }
+  if (agent !== undefined) {
+    body.agent = agent
+  }
+  if (model !== undefined) {
+    body.model = model
   }
 
   return body

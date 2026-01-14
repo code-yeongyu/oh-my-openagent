@@ -2,7 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
 import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 export * from "./constants"
@@ -14,6 +15,7 @@ export * from "./constants"
  * - Mixed separators (e.g., .sisyphus\\plans/x.md)
  * - Case-insensitive directory/extension matching
  * - Workspace confinement (blocks paths outside root or via traversal)
+ * - Nested project paths (e.g., parent/.sisyphus/... when ctx.directory is parent)
  */
 function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
   // 1. Resolve to absolute path
@@ -27,10 +29,9 @@ function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
     return false
   }
 
-  // 4. Split by both separators and check first segment matches ALLOWED_PATH_PREFIX (case-insensitive)
-  // Guard: if rel is empty (filePath === workspaceRoot), segments[0] would be "" — reject
-  const segments = rel.split(/[/\\]/)
-  if (!segments[0] || segments[0].toLowerCase() !== ALLOWED_PATH_PREFIX.toLowerCase()) {
+  // 4. Check if .sisyphus/ or .sisyphus\ exists anywhere in the path (case-insensitive)
+  // This handles both direct paths (.sisyphus/x.md) and nested paths (project/.sisyphus/x.md)
+  if (!/\.sisyphus[/\\]/i.test(rel)) {
     return false
   }
 
@@ -61,10 +62,14 @@ function getMessageDir(sessionID: string): string | null {
 
 const TASK_TOOLS = ["sisyphus_task", "task", "call_omo_agent"]
 
-function getAgentFromSession(sessionID: string): string | undefined {
+function getAgentFromMessageFiles(sessionID: string): string | undefined {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return undefined
-  return findNearestMessageWithFields(messageDir)?.agent
+  return findFirstMessageWithAgent(messageDir) ?? findNearestMessageWithFields(messageDir)?.agent
+}
+
+function getAgentFromSession(sessionID: string): string | undefined {
+  return getSessionAgent(sessionID) ?? getAgentFromMessageFiles(sessionID)
 }
 
 export function createPrometheusMdOnlyHook(ctx: PluginInput) {
