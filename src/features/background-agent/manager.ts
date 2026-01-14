@@ -66,6 +66,7 @@ export class BackgroundManager {
     log("[background-agent] launch() called with:", {
       agent: input.agent,
       model: input.model,
+      modelChainLength: input.modelChain?.length,
       description: input.description,
       parentSessionID: input.parentSessionID,
     })
@@ -153,17 +154,19 @@ export class BackgroundManager {
       sessionID,
       agent: input.agent,
       model: input.model,
+      modelChainLength: input.modelChain?.length,
       hasSkillContent: !!input.skillContent,
       promptLength: input.prompt.length,
     })
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
-    // Include model if caller provided one (e.g., from Sisyphus category configs)
+    // Include model or modelChain if caller provided one (e.g., from Sisyphus category configs)
     this.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: input.agent,
         ...(input.model ? { model: input.model } : {}),
+        ...(input.modelChain && input.modelChain.length > 0 ? { modelChain: input.modelChain } : {}),
         system: input.skillContent,
         tools: {
           task: false,
@@ -178,7 +181,7 @@ export class BackgroundManager {
       if (existingTask) {
         existingTask.status = "error"
         const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        if (errorMessage.includes("agent.name")) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
         } else {
           existingTask.error = errorMessage
