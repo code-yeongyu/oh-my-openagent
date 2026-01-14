@@ -7,6 +7,7 @@ import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../co
 import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { createBuiltinSkills } from "../../features/builtin-skills/skills"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
@@ -87,11 +88,12 @@ function resolveCategoryConfig(
 }
 
 export interface SisyphusTaskToolOptions {
-  manager: BackgroundManager
-  client: OpencodeClient
-  directory: string
-  userCategories?: CategoriesConfig
-  gitMasterConfig?: GitMasterConfig
+	manager: BackgroundManager
+	client: OpencodeClient
+	directory: string
+	userCategories?: CategoriesConfig
+	gitMasterConfig?: GitMasterConfig
+	pluginSkills?: Map<string, LoadedSkill>
 }
 
 export interface BuildSystemContentInput {
@@ -114,7 +116,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig } = options
+	const { manager, client, directory, userCategories, gitMasterConfig, pluginSkills } = options
 
   return tool({
     description: SISYPHUS_TASK_DESCRIPTION,
@@ -139,9 +141,11 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       let skillContent: string | undefined
       if (args.skills.length > 0) {
-        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig })
+        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig, pluginSkills })
         if (notFound.length > 0) {
-          const available = createBuiltinSkills().map(s => s.name).join(", ")
+          const builtinNames = createBuiltinSkills().map(s => s.name)
+          const pluginNames = pluginSkills ? Array.from(pluginSkills.keys()) : []
+          const available = [...builtinNames, ...pluginNames].join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
         }
         skillContent = Array.from(resolved.values()).join("\n\n")

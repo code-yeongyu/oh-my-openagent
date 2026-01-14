@@ -45,7 +45,13 @@ import {
   discoverOpencodeProjectSkills,
   mergeSkills,
 } from "./features/opencode-skill-loader";
+import type { LoadedSkill } from "./features/opencode-skill-loader/types";
+import type { CommandDefinition } from "./features/claude-code-command-loader/types";
 import { createBuiltinSkills } from "./features/builtin-skills";
+import {
+  loadPluginSkillsAsCommands,
+  discoverInstalledPlugins,
+} from "./features/claude-code-plugin-loader";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
 import {
   setMainSession,
@@ -237,12 +243,24 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
+
+  // Load plugin skills (needed for sisyphusTask)
+  const pluginLoadResult = await discoverInstalledPlugins();
+  const pluginSkillCommands = loadPluginSkillsAsCommands(pluginLoadResult.plugins);
+  const pluginSkills: LoadedSkill[] = Object.entries(pluginSkillCommands).map(([name, definition]) => ({
+    name,
+    definition,
+    scope: "plugin" as const,
+  }));
+  const pluginSkillsMap = new Map(pluginSkills.map((s) => [s.name, s]));
+
   const sisyphusTask = createSisyphusTask({
     manager: backgroundManager,
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
+    pluginSkills: pluginSkillsMap,
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
@@ -262,13 +280,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
     discoverOpencodeProjectSkills(),
   ]);
+
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
     userSkills,
     globalSkills,
     projectSkills,
-    opencodeProjectSkills
+    opencodeProjectSkills,
+    { pluginSkills }
   );
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";

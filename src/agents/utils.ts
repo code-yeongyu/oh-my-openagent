@@ -15,6 +15,7 @@ import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
 import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
+import type { LoadedSkill } from "../features/opencode-skill-loader/types"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -51,7 +52,8 @@ function isFactory(source: AgentSource): source is AgentFactory {
 export function buildAgent(
   source: AgentSource,
   model?: string,
-  categories?: CategoriesConfig
+  categories?: CategoriesConfig,
+  pluginSkills?: Map<string, LoadedSkill>
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -75,7 +77,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills)
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { pluginSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -130,7 +132,8 @@ export function createBuiltinAgents(
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
-  categories?: CategoriesConfig
+  categories?: CategoriesConfig,
+  pluginSkills?: Map<string, LoadedSkill>
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
@@ -149,7 +152,7 @@ export function createBuiltinAgents(
     const override = agentOverrides[agentName]
     const model = override?.model
 
-    let config = buildAgent(source, model, mergedCategories)
+    let config = buildAgent(source, model, mergedCategories, pluginSkills)
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()

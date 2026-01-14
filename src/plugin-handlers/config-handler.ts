@@ -1,4 +1,5 @@
 import { createBuiltinAgents } from "../agents";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import {
   loadUserCommands,
@@ -99,12 +100,21 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
+    // Convert plugin commands to LoadedSkill format
+    const pluginSkills: LoadedSkill[] = Object.entries(pluginComponents.skills).map(([name, definition]) => ({
+      name,
+      definition,
+      scope: "plugin" as const,
+    }));
+    const pluginSkillsMap = new Map(pluginSkills.map((s) => [s.name, s]));
+
     const builtinAgents = createBuiltinAgents(
       pluginConfig.disabled_agents,
       pluginConfig.agents,
       ctx.directory,
       config.model as string | undefined,
-      pluginConfig.categories
+      pluginConfig.categories,
+      pluginSkillsMap
     );
 
     // Claude Code agents: Do NOT apply permission migration
