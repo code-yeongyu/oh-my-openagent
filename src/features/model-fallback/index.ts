@@ -72,7 +72,8 @@ export async function withModelFallback<T>(
   operation: (model: ModelSpec) => Promise<T>,
   options?: { retryConfig?: RetryConfig; logPrefix?: string }
 ): Promise<RetryResult<T>> {
-  const maxAttempts = Math.max(1, options?.retryConfig?.maxAttempts ?? modelChain.length)
+  const rawMaxAttempts = options?.retryConfig?.maxAttempts
+  const maxAttempts = Math.max(1, Number.isFinite(rawMaxAttempts) ? rawMaxAttempts : modelChain.length)
   const delayMs = options?.retryConfig?.delayMs ?? 1000
   const prefix = options?.logPrefix ?? "[model-fallback]"
   const errors: Array<{ model: string; error: string }> = []

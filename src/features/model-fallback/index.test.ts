@@ -412,6 +412,23 @@ describe("model-fallback", () => {
       expect(operation).toHaveBeenCalledTimes(2)
     })
 
+    test("handles NaN maxAttempts by using chain length", async () => {
+      // #given
+      const chain = buildModelChain("anthropic/claude-opus-4-5", ["openai/gpt-5.2"])
+      const operation = mock(async (model: ModelSpec) => `success:${model.modelID}`)
+
+      // #when
+      const result = await withModelFallback(chain, operation, {
+        retryConfig: { maxAttempts: NaN, delayMs: 10 },
+      })
+
+      // #then
+      expect(result.success).toBe(true)
+      expect(result.attempts).toBe(1)
+      expect(Number.isNaN(result.attempts)).toBe(false)
+      expect(operation).toHaveBeenCalledTimes(1)
+    })
+
     test("returns error for empty model chain", async () => {
       // #given
       const chain: ModelSpec[] = []
