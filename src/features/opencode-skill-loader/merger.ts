@@ -252,17 +252,22 @@ export function mergeSkills(
     }
   }
 
+	const disabledNames = new Set(normalizedConfig.disable)
+	for (const [name, entry] of Object.entries(normalizedConfig.entries)) {
+		if (entry === false || (entry !== true && entry.disable)) {
+			disabledNames.add(name)
+		}
+	}
+
 	if (options.pluginSkills) {
 		for (const skill of options.pluginSkills) {
+			if (disabledNames.has(skill.name)) continue
+
 			const existing = skillMap.get(skill.name)
 			if (!existing || SCOPE_PRIORITY[skill.scope] > SCOPE_PRIORITY[existing.scope]) {
 				skillMap.set(skill.name, skill)
 			}
 		}
-	}
-
-	for (const name of normalizedConfig.disable) {
-		skillMap.delete(name)
 	}
 
   if (normalizedConfig.enable.length > 0) {
