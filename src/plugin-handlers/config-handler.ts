@@ -305,6 +305,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         call_omo_agent: false,
       };
     }
+    if (agentResult["Prometheus (Planner)"]) {
+      (agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools = {
+        ...(agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools,
+        call_omo_agent: false,
+      };
+    }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
