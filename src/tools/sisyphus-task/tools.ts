@@ -403,6 +403,7 @@ ${textContent || "(No text output)"}`
             parentModel,
             parentAgent,
             model: categoryModel,
+            modelChain,
             skills: args.skills,
             skillContent: systemContent,
           })
@@ -512,7 +513,8 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
             failedModels.push({ model: modelStr, error: errorMessage })
             
-            if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+            // Only abort on agent configuration errors, not transient errors
+            if (errorMessage.includes("agent.name")) {
               if (toastManager && taskId !== undefined) {
                 toastManager.removeTask(taskId)
               }
