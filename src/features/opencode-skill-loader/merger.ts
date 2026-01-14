@@ -252,10 +252,6 @@ export function mergeSkills(
     }
   }
 
-	for (const name of normalizedConfig.disable) {
-		skillMap.delete(name)
-	}
-
 	if (options.pluginSkills) {
 		for (const skill of options.pluginSkills) {
 			const existing = skillMap.get(skill.name)
@@ -263,6 +259,10 @@ export function mergeSkills(
 				skillMap.set(skill.name, skill)
 			}
 		}
+	}
+
+	for (const name of normalizedConfig.disable) {
+		skillMap.delete(name)
 	}
 
   if (normalizedConfig.enable.length > 0) {
