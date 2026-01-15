@@ -262,7 +262,11 @@ export class BackgroundManager {
   }): Promise<BackgroundTask> {
     const existingTask = this.tasks.get(input.taskId)
     if (existingTask) {
-      if (input.parentSessionID !== existingTask.parentSessionID) {
+      // P2 fix: Clean up old parent's pending set BEFORE changing parent
+      // Otherwise cleanupPendingByParent would use the new parent ID
+      const parentChanged = input.parentSessionID !== existingTask.parentSessionID
+      if (parentChanged) {
+        this.cleanupPendingByParent(existingTask)  // Clean from OLD parent
         existingTask.parentSessionID = input.parentSessionID
       }
       if (input.parentAgent !== undefined) {
@@ -281,8 +285,8 @@ export class BackgroundManager {
         const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
         pending.add(existingTask.id)
         this.pendingByParent.set(input.parentSessionID, pending)
-      } else {
-        // Don't re-add completed/cancelled tasks; clean any stale entry
+      } else if (!parentChanged) {
+        // Only clean up if parent didn't change (already cleaned above if it did)
         this.cleanupPendingByParent(existingTask)
       }
 
