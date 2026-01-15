@@ -3,8 +3,9 @@
 // Wrapper script that detects platform and spawns the correct binary
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { getPlatformPackage, getBinaryPath } from "./platform.js";
+import { getPlatformPackage, getBinaryPath, getFallbackCliPath } from "./platform.js";
 
 const require = createRequire(import.meta.url);
 
@@ -46,11 +47,36 @@ function main() {
   try {
     binPath = require.resolve(binRelPath);
   } catch {
+    const fallbackCliPath = getFallbackCliPath();
+    if (existsSync(fallbackCliPath)) {
+      const fallbackResult = spawnSync("bun", [fallbackCliPath, ...process.argv.slice(2)], {
+        stdio: "inherit",
+      });
+
+      if (!fallbackResult.error) {
+        if (fallbackResult.signal) {
+          const signalNum = fallbackResult.signal === "SIGTERM" ? 15 :
+                            fallbackResult.signal === "SIGKILL" ? 9 :
+                            fallbackResult.signal === "SIGINT" ? 2 : 1;
+          process.exit(128 + signalNum);
+        }
+
+        process.exit(fallbackResult.status ?? 1);
+      }
+
+      if (fallbackResult.error?.code !== "ENOENT") {
+        console.error(`\noh-my-opencode: Failed to execute Bun fallback.`);
+        console.error(`Error: ${fallbackResult.error.message}\n`);
+        process.exit(2);
+      }
+    }
+
     console.error(`\noh-my-opencode: Platform binary not installed.`);
     console.error(`\nYour platform: ${platform}-${arch}${libcFamily === "musl" ? "-musl" : ""}`);
     console.error(`Expected package: ${pkg}`);
     console.error(`\nTo fix, run:`);
-    console.error(`  npm install ${pkg}\n`);
+    console.error(`  npm install ${pkg}`);
+    console.error(`\nOr install Bun to use the JS fallback.\n`);
     process.exit(1);
   }
   

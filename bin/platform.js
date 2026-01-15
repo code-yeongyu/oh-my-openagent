@@ -1,6 +1,8 @@
 // bin/platform.js
 // Shared platform detection module - used by wrapper and postinstall
 
+import { fileURLToPath } from "node:url";
+
 /**
  * Get the platform-specific package name
  * @param {{ platform: string, arch: string, libcFamily?: string | null }} options
@@ -35,4 +37,8 @@ export function getPlatformPackage({ platform, arch, libcFamily }) {
 export function getBinaryPath(pkg, platform) {
   const ext = platform === "win32" ? ".exe" : "";
   return `${pkg}/bin/oh-my-opencode${ext}`;
+}
+
+export function getFallbackCliPath() {
+  return fileURLToPath(new URL("../dist/cli/index.js", import.meta.url));
 }

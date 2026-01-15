@@ -1,6 +1,6 @@
 // bin/platform.test.ts
 import { describe, expect, test } from "bun:test";
-import { getPlatformPackage, getBinaryPath } from "./platform.js";
+import { getPlatformPackage, getBinaryPath, getFallbackCliPath } from "./platform.js";
 
 describe("getPlatformPackage", () => {
   // #region Darwin platforms
@@ -144,5 +144,15 @@ describe("getBinaryPath", () => {
 
     // #then returns path without extension
     expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode");
+  });
+});
+
+describe("getFallbackCliPath", () => {
+  test("returns path to dist/cli/index.js", () => {
+    // #given fallback cli path
+    const result = getFallbackCliPath();
+
+    // #then returns dist cli path
+    expect(result).toMatch(/dist[\\/]+cli[\\/]+index\.js$/);
   });
 });
