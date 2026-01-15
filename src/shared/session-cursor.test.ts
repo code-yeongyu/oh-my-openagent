@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { getNewMessages, resetMessageCursor } from "./session-cursor"
+import { consumeNewMessages, resetMessageCursor } from "./session-cursor"
 
-describe("getNewMessages", () => {
+describe("consumeNewMessages", () => {
   const sessionID = "session-123"
 
   const buildMessage = (id: string, created: number) => ({
@@ -17,8 +17,8 @@ describe("getNewMessages", () => {
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
 
     // #when
-    const first = getNewMessages(sessionID, messages)
-    const second = getNewMessages(sessionID, messages)
+    const first = consumeNewMessages(sessionID, messages)
+    const second = consumeNewMessages(sessionID, messages)
 
     // #then
     expect(first).toEqual(messages)
@@ -28,11 +28,11 @@ describe("getNewMessages", () => {
   it("returns only new messages after cursor advances", () => {
     // #given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
-    getNewMessages(sessionID, messages)
+    consumeNewMessages(sessionID, messages)
     const extended = [...messages, buildMessage("m3", 3)]
 
     // #when
-    const next = getNewMessages(sessionID, extended)
+    const next = consumeNewMessages(sessionID, extended)
 
     // #then
     expect(next).toEqual([extended[2]])
@@ -41,11 +41,11 @@ describe("getNewMessages", () => {
   it("resets when message history shrinks", () => {
     // #given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
-    getNewMessages(sessionID, messages)
+    consumeNewMessages(sessionID, messages)
     const shorter = [buildMessage("n1", 1)]
 
     // #when
-    const next = getNewMessages(sessionID, shorter)
+    const next = consumeNewMessages(sessionID, shorter)
 
     // #then
     expect(next).toEqual(shorter)
@@ -54,11 +54,11 @@ describe("getNewMessages", () => {
   it("returns all messages when last key is missing", () => {
     // #given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
-    getNewMessages(sessionID, messages)
+    consumeNewMessages(sessionID, messages)
     const replaced = [buildMessage("n1", 1), buildMessage("n2", 2)]
 
     // #when
-    const next = getNewMessages(sessionID, replaced)
+    const next = consumeNewMessages(sessionID, replaced)
 
     // #then
     expect(next).toEqual(replaced)
