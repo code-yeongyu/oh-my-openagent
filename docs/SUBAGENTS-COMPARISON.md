@@ -4,6 +4,94 @@
 
 ---
 
+## 🎯 目标流程 vs 当前实现 - 差异分析
+
+> **端到端流程图（第 1107 行起）是最终目标定稿。** 本节对比目标流程与当前实现的差异，列出达成目标所需的任务。
+
+### 差异分析表
+
+| 组件 | 目标流程（文档） | 当前实现状态 | 差距 |
+|------|------------------|--------------|------|
+| **Phase 0: 意图门控** | 自动化 Skill 检查 → 分类 → 歧义检查 | `orchestrator-sisyphus.ts` 系统提示中实现 | Step 0 (Skill Check) 是隐式的提示，缺少工具级别的强制执行 |
+| **Planning Phase** | 顺序调用 Metis → Prometheus → Momus | Agents 存在并在 `index.ts` 中配置 | 循环是 **LLM 驱动的提示**；没有硬编码的状态机强制执行 |
+| **Phase 2A: 探索** | 自动调用 dispatching-parallel-agents skill 并行派发 explore/librarian | `sisyphus_task` 支持后台 explore/librarian | **保守使用**：默认使用直接工具（grep/lsp），警告不要使用后台 agents |
+| **Phase 2B: 执行者选择** | 按任务类型选择执行者（Junior/Frontend/Doc-Writer） | `orchestrator-sisyphus.ts` 中有 Visual vs Logic 分类逻辑 | Frontend 已实现；Junior/General 是默认回退，缺少 Doc-Writer 自动选择 |
+| **Archiver Agent** | Phase 3 归档（Git 策略、清理） | `src/agents/archiver.ts` 存在 | **未接入**：标记为"本地开发中"，尚未被编排器完成钩子自动触发 |
+| **验证机制** | "Subagents Lie" - 强制验证每个声明 | `sisyphus-orchestrator/index.ts` 注入验证提醒 | **手动执行**：编排器被提醒验证，但系统不强制调用 `lsp_diagnostics` |
+
+### 达成目标的 Tasks
+
+#### Phase 1: 基础设施完善
+
+- [ ] **Task 1.1**: 将 `archiver` agent 接入 `sisyphus-orchestrator` 完成钩子
+  - 文件: `src/hooks/sisyphus-orchestrator/index.ts`
+  - 验收: Phase 3 完成时自动触发 Archiver
+
+- [ ] **Task 1.2**: 将 `implementer` agent 接入执行流程
+  - 文件: `src/agents/orchestrator-sisyphus.ts`
+  - 验收: 代码任务自动派发给 implementer
+
+#### Phase 2: 意图门控强化
+
+- [ ] **Task 2.1**: 实现 Step 0 (Skill Check) 的工具级别强制执行
+  - 文件: `src/hooks/sisyphus-orchestrator/index.ts`
+  - 验收: 每条消息首先检查 Skill 匹配
+
+- [ ] **Task 2.2**: 增强歧义检测逻辑
+  - 文件: `src/agents/orchestrator-sisyphus.ts`
+  - 验收: 2x 工作量差异时自动询问用户
+
+#### Phase 3: Planning 循环硬编码
+
+- [ ] **Task 3.1**: 实现 Metis → Prometheus → Momus 状态机
+  - 文件: 新建 `src/hooks/planning-loop/index.ts`
+  - 验收: Planning Phase 有明确的状态转换
+
+- [ ] **Task 3.2**: Momus REJECT 时自动返回 Prometheus
+  - 验收: 计划审查失败时自动重新规划
+
+#### Phase 4: 探索阶段增强
+
+- [ ] **Task 4.1**: Phase 2A 默认使用 dispatching-parallel-agents 策略
+  - 文件: `src/agents/orchestrator-sisyphus.ts`
+  - 验收: 探索阶段自动并行派发 explore/librarian
+
+- [ ] **Task 4.2**: 移除"后台 agents RARELY NEEDED"警告
+  - 验收: 后台并行成为默认行为
+
+#### Phase 5: 执行者自动选择
+
+- [ ] **Task 5.1**: 实现 Doc-Writer 自动选择逻辑
+  - 文件: `src/agents/orchestrator-sisyphus.ts`
+  - 触发条件: `.md/.rst/.txt` 文件、README/DOCS
+  - 验收: 文档任务自动派发给 document-writer
+
+- [ ] **Task 5.2**: 统一 Sequential 和 Wave 模式的执行者选择
+  - 文件: `src/features/builtin-skills/executing-plans/SKILL.md`, `wave-parallel-execution/SKILL.md`
+  - 验收: 两种模式使用相同的选择逻辑
+
+#### Phase 6: 验证机制强化
+
+- [ ] **Task 6.1**: 强制 `lsp_diagnostics` 在任务标记完成前执行
+  - 文件: `src/hooks/sisyphus-orchestrator/index.ts`
+  - 验收: 子代理报告成功后自动运行诊断
+
+- [ ] **Task 6.2**: 实现"Subagents Lie"自动验证钩子
+  - 验收: 每个子代理返回结果后强制验证
+
+---
+
+### 优先级建议
+
+| 优先级 | Tasks | 理由 |
+|--------|-------|------|
+| **P0 - 立即** | 1.1, 1.2 | 基础设施：agents 已存在，只需接入 |
+| **P1 - 高** | 5.1, 5.2 | 执行者选择：直接影响任务质量 |
+| **P2 - 中** | 4.1, 6.1 | 探索和验证：提升效率和可靠性 |
+| **P3 - 低** | 2.1, 2.2, 3.1, 3.2 | 意图门控和规划循环：LLM 提示已基本工作 |
+
+---
+
 ## 版本说明
 
 ### 原版 v3.0.0-beta（10 个 Agents）
