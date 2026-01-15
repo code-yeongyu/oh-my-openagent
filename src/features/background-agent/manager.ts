@@ -275,12 +275,18 @@ export class BackgroundManager {
       subagentSessions.add(existingTask.sessionID)
       this.startPolling()
 
-      // Track for batched notifications (external tasks need tracking too)
-      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
-      pending.add(existingTask.id)
-      this.pendingByParent.set(input.parentSessionID, pending)
+      // Track for batched notifications only if task is still running
+      // Don't add stale entries for completed tasks
+      if (existingTask.status === "running") {
+        const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+        pending.add(existingTask.id)
+        this.pendingByParent.set(input.parentSessionID, pending)
+      } else {
+        // Don't re-add completed/cancelled tasks; clean any stale entry
+        this.cleanupPendingByParent(existingTask)
+      }
 
-      log("[background-agent] External task already registered:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
+      log("[background-agent] External task already registered:", { taskId: existingTask.id, sessionID: existingTask.sessionID, status: existingTask.status })
 
       return existingTask
     }
