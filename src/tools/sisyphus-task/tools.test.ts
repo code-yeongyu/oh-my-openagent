@@ -541,10 +541,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
       
-      // #then - should return error message with the prompt error
+      // #then - should return detailed error message with args and stack trace
       expect(result).toContain("❌")
-      expect(result).toContain("Failed to send prompt")
+      expect(result).toContain("Send prompt failed")
       expect(result).toContain("JSON Parse error")
+      expect(result).toContain("**Arguments**:")
+      expect(result).toContain("**Stack Trace**:")
     })
 
     test("sync mode success returns task result with content", async () => {
