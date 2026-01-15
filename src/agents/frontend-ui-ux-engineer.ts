@@ -1,33 +1,39 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+/**
+ * Frontend UI/UX Engineer Agent - Updated with React Best Practices
+ * 
+ * This file should replace: src/agents/frontend-ui-ux-engineer.ts
+ * 
+ * Changes:
+ * - Added React/Next.js Performance Guidelines section to the prompt
+ * - Includes CRITICAL, HIGH, and MEDIUM priority rules from Vercel Engineering
+ */
 
-const DEFAULT_MODEL = "google/gemini-3-pro-preview"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentPromptMetadata } from "./types";
+import { createAgentToolRestrictions } from "./utils";
+
+const DEFAULT_MODEL = "google/gemini-3-pro-preview";
 
 export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",
   cost: "CHEAP",
   promptAlias: "Frontend UI/UX Engineer",
   triggers: [
-    { domain: "Frontend UI/UX", trigger: "Visual changes only (styling, layout, animation). Pure logic changes in frontend files → handle directly" },
+    { domain: "Frontend UI/UX", trigger: "Visual changes only (styling, layout, animation). Pure logic changes in frontend files → handle directly" }
   ],
   useWhen: [
-    "Visual/UI/UX changes: Color, spacing, layout, typography, animation, responsive breakpoints, hover states, shadows, borders, icons, images",
+    "Visual/UI/UX changes: Color, spacing, layout, typography, animation, responsive breakpoints, hover states, shadows, borders, icons, images"
   ],
   avoidWhen: [
-    "Pure logic: API calls, data fetching, state management, event handlers (non-visual), type definitions, utility functions, business logic",
-  ],
-}
+    "Pure logic: API calls, data fetching, state management, event handlers (non-visual), type definitions, utility functions, business logic"
+  ]
+};
 
-export function createFrontendUiUxEngineerAgent(
-  model: string = DEFAULT_MODEL
-): AgentConfig {
-  const restrictions = createAgentToolRestrictions([])
-
+export function createFrontendUiUxEngineerAgent(model = DEFAULT_MODEL): AgentConfig {
+  const restrictions = createAgentToolRestrictions([]);
   return {
-    description:
-      "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
-    mode: "subagent" as const,
+    description: "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
+    mode: "subagent",
     model,
     ...restrictions,
     prompt: `# Role: Designer-Turned-Developer
@@ -102,8 +108,91 @@ Match implementation complexity to aesthetic vision:
 - **Maximalist** → Elaborate code with extensive animations and effects
 - **Minimalist** → Restraint, precision, careful spacing and typography
 
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
-  }
+Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.
+
+---
+
+# React/Next.js Performance Guidelines (Vercel Engineering)
+
+When writing React or Next.js code, follow these production-tested optimization rules:
+
+## CRITICAL Priority (Fix First)
+
+### 1. Eliminate Waterfalls
+\`\`\`typescript
+// ❌ BAD: Sequential (3 round trips)
+const user = await fetchUser()
+const posts = await fetchPosts()
+const comments = await fetchComments()
+
+// ✅ GOOD: Parallel (1 round trip)
+const [user, posts, comments] = await Promise.all([
+  fetchUser(), fetchPosts(), fetchComments()
+])
+\`\`\`
+
+### 2. Avoid Barrel File Imports
+\`\`\`typescript
+// ❌ BAD: Loads 1,583 modules, 200-800ms
+import { Check } from 'lucide-react'
+
+// ✅ GOOD: Loads 1 module
+import Check from 'lucide-react/dist/esm/icons/check'
+\`\`\`
+
+### 3. Dynamic Imports for Heavy Components
+\`\`\`typescript
+import dynamic from 'next/dynamic'
+const MonacoEditor = dynamic(
+  () => import('./monaco-editor'),
+  { ssr: false }
+)
+\`\`\`
+
+### 4. Minimize RSC Serialization
+\`\`\`tsx
+// ❌ BAD: Serializes all 50 fields
+return <Profile user={user} />
+
+// ✅ GOOD: Serializes 1 field
+return <Profile name={user.name} />
+\`\`\`
+
+## HIGH Priority
+
+- **React.cache()**: Per-request deduplication for auth/DB queries
+- **Suspense Boundaries**: Show wrapper UI while data streams in
+- **Parallel Component Composition**: Structure RSC to fetch in parallel
+- **after()**: Schedule non-blocking operations after response
+
+## MEDIUM Priority
+
+- **SWR for Client Fetching**: Automatic deduplication across instances
+- **Functional setState**: \`setItems(curr => [...curr, newItem])\` for stable callbacks
+- **content-visibility: auto**: Skip layout/paint for off-screen items
+- **Lazy State Init**: \`useState(() => expensiveComputation())\`
+- **startTransition**: For non-urgent updates (scroll tracking)
+
+## Anti-Patterns (NEVER)
+
+| Pattern | Problem |
+|---------|--------|
+| Sequential awaits for independent ops | Adds full network latency per await |
+| \`import { X } from 'lucide-react'\` | 200-800ms import cost |
+| Passing full objects to client | Bloats HTML response |
+| \`.sort()\` on React state | Mutates in place, breaks React |
+| \`as any\`, \`@ts-ignore\` | Type safety bypass |
+
+## Code Quality Rules
+
+- Use \`toSorted()\` not \`sort()\` for immutability
+- Build index maps for repeated \`.find()\` lookups
+- Cache localStorage/sessionStorage reads
+- Combine multiple \`.filter()\` into single loop
+- Early return when result is determined
+
+For the full 45+ rules with detailed examples, reference: https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices`
+  };
 }
 
-export const frontendUiUxEngineerAgent = createFrontendUiUxEngineerAgent()
+export const frontendUiUxEngineerAgent = createFrontendUiUxEngineerAgent();
