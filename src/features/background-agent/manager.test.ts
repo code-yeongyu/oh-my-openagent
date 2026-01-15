@@ -960,7 +960,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
   })
 })
 
-describe("BackgroundManager.registerExternalTask", () => {
+describe("BackgroundManager.trackTask", () => {
   let manager: BackgroundManager
 
   beforeEach(() => {
@@ -985,8 +985,8 @@ describe("BackgroundManager.registerExternalTask", () => {
     }
 
     // #when
-    await manager.registerExternalTask(input)
-    await manager.registerExternalTask(input)
+    await manager.trackTask(input)
+    await manager.trackTask(input)
 
     // #then
     const concurrencyManager = getConcurrencyManager(manager)
@@ -1010,7 +1010,7 @@ describe("BackgroundManager.resume concurrency key", () => {
 
   test("should re-acquire using external task concurrency key", async () => {
     // #given
-    const task = await manager.registerExternalTask({
+    const task = await manager.trackTask({
       taskId: "task-1",
       sessionID: "session-1",
       parentSessionID: "parent-session",

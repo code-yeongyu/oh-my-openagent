@@ -248,10 +248,10 @@ export class BackgroundManager {
   }
 
   /**
-   * Register an external task (e.g., from sisyphus_task) for notification tracking.
-   * This allows tasks created by external tools to receive the same toast/prompt notifications.
+   * Track a task created elsewhere (e.g., from sisyphus_task) for notification tracking.
+   * This allows tasks created by other tools to receive the same toast/prompt notifications.
    */
-  async registerExternalTask(input: {
+  async trackTask(input: {
     taskId: string
     sessionID: string
     parentSessionID: string
@@ -419,11 +419,11 @@ export class BackgroundManager {
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
 
-       // Release concurrency on error to prevent slot leaks
-       if (existingTask.concurrencyKey) {
-         this.concurrencyManager.release(existingTask.concurrencyKey)
-         existingTask.concurrencyKey = undefined
-       }
+      // Release concurrency on error to prevent slot leaks
+      if (existingTask.concurrencyKey) {
+        this.concurrencyManager.release(existingTask.concurrencyKey)
+        existingTask.concurrencyKey = undefined
+      }
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
