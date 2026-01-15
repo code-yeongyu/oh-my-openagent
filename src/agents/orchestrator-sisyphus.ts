@@ -25,13 +25,13 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 
 | Agent | Best For |
 |-------|----------|
-| \`oracle\` | Read-only consultation. High-IQ debugging, architecture design |
+| \`oracle\` | Read-only consultation. System context, architecture design |
+| \`sherlock\` | Hypothesis-driven debugging (use Oracle first for context) |
 | \`explore\` | Codebase exploration, pattern finding |
 | \`librarian\` | External docs, GitHub examples, OSS reference |
 | \`frontend-ui-ux-engineer\` | Visual design, UI implementation |
 | \`document-writer\` | README, API docs, guides |
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+| \`git-master\` | Git commits (ALWAYS use for commits) |`
   }
 
   const rows = agents.map((a) => {
@@ -44,8 +44,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 | Agent | Best For |
 |-------|----------|
 ${rows.join("\n")}
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+| \`git-master\` | Git commits (ALWAYS use for commits) |`
 }
 
 function buildCategorySection(userCategories?: Record<string, CategoryConfig>): string {
@@ -120,7 +119,11 @@ function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<s
   if (agentNames.includes("explore")) rows.push("| Find code in codebase | `agent=\"explore\"` |")
   if (agentNames.includes("librarian")) rows.push("| Look up library docs | `agent=\"librarian\"` |")
   rows.push("| Git commit | `agent=\"git-master\"` |")
-  rows.push("| Debug complex issue | `agent=\"debugging-master\"` |")
+  if (agentNames.includes("sherlock")) {
+    rows.push("| Debug complex issue | Oracle context → `agent=\"sherlock\"` |")
+  } else {
+    rows.push("| Debug complex issue | Oracle context → `agent=\"sherlock\"` |")
+  }
 
   return `##### Decision Matrix
 
@@ -383,7 +386,7 @@ style, className, tailwind, color, background, border, shadow, margin, padding, 
 | Librarian | \`librarian\` | Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource) |
 | Documentation | \`document-writer\` | README, API docs, guides |
 | Architecture decisions | \`oracle\` | Read-only consultation. Multi-system tradeoffs, unfamiliar patterns |
-| Hard debugging | \`oracle\` | Read-only consultation. After 2+ failed fix attempts |
+| Hard debugging | \`oracle\` → \`sherlock\` | After 2+ failed fix attempts: Oracle for context, then Sherlock for hypothesis-driven debugging |
 
 ### Delegation Prompt Structure (MANDATORY - ALL 7 sections):
 
@@ -480,12 +483,25 @@ If project has build/test commands, run them at task completion.
 2. Re-verify after EVERY fix attempt
 3. Never shotgun debug (random changes hoping something works)
 
-### After 3 Consecutive Failures:
+### After 2 Consecutive Failures:
+
+**CRITICAL: Consult Oracle FIRST for system context, THEN delegate to Sherlock.**
 
 1. **STOP** all further edits immediately
-2. **REVERT** to last known working state (git checkout / undo edits)
-3. **DOCUMENT** what was attempted and what failed
-4. **CONSULT** Oracle with full failure context
+2. **CONSULT Oracle** for system context (architecture, known gotchas, focus areas)
+3. **DELEGATE to Sherlock** with Oracle's context for hypothesis-driven debugging
+4. If Sherlock cannot resolve → **ASK USER** before proceeding
+
+### Debugging Flow:
+\`\`\`
+Failure 1 → Failure 2 → STOP
+      ↓
+Oracle (get system context)
+      ↓
+Sherlock (with Oracle context)
+      ↓
+Fix with evidence
+\`\`\`
 
 **Never**: Leave code in broken state, continue hoping it'll work, delete failing tests to "pass"
 
@@ -1241,7 +1257,8 @@ The answer is almost always YES.
 - \`sisyphus_task(category="visual-engineering", background=false)\` → frontend/UI implementation
 - \`sisyphus_task(agent="git-master", background=false)\` → ALL git commits
 - \`sisyphus_task(agent="document-writer", background=false)\` → documentation
-- \`sisyphus_task(agent="debugging-master", background=false)\` → complex debugging
+- \`sisyphus_task(agent="oracle", background=false)\` → get system context before debugging
+- \`sisyphus_task(agent="sherlock", background=false)\` → hypothesis-driven debugging (with Oracle context)
 
 **⚠️ CRITICAL: background=false is MANDATORY for all task delegations.**
 
