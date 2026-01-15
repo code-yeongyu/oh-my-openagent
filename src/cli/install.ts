@@ -10,8 +10,8 @@ import {
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
+import packageJson from "../../package.json" with { type: "json" }
 
-const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
 
 const SYMBOLS = {

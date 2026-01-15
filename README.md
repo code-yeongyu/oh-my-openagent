@@ -258,20 +258,17 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 
 ### For Humans
 
-> **⚠️ Prerequisite: Bun is required**
->
-> This tool **requires [Bun](https://bun.sh/) to be installed** on your system.
-> Even if you use `npx` to run the installer, the underlying runtime depends on Bun.
-
 Run the interactive installer:
 
 ```bash
-bunx oh-my-opencode install
-# or use npx if bunx doesn't work
 npx oh-my-opencode install
+# or with bun
+bunx oh-my-opencode install
 ```
 
-> **Note for Ubuntu/Debian users**: If you installed Bun via Snap (`/snap/bin/bun`), `bunx` will fail with "script not found" due to Snap's sandboxing. Either use `npx` instead, or reinstall Bun via the official installer: `curl -fsSL https://bun.sh/install | bash`
+> **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
+>
+> **Supported platforms**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
