@@ -13,6 +13,11 @@ describe("non-interactive-env hook", () => {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
     }
+    // #given clean Unix-like environment for all tests
+    // This prevents CI environments (which may have PSModulePath set) from
+    // triggering PowerShell detection in tests that expect Unix behavior
+    delete process.env.PSModulePath
+    process.env.SHELL = "/bin/bash"
   })
 
   afterEach(() => {
