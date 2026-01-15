@@ -6,6 +6,7 @@ import { getMainSessionID, subagentSessions } from "../features/claude-code-sess
 import {
     findNearestMessageWithFields,
     MESSAGE_STORAGE,
+    type ToolPermission,
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
 
@@ -151,15 +152,24 @@ export function createTodoContinuationEnforcer(
     }).catch(() => {})
   }
 
-  async function injectContinuation(sessionID: string, incompleteCount: number, total: number): Promise<void> {
+  interface ResolvedMessageInfo {
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    tools?: Record<string, ToolPermission>
+  }
+
+  async function injectContinuation(
+    sessionID: string,
+    incompleteCount: number,
+    total: number,
+    resolvedInfo?: ResolvedMessageInfo
+  ): Promise<void> {
     const state = sessions.get(sessionID)
 
     if (state?.isRecovering) {
       log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
       return
     }
-
-
 
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
@@ -185,38 +195,44 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const messageDir = getMessageDir(sessionID)
-    const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    let agentName = resolvedInfo?.agent
+    let model = resolvedInfo?.model
+    let tools = resolvedInfo?.tools
 
-    const agentName = prevMessage?.agent
+    if (!agentName || !model) {
+      const messageDir = getMessageDir(sessionID)
+      const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+      agentName = agentName ?? prevMessage?.agent
+      model = model ?? (prevMessage?.model?.providerID && prevMessage?.model?.modelID
+        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        : undefined)
+      tools = tools ?? prevMessage?.tools
+    }
+
     if (agentName && skipAgents.includes(agentName)) {
       log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
       return
     }
 
-    const editPermission = prevMessage?.tools?.edit
-    const writePermission = prevMessage?.tools?.write
-    const hasWritePermission = !prevMessage?.tools ||
+    const editPermission = tools?.edit
+    const writePermission = tools?.write
+    const hasWritePermission = !tools ||
       ((editPermission !== false && editPermission !== "deny") &&
        (writePermission !== false && writePermission !== "deny"))
     if (!hasWritePermission) {
-      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
+      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: agentName })
       return
     }
 
     const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
-    const model = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-      ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
-      : undefined
-
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, model, incompleteCount: freshIncompleteCount })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
-          agent: prevMessage?.agent,
+          agent: agentName,
           ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: prompt }],
         },
@@ -229,7 +245,12 @@ export function createTodoContinuationEnforcer(
     }
   }
 
-  function startCountdown(sessionID: string, incompleteCount: number, total: number): void {
+  function startCountdown(
+    sessionID: string,
+    incompleteCount: number,
+    total: number,
+    resolvedInfo?: ResolvedMessageInfo
+  ): void {
     const state = getState(sessionID)
     cancelCountdown(sessionID)
 
@@ -246,7 +267,7 @@ export function createTodoContinuationEnforcer(
 
     state.countdownTimer = setTimeout(() => {
       cancelCountdown(sessionID)
-      injectContinuation(sessionID, incompleteCount, total)
+      injectContinuation(sessionID, incompleteCount, total, resolvedInfo)
     }, COUNTDOWN_SECONDS * 1000)
 
     log(`[${HOOK_NAME}] Countdown started`, { sessionID, seconds: COUNTDOWN_SECONDS, incompleteCount })
@@ -350,15 +371,26 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      let agentName: string | undefined
+      let resolvedInfo: ResolvedMessageInfo | undefined
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
         })
-        const messages = (messagesResp.data ?? []) as Array<{ info?: { agent?: string } }>
+        const messages = (messagesResp.data ?? []) as Array<{
+          info?: {
+            agent?: string
+            model?: { providerID: string; modelID: string }
+            tools?: Record<string, ToolPermission>
+          }
+        }>
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].info?.agent) {
-            agentName = messages[i].info?.agent
+          const info = messages[i].info
+          if (info?.agent || info?.model) {
+            resolvedInfo = {
+              agent: info.agent,
+              model: info.model,
+              tools: info.tools,
+            }
             break
           }
         }
@@ -366,13 +398,13 @@ export function createTodoContinuationEnforcer(
         log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(err) })
       }
 
-      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName, skipAgents })
-      if (agentName && skipAgents.includes(agentName)) {
-        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
+      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents })
+      if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
+        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
         return
       }
 
-      startCountdown(sessionID, incompleteCount, todos.length)
+      startCountdown(sessionID, incompleteCount, todos.length, resolvedInfo)
       return
     }
 

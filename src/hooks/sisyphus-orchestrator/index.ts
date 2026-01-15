@@ -436,11 +436,26 @@ export function createSisyphusOrchestratorHook(
     try {
       log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
-      const messageDir = getMessageDir(sessionID)
-      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-        : undefined
+      let model: { providerID: string; modelID: string } | undefined
+      try {
+        const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+        const messages = (messagesResp.data ?? []) as Array<{
+          info?: { model?: { providerID: string; modelID: string } }
+        }>
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msgModel = messages[i].info?.model
+          if (msgModel?.providerID && msgModel?.modelID) {
+            model = { providerID: msgModel.providerID, modelID: msgModel.modelID }
+            break
+          }
+        }
+      } catch {
+        const messageDir = getMessageDir(sessionID)
+        const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+          ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+          : undefined
+      }
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
