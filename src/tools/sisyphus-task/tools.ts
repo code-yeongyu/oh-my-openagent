@@ -51,6 +51,54 @@ function formatDuration(start: Date, end?: Date): string {
   return `${seconds}s`
 }
 
+interface ErrorContext {
+  operation: string
+  args?: SisyphusTaskArgs
+  sessionID?: string
+  agent?: string
+  category?: string
+}
+
+function formatDetailedError(error: unknown, ctx: ErrorContext): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const stack = error instanceof Error ? error.stack : undefined
+
+  const lines: string[] = [
+    `❌ ${ctx.operation} failed`,
+    "",
+    `**Error**: ${message}`,
+  ]
+
+  if (ctx.sessionID) {
+    lines.push(`**Session ID**: ${ctx.sessionID}`)
+  }
+
+  if (ctx.agent) {
+    lines.push(`**Agent**: ${ctx.agent}${ctx.category ? ` (category: ${ctx.category})` : ""}`)
+  }
+
+  if (ctx.args) {
+    lines.push("", "**Arguments**:")
+    lines.push(`- description: "${ctx.args.description}"`)
+    lines.push(`- category: ${ctx.args.category ?? "(none)"}`)
+    lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
+    lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
+    lines.push(`- skills: [${ctx.args.skills?.join(", ") ?? ""}]`)
+    if (ctx.args.resume) {
+      lines.push(`- resume: ${ctx.args.resume}`)
+    }
+  }
+
+  if (stack) {
+    lines.push("", "**Stack Trace**:")
+    lines.push("```")
+    lines.push(stack.split("\n").slice(0, 10).join("\n"))
+    lines.push("```")
+  }
+
+  return lines.join("\n")
+}
+
 type ToolContextWithMetadata = {
   sessionID: string
   messageID: string
@@ -203,8 +251,11 @@ Status: ${task.status}
 Agent continues with full previous context preserved.
 Use \`background_output\` with task_id="${task.id}" to check progress.`
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            return `❌ Failed to resume task: ${message}`
+            return formatDetailedError(error, {
+              operation: "Resume background task",
+              args,
+              sessionID: args.resume,
+            })
           }
         }
 
@@ -464,8 +515,12 @@ Status: ${task.status}
 
 System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          return `❌ Failed to launch task: ${message}`
+          return formatDetailedError(error, {
+            operation: "Launch background task",
+            args,
+            agent: agentToUse,
+            category: args.category,
+          })
         }
       }
 
@@ -536,9 +591,21 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           }
           const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
           if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-            return `❌ Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.\n\nSession ID: ${sessionID}`
+            return formatDetailedError(new Error(`Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`), {
+              operation: "Send prompt to agent",
+              args,
+              sessionID,
+              agent: agentToUse,
+              category: args.category,
+            })
           }
-          return `❌ Failed to send prompt: ${errorMessage}\n\nSession ID: ${sessionID}`
+          return formatDetailedError(promptError, {
+            operation: "Send prompt",
+            args,
+            sessionID,
+            agent: agentToUse,
+            category: args.category,
+          })
         }
 
         // Poll for session completion with stability detection
@@ -659,8 +726,13 @@ ${textContent || "(No text output)"}`
         if (syncSessionID) {
           subagentSessions.delete(syncSessionID)
         }
-        const message = error instanceof Error ? error.message : String(error)
-        return `❌ Task failed: ${message}`
+        return formatDetailedError(error, {
+          operation: "Execute task",
+          args,
+          sessionID: syncSessionID,
+          agent: agentToUse,
+          category: args.category,
+        })
       }
     },
   })
