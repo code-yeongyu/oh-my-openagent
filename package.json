@@ -6,10 +6,12 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "oh-my-opencode": "./dist/cli/index.js"
+    "oh-my-opencode": "./bin/oh-my-opencode.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin",
+    "postinstall.mjs"
   ],
   "exports": {
     ".": {
@@ -20,8 +22,11 @@
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build:all": "bun run build && bun run build:binaries",
+    "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
     "clean": "rm -rf dist",
+    "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
@@ -55,6 +60,7 @@
     "@opencode-ai/plugin": "^1.1.19",
     "@opencode-ai/sdk": "^1.1.19",
     "commander": "^14.0.2",
+    "detect-libc": "^2.0.0",
     "hono": "^4.10.4",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
@@ -69,6 +75,15 @@
     "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
     "typescript": "^5.7.3"
+  },
+  "optionalDependencies": {
+    "oh-my-opencode-darwin-arm64": "0.0.0",
+    "oh-my-opencode-darwin-x64": "0.0.0",
+    "oh-my-opencode-linux-arm64": "0.0.0",
+    "oh-my-opencode-linux-arm64-musl": "0.0.0",
+    "oh-my-opencode-linux-x64": "0.0.0",
+    "oh-my-opencode-linux-x64-musl": "0.0.0",
+    "oh-my-opencode-windows-x64": "0.0.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
