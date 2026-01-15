@@ -7,7 +7,7 @@ import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { getNewMessages } from "../../shared/session-cursor"
+import { consumeNewMessages } from "../../shared/session-cursor"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -240,7 +240,7 @@ Session ID: ${task.sessionID}
     return timeA.localeCompare(timeB)
   })
   
-  const newMessages = getNewMessages(task.sessionID, sortedMessages)
+  const newMessages = consumeNewMessages(task.sessionID, sortedMessages)
   if (newMessages.length === 0) {
     const duration = formatDuration(task.startedAt, task.completedAt)
     return `Task Result

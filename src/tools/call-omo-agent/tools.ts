@@ -5,7 +5,7 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
-import { getNewMessages } from "../../shared/session-cursor"
+import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 
@@ -291,7 +291,7 @@ async function executeSync(
     return timeA - timeB
   })
 
-  const newMessages = getNewMessages(sessionID, sortedMessages)
+  const newMessages = consumeNewMessages(sessionID, sortedMessages)
 
   if (newMessages.length === 0) {
     return `No new output since last check.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
