@@ -40,7 +40,7 @@ function buildMessageKey(message: CursorMessage, index: number): string {
   return `i:${index}`
 }
 
-export function getNewMessages<T extends CursorMessage>(
+export function consumeNewMessages<T extends CursorMessage>(
   sessionID: string | undefined,
   messages: T[]
 ): T[] {
