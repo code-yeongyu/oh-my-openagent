@@ -1,0 +1,16 @@
+{
+  "name": "oh-my-opencode-darwin-x64",
+  "version": "0.0.0",
+  "description": "Platform-specific binary for oh-my-opencode (darwin-x64)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/code-yeongyu/oh-my-opencode"
+  },
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "files": ["bin"],
+  "bin": {
+    "oh-my-opencode": "./bin/oh-my-opencode"
+  }
+}
