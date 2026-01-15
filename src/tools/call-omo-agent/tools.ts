@@ -5,6 +5,7 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { getNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 
@@ -290,11 +291,17 @@ async function executeSync(
     return timeA - timeB
   })
 
+  const newMessages = getNewMessages(sessionID, sortedMessages)
+
+  if (newMessages.length === 0) {
+    return `No new output since last check.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+  }
+
   // Extract content from ALL messages, not just the last one
   // Tool results may be in earlier messages while the final message is empty
   const extractedContent: string[] = []
 
-  for (const message of sortedMessages) {
+  for (const message of newMessages) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const part of (message as any).parts ?? []) {
       // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
