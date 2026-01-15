@@ -236,5 +236,148 @@ describe("start-work hook", () => {
       expect(output.parts[0].text).toContain("Ask the user")
       expect(output.parts[0].text).not.toContain("Which plan would you like to work on?")
     })
+
+    test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
+      // #given - existing boulder state pointing to old plan
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      // Old plan (in boulder state)
+      const oldPlanPath = join(plansDir, "old-plan.md")
+      writeFileSync(oldPlanPath, "# Old Plan\n- [ ] Old Task 1")
+
+      // New plan (user wants this one)
+      const newPlanPath = join(plansDir, "new-plan.md")
+      writeFileSync(newPlanPath, "# New Plan\n- [ ] New Task 1")
+
+      // Set up stale boulder state pointing to old plan
+      const staleState: BoulderState = {
+        active_plan: oldPlanPath,
+        started_at: "2026-01-01T10:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "old-plan",
+      }
+      writeBoulderState(TEST_DIR, staleState)
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: `Start Sisyphus work session
+<user-request>
+new-plan
+</user-request>`,
+          },
+        ],
+      }
+
+      // #when - user explicitly specifies new-plan
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should select new-plan, NOT resume old-plan
+      expect(output.parts[0].text).toContain("new-plan")
+      expect(output.parts[0].text).not.toContain("RESUMING")
+      expect(output.parts[0].text).not.toContain("old-plan")
+    })
+
+    test("should strip ultrawork/ulw keywords from plan name argument", async () => {
+      // #given - plan with ultrawork keyword in user-request
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "my-feature-plan.md")
+      writeFileSync(planPath, "# My Feature Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: `Start Sisyphus work session
+<user-request>
+my-feature-plan ultrawork
+</user-request>`,
+          },
+        ],
+      }
+
+      // #when - user specifies plan with ultrawork keyword
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should find plan without ultrawork suffix
+      expect(output.parts[0].text).toContain("my-feature-plan")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+
+    test("should strip ulw keyword from plan name argument", async () => {
+      // #given - plan with ulw keyword in user-request
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "api-refactor.md")
+      writeFileSync(planPath, "# API Refactor\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: `Start Sisyphus work session
+<user-request>
+api-refactor ulw
+</user-request>`,
+          },
+        ],
+      }
+
+      // #when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should find plan without ulw suffix
+      expect(output.parts[0].text).toContain("api-refactor")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+
+    test("should match plan by partial name", async () => {
+      // #given - user specifies partial plan name
+      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+
+      const planPath = join(plansDir, "2026-01-15-feature-implementation.md")
+      writeFileSync(planPath, "# Feature Implementation\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: `Start Sisyphus work session
+<user-request>
+feature-implementation
+</user-request>`,
+          },
+        ],
+      }
+
+      // #when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // #then - should find plan by partial match
+      expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
   })
 })
