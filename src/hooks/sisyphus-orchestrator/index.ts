@@ -63,34 +63,45 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
-const VERIFICATION_REMINDER = `**MANDATORY VERIFICATION - SUBAGENTS LIE**
+const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
 
-Subagents FREQUENTLY claim completion when:
-- Tests are actually FAILING
-- Code has type/lint ERRORS
-- Implementation is INCOMPLETE
-- Patterns were NOT followed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**YOU MUST VERIFY EVERYTHING YOURSELF:**
+⚠️ CRITICAL: Subagents FREQUENTLY LIE about completion.
+Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
-1. Run \`lsp_diagnostics\` on changed files - Must be CLEAN
-2. Run tests yourself - Must PASS (not "agent said it passed")
-3. Read the actual code - Must match requirements
-4. Check build/typecheck - Must succeed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-DO NOT TRUST THE AGENT'S SELF-REPORT.
-VERIFY EACH CLAIM WITH YOUR OWN TOOL CALLS.
+**STEP 1: VERIFY WITH YOUR OWN TOOL CALLS (DO THIS NOW)**
 
-**HANDS-ON QA REQUIRED (after ALL tasks complete):**
+Run these commands YOURSELF - do NOT trust agent's claims:
+1. \`lsp_diagnostics\` on changed files → Must be CLEAN
+2. \`bash\` to run tests → Must PASS
+3. \`bash\` to run build/typecheck → Must succeed
+4. \`Read\` the actual code → Must match requirements
 
-| Deliverable Type | Verification Tool | Action |
-|------------------|-------------------|--------|
-| **Frontend/UI** | \`/playwright\` skill | Navigate, interact, screenshot evidence |
-| **TUI/CLI** | \`interactive_bash\` (tmux) | Run interactively, verify output |
-| **API/Backend** | \`bash\` with curl | Send requests, verify responses |
+**STEP 2: DETERMINE IF HANDS-ON QA IS NEEDED**
 
-Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages, integration problems.
-**FAILURE TO DO HANDS-ON QA = INCOMPLETE WORK.**`
+| Deliverable Type | QA Method | Tool |
+|------------------|-----------|------|
+| **Frontend/UI** | Browser interaction | \`/playwright\` skill |
+| **TUI/CLI** | Run interactively | \`interactive_bash\` (tmux) |
+| **API/Backend** | Send real requests | \`bash\` with curl |
+
+Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages.
+
+**STEP 3: IF QA IS NEEDED - ADD TO TODO IMMEDIATELY**
+
+\`\`\`
+todowrite([
+  { id: "qa-X", content: "HANDS-ON QA: [specific verification action]", status: "pending", priority: "high" }
+])
+\`\`\`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**BLOCKING: DO NOT proceed to next task until Steps 1-3 are complete.**
+**FAILURE TO DO QA = INCOMPLETE WORK = USER WILL REJECT.**`
 
 const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
@@ -183,20 +194,38 @@ function buildOrchestratorReminder(planName: string, progress: { total: number; 
   return `
 ---
 
-**State:** Plan: ${planName} | ${progress.completed}/${progress.total} done, ${remaining} left
+**BOULDER STATE:** Plan: \`${planName}\` | ✅ ${progress.completed}/${progress.total} done | ⏳ ${remaining} remaining
 
 ---
 
 ${buildVerificationReminder(sessionId)}
 
-ALL pass? → commit atomic unit, mark \`[x]\`, next task.`
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**AFTER VERIFICATION PASSES - YOUR NEXT ACTIONS (IN ORDER):**
+
+1. **COMMIT** atomic unit (only verified changes)
+2. **MARK** \`[x]\` in plan file for completed task
+3. **PROCEED** to next task immediately
+
+**DO NOT STOP. ${remaining} tasks remain. Keep bouldering.**`
 }
 
 function buildStandaloneVerificationReminder(sessionId: string): string {
   return `
 ---
 
-${buildVerificationReminder(sessionId)}`
+${buildVerificationReminder(sessionId)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**AFTER VERIFICATION - CHECK YOUR TODO LIST:**
+
+1. Run \`todoread\` to see remaining tasks
+2. If QA tasks exist → execute them BEFORE marking complete
+3. Mark completed tasks → proceed to next pending task
+
+**NO TODO = NO TRACKING = INCOMPLETE WORK. Use todowrite aggressively.**`
 }
 
 function extractSessionIdFromOutput(output: string): string {
