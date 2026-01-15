@@ -6,17 +6,16 @@ CLI for oh-my-opencode: interactive installer, health diagnostics (doctor), runt
 ## STRUCTURE
 ```
 cli/
-├── index.ts              # Commander.js entry, subcommand routing (184 lines)
-├── install.ts            # Interactive TUI installer (436 lines)
-├── config-manager.ts     # JSONC parsing, env detection (725 lines)
+├── index.ts              # Commander.js entry, subcommand routing (146 lines)
+├── install.ts            # Interactive TUI installer (462 lines)
+├── config-manager.ts     # JSONC parsing, env detection (730 lines)
 ├── types.ts              # CLI-specific types
-├── commands/             # CLI subcommands (auth.ts)
 ├── doctor/               # Health check system
 │   ├── index.ts          # Doctor command entry
 │   ├── runner.ts         # Health check orchestration
 │   ├── constants.ts      # Check categories
 │   ├── types.ts          # Check result interfaces
-│   └── checks/           # 10+ check modules (17+ individual checks)
+│   └── checks/           # 10 check modules (14 individual checks)
 ├── get-local-version/    # Version detection
 └── run/                  # OpenCode session launcher
     ├── completion.ts     # Completion logic
@@ -28,16 +27,17 @@ cli/
 |---------|---------|
 | `install` | Interactive setup wizard with subscription detection |
 | `doctor` | Environment health checks (LSP, Auth, Config, Deps) |
-| `run` | Launch OpenCode session with event handling |
-| `auth` | Manage authentication providers |
+| `run` | Launch OpenCode session with todo/background completion enforcement |
+| `get-local-version` | Detect and return local plugin version & update status |
 
 ## DOCTOR CHECKS
-17+ checks in `doctor/checks/`:
-- `version.ts`: OpenCode >= 1.0.150
+14 checks in `doctor/checks/`:
+- `version.ts`: OpenCode >= 1.0.150 & plugin update status
 - `config.ts`: Plugin registration & JSONC validity
-- `dependencies.ts`: bun, node, git, gh-cli
+- `dependencies.ts`: AST-Grep (CLI/NAPI), Comment Checker
 - `auth.ts`: Anthropic, OpenAI, Google (Antigravity)
 - `lsp.ts`, `mcp.ts`: Tool connectivity checks
+- `gh.ts`: GitHub CLI availability
 
 ## CONFIG-MANAGER
 - **JSONC**: Supports comments and trailing commas via `parseJsonc`
