@@ -6,8 +6,8 @@ import type { SisyphusTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
 import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
-import { resolveMultipleSkills } from "../../features/opencode-skill-loader/skill-content"
-import { createBuiltinSkills } from "../../features/builtin-skills/skills"
+import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
+import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
@@ -196,9 +196,10 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
 
       let skillContent: string | undefined
       if (args.skills.length > 0) {
-        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig })
+        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.skills, { gitMasterConfig })
         if (notFound.length > 0) {
-          const available = createBuiltinSkills().map(s => s.name).join(", ")
+          const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
+          const available = allSkills.map(s => s.name).join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
         }
         skillContent = Array.from(resolved.values()).join("\n\n")
