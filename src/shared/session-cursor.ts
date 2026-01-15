@@ -57,8 +57,9 @@ export function getNewMessages<T extends CursorMessage>(
       const lastIndex = keys.lastIndexOf(cursor.lastKey)
       if (lastIndex >= 0) {
         startIndex = lastIndex + 1
-      } else if (cursor.lastCount <= messages.length) {
-        startIndex = cursor.lastCount
+      } else {
+        // History changed without a shrink; reset to avoid skipping messages.
+        startIndex = 0
       }
     }
   }

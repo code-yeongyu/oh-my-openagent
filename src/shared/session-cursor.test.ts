@@ -50,4 +50,17 @@ describe("getNewMessages", () => {
     // #then
     expect(next).toEqual(shorter)
   })
+
+  it("returns all messages when last key is missing", () => {
+    // #given
+    const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
+    getNewMessages(sessionID, messages)
+    const replaced = [buildMessage("n1", 1), buildMessage("n2", 2)]
+
+    // #when
+    const next = getNewMessages(sessionID, replaced)
+
+    // #then
+    expect(next).toEqual(replaced)
+  })
 })
