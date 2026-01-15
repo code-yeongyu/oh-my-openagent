@@ -7,6 +7,7 @@ import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { getNewMessages } from "../../shared/session-cursor"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -239,11 +240,26 @@ Session ID: ${task.sessionID}
     return timeA.localeCompare(timeB)
   })
   
+  const newMessages = getNewMessages(task.sessionID, sortedMessages)
+  if (newMessages.length === 0) {
+    const duration = formatDuration(task.startedAt, task.completedAt)
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${duration}
+Session ID: ${task.sessionID}
+
+---
+
+(No new output since last check)`
+  }
+
   // Extract content from ALL messages, not just the last one
   // Tool results may be in earlier messages while the final message is empty
   const extractedContent: string[] = []
   
-  for (const message of sortedMessages) {
+  for (const message of newMessages) {
     for (const part of message.parts ?? []) {
       // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
       if ((part.type === "text" || part.type === "reasoning") && part.text) {
