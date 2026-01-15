@@ -129,7 +129,9 @@ export class BackgroundManager {
       parentAgent: input.parentAgent,
       model: input.model,
       concurrencyKey,
+      concurrencyGroup: concurrencyKey,
     }
+
 
     this.tasks.set(task.id, task)
     this.startPolling()
@@ -189,8 +191,9 @@ export class BackgroundManager {
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
-         existingTask.concurrencyKey = undefined
+          existingTask.concurrencyKey = undefined
         }
+
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
@@ -250,6 +253,33 @@ export class BackgroundManager {
     parentAgent?: string
     concurrencyKey?: string
   }): Promise<BackgroundTask> {
+    const existingTask = this.tasks.get(input.taskId)
+    if (existingTask) {
+      if (input.parentSessionID !== existingTask.parentSessionID) {
+        existingTask.parentSessionID = input.parentSessionID
+      }
+      if (input.parentAgent !== undefined) {
+        existingTask.parentAgent = input.parentAgent
+      }
+      if (!existingTask.concurrencyGroup) {
+        existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
+      }
+
+      subagentSessions.add(existingTask.sessionID)
+      this.startPolling()
+
+      // Track for batched notifications (external tasks need tracking too)
+      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+      pending.add(existingTask.id)
+      this.pendingByParent.set(input.parentSessionID, pending)
+
+      log("[background-agent] External task already registered:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
+
+      return existingTask
+    }
+
+    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "sisyphus_task"
+
     // Acquire concurrency slot if a key is provided
     if (input.concurrencyKey) {
       await this.concurrencyManager.acquire(input.concurrencyKey)
@@ -271,11 +301,13 @@ export class BackgroundManager {
       },
       parentAgent: input.parentAgent,
       concurrencyKey: input.concurrencyKey,
+      concurrencyGroup,
     }
 
     this.tasks.set(task.id, task)
     subagentSessions.add(input.sessionID)
     this.startPolling()
+
 
     // Track for batched notifications (external tasks need tracking too)
     const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
@@ -301,12 +333,12 @@ export class BackgroundManager {
       return existingTask
     }
 
-    // Re-acquire concurrency using the agent name as the key (same as launch()).
-    // Note: existingTask.concurrencyKey is cleared when tasks complete, so we
-    // derive the key from task.agent which persists through completion.
-    const concurrencyKey = existingTask.agent
+    // Re-acquire concurrency using the persisted concurrency group
+    const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
     await this.concurrencyManager.acquire(concurrencyKey)
     existingTask.concurrencyKey = concurrencyKey
+    existingTask.concurrencyGroup = concurrencyKey
+
 
     existingTask.status = "running"
     existingTask.completedAt = undefined
