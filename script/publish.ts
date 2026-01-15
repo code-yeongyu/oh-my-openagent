@@ -187,26 +187,31 @@ async function publishPackage(cwd: string, distTag: string | null): Promise<Publ
 
 async function publishAllPackages(version: string): Promise<void> {
   const distTag = getDistTag(version)
+  const skipPlatform = process.env.SKIP_PLATFORM_PACKAGES === "true"
   
-  console.log("\n📦 Publishing platform packages...")
-  
-  // Publish platform packages first
-  for (const platform of PLATFORM_PACKAGES) {
-    const pkgDir = join(process.cwd(), "packages", platform)
-    const pkgName = `oh-my-opencode-${platform}`
+  if (skipPlatform) {
+    console.log("\n⏭️  Skipping platform packages (SKIP_PLATFORM_PACKAGES=true)")
+  } else {
+    console.log("\n📦 Publishing platform packages...")
     
-    console.log(`\n  Publishing ${pkgName}...`)
-    const result = await publishPackage(pkgDir, distTag)
-    
-    if (result.success) {
-      if (result.alreadyPublished) {
-        console.log(`  ✓ ${pkgName}@${version} (already published)`)
+    // Publish platform packages first
+    for (const platform of PLATFORM_PACKAGES) {
+      const pkgDir = join(process.cwd(), "packages", platform)
+      const pkgName = `oh-my-opencode-${platform}`
+      
+      console.log(`\n  Publishing ${pkgName}...`)
+      const result = await publishPackage(pkgDir, distTag)
+      
+      if (result.success) {
+        if (result.alreadyPublished) {
+          console.log(`  ✓ ${pkgName}@${version} (already published)`)
+        } else {
+          console.log(`  ✓ ${pkgName}@${version}`)
+        }
       } else {
-        console.log(`  ✓ ${pkgName}@${version}`)
+        console.error(`  ✗ ${pkgName} failed: ${result.error}`)
+        throw new Error(`Failed to publish ${pkgName}`)
       }
-    } else {
-      console.error(`  ✗ ${pkgName} failed: ${result.error}`)
-      throw new Error(`Failed to publish ${pkgName}`)
     }
   }
   
