@@ -18,7 +18,10 @@ import { join } from "node:path"
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
 
+type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
+
 type OpencodeClient = PluginInput["client"]
+
 
 interface MessagePartInfo {
   sessionID?: string
@@ -45,6 +48,10 @@ interface Todo {
 }
 
 export class BackgroundManager {
+  private static cleanupManagers = new Set<BackgroundManager>()
+  private static cleanupRegistered = false
+  private static cleanupHandlers = new Map<ProcessCleanupEvent, () => void>()
+
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
   private pendingByParent: Map<string, Set<string>>  // Track pending tasks per parent for batching
@@ -52,8 +59,8 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private concurrencyManager: ConcurrencyManager
-  private cleanupRegistered = false
   private shutdownTriggered = false
+
 
   constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
     this.tasks = new Map()
@@ -648,25 +655,47 @@ export class BackgroundManager {
   }
 
   private registerProcessCleanup(): void {
-    if (this.cleanupRegistered) return
-    this.cleanupRegistered = true
+    BackgroundManager.cleanupManagers.add(this)
 
-    const cleanup = () => {
-      try {
-        this.shutdown()
-      } catch (error) {
-        log("[background-agent] Error during shutdown cleanup:", error)
+    if (BackgroundManager.cleanupRegistered) return
+    BackgroundManager.cleanupRegistered = true
+
+    const cleanupAll = () => {
+      for (const manager of BackgroundManager.cleanupManagers) {
+        try {
+          manager.shutdown()
+        } catch (error) {
+          log("[background-agent] Error during shutdown cleanup:", error)
+        }
       }
     }
 
-    registerProcessSignal("SIGINT", cleanup)
-    registerProcessSignal("SIGTERM", cleanup)
-    if (process.platform === "win32") {
-      registerProcessSignal("SIGBREAK", cleanup)
+    const registerSignal = (signal: ProcessCleanupEvent, exitAfter: boolean): void => {
+      const listener = registerProcessSignal(signal, cleanupAll, exitAfter)
+      BackgroundManager.cleanupHandlers.set(signal, listener)
     }
-    process.on("beforeExit", cleanup)
-    process.on("exit", cleanup)
+
+    registerSignal("SIGINT", true)
+    registerSignal("SIGTERM", true)
+    if (process.platform === "win32") {
+      registerSignal("SIGBREAK", true)
+    }
+    registerSignal("beforeExit", false)
+    registerSignal("exit", false)
   }
+
+  private unregisterProcessCleanup(): void {
+    BackgroundManager.cleanupManagers.delete(this)
+
+    if (BackgroundManager.cleanupManagers.size > 0) return
+
+    for (const [signal, listener] of BackgroundManager.cleanupHandlers.entries()) {
+      process.off(signal, listener)
+    }
+    BackgroundManager.cleanupHandlers.clear()
+    BackgroundManager.cleanupRegistered = false
+  }
+
 
   /**
    * Get all running tasks (for compaction hook)
@@ -1029,19 +1058,27 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.tasks.clear()
     this.notifications.clear()
     this.pendingByParent.clear()
+    this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
+
   }
 }
 
 function registerProcessSignal(
-  signal: NodeJS.Signals,
-  handler: () => void
-): void {
-  process.on(signal, () => {
+  signal: ProcessCleanupEvent,
+  handler: () => void,
+  exitAfter: boolean
+): () => void {
+  const listener = () => {
     handler()
-    process.exit(0)
-  })
+    if (exitAfter) {
+      process.exit(0)
+    }
+  }
+  process.on(signal, listener)
+  return listener
 }
+
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null

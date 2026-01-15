@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import { afterEach } from "bun:test"
+import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
 import { BackgroundManager } from "./manager"
@@ -167,7 +168,7 @@ function createBackgroundManager(): BackgroundManager {
       prompt: async () => ({}),
     },
   }
-  return new BackgroundManager({ client, directory: "C:\\tmp" } as unknown as PluginInput)
+  return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 }
 
 function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
@@ -184,6 +185,18 @@ function stubNotifyParentSession(manager: BackgroundManager): void {
 
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
   return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> }).tryCompleteTask(task, "test")
+}
+
+function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
+  const signals: Array<NodeJS.Signals | "beforeExit" | "exit"> = ["SIGINT", "SIGTERM", "beforeExit", "exit"]
+  if (process.platform === "win32") {
+    signals.push("SIGBREAK")
+  }
+  return signals
+}
+
+function getListenerCounts(signals: Array<NodeJS.Signals | "beforeExit" | "exit">): Record<string, number> {
+  return Object.fromEntries(signals.map((signal) => [signal, process.listenerCount(signal)]))
 }
 
 
@@ -1020,6 +1033,30 @@ describe("BackgroundManager.resume concurrency key", () => {
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(task.concurrencyKey).toBe("external-key")
+  })
+})
+
+describe("BackgroundManager process cleanup", () => {
+  test("should remove listeners after last shutdown", () => {
+    // #given
+    const signals = getCleanupSignals()
+    const baseline = getListenerCounts(signals)
+    const managerA = createBackgroundManager()
+    const managerB = createBackgroundManager()
+
+    // #when
+    const afterCreate = getListenerCounts(signals)
+    managerA.shutdown()
+    const afterFirstShutdown = getListenerCounts(signals)
+    managerB.shutdown()
+    const afterSecondShutdown = getListenerCounts(signals)
+
+    // #then
+    for (const signal of signals) {
+      expect(afterCreate[signal]).toBe(baseline[signal] + 1)
+      expect(afterFirstShutdown[signal]).toBe(baseline[signal] + 1)
+      expect(afterSecondShutdown[signal]).toBe(baseline[signal])
+    }
   })
 })
 
