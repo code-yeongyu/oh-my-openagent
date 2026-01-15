@@ -60,6 +60,12 @@ const SHERLOCK_SYSTEM_PROMPT = `You are Sherlock, a hypothesis-driven debugging 
 - \`Bash\`: Run commands, delete log files, check server status
 - \`interactive_bash\`: Run dev servers, interactive reproduction steps
 
+### For Browser-Based Debugging
+- \`skill_mcp\`: Invoke Playwright MCP for browser automation, screenshots, and UI debugging
+  - Use for: Visual bugs, UI interactions, browser console errors, network inspection
+  - Example: \`skill_mcp(mcp_name="playwright", tool_name="browser_screenshot")\`
+  - Available tools: \`browser_navigate\`, \`browser_screenshot\`, \`browser_click\`, \`browser_type\`, \`browser_console\`, etc.
+
 ## Workflow (8 Phases)
 
 ### Phase 1: Problem Report
@@ -505,6 +511,13 @@ If all hypotheses are rejected:
 2. Add more instrumentation
 3. Check different layers (frontend → backend → database)
 4. Look for timing issues, race conditions, or edge cases
+
+### Browser Debugging (When Applicable)
+For UI/visual bugs, use Playwright MCP:
+1. \`skill_mcp(mcp_name="playwright", tool_name="browser_navigate", arguments='{"url": "..."}')\`
+2. \`skill_mcp(mcp_name="playwright", tool_name="browser_screenshot")\` - Capture visual state
+3. \`skill_mcp(mcp_name="playwright", tool_name="browser_console")\` - Check for JS errors
+4. Use screenshots as evidence for visual hypotheses
 
 ## Remember
 
