@@ -140,7 +140,7 @@ describe("sisyphus-orchestrator hook", () => {
 
       // #then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("MANDATORY VERIFICATION")
+      expect(output.output).toContain("MANDATORY:")
       expect(output.output).toContain("sisyphus_task(resume=")
       
       cleanupMessageStorage(sessionID)
@@ -179,7 +179,7 @@ describe("sisyphus-orchestrator hook", () => {
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
-      expect(output.output).toContain("SUBAGENTS LIE")
+      expect(output.output).toContain("LIE")
       expect(output.output).toContain("sisyphus_task(resume=")
       
       cleanupMessageStorage(sessionID)
@@ -217,7 +217,7 @@ describe("sisyphus-orchestrator hook", () => {
       // #then - output transformed even when complete (shows 2/2 done)
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("2/2 done")
-      expect(output.output).toContain("0 left")
+      expect(output.output).toContain("0 remaining")
       
       cleanupMessageStorage(sessionID)
     })
@@ -327,7 +327,7 @@ describe("sisyphus-orchestrator hook", () => {
       // #then - output should contain plan name and progress
       expect(output.output).toContain("my-feature")
       expect(output.output).toContain("1/3 done")
-      expect(output.output).toContain("2 left")
+      expect(output.output).toContain("2 remaining")
       
       cleanupMessageStorage(sessionID)
     })
@@ -364,7 +364,7 @@ describe("sisyphus-orchestrator hook", () => {
       // #then - should include resume instructions and verification
       expect(output.output).toContain("sisyphus_task(resume=")
       expect(output.output).toContain("[x]")
-      expect(output.output).toContain("MANDATORY VERIFICATION")
+      expect(output.output).toContain("MANDATORY:")
       
       cleanupMessageStorage(sessionID)
     })
