@@ -675,21 +675,33 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 </system-reminder>`
     }
 
-    // Dynamically lookup the parent session's current message context
-    // This ensures we use the CURRENT model/agent, not the stale one from task creation time
-    const messageDir = getMessageDir(task.parentSessionID)
-    const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    let agent: string | undefined = task.parentAgent
+    let model: { providerID: string; modelID: string } | undefined
 
-    const agent = currentMessage?.agent ?? task.parentAgent
-    const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-      ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-      : undefined
+    try {
+      const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
+      const messages = (messagesResp.data ?? []) as Array<{
+        info?: { agent?: string; model?: { providerID: string; modelID: string } }
+      }>
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const info = messages[i].info
+        if (info?.agent || info?.model) {
+          agent = info.agent ?? task.parentAgent
+          model = info.model
+          break
+        }
+      }
+    } catch {
+      const messageDir = getMessageDir(task.parentSessionID)
+      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+      agent = currentMessage?.agent ?? task.parentAgent
+      model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+        : undefined
+    }
 
     log("[background-agent] notifyParentSession context:", {
       taskId: task.id,
-      messageDir: !!messageDir,
-      currentAgent: currentMessage?.agent,
-      currentModel: currentMessage?.model,
       resolvedAgent: agent,
       resolvedModel: model,
     })
