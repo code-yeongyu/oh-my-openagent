@@ -312,4 +312,23 @@ IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
 
 SYNTHESIZE findings before proceeding.`,
   },
+  // BRAINSTORM: EN/KO/JP/CN/VN - Triggers brainstorming skill for design work
+  {
+    pattern:
+      /\b(brainstorm|brain\s*storm|ideate|design|architect|plan\s+out|sketch\s+out|draft|propose|prototype|conceptualize|envision|blueprint|whiteboard|spitball)ing?\b|let'?s\s+(build|create|make|develop|implement)|build\s+a|create\s+a|make\s+a|add\s+(a\s+)?(new|feature)|new\s+feature|头脑风暴|脑暴|设计|构思|规划|方案|草拟|브레인스토밍|아이디어|설계|구상|기획|ブレスト|ブレインストーミング|設計|構想|企画|アイデア出し|動腦|腦力激盪|構思|đột phá|ý tưởng|thiết kế|phác thảo/i,
+    message: `[brainstorm-mode]
+DESIGN MODE ACTIVATED. Before implementing, use the brainstorming skill.
+
+**MANDATORY**: Invoke skill("brainstorming") NOW.
+
+This skill will guide you through:
+1. Understanding the idea (ask clarifying questions)
+2. Exploring 2-3 approaches with trade-offs
+3. Presenting the design incrementally
+4. Creating changes/<name>/proposal.md
+
+DO NOT skip to implementation. Design first, code second.
+
+After brainstorming → use skill("creating-changes") to write design.md and tasks.md.`,
+  },
 ]

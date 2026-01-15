@@ -11,8 +11,11 @@
   "files": [
     "dist",
     "bin",
-    "postinstall.mjs"
+    "postinstall.mjs",
+    "src/features/builtin-skills/**/SKILL.md",
+    "src/features/builtin-skills/**/reference.md"
   ],
+
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

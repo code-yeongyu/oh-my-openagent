@@ -4,6 +4,8 @@ import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { STATUS_TEMPLATE } from "./templates/status"
+import { REVERT_TEMPLATE } from "./templates/revert"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -69,6 +71,23 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[plan-name]",
+  },
+  status: {
+    description: "(builtin) Display current change execution status",
+    template: `<command-instruction>
+${STATUS_TEMPLATE}
+</command-instruction>`,
+  },
+  revert: {
+    description: "(builtin) Revert to a previous checkpoint",
+    template: `<command-instruction>
+${REVERT_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[task <id>] [phase <n>] [change]",
   },
 }
 

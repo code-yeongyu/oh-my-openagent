@@ -5,6 +5,11 @@ import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
+import { createImplementerAgent, IMPLEMENTER_PROMPT_METADATA } from "./implementer"
+import { createArchiverAgent, ARCHIVER_PROMPT_METADATA } from "./archiver"
+import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
+
+import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
@@ -24,6 +29,11 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
+  implementer: createImplementerAgent,
+  archiver: createArchiverAgent,
+  "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
+
+  "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
@@ -40,6 +50,11 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
+  implementer: IMPLEMENTER_PROMPT_METADATA,
+  archiver: ARCHIVER_PROMPT_METADATA,
+  "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
+
+  "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
 }
 

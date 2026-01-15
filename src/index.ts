@@ -163,6 +163,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
     ? createCompactionContextInjector()
     : undefined;
+  
+  // Create a mutable reference for todoContinuationEnforcer callbacks
+  // This allows preemptiveCompaction to call these even though it's created first
+  const todoContinuationCallbacks: {
+    markRecovering?: (sessionID: string) => void;
+    markRecoveryComplete?: (sessionID: string) => void;
+  } = {};
+
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
     : null;
@@ -266,6 +274,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     sessionRecovery.setOnRecoveryCompleteCallback(
       todoContinuationEnforcer.markRecoveryComplete
     );
+  }
+
+  // Bind todoContinuationEnforcer callbacks for preemptiveCompaction
+  // This completes the late binding setup from earlier
+  if (todoContinuationEnforcer) {
+    todoContinuationCallbacks.markRecovering = todoContinuationEnforcer.markRecovering;
+    todoContinuationCallbacks.markRecoveryComplete = todoContinuationEnforcer.markRecoveryComplete;
   }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
