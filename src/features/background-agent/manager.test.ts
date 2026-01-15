@@ -1,5 +1,10 @@
 import { describe, test, expect, beforeEach } from "bun:test"
+import { afterEach } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
+import { BackgroundManager } from "./manager"
+import { ConcurrencyManager } from "./concurrency"
+
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
@@ -155,6 +160,32 @@ function createMockTask(overrides: Partial<BackgroundTask> & { id: string; sessi
     ...overrides,
   }
 }
+
+function createBackgroundManager(): BackgroundManager {
+  const client = {
+    session: {
+      prompt: async () => ({}),
+    },
+  }
+  return new BackgroundManager({ client, directory: "C:\\tmp" } as unknown as PluginInput)
+}
+
+function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
+  return (manager as unknown as { concurrencyManager: ConcurrencyManager }).concurrencyManager
+}
+
+function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
+  return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
+}
+
+function stubNotifyParentSession(manager: BackgroundManager): void {
+  (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> }).notifyParentSession = async () => {}
+}
+
+async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
+  return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> }).tryCompleteTask(task, "test")
+}
+
 
 describe("BackgroundManager.getAllDescendantTasks", () => {
   let manager: MockBackgroundManager
@@ -844,36 +875,25 @@ function buildNotificationPromptBody(
   return body
 }
 
-describe("tryCompleteTask pattern - race condition prevention", () => {
-  /**
-   * These tests verify the tryCompleteTask pattern behavior
-   * by simulating the guard logic in a mock implementation.
-   */
+describe("BackgroundManager.tryCompleteTask", () => {
+  let manager: BackgroundManager
 
-  test("should prevent double completion when task already completed", () => {
-    // #given - task already completed
-    const task: BackgroundTask = {
-      id: "task-1",
-      sessionID: "session-1",
-      parentSessionID: "session-parent",
-      parentMessageID: "msg-1",
-      description: "test task",
-      prompt: "test",
-      agent: "explore",
-      status: "completed",
-      startedAt: new Date(),
-      completedAt: new Date(),
-    }
-
-    // #when - try to complete again (simulating tryCompleteTask guard)
-    const canComplete = task.status === "running"
-
-    // #then - should not allow completion
-    expect(canComplete).toBe(false)
+  beforeEach(() => {
+    // #given
+    manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
   })
 
-  test("should allow completion when task is running", () => {
-    // #given - task is running
+  afterEach(() => {
+    manager.shutdown()
+  })
+
+  test("should release concurrency and clear key on completion", async () => {
+    // #given
+    const concurrencyKey = "anthropic/claude-opus-4-5"
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire(concurrencyKey)
+
     const task: BackgroundTask = {
       id: "task-1",
       sessionID: "session-1",
@@ -884,87 +904,25 @@ describe("tryCompleteTask pattern - race condition prevention", () => {
       agent: "explore",
       status: "running",
       startedAt: new Date(),
-    }
-
-    // #when - check if can complete
-    const canComplete = task.status === "running"
-
-    // #then
-    expect(canComplete).toBe(true)
-  })
-
-  test("should prevent completion when task is cancelled", () => {
-    // #given - task cancelled by session.deleted
-    const task: BackgroundTask = {
-      id: "task-1",
-      sessionID: "session-1",
-      parentSessionID: "session-parent",
-      parentMessageID: "msg-1",
-      description: "test task",
-      prompt: "test",
-      agent: "explore",
-      status: "cancelled",
-      startedAt: new Date(),
+      concurrencyKey,
     }
 
     // #when
-    const canComplete = task.status === "running"
+    const completed = await tryCompleteTaskForTest(manager, task)
 
     // #then
-    expect(canComplete).toBe(false)
-  })
-
-  test("should prevent completion when task errored", () => {
-    // #given - task errored
-    const task: BackgroundTask = {
-      id: "task-1",
-      sessionID: "session-1",
-      parentSessionID: "session-parent",
-      parentMessageID: "msg-1",
-      description: "test task",
-      prompt: "test",
-      agent: "explore",
-      status: "error",
-      error: "some error",
-      startedAt: new Date(),
-    }
-
-    // #when
-    const canComplete = task.status === "running"
-
-    // #then
-    expect(canComplete).toBe(false)
-  })
-})
-
-describe("concurrencyKey management", () => {
-  test("concurrencyKey should be undefined after release", () => {
-    // #given - task with concurrency key
-    const task: BackgroundTask = {
-      id: "task-1",
-      sessionID: "session-1",
-      parentSessionID: "session-parent",
-      parentMessageID: "msg-1",
-      description: "test task",
-      prompt: "test",
-      agent: "explore",
-      status: "running",
-      startedAt: new Date(),
-      concurrencyKey: "anthropic/claude-sonnet-4-5",
-    }
-
-    // #when - simulate release pattern (what tryCompleteTask does)
-    if (task.concurrencyKey) {
-      // concurrencyManager.release(task.concurrencyKey) would be called
-      task.concurrencyKey = undefined
-    }
-
-    // #then
+    expect(completed).toBe(true)
+    expect(task.status).toBe("completed")
     expect(task.concurrencyKey).toBeUndefined()
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 
-  test("release should be idempotent with concurrencyKey guard", () => {
-    // #given - task with key already released
+  test("should prevent double completion and double release", async () => {
+    // #given
+    const concurrencyKey = "anthropic/claude-opus-4-5"
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire(concurrencyKey)
+
     const task: BackgroundTask = {
       id: "task-1",
       sessionID: "session-1",
@@ -973,19 +931,95 @@ describe("concurrencyKey management", () => {
       description: "test task",
       prompt: "test",
       agent: "explore",
-      status: "completed",
+      status: "running",
       startedAt: new Date(),
-      concurrencyKey: undefined, // already released
+      concurrencyKey,
     }
 
-    // #when - try to release again (guard pattern)
-    let releaseCount = 0
-    if (task.concurrencyKey) {
-      releaseCount++
-      task.concurrencyKey = undefined
-    }
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+    const secondAttempt = await tryCompleteTaskForTest(manager, task)
 
-    // #then - no double release
-    expect(releaseCount).toBe(0)
+    // #then
+    expect(secondAttempt).toBe(false)
+    expect(task.status).toBe("completed")
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 })
+
+describe("BackgroundManager.registerExternalTask", () => {
+  let manager: BackgroundManager
+
+  beforeEach(() => {
+    // #given
+    manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+  })
+
+  afterEach(() => {
+    manager.shutdown()
+  })
+
+  test("should not double acquire on duplicate registration", async () => {
+    // #given
+    const input = {
+      taskId: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "parent-session",
+      description: "external task",
+      agent: "sisyphus_task",
+      concurrencyKey: "external-key",
+    }
+
+    // #when
+    await manager.registerExternalTask(input)
+    await manager.registerExternalTask(input)
+
+    // #then
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(getTaskMap(manager).size).toBe(1)
+  })
+})
+
+describe("BackgroundManager.resume concurrency key", () => {
+  let manager: BackgroundManager
+
+  beforeEach(() => {
+    // #given
+    manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+  })
+
+  afterEach(() => {
+    manager.shutdown()
+  })
+
+  test("should re-acquire using external task concurrency key", async () => {
+    // #given
+    const task = await manager.registerExternalTask({
+      taskId: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "parent-session",
+      description: "external task",
+      agent: "sisyphus_task",
+      concurrencyKey: "external-key",
+    })
+
+    await tryCompleteTaskForTest(manager, task)
+
+    // #when
+    await manager.resume({
+      sessionId: "session-1",
+      prompt: "resume",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+
+    // #then
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(task.concurrencyKey).toBe("external-key")
+  })
+})
+
