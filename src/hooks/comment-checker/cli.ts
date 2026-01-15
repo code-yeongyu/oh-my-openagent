@@ -121,9 +121,6 @@ export function startBackgroundInit(): void {
   }
 }
 
-// Legacy export for backwards compatibility (sync, no download)
-export const COMMENT_CHECKER_CLI_PATH = findCommentCheckerPathSync()
-
 export interface HookInput {
   session_id: string
   tool_name: string
@@ -152,7 +149,7 @@ export interface CheckResult {
  * @param customPrompt Optional custom prompt to replace default warning message
  */
 export async function runCommentChecker(input: HookInput, cliPath?: string, customPrompt?: string): Promise<CheckResult> {
-  const binaryPath = cliPath ?? resolvedCliPath ?? COMMENT_CHECKER_CLI_PATH
+  const binaryPath = cliPath ?? resolvedCliPath ?? getCommentCheckerPathSync()
   
   if (!binaryPath) {
     debugLog("comment-checker binary not found")
