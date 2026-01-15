@@ -1,34 +1,5 @@
 import type { LSPServerConfig } from "./types"
 
-export const SYMBOL_KIND_MAP: Record<number, string> = {
-  1: "File",
-  2: "Module",
-  3: "Namespace",
-  4: "Package",
-  5: "Class",
-  6: "Method",
-  7: "Property",
-  8: "Field",
-  9: "Constructor",
-  10: "Enum",
-  11: "Interface",
-  12: "Function",
-  13: "Variable",
-  14: "Constant",
-  15: "String",
-  16: "Number",
-  17: "Boolean",
-  18: "Array",
-  19: "Object",
-  20: "Key",
-  21: "Null",
-  22: "EnumMember",
-  23: "Struct",
-  24: "Event",
-  25: "Operator",
-  26: "TypeParameter",
-}
-
 export const SEVERITY_MAP: Record<number, string> = {
   1: "error",
   2: "warning",
@@ -36,8 +7,6 @@ export const SEVERITY_MAP: Record<number, string> = {
   4: "hint",
 }
 
-export const DEFAULT_MAX_REFERENCES = 200
-export const DEFAULT_MAX_SYMBOLS = 200
 export const DEFAULT_MAX_DIAGNOSTICS = 200
 
 export const LSP_INSTALL_HINTS: Record<string, string> = {

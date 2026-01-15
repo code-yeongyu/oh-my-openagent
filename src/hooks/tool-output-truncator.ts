@@ -12,8 +12,6 @@ const TRUNCATABLE_TOOLS = [
   "glob",
   "Glob",
   "safe_glob",
-  "lsp_find_references",
-  "lsp_symbols",
   "lsp_diagnostics",
   "ast_grep_search",
   "interactive_bash",
