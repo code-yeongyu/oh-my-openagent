@@ -530,7 +530,10 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
 
       try {
         const parentSession = client.session.get
-          ? await client.session.get({ path: { id: ctx.sessionID } }).catch(() => null)
+          ? await client.session.get({ path: { id: ctx.sessionID } }).catch((err) => {
+              log("[sisyphus_task] Failed to get parent session:", err)
+              return null
+            })
           : null
         const parentDirectory = parentSession?.data?.directory ?? directory
 
