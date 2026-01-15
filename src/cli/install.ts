@@ -11,7 +11,8 @@ import {
   detectCurrentConfig,
 } from "./config-manager"
 
-const packageJson = await import("../../package.json")
+// Using require() instead of top-level await for Bun single-file executable compatibility
+const packageJson = require("../../package.json") as { version: string }
 const VERSION = packageJson.version
 
 const SYMBOLS = {
