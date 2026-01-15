@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log } from "../../shared"
+import { isNonInteractive } from "./detector"
+import { log, detectShellType, buildEnvPrefix } from "../../shared"
 
 export * from "./constants"
 export * from "./detector"
@@ -17,35 +18,6 @@ function detectBannedCommand(command: string): string | undefined {
     }
   }
   return undefined
-}
-
-/**
- * Shell-escape a value for use in VAR=value prefix.
- * Wraps in single quotes if contains special chars.
- */
-function shellEscape(value: string): string {
-  // Empty string needs quotes
-  if (value === "") return "''"
-  // If contains special chars, wrap in single quotes (escape existing single quotes)
-  if (/[^a-zA-Z0-9_\-.:\/]/.test(value)) {
-    return `'${value.replace(/'/g, "'\\''")}'`
-  }
-  return value
-}
-
-/**
- * Build export statement for environment variables.
- * Uses `export VAR1=val1 VAR2=val2;` format to ensure variables
- * apply to ALL commands in a chain (e.g., `cmd1 && cmd2`).
- *
- * Previous approach used VAR=value prefix which only applies to the first command.
- * OpenCode's bash tool ignores args.env, so we must prepend to command.
- */
-function buildEnvPrefix(env: Record<string, string>): string {
-  const exports = Object.entries(env)
-    .map(([key, value]) => `${key}=${shellEscape(value)}`)
-    .join(" ")
-  return `export ${exports};`
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
@@ -74,11 +46,12 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      // OpenCode's bash tool uses hardcoded `...process.env` in spawn(),
-      // ignoring any args.env we might set. Prepend export statement to command.
-      // Uses `export VAR=val;` format to ensure variables apply to ALL commands
-      // in a chain (e.g., `git add file && git rebase --continue`).
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV)
+      if (!isNonInteractive()) {
+        return
+      }
+
+      const shellType = detectShellType()
+      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       output.args.command = `${envPrefix} ${command}`
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
