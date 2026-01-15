@@ -6,8 +6,9 @@
 ## STRUCTURE
 ```
 hooks/
-├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit (555 lines)
-├── sisyphus-orchestrator/      # Main orchestration & agent delegation (677 lines)
+├── sisyphus-orchestrator/      # Main orchestration & agent delegation (684 lines)
+├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit (554 lines)
+├── todo-continuation-enforcer.ts # Force completion of [ ] items (445 lines)
 ├── ralph-loop/                 # Self-referential dev loop (364 lines)
 ├── claude-code-hooks/          # settings.json hook compatibility layer
 ├── comment-checker/            # Prevents AI slop/excessive comments
@@ -23,7 +24,6 @@ hooks/
 ├── start-work/                 # Initializes work sessions (ulw/ulw)
 ├── think-mode/                 # Dynamic thinking budget adjustment
 ├── background-notification/    # OS notification on task completion
-├── todo-continuation-enforcer.ts # Force completion of [ ] items
 └── tool-output-truncator.ts    # Prevents context bloat from verbose tools
 ```
 

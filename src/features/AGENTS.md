@@ -6,13 +6,13 @@ Claude Code compatibility layer + core feature modules. Commands, skills, agents
 ## STRUCTURE
 ```
 features/
-├── background-agent/           # Task lifecycle, notifications (825 lines manager.ts)
+├── background-agent/           # Task lifecycle, notifications (928 lines manager.ts)
 ├── boulder-state/              # Boulder state persistence
 ├── builtin-commands/           # Built-in slash commands
 │   └── templates/              # start-work, refactor, init-deep, ralph-loop
 ├── builtin-skills/             # Built-in skills (1230 lines skills.ts)
 │   ├── git-master/             # Atomic commits, rebase, history search
-│   ├── playwright/             # Browser automation skill
+│   ├── playwright              # Browser automation skill
 │   └── frontend-ui-ux/         # Designer-turned-developer skill
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
@@ -24,8 +24,7 @@ features/
 ├── opencode-skill-loader/      # Skills from OpenCode + Claude paths
 ├── skill-mcp-manager/          # MCP servers in skill YAML
 ├── task-toast-manager/         # Task toast notifications
-├── hook-message-injector/      # Inject messages into conversation
-└── context-injector/           # Context collection and injection
+└── hook-message-injector/      # Inject messages into conversation
 ```
 
 ## LOADER PRIORITY
