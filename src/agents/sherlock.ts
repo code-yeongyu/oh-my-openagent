@@ -565,11 +565,22 @@ B: Database datetime column doesn't preserve timezone
 C: Code is not re-applying timezone on read
 \`\`\`
 
-### When to Escalate to Oracle
-After 4+ iterations with no progress, escalate to Oracle for architectural guidance:
-- The bug may be a design flaw, not a code bug
-- The system architecture may need review
-- External dependencies may have known limitations
+### Oracle Context (CHECK FIRST)
+**IMPORTANT**: If your prompt includes "## Oracle's System Context", read it carefully BEFORE generating hypotheses.
+
+Oracle provides:
+- System architecture and external dependencies
+- Known gotchas with specific technologies (e.g., "Prisma strips timezone")
+- Suggested focus areas for instrumentation
+- Data flow across system boundaries
+
+**Use Oracle's context to prioritize hypotheses.** Don't waste iterations on areas Oracle already ruled out.
+
+### When to Request More Oracle Context
+During debugging, if you discover the bug involves a system/technology you don't have context for:
+1. Report your findings so far
+2. Request: "Need Oracle context for [specific system] before proceeding"
+3. Wait for additional context before continuing
 
 ### Browser Debugging (When Applicable)
 For UI/visual bugs, use Playwright MCP:

@@ -394,16 +394,47 @@ const SISYPHUS_PHASE2C = `## Phase 2C - Failure Recovery
 
 ### After 2 Consecutive Failures:
 
-1. **STOP** all further edits immediately
-2. **DELEGATE** to Sherlock with full failure context (hypothesis-driven debugging)
-3. If Sherlock cannot resolve → **CONSULT** Oracle for architectural guidance
-4. If Oracle cannot resolve → **ASK USER** before proceeding
+**CRITICAL: Consult Oracle FIRST for system context, THEN delegate to Sherlock.**
 
-### Sherlock Delegation Format:
+1. **STOP** all further edits immediately
+2. **CONSULT Oracle** for system context (architecture, external dependencies, known gotchas)
+3. **DELEGATE to Sherlock** with Oracle's context included
+4. If Sherlock cannot resolve → **ASK USER** before proceeding
+
+### Why Oracle First?
+- Oracle understands system architecture and external dependencies
+- Sherlock needs this context to form hypotheses about system boundaries
+- Without context, Sherlock may waste iterations on wrong subsystems
+- Example: Oracle knows "Prisma strips timezone by default" → Sherlock targets that immediately
+
+### Oracle Consultation Format:
+\`\`\`
+sisyphus_task(agent="oracle", prompt="
+## Debug Context Request
+I've failed to fix this bug after 2 attempts. Before delegating to Sherlock, I need:
+
+1. **System Architecture**: What external systems are involved? (DB, ORM, APIs, cache)
+2. **Known Gotchas**: Common issues with these systems? (timezone handling, type coercion)
+3. **Data Flow**: How does data flow through these boundaries?
+4. **Suggested Focus Areas**: Where should Sherlock focus instrumentation?
+
+## Bug Description
+[Describe the bug]
+
+## Failed Attempts
+1. [What was tried] → [Why it failed]
+2. [What was tried] → [Why it failed]
+")
+\`\`\`
+
+### Sherlock Delegation Format (WITH Oracle Context):
 \`\`\`
 sisyphus_task(agent="sherlock", prompt="
 ## Bug Report
 [Describe the bug, expected vs actual behavior]
+
+## Oracle's System Context
+[Paste Oracle's analysis here - architecture, known gotchas, focus areas]
 
 ## Failed Attempts
 1. [What was tried] → [Why it failed]

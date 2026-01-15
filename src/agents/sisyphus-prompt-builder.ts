@@ -271,13 +271,23 @@ export function buildSherlockSection(agents: AvailableAgent[]): string {
 
 Sherlock is a debugging specialist. Unlike Oracle (read-only consultant), Sherlock ACTIVELY debugs: instruments code, runs tests, analyzes logs, and implements fixes.
 
+### CRITICAL: Oracle → Sherlock Flow
+
+**After 2+ failed fix attempts, ALWAYS consult Oracle FIRST:**
+1. **Oracle** provides system context (architecture, known gotchas, focus areas)
+2. **Sherlock** receives Oracle's context and uses it to form better hypotheses
+3. This prevents wasted iterations on wrong subsystems
+
+**Example**: Bug with timezone display
+- Without Oracle: Sherlock spends 4 iterations instrumenting UI code
+- With Oracle: Oracle says "Prisma strips timezone by default" → Sherlock targets ORM immediately
+
 ### WHEN to Delegate:
 
 | Trigger | Action |
 |---------|--------|
-${useWhen.map((w) => `| ${w} | Delegate to Sherlock |`).join("\n")}
-| After 2+ failed fix attempts | Delegate to Sherlock with failure context |
-| Complex runtime bugs | Delegate to Sherlock |
+${useWhen.map((w) => `| ${w} | Consult Oracle → Delegate to Sherlock |`).join("\n")}
+| After 2+ failed fix attempts | Oracle context → Sherlock debugging |
 
 ### WHEN NOT to Delegate:
 
@@ -287,18 +297,28 @@ ${avoidWhen.map((w) => `- ${w}`).join("\n")}
 
 | Situation | Use |
 |-----------|-----|
-| Need debugging **advice** | Oracle (read-only) |
-| Need bug **investigation and fix** | Sherlock (active) |
+| **System context before debugging** | Oracle FIRST |
+| Need debugging **advice only** | Oracle (read-only) |
+| Need bug **investigation and fix** | Sherlock (with Oracle context) |
 | Architecture questions | Oracle |
-| Runtime behavior differs from expected | Sherlock |
-| After 2+ failed fix attempts | Sherlock |
+| Runtime behavior differs from expected | Oracle context → Sherlock |
 
-### Usage Pattern:
+### Usage Pattern (Oracle → Sherlock):
 \`\`\`typescript
-sisyphus_task(
-  agent="sherlock",
-  prompt="..."  // Include: Bug Report, Steps to Reproduce, Failed Attempts, Relevant Files
-)
+// Step 1: Get context from Oracle
+sisyphus_task(agent="oracle", prompt="Debug context request: [bug description]")
+
+// Step 2: Delegate to Sherlock WITH Oracle's context
+sisyphus_task(agent="sherlock", prompt="
+## Bug Report
+[description]
+
+## Oracle's System Context
+[paste Oracle's analysis]
+
+## Failed Attempts
+[list attempts]
+")
 \`\`\`
 </Sherlock_Usage>`
 }
