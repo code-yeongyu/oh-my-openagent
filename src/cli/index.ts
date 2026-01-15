@@ -26,12 +26,13 @@ program
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--chatgpt <value>", "ChatGPT subscription: no, yes")
   .option("--gemini <value>", "Gemini integration: no, yes")
+  .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes
-  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no
+  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
 
 Model Providers:
   Claude      Required for Sisyphus (main orchestrator) and Librarian agents
@@ -44,6 +45,7 @@ Model Providers:
       claude: options.claude,
       chatgpt: options.chatgpt,
       gemini: options.gemini,
+      copilot: options.copilot,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
