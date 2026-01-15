@@ -509,46 +509,6 @@ export class LSPClient {
     await new Promise((r) => setTimeout(r, 1000))
   }
 
-  async hover(filePath: string, line: number, character: number): Promise<unknown> {
-    const absPath = resolve(filePath)
-    await this.openFile(absPath)
-    return this.send("textDocument/hover", {
-      textDocument: { uri: pathToFileURL(absPath).href },
-      position: { line: line - 1, character },
-    })
-  }
-
-  async definition(filePath: string, line: number, character: number): Promise<unknown> {
-    const absPath = resolve(filePath)
-    await this.openFile(absPath)
-    return this.send("textDocument/definition", {
-      textDocument: { uri: pathToFileURL(absPath).href },
-      position: { line: line - 1, character },
-    })
-  }
-
-  async references(filePath: string, line: number, character: number, includeDeclaration = true): Promise<unknown> {
-    const absPath = resolve(filePath)
-    await this.openFile(absPath)
-    return this.send("textDocument/references", {
-      textDocument: { uri: pathToFileURL(absPath).href },
-      position: { line: line - 1, character },
-      context: { includeDeclaration },
-    })
-  }
-
-  async documentSymbols(filePath: string): Promise<unknown> {
-    const absPath = resolve(filePath)
-    await this.openFile(absPath)
-    return this.send("textDocument/documentSymbol", {
-      textDocument: { uri: pathToFileURL(absPath).href },
-    })
-  }
-
-  async workspaceSymbols(query: string): Promise<unknown> {
-    return this.send("workspace/symbol", { query })
-  }
-
   async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
     const absPath = resolve(filePath)
     const uri = pathToFileURL(absPath).href
@@ -585,33 +545,6 @@ export class LSPClient {
       position: { line: line - 1, character },
       newName,
     })
-  }
-
-  async codeAction(
-    filePath: string,
-    startLine: number,
-    startChar: number,
-    endLine: number,
-    endChar: number,
-    only?: string[]
-  ): Promise<unknown> {
-    const absPath = resolve(filePath)
-    await this.openFile(absPath)
-    return this.send("textDocument/codeAction", {
-      textDocument: { uri: pathToFileURL(absPath).href },
-      range: {
-        start: { line: startLine - 1, character: startChar },
-        end: { line: endLine - 1, character: endChar },
-      },
-      context: {
-        diagnostics: [],
-        only,
-      },
-    })
-  }
-
-  async codeActionResolve(codeAction: unknown): Promise<unknown> {
-    return this.send("codeAction/resolve", codeAction)
   }
 
   isAlive(): boolean {
