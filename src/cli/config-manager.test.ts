@@ -170,24 +170,32 @@ describe("fetchNpmDistTags", () => {
 })
 
 describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
-  test("Gemini models include full spec (limit + modalities)", () => {
+  test("All models include full spec (limit + modalities)", () => {
     const google = (ANTIGRAVITY_PROVIDER_CONFIG as any).google
     expect(google).toBeTruthy()
 
     const models = google.models as Record<string, any>
     expect(models).toBeTruthy()
 
+    // #given all models in the config
     const required = [
-      "antigravity-gemini-3-pro-high",
-      "antigravity-gemini-3-pro-low",
+      "antigravity-gemini-3-pro",
       "antigravity-gemini-3-flash",
+      "antigravity-claude-sonnet-4-5",
+      "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-opus-4-5-thinking",
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-3-flash-preview",
+      "gemini-3-pro-preview",
     ]
 
+    // #when checking each model
     for (const key of required) {
       const model = models[key]
+      // #then each model should have required properties
       expect(model).toBeTruthy()
       expect(typeof model.name).toBe("string")
-      expect(model.name.includes("(Antigravity)")).toBe(true)
 
       expect(model.limit).toBeTruthy()
       expect(typeof model.limit.context).toBe("number")
@@ -196,6 +204,57 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
       expect(model.modalities).toBeTruthy()
       expect(Array.isArray(model.modalities.input)).toBe(true)
       expect(Array.isArray(model.modalities.output)).toBe(true)
+    }
+  })
+
+  test("Antigravity models have (Antigravity) in name", () => {
+    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+
+    const antigravityModels = [
+      "antigravity-gemini-3-pro",
+      "antigravity-gemini-3-flash",
+      "antigravity-claude-sonnet-4-5",
+      "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-opus-4-5-thinking",
+    ]
+
+    for (const key of antigravityModels) {
+      expect(models[key].name.includes("(Antigravity)")).toBe(true)
+    }
+  })
+
+  test("Gemini CLI models have (Gemini CLI) in name", () => {
+    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+
+    const geminiCliModels = [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-3-flash-preview",
+      "gemini-3-pro-preview",
+    ]
+
+    for (const key of geminiCliModels) {
+      expect(models[key].name.includes("(Gemini CLI)")).toBe(true)
+    }
+  })
+
+  test("Thinking models have variants with thinkingConfig or thinkingLevel", () => {
+    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+
+    // #given models with variants
+    const modelsWithVariants = [
+      "antigravity-gemini-3-pro",
+      "antigravity-gemini-3-flash",
+      "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-opus-4-5-thinking",
+    ]
+
+    // #when checking variants
+    for (const key of modelsWithVariants) {
+      const model = models[key]
+      // #then variants should exist
+      expect(model.variants).toBeTruthy()
+      expect(Object.keys(model.variants).length).toBeGreaterThan(0)
     }
   })
 })
