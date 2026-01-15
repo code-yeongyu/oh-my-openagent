@@ -315,12 +315,30 @@ export function createRalphLoopHook(
         .catch(() => {})
 
       try {
-        const messageDir = getMessageDir(sessionID)
-        const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-        const agent = currentMessage?.agent
-        const model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-          ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-          : undefined
+        let agent: string | undefined
+        let model: { providerID: string; modelID: string } | undefined
+
+        try {
+          const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+          const messages = (messagesResp.data ?? []) as Array<{
+            info?: { agent?: string; model?: { providerID: string; modelID: string } }
+          }>
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const info = messages[i].info
+            if (info?.agent || info?.model) {
+              agent = info.agent
+              model = info.model
+              break
+            }
+          }
+        } catch {
+          const messageDir = getMessageDir(sessionID)
+          const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+          agent = currentMessage?.agent
+          model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+            ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+            : undefined
+        }
 
         await ctx.client.session.prompt({
           path: { id: sessionID },

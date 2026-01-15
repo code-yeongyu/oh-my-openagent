@@ -279,12 +279,30 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         })
 
         try {
-          const resumeMessageDir = getMessageDir(args.resume)
-          const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
-          const resumeAgent = resumeMessage?.agent
-          const resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
-            ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
-            : undefined
+          let resumeAgent: string | undefined
+          let resumeModel: { providerID: string; modelID: string } | undefined
+
+          try {
+            const messagesResp = await client.session.messages({ path: { id: args.resume } })
+            const messages = (messagesResp.data ?? []) as Array<{
+              info?: { agent?: string; model?: { providerID: string; modelID: string } }
+            }>
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const info = messages[i].info
+              if (info?.agent || info?.model) {
+                resumeAgent = info.agent
+                resumeModel = info.model
+                break
+              }
+            }
+          } catch {
+            const resumeMessageDir = getMessageDir(args.resume)
+            const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+            resumeAgent = resumeMessage?.agent
+            resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
+              ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+              : undefined
+          }
 
           await client.session.prompt({
             path: { id: args.resume },
