@@ -206,28 +206,55 @@ export function buildFrontendSection(agents: AvailableAgent[]): string {
   const frontendAgent = agents.find((a) => a.name === "frontend-ui-ux-engineer")
   if (!frontendAgent) return ""
 
-  return `### Frontend Files: Decision Gate (NOT a blind block)
+  return `### Frontend Files: VISUAL = HARD BLOCK (zero tolerance)
 
-Frontend files (.tsx, .jsx, .vue, .svelte, .css, etc.) require **classification before action**.
+**DEFAULT ASSUMPTION**: Any frontend file change is VISUAL until proven otherwise.
 
-#### Step 1: Classify the Change Type
+#### HARD BLOCK: Visual Changes (NEVER touch directly)
 
-| Change Type | Examples | Action |
-|-------------|----------|--------|
-| **Visual/UI/UX** | Color, spacing, layout, typography, animation, responsive breakpoints, hover states, shadows, borders, icons, images | **DELEGATE** to \`frontend-ui-ux-engineer\` |
-| **Pure Logic** | API calls, data fetching, state management, event handlers (non-visual), type definitions, utility functions, business logic | **CAN handle directly** |
-| **Mixed** | Component changes both visual AND logic | **Split**: handle logic yourself, delegate visual to \`frontend-ui-ux-engineer\` |
+| Pattern | Action | No Exceptions |
+|---------|--------|---------------|
+| \`.tsx\`, \`.jsx\` with styling | DELEGATE | Even "just add className" |
+| \`.vue\`, \`.svelte\` | DELEGATE | Even single prop change |
+| \`.css\`, \`.scss\`, \`.sass\`, \`.less\` | DELEGATE | Even color/margin tweak |
+| Any file with visual keywords | DELEGATE | See keyword list below |
 
-#### Step 2: Ask Yourself
+#### Keyword Detection (INSTANT DELEGATE)
 
-Before touching any frontend file, think:
-> "Is this change about **how it LOOKS** or **how it WORKS**?"
+If your change involves **ANY** of these keywords → **STOP. DELEGATE.**
 
-- **LOOKS** (colors, sizes, positions, animations) → DELEGATE
-- **WORKS** (data flow, API integration, state) → Handle directly
+\`\`\`
+style, className, tailwind, css, color, background, border, shadow,
+margin, padding, width, height, flex, grid, animation, transition,
+hover, responsive, font-size, font-weight, icon, svg, image, layout,
+position, display, opacity, z-index, transform, gradient, theme
+\`\`\`
 
-#### When in Doubt → DELEGATE if ANY of these keywords involved:
-style, className, tailwind, color, background, border, shadow, margin, padding, width, height, flex, grid, animation, transition, hover, responsive, font-size, icon, svg`
+**YOU CANNOT**:
+- "Just quickly fix this style"
+- "It's only one className"
+- "Too simple to delegate"
+
+#### EXCEPTION: Pure Logic Only
+
+You MAY handle directly **ONLY IF ALL** conditions are met:
+1. Change is **100% logic** (API, state, event handlers, types, utils)
+2. **Zero** visual keywords in your diff
+3. No styling, layout, or appearance changes whatsoever
+
+| Pure Logic Examples | Visual Examples (DELEGATE) |
+|---------------------|---------------------------|
+| Add onClick API call | Change button color |
+| Fix pagination logic | Add loading spinner animation |
+| Add form validation | Make modal responsive |
+| Update state management | Adjust spacing/margins |
+
+#### Mixed Changes → SPLIT
+
+If change has BOTH logic AND visual:
+1. Handle logic yourself
+2. DELEGATE visual part to \`frontend-ui-ux-engineer\`
+3. **Never** combine them into one edit`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
@@ -271,7 +298,7 @@ export function buildHardBlocksSection(agents: AvailableAgent[]): string {
 
   if (frontendAgent) {
     blocks.unshift(
-      "| Frontend VISUAL changes (styling, layout, animation) | Always delegate to `frontend-ui-ux-engineer` |"
+      "| Frontend VISUAL changes (styling, className, layout, animation, any visual keyword) | **HARD BLOCK** - Always delegate to `frontend-ui-ux-engineer`. Zero tolerance. |"
     )
   }
 
@@ -297,7 +324,7 @@ export function buildAntiPatternsSection(agents: AvailableAgent[]): string {
     patterns.splice(
       4,
       0,
-      "| **Frontend** | Direct edit to visual/styling code (logic changes OK) |"
+      "| **Frontend** | ANY direct edit to visual/styling code. Keyword detected = DELEGATE. Pure logic only = OK |"
     )
   }
 
