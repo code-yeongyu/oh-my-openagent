@@ -259,6 +259,50 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
+export function buildSherlockSection(agents: AvailableAgent[]): string {
+  const sherlockAgent = agents.find((a) => a.name === "sherlock")
+  if (!sherlockAgent) return ""
+
+  const useWhen = sherlockAgent.metadata.useWhen || []
+  const avoidWhen = sherlockAgent.metadata.avoidWhen || []
+
+  return `<Sherlock_Usage>
+## Sherlock — Hypothesis-Driven Debugger
+
+Sherlock is a debugging specialist. Unlike Oracle (read-only consultant), Sherlock ACTIVELY debugs: instruments code, runs tests, analyzes logs, and implements fixes.
+
+### WHEN to Delegate:
+
+| Trigger | Action |
+|---------|--------|
+${useWhen.map((w) => `| ${w} | Delegate to Sherlock |`).join("\n")}
+| After 2+ failed fix attempts | Delegate to Sherlock with failure context |
+| Complex runtime bugs | Delegate to Sherlock |
+
+### WHEN NOT to Delegate:
+
+${avoidWhen.map((w) => `- ${w}`).join("\n")}
+
+### Oracle vs Sherlock:
+
+| Situation | Use |
+|-----------|-----|
+| Need debugging **advice** | Oracle (read-only) |
+| Need bug **investigation and fix** | Sherlock (active) |
+| Architecture questions | Oracle |
+| Runtime behavior differs from expected | Sherlock |
+| After 2+ failed fix attempts | Sherlock |
+
+### Usage Pattern:
+\`\`\`typescript
+sisyphus_task(
+  agent="sherlock",
+  prompt="..."  // Include: Bug Report, Steps to Reproduce, Failed Attempts, Relevant Files
+)
+\`\`\`
+</Sherlock_Usage>`
+}
+
 export function buildHardBlocksSection(agents: AvailableAgent[]): string {
   const frontendAgent = agents.find((a) => a.name === "frontend-ui-ux-engineer")
 

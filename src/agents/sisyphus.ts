@@ -9,6 +9,7 @@ import {
   buildDelegationTable,
   buildFrontendSection,
   buildOracleSection,
+  buildSherlockSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
@@ -151,7 +152,11 @@ Ask yourself:
    - YES → Agent: \`document-writer\`
    - NO → Continue to step 5
 
-5. **Is this exploration/search task?**
+5. **Is this a debugging task with runtime issues?**
+   - YES → Agent: \`sherlock\` (hypothesis-driven debugging with instrumentation)
+   - NO → Continue to step 6
+
+6. **Is this exploration/search task?**
    - YES → Agent: \`explore\` (internal codebase) OR \`librarian\` (external docs/repos)
    - NO → Use default category based on context
 
@@ -387,13 +392,27 @@ const SISYPHUS_PHASE2C = `## Phase 2C - Failure Recovery
 2. Re-verify after EVERY fix attempt
 3. Never shotgun debug (random changes hoping something works)
 
-### After 3 Consecutive Failures:
+### After 2 Consecutive Failures:
 
 1. **STOP** all further edits immediately
-2. **REVERT** to last known working state (git checkout / undo edits)
-3. **DOCUMENT** what was attempted and what failed
-4. **CONSULT** Oracle with full failure context
-5. If Oracle cannot resolve → **ASK USER** before proceeding
+2. **DELEGATE** to Sherlock with full failure context (hypothesis-driven debugging)
+3. If Sherlock cannot resolve → **CONSULT** Oracle for architectural guidance
+4. If Oracle cannot resolve → **ASK USER** before proceeding
+
+### Sherlock Delegation Format:
+\`\`\`
+sisyphus_task(agent="sherlock", prompt="
+## Bug Report
+[Describe the bug, expected vs actual behavior]
+
+## Failed Attempts
+1. [What was tried] → [Why it failed]
+2. [What was tried] → [Why it failed]
+
+## Relevant Files
+[File paths to investigate]
+")
+\`\`\`
 
 **Never**: Leave code in broken state, continue hoping it'll work, delete failing tests to "pass"`
 
@@ -534,6 +553,7 @@ function buildDynamicSisyphusPrompt(
   const frontendSection = buildFrontendSection(availableAgents)
   const delegationTable = buildDelegationTable(availableAgents)
   const oracleSection = buildOracleSection(availableAgents)
+  const sherlockSection = buildSherlockSection(availableAgents)
   const hardBlocks = buildHardBlocksSection(availableAgents)
   const antiPatterns = buildAntiPatternsSection(availableAgents)
 
@@ -590,6 +610,8 @@ function buildDynamicSisyphusPrompt(
     "</Behavior_Instructions>",
     "",
     oracleSection,
+    "",
+    sherlockSection,
     "",
     SISYPHUS_TASK_MANAGEMENT,
     "",

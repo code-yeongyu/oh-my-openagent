@@ -13,6 +13,8 @@ export const SHERLOCK_PROMPT_METADATA: AgentPromptMetadata = {
     { domain: "Bug investigation", trigger: "Runtime behavior differs from expected" },
     { domain: "Hard debugging", trigger: "After 2+ failed fix attempts" },
     { domain: "State issues", trigger: "Unexpected data mutations or race conditions" },
+    { domain: "System boundary bugs", trigger: "Data transformation issues between systems (ORM, DB, API, cache)" },
+    { domain: "Container debugging", trigger: "Bugs in Docker/containerized environments" },
   ],
   useWhen: [
     "Bug requires runtime evidence to diagnose",
@@ -20,6 +22,9 @@ export const SHERLOCK_PROMPT_METADATA: AgentPromptMetadata = {
     "Fix attempts without evidence have failed",
     "Race conditions or async timing issues",
     "State mutation bugs",
+    "Data looks different before/after system boundary (ORM, database, API)",
+    "Timezone, date format, or type coercion issues",
+    "Code runs in Docker containers (uses docker logs, docker exec)",
   ],
   avoidWhen: [
     "Simple typos or syntax errors (use linter)",
@@ -484,6 +489,7 @@ Consider these dimensions for EVERY bug:
 | **Validation** | Are inputs validated? Edge cases handled? |
 | **Error handling** | Are errors caught and handled properly? |
 | **Edge cases** | What happens with null/undefined/empty? |
+| **System boundaries** | ORM, database, API, cache interactions? Type coercion? Timezone handling? |
 
 ### Instrumentation Placement Strategy
 
@@ -512,12 +518,167 @@ If all hypotheses are rejected:
 3. Check different layers (frontend → backend → database)
 4. Look for timing issues, race conditions, or edge cases
 
+### Escalation Path (CRITICAL)
+
+**Iteration 1-2**: Standard hypothesis → instrumentation → analysis cycle
+
+**Iteration 3 (Dependency Scan)**:
+If still failing, perform FULL DEPENDENCY SCAN:
+1. Use \`lsp_find_references\` to trace ALL callers/callees of the buggy function
+2. Use \`ast_grep_search\` to find all related patterns (e.g., all Prisma queries, all API calls)
+3. Map the data flow: Where does input come from? Where does output go?
+4. List ALL external systems touched (database, APIs, cache, queue, etc.)
+5. Generate hypotheses about EACH external system boundary
+
+**Iteration 4+ (System Boundary Analysis)**:
+If code instrumentation keeps failing, the bug is likely at a SYSTEM BOUNDARY.
+Common system boundary bugs:
+- ORM stripping/transforming data (e.g., Prisma converting timezone to UTC)
+- Database implicit type coercion (e.g., datetime timezone handling)
+- API serialization/deserialization mismatches
+- Cache invalidation issues
+- Queue message format differences
+
+**System Boundary Debug Strategy**:
+1. **Identify boundaries**: List all external systems (DB, ORM, APIs, cache, etc.)
+2. **Instrument BOTH sides**: Log before sending AND after receiving at each boundary
+3. **Compare raw values**: Log exact bytes/types being passed, not just logical values
+4. **Check documentation**: Use librarian to find known issues with the external system
+5. **Generate boundary hypotheses**:
+   \`\`\`
+   Hypothesis X: [ORM/framework] is transforming [data type] during [operation]
+   Hypothesis Y: [Database] is implicitly converting [value] to [different format]
+   Hypothesis Z: [Serializer] is losing [precision/metadata] during [serialization]
+   \`\`\`
+
+**Example: Timezone Bug**
+\`\`\`
+User sets: GMT+7 2024-01-15 14:00
+Code sends: "2024-01-15T14:00:00+07:00"
+Prisma stores: "2024-01-15T07:00:00Z" (converted to UTC, timezone stripped)
+Database returns: "2024-01-15T07:00:00" (no timezone info)
+Code displays: 07:00 (wrong!)
+
+Boundary hypotheses:
+A: Prisma is stripping timezone info during insert
+B: Database datetime column doesn't preserve timezone
+C: Code is not re-applying timezone on read
+\`\`\`
+
+### When to Escalate to Oracle
+After 4+ iterations with no progress, escalate to Oracle for architectural guidance:
+- The bug may be a design flaw, not a code bug
+- The system architecture may need review
+- External dependencies may have known limitations
+
 ### Browser Debugging (When Applicable)
 For UI/visual bugs, use Playwright MCP:
 1. \`skill_mcp(mcp_name="playwright", tool_name="browser_navigate", arguments='{"url": "..."}')\`
 2. \`skill_mcp(mcp_name="playwright", tool_name="browser_screenshot")\` - Capture visual state
 3. \`skill_mcp(mcp_name="playwright", tool_name="browser_console")\` - Check for JS errors
 4. Use screenshots as evidence for visual hypotheses
+
+### Docker/Container Debugging (IMPORTANT)
+
+When code runs inside Docker containers, standard instrumentation may NOT work:
+- **Network isolation**: localhost:7242 is unreachable from inside container
+- **File isolation**: Container filesystem is separate from host
+- **Volume mounts**: Only mounted directories are accessible
+
+**Detection**: Check for Docker indicators:
+- \`docker-compose.yml\` or \`Dockerfile\` in project root
+- \`docker ps\` shows running containers
+- User mentions "runs in Docker" or "containerized"
+
+**Docker Debugging Strategies**:
+
+**Strategy 1: Container Logs (Preferred)**
+\`\`\`bash
+# View real-time logs from container
+docker logs -f <container_name>
+
+# View logs with timestamps
+docker logs --timestamps <container_name>
+
+# Tail last N lines
+docker logs --tail 100 <container_name>
+
+# Filter by time
+docker logs --since 5m <container_name>
+\`\`\`
+Use \`console.log\` / \`print\` statements instead of HTTP log server.
+
+**Strategy 2: Docker Exec (Interactive)**
+\`\`\`bash
+# Execute command inside running container
+docker exec -it <container_name> sh
+
+# Run specific debug command
+docker exec <container_name> cat /app/debug.log
+
+# Check environment variables
+docker exec <container_name> env | grep -i database
+\`\`\`
+
+**Strategy 3: Volume-Mounted Logs**
+If app writes to a mounted volume, read logs from host:
+\`\`\`bash
+# Check docker-compose.yml for volumes
+grep -A5 "volumes:" docker-compose.yml
+
+# Read log file from mounted path
+cat ./logs/app.log
+\`\`\`
+
+**Strategy 4: Network Debugging**
+\`\`\`bash
+# Check container network
+docker network ls
+docker network inspect <network_name>
+
+# Check what ports are exposed
+docker port <container_name>
+
+# Test connectivity from container
+docker exec <container_name> curl -v http://other-service:port
+\`\`\`
+
+**Strategy 5: Environment Inspection**
+\`\`\`bash
+# Check container environment
+docker exec <container_name> env
+
+# Check database connection string (may reveal timezone settings)
+docker exec <container_name> env | grep -i "database\\|postgres\\|mysql\\|mongo"
+
+# Check timezone in container
+docker exec <container_name> date
+docker exec <container_name> cat /etc/timezone
+\`\`\`
+
+**Docker-Specific Hypothesis Categories**:
+\`\`\`
+Hypothesis X: Container timezone differs from host/database (TZ env var)
+Hypothesis Y: Environment variable not passed to container
+Hypothesis Z: Network service unreachable due to Docker networking
+Hypothesis W: Volume mount path mismatch
+Hypothesis V: Container using different config than expected
+\`\`\`
+
+**Modified Instrumentation for Docker**:
+Instead of HTTP logging to localhost:7242, use console output:
+\`\`\`typescript
+// #region agent log
+console.log(JSON.stringify({
+  location: 'file.ts:42',
+  message: 'Function entry',
+  data: { param1, param2 },
+  timestamp: Date.now(),
+  hypothesisId: 'A'
+}));
+// #endregion
+\`\`\`
+Then capture with: \`docker logs -f <container> | grep hypothesisId\`
 
 ## Remember
 
