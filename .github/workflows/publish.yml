@@ -109,7 +109,7 @@ jobs:
           echo "=== Running bun build (CLI) ==="
           bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
           echo "=== Running tsc ==="
-          tsc --emitDeclarationOnly
+          bunx tsc --emitDeclarationOnly
           echo "=== Running build:schema ==="
           bun run build:schema
 
