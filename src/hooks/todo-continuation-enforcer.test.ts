@@ -807,4 +807,26 @@ describe("todo-continuation-enforcer", () => {
     // #then - no continuation (API fallback detected the abort)
     expect(promptCalls).toHaveLength(0)
   })
+
+  test("should pass model property in prompt call (undefined when no message context)", async () => {
+    // #given - session with incomplete todos, no prior message context available
+    const sessionID = "main-model-preserve"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // #when - session goes idle and continuation is injected
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 2500))
+
+    // #then - prompt call made, model is undefined when no context (expected behavior)
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
+    expect("model" in promptCalls[0]).toBe(true)
+  })
 })
