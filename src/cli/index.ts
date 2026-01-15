@@ -8,9 +8,8 @@ import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import packageJson from "../../package.json" with { type: "json" }
 
-// Using require() instead of top-level await for Bun single-file executable compatibility
-const packageJson = require("../../package.json") as { version: string }
 const VERSION = packageJson.version
 
 const program = new Command()

@@ -10,9 +10,8 @@ import {
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
+import packageJson from "../../package.json" with { type: "json" }
 
-// Using require() instead of top-level await for Bun single-file executable compatibility
-const packageJson = require("../../package.json") as { version: string }
 const VERSION = packageJson.version
 
 const SYMBOLS = {
