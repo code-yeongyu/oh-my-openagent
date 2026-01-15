@@ -206,14 +206,18 @@ export function createTodoContinuationEnforcer(
 
     const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
-    try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, incompleteCount: freshIncompleteCount })
+    const model = prevMessage?.model?.providerID && prevMessage?.model?.modelID
+      ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+      : undefined
 
-      // Don't pass model - let OpenCode use session's existing lastModel
+    try {
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, model, incompleteCount: freshIncompleteCount })
+
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
           agent: prevMessage?.agent,
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },
