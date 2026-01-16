@@ -77,6 +77,7 @@
           "claude-code-hooks",
           "auto-slash-command",
           "edit-error-recovery",
+          "sisyphus-task-retry",
           "prometheus-md-only",
           "start-work",
           "sisyphus-orchestrator"
@@ -2426,6 +2427,64 @@
         "include_co_authored_by": {
           "default": true,
           "type": "boolean"
+        }
+      }
+    },
+    "auto_skill_matching": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "threshold": {
+          "default": 0.3,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxSkills": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 1
+        },
+        "method": {
+          "default": "hybrid",
+          "type": "string",
+          "enum": ["keyword", "description", "hybrid", "llm"]
+        },
+        "enableCaching": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enableContextAwareness": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enableExplicitMentions": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enableSkillBundles": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enableConflictDetection": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enableLearning": {
+          "default": true,
+          "type": "boolean"
+        },
+        "llmModel": {
+          "type": "string"
+        },
+        "llmThreshold": {
+          "default": 0.7,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }

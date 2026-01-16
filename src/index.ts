@@ -48,6 +48,7 @@ import {
 } from "./features/opencode-skill-loader";
 import { createBuiltinSkills } from "./features/builtin-skills";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
+import { buildSkillIndex } from "./features/skill-matcher";
 import {
   setMainSession,
   getMainSessionID,
@@ -223,6 +224,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundManager = new BackgroundManager(ctx);
 
   initTaskToastManager(ctx.client);
+
+  buildSkillIndex(true);
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })

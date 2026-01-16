@@ -62,7 +62,8 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "xdg-basedir": "^5.1.0",
-    "zod": "^4.1.8"
+    "zod": "^4.1.8",
+    "opencode-antigravity-auth": "^1.2.9-beta.3"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

@@ -12,6 +12,14 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import {
+	matchSkills,
+	getDefaultConfig,
+	suggestParallelAgents,
+	recordSkillFeedback,
+	getFeedbackStats,
+	buildSkillIndex,
+} from "../../features/skill-matcher"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -147,8 +155,43 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
-      if (args.skills.length > 0) {
-        const { resolved, notFound } = resolveMultipleSkills(args.skills, { gitMasterConfig })
+      let skillsToUse = args.skills
+      let skillWarnings: string[] = []
+      let skillBundles: string[] = []
+      let explicitMentions: string[] = []
+      let parallelAgentSuggestion: ReturnType<typeof suggestParallelAgents> | null = null
+
+      if (skillsToUse.length === 0 && args.prompt.trim()) {
+        const matcherConfig = getDefaultConfig()
+        try {
+          const openCodeConfig = await client.config.get()
+          const autoSkillMatch = (openCodeConfig as { auto_skill_matching?: Partial<typeof matcherConfig> })?.auto_skill_matching
+          if (autoSkillMatch) {
+            Object.assign(matcherConfig, autoSkillMatch)
+          }
+        } catch {}
+
+        const matchResult = matchSkills(args.prompt, matcherConfig, [], directory)
+        if (matchResult.matchedSkills.length > 0) {
+          skillsToUse = matchResult.matchedSkills
+          skillWarnings = matchResult.warnings
+          skillBundles = matchResult.usedBundles
+          explicitMentions = matchResult.explicitMentions
+          log("[sisyphus_task] Auto-matched skills", {
+            skills: skillsToUse,
+            count: skillsToUse.length,
+            bundles: skillBundles,
+            explicit: explicitMentions,
+          })
+        }
+
+        if (matcherConfig.method === "llm" || matcherConfig.enableCaching) {
+          parallelAgentSuggestion = suggestParallelAgents(args.prompt)
+        }
+      }
+
+      if (skillsToUse.length > 0) {
+        const { resolved, notFound } = resolveMultipleSkills(skillsToUse, { gitMasterConfig })
         if (notFound.length > 0) {
           const available = createBuiltinSkills().map(s => s.name).join(", ")
           return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
@@ -340,7 +383,6 @@ ${textContent || "(No text output)"}`
         const openCodeConfig = await client.config.get()
         systemDefaultModel = (openCodeConfig as { model?: string })?.model
       } catch {
-        // Config fetch failed, proceed without system default
         systemDefaultModel = undefined
       }
 
