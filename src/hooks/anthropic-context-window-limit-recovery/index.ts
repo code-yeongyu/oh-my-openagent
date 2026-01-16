@@ -7,7 +7,6 @@ import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
-  dcpForCompaction?: boolean
 }
 
 function createRecoveryState(): AutoCompactState {
@@ -16,7 +15,6 @@ function createRecoveryState(): AutoCompactState {
     errorDataBySession: new Map<string, ParsedTokenLimitError>(),
     retryStateBySession: new Map(),
     truncateStateBySession: new Map(),
-    dcpStateBySession: new Map(),
     emptyContentAttemptBySession: new Map(),
     compactionInProgress: new Set<string>(),
   }
@@ -25,7 +23,6 @@ function createRecoveryState(): AutoCompactState {
 export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, options?: AnthropicContextWindowLimitRecoveryOptions) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
-  const dcpForCompaction = options?.dcpForCompaction
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -37,7 +34,6 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
         autoCompactState.truncateStateBySession.delete(sessionInfo.id)
-        autoCompactState.dcpStateBySession.delete(sessionInfo.id)
         autoCompactState.emptyContentAttemptBySession.delete(sessionInfo.id)
         autoCompactState.compactionInProgress.delete(sessionInfo.id)
       }
@@ -81,8 +77,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
             autoCompactState,
             ctx.client,
             ctx.directory,
-            experimental,
-            dcpForCompaction
+            experimental
           )
         }, 300)
       }
@@ -141,8 +136,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState,
         ctx.client,
         ctx.directory,
-        experimental,
-        dcpForCompaction
+        experimental
       )
     }
   }
@@ -152,6 +146,6 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
   }
 }
 
-export type { AutoCompactState, DcpState, ParsedTokenLimitError, TruncateState } from "./types"
+export type { AutoCompactState, ParsedTokenLimitError, TruncateState } from "./types"
 export { parseAnthropicTokenLimitError } from "./parser"
 export { executeCompact, getLastAssistant } from "./executor"

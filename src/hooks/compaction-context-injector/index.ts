@@ -1,6 +1,13 @@
-import type { SummarizeContext } from "../preemptive-compaction"
 import { injectHookMessage } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+
+export interface SummarizeContext {
+  sessionID: string
+  providerID: string
+  modelID: string
+  usageRatio: number
+  directory: string
+}
 
 const SUMMARIZE_CONTEXT_PROMPT = `[COMPACTION CONTEXT INJECTION]
 
