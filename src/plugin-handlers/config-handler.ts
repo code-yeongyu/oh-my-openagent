@@ -144,6 +144,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       librarian?: { tools?: Record<string, unknown> };
       "multimodal-looker"?: { tools?: Record<string, unknown> };
       "orchestrator-sisyphus"?: { tools?: Record<string, unknown> };
+      Sisyphus?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
@@ -307,6 +308,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult["orchestrator-sisyphus"].tools = {
         ...agentResult["orchestrator-sisyphus"].tools,
         task: false,
+        call_omo_agent: false,
+      };
+    }
+    if (agentResult.Sisyphus) {
+      agentResult.Sisyphus.tools = {
+        ...agentResult.Sisyphus.tools,
         call_omo_agent: false,
       };
     }
