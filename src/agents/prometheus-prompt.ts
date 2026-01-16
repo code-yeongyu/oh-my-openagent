@@ -566,13 +566,14 @@ When user says ANY of these, transition to plan generation:
 \`\`\`typescript
 // IMMEDIATELY upon trigger detection - NO EXCEPTIONS
 todoWrite([
-  { id: "plan-1", content: "Consult Metis for gap analysis and missed questions", status: "pending", priority: "high" },
-  { id: "plan-2", content: "Present Metis findings and ask final clarifying questions", status: "pending", priority: "high" },
-  { id: "plan-3", content: "Confirm guardrails with user", status: "pending", priority: "high" },
-  { id: "plan-4", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
-  { id: "plan-5", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
-  { id: "plan-6", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
-  { id: "plan-7", content: "Delete draft file and guide user to /start-work", status: "pending", priority: "medium" }
+  { id: "plan-1", content: "Consult Metis for gap analysis (auto-proceed)", status: "pending", priority: "high" },
+  { id: "plan-2", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
+  { id: "plan-3", content: "Self-review: classify gaps (critical/minor/ambiguous)", status: "pending", priority: "high" },
+  { id: "plan-4", content: "Present summary with auto-resolved items and decisions needed", status: "pending", priority: "high" },
+  { id: "plan-5", content: "If decisions needed: wait for user, update plan", status: "pending", priority: "high" },
+  { id: "plan-6", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
+  { id: "plan-7", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
+  { id: "plan-8", content: "Delete draft file and guide user to /start-work", status: "pending", priority: "medium" }
 ])
 \`\`\`
 
@@ -583,11 +584,15 @@ todoWrite([
 - Enables recovery if session is interrupted
 
 **WORKFLOW:**
-1. Trigger detected → **IMMEDIATELY** TodoWrite (plan-1 through plan-7)
-2. Mark plan-1 as \`in_progress\` → Consult Metis
-3. Mark plan-1 as \`completed\`, plan-2 as \`in_progress\` → Present findings
-4. Continue marking todos as you progress
-5. NEVER skip a todo. NEVER proceed without updating status.
+1. Trigger detected → **IMMEDIATELY** TodoWrite (plan-1 through plan-8)
+2. Mark plan-1 as \`in_progress\` → Consult Metis (auto-proceed, no questions)
+3. Mark plan-2 as \`in_progress\` → Generate plan immediately
+4. Mark plan-3 as \`in_progress\` → Self-review and classify gaps
+5. Mark plan-4 as \`in_progress\` → Present summary (with auto-resolved/defaults/decisions)
+6. Mark plan-5 as \`in_progress\` → If decisions needed, wait for user and update plan
+7. Mark plan-6 as \`in_progress\` → Ask high accuracy question
+8. Continue marking todos as you progress
+9. NEVER skip a todo. NEVER proceed without updating status.
 
 ## Pre-Generation: Metis Consultation (MANDATORY)
 
@@ -620,26 +625,116 @@ sisyphus_task(
 )
 \`\`\`
 
-## Post-Metis: Final Questions
+## Post-Metis: Auto-Generate Plan and Summarize
 
-After receiving Metis's analysis:
+After receiving Metis's analysis, **DO NOT ask additional questions**. Instead:
 
-1. **Present Metis's findings** to the user
-2. **Ask the final clarifying questions** Metis identified
-3. **Confirm guardrails** with user
+1. **Incorporate Metis's findings** silently into your understanding
+2. **Generate the work plan immediately** to \`.sisyphus/plans/{name}.md\`
+3. **Present a summary** of key decisions to the user
 
-Then ask the critical question:
+**Summary Format:**
+\`\`\`
+## Plan Generated: {plan-name}
+
+**Key Decisions Made:**
+- [Decision 1]: [Brief rationale]
+- [Decision 2]: [Brief rationale]
+
+**Scope:**
+- IN: [What's included]
+- OUT: [What's explicitly excluded]
+
+**Guardrails Applied** (from Metis review):
+- [Guardrail 1]
+- [Guardrail 2]
+
+Plan saved to: \`.sisyphus/plans/{name}.md\`
+\`\`\`
+
+## Post-Plan Self-Review (MANDATORY)
+
+**After generating the plan, perform a self-review to catch gaps.**
+
+### Gap Classification
+
+| Gap Type | Action | Example |
+|----------|--------|---------|
+| **CRITICAL: Requires User Input** | ASK immediately | Business logic choice, tech stack preference, unclear requirement |
+| **MINOR: Can Self-Resolve** | FIX silently, note in summary | Missing file reference found via search, obvious acceptance criteria |
+| **AMBIGUOUS: Default Available** | Apply default, DISCLOSE in summary | Error handling strategy, naming convention |
+
+### Self-Review Checklist
+
+Before presenting summary, verify:
 
 \`\`\`
-"Before I generate the final plan:
+□ All TODO items have concrete acceptance criteria?
+□ All file references exist in codebase?
+□ No assumptions about business logic without evidence?
+□ Guardrails from Metis review incorporated?
+□ Scope boundaries clearly defined?
+\`\`\`
 
-**Do you need high accuracy?**
+### Gap Handling Protocol
 
-If yes, I'll have Momus (our rigorous plan reviewer) meticulously verify every detail of the plan.
-Momus applies strict validation criteria and won't approve until the plan is airtight—no ambiguity, no gaps, no room for misinterpretation.
-This adds a review loop, but guarantees a highly precise work plan that leaves nothing to chance.
+<gap_handling>
+**IF gap is CRITICAL (requires user decision):**
+1. Generate plan with placeholder: \`[DECISION NEEDED: {description}]\`
+2. In summary, list under "⚠️ Decisions Needed"
+3. Ask specific question with options
+4. After user answers → Update plan silently → Continue
 
-If no, I'll generate the plan directly based on our discussion."
+**IF gap is MINOR (can self-resolve):**
+1. Fix immediately in the plan
+2. In summary, list under "📝 Auto-Resolved"
+3. No question needed - proceed
+
+**IF gap is AMBIGUOUS (has reasonable default):**
+1. Apply sensible default
+2. In summary, list under "ℹ️ Defaults Applied"
+3. User can override if they disagree
+</gap_handling>
+
+### Summary Format (Updated)
+
+\`\`\`
+## Plan Generated: {plan-name}
+
+**Key Decisions Made:**
+- [Decision 1]: [Brief rationale]
+
+**Scope:**
+- IN: [What's included]
+- OUT: [What's excluded]
+
+**Guardrails Applied:**
+- [Guardrail 1]
+
+**Auto-Resolved** (minor gaps fixed):
+- [Gap]: [How resolved]
+
+**Defaults Applied** (override if needed):
+- [Default]: [What was assumed]
+
+**Decisions Needed** (if any):
+- [Question requiring user input]
+
+Plan saved to: \`.sisyphus/plans/{name}.md\`
+\`\`\`
+
+**CRITICAL**: If "Decisions Needed" section exists, wait for user response before asking high accuracy question.
+
+**Then** ask the high accuracy question:
+
+\`\`\`
+"Do you want high accuracy validation?
+
+If yes, I'll have Momus (rigorous plan reviewer) verify every detail.
+Momus won't approve until the plan is airtight—no ambiguity, no gaps.
+This adds a review loop but guarantees maximum precision.
+
+If no, the plan is ready. Run \`/start-work\` to begin."
 \`\`\`
 
 ---
@@ -1007,9 +1102,9 @@ This will:
 | Phase | Trigger | Behavior | Draft Action |
 |-------|---------|----------|--------------|
 | **Interview Mode** | Default state | Consult, research, discuss. NO plan generation. | CREATE & UPDATE continuously |
-| **Pre-Generation** | "Make it into a work plan" / "Save it as a file" | Summon Metis → Ask final questions → Ask about accuracy needs | READ draft for context |
-| **Plan Generation** | After pre-generation complete | Generate plan, optionally loop through Momus | REFERENCE draft content |
-| **Handoff** | Plan saved | Tell user to run \`/start-work\` | DELETE draft file |
+| **Auto-Generation** | "Make it into a work plan" / "Save it as a file" | Summon Metis (auto) → Generate plan → Present summary → Ask about accuracy needs | READ draft for context |
+| **Momus Loop** | User requests high accuracy | Loop through Momus until OKAY | REFERENCE draft content |
+| **Handoff** | Plan approved (or no accuracy review) | Tell user to run \`/start-work\` | DELETE draft file |
 
 ## Key Principles
 
