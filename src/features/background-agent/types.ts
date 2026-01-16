@@ -36,6 +36,12 @@ export interface BackgroundTask {
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Initial wait before polling in ms */
+  initial_wait_ms?: number
+  /** Polling interval in ms */
+  poll_interval_ms?: number
+  /** Hard timeout in ms */
+  timeout_ms?: number
 }
 
 export interface LaunchInput {
@@ -49,6 +55,9 @@ export interface LaunchInput {
   model?: { providerID: string; modelID: string; variant?: string }
   skills?: string[]
   skillContent?: string
+  initial_wait_ms?: number
+  poll_interval_ms?: number
+  timeout_ms?: number
 }
 
 export interface ResumeInput {

@@ -2060,6 +2060,18 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "initial_wait_ms": {
+            "type": "number",
+            "minimum": 1000
+          },
+          "poll_interval_ms": {
+            "type": "number",
+            "minimum": 500
+          },
+          "timeout_ms": {
+            "type": "number",
+            "minimum": 30000
           }
         },
         "required": [
@@ -2405,6 +2417,18 @@
             "type": "number",
             "minimum": 1
           }
+        },
+        "default_initial_wait_ms": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "default_poll_interval_ms": {
+          "type": "number",
+          "minimum": 500
+        },
+        "default_timeout_ms": {
+          "type": "number",
+          "minimum": 30000
         }
       }
     },
@@ -2427,6 +2451,39 @@
           "default": true,
           "type": "boolean"
         }
+      }
+    },
+    "keyword_modes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "prompt_file": {
+            "type": "string"
+          },
+          "show_toast": {
+            "default": true,
+            "type": "boolean"
+          },
+          "toast_title": {
+            "type": "string"
+          },
+          "toast_message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern"
+        ]
       }
     }
   }

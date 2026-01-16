@@ -15,8 +15,10 @@ import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-i
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-const TASK_TTL_MS = 30 * 60 * 1000
-const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
+const DEFAULT_INITIAL_WAIT_MS = 5 * 60 * 1000   // 5 minutes
+const DEFAULT_POLL_INTERVAL_MS = 60 * 1000      // 60 seconds
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000       // 15 minutes
+const MIN_STABILITY_TIME_MS = 10 * 1000
 
 type OpencodeClient = PluginInput["client"]
 
@@ -52,6 +54,9 @@ export class BackgroundManager {
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
   private concurrencyManager: ConcurrencyManager
+  private defaultInitialWaitMs: number
+  private defaultPollIntervalMs: number
+  private defaultTimeoutMs: number
 
   constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
     this.tasks = new Map()
@@ -60,6 +65,9 @@ export class BackgroundManager {
     this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
+    this.defaultInitialWaitMs = config?.default_initial_wait_ms ?? DEFAULT_INITIAL_WAIT_MS
+    this.defaultPollIntervalMs = config?.default_poll_interval_ms ?? DEFAULT_POLL_INTERVAL_MS
+    this.defaultTimeoutMs = config?.default_timeout_ms ?? DEFAULT_TIMEOUT_MS
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -126,6 +134,9 @@ export class BackgroundManager {
       parentAgent: input.parentAgent,
       model: input.model,
       concurrencyKey,
+      initial_wait_ms: input.initial_wait_ms ?? this.defaultInitialWaitMs,
+      poll_interval_ms: input.poll_interval_ms ?? this.defaultPollIntervalMs,
+      timeout_ms: input.timeout_ms ?? this.defaultTimeoutMs,
     }
 
     this.tasks.set(task.id, task)
@@ -173,16 +184,33 @@ export class BackgroundManager {
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      log("[background-agent] prompt error:", { 
+        sessionID, 
+        agent: input.agent,
+        errorName: error?.name,
+        errorMessage,
+      })
+      
+      // Only treat as fatal if it's clearly an agent/session creation issue.
+      // Network timeouts, connection drops, and SDK issues should NOT mark task as failed
+      // since the session may still be running successfully (common during high API load).
+      const isFatalError = 
+        errorMessage.includes("agent.name") || 
+        errorMessage.includes("undefined") ||
+        errorMessage.includes("not found") ||
+        errorMessage.includes("not registered") ||
+        errorMessage.includes("does not exist")
+      
+      if (!isFatalError) {
+        log("[background-agent] Non-fatal prompt error, letting polling detect actual status:", sessionID)
+        return
+      }
+      
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-        } else {
-          existingTask.error = errorMessage
-        }
+        existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
@@ -540,10 +568,21 @@ export class BackgroundManager {
   private startPolling(): void {
     if (this.pollingInterval) return
 
+    const minPollInterval = this.getMinPollInterval()
     this.pollingInterval = setInterval(() => {
       this.pollRunningTasks()
-    }, 2000)
+    }, minPollInterval)
     this.pollingInterval.unref()
+  }
+
+  private getMinPollInterval(): number {
+    let minInterval = this.defaultPollIntervalMs
+    for (const task of this.tasks.values()) {
+      if (task.status === "running" && task.poll_interval_ms) {
+        minInterval = Math.min(minInterval, task.poll_interval_ms)
+      }
+    }
+    return minInterval
   }
 
   private stopPolling(): void {
@@ -713,15 +752,20 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     for (const [taskId, task] of this.tasks.entries()) {
       const age = now - task.startedAt.getTime()
-      if (age > TASK_TTL_MS) {
-        log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
+      const taskTimeout = task.timeout_ms ?? this.defaultTimeoutMs
+      if (age > taskTimeout) {
+        const timeoutMinutes = Math.round(taskTimeout / 60000)
+        log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s", timeout: timeoutMinutes + "m" })
         task.status = "error"
-        task.error = "Task timed out after 30 minutes"
+        task.error = `Task timed out after ${timeoutMinutes} minutes`
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
         }
-        this.clearNotificationsForTask(taskId)
+        this.markForNotification(task)
+        this.notifyParentSession(task).catch(err => {
+          log("[background-agent] Failed to notify on timeout:", err)
+        })
         this.tasks.delete(taskId)
         subagentSessions.delete(task.sessionID)
       }
@@ -734,7 +778,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       }
       const validNotifications = notifications.filter((task) => {
         const age = now - task.startedAt.getTime()
-        return age <= TASK_TTL_MS
+        const taskTimeout = task.timeout_ms ?? this.defaultTimeoutMs
+        return age <= taskTimeout
       })
       if (validNotifications.length === 0) {
         this.notifications.delete(sessionID)
@@ -752,6 +797,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
+
+      const age = Date.now() - task.startedAt.getTime()
+      const initialWait = task.initial_wait_ms ?? this.defaultInitialWaitMs
+      if (age < initialWait) continue
 
 try {
         const sessionStatus = allStatuses[task.sessionID]

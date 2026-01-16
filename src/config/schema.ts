@@ -166,6 +166,12 @@ export const CategoryConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),
+  /** Wait before first poll in ms (default: 300000 = 5 min) */
+  initial_wait_ms: z.number().min(1000).optional(),
+  /** Polling interval in ms after initial wait (default: 60000 = 60 sec) */
+  poll_interval_ms: z.number().min(500).optional(),
+  /** Hard timeout in ms - task killed after this (default: 900000 = 15 min) */
+  timeout_ms: z.number().min(30000).optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([
@@ -287,11 +293,32 @@ export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(1)).optional(),
   modelConcurrency: z.record(z.string(), z.number().min(1)).optional(),
+  /** Wait before first poll in ms (default: 300000 = 5 min) */
+  default_initial_wait_ms: z.number().min(1000).optional(),
+  /** Polling interval in ms (default: 60000 = 60 sec) */
+  default_poll_interval_ms: z.number().min(500).optional(),
+  /** Hard timeout in ms (default: 900000 = 15 min) */
+  default_timeout_ms: z.number().min(30000).optional(),
 })
 
 export const NotificationConfigSchema = z.object({
   /** Force enable session-notification even if external notification plugins are detected (default: false) */
   force_enable: z.boolean().optional(),
+})
+
+export const KeywordModeConfigSchema = z.object({
+  /** Regex pattern to match (case-insensitive by default) */
+  pattern: z.string(),
+  /** Inline prompt to inject when keyword is detected */
+  prompt: z.string().optional(),
+  /** Path to external .md file containing the prompt (supports ~ expansion) */
+  prompt_file: z.string().optional(),
+  /** Whether to show toast notification when mode activates (default: true) */
+  show_toast: z.boolean().default(true),
+  /** Custom toast title */
+  toast_title: z.string().optional(),
+  /** Custom toast message */
+  toast_message: z.string().optional(),
 })
 
 export const GitMasterConfigSchema = z.object({
@@ -320,6 +347,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
+  /** Custom keyword modes - define your own triggers and prompts */
+  keyword_modes: z.record(z.string(), KeywordModeConfigSchema).optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -342,5 +371,6 @@ export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
 export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
 export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
 export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
+export type KeywordModeConfig = z.infer<typeof KeywordModeConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
