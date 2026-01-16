@@ -1,6 +1,7 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import { log } from "../../shared"
+import { getMainSessionID } from "../claude-code-session-state"
 
 interface OutputPart {
   type: string
@@ -105,14 +106,17 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
-      const sessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
-      log("[DEBUG] Extracted sessionID from lastUserMessage.info", {
+      // Try message.info.sessionID first, fallback to mainSessionID
+      const messageSessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
+      const sessionID = messageSessionID ?? getMainSessionID()
+      log("[DEBUG] Extracted sessionID", {
+        messageSessionID,
+        mainSessionID: getMainSessionID(),
         sessionID,
         infoKeys: Object.keys(lastUserMessage.info),
-        lastUserMessageInfo: JSON.stringify(lastUserMessage.info).slice(0, 200),
       })
       if (!sessionID) {
-        log("[DEBUG] sessionID is undefined or empty")
+        log("[DEBUG] sessionID is undefined (both message.info and mainSessionID are empty)")
         return
       }
 
