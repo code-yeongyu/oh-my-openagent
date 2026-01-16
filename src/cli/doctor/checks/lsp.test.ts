@@ -22,15 +22,17 @@ describe("lsp check", () => {
       // #given
       const spawnSpy = spyOn(Bun, "spawn")
 
-      // #when getting servers info
-      await lsp.getLspServersInfo()
+      try {
+        // #when getting servers info
+        await lsp.getLspServersInfo()
 
-      // #then should not spawn which
-      const calls = spawnSpy.mock.calls
-      const whichCalls = calls.filter((c) => Array.isArray(c) && Array.isArray(c[0]) && c[0][0] === "which")
-      expect(whichCalls.length).toBe(0)
-
-      spawnSpy.mockRestore()
+        // #then should not spawn which
+        const calls = spawnSpy.mock.calls
+        const whichCalls = calls.filter((c) => Array.isArray(c) && Array.isArray(c[0]) && c[0][0] === "which")
+        expect(whichCalls.length).toBe(0)
+      } finally {
+        spawnSpy.mockRestore()
+      }
     })
   })
 
