@@ -101,8 +101,7 @@ todowrite([
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**BLOCKING: DO NOT proceed to next task until Steps 1-3 are complete.**
-**FAILURE TO DO QA = INCOMPLETE WORK = USER WILL REJECT.**`
+**BLOCKING: DO NOT proceed to Step 4 until Steps 1-3 are VERIFIED.**`
 
 const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
@@ -195,21 +194,35 @@ function buildOrchestratorReminder(planName: string, progress: { total: number; 
   return `
 ---
 
-**BOULDER STATE:** Plan: \`${planName}\` | ✅ ${progress.completed}/${progress.total} done | ⏳ ${remaining} remaining
+**BOULDER STATE:** Plan: \`${planName}\` | ${progress.completed}/${progress.total} done | ${remaining} remaining
 
 ---
 
 ${buildVerificationReminder(sessionId)}
 
+**STEP 4: MARK COMPLETION IN PLAN FILE (IMMEDIATELY)**
+
+RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
+
+Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
+- Change \`[ ]\` to \`[x]\` for the completed task
+- Use \`Edit\` tool to modify the checkbox
+
+**DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
+
+**STEP 5: COMMIT ATOMIC UNIT**
+
+- Stage ONLY the verified changes
+- Commit with clear message describing what was done
+
+**STEP 6: PROCEED TO NEXT TASK**
+
+- Read the plan file to identify the next \`[ ]\` task
+- Start immediately - DO NOT STOP
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**AFTER VERIFICATION PASSES - YOUR NEXT ACTIONS (IN ORDER):**
-
-1. **COMMIT** atomic unit (only verified changes)
-2. **MARK** \`[x]\` in plan file for completed task
-3. **PROCEED** to next task immediately
-
-**DO NOT STOP. ${remaining} tasks remain. Keep bouldering.**`
+**${remaining} tasks remain. Keep bouldering.**`
 }
 
 function buildStandaloneVerificationReminder(sessionId: string): string {
@@ -218,13 +231,27 @@ function buildStandaloneVerificationReminder(sessionId: string): string {
 
 ${buildVerificationReminder(sessionId)}
 
+**STEP 4: UPDATE TODO STATUS (IMMEDIATELY)**
+
+RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
+
+1. Run \`todoread\` to see your todo list
+2. Mark the completed task as \`completed\` using \`todowrite\`
+
+**DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
+
+**STEP 5: EXECUTE QA TASKS (IF ANY)**
+
+If QA tasks exist in your todo list:
+- Execute them BEFORE proceeding
+- Mark each QA task complete after successful verification
+
+**STEP 6: PROCEED TO NEXT PENDING TASK**
+
+- Identify the next \`pending\` task from your todo list
+- Start immediately - DO NOT STOP
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**AFTER VERIFICATION - CHECK YOUR TODO LIST:**
-
-1. Run \`todoread\` to see remaining tasks
-2. If QA tasks exist → execute them BEFORE marking complete
-3. Mark completed tasks → proceed to next pending task
 
 **NO TODO = NO TRACKING = INCOMPLETE WORK. Use todowrite aggressively.**`
 }
@@ -441,12 +468,17 @@ export function createSisyphusOrchestratorHook(
       try {
         const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
         const messages = (messagesResp.data ?? []) as Array<{
-          info?: { model?: { providerID: string; modelID: string } }
+          info?: { model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
         }>
         for (let i = messages.length - 1; i >= 0; i--) {
-          const msgModel = messages[i].info?.model
+          const info = messages[i].info
+          const msgModel = info?.model
           if (msgModel?.providerID && msgModel?.modelID) {
             model = { providerID: msgModel.providerID, modelID: msgModel.modelID }
+            break
+          }
+          if (info?.providerID && info?.modelID) {
+            model = { providerID: info.providerID, modelID: info.modelID }
             break
           }
         }
