@@ -92,17 +92,20 @@ describe("claude-code-session-state", () => {
   describe("mainSessionID", () => {
     test.serial("should store and retrieve main session ID", () => {
       // #given
-      const mainID = "main-session-123"
+      setMainSession(undefined)
+      const mainID = "main-session-unit-test"
 
       // #when
       setMainSession(mainID)
 
       // #then
       expect(getMainSessionID()).toBe(mainID)
+      setMainSession(undefined)
     })
 
     test.serial("should return undefined when not set", () => {
       // #given - not set
+      setMainSession(undefined)
 
       // #then
       expect(getMainSessionID()).toBeUndefined()
