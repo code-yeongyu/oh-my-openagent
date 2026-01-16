@@ -187,32 +187,61 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorName = error?.name ?? ""
       log("[background-agent] prompt error:", { 
         sessionID, 
         agent: input.agent,
-        errorName: error?.name,
+        errorName,
         errorMessage,
       })
       
-      // Only treat as fatal if it's clearly an agent/session creation issue.
-      // Network timeouts, connection drops, and SDK issues should NOT mark task as failed
-      // since the session may still be running successfully (common during high API load).
-      const isFatalError = 
-        errorMessage.includes("agent.name") || 
-        errorMessage.includes("undefined") ||
-        errorMessage.includes("not found") ||
-        errorMessage.includes("not registered") ||
-        errorMessage.includes("does not exist")
+      // INVERTED LOGIC: Treat errors as fatal by default.
+      // Only skip notification for known TRANSIENT network errors where
+      // the session may still be running successfully (common during high API load).
+      // 
+      // Transient errors: network timeouts, connection drops, empty SDK errors
+      // These indicate the request failed to send, but the session may have started.
+      const isTransientNetworkError = 
+        errorName === "TimeoutError" ||
+        errorName === "AbortError" ||
+        errorName === "FetchError" ||
+        errorMessage.includes("ETIMEDOUT") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("ECONNREFUSED") ||
+        errorMessage.includes("ENOTFOUND") ||
+        errorMessage.includes("EAI_AGAIN") ||
+        errorMessage.includes("EPIPE") ||
+        errorMessage.includes("ENETUNREACH") ||
+        errorMessage.includes("EHOSTUNREACH") ||
+        errorMessage.includes("socket hang up") ||
+        errorMessage.includes("network request failed") ||
+        errorMessage.includes("connection timed out") ||
+        errorMessage.includes("request timed out") ||
+        // Empty error object {} from SDK issues - session likely still running
+        (errorMessage === "{}" || errorMessage === "")
       
-      if (!isFatalError) {
-        log("[background-agent] Non-fatal prompt error, letting polling detect actual status:", sessionID)
+      if (isTransientNetworkError) {
+        log("[background-agent] Transient network error, letting polling detect actual status:", sessionID)
         return
       }
       
+      // All other errors are fatal: auth, permission, invalid payload, agent not found, etc.
+      // Mark task as failed immediately to release concurrency and notify parent.
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
-        existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+        // Provide specific error message for agent-related issues (stricter matching)
+        const isAgentNotFoundError = 
+          errorMessage.includes("agent") && (
+            errorMessage.includes("not found") || 
+            errorMessage.includes("not registered") || 
+            errorMessage.includes("does not exist")
+          )
+        if (isAgentNotFoundError) {
+          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+        } else {
+          existingTask.error = `Background task failed: ${errorMessage}`
+        }
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
@@ -432,10 +461,41 @@ export class BackgroundManager {
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
-      log("[background-agent] resume prompt error:", error)
-      existingTask.status = "error"
       const errorMessage = error instanceof Error ? error.message : String(error)
-      existingTask.error = errorMessage
+      const errorName = error?.name ?? ""
+      log("[background-agent] resume prompt error:", { 
+        sessionID: existingTask.sessionID, 
+        agent: existingTask.agent,
+        errorName,
+        errorMessage,
+      })
+      
+      // Same transient network error handling as launch()
+      const isTransientNetworkError = 
+        errorName === "TimeoutError" ||
+        errorName === "AbortError" ||
+        errorName === "FetchError" ||
+        errorMessage.includes("ETIMEDOUT") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("ECONNREFUSED") ||
+        errorMessage.includes("ENOTFOUND") ||
+        errorMessage.includes("EAI_AGAIN") ||
+        errorMessage.includes("EPIPE") ||
+        errorMessage.includes("ENETUNREACH") ||
+        errorMessage.includes("EHOSTUNREACH") ||
+        errorMessage.includes("socket hang up") ||
+        errorMessage.includes("network request failed") ||
+        errorMessage.includes("connection timed out") ||
+        errorMessage.includes("request timed out") ||
+        (errorMessage === "{}" || errorMessage === "")
+      
+      if (isTransientNetworkError) {
+        log("[background-agent] Transient network error on resume, letting polling detect actual status:", existingTask.sessionID)
+        return
+      }
+      
+      existingTask.status = "error"
+      existingTask.error = `Resume failed: ${errorMessage}`
       existingTask.completedAt = new Date()
 
       // Release concurrency on error to prevent slot leaks
