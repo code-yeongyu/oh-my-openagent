@@ -51,6 +51,7 @@ import {
   setMainSession,
   getMainSessionID,
   setSessionAgent,
+  updateSessionAgent,
   clearSessionAgent,
 } from "./features/claude-code-session-state";
 import {
@@ -309,7 +310,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       if (input.agent) {
-        setSessionAgent(input.sessionID, input.agent);
+        updateSessionAgent(input.sessionID, input.agent);
       }
 
       const message = (output as { message: { variant?: string } }).message
@@ -450,7 +451,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         const agent = info?.agent as string | undefined;
         const role = info?.role as string | undefined;
         if (sessionID && agent && role === "user") {
-          setSessionAgent(sessionID, agent);
+          updateSessionAgent(sessionID, agent);
         }
       }
 
