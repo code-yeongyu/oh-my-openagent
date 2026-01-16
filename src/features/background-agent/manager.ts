@@ -826,13 +826,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     try {
       const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
       const messages = (messagesResp.data ?? []) as Array<{
-        info?: { agent?: string; model?: { providerID: string; modelID: string } }
+        info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
       }>
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
-        if (info?.agent || info?.model) {
+        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
           agent = info.agent ?? task.parentAgent
-          model = info.model
+          model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
           break
         }
       }
