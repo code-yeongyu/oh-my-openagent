@@ -144,8 +144,8 @@ describe("TaskToastManager", () => {
   })
 
   describe("model fallback info in toast message", () => {
-    test("should display warning when model falls back to category-default", () => {
-      // #given - a task with model fallback to category-default
+    test("should NOT display warning when model is category-default (normal behavior)", () => {
+      // #given - category-default is the intended behavior, not a fallback
       const task = {
         id: "task_1",
         description: "Task with category default model",
@@ -157,16 +157,15 @@ describe("TaskToastManager", () => {
       // #when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should show warning with model info
+      // #then - toast should NOT show warning - category default is expected
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("⚠️")
-      expect(call.body.message).toContain("google/gemini-3-pro-preview")
-      expect(call.body.message).toContain("(category default)")
+      expect(call.body.message).not.toContain("⚠️")
+      expect(call.body.message).not.toContain("(category default)")
     })
 
     test("should display warning when model falls back to system-default", () => {
-      // #given - a task with model fallback to system-default
+      // #given - system-default is a fallback (no category default, no user config)
       const task = {
         id: "task_1b",
         description: "Task with system default model",
@@ -178,16 +177,16 @@ describe("TaskToastManager", () => {
       // #when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should show warning with model info
+      // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("⚠️")
       expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
-      expect(call.body.message).toContain("(system default)")
+      expect(call.body.message).toContain("(system default fallback)")
     })
 
     test("should display warning when model is inherited from parent", () => {
-      // #given - a task with inherited model
+      // #given - inherited is a fallback (custom category without model definition)
       const task = {
         id: "task_2",
         description: "Task with inherited model",
@@ -199,12 +198,12 @@ describe("TaskToastManager", () => {
       // #when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should show warning with inherited model
+      // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("⚠️")
       expect(call.body.message).toContain("cliproxy/claude-opus-4-5")
-      expect(call.body.message).toContain("(inherited)")
+      expect(call.body.message).toContain("(inherited from parent)")
     })
 
     test("should not display model info when user-defined", () => {
