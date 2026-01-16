@@ -577,9 +577,6 @@ Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now a
 The features in your editor? Other agents can't touch them.
 Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
 
-- **lsp_goto_definition**: Jump to symbol definition
-- **lsp_find_references**: Find all usages across workspace
-- **lsp_symbols**: Get symbols from file (scope='document') or search across workspace (scope='workspace')
 - **lsp_diagnostics**: Get errors/warnings before build
 - **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
