@@ -9,6 +9,8 @@ import {
     type ToolPermission,
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
+import { appendSubagentSettingsToPrompt } from "../shared/subagent-settings"
+
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -224,7 +226,11 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
+    const prompt = appendSubagentSettingsToPrompt(
+      `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`,
+      { directory: ctx.directory }
+    )
+
 
     try {
       log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })

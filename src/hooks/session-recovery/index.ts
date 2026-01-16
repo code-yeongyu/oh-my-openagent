@@ -16,6 +16,8 @@ import {
   stripThinkingParts,
 } from "./storage"
 import type { MessageData, ResumeConfig } from "./types"
+import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
+
 
 export interface SessionRecoveryOptions {
   experimental?: ExperimentalConfig
@@ -72,12 +74,17 @@ function extractResumeConfig(userMessage: MessageData | undefined, sessionID: st
   }
 }
 
-async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
+async function resumeSession(client: Client, config: ResumeConfig, directory: string): Promise<boolean> {
   try {
     await client.session.prompt({
       path: { id: config.sessionID },
       body: {
-        parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
+        parts: [
+          {
+            type: "text",
+            text: appendSubagentSettingsToPrompt(RECOVERY_RESUME_TEXT, { directory }),
+          },
+        ],
         agent: config.agent,
         model: config.model,
       },
@@ -87,6 +94,7 @@ async function resumeSession(client: Client, config: ResumeConfig): Promise<bool
     return false
   }
 }
+
 
 function getErrorMessage(error: unknown): string {
   if (!error) return ""
@@ -398,14 +406,14 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         if (success && experimental?.auto_resume) {
           const lastUser = findLastUserMessage(msgs ?? [])
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
-          await resumeSession(ctx.client, resumeConfig)
+          await resumeSession(ctx.client, resumeConfig, ctx.directory)
         }
       } else if (errorType === "thinking_disabled_violation") {
         success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
         if (success && experimental?.auto_resume) {
           const lastUser = findLastUserMessage(msgs ?? [])
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
-          await resumeSession(ctx.client, resumeConfig)
+          await resumeSession(ctx.client, resumeConfig, ctx.directory)
         }
       }
 

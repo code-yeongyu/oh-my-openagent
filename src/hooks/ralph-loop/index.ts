@@ -2,6 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
+import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
+
 import { readState, writeState, clearState, incrementIteration } from "./storage"
 import {
   HOOK_NAME,
@@ -298,10 +300,14 @@ export function createRalphLoopHook(
         max: newState.max_iterations,
       })
 
-      const continuationPrompt = CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
-        .replace("{{MAX}}", String(newState.max_iterations))
-        .replace("{{PROMISE}}", newState.completion_promise)
-        .replace("{{PROMPT}}", newState.prompt)
+      const continuationPrompt = appendSubagentSettingsToPrompt(
+        CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
+          .replace("{{MAX}}", String(newState.max_iterations))
+          .replace("{{PROMISE}}", newState.completion_promise)
+          .replace("{{PROMPT}}", newState.prompt),
+        { directory: ctx.directory }
+      )
+
 
       await ctx.client.tui
         .showToast({

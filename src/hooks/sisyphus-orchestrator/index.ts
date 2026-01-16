@@ -10,7 +10,9 @@ import {
 import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
 import type { BackgroundManager } from "../../features/background-agent"
+
 
 export const HOOK_NAME = "sisyphus-orchestrator"
 
@@ -429,9 +431,12 @@ export function createSisyphusOrchestratorHook(
       return
     }
 
-    const prompt = BOULDER_CONTINUATION_PROMPT
-      .replace(/{PLAN_NAME}/g, planName) +
-      `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
+    const prompt = appendSubagentSettingsToPrompt(
+      BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+        `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`,
+      { directory: ctx.directory }
+    )
+
 
     try {
       log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })

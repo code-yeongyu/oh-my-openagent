@@ -24,3 +24,6 @@ export * from "./zip-extractor"
 export * from "./agent-variant"
 export * from "./session-cursor"
 export * from "./shell-env"
+export * from "./runtime-plugin-config"
+export * from "./subagent-settings"
+
