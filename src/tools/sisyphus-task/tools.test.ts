@@ -305,7 +305,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: true,
-          skills: [],
+          skills: null,
         },
         toolContext
       )
@@ -320,10 +320,12 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("SISYPHUS_TASK_DESCRIPTION documents skills parameter", () => {
+    test("SISYPHUS_TASK_DESCRIPTION documents skills parameter with null option", () => {
       // #given / #when / #then
       expect(SISYPHUS_TASK_DESCRIPTION).toContain("skills")
       expect(SISYPHUS_TASK_DESCRIPTION).toContain("Array of skill names")
+      expect(SISYPHUS_TASK_DESCRIPTION).toContain("Empty array [] is NOT allowed")
+      expect(SISYPHUS_TASK_DESCRIPTION).toContain("null if no skills needed")
     })
 
     test("skills parameter is required - returns error when not provided", async () => {
@@ -368,6 +370,104 @@ describe("sisyphus-task", () => {
       expect(result).toContain("skills")
       expect(result).toContain("REQUIRED")
     })
+
+    test("empty array [] returns error with available skills list", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - empty array passed
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should return error about empty array with guidance
+      expect(result).toContain("❌")
+      expect(result).toContain("Empty array []")
+      expect(result).toContain("not allowed")
+      expect(result).toContain("skills=null")
+    })
+
+    test("null skills is allowed and proceeds without skill content", async () => {
+      // #given
+      const { createSisyphusTask } = require("./tools")
+      let promptBody: any
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      
+      const tool = createSisyphusTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - null skills passed
+      await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: null,
+        },
+        toolContext
+      )
+      
+      // #then - should proceed without system content from skills
+      expect(promptBody).toBeDefined()
+      // system should not contain skill content (only category prompt append if any)
+    }, { timeout: 20000 })
   })
 
   describe("resume with background parameter", () => {
@@ -426,7 +526,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue the task",
         resume: "ses_resume_test",
         run_in_background: false,
-        skills: [],
+        skills: null,
       },
       toolContext
     )
@@ -481,7 +581,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue in background",
         resume: "ses_bg_resume",
         run_in_background: true,
-        skills: [],
+        skills: null,
       },
       toolContext
     )
@@ -536,7 +636,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          skills: null,
         },
         toolContext
       )
@@ -597,7 +697,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          skills: null,
         },
         toolContext
       )
@@ -650,7 +750,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          skills: null,
         },
         toolContext
       )
@@ -705,7 +805,7 @@ describe("sisyphus-task", () => {
         prompt: "test",
         category: "custom-cat",
         run_in_background: false,
-        skills: []
+        skills: null
       }, toolContext)
 
       // #then
