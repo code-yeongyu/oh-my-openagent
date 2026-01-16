@@ -93,7 +93,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
       // #when
@@ -114,7 +114,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "Start Sisyphus work session\nSession: $SESSION_ID",
+            text: "<session-context>Session: $SESSION_ID</session-context>",
           },
         ],
       }
@@ -137,7 +137,7 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: "Start Sisyphus work session\nTime: $TIMESTAMP",
+            text: "<session-context>Time: $TIMESTAMP</session-context>",
           },
         ],
       }
@@ -168,7 +168,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
       // #when
@@ -196,7 +196,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
       // #when
@@ -224,7 +224,7 @@ describe("start-work hook", () => {
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
       // #when
@@ -265,10 +265,9 @@ describe("start-work hook", () => {
         parts: [
           {
             type: "text",
-            text: `Start Sisyphus work session
-<user-request>
-new-plan
-</user-request>`,
+            text: `<session-context>
+<user-request>new-plan</user-request>
+</session-context>`,
           },
         ],
       }
@@ -298,10 +297,9 @@ new-plan
         parts: [
           {
             type: "text",
-            text: `Start Sisyphus work session
-<user-request>
-my-feature-plan ultrawork
-</user-request>`,
+            text: `<session-context>
+<user-request>my-feature-plan ultrawork</user-request>
+</session-context>`,
           },
         ],
       }
@@ -330,10 +328,9 @@ my-feature-plan ultrawork
         parts: [
           {
             type: "text",
-            text: `Start Sisyphus work session
-<user-request>
-api-refactor ulw
-</user-request>`,
+            text: `<session-context>
+<user-request>api-refactor ulw</user-request>
+</session-context>`,
           },
         ],
       }
@@ -362,10 +359,9 @@ api-refactor ulw
         parts: [
           {
             type: "text",
-            text: `Start Sisyphus work session
-<user-request>
-feature-implementation
-</user-request>`,
+            text: `<session-context>
+<user-request>feature-implementation</user-request>
+</session-context>`,
           },
         ],
       }
@@ -389,7 +385,7 @@ feature-implementation
       
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
-        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
       // #when - start-work command is processed
