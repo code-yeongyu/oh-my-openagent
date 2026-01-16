@@ -1,7 +1,7 @@
 # TOOLS KNOWLEDGE BASE
 
 ## OVERVIEW
-Custom tools extending agent capabilities: LSP (7 tools), AST-aware search/replace, background tasks, and multimodal analysis.
+Custom tools extending agent capabilities: LSP (3 tools), AST-aware search/replace, background tasks, and multimodal analysis.
 
 ## STRUCTURE
 ```
@@ -30,7 +30,7 @@ tools/
 ## TOOL CATEGORIES
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| LSP | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_rename, etc. | IDE-grade code intelligence (7 tools) |
+| LSP | lsp_diagnostics, lsp_prepare_rename, lsp_rename | IDE-grade code intelligence (3 tools) |
 | AST | ast_grep_search, ast_grep_replace | Structural pattern matching/rewriting |
 | Search | grep, glob | Timeout-safe file and content search |
 | Session | session_list, session_read, session_search, session_info | History navigation and retrieval |
