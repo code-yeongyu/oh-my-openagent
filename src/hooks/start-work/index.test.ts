@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir, homedir } from "node:os"
@@ -8,6 +8,7 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
+import * as sessionState from "../../features/claude-code-session-state"
 
 describe("start-work hook", () => {
   const TEST_DIR = join(tmpdir(), "start-work-test-" + Date.now())
@@ -378,6 +379,28 @@ feature-implementation
       // #then - should find plan by partial match
       expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
+    })
+  })
+
+  describe("session agent management", () => {
+    test("should clear session agent when start-work command is triggered", async () => {
+      // #given - spy on clearSessionAgent
+      const clearSpy = spyOn(sessionState, "clearSessionAgent")
+      
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "Start Sisyphus work session" }],
+      }
+
+      // #when - start-work command is processed
+      await hook["chat.message"](
+        { sessionID: "ses-prometheus-to-sisyphus" },
+        output
+      )
+
+      // #then - clearSessionAgent should be called with the sessionID
+      expect(clearSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus")
+      clearSpy.mockRestore()
     })
   })
 })
