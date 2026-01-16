@@ -284,6 +284,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     config.tools = {
       ...(config.tools as Record<string, unknown>),
       "grep_app_*": false,
+      LspHover: false,
+      LspCodeActions: false,
+      LspCodeActionResolve: false,
     };
 
     if (agentResult.librarian) {
