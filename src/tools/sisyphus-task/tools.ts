@@ -297,13 +297,13 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           try {
             const messagesResp = await client.session.messages({ path: { id: args.resume } })
             const messages = (messagesResp.data ?? []) as Array<{
-              info?: { agent?: string; model?: { providerID: string; modelID: string } }
+              info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
             }>
             for (let i = messages.length - 1; i >= 0; i--) {
               const info = messages[i].info
-              if (info?.agent || info?.model) {
+              if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
                 resumeAgent = info.agent
-                resumeModel = info.model
+                resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
                 break
               }
             }
