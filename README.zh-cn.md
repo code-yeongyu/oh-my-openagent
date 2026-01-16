@@ -574,11 +574,7 @@ gh repo star code-yeongyu/oh-my-opencode
 你编辑器中的功能？其他智能体无法触及。
 把你最好的工具交给你最好的同事。现在它们可以正确地重构、导航和分析。
 
-- **lsp_goto_definition**：跳转到符号定义
-- **lsp_find_references**：查找工作区中的所有使用
-- **lsp_symbols**：从文件获取符号 (scope='document') 或在工作区中搜索 (scope='workspace')
 - **lsp_diagnostics**：在构建前获取错误/警告
-- **lsp_servers**：列出可用的 LSP 服务器
 - **lsp_prepare_rename**：验证重命名操作
 - **lsp_rename**：在工作区中重命名符号
 - **ast_grep_search**：AST 感知的代码模式搜索（25 种语言）
