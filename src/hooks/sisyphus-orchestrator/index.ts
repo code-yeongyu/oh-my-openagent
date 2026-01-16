@@ -376,7 +376,9 @@ function isCallerOrchestrator(sessionID?: string): boolean {
 
 interface SessionState {
   lastEventWasAbortError?: boolean
+  hasInjectedSubagentSettingsForBoulder?: boolean
 }
+
 
 export interface SisyphusOrchestratorHookOptions {
   directory: string
@@ -431,8 +433,16 @@ export function createSisyphusOrchestratorHook(
       return
     }
 
-    const prompt = BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+    const state = getState(sessionID)
+
+    let prompt = BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
       `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
+
+    if (!state.hasInjectedSubagentSettingsForBoulder) {
+      prompt = appendSubagentSettingsToPrompt(prompt, { directory: ctx.directory })
+      state.hasInjectedSubagentSettingsForBoulder = true
+    }
+
 
 
     try {
@@ -596,6 +606,17 @@ export function createSisyphusOrchestratorHook(
         }
         return
       }
+
+      if (event.type === "session.compacted") {
+        const sessionID = (props?.sessionID ??
+          (props?.info as { id?: string } | undefined)?.id) as string | undefined
+        if (sessionID) {
+          sessions.delete(sessionID)
+          log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
+        }
+        return
+      }
+
     },
 
     "tool.execute.before": async (
