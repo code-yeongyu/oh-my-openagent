@@ -107,7 +107,7 @@ export function shouldDeleteAgentConfig(
   config: Record<string, unknown>,
   category: string
 ): boolean {
-  const { DEFAULT_CATEGORIES } = require("../tools/sisyphus-task/constants")
+  const { DEFAULT_CATEGORIES } = require("../tools/delegate-task/constants")
   const defaults = DEFAULT_CATEGORIES[category]
   if (!defaults) return false
 
