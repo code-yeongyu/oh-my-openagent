@@ -104,7 +104,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.agents,
       ctx.directory,
       config.model as string | undefined,
-      pluginConfig.categories
+      pluginConfig.categories,
+      pluginConfig.git_master
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -143,6 +144,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       librarian?: { tools?: Record<string, unknown> };
       "multimodal-looker"?: { tools?: Record<string, unknown> };
       "orchestrator-sisyphus"?: { tools?: Record<string, unknown> };
+      Sisyphus?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
@@ -284,6 +286,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     config.tools = {
       ...(config.tools as Record<string, unknown>),
       "grep_app_*": false,
+      LspHover: false,
+      LspCodeActions: false,
+      LspCodeActionResolve: false,
     };
 
     if (agentResult.librarian) {
@@ -303,6 +308,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       agentResult["orchestrator-sisyphus"].tools = {
         ...agentResult["orchestrator-sisyphus"].tools,
         task: false,
+        call_omo_agent: false,
+      };
+    }
+    if (agentResult.Sisyphus) {
+      agentResult.Sisyphus.tools = {
+        ...agentResult.Sisyphus.tools,
         call_omo_agent: false,
       };
     }

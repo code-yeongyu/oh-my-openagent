@@ -17,7 +17,6 @@ describe("executeCompact lock management", () => {
       errorDataBySession: new Map(),
       retryStateBySession: new Map(),
       truncateStateBySession: new Map(),
-      dcpStateBySession: new Map(),
       emptyContentAttemptBySession: new Map(),
       compactionInProgress: new Set<string>(),
     }
@@ -119,7 +118,6 @@ describe("executeCompact lock management", () => {
       truncate_all_tool_outputs: false,
       aggressive_truncation: true,
     }
-    const dcpForCompaction = true
 
     // #when: Execute compaction with experimental flag
     await executeCompact(
@@ -129,7 +127,6 @@ describe("executeCompact lock management", () => {
       mockClient,
       directory,
       experimental,
-      dcpForCompaction,
     )
 
     // #then: Lock should be cleared even on early return

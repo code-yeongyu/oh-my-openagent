@@ -11,7 +11,7 @@ import {
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
-
+import { clearSessionAgent } from "../../features/claude-code-session-state"
 
 export const HOOK_NAME = "start-work"
 
@@ -71,6 +71,9 @@ export function createStartWorkHook(ctx: PluginInput) {
       log(`[${HOOK_NAME}] Processing start-work command`, {
         sessionID: input.sessionID,
       })
+
+      // Clear previous session agent (e.g., Prometheus) to allow mode transition
+      clearSessionAgent(input.sessionID)
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID

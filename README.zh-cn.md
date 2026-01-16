@@ -574,11 +574,7 @@ gh repo star code-yeongyu/oh-my-opencode
 你编辑器中的功能？其他智能体无法触及。
 把你最好的工具交给你最好的同事。现在它们可以正确地重构、导航和分析。
 
-- **lsp_goto_definition**：跳转到符号定义
-- **lsp_find_references**：查找工作区中的所有使用
-- **lsp_symbols**：从文件获取符号 (scope='document') 或在工作区中搜索 (scope='workspace')
 - **lsp_diagnostics**：在构建前获取错误/警告
-- **lsp_servers**：列出可用的 LSP 服务器
 - **lsp_prepare_rename**：验证重命名操作
 - **lsp_rename**：在工作区中重命名符号
 - **ast_grep_search**：AST 感知的代码模式搜索（25 种语言）
@@ -1178,7 +1174,6 @@ Oh My OpenCode 添加了重构工具（重命名、代码操作）。
 ```json
 {
   "experimental": {
-    "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true
@@ -1186,13 +1181,11 @@ Oh My OpenCode 添加了重构工具（重命名、代码操作）。
 }
 ```
 
-| 选项                              | 默认    | 描述                                                                                                                                                                                          |
-| --------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction_threshold` | `0.85`  | 触发预防性压缩的阈值百分比（0.5-0.95）。`preemptive-compaction` 钩子默认启用；此选项自定义阈值。                                                                                              |
-| `truncate_all_tool_outputs`       | `false` | 截断所有工具输出而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。工具输出截断器默认启用——通过 `disabled_hooks` 禁用。                                                                       |
-| `aggressive_truncation`           | `false` | 当超过 token 限制时，积极截断工具输出以适应限制。比默认截断行为更激进。如果不足以满足，则回退到总结/恢复。                                                                                    |
-| `auto_resume`                     | `false` | 从思考块错误或禁用思考违规成功恢复后自动恢复会话。提取最后一条用户消息并继续。                                                                                                                |
-| `dcp_for_compaction`              | `false` | 为压缩启用 DCP（动态上下文修剪）——当超过 token 限制时首先运行。在运行压缩之前修剪重复的工具调用和旧的工具输出。                                                                               |
+| 选项                        | 默认    | 描述                                                                                                                                                       |
+| --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `truncate_all_tool_outputs` | `false` | 截断所有工具输出而不仅仅是白名单工具（Grep、Glob、LSP、AST-grep）。工具输出截断器默认启用——通过 `disabled_hooks` 禁用。                                    |
+| `aggressive_truncation`     | `false` | 当超过 token 限制时，积极截断工具输出以适应限制。比默认截断行为更激进。如果不足以满足，则回退到总结/恢复。                                                 |
+| `auto_resume`               | `false` | 从思考块错误或禁用思考违规成功恢复后自动恢复会话。提取最后一条用户消息并继续。                                                                             |
 
 **警告**：这些功能是实验性的，可能导致意外行为。只有在理解其影响后才启用。
 

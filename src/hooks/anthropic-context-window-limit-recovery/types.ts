@@ -18,17 +18,11 @@ export interface TruncateState {
   lastTruncatedPartId?: string
 }
 
-export interface DcpState {
-  attempted: boolean
-  itemsPruned: number
-}
-
 export interface AutoCompactState {
   pendingCompact: Set<string>
   errorDataBySession: Map<string, ParsedTokenLimitError>
   retryStateBySession: Map<string, RetryState>
   truncateStateBySession: Map<string, TruncateState>
-  dcpStateBySession: Map<string, DcpState>
   emptyContentAttemptBySession: Map<string, number>
   compactionInProgress: Set<string>
 }

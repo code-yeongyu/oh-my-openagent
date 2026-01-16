@@ -11,6 +11,7 @@ import { getMainSessionID, subagentSessions } from "../../features/claude-code-s
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
+import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import type { BackgroundManager } from "../../features/background-agent"
 
 
@@ -30,7 +31,7 @@ const DIRECT_WORK_REMINDER = `
 
 ---
 
-[SYSTEM REMINDER - DELEGATION REQUIRED]
+${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
 You just performed direct file modifications outside \`.sisyphus/\`.
 
@@ -54,7 +55,7 @@ You should NOT:
 ---
 `
 
-const BOULDER_CONTINUATION_PROMPT = `[SYSTEM REMINDER - BOULDER CONTINUATION]
+const BOULDER_CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.BOULDER_CONTINUATION)}
 
 You have an active work plan with incomplete tasks. Continue working.
 
@@ -109,7 +110,7 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ---
 
-⚠️⚠️⚠️ [CRITICAL SYSTEM DIRECTIVE - DELEGATION REQUIRED] ⚠️⚠️⚠️
+⚠️⚠️⚠️ ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)} ⚠️⚠️⚠️
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
@@ -157,7 +158,7 @@ sisyphus_task(
 
 const SINGLE_TASK_DIRECTIVE = `
 
-[SYSTEM DIRECTIVE - SINGLE TASK ONLY]
+${createSystemDirective(SystemDirectiveTypes.SINGLE_TASK_ONLY)}
 
 **STOP. READ THIS BEFORE PROCEEDING.**
 
@@ -649,7 +650,7 @@ export function createSisyphusOrchestratorHook(
       // Check sisyphus_task - inject single-task directive
       if (input.tool === "sisyphus_task") {
         const prompt = output.args.prompt as string | undefined
-        if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - SINGLE TASK ONLY]")) {
+        if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
           log(`[${HOOK_NAME}] Injected single-task directive to sisyphus_task`, {
             sessionID: input.sessionID,

@@ -1,5 +1,4 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-import { getAllServers } from "./config"
 import {
   DEFAULT_MAX_DIAGNOSTICS,
 } from "./constants"
@@ -59,28 +58,6 @@ export const lsp_diagnostics: ToolDefinition = tool({
       if (truncated) {
         lines.unshift(`Found ${total} diagnostics (showing first ${DEFAULT_MAX_DIAGNOSTICS}):`)
       }
-      const output = lines.join("\n")
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
-    }
-  },
-})
-
-export const lsp_servers: ToolDefinition = tool({
-  description: "List available LSP servers and installation status.",
-  args: {},
-  execute: async (_args, context) => {
-    try {
-      const servers = getAllServers()
-      const lines = servers.map((s) => {
-        if (s.disabled) {
-          return `${s.id} [disabled] - ${s.extensions.join(", ")}`
-        }
-        const status = s.installed ? "[installed]" : "[not installed]"
-        return `${s.id} ${status} - ${s.extensions.join(", ")}`
-      })
       const output = lines.join("\n")
       return output
     } catch (e) {
