@@ -303,21 +303,22 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult["orchestrator-sisyphus"]) {
       const agent = agentResult["orchestrator-sisyphus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny" };
+      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", sisyphus_task: "allow" };
     }
     if (agentResult.Sisyphus) {
       const agent = agentResult.Sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", sisyphus_task: "allow" };
     }
     if (agentResult["Prometheus (Planner)"]) {
       const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", sisyphus_task: "allow" };
     }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
       webfetch: "allow",
       external_directory: "allow",
+      sisyphus_task: "deny",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
