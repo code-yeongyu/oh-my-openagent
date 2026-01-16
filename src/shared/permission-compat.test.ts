@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
   createAgentToolRestrictions,
+  createAgentToolAllowlist,
   migrateToolsToPermission,
   migratePermissionToTools,
   migrateAgentConfig,
@@ -54,6 +55,63 @@ describe("permission-compat", () => {
       expect(result).toEqual({
         permission: { write: "deny" },
       })
+    })
+  })
+
+  describe("createAgentToolAllowlist", () => {
+    test("returns wildcard deny with explicit allow for v1.1.1+", () => {
+      // #given version is 1.1.1
+      setVersionCache("1.1.1")
+
+      // #when creating allowlist
+      const result = createAgentToolAllowlist(["read"])
+
+      // #then returns wildcard deny with read allow
+      expect(result).toEqual({
+        permission: { "*": "deny", read: "allow" },
+      })
+    })
+
+    test("returns wildcard deny with multiple allows for v1.1.1+", () => {
+      // #given version is 1.1.1
+      setVersionCache("1.1.1")
+
+      // #when creating allowlist with multiple tools
+      const result = createAgentToolAllowlist(["read", "glob"])
+
+      // #then returns wildcard deny with both allows
+      expect(result).toEqual({
+        permission: { "*": "deny", read: "allow", glob: "allow" },
+      })
+    })
+
+    test("returns explicit deny list for old versions", () => {
+      // #given version is below 1.1.1
+      setVersionCache("1.0.150")
+
+      // #when creating allowlist
+      const result = createAgentToolAllowlist(["read"])
+
+      // #then returns tools format with common tools denied except read
+      expect(result).toHaveProperty("tools")
+      const tools = (result as { tools: Record<string, boolean> }).tools
+      expect(tools.write).toBe(false)
+      expect(tools.edit).toBe(false)
+      expect(tools.bash).toBe(false)
+      expect(tools.read).toBeUndefined()
+    })
+
+    test("excludes allowed tools from legacy deny list", () => {
+      // #given version is below 1.1.1
+      setVersionCache("1.0.150")
+
+      // #when creating allowlist with glob
+      const result = createAgentToolAllowlist(["read", "glob"])
+
+      // #then glob is not in deny list
+      const tools = (result as { tools: Record<string, boolean> }).tools
+      expect(tools.glob).toBeUndefined()
+      expect(tools.write).toBe(false)
     })
   })
 
