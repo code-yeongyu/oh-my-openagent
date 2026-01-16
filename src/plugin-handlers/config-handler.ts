@@ -104,7 +104,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.agents,
       ctx.directory,
       config.model as string | undefined,
-      pluginConfig.categories
+      pluginConfig.categories,
+      pluginConfig.git_master
     );
 
     // Claude Code agents: Do NOT apply permission migration
