@@ -182,7 +182,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
       run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
-      skills: tool.schema.array(tool.schema.string()).describe("Array of skill names to prepend to the prompt. Use [] if no skills needed."),
+      skills: tool.schema.array(tool.schema.string()).nullable().describe("Array of skill names to prepend to the prompt. Use null if no skills needed. Empty array [] is NOT allowed."),
     },
     async execute(args: SisyphusTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
@@ -190,12 +190,24 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
         return `❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
       }
       if (args.skills === undefined) {
-        return `❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills needed.`
+        return `❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=null if no skills are needed, or provide an array of skill names.`
+      }
+      if (Array.isArray(args.skills) && args.skills.length === 0) {
+        const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
+        const availableSkillsList = allSkills.map(s => `  - ${s.name}`).slice(0, 15).join("\n")
+        return `❌ Invalid arguments: Empty array [] is not allowed for 'skills' parameter.
+
+Use skills=null if this task genuinely requires no specialized skills.
+Otherwise, select appropriate skills from available options:
+
+${availableSkillsList}${allSkills.length > 15 ? `\n  ... and ${allSkills.length - 15} more` : ""}
+
+If you believe no skills are needed, you MUST explicitly explain why to the user before using skills=null.`
       }
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
-      if (args.skills.length > 0) {
+      if (args.skills !== null && args.skills.length > 0) {
         const { resolved, notFound } = await resolveMultipleSkillsAsync(args.skills, { gitMasterConfig })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
@@ -515,7 +527,7 @@ ${textContent || "(No text output)"}`
             parentModel,
             parentAgent,
             model: categoryModel,
-            skills: args.skills,
+            skills: args.skills ?? undefined,
             skillContent: systemContent,
           })
 
@@ -579,7 +591,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             description: args.description,
             agent: agentToUse,
             isBackground: false,
-            skills: args.skills,
+            skills: args.skills ?? undefined,
             modelInfo,
           })
         }
