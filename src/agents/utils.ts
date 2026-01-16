@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
-import type { CategoriesConfig, CategoryConfig } from "../config/schema"
+import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../config/schema"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
@@ -51,7 +51,8 @@ function isFactory(source: AgentSource): source is AgentFactory {
 export function buildAgent(
   source: AgentSource,
   model?: string,
-  categories?: CategoriesConfig
+  categories?: CategoriesConfig,
+  gitMasterConfig?: GitMasterConfig
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -75,7 +76,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills)
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -130,7 +131,8 @@ export function createBuiltinAgents(
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
-  categories?: CategoriesConfig
+  categories?: CategoriesConfig,
+  gitMasterConfig?: GitMasterConfig
 ): Record<string, AgentConfig> {
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
@@ -149,7 +151,7 @@ export function createBuiltinAgents(
     const override = agentOverrides[agentName]
     const model = override?.model
 
-    let config = buildAgent(source, model, mergedCategories)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()
