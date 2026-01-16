@@ -448,6 +448,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           setMainSession(undefined);
         }
         if (sessionInfo?.id) {
+          contextCollector.clearHistory(sessionInfo.id)
           clearSessionAgent(sessionInfo.id);
           resetMessageCursor(sessionInfo.id);
           firstMessageVariantGate.clear(sessionInfo.id);

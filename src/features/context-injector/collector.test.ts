@@ -10,6 +10,32 @@ describe("ContextCollector", () => {
   })
 
   describe("register", () => {
+    it("clears consumed history for a session", () => {
+      // #given
+      const sessionID = "ses_once_clear"
+      const options = {
+        id: "once",
+        source: "custom" as ContextSourceType,
+        content: "once content",
+        once: true,
+      }
+
+      // #when
+      collector.register(sessionID, options)
+      collector.consume(sessionID)
+      collector.register(sessionID, options)
+
+      // #then
+      expect(collector.hasPending(sessionID)).toBe(false)
+
+      // #when - clear history
+      collector.clearHistory(sessionID)
+      collector.register(sessionID, options)
+
+      // #then
+      expect(collector.hasPending(sessionID)).toBe(true)
+    })
+
     it("registers context for a session", () => {
       // #given
       const sessionID = "ses_test1"

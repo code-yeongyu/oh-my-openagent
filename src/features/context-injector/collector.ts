@@ -14,20 +14,27 @@ const PRIORITY_ORDER: Record<ContextPriority, number> = {
 
 const CONTEXT_SEPARATOR = "\n\n---\n\n"
 
+type ConsumedHistoryEntry = {
+  keys: Set<string>
+  lastTouchedAt: number
+}
+
 export class ContextCollector {
   private sessions: Map<string, Map<string, ContextEntry>> = new Map()
-  private consumedHistory: Map<string, Set<string>> = new Map()
+  private consumedHistory: Map<string, ConsumedHistoryEntry> = new Map()
+
+  private readonly consumedHistoryMaxSessions = 1000
+  private readonly consumedHistoryTtlMs = 1000 * 60 * 60 * 24
 
   register(sessionID: string, options: RegisterContextOptions): void {
     const key = `${options.source}:${options.id}`
 
+    this.pruneConsumedHistory(Date.now())
+
     // Check if this context has already been consumed in this session
     if (options.once) {
-      if (!this.consumedHistory.has(sessionID)) {
-        this.consumedHistory.set(sessionID, new Set())
-      }
-      const history = this.consumedHistory.get(sessionID)!
-      if (history.has(key)) {
+      const history = this.ensureConsumedHistory(sessionID, Date.now())
+      if (history.keys.has(key)) {
         return
       }
     }
@@ -73,18 +80,18 @@ export class ContextCollector {
   }
 
   consume(sessionID: string): PendingContext {
+    const now = Date.now()
     const pending = this.getPending(sessionID)
+
+    this.pruneConsumedHistory(now)
 
     // Mark 'once' entries as consumed
     if (pending.hasContent) {
-      if (!this.consumedHistory.has(sessionID)) {
-        this.consumedHistory.set(sessionID, new Set())
-      }
-      const history = this.consumedHistory.get(sessionID)!
-      
+      const history = this.ensureConsumedHistory(sessionID, now)
+
       for (const entry of pending.entries) {
         if (entry.once) {
-          history.add(`${entry.source}:${entry.id}`)
+          history.keys.add(`${entry.source}:${entry.id}`)
         }
       }
     }
@@ -95,6 +102,43 @@ export class ContextCollector {
 
   clear(sessionID: string): void {
     this.sessions.delete(sessionID)
+  }
+
+  clearHistory(sessionID: string): void {
+    this.consumedHistory.delete(sessionID)
+  }
+
+  private ensureConsumedHistory(sessionID: string, now: number): ConsumedHistoryEntry {
+    const existing = this.consumedHistory.get(sessionID)
+    if (existing) {
+      existing.lastTouchedAt = now
+      return existing
+    }
+
+    const entry: ConsumedHistoryEntry = { keys: new Set(), lastTouchedAt: now }
+    this.consumedHistory.set(sessionID, entry)
+    return entry
+  }
+
+  private pruneConsumedHistory(now: number): void {
+    if (this.consumedHistory.size === 0) return
+
+    for (const [sessionID, entry] of this.consumedHistory.entries()) {
+      if (now - entry.lastTouchedAt > this.consumedHistoryTtlMs) {
+        this.consumedHistory.delete(sessionID)
+      }
+    }
+
+    if (this.consumedHistory.size <= this.consumedHistoryMaxSessions) return
+
+    const entries = [...this.consumedHistory.entries()].sort(
+      (a, b) => a[1].lastTouchedAt - b[1].lastTouchedAt
+    )
+
+    const overBy = this.consumedHistory.size - this.consumedHistoryMaxSessions
+    for (let i = 0; i < overBy; i++) {
+      this.consumedHistory.delete(entries[i][0])
+    }
   }
 
   hasPending(sessionID: string): boolean {
