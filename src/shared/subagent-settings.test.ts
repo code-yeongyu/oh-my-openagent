@@ -24,6 +24,9 @@ describe("subagent-settings", () => {
         modelConcurrency: { "anthropic/claude-opus-4-5": 1 },
       },
       disabled_agents: ["oracle"],
+      agents: {
+        build: { category: "quick", skills: ["git-master"], disable: false },
+      },
     } as any)
 
     const text = buildSubagentSettingsBlock({ directory: "/repo" })
@@ -32,5 +35,8 @@ describe("subagent-settings", () => {
     expect(text).toContain('"anthropic/claude-opus-4-5":1')
     expect(text).toContain("disabled_agents")
     expect(text).toContain("oracle")
+    expect(text).toContain("agent_overrides")
+    expect(text).toContain("build")
+    expect(text).toContain("quick")
   })
 })

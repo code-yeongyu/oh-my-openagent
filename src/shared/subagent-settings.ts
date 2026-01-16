@@ -28,40 +28,30 @@ export function buildSubagentSettingsBlock(ctx?: SubagentSettingsContext): strin
 
   const agentOverrides = config?.agents
   const agentOverrideSummary = agentOverrides
-    ? {
-        Sisyphus: agentOverrides.Sisyphus
-          ? {
-              model: agentOverrides.Sisyphus.model,
-              category: agentOverrides.Sisyphus.category,
-              skills: agentOverrides.Sisyphus.skills,
-            }
-          : undefined,
-        explore: agentOverrides.explore
-          ? {
-              model: agentOverrides.explore.model,
-              category: agentOverrides.explore.category,
-              skills: agentOverrides.explore.skills,
-            }
-          : undefined,
-        librarian: agentOverrides.librarian
-          ? {
-              model: agentOverrides.librarian.model,
-              category: agentOverrides.librarian.category,
-              skills: agentOverrides.librarian.skills,
-            }
-          : undefined,
-        oracle: agentOverrides.oracle
-          ? {
-              model: agentOverrides.oracle.model,
-              category: agentOverrides.oracle.category,
-              skills: agentOverrides.oracle.skills,
-            }
-          : undefined,
-      }
+    ? Object.fromEntries(
+        Object.entries(agentOverrides)
+          .filter(([, override]) => override !== undefined)
+          .map(([name, override]) => [
+            name,
+            {
+              model: override?.model,
+              variant: override?.variant,
+              category: override?.category,
+              skills: override?.skills,
+              temperature: override?.temperature,
+              top_p: override?.top_p,
+              tools: override?.tools,
+              disable: override?.disable,
+              mode: override?.mode,
+              color: override?.color,
+              permission: override?.permission,
+            },
+          ])
+      )
     : undefined
 
   const hasAgentOverrideSummary =
-    agentOverrideSummary && Object.values(agentOverrideSummary).some(Boolean)
+    agentOverrideSummary && Object.keys(agentOverrideSummary).length > 0
 
   const directoryLine = ctx?.directory ? `- directory: ${ctx.directory}` : undefined
 
