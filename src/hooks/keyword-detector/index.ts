@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
 import { log } from "../../shared"
+import { isSystemDirective } from "../../shared/system-directive"
 import { getMainSessionID } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
 
@@ -23,6 +24,12 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
+
+      if (isSystemDirective(promptText)) {
+        log(`[keyword-detector] Skipping system directive message`, { sessionID: input.sessionID })
+        return
+      }
+
       let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), input.agent)
 
       if (detectedKeywords.length === 0) {
