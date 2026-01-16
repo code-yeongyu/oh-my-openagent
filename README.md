@@ -1165,7 +1165,6 @@ Opt-in experimental features that may change or be removed in future versions. U
 ```json
 {
   "experimental": {
-    "preemptive_compaction_threshold": 0.85,
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true
@@ -1173,13 +1172,11 @@ Opt-in experimental features that may change or be removed in future versions. U
 }
 ```
 
-| Option                            | Default | Description                                                                                                                                                                                   |
-| --------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preemptive_compaction_threshold` | `0.85`  | Threshold percentage (0.5-0.95) to trigger preemptive compaction. The `preemptive-compaction` hook is enabled by default; this option customizes the threshold.                               |
-| `truncate_all_tool_outputs`       | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
-| `aggressive_truncation`           | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
-| `auto_resume`                     | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                             |
-| `dcp_for_compaction`              | `false` | Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded. Prunes duplicate tool calls and old tool outputs before running compaction.                       |
+| Option                      | Default | Description                                                                                                                                                                                   |
+| --------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `truncate_all_tool_outputs` | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
+| `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
+| `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                             |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 

@@ -79,7 +79,7 @@ export const HookNameSchema = z.enum([
   "empty-message-sanitizer",
   "thinking-block-validator",
   "ralph-loop",
-  "preemptive-compaction",
+
   "compaction-context-injector",
   "claude-code-hooks",
   "auto-slash-command",
@@ -225,16 +225,10 @@ export const DynamicContextPruningConfigSchema = z.object({
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
-  /** Enable preemptive compaction at threshold (default: true since v2.9.0) */
-  preemptive_compaction: z.boolean().optional(),
-  /** Threshold percentage to trigger preemptive compaction (default: 0.80) */
-  preemptive_compaction_threshold: z.number().min(0.5).max(0.95).optional(),
   /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
-  /** Enable DCP (Dynamic Context Pruning) for compaction - runs first when token limit exceeded (default: false) */
-  dcp_for_compaction: z.boolean().optional(),
 })
 
 export const SkillSourceSchema = z.union([

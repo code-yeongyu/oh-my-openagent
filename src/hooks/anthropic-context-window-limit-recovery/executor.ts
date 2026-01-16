@@ -1,12 +1,11 @@
 import type {
   AutoCompactState,
-  DcpState,
   RetryState,
   TruncateState,
 } from "./types";
 import type { ExperimentalConfig } from "../../config";
 import { RETRY_CONFIG, TRUNCATE_CONFIG } from "./types";
-import { executeDynamicContextPruning } from "./pruning-executor";
+
 import {
   findLargestToolResult,
   truncateToolResult,
@@ -82,17 +81,7 @@ function getOrCreateTruncateState(
   return state;
 }
 
-function getOrCreateDcpState(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): DcpState {
-  let state = autoCompactState.dcpStateBySession.get(sessionID);
-  if (!state) {
-    state = { attempted: false, itemsPruned: 0 };
-    autoCompactState.dcpStateBySession.set(sessionID, state);
-  }
-  return state;
-}
+
 
 function sanitizeEmptyMessagesBeforeSummarize(sessionID: string): number {
   const emptyMessageIds = findEmptyMessages(sessionID);
@@ -168,7 +157,6 @@ function clearSessionState(
   autoCompactState.errorDataBySession.delete(sessionID);
   autoCompactState.retryStateBySession.delete(sessionID);
   autoCompactState.truncateStateBySession.delete(sessionID);
-  autoCompactState.dcpStateBySession.delete(sessionID);
   autoCompactState.emptyContentAttemptBySession.delete(sessionID);
   autoCompactState.compactionInProgress.delete(sessionID);
 }
@@ -275,7 +263,6 @@ export async function executeCompact(
   client: any,
   directory: string,
   experimental?: ExperimentalConfig,
-  dcpForCompaction?: boolean,
 ): Promise<void> {
   if (autoCompactState.compactionInProgress.has(sessionID)) {
     await (client as Client).tui
@@ -302,61 +289,7 @@ export async function executeCompact(
       errorData?.maxTokens &&
       errorData.currentTokens > errorData.maxTokens;
 
-    // PHASE 1: DCP (Dynamic Context Pruning) - prune duplicate tool calls first
-    const dcpState = getOrCreateDcpState(autoCompactState, sessionID);
-    if (dcpForCompaction !== false && !dcpState.attempted && isOverLimit) {
-      dcpState.attempted = true;
-      log("[auto-compact] PHASE 1: DCP triggered on token limit error", {
-        sessionID,
-        currentTokens: errorData.currentTokens,
-        maxTokens: errorData.maxTokens,
-      });
-
-      const dcpConfig = experimental?.dynamic_context_pruning ?? {
-        enabled: true,
-        notification: "detailed" as const,
-        protected_tools: [
-          "task",
-          "todowrite",
-          "todoread",
-          "lsp_rename",
-        ],
-      };
-
-      try {
-        const pruningResult = await executeDynamicContextPruning(
-          sessionID,
-          dcpConfig,
-          client,
-        );
-
-        if (pruningResult.itemsPruned > 0) {
-          dcpState.itemsPruned = pruningResult.itemsPruned;
-          log("[auto-compact] DCP successful, proceeding to truncation", {
-            itemsPruned: pruningResult.itemsPruned,
-            tokensSaved: pruningResult.totalTokensSaved,
-          });
-
-          await (client as Client).tui
-            .showToast({
-              body: {
-                title: "Dynamic Context Pruning",
-                message: `Pruned ${pruningResult.itemsPruned} items (~${Math.round(pruningResult.totalTokensSaved / 1000)}k tokens). Proceeding to truncation...`,
-                variant: "success",
-                duration: 3000,
-              },
-            })
-            .catch(() => {});
-          // Continue to PHASE 2 (truncation) instead of summarizing immediately
-        } else {
-          log("[auto-compact] DCP did not prune any items", { sessionID });
-        }
-      } catch (error) {
-        log("[auto-compact] DCP failed", { error: String(error) });
-      }
-    }
-
-    // PHASE 2: Aggressive Truncation - always try when over limit (not experimental-only)
+    // Aggressive Truncation - always try when over limit
     if (
       isOverLimit &&
       truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts
@@ -448,7 +381,6 @@ export async function executeCompact(
               client,
               directory,
               experimental,
-              dcpForCompaction,
             );
           }, 500);
           return;
@@ -517,7 +449,6 @@ export async function executeCompact(
               client,
               directory,
               experimental,
-              dcpForCompaction,
             );
           }, cappedDelay);
           return;
