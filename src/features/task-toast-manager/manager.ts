@@ -107,16 +107,16 @@ export class TaskToastManager {
 
     const lines: string[] = []
 
-    // Show model fallback warning for the new task if applicable
-    if (newTask.modelInfo && newTask.modelInfo.type !== "user-defined") {
-      const icon = "⚠️"
-      const suffixMap: Partial<Record<ModelFallbackInfo["type"], string>> = {
-        inherited: " (inherited)",
-        "category-default": " (category default)",
-        "system-default": " (system default)",
+    const isFallback = newTask.modelInfo && (
+      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+    )
+    if (isFallback) {
+      const suffixMap: Record<"inherited" | "system-default", string> = {
+        inherited: " (inherited from parent)",
+        "system-default": " (system default fallback)",
       }
-      const suffix = suffixMap[newTask.modelInfo.type] ?? ""
-      lines.push(`${icon} Model: ${newTask.modelInfo.model}${suffix}`)
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      lines.push(`⚠️ Model fallback: ${newTask.modelInfo!.model}${suffix}`)
       lines.push("")
     }
 
