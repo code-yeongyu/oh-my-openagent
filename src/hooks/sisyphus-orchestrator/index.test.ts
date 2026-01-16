@@ -862,6 +862,46 @@ describe("sisyphus-orchestrator hook", () => {
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
+    test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
+      // #given - boulder state with incomplete plan
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createSisyphusOrchestratorHook(mockInput)
+
+      // #when - fire multiple idle events in rapid succession (simulating infinite loop bug)
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // #then - should only call prompt ONCE due to debouncing
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+    })
+
     test("should cleanup on session.deleted", async () => {
       // #given - boulder state
       const planPath = join(TEST_DIR, "test-plan.md")

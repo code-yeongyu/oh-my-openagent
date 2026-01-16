@@ -402,7 +402,10 @@ function isCallerOrchestrator(sessionID?: string): boolean {
 
 interface SessionState {
   lastEventWasAbortError?: boolean
+  lastContinuationInjectedAt?: number
 }
+
+const CONTINUATION_COOLDOWN_MS = 5000
 
 export interface SisyphusOrchestratorHookOptions {
   directory: string
@@ -576,6 +579,13 @@ export function createSisyphusOrchestratorHook(
           return
         }
 
+        const now = Date.now()
+        if (state.lastContinuationInjectedAt && now - state.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
+          log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, { sessionID, cooldownRemaining: CONTINUATION_COOLDOWN_MS - (now - state.lastContinuationInjectedAt) })
+          return
+        }
+
+        state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
         injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total)
         return
