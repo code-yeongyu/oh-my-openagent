@@ -24,14 +24,20 @@ describe("isServerInstalled", () => {
       console.error(`Failed to clean up temp dir: ${e}`)
     }
 
-    const keys = ["PATH", "Path", "PATHEXT"]
-    for (const key of keys) {
-      const val = savedEnv[key]
-      if (val === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = val
-      }
+    const pathVal = savedEnv.PATH ?? savedEnv.Path
+    if (pathVal === undefined) {
+      delete process.env.PATH
+      delete process.env.Path
+    } else {
+      process.env.PATH = pathVal
+      process.env.Path = pathVal
+    }
+
+    const pathextVal = savedEnv.PATHEXT
+    if (pathextVal === undefined) {
+      delete process.env.PATHEXT
+    } else {
+      process.env.PATHEXT = pathextVal
     }
   })
 
