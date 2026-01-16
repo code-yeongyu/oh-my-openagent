@@ -55,7 +55,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
       `Supported extensions: ${server.extensions.join(", ")}`,
       ``,
       `After installation, the server will be available automatically.`,
-      `Run 'lsp_servers' tool to verify installation status.`,
+      `Run 'LspServers' tool to verify installation status.`,
     ].join("\n")
   }
 
