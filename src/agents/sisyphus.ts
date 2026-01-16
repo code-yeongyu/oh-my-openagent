@@ -1,18 +1,18 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { isGptModel } from "./types"
-import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableSkill, AvailableTool } from "./sisyphus-prompt-builder"
 import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
-  buildDelegationTable,
-  buildFrontendSection,
-  buildOracleSection,
-  buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildDelegationTable,
+  buildExploreSection,
+  buildFrontendSection,
+  buildHardBlocksSection,
+  buildKeyTriggersSection,
+  buildLibrarianSection,
+  buildOracleSection,
+  buildToolSelectionTable,
   categorizeTools,
 } from "./sisyphus-prompt-builder"
+import { isGptModel } from "./types"
 
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
@@ -336,7 +336,6 @@ When you're mentioned in GitHub issues or asked to "look into" something and "cr
 2. **Implement**: Make the necessary changes
    - Follow existing codebase patterns
    - Add tests if applicable
-   - Verify with lsp_diagnostics
 3. **Verify**: Ensure everything works
    - Run build if exists
    - Run tests if exists
@@ -361,18 +360,12 @@ const SISYPHUS_CODE_CHANGES = `### Code Changes:
 
 ### Verification:
 
-Run \`lsp_diagnostics\` on changed files at:
-- End of a logical task unit
-- Before marking a todo item complete
-- Before reporting completion to user
-
 If project has build/test commands, run them at task completion.
 
 ### Evidence Requirements (task NOT complete without these):
 
 | Action | Required Evidence |
 |--------|-------------------|
-| File edit | \`lsp_diagnostics\` clean on changed files |
 | Build command | Exit code 0 |
 | Test run | Pass (or explicit note of pre-existing failures) |
 | Delegation | Agent result received and verified |
@@ -401,7 +394,6 @@ const SISYPHUS_PHASE3 = `## Phase 3 - Completion
 
 A task is complete when:
 - [ ] All planned todo items marked done
-- [ ] Diagnostics clean on changed files
 - [ ] Build passes (if applicable)
 - [ ] User's original request fully addressed
 
@@ -525,7 +517,7 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 function buildDynamicSisyphusPrompt(
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = []
+  availableSkills: AvailableSkill[] = [],
 ): string {
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
   const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
@@ -610,7 +602,7 @@ export function createSisyphusAgent(
   model: string = DEFAULT_MODEL,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
-  availableSkills?: AvailableSkill[]
+  availableSkills?: AvailableSkill[],
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []

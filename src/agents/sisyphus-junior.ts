@@ -1,11 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { isGptModel } from "./types"
 import type { AgentOverrideConfig, CategoryConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   migrateAgentConfig,
   supportsNewPermissionSystem,
 } from "../shared/permission-compat"
+import { isGptModel } from "./types"
 
 const SISYPHUS_JUNIOR_PROMPT = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
@@ -58,7 +58,6 @@ No todos on multi-step work = INCOMPLETE WORK.
 
 <Verification>
 Task NOT complete without:
-- lsp_diagnostics clean on changed files
 - Build passes (if applicable)
 - All todos marked completed
 </Verification>
@@ -85,7 +84,7 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 
 export function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
-  systemDefaultModel?: string
+  systemDefaultModel?: string,
 ): AgentConfig {
   if (override?.disable) {
     override = undefined
@@ -121,7 +120,8 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   const base: AgentConfig = {
-    description: override?.description ??
+    description:
+      override?.description ??
       "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
     mode: "subagent" as const,
     model,
@@ -148,7 +148,7 @@ export function createSisyphusJuniorAgentWithOverrides(
 
 export function createSisyphusJuniorAgent(
   categoryConfig: CategoryConfig,
-  promptAppend?: string
+  promptAppend?: string,
 ): AgentConfig {
   const prompt = buildSisyphusJuniorPrompt(promptAppend)
   const model = categoryConfig.model
@@ -158,10 +158,8 @@ export function createSisyphusJuniorAgent(
     ...(categoryConfig.tools ? { tools: categoryConfig.tools } : {}),
   })
 
-
   const base: AgentConfig = {
-    description:
-      "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
+    description: "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
     mode: "subagent" as const,
     model,
     maxTokens: categoryConfig.maxTokens ?? 64000,
