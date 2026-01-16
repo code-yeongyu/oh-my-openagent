@@ -578,7 +578,6 @@ The features in your editor? Other agents can't touch them.
 Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
 
 - **lsp_diagnostics**: Get errors/warnings before build
-- **lsp_servers**: List available LSP servers
 - **lsp_prepare_rename**: Validate rename operation
 - **lsp_rename**: Rename symbol across workspace
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
