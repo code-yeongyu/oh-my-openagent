@@ -313,6 +313,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
       agent.permission = { ...agent.permission, call_omo_agent: "deny", sisyphus_task: "allow" };
     }
+    if (agentResult["Sisyphus-Junior"]) {
+      const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, sisyphus_task: "allow" };
+    }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
