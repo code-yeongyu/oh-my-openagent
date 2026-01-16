@@ -24,7 +24,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
-import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants";
+import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
 
@@ -303,26 +303,26 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult["orchestrator-sisyphus"]) {
       const agent = agentResult["orchestrator-sisyphus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", sisyphus_task: "allow" };
+      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow" };
     }
     if (agentResult.Sisyphus) {
       const agent = agentResult.Sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", sisyphus_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
     }
     if (agentResult["Prometheus (Planner)"]) {
       const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", sisyphus_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
     }
     if (agentResult["Sisyphus-Junior"]) {
       const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, sisyphus_task: "allow" };
+      agent.permission = { ...agent.permission, delegate_task: "allow" };
     }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
       webfetch: "allow",
       external_directory: "allow",
-      sisyphus_task: "deny",
+      delegate_task: "deny",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)

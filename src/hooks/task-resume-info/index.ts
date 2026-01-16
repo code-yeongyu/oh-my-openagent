@@ -1,4 +1,4 @@
-const TARGET_TOOLS = ["task", "Task", "call_omo_agent", "sisyphus_task"]
+const TARGET_TOOLS = ["task", "Task", "call_omo_agent", "delegate_task"]
 
 const SESSION_ID_PATTERNS = [
   /Session ID: (ses_[a-zA-Z0-9_-]+)/,
@@ -27,7 +27,7 @@ export function createTaskResumeInfoHook() {
     const sessionId = extractSessionId(output.output)
     if (!sessionId) return
 
-    output.output = output.output.trimEnd() + `\n\nto resume: sisyphus_task(resume="${sessionId}", prompt="...")`
+    output.output = output.output.trimEnd() + `\n\nto resume: delegate_task(resume="${sessionId}", prompt="...")`
   }
 
   return {

@@ -580,7 +580,7 @@ gh repo star code-yeongyu/oh-my-opencode
 - **ast_grep_search**：AST 感知的代码模式搜索（25 种语言）
 - **ast_grep_replace**：AST 感知的代码替换
 - **call_omo_agent**：生成专业的 explore/librarian 智能体。支持 `run_in_background` 参数进行异步执行。
-- **sisyphus_task**：基于类别的任务委派，使用专业智能体。支持预配置的类别（visual、business-logic）或直接指定智能体。使用 `background_output` 检索结果，使用 `background_cancel` 取消任务。参见[类别](#类别)。
+- **delegate_task**：基于类别的任务委派，使用专业智能体。支持预配置的类别（visual、business-logic）或直接指定智能体。使用 `background_output` 检索结果，使用 `background_cancel` 取消任务。参见[类别](#类别)。
 
 #### 会话管理
 
@@ -931,7 +931,7 @@ Oh My OpenCode 从以下位置读取和执行钩子：
 Oh My OpenCode 包含提供额外功能的内置技能：
 
 - **playwright**：使用 Playwright MCP 进行浏览器自动化。用于网页抓取、测试、截图和浏览器交互。
-- **git-master**：Git 专家，用于原子提交、rebase/squash 和历史搜索（blame、bisect、log -S）。**强烈推荐**：与 `sisyphus_task(category='quick', skills=['git-master'], ...)` 一起使用以节省上下文。
+- **git-master**：Git 专家，用于原子提交、rebase/squash 和历史搜索（blame、bisect、log -S）。**强烈推荐**：与 `delegate_task(category='quick', skills=['git-master'], ...)` 一起使用以节省上下文。
 
 通过 `~/.config/opencode/oh-my-opencode.json` 或 `.opencode/oh-my-opencode.json` 中的 `disabled_skills` 禁用内置技能：
 
@@ -1070,7 +1070,7 @@ Oh My OpenCode 包含提供额外功能的内置技能：
 
 ### 类别
 
-类别通过 `sisyphus_task` 工具实现领域特定的任务委派。每个类别预配置一个专业的 `Sisyphus-Junior-{category}` 智能体，带有优化的模型设置和提示。
+类别通过 `delegate_task` 工具实现领域特定的任务委派。每个类别预配置一个专业的 `Sisyphus-Junior-{category}` 智能体，带有优化的模型设置和提示。
 
 **默认类别：**
 
@@ -1082,12 +1082,12 @@ Oh My OpenCode 包含提供额外功能的内置技能：
 **使用方法：**
 
 ```
-// 通过 sisyphus_task 工具
-sisyphus_task(category="visual", prompt="创建一个响应式仪表板组件")
-sisyphus_task(category="business-logic", prompt="设计支付处理流程")
+// 通过 delegate_task 工具
+delegate_task(category="visual", prompt="创建一个响应式仪表板组件")
+delegate_task(category="business-logic", prompt="设计支付处理流程")
 
 // 或直接指定特定智能体
-sisyphus_task(agent="oracle", prompt="审查这个架构")
+delegate_task(agent="oracle", prompt="审查这个架构")
 ```
 
 **自定义类别：**

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "bun:test"
 import {
-  SISYPHUS_TASK_ERROR_PATTERNS,
-  detectSisyphusTaskError,
+  DELEGATE_TASK_ERROR_PATTERNS,
+  detectDelegateTaskError,
   buildRetryGuidance,
 } from "./index"
 
 describe("sisyphus-task-retry", () => {
-  describe("SISYPHUS_TASK_ERROR_PATTERNS", () => {
+  describe("DELEGATE_TASK_ERROR_PATTERNS", () => {
     // #given error patterns are defined
-    // #then should include all known sisyphus_task error types
+    // #then should include all known delegate_task error types
     it("should contain all known error patterns", () => {
-      expect(SISYPHUS_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
+      expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
       
-      const patternTexts = SISYPHUS_TASK_ERROR_PATTERNS.map(p => p.pattern)
+      const patternTexts = DELEGATE_TASK_ERROR_PATTERNS.map(p => p.pattern)
       expect(patternTexts).toContain("run_in_background")
       expect(patternTexts).toContain("skills")
       expect(patternTexts).toContain("category OR subagent_type")
@@ -21,14 +21,14 @@ describe("sisyphus-task-retry", () => {
     })
   })
 
-  describe("detectSisyphusTaskError", () => {
+  describe("detectDelegateTaskError", () => {
     // #given tool output with run_in_background error
     // #when detecting error
     // #then should return matching error info
     it("should detect run_in_background missing error", () => {
       const output = "❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation."
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("missing_run_in_background")
@@ -37,7 +37,7 @@ describe("sisyphus-task-retry", () => {
     it("should detect skills missing error", () => {
       const output = "❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills needed."
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("missing_skills")
@@ -46,7 +46,7 @@ describe("sisyphus-task-retry", () => {
     it("should detect category/subagent mutual exclusion error", () => {
       const output = "❌ Invalid arguments: Provide EITHER category OR subagent_type, not both."
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("mutual_exclusion")
@@ -55,7 +55,7 @@ describe("sisyphus-task-retry", () => {
     it("should detect unknown category error", () => {
       const output = '❌ Unknown category: "invalid-cat". Available: visual-engineering, ultrabrain, quick'
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("unknown_category")
@@ -64,7 +64,7 @@ describe("sisyphus-task-retry", () => {
     it("should detect unknown agent error", () => {
       const output = '❌ Unknown agent: "fake-agent". Available agents: explore, librarian, oracle'
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("unknown_agent")
@@ -73,7 +73,7 @@ describe("sisyphus-task-retry", () => {
     it("should return null for successful output", () => {
       const output = "Background task launched.\n\nTask ID: bg_12345\nSession ID: ses_abc"
       
-      const result = detectSisyphusTaskError(output)
+      const result = detectDelegateTaskError(output)
       
       expect(result).toBeNull()
     })

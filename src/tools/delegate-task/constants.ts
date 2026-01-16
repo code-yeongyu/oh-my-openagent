@@ -236,7 +236,7 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 
 const BUILTIN_CATEGORIES = Object.keys(DEFAULT_CATEGORIES).join(", ")
 
-export const SISYPHUS_TASK_DESCRIPTION = `Spawn agent task with category-based or direct agent selection.
+export const DELEGATE_TASK_DESCRIPTION = `Spawn agent task with category-based or direct agent selection.
 
 MUTUALLY EXCLUSIVE: Provide EITHER category OR agent, not both (unless resuming).
 

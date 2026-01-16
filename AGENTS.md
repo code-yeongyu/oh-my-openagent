@@ -96,7 +96,7 @@ oh-my-opencode/
 - **Over-exploration**: Stop searching when sufficient context found
 - **High temperature**: Don't use >0.3 for code-related agents
 - **Broad tool access**: Prefer explicit `include` over unrestricted access
-- **Sequential agent calls**: Use `sisyphus_task` for parallel execution
+- **Sequential agent calls**: Use `delegate_task` for parallel execution
 - **Heavy PreToolUse logic**: Slows every tool call
 - **Self-planning for complex tasks**: Spawn planning agent (Prometheus) instead
 - **Trust agent self-reports**: ALWAYS verify results independently
