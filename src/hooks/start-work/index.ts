@@ -59,9 +59,9 @@ export function createStartWorkHook(ctx: PluginInput) {
         .join("\n")
         .trim() || ""
 
-      const isStartWorkCommand =
-        promptText.includes("Start Sisyphus work session") ||
-        promptText.includes("<session-context>")
+      // Only trigger on actual command execution (contains <session-context> tag)
+      // NOT on description text like "Start Sisyphus work session from Prometheus plan"
+      const isStartWorkCommand = promptText.includes("<session-context>")
 
       if (!isStartWorkCommand) {
         return
