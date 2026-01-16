@@ -145,13 +145,7 @@ export function createClaudeCodeHooksHook(
           const hookContent = result.messages.join("\n\n")
           log(`[claude-code-hooks] Injecting ${result.messages.length} hook messages`, { sessionID: input.sessionID, contentLength: hookContent.length, isFirstMessage })
 
-          if (isFirstMessage) {
-            const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
-            if (idx >= 0) {
-              output.parts[idx].text = `${hookContent}\n\n${output.parts[idx].text ?? ""}`
-              log("UserPromptSubmit hooks prepended to first message parts directly", { sessionID: input.sessionID })
-            }
-          } else if (contextCollector) {
+          if (contextCollector) {
             log("[DEBUG] Registering hook content to contextCollector", {
               sessionID: input.sessionID,
               contentLength: hookContent.length,
@@ -168,14 +162,6 @@ export function createClaudeCodeHooksHook(
               sessionID: input.sessionID,
               contentLength: hookContent.length,
             })
-          } else {
-            const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
-            if (idx >= 0) {
-              output.parts[idx].text = `${hookContent}\n\n${output.parts[idx].text ?? ""}`
-              log("Hook content prepended to message (fallback)", {
-                sessionID: input.sessionID,
-              })
-            }
           }
         }
       }
@@ -257,7 +243,7 @@ export function createClaudeCodeHooksHook(
       const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
       // Use metadata if available and non-empty, otherwise wrap output.output in a structured object
-      // This ensures plugin tools (call_omo_agent, sisyphus_task, task) that return strings
+      // This ensures plugin tools (call_omo_agent, delegate_task, task) that return strings
       // get their results properly recorded in transcripts instead of empty {}
       const metadata = output.metadata as Record<string, unknown> | undefined
       const hasMetadata = metadata && typeof metadata === "object" && Object.keys(metadata).length > 0

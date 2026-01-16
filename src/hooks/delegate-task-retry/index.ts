@@ -1,12 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-export interface SisyphusTaskErrorPattern {
+export interface DelegateTaskErrorPattern {
   pattern: string
   errorType: string
   fixHint: string
 }
 
-export const SISYPHUS_TASK_ERROR_PATTERNS: SisyphusTaskErrorPattern[] = [
+export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
   {
     pattern: "run_in_background",
     errorType: "missing_run_in_background",
@@ -45,7 +45,7 @@ export const SISYPHUS_TASK_ERROR_PATTERNS: SisyphusTaskErrorPattern[] = [
   {
     pattern: "Cannot call primary agent",
     errorType: "primary_agent",
-    fixHint: "Primary agents cannot be called via sisyphus_task. Use a subagent like 'explore', 'oracle', or 'librarian'",
+    fixHint: "Primary agents cannot be called via delegate_task. Use a subagent like 'explore', 'oracle', or 'librarian'",
   },
   {
     pattern: "Skills not found",
@@ -59,10 +59,10 @@ export interface DetectedError {
   originalOutput: string
 }
 
-export function detectSisyphusTaskError(output: string): DetectedError | null {
+export function detectDelegateTaskError(output: string): DetectedError | null {
   if (!output.includes("❌")) return null
 
-  for (const errorPattern of SISYPHUS_TASK_ERROR_PATTERNS) {
+  for (const errorPattern of DELEGATE_TASK_ERROR_PATTERNS) {
     if (output.includes(errorPattern.pattern)) {
       return {
         errorType: errorPattern.errorType,
@@ -80,16 +80,16 @@ function extractAvailableList(output: string): string | null {
 }
 
 export function buildRetryGuidance(errorInfo: DetectedError): string {
-  const pattern = SISYPHUS_TASK_ERROR_PATTERNS.find(
+  const pattern = DELEGATE_TASK_ERROR_PATTERNS.find(
     (p) => p.errorType === errorInfo.errorType
   )
 
   if (!pattern) {
-    return `[sisyphus_task ERROR] Fix the error and retry with correct parameters.`
+    return `[delegate_task ERROR] Fix the error and retry with correct parameters.`
   }
 
   let guidance = `
-[sisyphus_task CALL FAILED - IMMEDIATE RETRY REQUIRED]
+[delegate_task CALL FAILED - IMMEDIATE RETRY REQUIRED]
 
 **Error Type**: ${errorInfo.errorType}
 **Fix**: ${pattern.fixHint}
@@ -101,11 +101,11 @@ export function buildRetryGuidance(errorInfo: DetectedError): string {
   }
 
   guidance += `
-**Action**: Retry sisyphus_task NOW with corrected parameters.
+**Action**: Retry delegate_task NOW with corrected parameters.
 
 Example of CORRECT call:
 \`\`\`
-sisyphus_task(
+delegate_task(
   description="Task description",
   prompt="Detailed prompt...",
   category="general",  // OR subagent_type="explore"
@@ -118,15 +118,15 @@ sisyphus_task(
   return guidance
 }
 
-export function createSisyphusTaskRetryHook(_ctx: PluginInput) {
+export function createDelegateTaskRetryHook(_ctx: PluginInput) {
   return {
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: unknown }
     ) => {
-      if (input.tool.toLowerCase() !== "sisyphus_task") return
+      if (input.tool.toLowerCase() !== "delegate_task") return
 
-      const errorInfo = detectSisyphusTaskError(output.output)
+      const errorInfo = detectDelegateTaskError(output.output)
       if (errorInfo) {
         const guidance = buildRetryGuidance(errorInfo)
         output.output += `\n${guidance}`

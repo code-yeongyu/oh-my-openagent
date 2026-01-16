@@ -980,7 +980,7 @@ describe("BackgroundManager.trackTask", () => {
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "sisyphus_task",
+      agent: "delegate_task",
       concurrencyKey: "external-key",
     }
 
@@ -1015,7 +1015,7 @@ describe("BackgroundManager.resume concurrency key", () => {
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "sisyphus_task",
+      agent: "delegate_task",
       concurrencyKey: "external-key",
     })
 

@@ -26,7 +26,7 @@ import {
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
-  createSisyphusTaskRetryHook,
+  createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
   createSisyphusOrchestratorHook,
@@ -64,7 +64,7 @@ import {
   createSlashcommandTool,
   discoverCommandsSync,
   sessionExists,
-  createSisyphusTask,
+  createDelegateTask,
   interactive_bash,
   startTmuxCheck,
   lspManager,
@@ -193,8 +193,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createEditErrorRecoveryHook(ctx)
     : null;
 
-  const sisyphusTaskRetry = isHookEnabled("sisyphus-task-retry")
-    ? createSisyphusTaskRetryHook(ctx)
+  const delegateTaskRetry = isHookEnabled("delegate-task-retry")
+    ? createDelegateTaskRetryHook(ctx)
     : null;
 
   const startWork = isHookEnabled("start-work")
@@ -233,7 +233,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
   const lookAt = createLookAt(ctx);
-  const sisyphusTask = createSisyphusTask({
+  const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
     directory: ctx.directory,
@@ -302,7 +302,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
-      sisyphus_task: sisyphusTask,
+      delegate_task: delegateTask,
       skill: skillTool,
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,
@@ -502,7 +502,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
         args.tools = {
           ...(args.tools as Record<string, boolean> | undefined),
-          sisyphus_task: false,
+          delegate_task: false,
           ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
         };
       }
@@ -550,7 +550,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await agentUsageReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
 await editErrorRecovery?.["tool.execute.after"](input, output);
-        await sisyphusTaskRetry?.["tool.execute.after"](input, output);
+        await delegateTaskRetry?.["tool.execute.after"](input, output);
         await sisyphusOrchestrator?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
     },

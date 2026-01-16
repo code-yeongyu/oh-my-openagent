@@ -34,7 +34,7 @@ tools/
 | AST | ast_grep_search, ast_grep_replace | Structural pattern matching/rewriting |
 | Search | grep, glob | Timeout-safe file and content search |
 | Session | session_list, session_read, session_search, session_info | History navigation and retrieval |
-| Background | sisyphus_task, background_output, background_cancel | Parallel agent orchestration |
+| Background | delegate_task, background_output, background_cancel | Parallel agent orchestration |
 | UI/Terminal | look_at, interactive_bash | Visual analysis and tmux control |
 | Execution | slashcommand, skill, skill_mcp | Command and skill-based extensibility |
 

@@ -14,7 +14,7 @@ Execute tasks directly. NEVER delegate or spawn other agents.
 <Critical_Constraints>
 BLOCKED ACTIONS (will fail if attempted):
 - task tool: BLOCKED
-- sisyphus_task tool: BLOCKED
+- delegate_task tool: BLOCKED
 
 ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
 You work ALONE for implementation. No delegation of implementation tasks.
@@ -75,7 +75,7 @@ function buildSisyphusJuniorPrompt(promptAppend?: string): string {
 
 // Core tools that Sisyphus-Junior must NEVER have access to
 // Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
-const BLOCKED_TOOLS = ["task", "sisyphus_task"]
+const BLOCKED_TOOLS = ["task", "delegate_task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
   model: "anthropic/claude-sonnet-4-5",

@@ -275,7 +275,7 @@ const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
   "task",
-  "sisyphus_task",
+  "delegate_task",
 ])
 
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5"

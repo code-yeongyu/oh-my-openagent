@@ -154,11 +154,11 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should inject read-only warning when Prometheus calls sisyphus_task", async () => {
+    test("should inject read-only warning when Prometheus calls delegate_task", async () => {
       // #given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "sisyphus_task",
+        tool: "delegate_task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
@@ -216,7 +216,7 @@ describe("prometheus-md-only", () => {
       // #given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "sisyphus_task",
+        tool: "delegate_task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
@@ -257,11 +257,11 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should not inject warning for non-Prometheus agents calling sisyphus_task", async () => {
+    test("should not inject warning for non-Prometheus agents calling delegate_task", async () => {
       // #given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "sisyphus_task",
+        tool: "delegate_task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
