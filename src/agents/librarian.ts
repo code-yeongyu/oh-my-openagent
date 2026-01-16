@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "opencode/glm-4.7-free"
 
@@ -21,13 +22,21 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  const restrictions = createAgentToolRestrictions([
+    "write",
+    "edit",
+    "task",
+    "sisyphus_task",
+    "call_omo_agent",
+  ])
+
   return {
     description:
       "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, background_task: false },
+    ...restrictions,
     prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.

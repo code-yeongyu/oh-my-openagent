@@ -17,6 +17,33 @@ export interface Range {
   end: Position
 }
 
+export interface Location {
+  uri: string
+  range: Range
+}
+
+export interface LocationLink {
+  targetUri: string
+  targetRange: Range
+  targetSelectionRange: Range
+  originSelectionRange?: Range
+}
+
+export interface SymbolInfo {
+  name: string
+  kind: number
+  location: Location
+  containerName?: string
+}
+
+export interface DocumentSymbol {
+  name: string
+  kind: number
+  range: Range
+  selectionRange: Range
+  children?: DocumentSymbol[]
+}
+
 export interface Diagnostic {
   range: Range
   severity?: number
