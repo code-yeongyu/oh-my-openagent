@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
   setSessionAgent,
   getSessionAgent,
@@ -10,13 +10,21 @@ import {
 } from "./state"
 
 describe("claude-code-session-state", () => {
-  beforeEach(() => {
-    // #given - clean state before each test
+  const resetState = () => {
     clearSessionAgent("test-session-1")
     clearSessionAgent("test-session-2")
     clearSessionAgent("test-prometheus-session")
     setMainSession(undefined)
     subagentSessions.clear()
+  }
+
+  beforeEach(() => {
+    // #given - clean state before each test
+    resetState()
+  })
+
+  afterEach(() => {
+    resetState()
   })
 
   describe("setSessionAgent", () => {
@@ -82,7 +90,7 @@ describe("claude-code-session-state", () => {
   })
 
   describe("mainSessionID", () => {
-    test("should store and retrieve main session ID", () => {
+    test.serial("should store and retrieve main session ID", () => {
       // #given
       const mainID = "main-session-123"
 
@@ -93,7 +101,7 @@ describe("claude-code-session-state", () => {
       expect(getMainSessionID()).toBe(mainID)
     })
 
-    test("should return undefined when not set", () => {
+    test.serial("should return undefined when not set", () => {
       // #given - not set
 
       // #then
