@@ -31,6 +31,8 @@ export interface ContextEntry {
   timestamp: number
   /** Optional metadata for debugging/logging */
   metadata?: Record<string, unknown>
+  /** If true, this context will only be injected once per session */
+  once?: boolean
 }
 
 /**
@@ -47,6 +49,8 @@ export interface RegisterContextOptions {
   priority?: ContextPriority
   /** Optional metadata */
   metadata?: Record<string, unknown>
+  /** If true, this context will only be injected once per session */
+  once?: boolean
 }
 
 /**

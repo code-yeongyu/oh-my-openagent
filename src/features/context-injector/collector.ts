@@ -16,14 +16,27 @@ const CONTEXT_SEPARATOR = "\n\n---\n\n"
 
 export class ContextCollector {
   private sessions: Map<string, Map<string, ContextEntry>> = new Map()
+  private consumedHistory: Map<string, Set<string>> = new Map()
 
   register(sessionID: string, options: RegisterContextOptions): void {
+    const key = `${options.source}:${options.id}`
+
+    // Check if this context has already been consumed in this session
+    if (options.once) {
+      if (!this.consumedHistory.has(sessionID)) {
+        this.consumedHistory.set(sessionID, new Set())
+      }
+      const history = this.consumedHistory.get(sessionID)!
+      if (history.has(key)) {
+        return
+      }
+    }
+
     if (!this.sessions.has(sessionID)) {
       this.sessions.set(sessionID, new Map())
     }
 
     const sessionMap = this.sessions.get(sessionID)!
-    const key = `${options.source}:${options.id}`
 
     const entry: ContextEntry = {
       id: options.id,
@@ -32,6 +45,7 @@ export class ContextCollector {
       priority: options.priority ?? "normal",
       timestamp: Date.now(),
       metadata: options.metadata,
+      once: options.once,
     }
 
     sessionMap.set(key, entry)
@@ -60,6 +74,21 @@ export class ContextCollector {
 
   consume(sessionID: string): PendingContext {
     const pending = this.getPending(sessionID)
+
+    // Mark 'once' entries as consumed
+    if (pending.hasContent) {
+      if (!this.consumedHistory.has(sessionID)) {
+        this.consumedHistory.set(sessionID, new Set())
+      }
+      const history = this.consumedHistory.get(sessionID)!
+      
+      for (const entry of pending.entries) {
+        if (entry.once) {
+          history.add(`${entry.source}:${entry.id}`)
+        }
+      }
+    }
+
     this.clear(sessionID)
     return pending
   }
