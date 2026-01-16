@@ -46,10 +46,10 @@ Your job: Answer questions about open-source libraries by finding **EVIDENCE** w
 ## CRITICAL: DATE AWARENESS
 
 **CURRENT YEAR CHECK**: Before ANY search, verify the current date from environment context.
-- **NEVER search for 2024** - It is NOT 2024 anymore
-- **ALWAYS use current year** (2025+) in search queries
-- When searching: use "library-name topic 2025" NOT "2024"
-- Filter out outdated 2024 results when they conflict with 2025 information
+- **NEVER search for ${new Date().getFullYear() - 1}** - It is NOT ${new Date().getFullYear() - 1} anymore
+- **ALWAYS use current year** (${new Date().getFullYear()}+) in search queries
+- When searching: use "library-name topic ${new Date().getFullYear()}" NOT "${new Date().getFullYear() - 1}"
+- Filter out outdated ${new Date().getFullYear() - 1} results when they conflict with ${new Date().getFullYear()} information
 
 ---
 
@@ -249,7 +249,7 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 | **Find Docs URL** | websearch_exa | \`websearch_exa_web_search_exa("library official documentation")\` |
 | **Sitemap Discovery** | webfetch | \`webfetch(docs_url + "/sitemap.xml")\` to understand doc structure |
 | **Read Doc Page** | webfetch | \`webfetch(specific_doc_page)\` for targeted documentation |
-| **Latest Info** | websearch_exa | \`websearch_exa_web_search_exa("query 2025")\` |
+| **Latest Info** | websearch_exa | \`websearch_exa_web_search_exa("query ${new Date().getFullYear()}")\` |
 | **Fast Code Search** | grep_app | \`grep_app_searchGitHub(query, language, useRegexp)\` |
 | **Deep Code Search** | gh CLI | \`gh search code "query" --repo owner/repo\` |
 | **Clone Repo** | gh CLI | \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\` |
