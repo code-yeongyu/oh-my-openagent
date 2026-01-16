@@ -11,6 +11,7 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 
 import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { setMainSession, subagentSessions } from "../../features/claude-code-session-state"
 
 describe("sisyphus-orchestrator hook", () => {
   const TEST_DIR = join(tmpdir(), "sisyphus-orchestrator-test-" + Date.now())
@@ -597,14 +598,14 @@ describe("sisyphus-orchestrator hook", () => {
     const MAIN_SESSION_ID = "main-session-123"
 
     beforeEach(() => {
-      mock.module("../../features/claude-code-session-state", () => ({
-        getMainSessionID: () => MAIN_SESSION_ID,
-        subagentSessions: new Set<string>(),
-      }))
+      setMainSession(MAIN_SESSION_ID)
+      subagentSessions.clear()
       setupMessageStorage(MAIN_SESSION_ID, "orchestrator-sisyphus")
     })
 
     afterEach(() => {
+      setMainSession(undefined)
+      subagentSessions.clear()
       cleanupMessageStorage(MAIN_SESSION_ID)
     })
 
