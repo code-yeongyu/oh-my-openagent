@@ -3,8 +3,12 @@ import { fileURLToPath } from "node:url"
 import { existsSync, readFileSync, writeFileSync } from "fs"
 import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
-import { SEVERITY_MAP } from "./constants"
+import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
 import type {
+  Location,
+  LocationLink,
+  DocumentSymbol,
+  SymbolInfo,
   Diagnostic,
   PrepareRenameResult,
   PrepareRenameDefaultBehavior,
@@ -106,9 +110,49 @@ export async function withLspClient<T>(filePath: string, fn: (client: LSPClient)
   }
 }
 
+export function formatLocation(loc: Location | LocationLink): string {
+  if ("targetUri" in loc) {
+    const uri = uriToPath(loc.targetUri)
+    const line = loc.targetRange.start.line + 1
+    const char = loc.targetRange.start.character
+    return `${uri}:${line}:${char}`
+  }
+
+  const uri = uriToPath(loc.uri)
+  const line = loc.range.start.line + 1
+  const char = loc.range.start.character
+  return `${uri}:${line}:${char}`
+}
+
+export function formatSymbolKind(kind: number): string {
+  return SYMBOL_KIND_MAP[kind] || `Unknown(${kind})`
+}
+
 export function formatSeverity(severity: number | undefined): string {
   if (!severity) return "unknown"
   return SEVERITY_MAP[severity] || `unknown(${severity})`
+}
+
+export function formatDocumentSymbol(symbol: DocumentSymbol, indent = 0): string {
+  const prefix = "  ".repeat(indent)
+  const kind = formatSymbolKind(symbol.kind)
+  const line = symbol.range.start.line + 1
+  let result = `${prefix}${symbol.name} (${kind}) - line ${line}`
+
+  if (symbol.children && symbol.children.length > 0) {
+    for (const child of symbol.children) {
+      result += "\n" + formatDocumentSymbol(child, indent + 1)
+    }
+  }
+
+  return result
+}
+
+export function formatSymbolInfo(symbol: SymbolInfo): string {
+  const kind = formatSymbolKind(symbol.kind)
+  const loc = formatLocation(symbol.location)
+  const container = symbol.containerName ? ` (in ${symbol.containerName})` : ""
+  return `${symbol.name} (${kind})${container} - ${loc}`
 }
 
 export function formatDiagnostic(diag: Diagnostic): string {

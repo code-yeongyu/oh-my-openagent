@@ -291,37 +291,27 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       LspCodeActionResolve: false,
     };
 
+    type AgentWithPermission = { permission?: Record<string, unknown> };
+    
     if (agentResult.librarian) {
-      agentResult.librarian.tools = {
-        ...agentResult.librarian.tools,
-        "grep_app_*": true,
-      };
+      const agent = agentResult.librarian as AgentWithPermission;
+      agent.permission = { ...agent.permission, "grep_app_*": "allow" };
     }
     if (agentResult["multimodal-looker"]) {
-      agentResult["multimodal-looker"].tools = {
-        ...agentResult["multimodal-looker"].tools,
-        task: false,
-        look_at: false,
-      };
+      const agent = agentResult["multimodal-looker"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, task: "deny", look_at: "deny" };
     }
     if (agentResult["orchestrator-sisyphus"]) {
-      agentResult["orchestrator-sisyphus"].tools = {
-        ...agentResult["orchestrator-sisyphus"].tools,
-        task: false,
-        call_omo_agent: false,
-      };
+      const agent = agentResult["orchestrator-sisyphus"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny" };
     }
     if (agentResult.Sisyphus) {
-      agentResult.Sisyphus.tools = {
-        ...agentResult.Sisyphus.tools,
-        call_omo_agent: false,
-      };
+      const agent = agentResult.Sisyphus as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
     }
     if (agentResult["Prometheus (Planner)"]) {
-      (agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools = {
-        ...(agentResult["Prometheus (Planner)"] as { tools?: Record<string, unknown> }).tools,
-        call_omo_agent: false,
-      };
+      const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
     }
 
     config.permission = {
