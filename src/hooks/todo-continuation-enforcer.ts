@@ -9,6 +9,7 @@ import {
     type ToolPermission,
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
+import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -40,7 +41,7 @@ interface SessionState {
   abortDetectedAt?: number
 }
 
-const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
+const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
 

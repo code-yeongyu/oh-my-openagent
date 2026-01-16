@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { readState, writeState, clearState, incrementIteration } from "./storage"
 import {
   HOOK_NAME,
@@ -42,7 +43,7 @@ interface OpenCodeSessionMessage {
   }>
 }
 
-const CONTINUATION_PROMPT = `[RALPH LOOP - ITERATION {{ITERATION}}/{{MAX}}]
+const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
 
 Your previous attempt did not output the completion promise. Continue working on the task.
 

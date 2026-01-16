@@ -5,6 +5,7 @@ import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, 
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 
 export * from "./constants"
 
@@ -89,7 +90,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       // Inject read-only warning for task tools called by Prometheus
       if (TASK_TOOLS.includes(toolName)) {
         const prompt = output.args.prompt as string | undefined
-        if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")) {
+        if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = prompt + PLANNING_CONSULT_WARNING
           log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
             sessionID: input.sessionID,
