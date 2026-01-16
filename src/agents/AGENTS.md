@@ -53,7 +53,7 @@ agents/
 ## ANTI-PATTERNS
 - **Trusting reports**: NEVER trust subagent self-reports; always verify outputs.
 - **High temp**: Don't use >0.3 for code agents (Sisyphus/Prometheus use 0.1).
-- **Sequential calls**: Prefer `sisyphus_task` with `run_in_background` for parallelism.
+- **Sequential calls**: Prefer `delegate_task` with `run_in_background` for parallelism.
 
 ## SHARED PROMPTS
 - **build-prompt.ts**: Unified base for Sisyphus and Builder variants.

@@ -36,7 +36,7 @@ You just performed direct file modifications outside \`.sisyphus/\`.
 **You are an ORCHESTRATOR, not an IMPLEMENTER.**
 
 As an orchestrator, you should:
-- **DELEGATE** implementation work to subagents via \`sisyphus_task\`
+- **DELEGATE** implementation work to subagents via \`delegate_task\`
 - **VERIFY** the work done by subagents
 - **COORDINATE** multiple tasks and ensure completion
 
@@ -46,7 +46,7 @@ You should NOT:
 - Implement features yourself
 
 **If you need to make changes:**
-1. Use \`sisyphus_task\` to delegate to an appropriate subagent
+1. Use \`delegate_task\` to delegate to an appropriate subagent
 2. Provide clear instructions in the prompt
 3. Verify the subagent's work after completion
 
@@ -120,7 +120,7 @@ You (orchestrator-sisyphus) are attempting to directly modify a file outside \`.
 🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
-1. **DELEGATE** all implementation work via \`sisyphus_task\`
+1. **DELEGATE** all implementation work via \`delegate_task\`
 2. **VERIFY** the work done by subagents (reading files is OK)
 3. **COORDINATE** - you orchestrate, you don't implement
 
@@ -138,11 +138,11 @@ As an ORCHESTRATOR, you MUST:
 
 **IF THIS IS FOR VERIFICATION:**
 Proceed if you are verifying subagent work by making a small fix.
-But for any substantial changes, USE \`sisyphus_task\`.
+But for any substantial changes, USE \`delegate_task\`.
 
 **CORRECT APPROACH:**
 \`\`\`
-sisyphus_task(
+delegate_task(
   category="...",
   prompt="[specific single task with clear acceptance criteria]"
 )
@@ -185,7 +185,7 @@ function buildVerificationReminder(sessionId: string): string {
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-sisyphus_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
+delegate_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -656,12 +656,12 @@ export function createSisyphusOrchestratorHook(
         return
       }
 
-      // Check sisyphus_task - inject single-task directive
-      if (input.tool === "sisyphus_task") {
+      // Check delegate_task - inject single-task directive
+      if (input.tool === "delegate_task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
-          log(`[${HOOK_NAME}] Injected single-task directive to sisyphus_task`, {
+          log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
             sessionID: input.sessionID,
           })
         }
@@ -695,7 +695,7 @@ export function createSisyphusOrchestratorHook(
         return
       }
 
-      if (input.tool !== "sisyphus_task") {
+      if (input.tool !== "delegate_task") {
         return
       }
 

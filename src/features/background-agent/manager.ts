@@ -180,7 +180,7 @@ export class BackgroundManager {
         tools: {
           ...getAgentToolRestrictions(input.agent),
           task: false,
-          sisyphus_task: false,
+          delegate_task: false,
           call_omo_agent: true,
         },
         parts: [{ type: "text", text: input.prompt }],
@@ -249,7 +249,7 @@ export class BackgroundManager {
   }
 
   /**
-   * Track a task created elsewhere (e.g., from sisyphus_task) for notification tracking.
+   * Track a task created elsewhere (e.g., from delegate_task) for notification tracking.
    * This allows tasks created by other tools to receive the same toast/prompt notifications.
    */
   async trackTask(input: {
@@ -296,7 +296,7 @@ export class BackgroundManager {
       return existingTask
     }
 
-    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "sisyphus_task"
+    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "delegate_task"
 
     // Acquire concurrency slot if a key is provided
     if (input.concurrencyKey) {
@@ -310,7 +310,7 @@ export class BackgroundManager {
       parentMessageID: "",
       description: input.description,
       prompt: "",
-      agent: input.agent || "sisyphus_task",
+      agent: input.agent || "delegate_task",
       status: "running",
       startedAt: new Date(),
       progress: {
@@ -409,7 +409,7 @@ export class BackgroundManager {
         tools: {
           ...getAgentToolRestrictions(existingTask.agent),
           task: false,
-          sisyphus_task: false,
+          delegate_task: false,
           call_omo_agent: true,
         },
         parts: [{ type: "text", text: input.prompt }],

@@ -10,7 +10,7 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, PermissionValue> = {
   write: "deny",
   edit: "deny",
   task: "deny",
-  sisyphus_task: "deny",
+  delegate_task: "deny",
   call_omo_agent: "deny",
 }
 
@@ -23,7 +23,7 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, PermissionValue>> = {
     write: "deny",
     edit: "deny",
     task: "deny",
-    sisyphus_task: "deny",
+    delegate_task: "deny",
   },
 
   "multimodal-looker": {
@@ -33,19 +33,19 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, PermissionValue>> = {
 
   "document-writer": {
     task: "deny",
-    sisyphus_task: "deny",
+    delegate_task: "deny",
     call_omo_agent: "deny",
   },
 
   "frontend-ui-ux-engineer": {
     task: "deny",
-    sisyphus_task: "deny",
+    delegate_task: "deny",
     call_omo_agent: "deny",
   },
 
   "Sisyphus-Junior": {
     task: "deny",
-    sisyphus_task: "deny",
+    delegate_task: "deny",
   },
 }
 

@@ -45,12 +45,12 @@ Don't wait—these run async while main session works.
 
 \`\`\`
 // Fire all at once, collect results later
-sisyphus_task(agent="explore", prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
-sisyphus_task(agent="explore", prompt="Entry points: FIND main files → REPORT non-standard organization")
-sisyphus_task(agent="explore", prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
-sisyphus_task(agent="explore", prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
-sisyphus_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-sisyphus_task(agent="explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
+delegate_task(agent="explore", prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
+delegate_task(agent="explore", prompt="Entry points: FIND main files → REPORT non-standard organization")
+delegate_task(agent="explore", prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
+delegate_task(agent="explore", prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
+delegate_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
+delegate_task(agent="explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
 \`\`\`
 
 <dynamic-agents>
@@ -76,9 +76,9 @@ max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' |
 Example spawning:
 \`\`\`
 // 500 files, 50k lines, depth 6, 15 large files → spawn 5+5+2+1 = 13 additional agents
-sisyphus_task(agent="explore", prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
-sisyphus_task(agent="explore", prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
-sisyphus_task(agent="explore", prompt="Cross-cutting concerns: FIND shared utilities across directories")
+delegate_task(agent="explore", prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
+delegate_task(agent="explore", prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
+delegate_task(agent="explore", prompt="Cross-cutting concerns: FIND shared utilities across directories")
 // ... more based on calculation
 \`\`\`
 </dynamic-agents>
@@ -240,7 +240,7 @@ Launch document-writer agents for each location:
 
 \`\`\`
 for loc in AGENTS_LOCATIONS (except root):
-  sisyphus_task(agent="document-writer", prompt=\\\`
+  delegate_task(agent="document-writer", prompt=\\\`
     Generate AGENTS.md for: \${loc.path}
     - Reason: \${loc.reason}
     - 30-80 lines max

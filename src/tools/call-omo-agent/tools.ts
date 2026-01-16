@@ -190,7 +190,7 @@ async function executeSync(
         tools: {
           ...getAgentToolRestrictions(args.subagent_type),
           task: false,
-          sisyphus_task: false,
+          delegate_task: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },

@@ -1,4 +1,4 @@
-export interface SisyphusTaskArgs {
+export interface DelegateTaskArgs {
   description: string
   prompt: string
   category?: string

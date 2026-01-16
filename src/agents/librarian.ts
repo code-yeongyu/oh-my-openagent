@@ -26,7 +26,7 @@ export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig
     "write",
     "edit",
     "task",
-    "sisyphus_task",
+    "delegate_task",
     "call_omo_agent",
   ])
 

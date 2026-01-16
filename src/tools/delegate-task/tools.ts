@@ -2,9 +2,9 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { SisyphusTaskArgs } from "./types"
+import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
-import { SISYPHUS_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
+import { DELEGATE_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -53,7 +53,7 @@ function formatDuration(start: Date, end?: Date): string {
 
 interface ErrorContext {
   operation: string
-  args?: SisyphusTaskArgs
+  args?: DelegateTaskArgs
   sessionID?: string
   agent?: string
   category?: string
@@ -143,7 +143,7 @@ function resolveCategoryConfig(
   return { config, promptAppend, model }
 }
 
-export interface SisyphusTaskToolOptions {
+export interface DelegateTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
   directory: string
@@ -170,11 +170,11 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   return skillContent || categoryPromptAppend
 }
 
-export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefinition {
+export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { manager, client, directory, userCategories, gitMasterConfig } = options
 
   return tool({
-    description: SISYPHUS_TASK_DESCRIPTION,
+    description: DELEGATE_TASK_DESCRIPTION,
     args: {
       description: tool.schema.string().describe("Short task description"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
@@ -184,7 +184,7 @@ export function createSisyphusTask(options: SisyphusTaskToolOptions): ToolDefini
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
       skills: tool.schema.array(tool.schema.string()).nullable().describe("Array of skill names to prepend to the prompt. Use null if no skills needed. Empty array [] is NOT allowed."),
     },
-    async execute(args: SisyphusTaskArgs, toolContext) {
+    async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       if (args.run_in_background === undefined) {
         return `❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
@@ -223,7 +223,7 @@ If you believe no skills are needed, you MUST explicitly explain why to the user
       const sessionAgent = getSessionAgent(ctx.sessionID)
       const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
       
-      log("[sisyphus_task] parentAgent resolution", {
+      log("[delegate_task] parentAgent resolution", {
         sessionID: ctx.sessionID,
         messageDir,
         ctxAgent: ctx.agent,
@@ -324,7 +324,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
               tools: {
                 ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
                 task: false,
-                sisyphus_task: false,
+                delegate_task: false,
                 call_omo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
@@ -502,7 +502,7 @@ ${textContent || "(No text output)"}`
           if (!callableNames.includes(agentToUse)) {
             const isPrimaryAgent = agents.some((a) => a.name === agentToUse && a.mode === "primary")
             if (isPrimaryAgent) {
-              return `❌ Cannot call primary agent "${agentToUse}" via sisyphus_task. Primary agents are top-level orchestrators.`
+              return `❌ Cannot call primary agent "${agentToUse}" via delegate_task. Primary agents are top-level orchestrators.`
             }
 
             const availableAgents = callableNames
@@ -610,7 +610,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               system: systemContent,
               tools: {
                 task: false,
-                sisyphus_task: false,
+                delegate_task: false,
                 call_omo_agent: true,
               },
               parts: [{ type: "text", text: args.prompt }],
@@ -651,11 +651,11 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         let stablePolls = 0
         let pollCount = 0
 
-        log("[sisyphus_task] Starting poll loop", { sessionID, agentToUse })
+        log("[delegate_task] Starting poll loop", { sessionID, agentToUse })
 
         while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
           if (ctx.abort?.aborted) {
-            log("[sisyphus_task] Aborted by user", { sessionID })
+            log("[delegate_task] Aborted by user", { sessionID })
             if (toastManager && taskId) toastManager.removeTask(taskId)
             return `Task aborted.\n\nSession ID: ${sessionID}`
           }
@@ -668,7 +668,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           const sessionStatus = allStatuses[sessionID]
 
           if (pollCount % 10 === 0) {
-            log("[sisyphus_task] Poll status", {
+            log("[delegate_task] Poll status", {
               sessionID,
               pollCount,
               elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
@@ -696,7 +696,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           if (currentMsgCount === lastMsgCount) {
             stablePolls++
             if (stablePolls >= STABILITY_POLLS_REQUIRED) {
-              log("[sisyphus_task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
+              log("[delegate_task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
               break
             }
           } else {
@@ -706,7 +706,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         }
 
         if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
-          log("[sisyphus_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
+          log("[delegate_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
         }
 
         const messagesResult = await client.session.messages({

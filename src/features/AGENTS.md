@@ -61,7 +61,7 @@ features/
 - Session-scoped MCP server lifecycle management
 
 ## ANTI-PATTERNS
-- Sequential execution for independent tasks (use `sisyphus_task`)
+- Sequential execution for independent tasks (use `delegate_task`)
 - Trusting agent self-reports without verification
 - Blocking main thread during loader initialization
 - Manual version bumping in `package.json`
