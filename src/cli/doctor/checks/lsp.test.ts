@@ -17,6 +17,21 @@ describe("lsp check", () => {
         expect(Array.isArray(s.extensions)).toBe(true)
       })
     })
+
+    it("does not spawn 'which' command (windows compatibility)", async () => {
+      // #given
+      const spawnSpy = spyOn(Bun, "spawn")
+
+      // #when getting servers info
+      await lsp.getLspServersInfo()
+
+      // #then should not spawn which
+      const calls = spawnSpy.mock.calls
+      const whichCalls = calls.filter((c) => Array.isArray(c) && Array.isArray(c[0]) && c[0][0] === "which")
+      expect(whichCalls.length).toBe(0)
+
+      spawnSpy.mockRestore()
+    })
   })
 
   describe("getLspServerStats", () => {
