@@ -12,21 +12,13 @@ const DEFAULT_LSP_SERVERS: Array<{
   { id: "gopls", binary: "gopls", extensions: [".go"] },
 ]
 
-async function checkBinaryExists(binary: string): Promise<boolean> {
-  try {
-    const proc = Bun.spawn(["which", binary], { stdout: "pipe", stderr: "pipe" })
-    await proc.exited
-    return proc.exitCode === 0
-  } catch {
-    return false
-  }
-}
+import { isServerInstalled } from "../../../tools/lsp/config"
 
 export async function getLspServersInfo(): Promise<LspServerInfo[]> {
   const servers: LspServerInfo[] = []
 
   for (const server of DEFAULT_LSP_SERVERS) {
-    const installed = await checkBinaryExists(server.binary)
+    const installed = isServerInstalled([server.binary])
     servers.push({
       id: server.id,
       installed,
