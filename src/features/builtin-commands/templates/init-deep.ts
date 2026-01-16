@@ -114,19 +114,19 @@ If \`--create-new\`: Read all existing first (preserve context) → then delete 
 
 #### 3. LSP Codemap (if available)
 \`\`\`
-lsp_servers()  # Check availability
+LspServers()  # Check availability
 
 # Entry points (parallel)
-lsp_symbols(filePath="src/index.ts", scope="document")
-lsp_symbols(filePath="main.py", scope="document")
+LspDocumentSymbols(filePath="src/index.ts")
+LspDocumentSymbols(filePath="main.py")
 
 # Key symbols (parallel)
-lsp_symbols(filePath=".", scope="workspace", query="class")
-lsp_symbols(filePath=".", scope="workspace", query="interface")
-lsp_symbols(filePath=".", scope="workspace", query="function")
+LspWorkspaceSymbols(filePath=".", query="class")
+LspWorkspaceSymbols(filePath=".", query="interface")
+LspWorkspaceSymbols(filePath=".", query="function")
 
 # Centrality for top exports
-lsp_find_references(filePath="...", line=X, character=Y)
+LspFindReferences(filePath="...", line=X, character=Y)
 \`\`\`
 
 **LSP Fallback**: If unavailable, rely on explore agents + AST-grep.
