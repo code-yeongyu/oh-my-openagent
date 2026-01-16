@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log } from "../../shared/logger"
+import { log, getAgentToolRestrictions } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
 
@@ -178,6 +178,7 @@ export class BackgroundManager {
         ...(input.model ? { model: input.model } : {}),
         system: input.skillContent,
         tools: {
+          ...getAgentToolRestrictions(input.agent),
           task: false,
           sisyphus_task: false,
           call_omo_agent: true,
@@ -406,6 +407,7 @@ export class BackgroundManager {
       body: {
         agent: existingTask.agent,
         tools: {
+          ...getAgentToolRestrictions(existingTask.agent),
           task: false,
           sisyphus_task: false,
           call_omo_agent: true,

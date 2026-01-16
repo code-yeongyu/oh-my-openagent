@@ -11,7 +11,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log } from "../../shared/logger"
+import { log, getAgentToolRestrictions } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -322,6 +322,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
               ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
               ...(resumeModel !== undefined ? { model: resumeModel } : {}),
               tools: {
+                ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
                 task: false,
                 sisyphus_task: false,
                 call_omo_agent: true,
