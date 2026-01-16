@@ -1,55 +1,52 @@
-import type { PermissionValue } from "./permission-compat"
-
 /**
  * Agent tool restrictions for session.prompt calls.
- * OpenCode SDK's session.prompt `tools` parameter OVERRIDES agent-level permissions.
- * This provides complete restriction sets so session.prompt calls include all necessary restrictions.
+ * OpenCode SDK's session.prompt `tools` parameter expects boolean values.
+ * true = tool allowed, false = tool denied.
  */
 
-const EXPLORATION_AGENT_DENYLIST: Record<string, PermissionValue> = {
-  write: "deny",
-  edit: "deny",
-  task: "deny",
-  delegate_task: "deny",
-  call_omo_agent: "deny",
+const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
+  write: false,
+  edit: false,
+  task: false,
+  delegate_task: false,
+  call_omo_agent: false,
 }
 
-const AGENT_RESTRICTIONS: Record<string, Record<string, PermissionValue>> = {
+const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   explore: EXPLORATION_AGENT_DENYLIST,
 
   librarian: EXPLORATION_AGENT_DENYLIST,
 
   oracle: {
-    write: "deny",
-    edit: "deny",
-    task: "deny",
-    delegate_task: "deny",
+    write: false,
+    edit: false,
+    task: false,
+    delegate_task: false,
   },
 
   "multimodal-looker": {
-    "*": "deny",
-    read: "allow",
+    read: true,
   },
 
   "document-writer": {
-    task: "deny",
-    delegate_task: "deny",
-    call_omo_agent: "deny",
+    task: false,
+    delegate_task: false,
+    call_omo_agent: false,
   },
 
   "frontend-ui-ux-engineer": {
-    task: "deny",
-    delegate_task: "deny",
-    call_omo_agent: "deny",
+    task: false,
+    delegate_task: false,
+    call_omo_agent: false,
   },
 
   "Sisyphus-Junior": {
-    task: "deny",
-    delegate_task: "deny",
+    task: false,
+    delegate_task: false,
   },
 }
 
-export function getAgentToolRestrictions(agentName: string): Record<string, PermissionValue> {
+export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
   return AGENT_RESTRICTIONS[agentName] ?? {}
 }
 
