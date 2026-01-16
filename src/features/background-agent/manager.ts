@@ -186,16 +186,33 @@ export class BackgroundManager {
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      log("[background-agent] prompt error:", { 
+        sessionID, 
+        agent: input.agent,
+        errorName: error?.name,
+        errorMessage,
+      })
+      
+      // Only treat as fatal if it's clearly an agent/session creation issue.
+      // Network timeouts, connection drops, and SDK issues should NOT mark task as failed
+      // since the session may still be running successfully (common during high API load).
+      const isFatalError = 
+        errorMessage.includes("agent.name") || 
+        errorMessage.includes("undefined") ||
+        errorMessage.includes("not found") ||
+        errorMessage.includes("not registered") ||
+        errorMessage.includes("does not exist")
+      
+      if (!isFatalError) {
+        log("[background-agent] Non-fatal prompt error, letting polling detect actual status:", sessionID)
+        return
+      }
+      
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
         existingTask.status = "error"
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-        } else {
-          existingTask.error = errorMessage
-        }
+        existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
         existingTask.completedAt = new Date()
         if (existingTask.concurrencyKey) {
           this.concurrencyManager.release(existingTask.concurrencyKey)
