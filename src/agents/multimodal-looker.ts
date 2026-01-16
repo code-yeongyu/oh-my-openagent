@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolAllowlist } from "../shared/permission-compat"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
 
@@ -14,11 +14,7 @@ export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
 export function createMultimodalLookerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "bash",
-  ])
+  const restrictions = createAgentToolAllowlist(["read"])
 
   return {
     description:
