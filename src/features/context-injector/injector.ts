@@ -142,14 +142,21 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const textPart = lastUserMessage.parts[textPartIndex] as { text?: string }
-      const originalText = textPart.text ?? ""
-      textPart.text = `${pending.merged}\n\n---\n\n${originalText}`
+      // empty-message-sanitizer 패턴 그대로 따름 (minimal fields)
+      const syntheticPart = {
+        id: `synthetic_hook_${Date.now()}`,
+        messageID: lastUserMessage.info.id,
+        sessionID: (lastUserMessage.info as { sessionID?: string }).sessionID ?? "",
+        type: "text" as const,
+        text: pending.merged,
+        synthetic: true,  // UI에서 숨겨짐
+      }
 
-      log("[context-injector] Prepended context to last user message", {
+      lastUserMessage.parts.splice(textPartIndex, 0, syntheticPart as Part)
+
+      log("[context-injector] Inserted synthetic part with hook content", {
         sessionID,
-        contextLength: pending.merged.length,
-        originalTextLength: originalText.length,
+        contentLength: pending.merged.length,
       })
     },
   }
