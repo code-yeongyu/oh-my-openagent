@@ -82,6 +82,11 @@ describe("claude-code-session-state", () => {
   })
 
   describe("mainSessionID", () => {
+    test("should return undefined when not set", () => {
+      // #given - beforeEach already resets, but verify
+      expect(getMainSessionID()).toBeUndefined()
+    })
+
     test("should store and retrieve main session ID", () => {
       // #given
       const mainID = "main-session-123"
@@ -91,13 +96,6 @@ describe("claude-code-session-state", () => {
 
       // #then
       expect(getMainSessionID()).toBe(mainID)
-    })
-
-    test("should return undefined when not set", () => {
-      // #given - not set
-
-      // #then
-      expect(getMainSessionID()).toBeUndefined()
     })
   })
 
