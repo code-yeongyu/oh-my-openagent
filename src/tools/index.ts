@@ -1,6 +1,5 @@
 import {
   lsp_diagnostics,
-  lsp_servers,
   lsp_prepare_rename,
   lsp_rename,
   lspManager,
@@ -54,7 +53,6 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
 
 export const builtinTools: Record<string, ToolDefinition> = {
   lsp_diagnostics,
-  lsp_servers,
   lsp_prepare_rename,
   lsp_rename,
   ast_grep_search,
