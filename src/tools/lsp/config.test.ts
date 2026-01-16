@@ -24,13 +24,27 @@ describe("isServerInstalled", () => {
       console.error(`Failed to clean up temp dir: ${e}`)
     }
 
-    const pathVal = savedEnv.PATH ?? savedEnv.Path
-    if (pathVal === undefined) {
-      delete process.env.PATH
-      delete process.env.Path
+    if (process.platform === "win32") {
+      const pathVal = savedEnv.PATH ?? savedEnv.Path
+      if (pathVal === undefined) {
+        delete process.env.PATH
+        delete process.env.Path
+      } else {
+        process.env.PATH = pathVal
+        process.env.Path = pathVal
+      }
     } else {
-      process.env.PATH = pathVal
-      process.env.Path = pathVal
+      if (savedEnv.PATH === undefined) {
+        delete process.env.PATH
+      } else {
+        process.env.PATH = savedEnv.PATH
+      }
+
+      if (savedEnv.Path === undefined) {
+        delete process.env.Path
+      } else {
+        process.env.Path = savedEnv.Path
+      }
     }
 
     const pathextVal = savedEnv.PATHEXT

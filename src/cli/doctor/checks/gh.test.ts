@@ -3,15 +3,60 @@ import * as gh from "./gh"
 
 describe("gh cli check", () => {
   describe("getGhCliInfo", () => {
-    it("returns gh cli info structure", async () => {
-      // #given
-      // #when checking gh cli info
-      const info = await gh.getGhCliInfo()
+    function createProc(opts: { stdout?: string; stderr?: string; exitCode?: number }) {
+      const stdoutText = opts.stdout ?? ""
+      const stderrText = opts.stderr ?? ""
+      const exitCode = opts.exitCode ?? 0
+      const encoder = new TextEncoder()
 
-      // #then should return valid info structure
-      expect(typeof info.installed).toBe("boolean")
-      expect(info.authenticated === true || info.authenticated === false).toBe(true)
-      expect(Array.isArray(info.scopes)).toBe(true)
+      return {
+        stdout: new ReadableStream({
+          start(controller) {
+            if (stdoutText) controller.enqueue(encoder.encode(stdoutText))
+            controller.close()
+          },
+        }),
+        stderr: new ReadableStream({
+          start(controller) {
+            if (stderrText) controller.enqueue(encoder.encode(stderrText))
+            controller.close()
+          },
+        }),
+        exited: Promise.resolve(exitCode),
+        exitCode,
+      } as unknown as ReturnType<typeof Bun.spawn>
+    }
+
+    it("returns gh cli info structure", async () => {
+      const spawnSpy = spyOn(Bun, "spawn").mockImplementation((cmd) => {
+        if (Array.isArray(cmd) && cmd[0] === "which" && cmd[1] === "gh") {
+          return createProc({ stdout: "/usr/bin/gh\n" })
+        }
+
+        if (Array.isArray(cmd) && cmd[0] === "gh" && cmd[1] === "--version") {
+          return createProc({ stdout: "gh version 2.40.0\n" })
+        }
+
+        if (Array.isArray(cmd) && cmd[0] === "gh" && cmd[1] === "auth" && cmd[2] === "status") {
+          return createProc({
+            exitCode: 0,
+            stderr: "Logged in to github.com account octocat (keyring)\nToken scopes: 'repo', 'read:org'\n",
+          })
+        }
+
+        throw new Error(`Unexpected Bun.spawn call: ${Array.isArray(cmd) ? cmd.join(" ") : String(cmd)}`)
+      })
+
+      try {
+        const info = await gh.getGhCliInfo()
+
+        expect(info.installed).toBe(true)
+        expect(info.version).toBe("2.40.0")
+        expect(typeof info.authenticated).toBe("boolean")
+        expect(Array.isArray(info.scopes)).toBe(true)
+      } finally {
+        spawnSpy.mockRestore()
+      }
     })
   })
 
