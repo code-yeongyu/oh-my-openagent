@@ -124,9 +124,8 @@ function resolveCategoryConfig(
     return null
   }
 
-  // Model priority: user override > parent model (inherit) > category default > system default
-  // Parent model takes precedence over category default so custom providers work out-of-box
-  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
+  // Model priority: user override > category default > parent model (fallback) > system default
+  const model = userConfig?.model ?? defaultConfig?.model ?? parentModelString ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,

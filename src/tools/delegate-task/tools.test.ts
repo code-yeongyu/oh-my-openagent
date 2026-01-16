@@ -19,7 +19,7 @@ function resolveCategoryConfig(
     return null
   }
 
-  const model = userConfig?.model ?? parentModelString ?? defaultConfig?.model ?? systemDefaultModel
+  const model = userConfig?.model ?? defaultConfig?.model ?? parentModelString ?? systemDefaultModel
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
@@ -212,15 +212,29 @@ describe("sisyphus-task", () => {
       expect(result!.config.temperature).toBe(0.3)
     })
 
-    test("parentModelString is used when no user model and takes precedence over default", () => {
-      // #given
+    test("category default model takes precedence over parentModelString", () => {
+      // #given - builtin category has default model, parent model should NOT override it
       const categoryName = "visual-engineering"
       const parentModelString = "cliproxy/claude-opus-4-5"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { parentModelString })
 
-      // #then
+      // #then - category default model wins, parent model is ignored for builtin categories
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+    })
+
+    test("parentModelString is used as fallback when category has no default model", () => {
+      // #given - custom category with no model defined, only parentModelString as fallback
+      const categoryName = "my-custom-no-model"
+      const userCategories = { "my-custom-no-model": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
+      const parentModelString = "cliproxy/claude-opus-4-5"
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, { userCategories, parentModelString })
+
+      // #then - parent model is used as fallback since custom category has no default
       expect(result).not.toBeNull()
       expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
     })
@@ -888,18 +902,18 @@ describe("sisyphus-task", () => {
       expect(actualModel).toBe("openai/gpt-5.2")
     })
 
-    test("when parentModelString is used - modelInfo should report inherited", () => {
-      // #given
+    test("category default model takes precedence over parentModelString for builtin category", () => {
+      // #given - builtin ultrabrain category has default model gpt-5.2
       const categoryName = "ultrabrain"
       const parentModelString = "cliproxy/claude-opus-4-5"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { parentModelString })
       
-      // #then - actualModel should be parentModelString, type should be "inherited"
+      // #then - category default model wins, not the parent model
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe(parentModelString)
+      expect(actualModel).toBe("openai/gpt-5.2")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of parentModelString", () => {
