@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { createPrometheusMdOnlyHook } from "./index"
 import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { SYSTEM_DIRECTIVE_PREFIX, createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
+import { clearSessionAgent } from "../../features/claude-code-session-state"
 
 describe("prometheus-md-only", () => {
   const TEST_SESSION_ID = "test-session-prometheus"
@@ -30,6 +31,7 @@ describe("prometheus-md-only", () => {
   }
 
   afterEach(() => {
+    clearSessionAgent(TEST_SESSION_ID)
     if (testMessageDir) {
       try {
         rmSync(testMessageDir, { recursive: true, force: true })
