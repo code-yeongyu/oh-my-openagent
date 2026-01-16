@@ -226,10 +226,7 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const prompt = appendSubagentSettingsToPrompt(
-      `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`,
-      { directory: ctx.directory }
-    )
+    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
 
     try {

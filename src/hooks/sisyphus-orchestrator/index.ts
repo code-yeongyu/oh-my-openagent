@@ -431,11 +431,8 @@ export function createSisyphusOrchestratorHook(
       return
     }
 
-    const prompt = appendSubagentSettingsToPrompt(
-      BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
-        `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`,
-      { directory: ctx.directory }
-    )
+    const prompt = BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
+      `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
 
 
     try {

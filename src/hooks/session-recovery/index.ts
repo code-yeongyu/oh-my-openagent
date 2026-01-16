@@ -16,7 +16,6 @@ import {
   stripThinkingParts,
 } from "./storage"
 import type { MessageData, ResumeConfig } from "./types"
-import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
 
 
 export interface SessionRecoveryOptions {
@@ -82,7 +81,7 @@ async function resumeSession(client: Client, config: ResumeConfig, directory: st
         parts: [
           {
             type: "text",
-            text: appendSubagentSettingsToPrompt(RECOVERY_RESUME_TEXT, { directory }),
+            text: RECOVERY_RESUME_TEXT,
           },
         ],
         agent: config.agent,

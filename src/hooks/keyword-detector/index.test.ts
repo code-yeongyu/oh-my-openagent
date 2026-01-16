@@ -89,6 +89,27 @@ describe("keyword-detector registers to ContextCollector", () => {
     // #then - nothing should be registered
     expect(collector.hasPending(sessionID)).toBe(false)
   })
+
+  test("should include SUBAGENT_SETTINGS in ultrawork message", async () => {
+    // #given
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-settings"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork" }],
+    }
+
+    // #when
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then
+    const pending = collector.getPending(sessionID)
+    const ultraworkEntry = pending.entries.find(e => e.id === "keyword-ultrawork")
+    expect(ultraworkEntry).toBeDefined()
+    expect(ultraworkEntry!.content).toContain("<SUBAGENT_SETTINGS>")
+    expect(ultraworkEntry!.content).toContain("- background_task.defaultConcurrency:")
+  })
 })
 
 describe("keyword-detector session filtering", () => {

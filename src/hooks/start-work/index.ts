@@ -10,6 +10,8 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
+import { appendSubagentSettingsToPrompt } from "../../shared/subagent-settings"
+
 
 export const HOOK_NAME = "start-work"
 
@@ -227,7 +229,10 @@ Ask the user which plan to work on. Present the options above and wait for their
           .replace(/\$SESSION_ID/g, sessionId)
           .replace(/\$TIMESTAMP/g, timestamp)
         
-        output.parts[idx].text += `\n\n---\n${contextInfo}`
+        const withContext = output.parts[idx].text + `\n\n---\n${contextInfo}`
+        output.parts[idx].text = appendSubagentSettingsToPrompt(withContext, {
+          directory: ctx.directory,
+        })
       }
 
       log(`[${HOOK_NAME}] Context injected`, {

@@ -72,6 +72,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
             source: "keyword-detector",
             content: keyword.message,
             priority: keyword.type === "ultrawork" ? "critical" : "high",
+            once: keyword.type === "ultrawork",
           })
         }
       }

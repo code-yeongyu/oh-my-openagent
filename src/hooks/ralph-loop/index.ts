@@ -300,13 +300,10 @@ export function createRalphLoopHook(
         max: newState.max_iterations,
       })
 
-      const continuationPrompt = appendSubagentSettingsToPrompt(
-        CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
-          .replace("{{MAX}}", String(newState.max_iterations))
-          .replace("{{PROMISE}}", newState.completion_promise)
-          .replace("{{PROMPT}}", newState.prompt),
-        { directory: ctx.directory }
-      )
+      const continuationPrompt = CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
+        .replace("{{MAX}}", String(newState.max_iterations))
+        .replace("{{PROMISE}}", newState.completion_promise)
+        .replace("{{PROMPT}}", newState.prompt)
 
 
       await ctx.client.tui

@@ -1,3 +1,5 @@
+import { appendSubagentSettingsToPrompt } from "../../shared"
+
 export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
 export const INLINE_CODE_PATTERN = /`[^`]+`/g
 
@@ -69,8 +71,10 @@ function isPlannerAgent(agentName?: string): boolean {
 export function getUltraworkMessage(agentName?: string): string {
   const isPlanner = isPlannerAgent(agentName)
 
+  let message = ""
+
   if (isPlanner) {
-    return `<ultrawork-mode>
+    message = `<ultrawork-mode>
 
 **MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
 
@@ -81,9 +85,8 @@ ${ULTRAWORK_PLANNER_SECTION}
 ---
 
 `
-  }
-
-  return `<ultrawork-mode>
+  } else {
+    message = `<ultrawork-mode>
 
 **MANDATORY**: You MUST say "ULTRAWORK MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
 
@@ -188,6 +191,10 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 ---
 
 `
+  }
+
+  // Append subagent settings exactly once
+  return appendSubagentSettingsToPrompt(message)
 }
 
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
