@@ -1,52 +1,63 @@
 # SHARED UTILITIES KNOWLEDGE BASE
 
 ## OVERVIEW
-Core cross-cutting utilities for path resolution, token-safe text processing, and Claude Code compatibility.
+
+43 cross-cutting utilities: path resolution, token truncation, config parsing, Claude Code compatibility.
 
 ## STRUCTURE
+
 ```
 shared/
-├── logger.ts              # Persistent file-based logging (tmpdir/oh-my-opencode.log)
+├── logger.ts              # File-based logging (tmpdir/oh-my-opencode.log)
 ├── permission-compat.ts   # Agent tool restrictions (ask/allow/deny)
-├── dynamic-truncator.ts   # Token-aware truncation with context headroom
-├── frontmatter.ts         # YAML frontmatter parsing with JSON_SCHEMA safety
-├── jsonc-parser.ts        # JSON with Comments support for config files
-├── data-path.ts           # XDG-compliant storage paths (~/.local/share)
-├── opencode-config-dir.ts # Resolve ~/.config/opencode for CLI/Desktop
-├── claude-config-dir.ts   # Resolve ~/.claude for compatibility
-├── migration.ts           # Legacy name mapping (omo -> Sisyphus)
-└── opencode-version.ts    # Version comparison logic (e.g., >= 1.0.150)
+├── dynamic-truncator.ts   # Token-aware truncation (50% headroom)
+├── frontmatter.ts         # YAML frontmatter parsing
+├── jsonc-parser.ts        # JSON with Comments support
+├── data-path.ts           # XDG-compliant storage (~/.local/share)
+├── opencode-config-dir.ts # ~/.config/opencode resolution
+├── claude-config-dir.ts   # ~/.claude resolution
+├── migration.ts           # Legacy config migration (omo → Sisyphus)
+├── opencode-version.ts    # Version comparison (>= 1.0.150)
+├── external-plugin-detector.ts # OAuth spoofing detection
+├── env-expander.ts        # ${VAR} expansion in configs
+├── system-directive.ts    # System directive types
+├── hook-utils.ts          # Hook helper functions
+└── *.test.ts              # Test files (colocated)
 ```
 
 ## WHEN TO USE
+
 | Task | Utility |
 |------|---------|
-| Debugging/Auditing | `log(message, data)` in `logger.ts` |
-| Limit agent context | `dynamicTruncate(ctx, sessionId, output)` |
-| Parse rule meta | `parseFrontmatter(content)` |
-| Load user configs | `parseJsonc(text)` or `readJsoncFile(path)` |
-| Restrict tools | `createAgentToolAllowlist(tools)` |
-| Resolve app paths | `getOpenCodeConfigDir()` or `getClaudeConfigDir()` |
-| Update legacy config | `migrateConfigFile(path, rawConfig)` |
+| Debug logging | `log(message, data)` in `logger.ts` |
+| Limit context | `dynamicTruncate(ctx, sessionId, output)` |
+| Parse frontmatter | `parseFrontmatter(content)` |
+| Load JSONC config | `parseJsonc(text)` or `readJsoncFile(path)` |
+| Restrict agent tools | `createAgentToolAllowlist(tools)` |
+| Resolve paths | `getOpenCodeConfigDir()`, `getClaudeConfigDir()` |
+| Migrate config | `migrateConfigFile(path, rawConfig)` |
+| Compare versions | `isOpenCodeVersionAtLeast("1.1.0")` |
 
-## CRITICAL PATTERNS
+## KEY PATTERNS
+
 ```typescript
-// Truncate large output based on 50% remaining context window
-const { result } = await dynamicTruncate(ctx, sessionID, largeBuffer);
+// Token-aware truncation
+const { result } = await dynamicTruncate(ctx, sessionID, largeBuffer)
 
-// Safe config loading with comment/trailing comma support
-const settings = readJsoncFile<Settings>(configPath);
+// JSONC config loading
+const settings = readJsoncFile<Settings>(configPath)
 
-// Version-gated logic for OpenCode 1.1.0+
-if (isOpenCodeVersionAtLeast("1.1.0")) { /* ... */ }
+// Version-gated features
+if (isOpenCodeVersionAtLeast("1.1.0")) { /* new feature */ }
 
-// Permission normalization for agent tools
-const permissions = migrateToolsToPermission(legacyTools);
+// Tool permission normalization
+const permissions = migrateToolsToPermission(legacyTools)
 ```
 
 ## ANTI-PATTERNS
-- Raw `JSON.parse` for configs (use `jsonc-parser.ts`)
-- Hardcoded `~/.claude` (use `claude-config-dir.ts`)
-- `console.log` for background agents (use `logger.ts`)
-- Unbounded tool output (always use `dynamic-truncator.ts`)
-- Manual version parsing (use `opencode-version.ts`)
+
+- **Raw JSON.parse**: Use `jsonc-parser.ts` for config files
+- **Hardcoded paths**: Use `*-config-dir.ts` utilities
+- **console.log**: Use `logger.ts` for background agents
+- **Unbounded output**: Always use `dynamic-truncator.ts`
+- **Manual version parse**: Use `opencode-version.ts`
