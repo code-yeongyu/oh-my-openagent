@@ -152,6 +152,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION=$(jq -r '.version' package.json)
+          git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
           git push -f origin master
