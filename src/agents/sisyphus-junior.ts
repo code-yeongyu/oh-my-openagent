@@ -138,7 +138,7 @@ export function createSisyphusJuniorAgent(
   promptAppend?: string
 ): AgentConfig {
   const prompt = buildSisyphusJuniorPrompt(promptAppend)
-  const model = categoryConfig.model
+  const model = categoryConfig.model ?? SISYPHUS_JUNIOR_DEFAULTS.model
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
   const categoryPermission = categoryConfig.tools
     ? Object.fromEntries(

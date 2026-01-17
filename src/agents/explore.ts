@@ -2,8 +2,6 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "opencode/grok-code"
-
 export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
   cost: "FREE",
@@ -24,7 +22,7 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
+export function createExploreAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
@@ -122,4 +120,3 @@ Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
 }
 
-export const exploreAgent = createExploreAgent()
