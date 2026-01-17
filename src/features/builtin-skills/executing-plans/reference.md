@@ -45,7 +45,7 @@ Risk-Tier: {0-3}
 
 ## Status File Format
 
-`.fusion/status.json`:
+`.superpowers/status.json`:
 
 ```json
 {

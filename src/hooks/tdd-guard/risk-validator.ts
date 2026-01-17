@@ -2,7 +2,7 @@
  * Risk Validator
  *
  * Determines Risk Tier for files and whether edits should be blocked.
- * Adapted from superpowers-fusion/lib/risk-validator.ts
+ * Adapted from superpowers-core/lib/risk-validator.ts
  */
 
 import type { RiskTier, RiskTierResult, BlockResult } from "./types"

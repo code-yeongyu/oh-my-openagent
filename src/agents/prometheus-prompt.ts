@@ -1194,3 +1194,33 @@ export const PROMETHEUS_PERMISSION = {
   webfetch: "allow" as const,
   question: "allow" as const,
 }
+
+import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
+
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+
+export const PROMETHEUS_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "advisor",
+  cost: "CHEAP",
+  promptAlias: "Prometheus (Planner)",
+  triggers: [
+    {
+      domain: "Planning",
+      trigger: "Strategic planning, work breakdown, task decomposition",
+    },
+  ],
+}
+
+export function createPrometheusAgent(model: string = DEFAULT_MODEL): AgentConfig {
+  return {
+    description: "Strategic planning consultant for work breakdown and task decomposition. Interviews users, gathers context, and creates detailed work plans.",
+    mode: "primary" as const,
+    model,
+    temperature: 0.2,
+    prompt: PROMETHEUS_SYSTEM_PROMPT,
+    permission: PROMETHEUS_PERMISSION,
+  }
+}
+
+export const prometheusAgent = createPrometheusAgent()

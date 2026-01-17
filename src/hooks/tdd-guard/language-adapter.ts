@@ -2,7 +2,7 @@
  * Language Adapter
  *
  * Detects programming language and test file patterns.
- * Adapted from superpowers-fusion/lib/language-adapter.ts
+ * Adapted from superpowers-core/lib/language-adapter.ts
  */
 
 import type { SupportedLanguage } from "./types"

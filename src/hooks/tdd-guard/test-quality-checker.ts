@@ -2,7 +2,7 @@
  * Test Quality Checker
  *
  * Validates test quality: non-empty, has assertions, no trivial assertions.
- * Adapted from superpowers-fusion/lib/test-quality-checker.ts
+ * Adapted from superpowers-core/lib/test-quality-checker.ts
  *
  * Note: This is a simplified version that uses regex-based checking.
  * The original uses @babel/parser for AST analysis, but we avoid that

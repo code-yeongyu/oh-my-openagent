@@ -11,6 +11,7 @@ import { multimodalLookerAgent } from "./multimodal-looker"
 import { metisAgent } from "./metis"
 import { orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
 import { momusAgent } from "./momus"
+import { prometheusAgent } from "./prometheus-prompt"
 
 
 export const builtinAgents: Record<string, AgentConfig> = {
@@ -26,6 +27,7 @@ export const builtinAgents: Record<string, AgentConfig> = {
   "multimodal-looker": multimodalLookerAgent,
   "Metis (Plan Consultant)": metisAgent,
   "Momus (Plan Reviewer)": momusAgent,
+  "Prometheus (Planner)": prometheusAgent,
   "orchestrator-sisyphus": orchestratorSisyphusAgent,
 }
 
