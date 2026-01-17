@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { AgentOverrideConfig, CategoryConfig } from "../config/schema"
+import type { AgentOverrideConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
@@ -121,67 +121,6 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   if (override?.top_p !== undefined) {
     base.top_p = override.top_p
-  }
-
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
-  }
-
-  return {
-    ...base,
-    thinking: { type: "enabled", budgetTokens: 32000 },
-  } as AgentConfig
-}
-
-export function createSisyphusJuniorAgent(
-  categoryConfig: CategoryConfig,
-  promptAppend?: string
-): AgentConfig {
-  const prompt = buildSisyphusJuniorPrompt(promptAppend)
-  const model = categoryConfig.model ?? SISYPHUS_JUNIOR_DEFAULTS.model
-  const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
-  const categoryPermission = categoryConfig.tools
-    ? Object.fromEntries(
-        Object.entries(categoryConfig.tools).map(([k, v]) => [
-          k,
-          v ? ("allow" as const) : ("deny" as const),
-        ])
-      )
-    : {}
-  const mergedPermission = {
-    ...categoryPermission,
-    ...baseRestrictions.permission,
-  }
-
-
-  const base: AgentConfig = {
-    description:
-      "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
-    mode: "subagent" as const,
-    model,
-    maxTokens: categoryConfig.maxTokens ?? 64000,
-    prompt,
-    color: "#20B2AA",
-    permission: mergedPermission,
-  }
-
-  if (categoryConfig.temperature !== undefined) {
-    base.temperature = categoryConfig.temperature
-  }
-  if (categoryConfig.top_p !== undefined) {
-    base.top_p = categoryConfig.top_p
-  }
-
-  if (categoryConfig.thinking) {
-    return { ...base, thinking: categoryConfig.thinking } as AgentConfig
-  }
-
-  if (categoryConfig.reasoningEffort) {
-    return {
-      ...base,
-      reasoningEffort: categoryConfig.reasoningEffort,
-      textVerbosity: categoryConfig.textVerbosity,
-    } as AgentConfig
   }
 
   if (isGptModel(model)) {
