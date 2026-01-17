@@ -745,7 +745,7 @@ describe("ralph-loop", () => {
       // #then - ultrawork toast shown
       const completionToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP COMPLETE!")
       expect(completionToast).toBeDefined()
-      expect(completionToast.message).toMatch(/JUST ULW ULW!/)
+      expect(completionToast!.message).toMatch(/JUST ULW ULW!/)
     })
 
     test("should show regular completion toast when ultrawork disabled", async () => {
