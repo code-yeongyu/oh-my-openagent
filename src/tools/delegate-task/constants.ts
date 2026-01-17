@@ -1,5 +1,65 @@
 import type { CategoryConfig } from "../../config/schema"
 
+/**
+ * Implementer Discipline Prompt - Three-phase workflow for code implementation tasks.
+ * Injected into code-focused categories (ultrabrain, most-capable, general) to enforce
+ * disciplined coding practices with Codex collaboration and TDD.
+ */
+export const IMPLEMENTER_DISCIPLINE_PROMPT = `<Implementer_Discipline>
+## Three-Phase Discipline Workflow (MANDATORY for Code Tasks)
+
+You MUST follow this three-phase workflow for any code implementation task.
+
+### Phase 1: Codex Prototype (BEFORE Coding)
+
+Before writing any implementation code, consult Codex for a code prototype:
+
+\`\`\`
+codex_codex(
+  PROMPT="Provide a unified diff patch prototype for: [task description]. Read-only reference only.",
+  cd="[project root]",
+  sandbox="read-only"
+)
+\`\`\`
+
+**WHY**: Codex provides an objective reference. Use it as logical guidance, then REWRITE to production quality.
+
+### Phase 2: TDD Workflow (Risk-Tiered)
+
+| Tier | TDD Requirement | Examples |
+|------|-----------------|----------|
+| 0 | None | docs, .gitignore, comments |
+| 1 | Logged only | CSS, renames, config |
+| 2 | Test OR exemption | UI components, utilities |
+| 3 | Strict test-first | Core logic, new features, bug fixes |
+
+**For Tier 2/3 tasks, follow RED-GREEN-REFACTOR:**
+1. **RED** - Write failing test first (test MUST fail)
+2. **GREEN** - Write MINIMAL code to pass (nothing more)
+3. **REFACTOR** - Clean up while tests stay GREEN
+
+### Phase 3: Codex Review (AFTER Coding)
+
+After completing implementation, IMMEDIATELY review with Codex:
+
+\`\`\`
+codex_codex(
+  PROMPT="Review this code change for: 1) Logical correctness 2) Edge cases 3) Code style consistency. [paste git diff or file content]",
+  cd="[project root]",
+  sandbox="read-only"
+)
+\`\`\`
+
+**CRITICAL**: Do NOT skip Phase 3. Codex catches issues you missed.
+
+### Enforcement
+
+- Phase 1 and 3 are MANDATORY for all code changes
+- Phase 2 TDD tier is determined by the nature of the change
+- Skipping any phase = INCOMPLETE WORK
+</Implementer_Discipline>
+`
+
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on VISUAL/UI tasks.
 
@@ -197,17 +257,23 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   },
 }
 
+// Code-focused categories get the Implementer Discipline prompt appended
+const CODE_FOCUSED_CATEGORIES = ["ultrabrain", "most-capable", "general"]
+
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
-  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
+  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
   "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   "unspecified-high": UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,
   writing: WRITING_CATEGORY_PROMPT_APPEND,
-  "most-capable": STRATEGIC_CATEGORY_PROMPT_APPEND,
-  general: "",
+  "most-capable": STRATEGIC_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
+  general: IMPLEMENTER_DISCIPLINE_PROMPT,
 }
+
+// Export for testing/verification
+export { CODE_FOCUSED_CATEGORIES }
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
