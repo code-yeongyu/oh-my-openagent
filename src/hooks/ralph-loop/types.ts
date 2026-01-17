@@ -8,6 +8,7 @@ export interface RalphLoopState {
   started_at: string
   prompt: string
   session_id?: string
+  ultrawork?: boolean
 }
 
 export interface RalphLoopOptions {
