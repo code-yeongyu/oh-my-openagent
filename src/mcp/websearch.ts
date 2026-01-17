@@ -5,4 +5,6 @@ export const websearch = {
   headers: process.env.EXA_API_KEY
     ? { "x-api-key": process.env.EXA_API_KEY }
     : undefined,
+  // Disable OAuth auto-detection - Exa uses API key header, not OAuth
+  oauth: false as const,
 }
