@@ -1036,6 +1036,93 @@ describe("BackgroundManager.resume concurrency key", () => {
   })
 })
 
+describe("BackgroundManager.resume model persistence", () => {
+  let manager: BackgroundManager
+  let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
+
+  beforeEach(() => {
+    // #given
+    promptCalls = []
+    const client = {
+      session: {
+        prompt: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+      },
+    }
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+  })
+
+  afterEach(() => {
+    manager.shutdown()
+  })
+
+  test("should pass model when task has a configured model", async () => {
+    // #given - task with model from category config
+    const taskWithModel: BackgroundTask = {
+      id: "task-with-model",
+      sessionID: "session-1",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task with model override",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(taskWithModel.id, taskWithModel)
+
+    // #when
+    await manager.resume({
+      sessionId: "session-1",
+      prompt: "continue the work",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+
+    // #then - model should be passed in prompt body
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
+    expect(promptCalls[0].body.agent).toBe("explore")
+  })
+
+  test("should NOT pass model when task has no model (backward compatibility)", async () => {
+    // #given - task without model (default behavior)
+    const taskWithoutModel: BackgroundTask = {
+      id: "task-no-model",
+      sessionID: "session-2",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task without model",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(taskWithoutModel.id, taskWithoutModel)
+
+    // #when
+    await manager.resume({
+      sessionId: "session-2",
+      prompt: "continue the work",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+
+    // #then - model should NOT be in prompt body
+    expect(promptCalls).toHaveLength(1)
+    expect("model" in promptCalls[0].body).toBe(false)
+    expect(promptCalls[0].body.agent).toBe("explore")
+  })
+})
+
 describe("BackgroundManager process cleanup", () => {
   test("should remove listeners after last shutdown", () => {
     // #given
