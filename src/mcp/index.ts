@@ -10,6 +10,7 @@ type RemoteMcpConfig = {
   url: string
   enabled: boolean
   headers?: Record<string, string>
+  oauth?: false
 }
 
 const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
