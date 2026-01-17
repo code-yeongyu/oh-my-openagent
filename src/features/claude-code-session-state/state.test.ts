@@ -6,17 +6,16 @@ import {
   updateSessionAgent,
   setMainSession,
   getMainSessionID,
-  subagentSessions,
+  _resetForTesting,
 } from "./state"
 
 describe("claude-code-session-state", () => {
   beforeEach(() => {
     // #given - clean state before each test
+    _resetForTesting()
     clearSessionAgent("test-session-1")
     clearSessionAgent("test-session-2")
     clearSessionAgent("test-prometheus-session")
-    setMainSession(undefined)
-    subagentSessions.clear()
   })
 
   describe("setSessionAgent", () => {
@@ -82,11 +81,6 @@ describe("claude-code-session-state", () => {
   })
 
   describe("mainSessionID", () => {
-    beforeEach(() => {
-      // #given - ensure clean state for mainSessionID tests
-      setMainSession(undefined)
-    })
-
     test("should store and retrieve main session ID", () => {
       // #given
       const mainID = "main-session-123"
