@@ -82,6 +82,11 @@ describe("claude-code-session-state", () => {
   })
 
   describe("mainSessionID", () => {
+    beforeEach(() => {
+      // #given - ensure clean state for mainSessionID tests
+      setMainSession(undefined)
+    })
+
     test("should store and retrieve main session ID", () => {
       // #given
       const mainID = "main-session-123"
