@@ -4,10 +4,12 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { testModels } from "./model-optimizer/test-command"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import type { TestModelsOptions } from "./model-optimizer/test-command"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -38,6 +40,8 @@ Model Providers:
   Claude      Required for Sisyphus (main orchestrator) and Librarian agents
   ChatGPT     Powers the Oracle agent for debugging and architecture
   Gemini      Powers frontend, documentation, and multimodal agents
+
+Note: Run 'test-models --apply' after install to auto-configure optimal models
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -133,6 +137,33 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("test-models")
+  .description("Show optimal model rankings for your available models (no API calls)")
+  .option("--verbose", "Show full rankings for each category")
+  .option("--apply", "Write optimal config to oh-my-opencode.json")
+  .addHelpText("after", `
+Examples:
+  $ bun run src/cli/index.ts test-models
+  $ bun run src/cli/index.ts test-models --verbose
+  $ bun run src/cli/index.ts test-models --apply
+
+This command:
+  1. Detects your available models via 'opencode models'
+  2. Shows the best model for each agent based on pre-defined rankings
+  3. Outputs recommended config (or writes it with --apply)
+
+No API calls - completely free!
+`)
+  .action(async (options) => {
+    const testOptions: TestModelsOptions = {
+      verbose: options.verbose ?? false,
+      apply: options.apply ?? false,
+    }
+    const exitCode = await testModels(testOptions)
     process.exit(exitCode)
   })
 
