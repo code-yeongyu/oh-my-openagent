@@ -717,6 +717,8 @@ export function detectCurrentConfig(): DetectedConfig {
       result.hasChatGPT = false
     } else if (agents["oracle"]?.model === "opencode/glm-4.7-free") {
       result.hasChatGPT = false
+    } else if (agents["oracle"]?.model?.startsWith("github-copilot/")) {
+      result.hasChatGPT = false
     }
 
     const hasAnyCopilotModel = Object.values(agents).some(
