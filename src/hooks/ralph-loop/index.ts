@@ -305,6 +305,10 @@ export function createRalphLoopHook(
         .replace("{{PROMISE}}", newState.completion_promise)
         .replace("{{PROMPT}}", newState.prompt)
 
+      const finalPrompt = newState.ultrawork
+        ? `ultrawork ${continuationPrompt}`
+        : continuationPrompt
+
       await ctx.client.tui
         .showToast({
           body: {
@@ -347,7 +351,7 @@ export function createRalphLoopHook(
           body: {
             ...(agent !== undefined ? { agent } : {}),
             ...(model !== undefined ? { model } : {}),
-            parts: [{ type: "text", text: continuationPrompt }],
+            parts: [{ type: "text", text: finalPrompt }],
           },
           query: { directory: ctx.directory },
         })

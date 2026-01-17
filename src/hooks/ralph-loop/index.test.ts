@@ -726,6 +726,36 @@ describe("ralph-loop", () => {
       // API should NOT be called since transcript found completion
       expect(messagesCalls.length).toBe(0)
     })
+
+    test("should prepend ultrawork to continuation prompt when ultrawork=true", async () => {
+      // #given - hook with ultrawork mode enabled
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build API", { ultrawork: true })
+
+      // #when - session goes idle (continuation triggered)
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - prompt should start with "ultrawork "
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toMatch(/^ultrawork /)
+    })
+
+    test("should NOT prepend ultrawork to continuation prompt when ultrawork=false", async () => {
+      // #given - hook without ultrawork mode
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build API")
+
+      // #when - session goes idle (continuation triggered)
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - prompt should NOT start with "ultrawork "
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).not.toMatch(/^ultrawork /)
+    })
   })
 
   describe("API timeout protection", () => {
