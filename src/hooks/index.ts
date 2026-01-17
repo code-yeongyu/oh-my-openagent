@@ -42,3 +42,6 @@ export { createDebugInjectorHook, type DebugInjectorConfig } from "./debugging-i
 
 // Failure Counter Hook - tracks consecutive sisyphus_task failures and triggers responses
 export { createFailureCounterHook, type FailureCounterConfig } from "./failure-counter";
+
+// Skill Suggestion Hook - suggests relevant skills based on prompt keywords
+export { createSkillSuggestionHook } from "./skill-suggestion";
