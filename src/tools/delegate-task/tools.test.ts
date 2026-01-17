@@ -84,6 +84,51 @@ describe("sisyphus-task", () => {
     })
   })
 
+  describe("category delegation config validation", () => {
+    test("returns error when systemDefaultModel is not configured", async () => {
+      // #given a mock client with no model in config
+      const { createDelegateTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) }, // No model configured
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when delegating with a category
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then returns descriptive error message
+      expect(result).toContain("No default model configured")
+    })
+  })
+
   describe("resolveCategoryConfig", () => {
     test("returns null for unknown category without user config", () => {
       // #given
