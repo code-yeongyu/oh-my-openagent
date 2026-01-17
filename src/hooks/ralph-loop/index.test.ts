@@ -92,6 +92,27 @@ describe("ralph-loop", () => {
       expect(readResult?.session_id).toBe("test-session-123")
     })
 
+    test("should handle ultrawork field", () => {
+      // #given - a state object with ultrawork enabled
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build a REST API",
+        session_id: "test-session-123",
+        ultrawork: true,
+      }
+
+      // #when - write and read state
+      writeState(TEST_DIR, state)
+      const readResult = readState(TEST_DIR)
+
+      // #then - ultrawork field should be preserved
+      expect(readResult?.ultrawork).toBe(true)
+    })
+
     test("should return null for non-existent state", () => {
       // #given - no state file exists
       // #when - read state
