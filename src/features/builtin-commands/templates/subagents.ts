@@ -126,10 +126,10 @@ After user selects a model:
 │                                                 │
 │  [subagent-name] → [model-name]                 │
 │                                                 │
-│  Config file: [path/to/config.json]             │
-│                                                 │
 │  💡 Changes apply to new sessions               │
 ╰─────────────────────────────────────────────────╯
+
+Config file: [path/to/config.json]
 \`\`\`
 
 4. **Return to Step 1** - Show updated list and allow more changes
