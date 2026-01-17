@@ -591,6 +591,14 @@
       "created_at": "2026-01-17T01:25:58Z",
       "repoId": 1108837393,
       "pullRequestNo": 863
+    },
+    {
+      "name": "G-hoon",
+      "id": 26299556,
+      "comment_id": 3764015966,
+      "created_at": "2026-01-17T15:27:41Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 879
     }
   ]
 }
