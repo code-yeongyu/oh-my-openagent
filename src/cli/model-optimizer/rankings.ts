@@ -1,12 +1,36 @@
 /**
  * Static model rankings by category.
- * 
+ *
  * HELP WANTED: We need help ranking AI models!
  * If you have experience with these models and can help improve the rankings,
  * please contribute: https://github.com/code-yeongyu/oh-my-opencode/issues
- * 
- * Rankings are ordered from best to worst within each category.
- * Higher position = higher preference when selecting optimal model.
+ *
+ * HOW TO MODIFY RANKINGS:
+ * ========================
+ *
+ * 1. MODEL_RANKINGS - Add/reorder models within categories:
+ *    - Each category is an array ordered from BEST to WORST
+ *    - Higher position = higher preference when user runs `model-config`
+ *    - Model IDs must match exactly what `opencode models` outputs
+ *    - Example: "anthropic/claude-opus-4-5", "openai/gpt-5.2"
+ *
+ * 2. AGENT_RANKING_MAP - Map agents to ranking categories:
+ *    - Key: agent name (e.g., "oracle", "Sisyphus")
+ *    - Value: which MODEL_RANKINGS category to use
+ *    - When user runs `model-config`, agent gets best available model from its category
+ *
+ * 3. CATEGORY_RANKING_MAP - Map task categories to ranking categories:
+ *    - Key: task category from delegate_task (e.g., "quick", "visual-engineering")
+ *    - Value: which MODEL_RANKINGS category to use
+ *
+ * 4. CATEGORY_TEMPERATURES / CATEGORY_VARIANTS - Per-category defaults:
+ *    - Temperature: 0.1 (deterministic) to 0.9 (creative)
+ *    - Variant: "low", "medium", "high", "max" (thinking effort)
+ *
+ * TESTING YOUR CHANGES:
+ *   bun test src/cli/model-optimizer/  # Run tests
+ *   bunx oh-my-opencode model-config   # See generated config
+ *   bunx oh-my-opencode model-config --verbose  # See full rankings
  */
 export const MODEL_RANKINGS = {
 	// Best overall (orchestrator, complex tasks)

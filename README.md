@@ -795,6 +795,40 @@ When agents thrive, you thrive. But I want to help you directly too.
 - **Thinking Block Validator**: Validates thinking blocks to ensure proper formatting and prevent API errors from malformed thinking content.
 - **Claude Code Hooks**: Executes hooks from Claude Code's settings.json - this is the compatibility layer that runs PreToolUse/PostToolUse/UserPromptSubmit/Stop hooks.
 
+## Model Config Optimizer
+
+Automatically generate optimal model configurations based on your available models.
+
+```bash
+# Show optimal config based on your available models
+bunx oh-my-opencode model-config
+
+# Show with full rankings for each category
+bunx oh-my-opencode model-config --verbose
+
+# Auto-apply config to your oh-my-opencode.json
+bunx oh-my-opencode model-config --apply
+```
+
+**How it works:**
+1. Detects your available models via `opencode models`
+2. Matches them against static rankings by category (orchestrator, reasoning, fast, coding, etc.)
+3. Generates optimal agent→model and category→model configuration
+4. Outputs JSON config or writes directly with `--apply`
+
+**No API calls - completely free!**
+
+### Contributing Rankings
+
+The model rankings are community-driven. If you have experience with AI models and want to help improve the rankings:
+
+1. Edit `src/cli/model-optimizer/rankings.ts`
+2. Add or reorder models in the appropriate category
+3. Test with `bunx oh-my-opencode model-config --verbose`
+4. Submit a PR
+
+See `src/cli/model-optimizer/AGENTS.md` for detailed contribution guidelines.
+
 ## Configuration
 
 Highly opinionated, but adjustable to taste.

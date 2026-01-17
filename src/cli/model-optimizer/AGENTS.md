@@ -51,11 +51,35 @@ The command outputs:
 3. Optimal category → model mapping with temperature/variant
 4. Recommended config JSON (or confirmation if --apply used)
 
-## HOW TO ADD MODELS TO RANKINGS
+## HOW TO CONTRIBUTE RANKINGS
+
+### Adding a New Model
+1. Find the model ID by running `opencode models`
+2. Edit `rankings.ts`
+3. Add the model ID to the appropriate category in `MODEL_RANKINGS`
+4. Position matters - place it where it belongs relative to other models
+5. Test: `bunx oh-my-opencode model-config --verbose`
+
+### Reordering Models
 1. Edit `rankings.ts`
-2. Add model ID to appropriate category in `MODEL_RANKINGS`
-3. Position matters - higher position = higher preference
-4. Test: `bunx oh-my-opencode model-config`
+2. Move the model ID up (higher priority) or down (lower priority) within its category
+3. Test to verify the change
+
+### Adding a New Agent
+1. Add entry to `AGENT_RANKING_MAP` mapping agent name → category
+2. Optionally set variant in `generateOptimalConfig()` function
+
+### Adding a New Task Category
+1. Add entry to `CATEGORY_RANKING_MAP` mapping category → ranking category
+2. Add entry to `CATEGORY_TEMPERATURES` (0.1-0.9)
+3. Add entry to `CATEGORY_VARIANTS` ("low", "medium", "high", "max")
+
+### Testing Changes
+```bash
+bun test src/cli/model-optimizer/  # Run unit tests
+bunx oh-my-opencode model-config   # See generated config
+bunx oh-my-opencode model-config --verbose  # See full rankings with your models
+```
 
 ## TYPE REFERENCE
 Key types in `types.ts`:
