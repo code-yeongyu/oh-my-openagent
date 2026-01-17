@@ -1,5 +1,6 @@
 # Dependencies
 .sisyphus/
+.superpowers/
 node_modules/
 
 # Build output

@@ -201,7 +201,7 @@
   - **当前项目中实际存在的目录**:
     | 目录 | 用途 | 内容 |
     |------|------|------|
-    | .fusion/ | 状态管理 | status.json (当前 change 状态) |
+    | .superpowers/ | 状态管理 | status.json (当前 change 状态) |
     | changes/ | 变更管理 | 活跃的变更目录 |
     | changes/{name}/ | 单个变更 | proposal.md, design.md, tasks.md |
     | changes/archive/ | 归档变更 | YYYY-MM-DD-{name}/ 子目录 |
@@ -210,11 +210,11 @@
   - **Skills 中定义的目录结构对比**:
     | 来源 | 目录 | 用途 | 当前状态 |
     |------|------|------|----------|
-    | 本地 Skills (我们的) | .fusion/status.json | 状态跟踪 | ✅ 存在使用中 |
+    | 本地 Skills (我们的) | .superpowers/status.json | 状态跟踪 | ✅ 存在使用中 |
     | 本地 Skills | changes/{name}/ | 变更文档 | ✅ 存在使用中 |
     | 本地 Skills | changes/archive/ | 归档 | ✅ 存在使用中 |
     | 本地 Skills | .worktrees/ | Git Worktrees | ⚠️ 定义了但未创建 |
-    | 本地 Skills | .fusion/wave-status.json | Wave 状态 | ⚠️ 定义了但未创建 |
+    | 本地 Skills | .superpowers/wave-status.json | Wave 状态 | ⚠️ 定义了但未创建 |
     | 官方流程 (文档中) | .sisyphus/drafts/ | 草稿 | ❌ 不存在 |
     | 官方流程 | .sisyphus/plans/{name}.md | 计划 | ❌ 不存在 |
     | 官方流程 | boulder.json | 执行状态 | ❌ 不存在 |
@@ -237,14 +237,14 @@
   - 结论: 我们的目录结构更合理，无需迁移到官方结构，但需要在文档中统一说明
   - 验收: 文档清晰说明两种方案的关系和选择理由
 
-- [ ] **Task 7.2**: 状态目录迁移到 `.superpowers/`
+- [x] **Task 7.2**: 状态目录迁移到 `.superpowers/` ✅ 已完成
   - **原因**: 当前使用 `.fusion/` 作为状态目录，但 `.superpowers/` 更符合项目命名（oh-my-opencode 的 superpowers 概念）。统一命名提高一致性。
-  - 当前: `.fusion/status.json`
-  - 目标: `.superpowers/status.json`
+  - 当前: `.superpowers/status.json` ✅
+  - 目标: `.superpowers/status.json` ✅
   
   - **需要更新的文件**:
-    - 所有引用 `.fusion/` 的 Skills
-    - wave-parallel-execution 中的 `.fusion/wave-status.json` → `.superpowers/wave-status.json`
+    - 所有引用 `.fusion/` 的 Skills → 已更新
+    - wave-parallel-execution 中的 `.superpowers/wave-status.json` → 已更新
   
   - **文件关系说明**:
     | 文件 | 用途 | 更新方式 | 内容 |
