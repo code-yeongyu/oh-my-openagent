@@ -23,7 +23,6 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 permissions:
   contents: write
   id-token: write
-  workflows: write
 
 jobs:
   test:
@@ -149,6 +148,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge to master
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -156,4 +156,4 @@ jobs:
           git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
-          git push -f origin master
+          git push -f origin master || echo "::warning::Failed to push to master. This can happen when workflow files changed. Manually sync master: git checkout master && git reset --hard v${VERSION} && git push -f"
