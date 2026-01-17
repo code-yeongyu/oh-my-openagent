@@ -401,15 +401,17 @@ export class BackgroundManager {
     log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
       sessionID: existingTask.sessionID,
       agent: existingTask.agent,
+      model: existingTask.model,
       promptLength: input.prompt.length,
     })
 
-    // Note: Don't pass model in body - use agent's configured model instead
     // Use prompt() instead of promptAsync() to properly initialize agent loop
+    // Include model if task has one (preserved from original launch with category config)
     this.client.session.prompt({
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
+        ...(existingTask.model ? { model: existingTask.model } : {}),
         tools: {
           ...getAgentToolRestrictions(existingTask.agent),
           task: false,
