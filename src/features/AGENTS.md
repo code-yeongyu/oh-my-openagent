@@ -6,25 +6,23 @@ Claude Code compatibility layer + core feature modules. Commands, skills, agents
 ## STRUCTURE
 ```
 features/
-├── background-agent/           # Task lifecycle, notifications (928 lines manager.ts)
-├── boulder-state/              # Boulder state persistence
-├── builtin-commands/           # Built-in slash commands
-│   └── templates/              # start-work, refactor, init-deep, ralph-loop
-├── builtin-skills/             # Built-in skills (1230 lines skills.ts)
-│   ├── git-master/             # Atomic commits, rebase, history search
-│   ├── playwright              # Browser automation skill
-│   └── frontend-ui-ux/         # Designer-turned-developer skill
+├── background-agent/           # Task lifecycle, notifications (1165 lines manager.ts)
+├── boulder-state/              # Boulder/Todo state persistence
+├── builtin-commands/           # Built-in slash commands (ralph-loop, refactor, init-deep)
+├── builtin-skills/             # Built-in skills (1203 lines skills.ts)
+│   ├── git-master/             # Atomic commits, history search
+│   ├── playwright/             # Browser automation
+│   └── frontend-ui-ux/         # Designer-developer skill
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
-├── claude-code-mcp-loader/     # .mcp.json files
-│   └── env-expander.ts         # ${VAR} expansion
+├── claude-code-mcp-loader/     # .mcp.json files with ${VAR} expansion
 ├── claude-code-plugin-loader/  # installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
-├── context-injector/           # Context collection and injection
+├── context-injector/           # AGENTS.md/README.md/Rules injection
 ├── opencode-skill-loader/      # Skills from OpenCode + Claude paths
-├── skill-mcp-manager/          # MCP servers in skill YAML
-├── task-toast-manager/         # Task toast notifications
-└── hook-message-injector/      # Inject messages into conversation
+├── skill-mcp-manager/          # MCP servers in skill YAML (stdio/http transports)
+├── task-toast-manager/         # Task status toast notifications
+└── hook-message-injector/      # Message injection into conversation streams
 ```
 
 ## LOADER PRIORITY
@@ -36,7 +34,7 @@ features/
 | MCPs | `.claude/.mcp.json` > `.mcp.json` > `~/.claude/.mcp.json` |
 
 ## CONFIG TOGGLES
-```json
+```jsonc
 {
   "claude_code": {
     "mcp": false,      // Skip .mcp.json
@@ -49,19 +47,19 @@ features/
 ```
 
 ## BACKGROUND AGENT
-- Lifecycle: pending → running → completed/failed
-- Concurrency limits per provider/model (manager.ts)
-- `background_output` to retrieve results, `background_cancel` for cleanup
-- Automatic task expiration and cleanup logic
+- **Lifecycle**: `launch` → `poll` (idle/stability detection) → `complete`.
+- **Concurrency**: Per-provider/model limits in `concurrency.ts`.
+- **Notification**: Auto-injects system reminders into parent session on task completion.
+- **Cleanup**: Shutdown handler cancels pending waiters; idle tasks pruning (30m TTL).
 
 ## SKILL MCP
-- MCP servers embedded in skill YAML frontmatter
-- Lazy client loading via `skill-mcp-manager`
-- `skill_mcp` tool for cross-skill tool discovery
-- Session-scoped MCP server lifecycle management
+- **Lazy Loading**: Clients connect on first tool call via `SkillMcpManager`.
+- **Transports**: `stdio` (local process) or `http` (SSE/Streamable HTTP).
+- **Environment**: `${VAR}` expansion in config via `env-expander.ts`.
+- **Lifecycle**: Session-scoped clients; auto-cleanup after 5m idle.
 
 ## ANTI-PATTERNS
-- Sequential execution for independent tasks (use `delegate_task`)
-- Trusting agent self-reports without verification
-- Blocking main thread during loader initialization
-- Manual version bumping in `package.json`
+- **Sequential Delegation**: Calling agents one-by-one; use `delegate_task` for parallel runs.
+- **Self-Report Trust**: Trusting agent's "I'm done" without verifying against session state.
+- **Main Thread Blocks**: Heavy I/O or long-running logic during loader initialization.
+- **Manual Versioning**: Updating `package.json` version field; managed exclusively by CI.

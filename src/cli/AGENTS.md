@@ -6,7 +6,7 @@ CLI for oh-my-opencode: interactive installer, health diagnostics (doctor), runt
 ## STRUCTURE
 ```
 cli/
-├── index.ts              # Commander.js entry, subcommand routing (146 lines)
+├── index.ts              # Commander.js entry, subcommand routing
 ├── install.ts            # Interactive TUI installer (462 lines)
 ├── config-manager.ts     # JSONC parsing, env detection (730 lines)
 ├── types.ts              # CLI-specific types
