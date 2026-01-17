@@ -1,13 +1,19 @@
 export const subagentSessions = new Set<string>()
 
-export let mainSessionID: string | undefined
+let _mainSessionID: string | undefined
 
 export function setMainSession(id: string | undefined) {
-  mainSessionID = id
+  _mainSessionID = id
 }
 
 export function getMainSessionID(): string | undefined {
-  return mainSessionID
+  return _mainSessionID
+}
+
+/** @internal For testing only */
+export function _resetForTesting(): void {
+  _mainSessionID = undefined
+  subagentSessions.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()
