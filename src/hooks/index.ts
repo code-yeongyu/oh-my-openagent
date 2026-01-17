@@ -33,3 +33,12 @@ export { createStartWorkHook } from "./start-work";
 export { createAtlasHook } from "./atlas";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
+
+// TDD Guard Hook - enforces Test-Driven Development for Tier 2/3 files
+export { createTddGuardHook, type TddGuardHookContext, type TddGuardHookOptions, type TddGuardConfig } from "./tdd-guard";
+
+// Debugging Injector Hook - injects systematic-debugging skill after >=2 fix failures
+export { createDebugInjectorHook, type DebugInjectorConfig } from "./debugging-injector";
+
+// Failure Counter Hook - tracks consecutive sisyphus_task failures and triggers responses
+export { createFailureCounterHook, type FailureCounterConfig } from "./failure-counter";
