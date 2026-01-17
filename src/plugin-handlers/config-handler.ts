@@ -99,6 +99,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
+    if (!(config.model as string | undefined)?.trim()) {
+      throw new Error(
+        'oh-my-opencode requires a default model to be configured.\n' +
+        'Please set one in OpenCode:\n' +
+        '  opencode config set model "provider/model-name"\n' +
+        'Example: opencode config set model "anthropic/claude-sonnet-4-5"'
+      )
+    }
+
     const builtinAgents = createBuiltinAgents(
       pluginConfig.disabled_agents,
       pluginConfig.agents,
