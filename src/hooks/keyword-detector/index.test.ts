@@ -76,7 +76,47 @@ describe("keyword-detector message transform", () => {
     expect(textPart!.text).toContain("[search-mode]")
   })
 
-  test("should NOT transform when no keywords detected", async () => {
+  test("should register consult-metis keyword for refactoring requests", async () => {
+    // #given - mock getMainSessionID to return our session
+    const collector = new ContextCollector()
+    const sessionID = "metis-test-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "I need to refactor this module" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - consult-metis context should be registered in collector
+    expect(collector.hasPending(sessionID)).toBe(true)
+    const pending = collector.getPending(sessionID)
+    expect(pending.entries.some((e) => e.id === "keyword-consult-metis")).toBe(true)
+  })
+
+  test("should register consult-metis keyword for ambiguous requests", async () => {
+    // #given - mock getMainSessionID to return our session
+    const collector = new ContextCollector()
+    const sessionID = "metis-ambiguous-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "I'm not sure how to approach this complex task" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - consult-metis context should be registered in collector
+    expect(collector.hasPending(sessionID)).toBe(true)
+    const pending = collector.getPending(sessionID)
+    expect(pending.entries.some((e) => e.id === "keyword-consult-metis")).toBe(true)
+  })
+
+  test("should NOT register to collector when no keywords detected", async () => {
     // #given - no keywords in message
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)

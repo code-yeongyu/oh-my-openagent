@@ -331,4 +331,34 @@ DO NOT skip to implementation. Design first, code second.
 
 After brainstorming → use skill("creating-changes") to write design.md and tasks.md.`,
   },
+  // CONSULT-METIS: Complex/ambiguous requests that need pre-planning analysis (Task 10.2)
+  {
+    pattern:
+      /\b(refactor|restructure|migrate|overhaul|rewrite|rearchitect|redesign|revamp|modernize|upgrade|consolidate)(ing)?\b|\b(complex|complicated|tricky|nuanced|subtle|intricate|elaborate|multifaceted)\b.*\b(task|feature|system|module|change)\b|\b(not\s+sure|unclear|ambiguous|vague|open[\s-]?ended|undefined|flexible|depends)\b.*\b(how|what|which|where|scope|approach|strategy)\b|what\s+should\s+(i|we)\s+(do|build|implement|change)|how\s+should\s+(i|we)\s+(approach|handle|structure|organize)|i'?m\s+not\s+sure\s+(how|what|if)|need\s+(help|guidance|advice)\s+(with|on|for)\s+(planning|scoping|defining)|clarify.*requirements|define.*scope|scope.*unclear|리팩토링|리팩터|재구성|재설계|마이그레이션|복잡한|애매한|범위|어떻게|リファクタリング|再構築|移行|複雑|曖昧|スコープ|どうすれば|重构|迁移|复杂|模糊|范围|怎么/i,
+    message: `[consult-metis-mode]
+COMPLEX/AMBIGUOUS REQUEST DETECTED. Consider consulting Metis (Plan Consultant) first.
+
+**RECOMMENDATION**: Before planning, use Metis to:
+1. Classify intent (Refactoring, Build, Mid-sized, Collaborative, Architecture, Research)
+2. Identify hidden requirements and ambiguities
+3. Prevent AI over-engineering patterns
+4. Generate clarifying questions for the user
+
+**HOW TO USE**:
+\`\`\`
+sisyphus_task(
+  subagent_type="Metis (Plan Consultant)",
+  prompt="Analyze this request and prepare directives for planning:
+  
+  User request: [paste user's request]
+  
+  Identify: intent type, hidden requirements, ambiguities, AI-slop risks.
+  Output: Questions for user + Directives for Prometheus."
+)
+\`\`\`
+
+**WHEN TO SKIP**: Simple, well-defined tasks with clear scope and acceptance criteria.
+
+Metis → Prometheus → Momus is the recommended planning flow for non-trivial work.`,
+  },
 ]
