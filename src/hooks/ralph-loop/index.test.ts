@@ -717,7 +717,10 @@ describe("ralph-loop", () => {
 
       // #when - session goes idle
       await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
       })
 
       // #then - should complete via transcript (API not called when transcript succeeds)
@@ -725,6 +728,40 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
       // API should NOT be called since transcript found completion
       expect(messagesCalls.length).toBe(0)
+    })
+
+    test("should show ultrawork completion toast", async () => {
+      // #given - hook with ultrawork mode and completion in transcript
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      hook.startLoop("test-id", "Build API", { ultrawork: true })
+
+      // #when - idle event triggered
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "test-id" } } })
+
+      // #then - ultrawork toast shown
+      const completionToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP COMPLETE!")
+      expect(completionToast).toBeDefined()
+      expect(completionToast.message).toMatch(/JUST ULW ULW!/)
+    })
+
+    test("should show regular completion toast when ultrawork disabled", async () => {
+      // #given - hook without ultrawork
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      hook.startLoop("test-id", "Build API")
+
+      // #when - idle event triggered
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "test-id" } } })
+
+      // #then - regular toast shown
+      expect(toastCalls.some(t => t.title === "Ralph Loop Complete!")).toBe(true)
     })
 
     test("should prepend ultrawork to continuation prompt when ultrawork=true", async () => {

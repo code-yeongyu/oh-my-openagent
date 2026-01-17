@@ -252,11 +252,18 @@ export function createRalphLoopHook(
         })
         clearState(ctx.directory, stateDir)
 
+        const title = state.ultrawork
+          ? "ULTRAWORK LOOP COMPLETE!"
+          : "Ralph Loop Complete!"
+        const message = state.ultrawork
+          ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`
+          : `Task completed after ${state.iteration} iteration(s)`
+
         await ctx.client.tui
           .showToast({
             body: {
-              title: "Ralph Loop Complete!",
-              message: `Task completed after ${state.iteration} iteration(s)`,
+              title,
+              message,
               variant: "success",
               duration: 5000,
             },
