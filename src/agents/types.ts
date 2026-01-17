@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-export type AgentFactory = (model?: string) => AgentConfig
+export type AgentFactory = (model: string) => AgentConfig
 
 /**
  * Agent category for grouping in Sisyphus prompt sections

@@ -2,8 +2,6 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "opencode/glm-4.7-free"
-
 export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
   cost: "CHEAP",
@@ -21,7 +19,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig {
+export function createLibrarianAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
@@ -326,4 +324,3 @@ grep_app_searchGitHub(query: "useQuery")
   }
 }
 
-export const librarianAgent = createLibrarianAgent()

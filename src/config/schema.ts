@@ -154,7 +154,7 @@ export const SisyphusAgentConfigSchema = z.object({
 })
 
 export const CategoryConfigSchema = z.object({
-  model: z.string(),
+  model: z.string().optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),

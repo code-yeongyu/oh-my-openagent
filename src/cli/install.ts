@@ -47,18 +47,11 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.dim("─".repeat(40)))
   lines.push("")
 
-  lines.push(color.bold(color.white("Agent Configuration")))
+  // v3 beta: No hardcoded models - agents use OpenCode's configured default model
+  lines.push(color.bold(color.white("Agent Models")))
   lines.push("")
-
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : (config.hasCopilot ? "github-copilot/claude-opus-4.5" : "glm-4.7-free")
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasCopilot ? "github-copilot/gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"))
-  const librarianModel = "glm-4.7-free"
-  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-
-  lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Librarian    ${SYMBOLS.arrow} ${color.cyan(librarianModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Frontend     ${SYMBOLS.arrow} ${color.cyan(frontendModel)}`)
+  lines.push(`  ${SYMBOLS.info} Agents will use your OpenCode default model`)
+  lines.push(`  ${SYMBOLS.bullet} Configure specific models in ${color.cyan("oh-my-opencode.json")} if needed`)
 
   return lines.join("\n")
 }

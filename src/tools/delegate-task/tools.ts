@@ -11,7 +11,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -107,15 +107,15 @@ type ToolContextWithMetadata = {
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
 }
 
-function resolveCategoryConfig(
+export function resolveCategoryConfig(
   categoryName: string,
   options: {
     userCategories?: CategoriesConfig
-    parentModelString?: string
-    systemDefaultModel?: string
+    inheritedModel?: string
+    systemDefaultModel: string
   }
-): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
-  const { userCategories, parentModelString, systemDefaultModel } = options
+): { config: CategoryConfig; promptAppend: string; model: string } | null {
+  const { userCategories, inheritedModel, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -124,8 +124,12 @@ function resolveCategoryConfig(
     return null
   }
 
-  // Model priority: user override > category default > parent model (fallback) > system default
-  const model = userConfig?.model ?? defaultConfig?.model ?? parentModelString ?? systemDefaultModel
+  // Model priority: user override > inherited from parent > system default
+  const model = resolveModel({
+    userModel: userConfig?.model,
+    inheritedModel,
+    systemDefault: systemDefaultModel,
+  })
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
@@ -421,16 +425,21 @@ ${textContent || "(No text output)"}`
       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
       let categoryPromptAppend: string | undefined
 
-      const parentModelString = parentModel
+      const inheritedModel = parentModel
         ? `${parentModel.providerID}/${parentModel.modelID}`
         : undefined
 
       let modelInfo: ModelFallbackInfo | undefined
 
       if (args.category) {
+        // Guard: require system default model for category delegation
+        if (!systemDefaultModel) {
+          return `No default model configured. Set a model in your OpenCode config (model field).`
+        }
+
         const resolved = resolveCategoryConfig(args.category, {
           userCategories,
-          parentModelString,
+          inheritedModel,
           systemDefaultModel,
         })
         if (!resolved) {
@@ -440,11 +449,6 @@ ${textContent || "(No text output)"}`
         // Determine model source by comparing against the actual resolved model
         const actualModel = resolved.model
         const userDefinedModel = userCategories?.[args.category]?.model
-        const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
-
-        if (!actualModel) {
-          return `No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
-        }
 
         if (!parseModelString(actualModel)) {
           return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
@@ -454,11 +458,8 @@ ${textContent || "(No text output)"}`
           case userDefinedModel:
             modelInfo = { model: actualModel, type: "user-defined" }
             break
-          case parentModelString:
+          case inheritedModel:
             modelInfo = { model: actualModel, type: "inherited" }
-            break
-          case categoryDefaultModel:
-            modelInfo = { model: actualModel, type: "category-default" }
             break
           case systemDefaultModel:
             modelInfo = { model: actualModel, type: "system-default" }
