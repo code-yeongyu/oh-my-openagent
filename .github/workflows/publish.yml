@@ -141,7 +141,6 @@ jobs:
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-          SKIP_PLATFORM_PACKAGES: true
 
       - name: Delete draft release
         run: gh release delete next --yes 2>/dev/null || echo "No draft release to delete"
