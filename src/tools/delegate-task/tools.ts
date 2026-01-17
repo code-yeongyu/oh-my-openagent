@@ -158,10 +158,10 @@ export interface SyncSessionCreatedEvent {
   parentID: string
   title: string
 }
-
 export interface DelegateTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
+  directory: string
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
