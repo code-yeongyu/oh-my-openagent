@@ -61,7 +61,7 @@ export interface RalphLoopHook {
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string }
+    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
@@ -150,7 +150,7 @@ export function createRalphLoopHook(
   const startLoop = (
     sessionID: string,
     prompt: string,
-    loopOptions?: { maxIterations?: number; completionPromise?: string }
+    loopOptions?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ): boolean => {
     const state: RalphLoopState = {
       active: true,
@@ -158,6 +158,7 @@ export function createRalphLoopHook(
       max_iterations:
         loopOptions?.maxIterations ?? config?.default_max_iterations ?? DEFAULT_MAX_ITERATIONS,
       completion_promise: loopOptions?.completionPromise ?? DEFAULT_COMPLETION_PROMISE,
+      ultrawork: loopOptions?.ultrawork,
       started_at: new Date().toISOString(),
       prompt,
       session_id: sessionID,

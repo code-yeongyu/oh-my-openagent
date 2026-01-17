@@ -185,6 +185,30 @@ describe("ralph-loop", () => {
       expect(state?.session_id).toBe("session-123")
     })
 
+    test("should accept ultrawork option in startLoop", () => {
+      // #given - hook instance
+      const hook = createRalphLoopHook(createMockPluginInput())
+
+      // #when - start loop with ultrawork
+      hook.startLoop("session-123", "Build something", { ultrawork: true })
+
+      // #then - state should have ultrawork=true
+      const state = hook.getState()
+      expect(state?.ultrawork).toBe(true)
+    })
+
+    test("should handle missing ultrawork option in startLoop", () => {
+      // #given - hook instance
+      const hook = createRalphLoopHook(createMockPluginInput())
+
+      // #when - start loop without ultrawork
+      hook.startLoop("session-123", "Build something")
+
+      // #then - state should have ultrawork=undefined
+      const state = hook.getState()
+      expect(state?.ultrawork).toBeUndefined()
+    })
+
     test("should inject continuation when loop active and no completion detected", async () => {
       // #given - active loop state
       const hook = createRalphLoopHook(createMockPluginInput())
