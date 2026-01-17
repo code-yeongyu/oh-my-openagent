@@ -21,7 +21,7 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
-  createEmptyMessageSanitizerHook,
+
   createThinkingBlockValidatorHook,
   createRalphLoopHook,
   createAutoSlashCommandHook,
@@ -174,9 +174,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
     ? createInteractiveBashSessionHook(ctx)
     : null;
-  const emptyMessageSanitizer = isHookEnabled("empty-message-sanitizer")
-    ? createEmptyMessageSanitizerHook()
-    : null;
+
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
     ? createThinkingBlockValidatorHook()
     : null;
@@ -393,10 +391,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         "experimental.chat.messages.transform"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ]?.(input, output as any);
-      await emptyMessageSanitizer?.[
-        "experimental.chat.messages.transform"
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ]?.(input, output as any);
+
     },
 
     config: configHandler,
