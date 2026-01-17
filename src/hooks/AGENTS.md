@@ -6,12 +6,12 @@
 ## STRUCTURE
 ```
 hooks/
-├── sisyphus-orchestrator/      # Main orchestration & agent delegation (684 lines)
-├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit (554 lines)
-├── todo-continuation-enforcer.ts # Force completion of [ ] items (445 lines)
-├── ralph-loop/                 # Self-referential dev loop (364 lines)
-├── claude-code-hooks/          # settings.json hook compatibility layer
-├── comment-checker/            # Prevents AI slop/excessive comments
+├── sisyphus-orchestrator/      # Main orchestration & agent delegation (771 lines)
+├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit (14 files)
+├── todo-continuation-enforcer.ts # Force completion of [ ] items
+├── ralph-loop/                 # Self-referential dev loop (7 files)
+├── claude-code-hooks/          # settings.json hook compatibility layer (13 files)
+├── comment-checker/            # Prevents AI slop/excessive comments (13 files)
 ├── auto-slash-command/         # Detects and executes /command patterns
 ├── rules-injector/             # Conditional rules from .claude/rules/
 ├── directory-agents-injector/  # Auto-injects local AGENTS.md files
@@ -21,7 +21,6 @@ hooks/
 ├── thinking-block-validator/   # Ensures valid <thinking> format
 ├── context-window-monitor.ts   # Reminds agents of remaining headroom
 ├── session-recovery/           # Auto-recovers from session crashes
-├── start-work/                 # Initializes work sessions (ulw/ulw)
 ├── think-mode/                 # Dynamic thinking budget adjustment
 ├── background-notification/    # OS notification on task completion
 └── tool-output-truncator.ts    # Prevents context bloat from verbose tools

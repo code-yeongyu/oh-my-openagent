@@ -1,60 +1,50 @@
 # TOOLS KNOWLEDGE BASE
 
 ## OVERVIEW
-Custom tools extending agent capabilities: LSP (3 tools), AST-aware search/replace, background tasks, and multimodal analysis.
+Core toolset implementing LSP, structural search, and system orchestration. Extends OpenCode with high-performance C++ bindings and multi-agent delegation.
 
 ## STRUCTURE
 ```
 tools/
-├── ast-grep/           # AST-aware search/replace (25 languages)
-│   ├── cli.ts          # @ast-grep/cli fallback
-│   └── napi.ts         # @ast-grep/napi native binding (preferred)
-├── background-task/    # Async agent task management
-├── call-omo-agent/     # Spawn explore/librarian agents
-├── glob/               # File pattern matching (timeout-safe)
-├── grep/               # Content search (timeout-safe)
-├── interactive-bash/   # Tmux session management
-├── look-at/            # Multimodal analysis (PDF, images)
-├── lsp/                # IDE-like code intelligence
-│   ├── client.ts       # LSP connection lifecycle (632 lines)
-│   ├── tools.ts        # Tool implementations
-│   └── config.ts, types.ts, utils.ts
-├── session-manager/    # OpenCode session history management
-├── sisyphus-task/      # Category-based delegation (667 lines)
-├── skill/              # Skill loading/execution
-├── skill-mcp/          # Skill-embedded MCP invocation
-├── slashcommand/       # Slash command execution
-└── index.ts            # builtinTools export (75 lines)
+├── [tool-name]/
+│   ├── index.ts      # Tool factory entry
+│   ├── tools.ts      # Business logic & implementation
+│   ├── types.ts      # Zod schemas & TS types
+│   └── constants.ts  # Tool-specific fixed values
+├── lsp/              # 11 tools via JSON-RPC client (596 lines client.ts)
+├── ast-grep/         # Structural search (NAPI bindings)
+├── delegate-task/    # Category-based agent routing (770 lines tools.ts)
+├── session-manager/  # OpenCode session history (9 files)
+└── interactive-bash/ # Tmux session management (5 files)
 ```
 
 ## TOOL CATEGORIES
-| Category | Tools | Purpose |
-|----------|-------|---------|
-| LSP | lsp_diagnostics, lsp_prepare_rename, lsp_rename | IDE-grade code intelligence (3 tools) |
-| AST | ast_grep_search, ast_grep_replace | Structural pattern matching/rewriting |
-| Search | grep, glob | Timeout-safe file and content search |
-| Session | session_list, session_read, session_search, session_info | History navigation and retrieval |
-| Background | delegate_task, background_output, background_cancel | Parallel agent orchestration |
-| UI/Terminal | look_at, interactive_bash | Visual analysis and tmux control |
-| Execution | slashcommand, skill, skill_mcp | Command and skill-based extensibility |
+| Category | Purpose | Key Implementations |
+|----------|---------|---------------------|
+| **LSP** | Semantic code intelligence | `lsp_goto_definition`, `lsp_find_references`, `lsp_rename` |
+| **Search** | Fast discovery & matching | `glob`, `grep`, `ast_grep_search`, `ast_grep_replace` |
+| **System** | CLI & Environment | `bash`, `interactive_bash` (tmux), `look_at` (vision) |
+| **Session** | History & Context | `session_read`, `session_search`, `session_select` |
+| **Agent** | Task Orchestration | `delegate_task`, `call_omo_agent` |
 
-## HOW TO ADD A TOOL
-1. Create directory `src/tools/my-tool/`.
-2. Implement `tools.ts` (factory), `types.ts`, and `constants.ts`.
-3. Export via `index.ts` and register in `src/tools/index.ts`.
+## HOW TO ADD
+1. **Directory**: Create `src/tools/[name]/` with standard files.
+2. **Factory**: Use `tool()` from `@opencode-ai/plugin/tool`.
+3. **Parameters**: Define strict Zod schemas in `types.ts`.
+4. **Registration**: Export from `src/tools/index.ts` and add to `builtinTools`.
 
 ## LSP SPECIFICS
-- **Lifecycle**: Lazy initialization on first call; auto-shutdown on idle.
-- **Config**: Merges `opencode.json` and `oh-my-opencode.json`.
-- **Capability**: Supports full LSP spec including `rename` and `prepareRename`.
+- **Client**: `lsp/client.ts` manages stdio lifecycle and JSON-RPC.
+- **Capabilities**: Supports definition, references, symbols, diagnostics, and workspace-wide rename.
+- **Protocol**: Maps standard LSP methods to tool-compatible responses.
 
 ## AST-GREP SPECIFICS
-- **Precision**: Uses tree-sitter for structural matching (avoids regex pitfalls).
-- **Binding**: Uses `@ast-grep/napi` for performance; ensure patterns are valid AST nodes.
-- **Variables**: Supports `$VAR` and `$$$` meta-variables for capture.
+- **Engine**: Uses `@ast-grep/napi` for 25+ language support.
+- **Patterns**: Supports meta-variables (`$VAR`) and multi-node matching (`$$$`).
+- **Performance**: Structural matching executed in Rust/C++ layer.
 
 ## ANTI-PATTERNS
-- **Sync Ops**: Never use synchronous file I/O; blocking the main thread kills responsiveness.
-- **No Timeouts**: Always wrap external CLI/LSP calls in timeouts (default 60s).
-- **Direct Subprocess**: Avoid raw `spawn` for ast-grep; use NAPI binding.
-- **Manual Pathing**: Use `shared/utils` for path normalization across platforms.
+- **Sequential Calls**: Don't call `bash` in loops; use `&&` or delegation.
+- **Raw File Ops**: Never use `mkdir/touch` inside tool logic.
+- **Heavy Sync**: Keep `PreToolUse` light; heavy computation belongs in `tools.ts`.
+- **Sleep**: Never use `sleep N`; use polling loops or tool-specific wait flags.
