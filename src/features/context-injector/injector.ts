@@ -146,7 +146,7 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      // empty-message-sanitizer 패턴 그대로 따름 (minimal fields)
+      // synthetic part 패턴 (minimal fields)
       const syntheticPart = {
         id: `synthetic_hook_${Date.now()}`,
         messageID: lastUserMessage.info.id,
