@@ -5,5 +5,5 @@ export interface DelegateTaskArgs {
   subagent_type?: string
   run_in_background: boolean
   resume?: string
-  skills: string[] | null
+  skills: string[]
 }
