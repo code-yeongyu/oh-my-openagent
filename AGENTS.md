@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-15T14:53:00+09:00
-**Commit:** 89fa9ff1
+**Generated:** 2026-01-17T19:00:25+09:00
+**Commit:** 987ae468
 **Branch:** dev
 
 ## OVERVIEW
@@ -21,7 +21,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # MCP configs: context7, grep_app, websearch
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (580 lines)
+│   └── index.ts       # Main plugin entry (568 lines)
 ├── script/            # build-schema.ts, publish.ts, generate-changelog.ts
 ├── assets/            # JSON schema
 └── dist/              # Build output (ESM + .d.ts)
@@ -48,7 +48,7 @@ oh-my-opencode/
 | Shared utilities | `src/shared/` | Cross-cutting utilities |
 | Slash commands | `src/hooks/auto-slash-command/` | Auto-detect and execute `/command` patterns |
 | Ralph Loop | `src/hooks/ralph-loop/` | Self-referential dev loop until completion |
-| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (684 lines) |
+| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (771 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -160,18 +160,17 @@ bun test               # Run tests (80+ test files, 2500+ BDD assertions)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/agents/orchestrator-sisyphus.ts` | 1485 | Orchestrator agent, 7-section delegation, accumulated wisdom |
-| `src/features/builtin-skills/skills.ts` | 1230 | Skill definitions (frontend-ui-ux, playwright) |
-| `src/agents/prometheus-prompt.ts` | 991 | Planning agent, interview mode, multi-agent validation |
-| `src/features/background-agent/manager.ts` | 928 | Task lifecycle, concurrency |
+| `src/agents/orchestrator-sisyphus.ts` | 1531 | Orchestrator agent, 7-section delegation, accumulated wisdom |
+| `src/features/builtin-skills/skills.ts` | 1203 | Skill definitions (frontend-ui-ux, playwright) |
+| `src/agents/prometheus-prompt.ts` | 1196 | Planning agent, interview mode, multi-agent validation |
+| `src/features/background-agent/manager.ts` | 1165 | Task lifecycle, concurrency |
+| `src/hooks/sisyphus-orchestrator/index.ts` | 771 | Orchestrator hook impl |
+| `src/tools/delegate-task/tools.ts` | 770 | Category-based task delegation |
 | `src/cli/config-manager.ts` | 730 | JSONC parsing, multi-level config, env detection |
-| `src/hooks/sisyphus-orchestrator/index.ts` | 684 | Orchestrator hook impl |
-| `src/tools/sisyphus-task/tools.ts` | 667 | Category-based task delegation |
-| `src/agents/sisyphus.ts` | 643 | Main Sisyphus prompt |
-| `src/tools/lsp/client.ts` | 632 | LSP protocol, JSON-RPC |
+| `src/agents/sisyphus.ts` | 640 | Main Sisyphus prompt |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactoring command template |
-| `src/index.ts` | 580 | Main plugin, all hook/tool init |
-| `src/hooks/anthropic-context-window-limit-recovery/executor.ts` | 554 | Multi-stage recovery |
+| `src/tools/lsp/client.ts` | 596 | LSP protocol, JSON-RPC |
+| `src/index.ts` | 568 | Main plugin, all hook/tool init |
 
 ## MCP ARCHITECTURE
 
