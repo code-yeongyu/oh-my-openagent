@@ -657,7 +657,7 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
-    test("should not inject when boulder plan is complete", async () => {
+    test("should inject Archiver dispatch prompt when boulder plan is complete", async () => {
       // #given - boulder state with complete plan
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -681,8 +681,12 @@ describe("atlas hook", () => {
         },
       })
 
-      // #then - should not call prompt
-      expect(mockInput._promptMock).not.toHaveBeenCalled()
+      // #then - should call prompt with Archiver dispatch (Phase 3 trigger)
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
+      expect(callArgs.body.agent).toBe("orchestrator-sisyphus")
+      expect(callArgs.body.parts[0].text).toContain("Phase 3")
     })
 
     test("should skip when abort error occurred before idle", async () => {
