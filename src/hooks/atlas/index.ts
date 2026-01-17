@@ -122,11 +122,27 @@ Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
 **STEP 1: VERIFY WITH YOUR OWN TOOL CALLS (DO THIS NOW)**
 
-Run these commands YOURSELF - do NOT trust agent's claims:
-1. \`lsp_diagnostics\` on changed files → Must be CLEAN
-2. \`bash\` to run tests → Must PASS
-3. \`bash\` to run build/typecheck → Must succeed
-4. \`Read\` the actual code → Must match requirements
+**⚠️ LSP_DIAGNOSTICS IS MANDATORY ⚠️**
+
+Before marking ANY task complete, you MUST run:
+\`\`\`
+lsp_diagnostics(filePath="path/to/changed/file.ts")
+\`\`\`
+
+| File Type | Required Check |
+|-----------|----------------|
+| \`.ts\`, \`.tsx\` | \`lsp_diagnostics\` - Must show 0 errors |
+| \`.js\`, \`.jsx\` | \`lsp_diagnostics\` - Must show 0 errors |
+| \`.py\` | \`lsp_diagnostics\` - Must show 0 errors |
+| \`.go\` | \`lsp_diagnostics\` - Must show 0 errors |
+
+**IF LSP_DIAGNOSTICS SHOWS ERRORS:**
+1. DO NOT mark task complete
+2. Use \`sisyphus_task(resume=session_id, prompt="fix: [error details]")\`
+3. Re-run \`lsp_diagnostics\` after fix
+4. Only mark complete when diagnostics are CLEAN
+
+**HANDS-ON QA REQUIRED (after ALL tasks complete):**
 
 **STEP 2: DETERMINE IF HANDS-ON QA IS NEEDED**
 

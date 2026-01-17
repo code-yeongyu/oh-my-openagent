@@ -44,9 +44,29 @@ Load plan, review critically, dispatch Implementer agent per task, with automati
 3. If concerns: Raise them with your human partner before starting
 4. If no concerns: Create TodoWrite and proceed
 
-### Step 2: Execute Tasks via Implementer Agent
+### Step 2: Execute Tasks via Appropriate Agent
 
-For each task, dispatch to Implementer agent:
+**Executor Selection Logic (MANDATORY):**
+
+Before dispatching each task, classify the task type and select the appropriate agent:
+
+| Task Type | File Extensions / Keywords | Agent | Skills |
+|-----------|---------------------------|-------|--------|
+| **Documentation** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
+| **Visual/UI** | `.tsx`, `.jsx`, `.vue`, `.css` with styling keywords | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
+| **Code** | `.ts`, `.js`, `.py`, etc. (logic, API, backend) | `implementer` | ["test-driven-development", "codex-mcp-collaboration"] |
+
+**Classification Decision Tree:**
+
+```
+Is task about documentation files (.md, .rst, docs/)?
+  YES → document-writer
+  NO  → Is task about visual/styling changes?
+          YES → frontend-ui-ux-engineer
+          NO  → implementer (default)
+```
+
+For each task, dispatch to the appropriate agent:
 
 ```typescript
 sisyphus_task({

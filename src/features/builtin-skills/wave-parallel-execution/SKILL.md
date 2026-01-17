@@ -93,7 +93,49 @@ For each Wave:
    }
    ```
 
-### Step 3: 并行调度 Waves (使用 Implementer Agent)
+### Step 3: 并行调度 Waves (使用适当的 Agent)
+
+**Executor Selection Logic (MANDATORY):**
+
+在调度每个 Wave 之前，根据任务类型选择适当的 agent：
+
+| 任务类型 | 文件扩展名 / 关键词 | Agent | Skills |
+|----------|---------------------|-------|--------|
+| **文档** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
+| **视觉/UI** | `.tsx`, `.jsx`, `.vue`, `.css` + 样式关键词 | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
+| **代码** | `.ts`, `.js`, `.py` 等 (逻辑, API, 后端) | `implementer` | ["test-driven-development", "codex-mcp-collaboration"] |
+
+**分类决策树:**
+
+```
+任务是关于文档文件 (.md, .rst, docs/) 吗?
+  是 → document-writer
+  否 → 任务是关于视觉/样式变更吗?
+         是 → frontend-ui-ux-engineer
+         否 → implementer (默认)
+```
+
+**Wave 内混合任务类型:**
+
+如果一个 Wave 包含多种类型的任务，按任务类型分组并分别调度：
+
+```typescript
+// 对 Wave 内的任务按类型分组
+const docTasks = wave.tasks.filter(t => isDocTask(t))
+const visualTasks = wave.tasks.filter(t => isVisualTask(t))
+const codeTasks = wave.tasks.filter(t => !isDocTask(t) && !isVisualTask(t))
+
+// 并行调度不同类型
+if (docTasks.length > 0) {
+  sisyphus_task({ subagent_type: "document-writer", ... })
+}
+if (visualTasks.length > 0) {
+  sisyphus_task({ subagent_type: "frontend-ui-ux-engineer", ... })
+}
+if (codeTasks.length > 0) {
+  sisyphus_task({ subagent_type: "implementer", ... })
+}
+```
 
 #### Wave Prompt 最佳实践
 
