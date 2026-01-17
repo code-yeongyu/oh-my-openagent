@@ -65,7 +65,53 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
-const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
+const ARCHIVER_DISPATCH_PROMPT = `
+---
+
+## 🎉 PHASE 3 READY - ALL TASKS COMPLETE
+
+All planned tasks have been completed. It's time to execute Phase 3 completion.
+
+**DISPATCH ARCHIVER NOW:**
+
+\`\`\`
+sisyphus_task(
+  agent="archiver",
+  prompt="""
+  Execute Phase 3 completion:
+  
+  1. TASK: Execute git strategy and archive changes
+  2. GIT_STRATEGY: [ask user: merge|pr|keep|discard]
+  3. PROJECT_ROOT: ${process.cwd()}
+  4. CHANGE_NAME: [current feature name]
+  5. BUILD_COMMAND: bun run build
+  
+  REQUIRED SKILLS:
+  - finishing-a-development-branch
+  - archiving-changes
+  
+  MUST DO:
+  - Run lsp_diagnostics on all changed files
+  - Run build command and verify exit code 0
+  - Archive to changes/archive/YYYY-MM-DD-{name}/
+  - Generate metadata.json with commit SHAs and file list
+  
+  MUST NOT DO:
+  - Skip diagnostics or build verification
+  - Archive without completing git strategy
+  """
+)
+\`\`\`
+
+**BEFORE DISPATCHING:**
+1. Ask user which git strategy to use (merge/pr/keep/discard)
+2. Confirm all verification passed
+3. Then dispatch Archiver
+
+---
+`
+
+const VERIFICATION_REMINDER = `**MANDATORY VERIFICATION - SUBAGENTS LIE**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -556,7 +602,22 @@ export function createAtlasHook(
 
         const progress = getPlanProgress(boulderState.active_plan)
         if (progress.isComplete) {
-          log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+          log(`[${HOOK_NAME}] Boulder complete - triggering Phase 3`, { sessionID, plan: boulderState.plan_name })
+          
+          // Inject Archiver dispatch prompt when all tasks are complete
+          try {
+            await ctx.client.session.prompt({
+              path: { id: sessionID },
+              body: {
+                agent: "orchestrator-sisyphus",
+                parts: [{ type: "text", text: ARCHIVER_DISPATCH_PROMPT.replace("${process.cwd()}", ctx.directory) }],
+              },
+              query: { directory: ctx.directory },
+            })
+            log(`[${HOOK_NAME}] Archiver dispatch prompt injected`, { sessionID })
+          } catch (err) {
+            log(`[${HOOK_NAME}] Archiver dispatch prompt failed`, { sessionID, error: String(err) })
+          }
           return
         }
 
