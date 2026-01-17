@@ -119,11 +119,36 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
 
       // Check for Momus rejection in output
       const resultStr = typeof output.result === "string" ? output.result : JSON.stringify(output.result)
-      if (phase === "momus" && /reject|revision\s+required|not\s+approved/i.test(resultStr)) {
+      if (phase === "momus" && /reject|revision\s+required|not\s+approved|needs\s+revision|incomplete|insufficient/i.test(resultStr)) {
         state.momusRejected = true
         messages.push({
           type: "text",
-          text: "⚠️ Momus REJECTED the plan. Return to Prometheus with the feedback to revise the plan.",
+          text: `⚠️ **Momus REJECTED the plan.**
+
+**REQUIRED ACTION**: Return to Prometheus with the rejection feedback.
+
+\`\`\`typescript
+sisyphus_task(
+  subagent_type="prometheus",
+  prompt="""
+  REVISION REQUIRED: Momus rejected the previous plan.
+  
+  FEEDBACK FROM MOMUS:
+  [Insert Momus rejection feedback here]
+  
+  INSTRUCTIONS:
+  1. Address each concern raised by Momus
+  2. Revise the plan accordingly
+  3. Ensure all acceptance criteria are clearer
+  4. Re-submit for Momus review after revision
+  """
+)
+\`\`\`
+
+**DO NOT**: 
+- Skip the revision and proceed to implementation
+- Ignore Momus feedback
+- Submit the same plan without changes`,
         })
       }
 
