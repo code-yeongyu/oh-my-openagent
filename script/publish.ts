@@ -232,10 +232,17 @@ async function publishAllPackages(version: string): Promise<void> {
 }
 
 async function buildPackages(): Promise<void> {
+  const skipPlatform = process.env.SKIP_PLATFORM_PACKAGES === "true"
+  
   console.log("\nBuilding packages...")
   await $`bun run clean && bun run build`
-  console.log("Building platform binaries...")
-  await $`bun run build:binaries`
+  
+  if (skipPlatform) {
+    console.log("⏭️  Skipping platform binaries (SKIP_PLATFORM_PACKAGES=true)")
+  } else {
+    console.log("Building platform binaries...")
+    await $`bun run build:binaries`
+  }
 }
 
 async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<void> {
