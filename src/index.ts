@@ -528,8 +528,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
          } else if (command === "cancel-ralph" && sessionID) {
            ralphLoop.cancelLoop(sessionID);
          } else if (command === "ulw-loop" && sessionID) {
-           const promptText = args?.command?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
-           ralphLoop.startLoop(sessionID, promptText, { ultrawork: true })
+           const rawArgs =
+             args?.command?.replace(/^\/?(ulw-loop)\s*/i, "") || "";
+           const taskMatch = rawArgs.match(/^["'](.+?)["']/);
+           const prompt =
+             taskMatch?.[1] ||
+             rawArgs.split(/\s+--/)[0]?.trim() ||
+             "Complete the task as instructed";
+
+           const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i);
+           const promiseMatch = rawArgs.match(
+             /--completion-promise=["']?([^"'\s]+)["']?/i
+           );
+
+           ralphLoop.startLoop(sessionID, prompt, {
+             ultrawork: true,
+             maxIterations: maxIterMatch
+               ? parseInt(maxIterMatch[1], 10)
+               : undefined,
+             completionPromise: promiseMatch?.[1],
+           });
          }
       }
     },
