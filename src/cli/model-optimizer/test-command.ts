@@ -1,11 +1,10 @@
 import color from "picocolors"
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
-import { homedir } from "node:os"
-import { join } from "node:path"
+import { dirname } from "node:path"
 import { detectAvailableModels } from "./model-detector"
 import { MODEL_RANKINGS, AGENT_RANKING_MAP, CATEGORY_RANKING_MAP, generateOptimalConfig } from "./rankings"
 import type { RankingCategory } from "./rankings"
-import { parseJsonc } from "../../shared"
+import { parseJsonc, getOpenCodeConfigPaths } from "../../shared"
 
 export interface TestModelsOptions {
 	verbose?: boolean
@@ -128,8 +127,10 @@ interface ApplyResult {
 }
 
 function applyConfig(config: { agents: Record<string, { model: string; variant?: string }>; categories: Record<string, { model: string; variant: string; temperature: number }> }): ApplyResult {
-	const configDir = join(homedir(), ".config", "opencode")
-	const configPath = join(configDir, "oh-my-opencode.json")
+	// Use shared config path resolution (respects OPENCODE_CONFIG_DIR, XDG, APPDATA)
+	const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+	const configPath = paths.omoConfig
+	const configDir = dirname(configPath)
 
 	try {
 		if (!existsSync(configDir)) {
