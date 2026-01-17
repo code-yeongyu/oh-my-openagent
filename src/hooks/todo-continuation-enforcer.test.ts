@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../features/background-agent"
-import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
 
 describe("todo-continuation-enforcer", () => {
@@ -60,16 +60,14 @@ describe("todo-continuation-enforcer", () => {
   }
 
   beforeEach(() => {
+    _resetForTesting()
     promptCalls = []
     toastCalls = []
     mockMessages = []
-    setMainSession(undefined)
-    subagentSessions.clear()
   })
 
   afterEach(() => {
-    setMainSession(undefined)
-    subagentSessions.clear()
+    _resetForTesting()
   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
