@@ -1,50 +1,74 @@
 # TOOLS KNOWLEDGE BASE
 
 ## OVERVIEW
-Core toolset implementing LSP, structural search, and system orchestration. Extends OpenCode with high-performance C++ bindings and multi-agent delegation.
+
+20+ tools: LSP (11), AST-Grep (2), Search (2), Session (4), Agent delegation (3), System (2). High-performance C++ bindings via @ast-grep/napi.
 
 ## STRUCTURE
+
 ```
 tools/
 ├── [tool-name]/
-│   ├── index.ts      # Tool factory entry
-│   ├── tools.ts      # Business logic & implementation
-│   ├── types.ts      # Zod schemas & TS types
-│   └── constants.ts  # Tool-specific fixed values
-├── lsp/              # 11 tools via JSON-RPC client (596 lines client.ts)
-├── ast-grep/         # Structural search (NAPI bindings)
-├── delegate-task/    # Category-based agent routing (770 lines tools.ts)
-├── session-manager/  # OpenCode session history (9 files)
-└── interactive-bash/ # Tmux session management (5 files)
+│   ├── index.ts      # Barrel export
+│   ├── tools.ts      # Business logic, ToolDefinition
+│   ├── types.ts      # Zod schemas
+│   └── constants.ts  # Fixed values, descriptions
+├── lsp/              # 11 tools: goto_definition, references, symbols, diagnostics, rename
+├── ast-grep/         # 2 tools: search, replace (25 languages via NAPI)
+├── delegate-task/    # Category-based agent routing (761 lines)
+├── session-manager/  # 4 tools: list, read, search, info
+├── grep/             # Custom grep with timeout/truncation
+├── glob/             # Custom glob with 60s timeout, 100 file limit
+├── interactive-bash/ # Tmux session management
+├── look-at/          # Multimodal PDF/image analysis
+├── skill/            # Skill execution
+├── skill-mcp/        # Skill MCP operations
+├── slashcommand/     # Slash command dispatch
+├── call-omo-agent/   # Direct agent invocation
+└── background-task/  # background_output, background_cancel
 ```
 
 ## TOOL CATEGORIES
-| Category | Purpose | Key Implementations |
-|----------|---------|---------------------|
-| **LSP** | Semantic code intelligence | `lsp_goto_definition`, `lsp_find_references`, `lsp_rename` |
-| **Search** | Fast discovery & matching | `glob`, `grep`, `ast_grep_search`, `ast_grep_replace` |
-| **System** | CLI & Environment | `bash`, `interactive_bash` (tmux), `look_at` (vision) |
-| **Session** | History & Context | `session_read`, `session_search`, `session_select` |
-| **Agent** | Task Orchestration | `delegate_task`, `call_omo_agent` |
+
+| Category | Tools | Purpose |
+|----------|-------|---------|
+| **LSP** | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_prepare_rename, lsp_rename | Semantic code intelligence |
+| **Search** | ast_grep_search, ast_grep_replace, grep, glob | Pattern discovery |
+| **Session** | session_list, session_read, session_search, session_info | History navigation |
+| **Agent** | delegate_task, call_omo_agent, background_output, background_cancel | Task orchestration |
+| **System** | interactive_bash, look_at | CLI, multimodal |
+| **Skill** | skill, skill_mcp, slashcommand | Skill execution |
 
 ## HOW TO ADD
-1. **Directory**: Create `src/tools/[name]/` with standard files.
-2. **Factory**: Use `tool()` from `@opencode-ai/plugin/tool`.
-3. **Parameters**: Define strict Zod schemas in `types.ts`.
-4. **Registration**: Export from `src/tools/index.ts` and add to `builtinTools`.
+
+1. Create `src/tools/[name]/` with standard files
+2. Use `tool()` from `@opencode-ai/plugin/tool`:
+   ```typescript
+   export const myTool: ToolDefinition = tool({
+     description: "...",
+     args: { param: tool.schema.string() },
+     execute: async (args) => { /* ... */ }
+   })
+   ```
+3. Export from `src/tools/index.ts`
+4. Add to `builtinTools` object
 
 ## LSP SPECIFICS
-- **Client**: `lsp/client.ts` manages stdio lifecycle and JSON-RPC.
-- **Capabilities**: Supports definition, references, symbols, diagnostics, and workspace-wide rename.
-- **Protocol**: Maps standard LSP methods to tool-compatible responses.
+
+- **Client**: `client.ts` manages stdio lifecycle, JSON-RPC
+- **Singleton**: `LSPServerManager` with ref counting
+- **Protocol**: Standard LSP methods mapped to tool responses
+- **Capabilities**: definition, references, symbols, diagnostics, rename
 
 ## AST-GREP SPECIFICS
-- **Engine**: Uses `@ast-grep/napi` for 25+ language support.
-- **Patterns**: Supports meta-variables (`$VAR`) and multi-node matching (`$$$`).
-- **Performance**: Structural matching executed in Rust/C++ layer.
+
+- **Engine**: `@ast-grep/napi` for 25+ languages
+- **Patterns**: Meta-variables `$VAR` (single), `$$$` (multiple)
+- **Performance**: Rust/C++ layer for structural matching
 
 ## ANTI-PATTERNS
-- **Sequential Calls**: Don't call `bash` in loops; use `&&` or delegation.
-- **Raw File Ops**: Never use `mkdir/touch` inside tool logic.
-- **Heavy Sync**: Keep `PreToolUse` light; heavy computation belongs in `tools.ts`.
-- **Sleep**: Never use `sleep N`; use polling loops or tool-specific wait flags.
+
+- **Sequential bash**: Use `&&` or delegation, not loops
+- **Raw file ops**: Never mkdir/touch in tool logic
+- **Sleep**: Use polling loops, tool-specific wait flags
+- **Heavy sync**: Keep PreToolUse light, computation in tools.ts
