@@ -502,4 +502,110 @@ describe("SkillMcpManager", () => {
       )
     })
   })
+
+  describe("operation retry logic", () => {
+    it("should retry operation when 'Not connected' error occurs", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "retry-server",
+        skillName: "retry-skill",
+        sessionID: "session-retry-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://example.com/mcp",
+        },
+        skillName: "retry-skill",
+      }
+
+      // Mock client that fails first time with "Not connected", then succeeds
+      let callCount = 0
+      const mockClient = {
+        callTool: mock(async () => {
+          callCount++
+          if (callCount === 1) {
+            throw new Error("Not connected")
+          }
+          return { content: [{ type: "text", text: "success" }] }
+        }),
+        close: mock(() => Promise.resolve()),
+      }
+
+      // Spy on getOrCreateClientWithRetry to inject mock client
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // #when
+      const result = await manager.callTool(info, context, "test-tool", {})
+
+      // #then
+      expect(callCount).toBe(2) // First call fails, second succeeds
+      expect(result).toEqual([{ type: "text", text: "success" }])
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(2) // Called twice due to retry
+    })
+
+    it("should fail after 3 retry attempts", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "fail-server",
+        skillName: "fail-skill",
+        sessionID: "session-fail-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://example.com/mcp",
+        },
+        skillName: "fail-skill",
+      }
+
+      // Mock client that always fails with "Not connected"
+      const mockClient = {
+        callTool: mock(async () => {
+          throw new Error("Not connected")
+        }),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // #when / #then
+      await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
+        /Failed after 3 reconnection attempts/
+      )
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(3) // Initial + 2 retries
+    })
+
+    it("should not retry on non-connection errors", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "error-server",
+        skillName: "error-skill",
+        sessionID: "session-error-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://example.com/mcp",
+        },
+        skillName: "error-skill",
+      }
+
+      // Mock client that fails with non-connection error
+      const mockClient = {
+        callTool: mock(async () => {
+          throw new Error("Tool not found")
+        }),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // #when / #then
+      await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
+        "Tool not found"
+      )
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(1) // No retry
+    })
+  })
 })

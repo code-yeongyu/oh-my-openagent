@@ -415,9 +415,10 @@ export class SkillMcpManager {
     name: string,
     args: Record<string, unknown>
   ): Promise<unknown> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config)
-    const result = await client.callTool({ name, arguments: args })
-    return result.content
+    return this.withOperationRetry(info, context.config, async (client) => {
+      const result = await client.callTool({ name, arguments: args })
+      return result.content
+    })
   }
 
   async readResource(
@@ -425,9 +426,10 @@ export class SkillMcpManager {
     context: SkillMcpServerContext,
     uri: string
   ): Promise<unknown> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config)
-    const result = await client.readResource({ uri })
-    return result.contents
+    return this.withOperationRetry(info, context.config, async (client) => {
+      const result = await client.readResource({ uri })
+      return result.contents
+    })
   }
 
   async getPrompt(
@@ -436,9 +438,53 @@ export class SkillMcpManager {
     name: string,
     args: Record<string, string>
   ): Promise<unknown> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config)
-    const result = await client.getPrompt({ name, arguments: args })
-    return result.messages
+    return this.withOperationRetry(info, context.config, async (client) => {
+      const result = await client.getPrompt({ name, arguments: args })
+      return result.messages
+    })
+  }
+
+  private async withOperationRetry<T>(
+    info: SkillMcpClientInfo,
+    config: ClaudeCodeMcpServer,
+    operation: (client: Client) => Promise<T>
+  ): Promise<T> {
+    const maxRetries = 3
+    let lastError: Error | null = null
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const client = await this.getOrCreateClientWithRetry(info, config)
+        return await operation(client)
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        const errorMessage = lastError.message.toLowerCase()
+
+        if (!errorMessage.includes("not connected")) {
+          throw lastError
+        }
+
+        if (attempt === maxRetries) {
+          throw new Error(
+            `Failed after ${maxRetries} reconnection attempts: ${lastError.message}`
+          )
+        }
+
+        const key = this.getClientKey(info)
+        const existing = this.clients.get(key)
+        if (existing) {
+          this.clients.delete(key)
+          try {
+            await existing.client.close()
+          } catch { /* process may already be terminated */ }
+          try {
+            await existing.transport.close()
+          } catch { /* transport may already be terminated */ }
+        }
+      }
+    }
+
+    throw lastError || new Error("Operation failed with unknown error")
   }
 
   private async getOrCreateClientWithRetry(
