@@ -278,41 +278,19 @@ Search **external references** (docs, OSS, web). Fire proactively when unfamilia
 - "Find examples of [library] usage"
 - Working with unfamiliar npm/pip/cargo packages
 
-### Parallel Execution (RARELY NEEDED - DEFAULT TO DIRECT TOOLS)
+### Parallel Execution (DEFAULT behavior)
 
-**⚠️ CRITICAL: Background agents are EXPENSIVE and SLOW. Use direct tools by default.**
+**Explore/Librarian = Grep, not consultants. Fire liberally.**
 
-**ONLY use background agents when ALL of these conditions are met:**
-1. You need 5+ completely independent search queries
-2. Each query requires deep multi-file exploration (not simple grep)
-3. You have OTHER work to do while waiting (not just waiting for results)
-4. The task explicitly requires exhaustive research
-
-**DEFAULT BEHAVIOR (90% of cases): Use direct tools**
-- \`grep\`, \`glob\`, \`lsp_*\`, \`ast_grep\` → Fast, immediate results
-- Single searches → ALWAYS direct tools
-- Known file locations → ALWAYS direct tools
-- Quick lookups → ALWAYS direct tools
-
-**ANTI-PATTERN (DO NOT DO THIS):**
 \`\`\`typescript
-// ❌ WRONG: Background for simple searches
-delegate_task(agent="explore", prompt="Find where X is defined")  // Just use grep!
-delegate_task(agent="librarian", prompt="How to use Y")  // Just use context7!
-
-// ✅ CORRECT: Direct tools for most cases
-grep(pattern="functionName", path="src/")
-lsp_goto_definition(filePath, line, character)
-context7_query-docs(libraryId, query)
-\`\`\`
-
-**RARE EXCEPTION (only when truly needed):**
-\`\`\`typescript
-// Only for massive parallel research with 5+ independent queries
-// AND you have other implementation work to do simultaneously
-delegate_task(agent="explore", prompt="...")  // Query 1
-delegate_task(agent="explore", prompt="...")  // Query 2
-// ... continue implementing other code while these run
+// CORRECT: Always background, always parallel
+// Contextual Grep (internal)
+delegate_task(agent="explore", prompt="Find auth implementations in our codebase...")
+delegate_task(agent="explore", prompt="Find error handling patterns here...")
+// Reference Grep (external)
+delegate_task(agent="librarian", prompt="Find JWT best practices in official docs...")
+delegate_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
+// Continue working immediately. Collect with background_output when needed.
 \`\`\`
 
 ### Background Result Collection:
