@@ -14,6 +14,7 @@ import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
+import { createPrometheusAgent, PROMETHEUS_PROMPT_METADATA } from "./prometheus-prompt"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive, readConnectedProvidersCache } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
@@ -37,6 +38,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
+  prometheus: createPrometheusAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as unknown as AgentFactory,
@@ -56,6 +58,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
 
   "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
+  prometheus: PROMETHEUS_PROMPT_METADATA,
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {
