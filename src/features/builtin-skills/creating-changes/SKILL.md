@@ -30,7 +30,7 @@ Before using this skill, ensure:
 
 1. Change directory exists: `changes/<name>/`
 2. `proposal.md` is complete (created by brainstorming skill)
-3. `.fusion/status.json` has `currentChange` set
+3. `.superpowers/status.json` has `currentChange` set
 
 ## The Process
 
@@ -95,7 +95,7 @@ See `reference.md` for the complete task template format.
 
 ### Step 4: Update Status
 
-Update `.fusion/status.json`:
+Update `.superpowers/status.json`:
 
 ```json
 {

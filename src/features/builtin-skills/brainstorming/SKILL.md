@@ -52,7 +52,7 @@ After the design is validated:
 1. **Determine Change Name**: kebab-case, verb prefix (`add-`, `fix-`, `update-`)
 2. **Create Directory**: `changes/<name>/`
 3. **Write proposal.md**: See `reference.md` for template
-4. **Update Status**: `.fusion/status.json`
+4. **Update Status**: `.superpowers/status.json`
 
 ## Key Principles
 

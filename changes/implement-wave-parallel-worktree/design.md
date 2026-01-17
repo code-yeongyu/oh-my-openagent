@@ -289,7 +289,7 @@ src/features/builtin-skills/
    - Baseline测试
 
 3. **恢复状态 (如有)**
-   - 读取 .fusion/status.json
+   - 读取 .superpowers/status.json
 ```
 
 ### 6.2 Step 2d 修改
@@ -299,7 +299,7 @@ src/features/builtin-skills/
 ### Step 2d: Commit and Track
 
 1. Commit with descriptive message including task ID
-2. Record SHA in .fusion/status.json
+2. Record SHA in .superpowers/status.json
 3. Mark as completed
 ```
 
@@ -312,7 +312,7 @@ src/features/builtin-skills/
    git commit -m "checkpoint: Task {taskId}: {description}"
    ```
 
-2. Record SHA in .fusion/status.json
+2. Record SHA in .superpowers/status.json
 
 3. Mark as completed
 

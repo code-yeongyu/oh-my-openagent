@@ -33,7 +33,7 @@ Load plan, review critically, dispatch Implementer agent per task, with automati
    - 如已在 worktree 中工作，跳过此步骤
 
 3. **恢复状态 (如有)**
-   - 读取 `.fusion/status.json`
+   - 读取 `.superpowers/status.json`
    - 如存在未完成任务，从上次中断位置恢复
    - 显示: "检测到未完成任务 {taskId}，将从此处继续"
 
@@ -135,7 +135,7 @@ Work from: ${worktreePath}
 After each COMPLETED response:
 
 1. Verify commit was made by Implementer
-2. Record SHA in `.fusion/status.json`:
+2. Record SHA in `.superpowers/status.json`:
    ```json
    {
      "tasks": {

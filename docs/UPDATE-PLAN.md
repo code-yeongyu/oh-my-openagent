@@ -338,7 +338,7 @@ This is not negotiable. This is not optional.
 │  ├── 确定名称: kebab-case, 动词前缀 (add-, fix-, update-)                 │
 │  ├── 创建: changes/<name>/                                              │
 │  ├── 写入: proposal.md                                                  │
-│  └── 更新: .fusion/status.json                                          │
+│  └── 更新: .superpowers/status.json                                          │
 │                                                                         │
 │  产出: changes/<name>/proposal.md                                       │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -351,7 +351,7 @@ This is not negotiable. This is not optional.
 │  Step 1: 审阅 proposal.md                                               │
 │  Step 2: 编写 design.md (技术设计)                                       │
 │  Step 3: 编写 tasks.md (任务分解)                                        │
-│  Step 4: 更新 .fusion/status.json → phase: "ready"                      │
+│  Step 4: 更新 .superpowers/status.json → phase: "ready"                      │
 │                                                                         │
 │  产出:                                                                   │
 │  ├── changes/<name>/design.md                                           │

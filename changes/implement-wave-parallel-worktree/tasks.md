@@ -60,7 +60,7 @@
      - Baseline测试
 
 3. **恢复状态 (如有)**
-   - 读取 .fusion/status.json
+   - 读取 .superpowers/status.json
 ```
 
 ---
@@ -75,7 +75,7 @@
 
 - [ ] Step 2d 改为自动git commit（不等待人工反馈）
 - [ ] commit message格式: `checkpoint: Task {taskId}: {description}`
-- [ ] 记录SHA到 .fusion/status.json
+- [ ] 记录SHA到 .superpowers/status.json
 - [ ] 任务完成后自动继续下一任务
 - [ ] 保留错误时停止询问的机制
 - [ ] 保留现有Step 2a-2c的Codex协作流程不变
@@ -92,7 +92,7 @@
    git commit -m "checkpoint: Task {taskId}: {description}"
    ```
 
-2. Record SHA in .fusion/status.json
+2. Record SHA in .superpowers/status.json
    ```json
    {
      "tasks": {

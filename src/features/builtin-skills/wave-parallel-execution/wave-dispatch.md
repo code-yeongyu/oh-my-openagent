@@ -165,7 +165,7 @@ try {
 
 ## 状态文件格式
 
-### .fusion/wave-status.json
+### .superpowers/wave-status.json
 
 ```json
 {
