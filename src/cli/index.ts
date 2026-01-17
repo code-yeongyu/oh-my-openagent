@@ -41,7 +41,7 @@ Model Providers:
   ChatGPT     Powers the Oracle agent for debugging and architecture
   Gemini      Powers frontend, documentation, and multimodal agents
 
-Note: Run 'test-models --apply' after install to auto-configure optimal models
+Note: Run 'model-config --apply' after install to auto-configure optimal models
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -141,15 +141,15 @@ Categories:
   })
 
 program
-  .command("test-models")
-  .description("Show optimal model rankings for your available models (no API calls)")
+  .command("model-config")
+  .description("Optimize model configuration based on your available models (no API calls)")
   .option("--verbose", "Show full rankings for each category")
   .option("--apply", "Write optimal config to oh-my-opencode.json")
   .addHelpText("after", `
 Examples:
-  $ bun run src/cli/index.ts test-models
-  $ bun run src/cli/index.ts test-models --verbose
-  $ bun run src/cli/index.ts test-models --apply
+  $ bunx oh-my-opencode model-config
+  $ bunx oh-my-opencode model-config --verbose
+  $ bunx oh-my-opencode model-config --apply
 
 This command:
   1. Detects your available models via 'opencode models'

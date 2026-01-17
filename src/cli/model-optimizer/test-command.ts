@@ -25,7 +25,7 @@ function printSection(title: string): void {
 }
 
 export async function testModels(options: TestModelsOptions): Promise<number> {
-	printHeader("Model Optimizer - Rankings View")
+	printHeader("Model Config Optimizer")
 
 	console.log("Detecting available models...")
 	const allModels = await detectAvailableModels()
