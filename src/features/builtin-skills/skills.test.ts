@@ -75,15 +75,56 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 4 skills regardless of provider", () => {
+	test("includes brainstorming skill", () => {
 		// #given
+		const skills = createBuiltinSkills()
 
 		// #when
-		const defaultSkills = createBuiltinSkills()
-		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
+		const names = skills.map((skill) => skill.name)
 
 		// #then
-		expect(defaultSkills).toHaveLength(4)
-		expect(agentBrowserSkills).toHaveLength(4)
+		expect(names).toContain("brainstorming")
+	})
+
+	test("includes creating-changes skill", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const names = skills.map((skill) => skill.name)
+
+		// #then
+		expect(names).toContain("creating-changes")
+	})
+
+	test("includes execution and completion skills", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const names = skills.map((skill) => skill.name)
+
+		// #then
+		const expected = [
+			"tdd",
+			"test-driven-development",
+			"systematic-debugging",
+			"requesting-code-review",
+			"receiving-code-review",
+			"codex-mcp-collaboration",
+			"verification-before-completion",
+			"using-git-worktrees",
+			"dispatching-parallel-agents",
+			"subagent-driven-development",
+			"finishing-a-development-branch",
+			"archiving-changes",
+			"writing-skills",
+			"wave-parallel-execution",
+			"executing-plans",
+		]
+
+		for (const name of expected) {
+			expect(names).toContain(name)
+		}
 	})
 })
