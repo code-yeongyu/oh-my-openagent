@@ -156,13 +156,45 @@ Approach:
 
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "visual-engineering": { model: "google/gemini-3-pro" },
-  ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
-  artistry: { model: "google/gemini-3-pro", variant: "max" },
-  quick: { model: "anthropic/claude-haiku-4-5" },
-  "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
-  "unspecified-high": { model: "anthropic/claude-opus-4-5", variant: "max" },
-  writing: { model: "google/gemini-3-flash" },
+  "visual-engineering": {
+    model: "google/gemini-3-pro",
+    defaultSkills: ["frontend-ui-ux", "playwright"],
+  },
+  ultrabrain: {
+    model: "openai/gpt-5.2-codex",
+    variant: "xhigh",
+    defaultSkills: ["systematic-debugging", "codex-mcp-collaboration"],
+  },
+  artistry: {
+    model: "google/gemini-3-pro",
+    variant: "max",
+    defaultSkills: [],
+  },
+  quick: {
+    model: "anthropic/claude-haiku-4-5",
+    defaultSkills: ["git-master"],
+  },
+  "unspecified-low": {
+    model: "anthropic/claude-sonnet-4-5",
+    defaultSkills: [],
+  },
+  "unspecified-high": {
+    model: "anthropic/claude-opus-4-5",
+    variant: "max",
+    defaultSkills: [],
+  },
+  writing: {
+    model: "google/gemini-3-flash",
+    defaultSkills: [],
+  },
+  "most-capable": {
+    model: "anthropic/claude-opus-4-5",
+    defaultSkills: ["tdd", "systematic-debugging"],
+  },
+  general: {
+    model: "anthropic/claude-sonnet-4-5",
+    defaultSkills: [],
+  },
 }
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
@@ -173,6 +205,8 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   "unspecified-high": UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,
   writing: WRITING_CATEGORY_PROMPT_APPEND,
+  "most-capable": STRATEGIC_CATEGORY_PROMPT_APPEND,
+  general: "",
 }
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
@@ -183,6 +217,8 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "unspecified-low": "Tasks that don't fit other categories, low effort required",
   "unspecified-high": "Tasks that don't fit other categories, high effort required",
   writing: "Documentation, prose, technical writing",
+  "most-capable": "Complex tasks requiring maximum capability",
+  general: "General purpose tasks without a specific category",
 }
 
 /**
@@ -417,5 +453,3 @@ export function isPlanAgent(agentName: string | undefined): boolean {
   const lowerName = agentName.toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
 }
-
-

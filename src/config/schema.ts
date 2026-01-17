@@ -197,6 +197,8 @@ export const CategoryConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),
+  /** Default skills to inject when using this category */
+  defaultSkills: z.array(z.string()).optional(),
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. */
   is_unstable_agent: z.boolean().optional(),
 })

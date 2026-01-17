@@ -286,35 +286,16 @@
   - 文件: `src/hooks/sisyphus-orchestrator/index.ts`
   - 验收: Phase 3 自动执行 verification → finishing-branch → Archiver
 
-- [ ] **Task 8.5**: 实现 Subagent 内部加载 Skill 机制
+- [x] **Task 8.5**: 实现 Subagent 内部加载 Skill 机制 ✅ 已完成 (Categories 部分)
   - **原因**: 端到端流程图的核心是"混合架构 - Subagent 内部加载 Skill"。当前 Skill 加载完全依赖调用者在 `sisyphus_task` 的 `skills` 参数中显式指定，容易遗漏。需要实现 Subagent 派发时自动携带对应 Skills。
   - 📍 参考流程图: Skill 加载理由说明 (第 1301-1324 行)
   
-  - **现有机制分析**:
-    - 调用者通过 `sisyphus_task(skills=["tdd", "git-master"])` 显式指定
-    - Sisyphus 系统提示中 "Delegation Prompt Structure" 要求包含 "REQUIRED SKILLS"
-    - 但这只是提示，不是强制执行，LLM 可能遗漏
+  - **已实现**:
+    - ✅ `src/config/schema.ts` - CategoryConfig 添加 `defaultSkills?: string[]`
+    - ✅ `src/tools/sisyphus-task/constants.ts` - DEFAULT_CATEGORIES 添加 defaultSkills
+    - ✅ `src/tools/sisyphus-task/tools.ts` - 实现 skill 合并逻辑
   
-  - **范围选择: B（包括 Junior Categories）**
-    - 不仅为命名 Agents 添加自动注入，也为 category-based Junior 添加
-    - 理由：`sisyphus_task(category="visual")` 是最常用的派发方式
-  
-  - **实现方案: C（混合方案）**
-    - 命名 Agents 在 agent 定义中配置 `defaultSkills`
-    - Categories 在 `DEFAULT_CATEGORIES` 中配置 `defaultSkills`
-    - `sisyphus_task` 在派发时合并去重
-  
-  - **命名 Agents 的 defaultSkills**:
-    | Agent | defaultSkills |
-    |-------|---------------|
-    | Metis (Plan Consultant) | `["brainstorming", "codex-mcp-collaboration"]` |
-    | Prometheus | `["creating-changes", "dispatching-parallel-agents"]` |
-    | Momus (Plan Reviewer) | `["verification-before-completion"]` |
-    | archiver | `["verification-before-completion", "finishing-a-development-branch", "archiving-changes"]` |
-    | frontend-ui-ux-engineer | `["frontend-ui-ux", "playwright"]` |
-    | implementer | `["tdd", "test-driven-development", "codex-mcp-collaboration"]` |
-  
-  - **Categories 的 defaultSkills**:
+  - **Categories 的 defaultSkills** (已实现):
     | Category | defaultSkills |
     |----------|---------------|
     | visual-engineering | `["frontend-ui-ux", "playwright"]` |
