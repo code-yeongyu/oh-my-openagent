@@ -64,7 +64,7 @@ function formatDetailedError(error: unknown, ctx: ErrorContext): string {
   const stack = error instanceof Error ? error.stack : undefined
 
   const lines: string[] = [
-    `❌ ${ctx.operation} failed`,
+    `${ctx.operation} failed`,
     "",
     `**Error**: ${message}`,
   ]
@@ -181,37 +181,28 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
       run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
       resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
-      skills: tool.schema.array(tool.schema.string()).nullable().describe("Array of skill names to prepend to the prompt. Use null if no skills needed. Empty array [] is NOT allowed."),
+      skills: tool.schema.array(tool.schema.string()).describe("Array of skill names to prepend to the prompt. Use [] (empty array) if no skills needed."),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       if (args.run_in_background === undefined) {
-        return `❌ Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
+        return `Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
       }
       if (args.skills === undefined) {
-        return `❌ Invalid arguments: 'skills' parameter is REQUIRED. Use skills=null if no skills are needed, or provide an array of skill names.`
+        return `Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills are needed, or provide an array of skill names.`
       }
-      if (Array.isArray(args.skills) && args.skills.length === 0) {
-        const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
-        const availableSkillsList = allSkills.map(s => `  - ${s.name}`).slice(0, 15).join("\n")
-        return `❌ Invalid arguments: Empty array [] is not allowed for 'skills' parameter.
-
-Use skills=null if this task genuinely requires no specialized skills.
-Otherwise, select appropriate skills from available options:
-
-${availableSkillsList}${allSkills.length > 15 ? `\n  ... and ${allSkills.length - 15} more` : ""}
-
-If you believe no skills are needed, you MUST explicitly explain why to the user before using skills=null.`
+      if (args.skills === null) {
+        return `Invalid arguments: skills=null is not allowed. Use skills=[] (empty array) if no skills are needed.`
       }
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
-      if (args.skills !== null && args.skills.length > 0) {
+      if (args.skills.length > 0) {
         const { resolved, notFound } = await resolveMultipleSkillsAsync(args.skills, { gitMasterConfig })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
           const available = allSkills.map(s => s.name).join(", ")
-          return `❌ Skills not found: ${notFound.join(", ")}. Available: ${available}`
+          return `Skills not found: ${notFound.join(", ")}. Available: ${available}`
         }
         skillContent = Array.from(resolved.values()).join("\n\n")
       }
@@ -334,7 +325,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             toastManager.removeTask(taskId)
           }
           const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-          return `❌ Failed to send resume prompt: ${errorMessage}\n\nSession ID: ${args.resume}`
+          return `Failed to send resume prompt: ${errorMessage}\n\nSession ID: ${args.resume}`
         }
 
         // Wait for message stability after prompt completes
@@ -372,7 +363,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           if (toastManager) {
             toastManager.removeTask(taskId)
           }
-          return `❌ Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.resume}`
+          return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.resume}`
         }
 
         const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
@@ -390,7 +381,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         if (!lastMessage) {
-          return `❌ No assistant response found.\n\nSession ID: ${args.resume}`
+          return `No assistant response found.\n\nSession ID: ${args.resume}`
         }
 
         // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
@@ -409,11 +400,11 @@ ${textContent || "(No text output)"}`
       }
 
       if (args.category && args.subagent_type) {
-        return `❌ Invalid arguments: Provide EITHER category OR subagent_type, not both.`
+        return `Invalid arguments: Provide EITHER category OR subagent_type, not both.`
       }
 
       if (!args.category && !args.subagent_type) {
-        return `❌ Invalid arguments: Must provide either category or subagent_type.`
+        return `Invalid arguments: Must provide either category or subagent_type.`
       }
 
       // Fetch OpenCode config at boundary to get system default model
@@ -443,7 +434,7 @@ ${textContent || "(No text output)"}`
           systemDefaultModel,
         })
         if (!resolved) {
-          return `❌ Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
+          return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
         // Determine model source by comparing against the actual resolved model
@@ -452,11 +443,11 @@ ${textContent || "(No text output)"}`
         const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
 
         if (!actualModel) {
-          return `❌ No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
+          return `No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
         }
 
         if (!parseModelString(actualModel)) {
-          return `❌ Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+          return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
         }
 
         switch (actualModel) {
@@ -484,7 +475,7 @@ ${textContent || "(No text output)"}`
         categoryPromptAppend = resolved.promptAppend || undefined
       } else {
         if (!args.subagent_type?.trim()) {
-          return `❌ Agent name cannot be empty.`
+          return `Agent name cannot be empty.`
         }
         const agentName = args.subagent_type.trim()
         agentToUse = agentName
@@ -501,13 +492,13 @@ ${textContent || "(No text output)"}`
           if (!callableNames.includes(agentToUse)) {
             const isPrimaryAgent = agents.some((a) => a.name === agentToUse && a.mode === "primary")
             if (isPrimaryAgent) {
-              return `❌ Cannot call primary agent "${agentToUse}" via delegate_task. Primary agents are top-level orchestrators.`
+              return `Cannot call primary agent "${agentToUse}" via delegate_task. Primary agents are top-level orchestrators.`
             }
 
             const availableAgents = callableNames
               .sort()
               .join(", ")
-            return `❌ Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
+            return `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
           }
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
@@ -527,7 +518,7 @@ ${textContent || "(No text output)"}`
             parentModel,
             parentAgent,
             model: categoryModel,
-            skills: args.skills ?? undefined,
+            skills: args.skills.length > 0 ? args.skills : undefined,
             skillContent: systemContent,
           })
 
@@ -576,7 +567,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         })
 
         if (createResult.error) {
-          return `❌ Failed to create session: ${createResult.error}`
+          return `Failed to create session: ${createResult.error}`
         }
 
         const sessionID = createResult.data.id
@@ -591,7 +582,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             description: args.description,
             agent: agentToUse,
             isBackground: false,
-            skills: args.skills ?? undefined,
+            skills: args.skills.length > 0 ? args.skills : undefined,
             modelInfo,
           })
         }
@@ -713,7 +704,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         })
 
         if (messagesResult.error) {
-          return `❌ Error fetching result: ${messagesResult.error}\n\nSession ID: ${sessionID}`
+          return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${sessionID}`
         }
 
         const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
@@ -727,7 +718,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
         const lastMessage = assistantMessages[0]
         
         if (!lastMessage) {
-          return `❌ No assistant response found.\n\nSession ID: ${sessionID}`
+          return `No assistant response found.\n\nSession ID: ${sessionID}`
         }
         
         // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")

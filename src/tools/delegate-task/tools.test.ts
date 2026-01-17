@@ -319,7 +319,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: true,
-          skills: null,
+          skills: [],
         },
         toolContext
       )
@@ -334,12 +334,11 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("DELEGATE_TASK_DESCRIPTION documents skills parameter with null option", () => {
+    test("DELEGATE_TASK_DESCRIPTION documents skills parameter with empty array option", () => {
       // #given / #when / #then
       expect(DELEGATE_TASK_DESCRIPTION).toContain("skills")
       expect(DELEGATE_TASK_DESCRIPTION).toContain("Array of skill names")
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("Empty array [] is NOT allowed")
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("null if no skills needed")
+      expect(DELEGATE_TASK_DESCRIPTION).toContain("[] (empty array) if no skills needed")
     })
 
     test("skills parameter is required - returns error when not provided", async () => {
@@ -385,7 +384,7 @@ describe("sisyphus-task", () => {
       expect(result).toContain("REQUIRED")
     })
 
-    test("empty array [] returns error with available skills list", async () => {
+    test("null skills returns error", async () => {
       // #given
       const { createDelegateTask } = require("./tools")
       
@@ -412,26 +411,26 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // #when - empty array passed
+      // #when - null passed
       const result = await tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          skills: null,
         },
         toolContext
       )
       
-      // #then - should return error about empty array with guidance
-      expect(result).toContain("❌")
-      expect(result).toContain("Empty array []")
-      expect(result).toContain("not allowed")
+      // #then - should return error about null
+      expect(result).toContain("Invalid arguments")
       expect(result).toContain("skills=null")
+      expect(result).toContain("not allowed")
+      expect(result).toContain("skills=[]")
     })
 
-    test("null skills is allowed and proceeds without skill content", async () => {
+    test("empty array [] is allowed and proceeds without skill content", async () => {
       // #given
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -466,21 +465,20 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // #when - null skills passed
+      // #when - empty array skills passed
       await tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: null,
+          skills: [],
         },
         toolContext
       )
       
       // #then - should proceed without system content from skills
       expect(promptBody).toBeDefined()
-      // system should not contain skill content (only category prompt append if any)
     }, { timeout: 20000 })
   })
 
@@ -540,7 +538,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue the task",
         resume: "ses_resume_test",
         run_in_background: false,
-        skills: null,
+        skills: [],
       },
       toolContext
     )
@@ -595,7 +593,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue in background",
         resume: "ses_bg_resume",
         run_in_background: true,
-        skills: null,
+        skills: [],
       },
       toolContext
     )
@@ -650,13 +648,12 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: null,
+          skills: [],
         },
         toolContext
       )
       
       // #then - should return detailed error message with args and stack trace
-      expect(result).toContain("❌")
       expect(result).toContain("Send prompt failed")
       expect(result).toContain("JSON Parse error")
       expect(result).toContain("**Arguments**:")
@@ -711,7 +708,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: null,
+          skills: [],
         },
         toolContext
       )
@@ -764,13 +761,12 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: null,
+          skills: [],
         },
         toolContext
       )
       
       // #then - should return agent not found error
-      expect(result).toContain("❌")
       expect(result).toContain("not found")
       expect(result).toContain("registered")
     })
@@ -819,7 +815,7 @@ describe("sisyphus-task", () => {
         prompt: "test",
         category: "custom-cat",
         run_in_background: false,
-        skills: null
+        skills: []
       }, toolContext)
 
       // #then
