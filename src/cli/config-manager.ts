@@ -333,7 +333,9 @@ export function generateOmoConfig(installConfig: InstallConfig): Record<string, 
     agents["explore"] = { model: "opencode/glm-4.7-free" }
   }
 
-  if (!installConfig.hasChatGPT) {
+  if (installConfig.hasChatGPT) {
+    agents["oracle"] = { model: "openai/gpt-5.2" }
+  } else {
     const oracleFallback = installConfig.hasCopilot
       ? "github-copilot/gpt-5.2"
       : installConfig.hasClaude

@@ -329,3 +329,97 @@ describe("generateOmoConfig - GitHub Copilot fallback", () => {
     expect(categories?.["writing"]?.model).toBe("github-copilot/gemini-3-flash-preview")
   })
 })
+
+describe("generateOmoConfig - Oracle agent configuration", () => {
+  test("oracle uses openai/gpt-5.2 when hasChatGPT is true", () => {
+    // #given user has ChatGPT subscription
+    const config: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasChatGPT: true,
+      hasGemini: false,
+      hasCopilot: false,
+    }
+
+    // #when generating config
+    const result = generateOmoConfig(config)
+
+    // #then oracle should use openai/gpt-5.2
+    const agents = result.agents as Record<string, { model?: string }>
+    expect(agents["oracle"]?.model).toBe("openai/gpt-5.2")
+  })
+
+  test("oracle uses github-copilot/gpt-5.2 when hasCopilot but no ChatGPT", () => {
+    // #given user has Copilot but no ChatGPT
+    const config: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasChatGPT: false,
+      hasGemini: false,
+      hasCopilot: true,
+    }
+
+    // #when generating config
+    const result = generateOmoConfig(config)
+
+    // #then oracle should use Copilot GPT fallback
+    const agents = result.agents as Record<string, { model?: string }>
+    expect(agents["oracle"]?.model).toBe("github-copilot/gpt-5.2")
+  })
+
+  test("oracle uses anthropic/claude-opus-4-5 when hasClaude but no ChatGPT or Copilot", () => {
+    // #given user has Claude but no ChatGPT or Copilot
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasChatGPT: false,
+      hasGemini: false,
+      hasCopilot: false,
+    }
+
+    // #when generating config
+    const result = generateOmoConfig(config)
+
+    // #then oracle should use Claude fallback
+    const agents = result.agents as Record<string, { model?: string }>
+    expect(agents["oracle"]?.model).toBe("anthropic/claude-opus-4-5")
+  })
+
+  test("oracle uses opencode/glm-4.7-free when no providers available", () => {
+    // #given user has no subscriptions
+    const config: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasChatGPT: false,
+      hasGemini: false,
+      hasCopilot: false,
+    }
+
+    // #when generating config
+    const result = generateOmoConfig(config)
+
+    // #then oracle should use free fallback
+    const agents = result.agents as Record<string, { model?: string }>
+    expect(agents["oracle"]?.model).toBe("opencode/glm-4.7-free")
+  })
+
+  test("oracle is always present in generated config", () => {
+    // #given various configurations
+    const configs: InstallConfig[] = [
+      { hasClaude: true, isMax20: true, hasChatGPT: true, hasGemini: true, hasCopilot: true },
+      { hasClaude: true, isMax20: false, hasChatGPT: false, hasGemini: false, hasCopilot: false },
+      { hasClaude: false, isMax20: false, hasChatGPT: true, hasGemini: false, hasCopilot: false },
+      { hasClaude: false, isMax20: false, hasChatGPT: false, hasGemini: false, hasCopilot: false },
+    ]
+
+    for (const config of configs) {
+      // #when generating config
+      const result = generateOmoConfig(config)
+
+      // #then oracle should always be present
+      const agents = result.agents as Record<string, { model?: string }>
+      expect(agents["oracle"]).toBeDefined()
+      expect(agents["oracle"]?.model).toBeTruthy()
+    }
+  })
+})
