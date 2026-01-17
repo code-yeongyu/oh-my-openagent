@@ -208,7 +208,7 @@ export const lsp_diagnostics: ToolDefinition = tool({
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      return output
+      throw new Error(output)
     }
   },
 })
