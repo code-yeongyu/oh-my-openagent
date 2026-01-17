@@ -17,6 +17,8 @@ import { join } from "node:path"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
+const DEFAULT_STALE_TIMEOUT_MS = 180_000  // 3 minutes
+const MIN_RUNTIME_BEFORE_STALE_MS = 30_000  // 30 seconds
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
 
@@ -60,6 +62,7 @@ export class BackgroundManager {
   private pollingInterval?: ReturnType<typeof setInterval>
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
+  private config?: BackgroundTaskConfig
 
 
   constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
@@ -69,6 +72,7 @@ export class BackgroundManager {
     this.client = ctx.client
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
+    this.config = config
     this.registerProcessCleanup()
   }
 
@@ -943,8 +947,49 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     }
   }
 
+  private async checkAndInterruptStaleTasks(): Promise<void> {
+    const staleTimeoutMs = this.config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
+    const now = Date.now()
+
+    for (const task of this.tasks.values()) {
+      if (task.status !== "running") continue
+      if (!task.progress?.lastUpdate) continue
+
+      const runtime = now - task.startedAt.getTime()
+      if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
+
+      const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
+      if (timeSinceLastUpdate <= staleTimeoutMs) continue
+
+      if (task.status !== "running") continue
+
+      const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
+      task.status = "cancelled"
+      task.error = `Stale timeout (no activity for ${staleMinutes}min)`
+      task.completedAt = new Date()
+
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      this.client.session.abort({
+        path: { id: task.sessionID },
+      }).catch(() => {})
+
+      log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
+
+      try {
+        await this.notifyParentSession(task)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
+      }
+    }
+  }
+
   private async pollRunningTasks(): Promise<void> {
     this.pruneStaleTasksAndNotifications()
+    await this.checkAndInterruptStaleTasks()
 
     const statusResult = await this.client.session.status()
     const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
