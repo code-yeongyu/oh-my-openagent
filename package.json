@@ -56,18 +56,14 @@
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.6.1",
     "@modelcontextprotocol/sdk": "^1.25.1",
-    "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "^1.1.19",
     "@opencode-ai/sdk": "^1.1.19",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
-    "hono": "^4.10.4",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
-    "open": "^11.0.0",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
-    "xdg-basedir": "^5.1.0",
     "zod": "^4.1.8"
   },
   "devDependencies": {
