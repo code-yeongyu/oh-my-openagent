@@ -88,7 +88,9 @@
           "sisyphus-orchestrator",
           "tdd-guard",
           "debugging-injector",
-          "failure-counter"
+          "failure-counter",
+          "skill-suggestion",
+          "planning-flow-guide"
         ]
       }
     },

@@ -102,6 +102,8 @@ export const HookNameSchema = z.enum([
   "tdd-guard",
   "debugging-injector",
   "failure-counter",
+  "skill-suggestion",
+  "planning-flow-guide",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
