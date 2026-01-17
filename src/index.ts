@@ -525,9 +525,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
               : undefined,
             completionPromise: promiseMatch?.[1],
           });
-        } else if (command === "cancel-ralph" && sessionID) {
-          ralphLoop.cancelLoop(sessionID);
-        }
+         } else if (command === "cancel-ralph" && sessionID) {
+           ralphLoop.cancelLoop(sessionID);
+         } else if (command === "ulw-loop" && sessionID) {
+           const promptText = args?.command?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
+           ralphLoop.startLoop(sessionID, promptText, { ultrawork: true })
+         }
       }
     },
 
