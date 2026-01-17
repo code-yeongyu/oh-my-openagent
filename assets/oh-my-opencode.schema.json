@@ -87,7 +87,8 @@
           "atlas",
           "sisyphus-orchestrator",
           "tdd-guard",
-          "debugging-injector"
+          "debugging-injector",
+          "failure-counter"
         ]
       }
     },
@@ -2662,6 +2663,12 @@
           },
           "is_unstable_agent": {
             "type": "boolean"
+          },
+          "defaultSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

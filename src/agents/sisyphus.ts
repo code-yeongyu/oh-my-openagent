@@ -402,39 +402,42 @@ After creating-changes produces design.md + tasks.md, present a concise plan sum
 
 ## Phase 2B - Implementation
 
-### Execution Strategy Selection (Multi-Task Only)
+### Execution Strategy Auto-Selection (Task 8.2)
 
-When tasks.md contains multiple tasks, choose execution strategy:
+**AUTOMATIC DECISION - DO NOT ASK USER:**
 
-| Strategy | When to Use | Setup |
-|----------|-------------|-------|
-| **Parallel (Default)** | Independent tasks, no file conflicts | Create worktree per Wave |
-| **Serial** | Many file conflicts, complex dependencies | Single worktree, sequential |
+When tasks.md is ready, count the tasks and automatically select:
 
-**Decision Flow:**
-1. Parse tasks.md → extract dependencies and files
-2. Detect file conflicts (same file modified by multiple tasks)
-3. Group into Waves (tasks with satisfied dependencies)
-4. If Waves > 1 and conflicts < 30% → Parallel mode
-5. Otherwise → Serial mode
+| Task Count | Mode | Skill to Load |
+|------------|------|---------------|
+| **≤ 5 tasks** | Sequential | \`skill("executing-plans")\` |
+| **> 5 tasks** | Wave-Parallel | \`skill("wave-parallel-execution")\` |
 
-**Parallel Mode Setup:**
+**Announce your decision:**
+"Task count: [N] → Using [Sequential/Wave-Parallel] mode"
+
+**Override only if user explicitly requests:**
+- "use sequential" → Force executing-plans
+- "use parallel" / "use wave" → Force wave-parallel-execution
+
+### Execution Mode Details
+
+**Sequential Mode (≤5 tasks):**
 \`\`\`
-skill("using-git-worktrees")
-For each Wave:
-  - Create worktree: feature/{name}-wave{N}
-  - Dispatch Implementer agents in parallel
-  - Wait for Wave completion
-  - Merge back to main branch
-  - Verify merged state
+skill("executing-plans")
+- Creates single worktree: feature/{name}
+- Executes tasks one by one
+- Auto git checkpoint after each task
+- Best for: dependent tasks, complex order
 \`\`\`
 
-**Serial Mode Setup:**
+**Wave-Parallel Mode (>5 tasks):**
 \`\`\`
-skill("using-git-worktrees") 
-- Create single worktree: feature/{name}
-- Execute tasks sequentially
-- Commit after each task
+skill("wave-parallel-execution")
+- Analyzes dependencies, groups into Waves
+- Creates worktree per Wave: feature/{name}-wave{N}
+- Parallel execution across Waves
+- Best for: independent tasks, parallelizable work
 \`\`\`
 
 ### Pre-Implementation:

@@ -6,6 +6,8 @@ import {
   readBoulderState,
   appendSessionId,
   getPlanProgress,
+  getCurrentPhase,
+  isExecutingPhase,
 } from "../../features/boulder-state"
 import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
@@ -65,14 +67,70 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
+const EXECUTION_MODE_AUTO_DECISION = `
+---
+
+## 🔄 EXECUTION MODE AUTO-DECISION (Task 8.2)
+
+When you have a tasks.md ready for execution, **automatically select** the execution mode:
+
+| Task Count | Mode | Skill |
+|------------|------|-------|
+| **≤ 5 tasks** | Sequential | \`executing-plans\` |
+| **> 5 tasks** | Wave-Parallel | \`wave-parallel-execution\` |
+
+**DO NOT ask user to choose.** Count tasks and announce:
+
+"Based on task count ([N] tasks):
+→ Selected mode: [Sequential/Wave-Parallel]
+→ Loading skill: [executing-plans/wave-parallel-execution]"
+
+**Override only if user explicitly says:**
+- "use sequential" → Force executing-plans
+- "use parallel" / "use wave" → Force wave-parallel-execution
+
+---
+`
+
 const ARCHIVER_DISPATCH_PROMPT = `
 ---
 
 ## 🎉 PHASE 3 READY - ALL TASKS COMPLETE
 
-All planned tasks have been completed. It's time to execute Phase 3 completion.
+All planned tasks have been completed. Execute Phase 3 completion in order:
 
-**DISPATCH ARCHIVER NOW:**
+### Step 3.1: Verification (MANDATORY FIRST)
+
+**BEFORE anything else, load and execute verification skill:**
+
+\`\`\`
+skill("verification-before-completion")
+\`\`\`
+
+Run through the checklist:
+- [ ] All acceptance criteria met
+- [ ] All tests pass (run them yourself, don't trust reports)
+- [ ] \`lsp_diagnostics\` clean on ALL changed files
+- [ ] No debug logs or TODO comments left
+- [ ] Build passes: \`bun run build\` or equivalent
+
+**⚠️ IF ANY CHECK FAILS → Return to Phase 2B to fix issues. DO NOT proceed.**
+
+### Step 3.2: Git Strategy Selection
+
+**Ask user which strategy to use:**
+
+"All verification passed. Choose git strategy:
+1. **merge** - Merge feature branch to main locally
+2. **pr** - Push and create Pull Request
+3. **keep** - Keep branch as-is (don't merge yet)
+4. **discard** - Discard all changes"
+
+Wait for user response.
+
+### Step 3.3: Dispatch Archiver
+
+**After user selects strategy, dispatch Archiver:**
 
 \`\`\`
 sisyphus_task(
@@ -81,7 +139,7 @@ sisyphus_task(
   Execute Phase 3 completion:
   
   1. TASK: Execute git strategy and archive changes
-  2. GIT_STRATEGY: [ask user: merge|pr|keep|discard]
+  2. GIT_STRATEGY: [user's choice from Step 3.2]
   3. PROJECT_ROOT: ${process.cwd()}
   4. CHANGE_NAME: [current feature name]
   5. BUILD_COMMAND: bun run build
@@ -91,22 +149,17 @@ sisyphus_task(
   - archiving-changes
   
   MUST DO:
-  - Run lsp_diagnostics on all changed files
-  - Run build command and verify exit code 0
+  - Execute the git strategy user selected
   - Archive to changes/archive/YYYY-MM-DD-{name}/
   - Generate metadata.json with commit SHAs and file list
+  - Clean up worktrees if any
   
   MUST NOT DO:
-  - Skip diagnostics or build verification
-  - Archive without completing git strategy
+  - Skip git strategy execution
+  - Archive without user confirmation
   """
 )
 \`\`\`
-
-**BEFORE DISPATCHING:**
-1. Ask user which git strategy to use (merge/pr/keep/discard)
-2. Confirm all verification passed
-3. Then dispatch Archiver
 
 ---
 `
@@ -724,9 +777,47 @@ export function createAtlasHook(
         return
       }
 
-      // Check delegate_task - inject single-task directive
-      if (input.tool === "delegate_task") {
+      // Check sisyphus_task - inject single-task directive and Phase enforcement (Task 9.3)
+      if (input.tool === "sisyphus_task" || input.tool === "delegate_task") {
+        const subagentType = (output.args.subagent_type as string | undefined)?.toLowerCase() || ""
         const prompt = output.args.prompt as string | undefined
+        // Phase enforcement (Task 9.3): Block planning agents during executing phase
+        const planningAgents = ["metis", "prometheus", "momus", "planner", "plan consultant", "plan reviewer"]
+        const isPlanningAgent = planningAgents.some(agent => subagentType.includes(agent))
+
+        if (isPlanningAgent && isExecutingPhase(ctx.directory)) {
+          const currentPhase = getCurrentPhase(ctx.directory)
+          const phaseWarning = `
+
+---
+
+🛑 **PHASE ENFORCEMENT VIOLATION (Task 9.3)**
+
+You are attempting to call a **planning agent** (${subagentType}) while in **executing phase**.
+
+| Current Phase | Target Agent | Allowed? |
+|---------------|--------------|----------|
+| ${currentPhase} | ${subagentType} | ❌ NO |
+
+**Rule**: During \`executing\` phase, planning agents (Metis, Prometheus, Momus) are blocked.
+
+**Options:**
+1. Complete current execution, then use \`/reset-phase\` to restart planning
+2. If you truly need to re-plan, ask user for confirmation first
+3. Continue with execution tasks instead
+
+**Proceeding anyway, but this is a workflow violation.**
+
+---
+`
+          output.message = (output.message || "") + phaseWarning
+          log(`[${HOOK_NAME}] Phase enforcement warning: planning agent called during executing`, {
+            sessionID: input.sessionID,
+            subagentType,
+            currentPhase,
+          })
+        }
+
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
           log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {

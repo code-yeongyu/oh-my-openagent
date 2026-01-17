@@ -116,28 +116,46 @@ Report:
 
 Ready for implementation."
 
-## Next Step: Choose Execution Method
+## Next Step: Automatic Execution Mode Selection
 
-Ask the user:
+**AUTOMATIC DECISION (Task 8.2):**
 
-"Please choose execution method:
+Count the number of tasks in `tasks.md` and automatically select the execution mode:
 
-**1. Sequential (推荐小型任务)**
+```
+Task Count ≤ 5  →  Sequential Mode (executing-plans)
+Task Count > 5  →  Wave-Parallel Mode (wave-parallel-execution)
+```
+
+**Announce the decision:**
+
+"Based on task count analysis:
+- Total tasks: [N]
+- Selected mode: [Sequential/Wave-Parallel]
+- Reason: [≤5 tasks favor sequential | >5 tasks benefit from parallelism]
+
+Proceeding with [mode] execution."
+
+### If Sequential Mode (≤5 tasks):
+
 → 自动创建单个 worktree
 → 逐个任务执行，每任务自动 git checkpoint
-→ 适合：< 5 个任务，依赖关系复杂
 → **REQUIRED SUB-SKILL:** Use superpowers:executing-plans
 
-**2. Wave-Parallel (推荐复杂任务)**
+### If Wave-Parallel Mode (>5 tasks):
+
 → 自动分析任务依赖，分组为 Waves
 → 为每个 Wave 创建独立 worktree
 → Wave 间并行执行
-→ 适合：> 5 个任务，有可并行的任务组
 → **REQUIRED SUB-SKILL:** Use superpowers:wave-parallel-execution
 
-**注意**: 两个选项都会自动创建 worktree，无需单独选择。
+**Override Option:**
 
-Please choose 1 or 2."
+If user explicitly requests a different mode, respect their choice:
+- "use sequential" → Force executing-plans regardless of task count
+- "use parallel" / "use wave" → Force wave-parallel-execution regardless of task count
+
+**注意**: 两个选项都会自动创建 worktree，无需单独选择。
 
 ## Key Principles
 

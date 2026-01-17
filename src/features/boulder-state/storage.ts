@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress } from "./types"
+import type { BoulderState, PlanProgress, PhaseStatus } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
@@ -146,5 +146,98 @@ export function createBoulderState(
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
+    phase: "idle",
+    last_updated: new Date().toISOString(),
   }
+}
+
+/**
+ * Update phase status in boulder state (Task 9.1)
+ */
+export function updatePhaseStatus(
+  directory: string,
+  phase: PhaseStatus,
+  currentTask?: string
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) return null
+
+  state.phase = phase
+  state.last_updated = new Date().toISOString()
+  
+  if (currentTask !== undefined) {
+    state.current_task = currentTask
+  }
+  
+  // Reset failure count when moving to a new phase
+  if (phase === "executing" || phase === "planning") {
+    state.failure_count = 0
+    state.last_error = undefined
+  }
+
+  if (writeBoulderState(directory, state)) {
+    return state
+  }
+  return null
+}
+
+/**
+ * Increment failure count for current task (Task 9.2)
+ */
+export function incrementFailureCount(
+  directory: string,
+  errorMessage?: string
+): { state: BoulderState | null; count: number } {
+  const state = readBoulderState(directory)
+  if (!state) return { state: null, count: 0 }
+
+  state.failure_count = (state.failure_count || 0) + 1
+  state.last_error = errorMessage
+  state.last_updated = new Date().toISOString()
+
+  if (writeBoulderState(directory, state)) {
+    return { state, count: state.failure_count }
+  }
+  return { state: null, count: 0 }
+}
+
+/**
+ * Reset failure count (e.g., after successful task or user intervention)
+ */
+export function resetFailureCount(directory: string): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) return null
+
+  state.failure_count = 0
+  state.last_error = undefined
+  state.last_updated = new Date().toISOString()
+
+  if (writeBoulderState(directory, state)) {
+    return state
+  }
+  return null
+}
+
+/**
+ * Get current phase status
+ */
+export function getCurrentPhase(directory: string): PhaseStatus {
+  const state = readBoulderState(directory)
+  return state?.phase || "idle"
+}
+
+/**
+ * Check if currently in a phase that allows planning agents
+ */
+export function canCallPlanningAgents(directory: string): boolean {
+  const phase = getCurrentPhase(directory)
+  return phase === "idle" || phase === "planning" || phase === "reviewing"
+}
+
+/**
+ * Check if currently in executing phase
+ */
+export function isExecutingPhase(directory: string): boolean {
+  const phase = getCurrentPhase(directory)
+  return phase === "executing"
 }
