@@ -61,7 +61,7 @@ export interface RalphLoopHook {
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string }
+    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
@@ -150,7 +150,7 @@ export function createRalphLoopHook(
   const startLoop = (
     sessionID: string,
     prompt: string,
-    loopOptions?: { maxIterations?: number; completionPromise?: string }
+    loopOptions?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ): boolean => {
     const state: RalphLoopState = {
       active: true,
@@ -158,6 +158,7 @@ export function createRalphLoopHook(
       max_iterations:
         loopOptions?.maxIterations ?? config?.default_max_iterations ?? DEFAULT_MAX_ITERATIONS,
       completion_promise: loopOptions?.completionPromise ?? DEFAULT_COMPLETION_PROMISE,
+      ultrawork: loopOptions?.ultrawork,
       started_at: new Date().toISOString(),
       prompt,
       session_id: sessionID,
@@ -251,11 +252,18 @@ export function createRalphLoopHook(
         })
         clearState(ctx.directory, stateDir)
 
+        const title = state.ultrawork
+          ? "ULTRAWORK LOOP COMPLETE!"
+          : "Ralph Loop Complete!"
+        const message = state.ultrawork
+          ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`
+          : `Task completed after ${state.iteration} iteration(s)`
+
         await ctx.client.tui
           .showToast({
             body: {
-              title: "Ralph Loop Complete!",
-              message: `Task completed after ${state.iteration} iteration(s)`,
+              title,
+              message,
               variant: "success",
               duration: 5000,
             },
@@ -304,6 +312,10 @@ export function createRalphLoopHook(
         .replace("{{PROMISE}}", newState.completion_promise)
         .replace("{{PROMPT}}", newState.prompt)
 
+      const finalPrompt = newState.ultrawork
+        ? `ultrawork ${continuationPrompt}`
+        : continuationPrompt
+
       await ctx.client.tui
         .showToast({
           body: {
@@ -346,7 +358,7 @@ export function createRalphLoopHook(
           body: {
             ...(agent !== undefined ? { agent } : {}),
             ...(model !== undefined ? { model } : {}),
-            parts: [{ type: "text", text: continuationPrompt }],
+            parts: [{ type: "text", text: finalPrompt }],
           },
           query: { directory: ctx.directory },
         })

@@ -8,4 +8,5 @@ export const SLASH_COMMAND_PATTERN = /^\/([a-zA-Z][\w-]*)\s*(.*)/
 export const EXCLUDED_COMMANDS = new Set([
   "ralph-loop",
   "cancel-ralph",
+  "ulw-loop",
 ])
