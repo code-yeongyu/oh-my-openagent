@@ -218,7 +218,7 @@ export class BackgroundManager {
         errorMessage.includes("connection timed out") ||
         errorMessage.includes("request timed out") ||
         // Empty error object {} from SDK issues - session likely still running
-        (errorMessage === "{}" || errorMessage === "")
+        errorMessage === "{}" || errorMessage === "" || errorMessage === "[object Object]"
       
       if (isTransientNetworkError) {
         log("[background-agent] Transient network error, letting polling detect actual status:", sessionID)
@@ -487,7 +487,7 @@ export class BackgroundManager {
         errorMessage.includes("network request failed") ||
         errorMessage.includes("connection timed out") ||
         errorMessage.includes("request timed out") ||
-        (errorMessage === "{}" || errorMessage === "")
+        errorMessage === "{}" || errorMessage === "" || errorMessage === "[object Object]"
       
       if (isTransientNetworkError) {
         log("[background-agent] Transient network error on resume, letting polling detect actual status:", existingTask.sessionID)
