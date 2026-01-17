@@ -306,77 +306,11 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
   return result
 }
 
-export function generateOmoConfig(installConfig: InstallConfig): Record<string, unknown> {
+export function generateOmoConfig(_installConfig: InstallConfig): Record<string, unknown> {
+  // v3 beta: No hardcoded model strings - users rely on their OpenCode configured model
+  // Users who want specific models configure them explicitly after install
   const config: Record<string, unknown> = {
     $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  }
-
-  const agents: Record<string, Record<string, unknown>> = {}
-
-  if (!installConfig.hasClaude) {
-    agents["Sisyphus"] = {
-      model: installConfig.hasCopilot ? "github-copilot/claude-opus-4.5" : "opencode/glm-4.7-free",
-    }
-  }
-
-  agents["librarian"] = { model: "opencode/glm-4.7-free" }
-
-  // Gemini models use `antigravity-` prefix for explicit Antigravity quota routing
-  // @see ANTIGRAVITY_PROVIDER_CONFIG comments for rationale
-  if (installConfig.hasGemini) {
-    agents["explore"] = { model: "google/antigravity-gemini-3-flash" }
-  } else if (installConfig.hasClaude && installConfig.isMax20) {
-    agents["explore"] = { model: "anthropic/claude-haiku-4-5" }
-  } else if (installConfig.hasCopilot) {
-    agents["explore"] = { model: "github-copilot/grok-code-fast-1" }
-  } else {
-    agents["explore"] = { model: "opencode/glm-4.7-free" }
-  }
-
-  if (!installConfig.hasChatGPT) {
-    const oracleFallback = installConfig.hasCopilot
-      ? "github-copilot/gpt-5.2"
-      : installConfig.hasClaude
-        ? "anthropic/claude-opus-4-5"
-        : "opencode/glm-4.7-free"
-    agents["oracle"] = { model: oracleFallback }
-  }
-
-  if (installConfig.hasGemini) {
-    agents["frontend-ui-ux-engineer"] = { model: "google/antigravity-gemini-3-pro-high" }
-    agents["document-writer"] = { model: "google/antigravity-gemini-3-flash" }
-    agents["multimodal-looker"] = { model: "google/antigravity-gemini-3-flash" }
-  } else if (installConfig.hasClaude) {
-    agents["frontend-ui-ux-engineer"] = { model: "anthropic/claude-opus-4-5" }
-    agents["document-writer"] = { model: "anthropic/claude-opus-4-5" }
-    agents["multimodal-looker"] = { model: "anthropic/claude-opus-4-5" }
-  } else if (installConfig.hasCopilot) {
-    agents["frontend-ui-ux-engineer"] = { model: "github-copilot/gemini-3-pro-preview" }
-    agents["document-writer"] = { model: "github-copilot/gemini-3-flash-preview" }
-    agents["multimodal-looker"] = { model: "github-copilot/gemini-3-flash-preview" }
-  } else {
-    agents["frontend-ui-ux-engineer"] = { model: "opencode/glm-4.7-free" }
-    agents["document-writer"] = { model: "opencode/glm-4.7-free" }
-    agents["multimodal-looker"] = { model: "opencode/glm-4.7-free" }
-  }
-
-  if (Object.keys(agents).length > 0) {
-    config.agents = agents
-  }
-
-  // Categories: override model for Antigravity auth or GitHub Copilot fallback
-  if (installConfig.hasGemini) {
-    config.categories = {
-      "visual-engineering": { model: "google/gemini-3-pro-high" },
-      artistry: { model: "google/gemini-3-pro-high" },
-      writing: { model: "google/gemini-3-flash-high" },
-    }
-  } else if (installConfig.hasCopilot) {
-    config.categories = {
-      "visual-engineering": { model: "github-copilot/gemini-3-pro-preview" },
-      artistry: { model: "github-copilot/gemini-3-pro-preview" },
-      writing: { model: "github-copilot/gemini-3-flash-preview" },
-    }
   }
 
   return config
@@ -646,11 +580,9 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
-interface OmoConfigData {
-  agents?: Record<string, { model?: string }>
-}
-
 export function detectCurrentConfig(): DetectedConfig {
+  // v3 beta: Since we no longer generate hardcoded model strings,
+  // detection only checks for plugin installation and Gemini auth plugin
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
@@ -678,53 +610,8 @@ export function detectCurrentConfig(): DetectedConfig {
     return result
   }
 
+  // Gemini auth plugin detection still works via plugin presence
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
-
-  const omoConfigPath = getOmoConfig()
-  if (!existsSync(omoConfigPath)) {
-    return result
-  }
-
-  try {
-    const stat = statSync(omoConfigPath)
-    if (stat.size === 0) {
-      return result
-    }
-
-    const content = readFileSync(omoConfigPath, "utf-8")
-    if (isEmptyOrWhitespace(content)) {
-      return result
-    }
-
-    const omoConfig = parseJsonc<OmoConfigData>(content)
-    if (!omoConfig || typeof omoConfig !== "object") {
-      return result
-    }
-
-    const agents = omoConfig.agents ?? {}
-
-    if (agents["Sisyphus"]?.model === "opencode/glm-4.7-free") {
-      result.hasClaude = false
-      result.isMax20 = false
-    } else if (agents["librarian"]?.model === "opencode/glm-4.7-free") {
-      result.hasClaude = true
-      result.isMax20 = false
-    }
-
-    if (agents["oracle"]?.model?.startsWith("anthropic/")) {
-      result.hasChatGPT = false
-    } else if (agents["oracle"]?.model === "opencode/glm-4.7-free") {
-      result.hasChatGPT = false
-    }
-
-    const hasAnyCopilotModel = Object.values(agents).some(
-      (agent) => agent?.model?.startsWith("github-copilot/")
-    )
-    result.hasCopilot = hasAnyCopilotModel
-
-  } catch {
-    /* intentionally empty - malformed omo config returns defaults from opencode config detection */
-  }
 
   return result
 }

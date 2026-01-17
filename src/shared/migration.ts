@@ -44,7 +44,19 @@ export const HOOK_NAME_MAP: Record<string, string> = {
   "anthropic-auto-compact": "anthropic-context-window-limit-recovery",
 }
 
-// Model to category mapping for auto-migration
+/**
+ * @deprecated LEGACY MIGRATION ONLY
+ * 
+ * This map exists solely for migrating old configs that used hardcoded model strings.
+ * It maps legacy model strings to semantic category names, allowing users to migrate
+ * from explicit model configs to category-based configs.
+ * 
+ * DO NOT add new entries here. New agents should use:
+ * - Category-based config (preferred): { category: "most-capable" }
+ * - Or inherit from OpenCode's config.model
+ * 
+ * This map will be removed in a future major version once migration period ends.
+ */
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
   "openai/gpt-5.2": "ultrabrain",

@@ -1458,9 +1458,10 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
     .replace("{SKILLS_SECTION}", skillsSection)
 }
 
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
-
-export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): AgentConfig {
+export function createOrchestratorSisyphusAgent(ctx: OrchestratorContext): AgentConfig {
+  if (!ctx.model) {
+    throw new Error("createOrchestratorSisyphusAgent requires a model in context")
+  }
   const restrictions = createAgentToolRestrictions([
     "task",
     "call_omo_agent",
@@ -1469,7 +1470,7 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     description:
       "Orchestrates work via delegate_task() to complete ALL tasks in a todo list until fully done",
     mode: "primary" as const,
-    model: ctx?.model ?? DEFAULT_MODEL,
+    model: ctx.model,
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
@@ -1477,8 +1478,6 @@ export function createOrchestratorSisyphusAgent(ctx?: OrchestratorContext): Agen
     ...restrictions,
   } as AgentConfig
 }
-
-export const orchestratorSisyphusAgent: AgentConfig = createOrchestratorSisyphusAgent()
 
 export const orchestratorSisyphusPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

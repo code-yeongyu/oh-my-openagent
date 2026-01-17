@@ -2,12 +2,14 @@ import { describe, test, expect } from "bun:test"
 import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 
+const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
+
 describe("createBuiltinAgents with model overrides", () => {
   test("Sisyphus with default model has thinking config", () => {
-    // #given - no overrides
+    // #given - no overrides, using systemDefaultModel
 
     // #when
-    const agents = createBuiltinAgents()
+    const agents = createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
@@ -22,7 +24,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
@@ -44,10 +46,26 @@ describe("createBuiltinAgents with model overrides", () => {
   })
 
   test("Oracle with default model has reasoningEffort", () => {
-    // #given - no overrides
+    // #given - no overrides, using systemDefaultModel for other agents
+    // Oracle uses its own default model (openai/gpt-5.2) from the factory singleton
 
     // #when
-    const agents = createBuiltinAgents()
+    const agents = createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - Oracle uses systemDefaultModel since model is now required
+    expect(agents.oracle.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.oracle.reasoningEffort).toBeUndefined()
+  })
+
+  test("Oracle with GPT model override has reasoningEffort, no thinking", () => {
+    // #given
+    const overrides = {
+      oracle: { model: "openai/gpt-5.2" },
+    }
+
+    // #when
+    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
@@ -63,7 +81,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.oracle.model).toBe("anthropic/claude-sonnet-4")
@@ -79,7 +97,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides)
+    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
@@ -89,9 +107,10 @@ describe("createBuiltinAgents with model overrides", () => {
 
 describe("buildAgent with category and skills", () => {
   const { buildAgent } = require("./utils")
+  const TEST_MODEL = "anthropic/claude-opus-4-5"
 
   test("agent with category inherits category settings", () => {
-    // #given
+    // #given - agent factory that sets category but no model
     const source = {
       "test-agent": () =>
         ({
@@ -101,10 +120,11 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
-    // #then
-    expect(agent.model).toBe("google/gemini-3-pro-preview")
+    // #then - DEFAULT_CATEGORIES only has temperature, not model
+    // Model remains undefined since neither factory nor category provides it
+    expect(agent.model).toBeUndefined()
     expect(agent.temperature).toBe(0.7)
   })
 
@@ -120,7 +140,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.model).toBe("custom/model")
@@ -145,7 +165,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"], undefined, categories)
+    const agent = buildAgent(source["test-agent"], TEST_MODEL, categories)
 
     // #then
     expect(agent.model).toBe("openai/gpt-5.2")
@@ -164,7 +184,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -184,7 +204,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -204,7 +224,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.model).toBe("custom/model")
@@ -225,10 +245,10 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
-    // #then
-    expect(agent.model).toBe("openai/gpt-5.2")
+    // #then - DEFAULT_CATEGORIES["ultrabrain"] only has temperature, not model
+    expect(agent.model).toBeUndefined()
     expect(agent.temperature).toBe(0.1)
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
     expect(agent.prompt).toContain("Task description")
@@ -246,9 +266,11 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
+    // Note: The factory receives model, but if category doesn't exist, it's not applied
+    // The agent's model comes from the factory output (which doesn't set model)
     expect(agent.model).toBeUndefined()
     expect(agent.prompt).toBe("Base prompt")
   })
@@ -265,7 +287,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
@@ -284,7 +306,7 @@ describe("buildAgent with category and skills", () => {
     }
 
     // #when
-    const agent = buildAgent(source["test-agent"])
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then
     expect(agent.prompt).toBe("Base prompt")

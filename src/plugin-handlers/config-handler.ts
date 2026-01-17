@@ -200,12 +200,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             )
           : undefined;
 
+        // Model resolution: explicit override → category config → OpenCode default
+        // No hardcoded fallback - OpenCode config.model is the terminal fallback
+        const resolvedModel = prometheusOverride?.model ?? categoryConfig?.model ?? defaultModel;
+
         const prometheusBase = {
-          model:
-            prometheusOverride?.model ??
-            categoryConfig?.model ??
-            defaultModel ??
-            "anthropic/claude-opus-4-5",
+          // Only include model if one was resolved - let OpenCode apply its own default if none
+          ...(resolvedModel ? { model: resolvedModel } : {}),
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
