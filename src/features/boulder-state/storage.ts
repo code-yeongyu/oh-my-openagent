@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress, PhaseStatus } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR, LEGACY_CHANGES_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -74,29 +74,67 @@ export function clearBoulderState(directory: string): boolean {
 
 /**
  * Find Prometheus plan files for this project.
- * Prometheus stores plans at: {project}/.sisyphus/plans/{name}.md
+ * Searches two locations (priority order):
+ * 1. {project}/.sisyphus/plans/{name}.md (preferred)
+ * 2. {project}/changes/{name}/tasks.md (legacy format)
+ * 
+ * Plans from .sisyphus/plans/ take priority when same name exists in both.
  */
 export function findPrometheusPlans(directory: string): string[] {
-  const plansDir = join(directory, PROMETHEUS_PLANS_DIR)
+  const plans: string[] = []
+  const seenNames = new Set<string>()
 
-  if (!existsSync(plansDir)) {
-    return []
+  // 1. Search .sisyphus/plans/*.md (priority)
+  const sisyphusPlansDir = join(directory, PROMETHEUS_PLANS_DIR)
+  if (existsSync(sisyphusPlansDir)) {
+    try {
+      const files = readdirSync(sisyphusPlansDir)
+      for (const f of files) {
+        if (f.endsWith(".md")) {
+          const planPath = join(sisyphusPlansDir, f)
+          const planName = basename(f, ".md").toLowerCase()
+          plans.push(planPath)
+          seenNames.add(planName)
+        }
+      }
+    } catch {
+      // Ignore errors reading directory
+    }
   }
 
-  try {
-    const files = readdirSync(plansDir)
-    return files
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => join(plansDir, f))
-      .sort((a, b) => {
-        // Sort by modification time, newest first
-        const aStat = require("node:fs").statSync(a)
-        const bStat = require("node:fs").statSync(b)
-        return bStat.mtimeMs - aStat.mtimeMs
-      })
-  } catch {
-    return []
+  // 2. Search changes/*/tasks.md (legacy, lower priority)
+  const changesDir = join(directory, LEGACY_CHANGES_DIR)
+  if (existsSync(changesDir)) {
+    try {
+      const subdirs = readdirSync(changesDir, { withFileTypes: true })
+      for (const dirent of subdirs) {
+        if (dirent.isDirectory()) {
+          const tasksPath = join(changesDir, dirent.name, "tasks.md")
+          if (existsSync(tasksPath)) {
+            const planName = dirent.name.toLowerCase()
+            // Only add if not already found in .sisyphus/plans/
+            if (!seenNames.has(planName)) {
+              plans.push(tasksPath)
+              seenNames.add(planName)
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore errors reading directory
+    }
   }
+
+  // Sort by modification time, newest first
+  return plans.sort((a, b) => {
+    try {
+      const aStat = require("node:fs").statSync(a)
+      const bStat = require("node:fs").statSync(b)
+      return bStat.mtimeMs - aStat.mtimeMs
+    } catch {
+      return 0
+    }
+  })
 }
 
 /**

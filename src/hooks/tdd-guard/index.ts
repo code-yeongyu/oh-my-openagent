@@ -3,12 +3,19 @@
  *
  * Enforces Test-Driven Development by blocking edits to Tier 2/3 files
  * without failing tests. When blocked, auto-injects the TDD Skill for guidance.
+ *
+ * Handles multiple events:
+ * - tool.execute.before (PreToolUse): Block edits without failing tests
+ * - tool.execute.after (PostToolUse): Append lint reminders after edits
+ * - chat.message (UserPromptSubmit): Handle /tdd on|off commands
  */
 
 import type { TddGuardConfig } from "./types"
 import { DEFAULT_TDD_GUARD_CONFIG, EXEMPTION_PATTERNS } from "./constants"
 import { determineRiskTier, shouldBlockEdit, matchesIgnorePattern } from "./risk-validator"
 import { isTestFile } from "./language-adapter"
+import { FileStorage } from "./storage"
+import { UserPromptHandler, SessionHandler, PostToolLintHandler } from "./handlers"
 
 // Inline TDD skill content (loaded at module init, fallback if external file not found)
 const TDD_SKILL_CONTENT = `# TDD Workflow (Auto-Injected)
@@ -83,7 +90,7 @@ function hasExemptionComment(content: string | undefined): boolean {
  * Create the TDD Guard Hook
  */
 export function createTddGuardHook(
-  _ctx: TddGuardHookContext,
+  ctx: TddGuardHookContext,
   options: TddGuardHookOptions = {}
 ) {
   const config: TddGuardConfig = {
@@ -94,7 +101,44 @@ export function createTddGuardHook(
   // Track files that have been checked this session to avoid duplicate messages
   const checkedFiles = new Set<string>()
 
+  // Initialize storage and handlers
+  const storage = FileStorage.create(ctx.cwd)
+  const userPromptHandler = new UserPromptHandler(storage)
+  const sessionHandler = new SessionHandler(storage)
+  const postToolLintHandler = new PostToolLintHandler(storage)
+
   return {
+    "chat.message": async (
+      input: { sessionID: string },
+      output: {
+        parts?: Array<{ type: string; text?: string }>
+        blocked?: boolean
+        message?: string
+      }
+    ): Promise<void> => {
+      // Extract prompt text from parts
+      const promptText = output.parts
+        ?.filter((p) => p.type === "text" && p.text)
+        .map((p) => p.text)
+        .join("\n")
+        .trim() || ""
+
+      if (!promptText) {
+        return
+      }
+
+      // Handle /tdd on|off commands
+      const result = await userPromptHandler.processCommand(promptText)
+      if (result.handled) {
+        if (result.blocked) {
+          output.blocked = true
+        }
+        if (result.message) {
+          output.message = result.message
+        }
+      }
+    },
+
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
       output: {
@@ -110,8 +154,14 @@ export function createTddGuardHook(
         return
       }
 
-      // Check if hook is enabled
+      // Check if hook is enabled via config
       if (!config.enabled) {
+        return
+      }
+
+      // Check if hook is enabled via /tdd on|off command
+      const isUserEnabled = await userPromptHandler.isEnabled()
+      if (!isUserEnabled) {
         return
       }
 
@@ -178,6 +228,65 @@ Your edit to "${filePath}" was blocked because this is a Tier ${tier.tier} file.
 ${TDD_SKILL_CONTENT}`,
           })
         }
+      }
+    },
+
+    "tool.execute.after": async (
+      input: { tool: string; sessionID: string; callID: string },
+      output: {
+        args: Record<string, unknown>
+        output?: string
+      }
+    ): Promise<void> => {
+      // Only process Edit and Write tools
+      const toolLower = input.tool.toLowerCase()
+      if (toolLower !== "edit" && toolLower !== "write") {
+        return
+      }
+
+      // Check if hook is enabled via config
+      if (!config.enabled) {
+        return
+      }
+
+      // Check if hook is enabled via /tdd on|off command
+      const isUserEnabled = await userPromptHandler.isEnabled()
+      if (!isUserEnabled) {
+        return
+      }
+
+      // Get file path from args
+      const filePath = (output.args.filePath ?? output.args.file_path ?? output.args.path) as string | undefined
+      if (!filePath) {
+        return
+      }
+
+      // Skip test files for lint reminders
+      if (isTestFile(filePath)) {
+        return
+      }
+
+      // Append lint reminder to output
+      const lintReminder = `
+[TDD Guard - Lint Reminder]
+File modified: ${filePath}
+
+Consider running linting/type-checking to catch issues early:
+- TypeScript: \`bun run typecheck\` or \`tsc --noEmit\`
+- ESLint: \`eslint ${filePath}\`
+- Tests: \`bun test\` (if tests exist for this file)
+`
+      output.output = (output.output || "") + lintReminder
+    },
+
+    // Handle session lifecycle events
+    event: async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
+      if (input.event.type === "session.created") {
+        // Initialize session state
+        await sessionHandler.processSessionStart(JSON.stringify({
+          type: "session_start",
+          source: "startup",
+        }))
       }
     },
   }

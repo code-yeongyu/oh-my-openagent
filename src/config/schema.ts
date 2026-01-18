@@ -347,19 +347,40 @@ export const BrowserAutomationConfigSchema = z.object({
 })
 
 export const TmuxLayoutSchema = z.enum([
-  'main-horizontal',  // main pane top, agent panes bottom stack
-  'main-vertical',    // main pane left, agent panes right stack (default)
-  'tiled',            // all panes same size grid
-  'even-horizontal',  // all panes horizontal row
-  'even-vertical',    // all panes vertical stack
+  "main-horizontal",  // main pane top, agent panes bottom stack
+  "main-vertical",    // main pane left, agent panes right stack (default)
+  "tiled",            // all panes same size grid
+  "even-horizontal",  // all panes horizontal row
+  "even-vertical",    // all panes vertical stack
 ])
 
 export const TmuxConfigSchema = z.object({
   enabled: z.boolean().default(false),
-  layout: TmuxLayoutSchema.default('main-vertical'),
+  layout: TmuxLayoutSchema.default("main-vertical"),
   main_pane_size: z.number().min(20).max(80).default(60),
   main_pane_min_width: z.number().min(40).default(120),
   agent_pane_min_width: z.number().min(20).default(40),
+})
+
+export const RiskTierSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])
+
+export const TddGuardConfigSchema = z.object({
+  /** Enable TDD Guard Hook (default: false) */
+  enabled: z.boolean().optional(),
+  /** Enable Risk Tier based validation (default: true) */
+  risk_tier_enabled: z.boolean().optional(),
+  /** Minimum tier to enforce TDD (default: 2) */
+  min_enforce_tier: RiskTierSchema.optional(),
+  /** Glob patterns to ignore (default: ["*.md", "*.json", "*.yaml", "*.css"]) */
+  ignore_patterns: z.array(z.string()).optional(),
+  /** Reject tests with empty body (default: true) */
+  reject_empty_tests: z.boolean().optional(),
+  /** Reject tests without assertions (default: true) */
+  reject_missing_assertions: z.boolean().optional(),
+  /** Reject trivial assertions like expect(true).toBe(true) (default: true) */
+  reject_trivial_assertions: z.boolean().optional(),
+  /** Inject TDD Skill when edit is blocked (default: true) */
+  inject_skill_on_block: z.boolean().optional(),
 })
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -382,6 +403,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  tdd_guard: TddGuardConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -408,5 +430,7 @@ export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProvider
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
+export type TddGuardConfig = z.infer<typeof TddGuardConfigSchema>
+export type RiskTier = z.infer<typeof RiskTierSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

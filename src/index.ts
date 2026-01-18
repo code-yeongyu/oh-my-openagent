@@ -34,6 +34,8 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
+  // TDD Guard hook
+  createTddGuardHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -232,6 +234,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
+
+  // TDD Guard hook - enforces Test-Driven Development
+  const tddGuard = isHookEnabled("tdd-guard")
+    ? createTddGuardHook({ cwd: ctx.directory }, { config: pluginConfig.tdd_guard })
+    : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
 

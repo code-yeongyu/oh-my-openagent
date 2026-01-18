@@ -3084,6 +3084,55 @@
           "minimum": 20
         }
       }
+    },
+    "tdd_guard": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "risk_tier_enabled": {
+          "type": "boolean"
+        },
+        "min_enforce_tier": {
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 0
+            },
+            {
+              "type": "number",
+              "const": 1
+            },
+            {
+              "type": "number",
+              "const": 2
+            },
+            {
+              "type": "number",
+              "const": 3
+            }
+          ]
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reject_empty_tests": {
+          "type": "boolean"
+        },
+        "reject_missing_assertions": {
+          "type": "boolean"
+        },
+        "reject_trivial_assertions": {
+          "type": "boolean"
+        },
+        "inject_skill_on_block": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
