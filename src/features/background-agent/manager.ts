@@ -49,6 +49,11 @@ interface Todo {
   id: string
 }
 
+interface QueueItem {
+  task: BackgroundTask
+  input: LaunchInput
+}
+
 export class BackgroundManager {
   private static cleanupManagers = new Set<BackgroundManager>()
   private static cleanupRegistered = false
@@ -64,6 +69,9 @@ export class BackgroundManager {
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
 
+
+  private queuesByKey: Map<string, QueueItem[]> = new Map()
+  private processingKeys: Set<string> = new Set()
 
   constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
     this.tasks = new Map()
@@ -250,6 +258,13 @@ export class BackgroundManager {
       }
     }
     return undefined
+  }
+
+  private getConcurrencyKeyFromInput(input: LaunchInput): string {
+    if (input.model) {
+      return `${input.model.providerID}/${input.model.modelID}`
+    }
+    return input.agent
   }
 
   /**
@@ -1129,6 +1144,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.tasks.clear()
     this.notifications.clear()
     this.pendingByParent.clear()
+    this.queuesByKey.clear()
+    this.processingKeys.clear()
     this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 
