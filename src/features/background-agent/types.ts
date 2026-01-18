@@ -1,4 +1,5 @@
 export type BackgroundTaskStatus =
+  | "pending"
   | "running"
   | "completed"
   | "error"
@@ -14,14 +15,15 @@ export interface TaskProgress {
 
 export interface BackgroundTask {
   id: string
-  sessionID: string
+  sessionID?: string
   parentSessionID: string
   parentMessageID: string
   description: string
   prompt: string
   agent: string
   status: BackgroundTaskStatus
-  startedAt: Date
+  queuedAt?: Date
+  startedAt?: Date
   completedAt?: Date
   result?: string
   error?: string
