@@ -78,7 +78,6 @@ function buildSisyphusJuniorPrompt(promptAppend?: string): string {
 const BLOCKED_TOOLS = ["task", "delegate_task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
-  model: "anthropic/claude-sonnet-4-5",
   temperature: 0.1,
 } as const
 
@@ -90,7 +89,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     override = undefined
   }
 
-  const model = override?.model ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  const model = override?.model ?? systemDefaultModel
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append
@@ -123,7 +122,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
-  if (isGptModel(model)) {
+  if (model && isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }
 
@@ -184,7 +183,7 @@ export function createSisyphusJuniorAgent(
     } as AgentConfig
   }
 
-  if (isGptModel(model)) {
+  if (model && isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }
 

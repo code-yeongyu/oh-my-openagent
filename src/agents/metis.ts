@@ -278,9 +278,7 @@ const metisRestrictions = createAgentToolRestrictions([
   "delegate_task",
 ])
 
-const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
-
-export function createMetisAgent(model: string = DEFAULT_MODEL): AgentConfig {
+export function createMetisAgent(model: string | undefined): AgentConfig {
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
@@ -292,8 +290,6 @@ export function createMetisAgent(model: string = DEFAULT_MODEL): AgentConfig {
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
-
-export const metisAgent: AgentConfig = createMetisAgent()
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

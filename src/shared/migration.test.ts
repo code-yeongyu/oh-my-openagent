@@ -369,10 +369,9 @@ describe("shouldDeleteAgentConfig", () => {
   })
 
   test("returns true when all fields match category defaults", () => {
-    // #given: Config with fields matching category defaults
+    // #given: Config with fields matching category defaults (model is not in defaults anymore)
     const config = {
       category: "visual-engineering",
-      model: "google/gemini-3-pro-preview",
       temperature: 0.7,
     }
 

@@ -204,8 +204,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           model:
             prometheusOverride?.model ??
             categoryConfig?.model ??
-            defaultModel ??
-            "anthropic/claude-opus-4-5",
+            defaultModel,
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,

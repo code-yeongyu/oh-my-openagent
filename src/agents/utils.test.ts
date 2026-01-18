@@ -3,16 +3,28 @@ import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 
 describe("createBuiltinAgents with model overrides", () => {
-  test("Sisyphus with default model has thinking config", () => {
-    // #given - no overrides
+  test("Sisyphus with systemDefaultModel has thinking config", () => {
+    // #given
+    const systemDefaultModel = "anthropic/claude-opus-4-5"
 
     // #when
-    const agents = createBuiltinAgents()
+    const agents = createBuiltinAgents([], {}, undefined, systemDefaultModel)
 
     // #then
     expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
     expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
+  })
+
+  test("Sisyphus with no systemDefaultModel has undefined model", () => {
+    // #given - no overrides, no systemDefaultModel
+
+    // #when
+    const agents = createBuiltinAgents()
+
+    // #then
+    expect(agents.Sisyphus.model).toBeUndefined()
+    expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
   })
 
   test("Sisyphus with GPT model override has reasoningEffort, no thinking", () => {
@@ -43,17 +55,16 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.thinking).toBeUndefined()
   })
 
-  test("Oracle with default model has reasoningEffort", () => {
-    // #given - no overrides
+  test("Oracle with no systemDefaultModel has undefined model and thinking config", () => {
+    // #given - no overrides, no systemDefaultModel
 
     // #when
     const agents = createBuiltinAgents()
 
     // #then
-    expect(agents.oracle.model).toBe("openai/gpt-5.2")
-    expect(agents.oracle.reasoningEffort).toBe("medium")
-    expect(agents.oracle.textVerbosity).toBe("high")
-    expect(agents.oracle.thinking).toBeUndefined()
+    expect(agents.oracle.model).toBeUndefined()
+    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.oracle.reasoningEffort).toBeUndefined()
   })
 
   test("Oracle with Claude model override has thinking, no reasoningEffort", () => {
@@ -104,7 +115,7 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"])
 
     // #then
-    expect(agent.model).toBe("google/gemini-3-pro-preview")
+    expect(agent.model).toBeUndefined()
     expect(agent.temperature).toBe(0.7)
   })
 
@@ -228,7 +239,7 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"])
 
     // #then
-    expect(agent.model).toBe("openai/gpt-5.2")
+    expect(agent.model).toBeUndefined()
     expect(agent.temperature).toBe(0.1)
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
     expect(agent.prompt).toContain("Task description")

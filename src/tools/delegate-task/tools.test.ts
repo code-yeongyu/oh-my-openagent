@@ -38,23 +38,23 @@ function resolveCategoryConfig(
 
 describe("sisyphus-task", () => {
   describe("DEFAULT_CATEGORIES", () => {
-    test("visual-engineering category has gemini model", () => {
+    test("visual-engineering category has no hardcoded model (inherits from system)", () => {
       // #given
       const category = DEFAULT_CATEGORIES["visual-engineering"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3-pro-preview")
+      expect(category.model).toBeUndefined()
       expect(category.temperature).toBe(0.7)
     })
 
-    test("ultrabrain category has gpt model", () => {
+    test("ultrabrain category has no hardcoded model (inherits from system)", () => {
       // #given
       const category = DEFAULT_CATEGORIES["ultrabrain"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.2")
+      expect(category.model).toBeUndefined()
       expect(category.temperature).toBe(0.1)
     })
   })
@@ -126,7 +126,7 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("returns default config for builtin category", () => {
+    test("returns default config for builtin category with no model (inherits from parent/system)", () => {
       // #given
       const categoryName = "visual-engineering"
 
@@ -135,7 +135,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBeUndefined()
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -212,17 +212,17 @@ describe("sisyphus-task", () => {
       expect(result!.config.temperature).toBe(0.3)
     })
 
-    test("category default model takes precedence over parentModelString", () => {
-      // #given - builtin category has default model, parent model should NOT override it
+    test("parentModelString is used when category has no model (builtin categories no longer have hardcoded models)", () => {
+      // #given - builtin category has no hardcoded model, parent model provides fallback
       const categoryName = "visual-engineering"
       const parentModelString = "cliproxy/claude-opus-4-5"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { parentModelString })
 
-      // #then - category default model wins, parent model is ignored for builtin categories
+      // #then - parent model is used since categories no longer have hardcoded models
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
     })
 
     test("parentModelString is used as fallback when category has no default model", () => {
@@ -255,7 +255,7 @@ describe("sisyphus-task", () => {
       expect(result!.config.model).toBe("my-provider/my-model")
     })
 
-    test("default model is used when no user model and no parentModelString", () => {
+    test("model is undefined when no user model, no parentModelString, and no systemDefaultModel", () => {
       // #given
       const categoryName = "visual-engineering"
 
@@ -264,7 +264,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBeUndefined()
     })
   })
 
@@ -438,7 +438,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({}) },
+        config: { get: async () => ({ model: "anthropic/claude-sonnet-4-5" }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
@@ -615,15 +615,15 @@ describe("sisyphus-task", () => {
       
       const mockClient = {
         session: {
+          create: async () => ({ data: { id: "ses_sync_error" } }),
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_sync_error_test" } }),
           prompt: async () => {
             throw new Error("JSON Parse error: Unexpected EOF")
           },
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
-        config: { get: async () => ({}) },
+        config: { get: async () => ({ model: "anthropic/claude-sonnet-4-5" }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -683,7 +683,7 @@ describe("sisyphus-task", () => {
           }),
           status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
         },
-        config: { get: async () => ({}) },
+        config: { get: async () => ({ model: "anthropic/claude-sonnet-4-5" }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -736,7 +736,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
-        config: { get: async () => ({}) },
+        config: { get: async () => ({ model: "anthropic/claude-sonnet-4-5" }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -879,37 +879,32 @@ describe("sisyphus-task", () => {
   })
 
   describe("modelInfo detection via resolveCategoryConfig", () => {
-    test("when parentModelString exists but default model wins - modelInfo should report category-default", () => {
-      // #given - Bug scenario: parentModelString is passed but userModel is undefined,
-      // and the resolution order is: userModel ?? parentModelString ?? defaultModel
-      // If parentModelString matches the resolved model, it's "inherited"
-      // If defaultModel matches, it's "category-default"
+    test("when no model sources exist - resolved model should be undefined", () => {
+      // #given - Categories no longer have hardcoded default models
       const categoryName = "ultrabrain"
       const parentModelString = undefined
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { parentModelString })
       
-      // #then - actualModel should be defaultModel, type should be "category-default"
+      // #then - model is undefined when no sources provide a model
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      const defaultModel = DEFAULT_CATEGORIES[categoryName]?.model
-      expect(actualModel).toBe(defaultModel)
-      expect(actualModel).toBe("openai/gpt-5.2")
+      expect(actualModel).toBeUndefined()
     })
 
-    test("category default model takes precedence over parentModelString for builtin category", () => {
-      // #given - builtin ultrabrain category has default model gpt-5.2
+    test("parentModelString is used as fallback when category has no default model", () => {
+      // #given - builtin ultrabrain category no longer has a default model
       const categoryName = "ultrabrain"
       const parentModelString = "cliproxy/claude-opus-4-5"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { parentModelString })
       
-      // #then - category default model wins, not the parent model
+      // #then - parentModelString is used as fallback
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("openai/gpt-5.2")
+      expect(actualModel).toBe("cliproxy/claude-opus-4-5")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of parentModelString", () => {

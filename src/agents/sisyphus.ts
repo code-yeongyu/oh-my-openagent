@@ -14,8 +14,6 @@ import {
   categorizeTools,
 } from "./sisyphus-prompt-builder"
 
-const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
-
 const SISYPHUS_ROLE_SECTION = `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
@@ -607,7 +605,7 @@ function buildDynamicSisyphusPrompt(
 }
 
 export function createSisyphusAgent(
-  model: string = DEFAULT_MODEL,
+  model: string | undefined,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[]
@@ -630,11 +628,9 @@ export function createSisyphusAgent(
     permission,
   }
 
-  if (isGptModel(model)) {
+  if (model && isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" }
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
-
-export const sisyphusAgent = createSisyphusAgent()

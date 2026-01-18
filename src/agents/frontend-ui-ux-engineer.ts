@@ -2,8 +2,6 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "google/gemini-3-pro-preview"
-
 export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",
   cost: "CHEAP",
@@ -20,7 +18,7 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createFrontendUiUxEngineerAgent(
-  model: string = DEFAULT_MODEL
+  model: string | undefined
 ): AgentConfig {
   const restrictions = createAgentToolRestrictions([])
 
@@ -105,5 +103,3 @@ Match implementation complexity to aesthetic vision:
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
   }
 }
-
-export const frontendUiUxEngineerAgent = createFrontendUiUxEngineerAgent()

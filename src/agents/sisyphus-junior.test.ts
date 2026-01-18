@@ -72,7 +72,19 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   })
 
   describe("defaults", () => {
-    test("uses default model when no override", () => {
+    test("uses systemDefaultModel when no override", () => {
+      // #given
+      const override = {}
+      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+
+      // #when
+      const result = createSisyphusJuniorAgentWithOverrides(override, systemDefaultModel)
+
+      // #then
+      expect(result.model).toBe(systemDefaultModel)
+    })
+
+    test("uses undefined model when no override and no systemDefaultModel", () => {
       // #given
       const override = {}
 
@@ -80,7 +92,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // #then
-      expect(result.model).toBe(SISYPHUS_JUNIOR_DEFAULTS.model)
+      expect(result.model).toBeUndefined()
     })
 
     test("uses default temperature when no override", () => {
@@ -96,19 +108,20 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   })
 
   describe("disable semantics", () => {
-    test("disable: true causes override block to be ignored", () => {
+    test("disable: true causes override block to be ignored, uses systemDefaultModel", () => {
       // #given
       const override = {
         disable: true,
         model: "openai/gpt-5.2",
         temperature: 0.9,
       }
+      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
 
       // #when
-      const result = createSisyphusJuniorAgentWithOverrides(override)
+      const result = createSisyphusJuniorAgentWithOverrides(override, systemDefaultModel)
 
-      // #then - defaults should be used, not the overrides
-      expect(result.model).toBe(SISYPHUS_JUNIOR_DEFAULTS.model)
+      // #then - systemDefaultModel should be used, not the overrides
+      expect(result.model).toBe(systemDefaultModel)
       expect(result.temperature).toBe(SISYPHUS_JUNIOR_DEFAULTS.temperature)
     })
   })

@@ -443,7 +443,7 @@ ${textContent || "(No text output)"}`
         const categoryDefaultModel = DEFAULT_CATEGORIES[args.category]?.model
 
         if (!actualModel) {
-          return `No model configured. Set a model in your OpenCode config, plugin config, or use a category with a default model.`
+          return `No model configured. Set a model in your OpenCode config, plugin config, or category config.`
         }
 
         if (!parseModelString(actualModel)) {

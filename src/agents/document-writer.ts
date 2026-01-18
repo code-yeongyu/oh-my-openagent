@@ -2,8 +2,6 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "google/gemini-3-flash-preview"
-
 export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",
   cost: "CHEAP",
@@ -14,7 +12,7 @@ export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createDocumentWriterAgent(
-  model: string = DEFAULT_MODEL
+  model: string | undefined
 ): AgentConfig {
   const restrictions = createAgentToolRestrictions([])
 
@@ -220,5 +218,3 @@ You are a technical writer who creates documentation that developers actually wa
 </guide>`,
   }
 }
-
-export const documentWriterAgent = createDocumentWriterAgent()

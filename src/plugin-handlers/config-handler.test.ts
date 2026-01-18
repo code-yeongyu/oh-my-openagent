@@ -12,7 +12,7 @@ describe("Prometheus category config resolution", () => {
 
     // #then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2")
+    expect(config?.model).toBeUndefined() // Models are no longer hardcoded in categories
     expect(config?.temperature).toBe(0.1)
   })
 
@@ -25,7 +25,7 @@ describe("Prometheus category config resolution", () => {
 
     // #then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("google/gemini-3-pro-preview")
+    expect(config?.model).toBeUndefined() // Models are no longer hardcoded in categories
     expect(config?.temperature).toBe(0.7)
   })
 
@@ -73,7 +73,7 @@ describe("Prometheus category config resolution", () => {
 
     // #then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2")
+    expect(config?.model).toBeUndefined() // Models are no longer hardcoded in categories
     expect(config?.temperature).toBe(0.1)
   })
 

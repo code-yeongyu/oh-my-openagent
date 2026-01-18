@@ -103,18 +103,22 @@ oh-my-opencode/
 
 ## AGENT MODELS
 
-| Agent | Default Model | Purpose |
-|-------|---------------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator with extended thinking |
-| oracle | openai/gpt-5.2 | Read-only consultation, high-IQ debugging |
-| librarian | opencode/glm-4.7-free | Multi-repo analysis, docs, GitHub search |
-| explore | opencode/grok-code | Fast codebase exploration (contextual grep) |
-| frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, visual design |
-| document-writer | google/gemini-3-flash | Technical documentation |
-| multimodal-looker | google/gemini-3-flash | PDF/image analysis |
-| Prometheus (Planner) | anthropic/claude-opus-4-5 | Strategic planning, interview mode |
-| Metis (Plan Consultant) | anthropic/claude-sonnet-4-5 | Pre-planning analysis |
-| Momus (Plan Reviewer) | anthropic/claude-sonnet-4-5 | Plan validation |
+Models are inherited from system default (OpenCode config) unless overridden via user config.
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| Sisyphus | *(inherited)* | Primary orchestrator with extended thinking |
+| oracle | *(inherited)* | Read-only consultation, high-IQ debugging |
+| librarian | *(inherited)* | Multi-repo analysis, docs, GitHub search |
+| explore | *(inherited)* | Fast codebase exploration (contextual grep) |
+| frontend-ui-ux-engineer | *(inherited)* | UI generation, visual design |
+| document-writer | *(inherited)* | Technical documentation |
+| multimodal-looker | *(inherited)* | PDF/image analysis |
+| Prometheus (Planner) | *(inherited)* | Strategic planning, interview mode |
+| Metis (Plan Consultant) | *(inherited)* | Pre-planning analysis |
+| Momus (Plan Reviewer) | *(inherited)* | Plan validation |
+
+**Resolution chain**: User config → Parent model → System default
 
 ## COMMANDS
 

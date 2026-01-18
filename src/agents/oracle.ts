@@ -3,8 +3,6 @@ import type { AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
-const DEFAULT_MODEL = "openai/gpt-5.2"
-
 export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",
   cost: "EXPENSIVE",
@@ -97,7 +95,7 @@ Organize your final answer in three tiers:
 
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`
 
-export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
+export function createOracleAgent(model: string | undefined): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
@@ -115,11 +113,9 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     prompt: ORACLE_SYSTEM_PROMPT,
   } as AgentConfig
 
-  if (isGptModel(model)) {
+  if (model && isGptModel(model)) {
     return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
-
-export const oracleAgent = createOracleAgent()
