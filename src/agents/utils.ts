@@ -18,7 +18,11 @@ import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-c
 
 type AgentSource = AgentFactory | AgentConfig
 
-const agentSources: Record<BuiltinAgentName, AgentSource> = {
+// orchestrator-sisyphus is excluded because it requires special parameters (not just model)
+// and is handled separately in createBuiltinAgents()
+type StandardAgentName = Exclude<BuiltinAgentName, "orchestrator-sisyphus">
+
+const agentSources: Record<StandardAgentName, AgentSource> = {
   Sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
@@ -28,7 +32,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   "Metis (Plan Consultant)": createMetisAgent,
   "Momus (Plan Reviewer)": createMomusAgent,
-} as Record<BuiltinAgentName, AgentSource>
+}
 
 /**
  * Metadata for each agent, used to build Sisyphus's dynamic prompt sections
@@ -141,10 +145,9 @@ export function createBuiltinAgents(
     : DEFAULT_CATEGORIES
 
   for (const [name, source] of Object.entries(agentSources)) {
-    const agentName = name as BuiltinAgentName
+    const agentName = name as StandardAgentName
 
     if (agentName === "Sisyphus") continue
-    if (agentName === "orchestrator-sisyphus") continue
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
