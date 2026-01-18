@@ -101,10 +101,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     if (!(config.model as string | undefined)?.trim()) {
       throw new Error(
-        'oh-my-opencode requires a default model to be configured.\n' +
-        'Please set one in OpenCode:\n' +
-        '  opencode config set model "provider/model-name"\n' +
-        'Example: opencode config set model "anthropic/claude-sonnet-4-5"'
+        'oh-my-opencode requires a default model.\n\n' +
+        'Add this to ~/.config/opencode/opencode.jsonc:\n\n' +
+        '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+        '(Replace with your preferred provider/model)'
       )
     }
 
