@@ -5,8 +5,8 @@
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.1)
-> > **オーケストレーターがベータ版で利用可能になりました。`oh-my-opencode@3.0.0-beta.1`を使用してインストールしてください。**
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
+> > **オーケストレーターがベータ版で利用可能になりました。`oh-my-opencode@3.0.0-beta.10`を使用してインストールしてください。**
 >
 > 一緒に歩みましょう！
 >
