@@ -9,9 +9,7 @@ export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
   triggers: [],
 }
 
-export function createMultimodalLookerAgent(
-  model: string | undefined
-): AgentConfig {
+export function createMultimodalLookerAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolAllowlist(["read"])
 
   return {

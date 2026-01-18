@@ -17,9 +17,7 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createFrontendUiUxEngineerAgent(
-  model: string | undefined
-): AgentConfig {
+export function createFrontendUiUxEngineerAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([])
 
   return {

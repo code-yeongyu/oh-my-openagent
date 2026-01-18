@@ -95,7 +95,7 @@ Organize your final answer in three tiers:
 
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.`
 
-export function createOracleAgent(model: string | undefined): AgentConfig {
+export function createOracleAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",

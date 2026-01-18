@@ -22,7 +22,7 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createExploreAgent(model: string | undefined): AgentConfig {
+export function createExploreAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",

@@ -278,7 +278,7 @@ const metisRestrictions = createAgentToolRestrictions([
   "delegate_task",
 ])
 
-export function createMetisAgent(model: string | undefined): AgentConfig {
+export function createMetisAgent(model?: string): AgentConfig {
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",

@@ -605,7 +605,7 @@ function buildDynamicSisyphusPrompt(
 }
 
 export function createSisyphusAgent(
-  model: string | undefined,
+  model?: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[]

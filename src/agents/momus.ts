@@ -389,7 +389,7 @@ Use structured format, **in the same language as the work plan**.
 **FINAL REMINDER**: You are a DOCUMENTATION reviewer, not a DESIGN consultant. The author's implementation direction is SACRED. Your job ends at "Is this well-documented enough to execute?" - NOT "Is this the right approach?"
 `
 
-export function createMomusAgent(model: string | undefined): AgentConfig {
+export function createMomusAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",

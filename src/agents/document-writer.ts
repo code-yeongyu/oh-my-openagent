@@ -11,9 +11,7 @@ export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createDocumentWriterAgent(
-  model: string | undefined
-): AgentConfig {
+export function createDocumentWriterAgent(model?: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([])
 
   return {
