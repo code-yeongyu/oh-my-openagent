@@ -130,7 +130,36 @@ export class BackgroundManager {
   }
 
   private async processKey(key: string): Promise<void> {
-    // TODO: Implement in Task 4
+    if (this.processingKeys.has(key)) {
+      return
+    }
+
+    this.processingKeys.add(key)
+
+    try {
+      const queue = this.queuesByKey.get(key)
+      while (queue && queue.length > 0) {
+        const item = queue[0]
+
+        await this.concurrencyManager.acquire(key)
+
+        if (item.task.status === "cancelled") {
+          this.concurrencyManager.release(key)
+          queue.shift()
+          continue
+        }
+
+        try {
+          await this.startTask(item)
+        } catch (error) {
+          log("[background-agent] Error starting task:", error)
+        }
+
+        queue.shift()
+      }
+    } finally {
+      this.processingKeys.delete(key)
+    }
   }
 
   private async startTask(item: QueueItem): Promise<void> {
