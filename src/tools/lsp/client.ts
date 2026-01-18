@@ -4,6 +4,7 @@ import { extname, resolve } from "path"
 import { pathToFileURL } from "node:url"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
+import { log } from "../../shared/logger"
 
 interface ManagedClient {
   client: LSPClient
@@ -149,13 +150,19 @@ class LSPServerManager {
       isInitializing: true,
     })
 
-    initPromise.then(() => {
-      const m = this.clients.get(key)
-      if (m) {
-        m.initPromise = undefined
-        m.isInitializing = false
-      }
-    })
+    initPromise
+      .then(() => {
+        const m = this.clients.get(key)
+        if (m) {
+          m.initPromise = undefined
+          m.isInitializing = false
+        }
+      })
+      .catch((err) => {
+        log(`[lsp] warmupClient failed for ${server.id}:`, err?.message ?? err)
+        this.clients.delete(key)
+        client.stop().catch(() => {})
+      })
   }
 
   releaseClient(root: string, serverId: string): void {
