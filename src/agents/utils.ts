@@ -151,7 +151,7 @@ export function createBuiltinAgents(
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
-    const model = override?.model
+    const model = override?.model ?? systemDefaultModel
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
 
