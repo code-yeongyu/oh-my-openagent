@@ -192,16 +192,23 @@ async function publishAllPackages(version: string): Promise<void> {
   if (skipPlatform) {
     console.log("\n⏭️  Skipping platform packages (SKIP_PLATFORM_PACKAGES=true)")
   } else {
-    console.log("\n📦 Publishing platform packages...")
+    console.log("\n📦 Publishing platform packages in parallel...")
     
-    // Publish platform packages first
-    for (const platform of PLATFORM_PACKAGES) {
+    // Publish platform packages in parallel for speed (avoids OIDC token expiration)
+    const publishPromises = PLATFORM_PACKAGES.map(async (platform) => {
       const pkgDir = join(process.cwd(), "packages", platform)
       const pkgName = `oh-my-opencode-${platform}`
       
-      console.log(`\n  Publishing ${pkgName}...`)
+      console.log(`  Starting ${pkgName}...`)
       const result = await publishPackage(pkgDir, distTag)
       
+      return { platform, pkgName, result }
+    })
+    
+    const results = await Promise.all(publishPromises)
+    
+    const failures: string[] = []
+    for (const { pkgName, result } of results) {
       if (result.success) {
         if (result.alreadyPublished) {
           console.log(`  ✓ ${pkgName}@${version} (already published)`)
@@ -210,8 +217,12 @@ async function publishAllPackages(version: string): Promise<void> {
         }
       } else {
         console.error(`  ✗ ${pkgName} failed: ${result.error}`)
-        throw new Error(`Failed to publish ${pkgName}`)
+        failures.push(pkgName)
       }
+    }
+    
+    if (failures.length > 0) {
+      throw new Error(`Failed to publish: ${failures.join(", ")}`)
     }
   }
   
