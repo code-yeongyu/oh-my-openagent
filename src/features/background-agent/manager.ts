@@ -96,9 +96,53 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    const concurrencyKey = input.agent
+    // Create task immediately with status="pending"
+    const task: BackgroundTask = {
+      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+      status: "pending",
+      queuedAt: new Date(),
+      // Do NOT set startedAt - will be set when running
+      // Do NOT set sessionID - will be set when running
+      description: input.description,
+      prompt: input.prompt,
+      agent: input.agent,
+      parentSessionID: input.parentSessionID,
+      parentMessageID: input.parentMessageID,
+      parentModel: input.parentModel,
+      parentAgent: input.parentAgent,
+      model: input.model,
+    }
 
-    await this.concurrencyManager.acquire(concurrencyKey)
+    this.tasks.set(task.id, task)
+
+    // Add to queue
+    const key = this.getConcurrencyKeyFromInput(input)
+    const queue = this.queuesByKey.get(key) ?? []
+    queue.push({ task, input })
+    this.queuesByKey.set(key, queue)
+
+    log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
+
+    // Trigger processing (fire-and-forget)
+    this.processKey(key)
+
+    return task
+  }
+
+  private async processKey(key: string): Promise<void> {
+    // TODO: Implement in Task 4
+  }
+
+  private async startTask(item: QueueItem): Promise<void> {
+    const { task, input } = item
+
+    log("[background-agent] Starting task:", {
+      taskId: task.id,
+      agent: input.agent,
+      model: input.model,
+    })
+
+    const concurrencyKey = this.getConcurrencyKeyFromInput(input)
 
     const parentSession = await this.client.session.get({
       path: { id: input.parentSessionID },
@@ -130,29 +174,17 @@ export class BackgroundManager {
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
-    const task: BackgroundTask = {
-      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
-      sessionID,
-      parentSessionID: input.parentSessionID,
-      parentMessageID: input.parentMessageID,
-      description: input.description,
-      prompt: input.prompt,
-      agent: input.agent,
-      status: "running",
-      startedAt: new Date(),
-      progress: {
-        toolCalls: 0,
-        lastUpdate: new Date(),
-      },
-      parentModel: input.parentModel,
-      parentAgent: input.parentAgent,
-      model: input.model,
-      concurrencyKey,
-      concurrencyGroup: concurrencyKey,
+    // Update task to running state
+    task.status = "running"
+    task.startedAt = new Date()
+    task.sessionID = sessionID
+    task.progress = {
+      toolCalls: 0,
+      lastUpdate: new Date(),
     }
+    task.concurrencyKey = concurrencyKey
+    task.concurrencyGroup = concurrencyKey
 
-
-    this.tasks.set(task.id, task)
     this.startPolling()
 
     // Track for batched notifications
@@ -220,8 +252,6 @@ export class BackgroundManager {
         })
       }
     })
-
-    return task
   }
 
   getTask(id: string): BackgroundTask | undefined {
