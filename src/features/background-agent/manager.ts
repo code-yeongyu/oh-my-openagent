@@ -115,6 +115,13 @@ export class BackgroundManager {
 
     this.tasks.set(task.id, task)
 
+    // Track for batched notifications immediately (pending state)
+    if (input.parentSessionID) {
+      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+      pending.add(task.id)
+      this.pendingByParent.set(input.parentSessionID, pending)
+    }
+
     // Add to queue
     const key = this.getConcurrencyKeyFromInput(input)
     const queue = this.queuesByKey.get(key) ?? []
@@ -215,11 +222,6 @@ export class BackgroundManager {
     task.concurrencyGroup = concurrencyKey
 
     this.startPolling()
-
-    // Track for batched notifications
-    const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
-    pending.add(task.id)
-    this.pendingByParent.set(input.parentSessionID, pending)
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
@@ -358,9 +360,8 @@ export class BackgroundManager {
       subagentSessions.add(existingTask.sessionID)
       this.startPolling()
 
-      // Track for batched notifications only if task is still running
-      // Don't add stale entries for completed tasks
-      if (existingTask.status === "running") {
+      // Track for batched notifications if task is pending or running
+      if (existingTask.status === "pending" || existingTask.status === "running") {
         const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
         pending.add(existingTask.id)
         this.pendingByParent.set(input.parentSessionID, pending)
@@ -404,11 +405,11 @@ export class BackgroundManager {
     subagentSessions.add(input.sessionID)
     this.startPolling()
 
-
-    // Track for batched notifications (external tasks need tracking too)
-    const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
-    pending.add(task.id)
-    this.pendingByParent.set(input.parentSessionID, pending)
+    if (input.parentSessionID) {
+      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+      pending.add(task.id)
+      this.pendingByParent.set(input.parentSessionID, pending)
+    }
 
     log("[background-agent] Registered external task:", { taskId: task.id, sessionID: input.sessionID })
 
@@ -455,10 +456,11 @@ export class BackgroundManager {
     this.startPolling()
     subagentSessions.add(existingTask.sessionID)
 
-    // Track for batched notifications (P2 fix: resumed tasks need tracking too)
-    const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
-    pending.add(existingTask.id)
-    this.pendingByParent.set(input.parentSessionID, pending)
+    if (input.parentSessionID) {
+      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+      pending.add(existingTask.id)
+      this.pendingByParent.set(input.parentSessionID, pending)
+    }
 
     const toastManager = getTaskToastManager()
     if (toastManager) {
@@ -873,9 +875,8 @@ export class BackgroundManager {
     
     let notification: string
     if (allComplete) {
-      // All tasks complete - build summary
       const completedTasks = Array.from(this.tasks.values())
-        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running")
+        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
         .map(t => `- \`${t.id}\`: ${t.description}`)
         .join("\n")
 
