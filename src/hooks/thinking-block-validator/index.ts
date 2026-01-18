@@ -63,14 +63,21 @@ function hasContentParts(parts: Part[]): boolean {
   })
 }
 
+// Meta types that don't count as "content" for thinking validation
+const META_TYPES = new Set(["step-start", "step-finish"])
+
 /**
  * Check if a message starts with a thinking/reasoning block
+ * Skips meta-types like step-start/step-finish
  */
 function startsWithThinkingBlock(parts: Part[]): boolean {
   if (!parts || parts.length === 0) return false
 
-  const firstPart = parts[0]
-  const type = firstPart.type as string
+  // Find first non-meta part
+  const firstContentPart = parts.find(p => !META_TYPES.has(p.type as string))
+  if (!firstContentPart) return false
+
+  const type = firstContentPart.type as string
   return type === "thinking" || type === "reasoning"
 }
 
@@ -140,8 +147,13 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
       }
 
       // Get the model info from the last user message
+      // Model can be in info.modelID, info.model.modelID, or info.model (string)
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as any)?.modelID || ""
+      const info = lastUserMessage?.info as any
+      const modelID = info?.modelID
+        || info?.model?.modelID
+        || (typeof info?.model === "string" ? info.model : "")
+        || ""
 
       // Only process if extended thinking might be enabled
       if (!isExtendedThinkingModel(modelID)) {

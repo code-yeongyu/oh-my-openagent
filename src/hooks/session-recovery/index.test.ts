@@ -1,5 +1,9 @@
-import { describe, expect, it } from "bun:test"
-import { detectErrorType } from "./index"
+import { describe, expect, it, beforeEach, afterEach, mock, spyOn } from "bun:test"
+import { detectErrorType, createSessionRecoveryHook } from "./index"
+import * as storage from "./storage"
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { join } from "node:path"
+import { PART_STORAGE, MESSAGE_STORAGE } from "./constants"
 
 describe("detectErrorType", () => {
   describe("thinking_block_order errors", () => {
@@ -199,5 +203,164 @@ describe("detectErrorType", () => {
       // #then should return thinking_block_order
       expect(result).toBe("thinking_block_order")
     })
+  })
+})
+
+describe("recoverToolResultMissing", () => {
+  const TEST_SESSION_ID = "ses_test_recovery_123"
+  const TEST_USER_MSG_ID = "msg_user_001"
+  const TEST_PREV_ASSISTANT_ID = "msg_assistant_001"  // Previous assistant with tools
+  const TEST_FAILED_ASSISTANT_ID = "msg_assistant_002"  // Failed message (no parts)
+  const TEST_TOOL_CALL_ID = "toolu_01abc123xyz"
+
+  // Storage paths for test cleanup
+  const getTestPartDir = (msgId: string) => join(PART_STORAGE, msgId)
+  const getTestMessageDir = () => join(MESSAGE_STORAGE, TEST_SESSION_ID)
+
+  beforeEach(() => {
+    // Create test directories
+    const partDir = getTestPartDir(TEST_PREV_ASSISTANT_ID)
+    const msgDir = getTestMessageDir()
+
+    if (!existsSync(partDir)) {
+      mkdirSync(partDir, { recursive: true })
+    }
+    if (!existsSync(msgDir)) {
+      mkdirSync(msgDir, { recursive: true })
+    }
+
+    // Write previous assistant message with tool parts
+    const toolPart = {
+      id: "prt_001",
+      sessionID: TEST_SESSION_ID,
+      messageID: TEST_PREV_ASSISTANT_ID,
+      type: "tool",
+      callID: TEST_TOOL_CALL_ID,
+      tool: "delegate_task",
+      state: {
+        status: "completed",
+        input: { prompt: "test" },
+        output: "done"
+      }
+    }
+    writeFileSync(
+      join(partDir, "prt_001.json"),
+      JSON.stringify(toolPart, null, 2)
+    )
+
+    // Write message metadata for both messages
+    const prevAssistantMeta = {
+      id: TEST_PREV_ASSISTANT_ID,
+      sessionID: TEST_SESSION_ID,
+      role: "assistant",
+      parentID: TEST_USER_MSG_ID,
+      time: { created: 1000, completed: 2000 }
+    }
+    const failedAssistantMeta = {
+      id: TEST_FAILED_ASSISTANT_ID,
+      sessionID: TEST_SESSION_ID,
+      role: "assistant",
+      parentID: TEST_USER_MSG_ID,
+      time: { created: 3000 }
+      // Note: no 'completed' - this message failed
+    }
+    writeFileSync(
+      join(msgDir, `${TEST_PREV_ASSISTANT_ID}.json`),
+      JSON.stringify(prevAssistantMeta, null, 2)
+    )
+    writeFileSync(
+      join(msgDir, `${TEST_FAILED_ASSISTANT_ID}.json`),
+      JSON.stringify(failedAssistantMeta, null, 2)
+    )
+  })
+
+  afterEach(() => {
+    // Cleanup test directories
+    try {
+      rmSync(getTestPartDir(TEST_PREV_ASSISTANT_ID), { recursive: true, force: true })
+      rmSync(getTestPartDir(TEST_FAILED_ASSISTANT_ID), { recursive: true, force: true })
+      rmSync(getTestMessageDir(), { recursive: true, force: true })
+    } catch {
+      // Ignore cleanup errors
+    }
+  })
+
+  it("should find tool_use from PREVIOUS assistant message when failed message has no parts", async () => {
+    // #given
+    // - Previous assistant message (msg_assistant_001) has tool parts with callID
+    // - Failed assistant message (msg_assistant_002) has NO parts (API never responded)
+    // - Error says tool_use without tool_result
+
+    // Mock the client
+    let promptCalled = false
+    let promptBody: unknown = null
+    const mockClient = {
+      session: {
+        abort: mock(() => Promise.resolve()),
+        messages: mock(() => Promise.resolve({
+          data: [
+            {
+              info: {
+                id: TEST_PREV_ASSISTANT_ID,
+                role: "assistant",
+                sessionID: TEST_SESSION_ID,
+              },
+              parts: [
+                {
+                  type: "tool",
+                  callID: TEST_TOOL_CALL_ID,
+                  tool: "delegate_task",
+                  state: { status: "completed", input: {} }
+                }
+              ]
+            },
+            {
+              info: {
+                id: TEST_FAILED_ASSISTANT_ID,
+                role: "assistant",
+                sessionID: TEST_SESSION_ID,
+              },
+              parts: []  // EMPTY - this is the bug scenario
+            }
+          ]
+        })),
+        prompt: mock((args: unknown) => {
+          promptCalled = true
+          promptBody = (args as { body: unknown }).body
+          return Promise.resolve()
+        })
+      },
+      tui: {
+        showToast: mock(() => Promise.resolve())
+      }
+    }
+
+    const mockCtx = {
+      client: mockClient,
+      directory: "/test"
+    }
+
+    const hook = createSessionRecoveryHook(mockCtx as any)
+
+    // #when - recovery is triggered for the failed message
+    const result = await hook.handleSessionRecovery({
+      id: TEST_FAILED_ASSISTANT_ID,
+      role: "assistant",
+      sessionID: TEST_SESSION_ID,
+      error: {
+        message: `messages.1: tool_use ids were found without tool_result blocks immediately after: ${TEST_TOOL_CALL_ID}`
+      }
+    })
+
+    // #then - should have called prompt with tool_result for the tool from PREVIOUS message
+    expect(result).toBe(true)
+    expect(promptCalled).toBe(true)
+    expect(promptBody).toBeDefined()
+
+    const body = promptBody as { parts: Array<{ type: string; tool_use_id: string }> }
+    expect(body.parts).toBeDefined()
+    expect(body.parts.length).toBeGreaterThan(0)
+    expect(body.parts[0].type).toBe("tool_result")
+    expect(body.parts[0].tool_use_id).toBe(TEST_TOOL_CALL_ID)
   })
 })

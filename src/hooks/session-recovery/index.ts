@@ -152,23 +152,80 @@ function extractToolUseIds(parts: MessagePart[]): string[] {
   return parts.filter((p): p is ToolUsePart => p.type === "tool_use" && !!p.id).map((p) => p.id)
 }
 
+function convertStoredPartsToMessageParts(messageID: string): MessagePart[] {
+  const storedParts = readParts(messageID)
+  return storedParts.map((p) => ({
+    type: p.type === "tool" ? "tool_use" : p.type,
+    id: "callID" in p ? (p as { callID?: string }).callID : p.id,
+    name: "tool" in p ? (p as { tool?: string }).tool : undefined,
+    input: "state" in p ? (p as { state?: { input?: Record<string, unknown> } }).state?.input : undefined,
+  }))
+}
+
+function normalizePartsToToolUse(parts: MessagePart[]): MessagePart[] {
+  // Convert OpenCode format (type: "tool", callID) to Anthropic format (type: "tool_use", id)
+  return parts.map((p) => {
+    if (p.type === "tool" || p.type === "tool_use") {
+      const callID = (p as { callID?: string }).callID
+      return {
+        ...p,
+        type: "tool_use" as const,
+        id: callID || p.id,
+      }
+    }
+    return p
+  })
+}
+
+function getToolUseIdsFromMessage(msg: MessageData): string[] {
+  let parts = msg.parts || []
+
+  // Fallback to filesystem storage if API parts are empty
+  if (parts.length === 0 && msg.info?.id) {
+    parts = convertStoredPartsToMessageParts(msg.info.id)
+  }
+
+  // Normalize to Anthropic format and extract IDs
+  const normalizedParts = normalizePartsToToolUse(parts)
+  return extractToolUseIds(normalizedParts)
+}
+
+function findToolUseIdsFromMessages(
+  failedAssistantMsg: MessageData,
+  allMessages: MessageData[]
+): string[] {
+  // First try the failed message itself
+  let toolUseIds = getToolUseIdsFromMessage(failedAssistantMsg)
+
+  if (toolUseIds.length > 0) {
+    return toolUseIds
+  }
+
+  // Failed message has no tool parts - search backwards for previous assistant message with tools
+  // This handles the case where API error occurred on a NEW assistant message that has no parts yet
+  const failedMsgId = failedAssistantMsg.info?.id
+  const failedMsgIndex = allMessages.findIndex((m) => m.info?.id === failedMsgId)
+
+  for (let i = failedMsgIndex - 1; i >= 0; i--) {
+    const msg = allMessages[i]
+    if (msg.info?.role !== "assistant") continue
+
+    toolUseIds = getToolUseIdsFromMessage(msg)
+    if (toolUseIds.length > 0) {
+      return toolUseIds
+    }
+  }
+
+  return []
+}
+
 async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  failedAssistantMsg: MessageData,
+  allMessages: MessageData[]
 ): Promise<boolean> {
-  // Try API parts first, fallback to filesystem if empty
-  let parts = failedAssistantMsg.parts || []
-  if (parts.length === 0 && failedAssistantMsg.info?.id) {
-    const storedParts = readParts(failedAssistantMsg.info.id)
-    parts = storedParts.map((p) => ({
-      type: p.type === "tool" ? "tool_use" : p.type,
-      id: "callID" in p ? (p as { callID?: string }).callID : p.id,
-      name: "tool" in p ? (p as { tool?: string }).tool : undefined,
-      input: "state" in p ? (p as { state?: { input?: Record<string, unknown> } }).state?.input : undefined,
-    }))
-  }
-  const toolUseIds = extractToolUseIds(parts)
+  const toolUseIds = findToolUseIdsFromMessages(failedAssistantMsg, allMessages)
 
   if (toolUseIds.length === 0) {
     return false
@@ -392,7 +449,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
       let success = false
 
       if (errorType === "tool_result_missing") {
-        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
+        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg, msgs ?? [])
       } else if (errorType === "thinking_block_order") {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
         if (success && experimental?.auto_resume) {
