@@ -12,6 +12,8 @@
  */
 const CONTEXT_ENGINE_MCP_TOOLS: Record<string, boolean> = {
   "context-engine_*": true,
+  "context-engine-indexer_*": true,
+  "context-engine-memory_*": true,
 };
 
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {

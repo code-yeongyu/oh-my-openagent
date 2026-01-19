@@ -1,22 +1,12 @@
 {
   "mcpServers": {
-    "context-engine": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@context-engine-bridge/context-engine-mcp-bridge",
-        "mcp-serve",
-        "--workspace",
-        "/Users/mirlok/Desktop/Context-Engine",
-        "--indexer-url",
-        "http://localhost:8003/mcp",
-        "--memory-url",
-        "http://localhost:8002/mcp"
-      ],
-      "env": {
-        "COLLECTION_NAME": "Context-Engine-41e67959"
-      }
+    "context-engine-indexer": {
+      "type": "remote",
+      "url": "http://localhost:8003/mcp"
+    },
+    "context-engine-memory": {
+      "type": "remote",
+      "url": "http://localhost:8002/mcp"
     }
   }
 }

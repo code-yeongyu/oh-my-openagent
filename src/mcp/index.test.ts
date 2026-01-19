@@ -13,8 +13,11 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(result).toHaveProperty("context-engine")
-    expect(Object.keys(result)).toHaveLength(4)
+    expect(result).toHaveProperty("context-engine-indexer")
+    expect(result).toHaveProperty("context-engine-memory")
+    expect(result["context-engine-indexer"].enabled).toBe(true)
+    expect(result["context-engine-memory"].enabled).toBe(true)
+    expect(Object.keys(result)).toHaveLength(5)
   })
 
   test("should filter out disabled built-in MCPs", () => {
@@ -28,13 +31,14 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(result).toHaveProperty("context-engine")
-    expect(Object.keys(result)).toHaveLength(3)
+    expect(result).toHaveProperty("context-engine-indexer")
+    expect(result).toHaveProperty("context-engine-memory")
+    expect(Object.keys(result)).toHaveLength(4)
   })
 
   test("should filter out all built-in MCPs when all disabled", () => {
     //#given
-    const disabledMcps = ["websearch", "context7", "grep_app", "context-engine"]
+    const disabledMcps = ["websearch", "context7", "grep_app", "context-engine-indexer", "context-engine-memory"]
 
     //#when
     const result = createBuiltinMcps(disabledMcps)
@@ -43,7 +47,8 @@ describe("createBuiltinMcps", () => {
     expect(result).not.toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).not.toHaveProperty("grep_app")
-    expect(result).not.toHaveProperty("context-engine")
+    expect(result).not.toHaveProperty("context-engine-indexer")
+    expect(result).not.toHaveProperty("context-engine-memory")
     expect(Object.keys(result)).toHaveLength(0)
   })
 
@@ -58,8 +63,9 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(result).toHaveProperty("context-engine")
-    expect(Object.keys(result)).toHaveLength(3)
+    expect(result).toHaveProperty("context-engine-indexer")
+    expect(result).toHaveProperty("context-engine-memory")
+    expect(Object.keys(result)).toHaveLength(4)
   })
 
   test("should handle empty disabled_mcps by default", () => {
@@ -71,8 +77,9 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(result).toHaveProperty("context-engine")
-    expect(Object.keys(result)).toHaveLength(4)
+    expect(result).toHaveProperty("context-engine-indexer")
+    expect(result).toHaveProperty("context-engine-memory")
+    expect(Object.keys(result)).toHaveLength(5)
   })
 
   test("should only filter built-in MCPs, ignoring unknown names", () => {
@@ -86,7 +93,8 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
-    expect(result).toHaveProperty("context-engine")
-    expect(Object.keys(result)).toHaveLength(4)
+    expect(result).toHaveProperty("context-engine-indexer")
+    expect(result).toHaveProperty("context-engine-memory")
+    expect(Object.keys(result)).toHaveLength(5)
   })
 })
