@@ -17,8 +17,6 @@ import { createAgentToolRestrictions } from "../shared/permission-compat"
  * implementation.
  */
 
-const DEFAULT_MODEL = "openai/gpt-5.2"
-
 export const MOMUS_SYSTEM_PROMPT = `You are a work plan review expert. You review the provided work plan (.sisyphus/plans/{name}.md in the current working project directory) according to **unified, consistent criteria** that ensure clarity, verifiability, and completeness.
 
 **CRITICAL FIRST RULE**:
@@ -391,7 +389,7 @@ Use structured format, **in the same language as the work plan**.
 **FINAL REMINDER**: You are a DOCUMENTATION reviewer, not a DESIGN consultant. The author's implementation direction is SACRED. Your job ends at "Is this well-documented enough to execute?" - NOT "Is this the right approach?"
 `
 
-export function createMomusAgent(model: string = DEFAULT_MODEL): AgentConfig {
+export function createMomusAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
@@ -416,7 +414,6 @@ export function createMomusAgent(model: string = DEFAULT_MODEL): AgentConfig {
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
 
-export const momusAgent = createMomusAgent()
 
 export const momusPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

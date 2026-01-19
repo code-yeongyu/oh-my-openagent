@@ -22,6 +22,7 @@ import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
+import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
@@ -97,6 +98,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     if (pluginComponents.errors.length > 0) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
+    }
+
+    if (!(config.model as string | undefined)?.trim()) {
+      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+      throw new Error(
+        'oh-my-opencode requires a default model.\n\n' +
+        `Add this to ${paths.configJsonc}:\n\n` +
+        '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+        '(Replace with your preferred provider/model)'
+      )
     }
 
     const builtinAgents = createBuiltinAgents(
@@ -200,12 +211,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             )
           : undefined;
 
+        // Model resolution: explicit override → category config → OpenCode default
+        // No hardcoded fallback - OpenCode config.model is the terminal fallback
+        const resolvedModel = prometheusOverride?.model ?? categoryConfig?.model ?? defaultModel;
+
         const prometheusBase = {
-          model:
-            prometheusOverride?.model ??
-            categoryConfig?.model ??
-            defaultModel ??
-            "anthropic/claude-opus-4-5",
+          // Only include model if one was resolved - let OpenCode apply its own default if none
+          ...(resolvedModel ? { model: resolvedModel } : {}),
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
