@@ -200,7 +200,7 @@ Meet our main agent: Sisyphus (Opus 4.5 High). Below are the tools Sisyphus uses
 
 #### Just Install This
 
-You can learn a lot from [overview page](./guide/overview.md), but following is like the example workflow.
+You can learn a lot from [overview page](docs/guide/overview.md), but following is like the example workflow.
 
 Just by installing this, you make your agents to work like:
 
