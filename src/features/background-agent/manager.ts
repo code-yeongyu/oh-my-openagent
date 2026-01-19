@@ -311,8 +311,10 @@ export class BackgroundManager {
 
     for (const child of directChildren) {
       result.push(child)
-      const descendants = this.getAllDescendantTasks(child.sessionID)
-      result.push(...descendants)
+      if (child.sessionID) {
+        const descendants = this.getAllDescendantTasks(child.sessionID)
+        result.push(...descendants)
+      }
     }
 
     return result
@@ -363,7 +365,9 @@ export class BackgroundManager {
         existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
       }
 
-      subagentSessions.add(existingTask.sessionID)
+      if (existingTask.sessionID) {
+        subagentSessions.add(existingTask.sessionID)
+      }
       this.startPolling()
 
       // Track for batched notifications if task is pending or running
@@ -428,6 +432,10 @@ export class BackgroundManager {
       throw new Error(`Task not found for session: ${input.sessionId}`)
     }
 
+    if (!existingTask.sessionID) {
+      throw new Error(`Task has no sessionID: ${existingTask.id}`)
+    }
+
     if (existingTask.status === "running") {
       log("[background-agent] Resume skipped - task already running:", {
         taskId: existingTask.id,
@@ -460,7 +468,9 @@ export class BackgroundManager {
     }
 
     this.startPolling()
-    subagentSessions.add(existingTask.sessionID)
+    if (existingTask.sessionID) {
+      subagentSessions.add(existingTask.sessionID)
+    }
 
     if (input.parentSessionID) {
       const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
@@ -571,9 +581,12 @@ export class BackgroundManager {
 
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
+      
+      const startedAt = task.startedAt
+      if (!startedAt) return
 
       // Edge guard: Require minimum elapsed time (5 seconds) before accepting idle
-      const elapsedMs = Date.now() - task.startedAt.getTime()
+      const elapsedMs = Date.now() - startedAt.getTime()
       const MIN_IDLE_TIME_MS = 5000
       if (elapsedMs < MIN_IDLE_TIME_MS) {
         log("[background-agent] Ignoring early session.idle, elapsed:", { elapsedMs, taskId: task.id })
@@ -885,7 +898,7 @@ export class BackgroundManager {
     // Note: Callers must release concurrency before calling this method
     // to ensure slots are freed even if notification fails
 
-    const duration = this.formatDuration(task.startedAt, task.completedAt)
+    const duration = this.formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
@@ -1057,7 +1070,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.cleanupPendingByParent(task)
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
-        subagentSessions.delete(task.sessionID)
+        if (task.sessionID) {
+          subagentSessions.delete(task.sessionID)
+        }
       }
     }
 
@@ -1067,6 +1082,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         continue
       }
       const validNotifications = notifications.filter((task) => {
+        if (!task.startedAt) return false
         const age = now - task.startedAt.getTime()
         return age <= TASK_TTL_MS
       })
@@ -1085,8 +1101,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
       if (!task.progress?.lastUpdate) continue
+      
+      const startedAt = task.startedAt
+      const sessionID = task.sessionID
+      if (!startedAt || !sessionID) continue
 
-      const runtime = now - task.startedAt.getTime()
+      const runtime = now - startedAt.getTime()
       if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
       const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
@@ -1105,7 +1125,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       }
 
       this.client.session.abort({
-        path: { id: task.sessionID },
+        path: { id: sessionID },
       }).catch(() => {})
 
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
@@ -1127,14 +1147,17 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
+      
+      const sessionID = task.sessionID
+      if (!sessionID) continue
 
       try {
-        const sessionStatus = allStatuses[task.sessionID]
+        const sessionStatus = allStatuses[sessionID]
         
         // Don't skip if session not in status - fall through to message-based detection
         if (sessionStatus?.type === "idle") {
           // Edge guard: Validate session has actual output before completing
-          const hasValidOutput = await this.validateSessionHasOutput(task.sessionID)
+          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
           if (!hasValidOutput) {
             log("[background-agent] Polling idle but no valid output yet, waiting:", task.id)
             continue
@@ -1143,7 +1166,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           // Re-check status after async operation
           if (task.status !== "running") continue
 
-          const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
           if (hasIncompleteTodos) {
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
             continue
@@ -1154,7 +1177,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         }
 
         const messagesResult = await this.client.session.messages({
-          path: { id: task.sessionID },
+          path: { id: sessionID },
         })
 
         if (!messagesResult.error && messagesResult.data) {
@@ -1196,14 +1219,17 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
           // Stability detection: complete when message count unchanged for 3 polls
           const currentMsgCount = messages.length
-          const elapsedMs = Date.now() - task.startedAt.getTime()
+          const startedAt = task.startedAt
+          if (!startedAt) continue
+          
+          const elapsedMs = Date.now() - startedAt.getTime()
 
           if (elapsedMs >= MIN_STABILITY_TIME_MS) {
             if (task.lastMsgCount === currentMsgCount) {
               task.stablePolls = (task.stablePolls ?? 0) + 1
               if (task.stablePolls >= 3) {
                 // Edge guard: Validate session has actual output before completing
-                const hasValidOutput = await this.validateSessionHasOutput(task.sessionID)
+                const hasValidOutput = await this.validateSessionHasOutput(sessionID)
                 if (!hasValidOutput) {
                   log("[background-agent] Stability reached but no valid output, waiting:", task.id)
                   continue
@@ -1212,7 +1238,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
                 // Re-check status after async operation
                 if (task.status !== "running") continue
 
-                const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+                const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
                 if (!hasIncompleteTodos) {
                   await this.tryCompleteTask(task, "stability detection")
                   continue

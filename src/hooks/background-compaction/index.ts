@@ -55,7 +55,9 @@ export function createBackgroundCompactionHook(manager: BackgroundManager) {
         sections.push("## Running Background Tasks")
         sections.push("")
         for (const t of running) {
-          const elapsed = Math.floor((Date.now() - t.startedAt.getTime()) / 1000)
+          const elapsed = t.startedAt 
+            ? Math.floor((Date.now() - t.startedAt.getTime()) / 1000)
+            : 0
           sections.push(`- **\`${t.id}\`** (${t.agent}): ${t.description} [${elapsed}s elapsed]`)
         }
         sections.push("")
