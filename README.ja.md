@@ -1,3 +1,14 @@
+> [!WARNING]
+> **セキュリティ警告：なりすましサイト**
+>
+> **ohmyopencode.comは本プロジェクトとは一切関係ありません。** 当方はそのサイトを運営しておらず、推奨もしていません。
+>
+> OhMyOpenCodeは**無料かつオープンソース**です。「公式」を名乗るサードパーティサイトでインストーラーをダウンロードしたり、支払い情報を入力したり**しないでください**。
+>
+> なりすましサイトはペイウォールの裏にあるため、**何が配布されているか確認できません**。そこからのダウンロードは**潜在的に危険なもの**として扱ってください。
+>
+> ✅ 公式ダウンロード：https://github.com/code-yeongyu/oh-my-opencode/releases
+
 > [!NOTE]
 >
 > [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
