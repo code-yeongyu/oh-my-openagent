@@ -11,7 +11,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -415,7 +415,7 @@ ${textContent || "(No text output)"}`
       let systemDefaultModel: string | undefined
       try {
         const openCodeConfig = await client.config.get()
-        systemDefaultModel = (openCodeConfig as { model?: string })?.model
+        systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
       } catch {
         // Config fetch failed, proceed without system default
         systemDefaultModel = undefined
@@ -434,7 +434,13 @@ ${textContent || "(No text output)"}`
       if (args.category) {
         // Guard: require system default model for category delegation
         if (!systemDefaultModel) {
-          return `No default model configured. Set a model in your OpenCode config (model field).`
+          const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+          return (
+            'oh-my-opencode requires a default model.\n\n' +
+            `Add this to ${paths.configJsonc}:\n\n` +
+            '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+            '(Replace with your preferred provider/model)'
+          )
         }
 
         const resolved = resolveCategoryConfig(args.category, {
