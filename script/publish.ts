@@ -161,9 +161,9 @@ interface PublishResult {
   error?: string
 }
 
-async function publishPackage(cwd: string, distTag: string | null): Promise<PublishResult> {
+async function publishPackage(cwd: string, distTag: string | null, useProvenance = true): Promise<PublishResult> {
   const tagArgs = distTag ? ["--tag", distTag] : []
-  const provenanceArgs = process.env.CI ? ["--provenance"] : []
+  const provenanceArgs = process.env.CI && useProvenance ? ["--provenance"] : []
   
   try {
     await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd)
@@ -212,7 +212,7 @@ async function publishAllPackages(version: string): Promise<void> {
         const pkgName = `oh-my-opencode-${platform}`
         
         console.log(`    Starting ${pkgName}...`)
-        const result = await publishPackage(pkgDir, distTag)
+        const result = await publishPackage(pkgDir, distTag, false)
         
         return { platform, pkgName, result }
       })
