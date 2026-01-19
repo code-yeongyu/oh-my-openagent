@@ -599,6 +599,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               agent: agentToUse,
               system: systemContent,
               tools: {
+                ...getAgentToolRestrictions(agentToUse),
                 task: false,
                 delegate_task: false,
                 call_omo_agent: true,
