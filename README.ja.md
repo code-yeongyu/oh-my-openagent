@@ -145,7 +145,7 @@ oMoMoMoMoMo···
 
 [Claude Code](https://www.claude.com/product/claude-code) は素晴らしいですよね。
 でも、もしあなたがハッカーなら、[OpenCode](https://github.com/sst/opencode) と恋に落ちることになるでしょう。
-**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプションですぐに使えます。**
+**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプション、OpenCode がすべてサポートしています。**
 
 - 無限に拡張可能で、無限にカスタマイズ可能です。
 - 画面のチラつき（フリッカー）がありません。
@@ -226,7 +226,29 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 
 ### 人間の方へ
 
-面倒な作業は LLM エージェントに任せましょう。このリンクをコピーして貼り付け、インストールと設定をお願いしてください。
+インタラクティブインストーラーを実行してください：
+
+```bash
+bunx oh-my-opencode install # 推奨
+npx oh-my-opencode install # 代替
+```
+
+> **注意**: CLI はすべての主要プラットフォーム向けのスタンドアロンバイナリを同梱しています。インストール後の CLI 実行にはランタイム (Bun/Node.js) は不要です。
+>
+> **対応プラットフォーム**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
+
+プロンプトに従って、Claude、ChatGPT、Gemini のサブスクリプションを設定してください。インストール後、指示に従ってプロバイダーの認証を行ってください。
+
+**代替方法: LLM エージェントに任せる**
+
+新しい opencode セッションに以下を貼り付けてください：
+```
+Install and configure by following the instructions here https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/README.md
+```
+
+**代替方法: LLM エージェントに任せる**
+
+新しい opencode セッションに以下を貼り付けてください：
 ```
 Install and configure by following the instructions here https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/README.md
 ```
@@ -241,7 +263,7 @@ Install and configure by following the instructions here https://raw.githubuserc
 
 ### ステップ 0: サブスクリプション情報を確認
 
-以下の 3 つの質問をして CLI オプションを決定してください：
+以下の質問をして CLI オプションを決定してください：
 
 1. **Claude Pro/Max のサブスクリプションをお持ちですか？**
    - **はい**: **max20 (20x モード) を使用していますか？**
@@ -256,6 +278,10 @@ Install and configure by following the instructions here https://raw.githubuserc
 3. **Gemini モデルを使用しますか？**
    - **はい** → `--gemini=yes`
    - **いいえ** → `--gemini=no`
+
+4. **GitHub Copilot のサブスクリプションをお持ちですか？**
+   - **はい** → `--copilot=yes`
+   - **いいえ** → `--copilot=no`
 
 ### ステップ 1: OpenCode インストール確認
 
@@ -275,16 +301,13 @@ OpenCode がインストールされていない場合は、[OpenCode インス�
 ユーザーの回答に基づいて、適切なフラグで CLI インストーラーを実行してください：
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
-# bunx が動作しない場合は npx を使用
-npx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
 ```
 
-> **Ubuntu/Debian ユーザーへの注意**: Snap で Bun をインストールした場合 (`/snap/bin/bun`)、Snap のサンドボックス化により `bunx` が「script not found」エラーで失敗します。代わりに `npx` を使用するか、公式インストーラーで Bun を再インストールしてください: `curl -fsSL https://bun.sh/install | bash`
-
 **例：**
-- すべてのサブスクリプション + max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
-- Claude のみ（max20 なし）: `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- すべてのサブスクリプション + max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
+- Claude のみ（max20 なし）: `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
+- GitHub Copilot のみ: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
 - サブスクリプションなし: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
 
 CLI が行うこと：
