@@ -125,7 +125,7 @@ describe("sisyphus-task", () => {
       )
       
       // #then returns descriptive error message
-      expect(result).toContain("No default model configured")
+      expect(result).toContain("oh-my-opencode requires a default model")
     })
   })
 
@@ -304,7 +304,7 @@ describe("sisyphus-task", () => {
 
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -363,7 +363,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -406,7 +406,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -453,7 +453,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
@@ -528,7 +528,7 @@ describe("sisyphus-task", () => {
           ],
         }),
       },
-      config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+      config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
       app: {
         agents: async () => ({ data: [] }),
       },
@@ -586,7 +586,7 @@ describe("sisyphus-task", () => {
           data: [],
         }),
       },
-      config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+      config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
     }
     
     const tool = createDelegateTask({
@@ -638,7 +638,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -698,7 +698,7 @@ describe("sisyphus-task", () => {
           }),
           status: async () => ({ data: { "ses_sync_success": { type: "idle" } } }),
         },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -751,7 +751,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: {
           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
         },
@@ -805,7 +805,7 @@ describe("sisyphus-task", () => {
           }),
           status: async () => ({ data: {} }),
         },
-        config: { get: async () => ({ model: SYSTEM_DEFAULT_MODEL }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: { agents: async () => ({ data: [] }) },
       }
 
