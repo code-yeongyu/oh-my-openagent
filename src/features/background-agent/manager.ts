@@ -94,6 +94,13 @@ export class BackgroundManager {
     if (!input.agent || input.agent.trim() === "") {
       throw new Error("Agent parameter is required")
     }
+
+    const key = this.getConcurrencyKeyFromInput(input)
+    const limit = this.concurrencyManager.getConcurrencyLimit(key)
+    if (limit <= 0) {
+      throw new Error("Background tasks are disabled (concurrency=0)")
+    }
+
     // Create task immediately with status="pending"
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
@@ -121,7 +128,6 @@ export class BackgroundManager {
     }
 
     // Add to queue
-    const key = this.getConcurrencyKeyFromInput(input)
     const queue = this.queuesByKey.get(key) ?? []
     queue.push({ task, input })
     this.queuesByKey.set(key, queue)
@@ -141,7 +147,9 @@ export class BackgroundManager {
     }
 
     // Trigger processing (fire-and-forget)
-    this.processKey(key)
+    void this.processKey(key).catch((error) => {
+      log("[background-agent] processKey error:", error)
+    })
 
     return task
   }

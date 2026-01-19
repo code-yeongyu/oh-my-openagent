@@ -22,7 +22,9 @@ export class ConcurrencyManager {
   }
 
   private normalizeLimit(value: number): number {
-    if (!Number.isFinite(value)) return 0
+    if (!Number.isFinite(value)) {
+      return value === Infinity ? 10 : 0
+    }
     if (value <= 0) return 0
     const floored = Math.floor(value)
     if (floored <= 0) return 0

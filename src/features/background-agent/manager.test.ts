@@ -1203,6 +1203,24 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(task.sessionID).toBeUndefined()
     })
 
+    test("should throw when background tasks are disabled (concurrency=0)", async () => {
+      // #given
+      const config = { defaultConcurrency: 0 }
+      manager.shutdown()
+      manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // #when / #then
+      await expect(manager.launch(input)).rejects.toThrow("Background tasks are disabled (concurrency=0)")
+    })
+
     test("should return immediately even with concurrency limit", async () => {
       // #given
       const config = { defaultConcurrency: 1 }
@@ -1925,4 +1943,3 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("cancelled")
   })
 })
-
