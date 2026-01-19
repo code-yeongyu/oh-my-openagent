@@ -130,6 +130,18 @@ export class BackgroundManager {
 
     log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
 
+    const toastManager = getTaskToastManager()
+    if (toastManager) {
+      toastManager.addTask({
+        id: task.id,
+        description: input.description,
+        agent: input.agent,
+        isBackground: true,
+        status: "queued",
+        skills: input.skills,
+      })
+    }
+
     // Trigger processing (fire-and-forget)
     this.processKey(key)
 
@@ -227,13 +239,7 @@ export class BackgroundManager {
 
     const toastManager = getTaskToastManager()
     if (toastManager) {
-      toastManager.addTask({
-        id: task.id,
-        description: input.description,
-        agent: input.agent,
-        isBackground: true,
-        skills: input.skills,
-      })
+      toastManager.updateTask(task.id, "running")
     }
 
     log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {

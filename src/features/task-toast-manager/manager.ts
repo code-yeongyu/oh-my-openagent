@@ -137,7 +137,8 @@ export class TaskToastManager {
       for (const task of queued) {
         const bgIcon = task.isBackground ? "⏳" : "⏸️"
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo}`)
+        const isNew = task.id === newTask.id ? " ← NEW" : ""
+        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo} - Queued${isNew}`)
       }
     }
 
