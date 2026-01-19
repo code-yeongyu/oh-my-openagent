@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../features/background-agent"
+import { readBoulderState } from "../features/boulder-state"
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
     findNearestMessageWithFields,
@@ -53,6 +54,37 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
 const COUNTDOWN_GRACE_PERIOD_MS = 500
+
+/**
+ * Keywords that indicate user is making a git/publish decision.
+ * When detected in the last user message, auto-continuation is suppressed.
+ * This prevents the enforcer from interrupting git strategy selection flow.
+ */
+const GIT_PUBLISH_KEYWORDS = [
+  // Git operations (English)
+  "merge", "pr", "pull request", "push", "commit", "keep", "discard",
+  "rebase", "squash", "cherry-pick", "checkout", "branch", "tag",
+  // Git operations (Chinese)
+  "合并", "推送", "提交", "保留", "丢弃", "放弃", "变基",
+  // Publish/Deploy (English)
+  "upload", "publish", "deploy", "release", "ship", "npm publish",
+  // Publish/Deploy (Chinese)
+  "上传", "发布", "部署", "发版", "发行",
+  // Options selection (when Phase 3 presents numbered choices)
+  "option 1", "option 2", "option 3", "option 4",
+  "选项1", "选项2", "选项3", "选项4",
+  "选择1", "选择2", "选择3", "选择4",
+]
+
+/**
+ * Check if message content contains git/publish decision keywords.
+ * Case-insensitive matching.
+ */
+function containsGitPublishKeywords(content: string): boolean {
+  if (!content) return false
+  const lowerContent = content.toLowerCase()
+  return GIT_PUBLISH_KEYWORDS.some(keyword => lowerContent.includes(keyword.toLowerCase()))
+}
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -347,6 +379,14 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 1.6: Boulder state - don't auto-continue when awaiting user input or completed
+      // This prevents todo-continuation from interfering with Phase 3 git strategy selection
+      const boulderState = readBoulderState(ctx.directory)
+      if (boulderState?.phase === "awaiting_user" || boulderState?.phase === "completed") {
+        log(`[${HOOK_NAME}] Skipped: boulder in terminal state (${boulderState.phase})`, { sessionID, plan: boulderState.plan_name })
+        return
+      }
+
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -357,16 +397,32 @@ export function createTodoContinuationEnforcer(
       }
 
       // Check 2: API-based abort detection (fallback, for cases where event was missed)
+      // Also check for git/publish keywords in last assistant message
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
           query: { directory: ctx.directory },
         })
-        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
+        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo; parts?: Array<{ type: string; text?: string }> }> }).data ?? []
 
         if (isLastAssistantMessageAborted(messages)) {
           log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
           return
+        }
+
+        // Check 2.5: Git/publish keyword detection in last assistant message
+        // When AI presents git strategy options or asks about publish/deploy, stop auto-continuation
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i] as { info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }
+          if (msg.info?.role === "assistant" && msg.parts) {
+            const textParts = msg.parts.filter(p => p.type === "text" && p.text)
+            const assistantContent = textParts.map(p => p.text).join(" ")
+            if (containsGitPublishKeywords(assistantContent)) {
+              log(`[${HOOK_NAME}] Skipped: git/publish keywords detected in last assistant message`, { sessionID, preview: assistantContent.slice(0, 100) })
+              return
+            }
+            break // Only check the last assistant message
+          }
         }
       } catch (err) {
         log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(err) })

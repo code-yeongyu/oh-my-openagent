@@ -684,25 +684,21 @@ export function createAtlasHook(
           return
         }
 
-        // CRITICAL: Check if boulder is already completed to prevent repeated Phase 3 triggers
-        if (boulderState.phase === "completed" || boulderState.completed_at) {
-          log(`[${HOOK_NAME}] Boulder already completed, skipping Phase 3`, { sessionID, plan: boulderState.plan_name })
+        // CRITICAL: Check if boulder is already completed OR awaiting user input to prevent repeated Phase 3 triggers
+        if (boulderState.phase === "completed" || boulderState.phase === "awaiting_user" || boulderState.completed_at) {
+          log(`[${HOOK_NAME}] Boulder in terminal state (${boulderState.phase}), skipping Phase 3`, { sessionID, plan: boulderState.plan_name })
           return
         }
 
         const progress = getPlanProgress(boulderState.active_plan)
         if (progress.isComplete) {
-          // TEMPORARILY DISABLED: Auto Phase 3 trigger was causing interference with normal work
-          // TODO: Re-enable after fixing the repeated trigger issue
-          log(`[${HOOK_NAME}] Boulder complete - Phase 3 auto-trigger DISABLED`, { sessionID, plan: boulderState.plan_name })
-          return
-          
-          /* DISABLED CODE:
           log(`[${HOOK_NAME}] Boulder complete - triggering Phase 3`, { sessionID, plan: boulderState.plan_name })
           
-          // Mark boulder as complete FIRST to prevent repeated triggers
-          markBoulderComplete(ctx.directory)
-          log(`[${HOOK_NAME}] Boulder marked as complete`, { sessionID, plan: boulderState.plan_name })
+          // Set phase to awaiting_user FIRST to prevent repeated triggers
+          // This blocks future session.idle events from re-injecting Phase 3
+          const { updatePhaseStatus } = await import("../../features/boulder-state/storage")
+          updatePhaseStatus(ctx.directory, "awaiting_user")
+          log(`[${HOOK_NAME}] Boulder phase set to awaiting_user`, { sessionID, plan: boulderState.plan_name })
           
           // Inject Archiver dispatch prompt when all tasks are complete
           try {
@@ -719,7 +715,6 @@ export function createAtlasHook(
             log(`[${HOOK_NAME}] Archiver dispatch prompt failed`, { sessionID, error: String(err) })
           }
           return
-          */
         }
 
         const now = Date.now()
