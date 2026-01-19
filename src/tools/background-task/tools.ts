@@ -383,24 +383,31 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
 
         if (cancelAll) {
           const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
-          const runningTasks = tasks.filter(t => t.status === "running")
+          const cancellableTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
 
-          if (runningTasks.length === 0) {
-            return `✅ No running background tasks to cancel.`
+          if (cancellableTasks.length === 0) {
+            return `✅ No running or pending background tasks to cancel.`
           }
 
           const results: string[] = []
-          for (const task of runningTasks) {
-            client.session.abort({
-              path: { id: task.sessionID },
-            }).catch(() => {})
+          for (const task of cancellableTasks) {
+            if (task.status === "pending") {
+              // Pending task: use manager method (no session to abort)
+              manager.cancelPendingTask(task.id)
+              results.push(`- ${task.id}: ${task.description} (pending)`)
+            } else {
+              // Running task: abort session
+              client.session.abort({
+                path: { id: task.sessionID },
+              }).catch(() => {})
 
-            task.status = "cancelled"
-            task.completedAt = new Date()
-            results.push(`- ${task.id}: ${task.description}`)
+              task.status = "cancelled"
+              task.completedAt = new Date()
+              results.push(`- ${task.id}: ${task.description} (running)`)
+            }
           }
 
-          return `✅ Cancelled ${runningTasks.length} background task(s):
+          return `✅ Cancelled ${cancellableTasks.length} background task(s):
 
 ${results.join("\n")}`
         }
@@ -410,11 +417,26 @@ ${results.join("\n")}`
           return `❌ Task not found: ${args.taskId}`
         }
 
-        if (task.status !== "running") {
+        if (task.status !== "running" && task.status !== "pending") {
           return `❌ Cannot cancel task: current status is "${task.status}".
-Only running tasks can be cancelled.`
+Only running or pending tasks can be cancelled.`
         }
 
+        if (task.status === "pending") {
+          // Pending task: use manager method (no session to abort, no slot to release)
+          const cancelled = manager.cancelPendingTask(task.id)
+          if (!cancelled) {
+            return `❌ Failed to cancel pending task: ${task.id}`
+          }
+
+          return `✅ Pending task cancelled successfully
+
+Task ID: ${task.id}
+Description: ${task.description}
+Status: ${task.status}`
+        }
+
+        // Running task: abort session
         // Fire-and-forget: abort 요청을 보내고 await 하지 않음
         // await 하면 메인 세션까지 abort 되는 문제 발생
         client.session.abort({
