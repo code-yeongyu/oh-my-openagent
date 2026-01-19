@@ -195,7 +195,7 @@
 
 #### 直接安装就行。
 
-你可以从 [overview page](./guide/overview.md) 学到很多，但以下是示例工作流程。
+你可以从 [overview page](docs/guide/overview.md) 学到很多，但以下是示例工作流程。
 
 只需安装这个，你的智能体就会这样工作：
 

@@ -62,7 +62,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
 </div>
 
@@ -191,7 +191,7 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 
 #### インストールするだけで。
 
-[overview page](./guide/overview.md) を読めば多くのことが学べますが、以下はワークフローの例です。
+[overview page](docs/guide/overview.md) を読めば多くのことが学べますが、以下はワークフローの例です。
 
 インストールするだけで、エージェントは以下のようなワークフローで働けるようになります：
 
