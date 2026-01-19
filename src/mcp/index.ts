@@ -1,6 +1,7 @@
 import { websearch } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
+import { context_engine_mcp, MCP_NAME as CONTEXT_ENGINE_MCP_NAME } from "./context-engine-mcp"
 import type { McpName } from "./types"
 
 export { McpNameSchema, type McpName } from "./types"
@@ -17,6 +18,7 @@ const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
   websearch,
   context7,
   grep_app,
+  [CONTEXT_ENGINE_MCP_NAME]: context_engine_mcp,
 }
 
 export function createBuiltinMcps(disabledMcps: string[] = []) {

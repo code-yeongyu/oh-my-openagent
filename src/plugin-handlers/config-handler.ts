@@ -329,11 +329,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ? await loadMcpConfigs()
       : { servers: {} };
 
+    const systemMcpConfig = config.mcp as Record<string, unknown> | undefined;
+    const disabledMcpsWithSystemOverrides = [
+      ...(pluginConfig.disabled_mcps ?? []),
+      ...Object.keys(systemMcpConfig ?? {}),
+    ];
+
     config.mcp = {
-      ...(config.mcp as Record<string, unknown>),
-      ...createBuiltinMcps(pluginConfig.disabled_mcps),
+      ...createBuiltinMcps(disabledMcpsWithSystemOverrides),
       ...mcpResult.servers,
       ...pluginComponents.mcpServers,
+      ...systemMcpConfig,
     };
 
     const builtinCommands = loadBuiltinCommands(pluginConfig.disabled_commands);

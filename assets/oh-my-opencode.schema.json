@@ -40,7 +40,8 @@
         "enum": [
           "playwright",
           "frontend-ui-ux",
-          "git-master"
+          "git-master",
+          "context-engine"
         ]
       }
     },

@@ -92,6 +92,76 @@ Match implementation complexity to aesthetic vision:
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
 }
 
+const contextEngineSkill: BuiltinSkill = {
+  name: "context-engine",
+  description:
+    "MCP Tool Selection Rules for Context-Engine. Use MCP tools for semantic code search, symbol graphs, memory, and codebase exploration. Favor context-engine tools over grep/literal search.",
+  template: `# Context-Engine MCP Tool Selection
+
+**Core principle:** Context-Engine MCP tools are PRIMARY for exploring code and history. Start with MCP for exploration, debugging, or "where/why" questions; use literal search only for exact-literal lookups.
+
+## When to Use MCP Tools
+
+- Exploring code without knowing exact strings/symbols
+- Need semantic or cross-file understanding (relationships, patterns, architecture)
+- Want ranked results with surrounding context, not just line hits
+- Asking conceptual/architectural or "where/why" behavior questions
+- Need rich context/snippets around matches
+
+## When to Use Literal Search (grep)
+
+- Know exact string/function/variable or error message
+- Only need to confirm existence or file/line quickly (not to understand behavior)
+
+## Tool Quick Reference
+
+| Tool | Use Case |
+|------|----------|
+| \`repo_search\` | General code search - "where is X implemented?" |
+| \`context_answer\` | NL explanations with citations - "What does module X do?" |
+| \`info_request\` | Quick discovery with summaries - broad architecture overviews |
+| \`symbol_graph\` | Call/import/definition graphs - "who calls this function?" |
+| \`neo4j_graph_query\` | Advanced traversals - impact analysis, transitive callers, cycles |
+| \`memory_store\` / \`memory_find\` | Store and retrieve knowledge/notes |
+| \`search_tests_for\` | Find test files for a query |
+| \`search_config_for\` | Find configuration files |
+| \`change_history_for_path\` | File change summary |
+| \`search_commits_for\` | Search git commit history |
+
+## Query Style
+
+Write queries as short natural-language fragments:
+- "database connection handling"
+- "error reporting patterns"
+- "authentication mechanisms"
+
+Do NOT use boolean operators (OR, AND), regex, or code patterns in semantic queries.
+
+## Performance Tips
+
+- Start with \`limit=3\`, \`compact=true\` for discovery
+- Increase to \`limit=5\`, \`include_snippet=true\` for details
+- Use \`output_format="toon"\` for 60-80% token reduction
+- Apply \`language\` and \`under\` filters to narrow scope
+
+## Grep Anti-Patterns (DON'T)
+
+\`\`\`bash
+grep -r "auth" .        # → Use MCP: "authentication mechanisms"
+grep -r "cache" .       # → Use MCP: "caching strategies"
+grep -r "error" .       # → Use MCP: "error handling patterns"
+\`\`\`
+
+## Grep Patterns (DO)
+
+\`\`\`bash
+grep -rn "UserAlreadyExists" .    # Specific error class
+grep -rn "REDIS_HOST" .           # Exact environment variable
+\`\`\`
+
+**If in doubt → start with MCP**`,
+}
+
 const gitMasterSkill: BuiltinSkill = {
   name: "git-master",
   description:
@@ -1199,5 +1269,5 @@ POTENTIAL ACTIONS:
 }
 
 export function createBuiltinSkills(): BuiltinSkill[] {
-  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill]
+  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill, contextEngineSkill]
 }
