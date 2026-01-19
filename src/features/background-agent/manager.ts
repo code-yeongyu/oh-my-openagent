@@ -732,6 +732,42 @@ export class BackgroundManager {
     }
   }
 
+  /**
+   * Cancels a pending task by removing it from queue and marking as cancelled.
+   * Does NOT abort session (no session exists yet) or release concurrency slot (wasn't acquired).
+   */
+  cancelPendingTask(taskId: string): boolean {
+    const task = this.tasks.get(taskId)
+    if (!task || task.status !== "pending") {
+      return false
+    }
+
+    // Find and remove from queue
+    const key = task.model 
+      ? `${task.model.providerID}/${task.model.modelID}`
+      : task.agent
+    const queue = this.queuesByKey.get(key)
+    if (queue) {
+      const index = queue.findIndex(item => item.task.id === taskId)
+      if (index !== -1) {
+        queue.splice(index, 1)
+        if (queue.length === 0) {
+          this.queuesByKey.delete(key)
+        }
+      }
+    }
+
+    // Mark as cancelled
+    task.status = "cancelled"
+    task.completedAt = new Date()
+
+    // Clean up pendingByParent
+    this.cleanupPendingByParent(task)
+
+    log("[background-agent] Cancelled pending task:", { taskId, key })
+    return true
+  }
+
   private startPolling(): void {
     if (this.pollingInterval) return
 
