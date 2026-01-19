@@ -200,6 +200,8 @@ Meet our main agent: Sisyphus (Opus 4.5 High). Below are the tools Sisyphus uses
 
 #### Just Install This
 
+You can learn a lot from [overview page](./guide/overview.md), but following is like the example workflow.
+
 Just by installing this, you make your agents to work like:
 
 1. Sisyphus doesn't waste time hunting for files himself; he keeps the main agent's context lean. Instead, he fires off background tasks to faster, cheaper models in parallel to map the territory for him.
