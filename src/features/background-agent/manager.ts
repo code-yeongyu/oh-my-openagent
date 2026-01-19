@@ -924,8 +924,7 @@ export class BackgroundManager {
     const allComplete = !pendingSet || pendingSet.size === 0
     const remainingCount = pendingSet?.size ?? 0
 
-    // Build notification message
-    const statusText = task.status === "error" ? "FAILED" : "COMPLETED"
+    const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string
@@ -1228,6 +1227,20 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             if (task.lastMsgCount === currentMsgCount) {
               task.stablePolls = (task.stablePolls ?? 0) + 1
               if (task.stablePolls >= 3) {
+                // Re-fetch session status to confirm agent is truly idle
+                const recheckStatus = await this.client.session.status()
+                const recheckData = (recheckStatus.data ?? {}) as Record<string, { type: string }>
+                const currentStatus = recheckData[sessionID]
+                
+                if (currentStatus?.type !== "idle") {
+                  log("[background-agent] Stability reached but session not idle, resetting:", { 
+                    taskId: task.id, 
+                    sessionStatus: currentStatus?.type ?? "not_in_status" 
+                  })
+                  task.stablePolls = 0
+                  continue
+                }
+
                 // Edge guard: Validate session has actual output before completing
                 const hasValidOutput = await this.validateSessionHasOutput(sessionID)
                 if (!hasValidOutput) {
