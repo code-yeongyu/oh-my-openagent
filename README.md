@@ -157,7 +157,7 @@ Meet Sisyphus: The Batteries-Included Agent that codes like you.
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
 But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
-**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. WE ALL COVER THEM.**
+**START WITH YOUR ChatGPT, Claude, Gemini SUBSCRIPTIONS. OPENCODE COVERS THEM ALL.**
 
 - Endlessly extensible. Endlessly customizable.
 - Zero screen flicker.
@@ -248,9 +248,8 @@ If you don't want all this, as mentioned, you can just pick and choose specific 
 Run the interactive installer:
 
 ```bash
-npx oh-my-opencode install
-# or with bun
-bunx oh-my-opencode install
+bunx oh-my-opencode install # recommended
+npx oh-my-opencode install # alternative
 ```
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
@@ -293,6 +292,10 @@ Ask the user these 3 questions to determine CLI options:
    - If **yes** → `--gemini=yes`
    - If **no** → `--gemini=no`
 
+4. **Do you have a GitHub Copilot Subscription?**
+   - If **yes** → `--copilot=yes`
+   - If **no** → `--copilot=no`
+
 ### Step 1: Install OpenCode (if not installed)
 
 ```bash
@@ -312,12 +315,13 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
 ```
 
 **Examples:**
-- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
-- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
+- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
 - User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
 
 The CLI will:

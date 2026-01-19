@@ -149,7 +149,7 @@
 
 [Claude Code](https://www.claude.com/product/claude-code) 很棒。
 但如果你是一个极客，你会对 [OpenCode](https://github.com/sst/opencode) 一见钟情。
-**从你的 ChatGPT、Claude、Gemini 订阅开始。我们全部支持。**
+**从你的 ChatGPT、Claude、Gemini 订阅开始。OpenCode 全部支持。**
 
 - 无限可扩展。无限可定制。
 - 零屏幕闪烁。
@@ -272,7 +272,7 @@ npx oh-my-opencode install
 
 ### 步骤 0：询问用户订阅情况
 
-向用户询问这 3 个问题以确定 CLI 选项：
+向用户询问以下问题以确定 CLI 选项：
 
 1. **你有 Claude Pro/Max 订阅吗？**
    - 如果 **是**：**你是否在 max20（20x 模式）？**
@@ -287,6 +287,10 @@ npx oh-my-opencode install
 3. **你会集成 Gemini 模型吗？**
    - 如果 **是** → `--gemini=yes`
    - 如果 **否** → `--gemini=no`
+
+4. **你有 GitHub Copilot 订阅吗？**
+   - 如果 **是** → `--copilot=yes`
+   - 如果 **否** → `--copilot=no`
 
 ### 步骤 1：安装 OpenCode（如未安装）
 
@@ -307,12 +311,13 @@ fi
 根据用户的回答，使用适当的标志运行 CLI 安装程序：
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
 ```
 
 **示例：**
-- 用户拥有所有订阅且有 max20：`bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes`
-- 用户只有 Claude（无 max20）：`bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no`
+- 用户拥有所有订阅且有 max20：`bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
+- 用户只有 Claude（无 max20）：`bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
+- 用户只有 GitHub Copilot：`bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
 - 用户没有订阅：`bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
 
 CLI 将会：
