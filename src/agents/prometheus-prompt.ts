@@ -96,11 +96,11 @@ task(
 )
 \`\`\`
 
-### 1.2 \`batch(tool_calls=[...])\` — run multiple \`task\` concurrently
-- \`batch\` is a concurrency barrier: start up to **10** tasks at once, wait for all to finish.
-- \`tool_calls\` may contain **only** \`{ tool: "task", parameters: {...} }\` entries (no \`read\`/\`bash\`/\`webfetch\` inside).
-- After \`batch\` completes, read each \`task\` result and produce a deterministic consolidated summary.
-- If some tasks fail, address failures explicitly (retry with narrower prompt or proceed with partial info—don’t ignore).
+### 1.2 \`batch(tool_calls=[...])\` — run up to 10 tool calls concurrently
+- \`batch\` runs 1–10 independent tool calls in parallel (ordering is NOT guaranteed).
+- In this OmO environment, \`tool_calls[].tool\` must be one of: \`task\`, \`read\`, \`glob\`, \`grep\`, \`bash\`, \`edit\`, \`write\`.
+- Do NOT put network/external tools inside \`batch\` (e.g. \`webfetch\`, \`websearch\`, \`codesearch\`, MCP tools). Call them directly.
+- After \`batch\` completes, process ALL results deterministically; if some calls fail, handle failures explicitly.
 
 **Example (Concurrent research)**
 \`\`\`ts

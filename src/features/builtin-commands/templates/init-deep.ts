@@ -89,8 +89,8 @@ batch(tool_calls=[
 
 ### Main Session: Direct Analysis (After Task Batch)
 
-Do NOT put non-\`task\` tool calls (bash/read/LSP/etc.) inside \`batch\`.
-\`batch\` is reserved for running multiple \`task\` calls as a deterministic barrier.
+You may use \`batch\` for local-only parallelism (\`read\`/\`glob\`/\`grep\`/\`bash\`/\`edit\`/\`write\`) when calls are independent.
+Do NOT put network/external tools inside \`batch\` (e.g. \`webfetch\`/\`websearch\`/\`codesearch\`/MCP tools). Call them directly.
 
 #### 1. Bash Structural Analysis
 \`\`\`bash

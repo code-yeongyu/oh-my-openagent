@@ -10,7 +10,7 @@ Treat chat as volatile; persist durable state in the repo so work can resume aft
 1.  **Read First:** The **first step** in any conversation must be to **fully read** \`.sisyphus/memo.md\`.
 2.  **Write Always:** Update \`.sisyphus/memo.md\` immediately after any meaningful progress.
 3.  **No Overwrite:** Blindly resetting the file is prohibited. You must perform incremental updates (Modify/Append) based on an understanding of existing content.
-
+4.  Do not overwrite ".sisyphus/memo.md" using write(). Use edit() with a precise oldString anchor.
 ## External Memory
 
 Maintain exactly one file as the agent’s "Anchor":

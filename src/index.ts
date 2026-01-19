@@ -990,9 +990,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             }
           }
 
+          const sessionID = input.sessionID;
+          const child = sessionID ? isChildSession(sessionID) : undefined;
           const mainSessionID = getMainSessionID();
           const isMainSession =
-            mainSessionID === undefined || input.sessionID === mainSessionID;
+            child === false ||
+            (child === undefined &&
+              mainSessionID !== undefined &&
+              sessionID === mainSessionID);
 
           // Hard block: sub-sessions must not use batch (prevents nesting via batch(task(...))).
           if (!isMainSession) {
@@ -1001,19 +1006,33 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             );
           }
 
-          // In this plugin, batch is used only as a barrier for parallel task() calls.
-          const nonTaskTools = Array.from(
+          // In this plugin, batch is allowed only for a small set of local-only tools and task().
+          // This prevents common failure modes (e.g. trying to batch external/network tools) and
+          // also avoids batch being used as a permission bypass inside sub-sessions.
+          const ALLOWED_BATCH_TOOLS = new Set([
+            "task",
+            "read",
+            "glob",
+            "grep",
+            "bash",
+            "edit",
+            "write",
+          ]);
+
+          const disallowedTools = Array.from(
             new Set(
               args.tool_calls
                 .map((c) => (c && typeof c.tool === "string" ? c.tool : ""))
-                .filter((t) => t !== "" && t !== "task")
+                .filter((t) => t !== "" && !ALLOWED_BATCH_TOOLS.has(t))
             )
           );
-          if (nonTaskTools.length > 0) {
+          if (disallowedTools.length > 0) {
             throw new Error(
-              `Only tool="task" is allowed inside batch(tool_calls=[...]) in this workflow. Found: ${nonTaskTools.join(
+              `Only these tools are allowed inside batch(tool_calls=[...]) in this workflow: ${Array.from(
+                ALLOWED_BATCH_TOOLS
+              ).join(", ")}. Found: ${disallowedTools.join(
                 ", "
-              )}. Call non-task tools directly (outside batch).`
+              )}. Call disallowed tools directly (outside batch).`
             );
           }
         }

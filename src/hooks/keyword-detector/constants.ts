@@ -283,7 +283,9 @@ Search mode: maximize search effort.
 
 Parallelize deterministically:
 - Use native \`task\` for explore/librarian sub-agents.
-- For parallel work, use \`batch(tool_calls=[...])\` with ONLY \`{ tool: "task", ... }\` entries (max 10) and wait for ALL results before continuing.
+- For parallel work, use \`batch(tool_calls=[...])\` (max 10) and wait for ALL results before continuing.
+  - Allowed inside \`batch\` in this environment: \`task\`, \`read\`, \`glob\`, \`grep\`, \`bash\`, \`edit\`, \`write\`.
+  - Do NOT batch network/external tools (e.g. \`webfetch\`, \`websearch\`, \`codesearch\`, MCP tools). Call them directly.
 
 Direct tools:
 - Grep / ripgrep (rg) for fast keyword search
