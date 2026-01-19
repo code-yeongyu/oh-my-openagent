@@ -194,6 +194,10 @@ ${promptPreview}
 }
 
 async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
+  if (!task.sessionID) {
+    return `Error: Task has no sessionID`
+  }
+  
   const messagesResult = await client.session.messages({
     path: { id: task.sessionID },
   })
@@ -219,7 +223,7 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
 Session ID: ${task.sessionID}
 
 ---
@@ -238,7 +242,7 @@ Session ID: ${task.sessionID}
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
 Session ID: ${task.sessionID}
 
 ---
@@ -255,7 +259,7 @@ Session ID: ${task.sessionID}
   
   const newMessages = consumeNewMessages(task.sessionID, sortedMessages)
   if (newMessages.length === 0) {
-    const duration = formatDuration(task.startedAt, task.completedAt)
+    const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
 
 Task ID: ${task.id}
@@ -299,7 +303,7 @@ Session ID: ${task.sessionID}
     .filter((text) => text.length > 0)
     .join("\n\n")
 
-  const duration = formatDuration(task.startedAt, task.completedAt)
+  const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
   return `Task Result
 
@@ -408,7 +412,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
               // Pending task: use manager method (no session to abort)
               manager.cancelPendingTask(task.id)
               results.push(`- ${task.id}: ${task.description} (pending)`)
-            } else {
+            } else if (task.sessionID) {
               // Running task: abort session
               client.session.abort({
                 path: { id: task.sessionID },
@@ -452,9 +456,11 @@ Status: ${task.status}`
         // Running task: abort session
         // Fire-and-forget: abort 요청을 보내고 await 하지 않음
         // await 하면 메인 세션까지 abort 되는 문제 발생
-        client.session.abort({
-          path: { id: task.sessionID },
-        }).catch(() => {})
+        if (task.sessionID) {
+          client.session.abort({
+            path: { id: task.sessionID },
+          }).catch(() => {})
+        }
 
         task.status = "cancelled"
         task.completedAt = new Date()
