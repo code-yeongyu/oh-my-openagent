@@ -98,11 +98,6 @@ Yes, technically possible. But I cannot recommend using it.
 
 ## Contents
 
-- [Claude OAuth Access Notice](#claude-oauth-access-notice)
-  - [TL;DR](#tldr)
-  - [FULL](#full)
-  - [Reviews](#reviews)
-  - [Contents](#contents)
 - [Oh My OpenCode](#oh-my-opencode)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
