@@ -2,6 +2,14 @@
 
 ## For Humans
 
+Paste this into your llm agent session:
+```
+Install and configure oh-my-opencode by following the instructions here:
+https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
+
+**Alternative, Not recommended, do this by yourself**
+
 Run the interactive installer:
 
 ```bash
@@ -15,13 +23,7 @@ npx oh-my-opencode install # alternative
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
-**Alternative: Let an LLM Agent do it**
-
-Paste this into a fresh opencode session:
-```
-Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
+After you install it, you can read this [overview guide](./overview.md) to understand more.
 
 ## For LLM Agents
 
