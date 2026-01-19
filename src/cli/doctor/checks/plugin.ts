@@ -22,6 +22,9 @@ function findPluginEntry(plugins: string[]): { entry: string; isPinned: boolean;
       const version = isPinned ? plugin.split("@")[1] : null
       return { entry: plugin, isPinned, version }
     }
+    if (plugin.startsWith("file://") && plugin.includes(PACKAGE_NAME)) {
+      return { entry: plugin, isPinned: false, version: "local-dev" }
+    }
   }
   return null
 }
