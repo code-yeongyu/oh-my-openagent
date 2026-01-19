@@ -99,7 +99,7 @@
           };
         };
 
-        packages.default = self.packages.${system}.oh-my-opencode;
+        packages.default = self.packages.${pkgs.stdenv.hostPlatform.system}.oh-my-opencode;
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
