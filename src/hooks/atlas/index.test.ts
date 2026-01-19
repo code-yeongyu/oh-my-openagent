@@ -140,7 +140,7 @@ describe("atlas hook", () => {
 
       // #then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("MANDATORY:")
+      expect(output.output).toContain("MANDATORY VERIFICATION")
       expect(output.output).toContain("delegate_task(session_id=")
       
       cleanupMessageStorage(sessionID)
@@ -364,7 +364,7 @@ describe("atlas hook", () => {
       // #then - should include session_id instructions and verification
       expect(output.output).toContain("delegate_task(session_id=")
       expect(output.output).toContain("[x]")
-      expect(output.output).toContain("MANDATORY:")
+      expect(output.output).toContain("MANDATORY VERIFICATION")
       
       cleanupMessageStorage(sessionID)
     })

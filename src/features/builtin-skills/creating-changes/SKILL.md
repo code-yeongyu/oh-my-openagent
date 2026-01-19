@@ -30,7 +30,7 @@ Before using this skill, ensure:
 
 1. Change directory exists: `changes/<name>/`
 2. `proposal.md` is complete (created by brainstorming skill)
-3. `.superpowers/status.json` has `currentChange` set
+3. `.sisyphus/boulder.json` has `currentChange` set
 
 ## The Process
 

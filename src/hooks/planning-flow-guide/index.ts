@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { getMainSessionID } from "../../features/claude-code-session-state"
+import { updatePhaseStatus, readBoulderState } from "../../features/boulder-state"
 import {
   HOOK_NAME,
   PLANNING_FLOW_ORDER,
@@ -117,6 +118,22 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
       state.phasesCompleted.add(phase)
       state.lastPhase = phase
 
+      // Update boulder PhaseStatus based on detected phase (Task 11)
+      try {
+        const boulderState = readBoulderState(ctx.directory)
+        if (boulderState) {
+          if (phase === "metis" || phase === "prometheus") {
+            updatePhaseStatus(ctx.directory, "planning")
+            log(`[${HOOK_NAME}] PhaseStatus updated to 'planning'`, { sessionID: input.sessionID, phase })
+          } else if (phase === "momus") {
+            updatePhaseStatus(ctx.directory, "reviewing")
+            log(`[${HOOK_NAME}] PhaseStatus updated to 'reviewing'`, { sessionID: input.sessionID, phase })
+          }
+        }
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to update PhaseStatus`, { sessionID: input.sessionID, error: String(err) })
+      }
+
       // Check for Momus rejection in output
       const resultStr = typeof output.result === "string" ? output.result : JSON.stringify(output.result)
       if (phase === "momus" && /reject|revision\s+required|not\s+approved|needs\s+revision|incomplete|insufficient/i.test(resultStr)) {
@@ -150,6 +167,25 @@ sisyphus_task(
 - Ignore Momus feedback
 - Submit the same plan without changes`,
         })
+      }
+
+      // Check for Momus OKAY → transition to executing (Task 12)
+      if (phase === "momus" && /\bOKAY\b|approved|plan\s+is\s+ready|looks\s+good/i.test(resultStr)) {
+        state.momusRejected = false
+        try {
+          updatePhaseStatus(ctx.directory, "executing")
+          log(`[${HOOK_NAME}] Momus OKAY detected - PhaseStatus updated to 'executing'`, { sessionID: input.sessionID })
+          messages.push({
+            type: "text",
+            text: `✅ **Momus APPROVED the plan.**
+
+**PhaseStatus updated**: reviewing → executing
+
+**Next step**: Run \`/start-work\` to begin execution, or the plan will be picked up automatically.`,
+          })
+        } catch (err) {
+          log(`[${HOOK_NAME}] Failed to update PhaseStatus to executing`, { sessionID: input.sessionID, error: String(err) })
+        }
       }
 
       log(`[${HOOK_NAME}] Planning phase detected`, {

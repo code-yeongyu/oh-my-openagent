@@ -13,6 +13,12 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
+## Phase Status
+
+**State Transition**: `executing` → `awaiting_user`
+
+This skill transitions the phase from `executing` to `awaiting_user` when presenting options to the user. The user must make a choice (merge, PR, keep, or discard) before the workflow can proceed. Phase status is tracked via `.sisyphus/boulder.json`.
+
 ## The Process
 
 ### Step 1: 检测分支状态

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
+import { AGENT_DEFAULT_SKILLS, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -259,21 +259,11 @@ Prompts MUST be in English.`
         throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
       }
       const runInBackground = args.run_in_background === true
-      const defaultSkills = args.category
+      let categoryDefaultSkills = args.category
         ? userCategories?.[args.category]?.defaultSkills ?? DEFAULT_CATEGORIES[args.category]?.defaultSkills ?? []
         : []
-      const mergedSkills = Array.from(new Set([...args.load_skills, ...defaultSkills]))
-
+      let mergedSkills: string[] = []
       let skillContent: string | undefined
-      if (mergedSkills.length > 0) {
-        const { resolved, notFound } = await resolveMultipleSkillsAsync(mergedSkills, { gitMasterConfig, browserProvider })
-        if (notFound.length > 0) {
-          const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
-          const available = allSkills.map(s => s.name).join(", ")
-          return `Skills not found: ${notFound.join(", ")}. Available: ${available}`
-        }
-        skillContent = Array.from(resolved.values()).join("\n\n")
-      }
 
       const messageDir = getMessageDir(ctx.sessionID)
       const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
@@ -527,6 +517,8 @@ To continue this session: session_id="${args.session_id}"`
           return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
         }
 
+        categoryDefaultSkills = resolved.defaultSkills
+
         const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category]
         let actualModel: string | undefined
 
@@ -752,8 +744,11 @@ To continue this session: session_id="${sessionID}"`
         if (equalsIgnoreCase(agentName, SISYPHUS_JUNIOR_AGENT)) {
           return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
 
-Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
+ Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
         }
+
+        // Get agent defaultSkills (Task 14)
+        categoryDefaultSkills = AGENT_DEFAULT_SKILLS[agentName] ?? []
 
         agentToUse = agentName
       }
@@ -787,6 +782,18 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
         agentToUse = matchedAgent.name
       } catch {
         // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
+      }
+
+      mergedSkills = Array.from(new Set([...args.load_skills, ...categoryDefaultSkills]))
+
+      if (mergedSkills.length > 0) {
+        const { resolved, notFound } = await resolveMultipleSkillsAsync(mergedSkills, { gitMasterConfig, browserProvider })
+        if (notFound.length > 0) {
+          const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
+          const available = allSkills.map(s => s.name).join(", ")
+          return `Skills not found: ${notFound.join(", ")}. Available: ${available}`
+        }
+        skillContent = Array.from(resolved.values()).join("\n\n")
       }
 
       const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })

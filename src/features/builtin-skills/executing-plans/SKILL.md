@@ -13,6 +13,12 @@ Load plan, review critically, dispatch Implementer agent per task, with automati
 
 **Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
+## Phase Status
+
+**State Transition**: `idle` → `executing`
+
+This skill operates in the `executing` phase. The phase is automatically tracked via `.sisyphus/boulder.json`.
+
 ## The Process
 
 ### Step 0: Environment Check
@@ -33,7 +39,7 @@ Load plan, review critically, dispatch Implementer agent per task, with automati
    - 如已在 worktree 中工作，跳过此步骤
 
 3. **恢复状态 (如有)**
-   - 读取 `.superpowers/status.json`
+   - 读取 `.sisyphus/boulder.json`
    - 如存在未完成任务，从上次中断位置恢复
    - 显示: "检测到未完成任务 {taskId}，将从此处继续"
 
@@ -135,7 +141,7 @@ Work from: ${worktreePath}
 After each COMPLETED response:
 
 1. Verify commit was made by Implementer
-2. Record SHA in `.superpowers/status.json`:
+2. Record SHA in `.sisyphus/boulder.json`:
    ```json
    {
      "tasks": {

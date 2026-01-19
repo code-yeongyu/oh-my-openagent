@@ -10,6 +10,7 @@ import {
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { isInCompactionCooldown, getCompactionCooldownRemaining, clearCompactionState } from "./compaction-state"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -281,11 +282,23 @@ export function createTodoContinuationEnforcer(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const error = props?.error as { name?: string } | undefined
+      const error = props?.error as { name?: string; message?: string } | undefined
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = getState(sessionID)
         state.abortDetectedAt = Date.now()
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
+      }
+      
+      // Detect context limit errors which trigger compaction
+      // Note: This is a fallback - the main compaction detection is via onSummarize hook
+      // in compaction-context-injector which uses shared compaction-state
+      const errorStr = JSON.stringify(error ?? {}).toLowerCase()
+      if (errorStr.includes("prompt is too long") || 
+          errorStr.includes("context limit") || 
+          errorStr.includes("server-side context limit") ||
+          errorStr.includes("token") && errorStr.includes("limit")) {
+        cancelCountdown(sessionID)
+        log(`[${HOOK_NAME}] Context limit error detected`, { sessionID, errorStr: errorStr.slice(0, 200) })
       }
 
       cancelCountdown(sessionID)
@@ -325,6 +338,13 @@ export function createTodoContinuationEnforcer(
           return
         }
         state.abortDetectedAt = undefined
+      }
+
+      // Check 1.5: Post-compact cooldown (1 minute after compact, don't remind)
+      // Uses shared state from compaction-context-injector via onSummarize hook
+      if (isInCompactionCooldown(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: post-compact cooldown active`, { sessionID, cooldownRemaining: getCompactionCooldownRemaining(sessionID) })
+        return
       }
 
       const hasRunningBgTasks = backgroundManager
@@ -424,8 +444,18 @@ export function createTodoContinuationEnforcer(
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       const role = info?.role as string | undefined
+      const agent = info?.agent as string | undefined
 
       if (!sessionID) return
+
+      // Detect compaction agent - trigger cooldown to prevent todo-reminder conflict
+      if (agent === "compaction") {
+        const { markCompaction } = await import("./compaction-state")
+        markCompaction(sessionID)
+        cancelCountdown(sessionID)
+        log(`[${HOOK_NAME}] Compaction agent detected, starting 1-minute cooldown`, { sessionID })
+        return
+      }
 
       if (role === "user") {
         const state = sessions.get(sessionID)
@@ -479,6 +509,9 @@ export function createTodoContinuationEnforcer(
       }
       return
     }
+
+    // Note: Compaction is now tracked via shared compaction-state module
+    // which is updated by compaction-context-injector's onSummarize hook
   }
 
   return {

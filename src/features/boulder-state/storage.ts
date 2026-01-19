@@ -139,6 +139,7 @@ export function findPrometheusPlans(directory: string): string[] {
 
 /**
  * Parse a plan file and count checkbox progress.
+ * Detects checkboxes at ALL indentation levels (including sub-task acceptance criteria).
  */
 export function getPlanProgress(planPath: string): PlanProgress {
   if (!existsSync(planPath)) {
@@ -148,9 +149,11 @@ export function getPlanProgress(planPath: string): PlanProgress {
   try {
     const content = readFileSync(planPath, "utf-8")
     
-    // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
+    // Match markdown checkboxes at ANY indentation level:
+    // - [ ] unchecked or - [x]/- [X] checked
+    // Allows any amount of leading whitespace (spaces/tabs)
+    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
+    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
 
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
@@ -278,4 +281,27 @@ export function canCallPlanningAgents(directory: string): boolean {
 export function isExecutingPhase(directory: string): boolean {
   const phase = getCurrentPhase(directory)
   return phase === "executing"
+}
+
+/**
+ * Mark boulder as complete - clears active_plan and sets phase to completed.
+ * This prevents Phase 3 from triggering repeatedly.
+ */
+export function markBoulderComplete(directory: string): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) return null
+
+  // Store the completed plan info before clearing
+  const completedState: BoulderState = {
+    ...state,
+    active_plan: "", // Clear active plan to stop continuation triggers
+    phase: "completed",
+    last_updated: new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+  }
+
+  if (writeBoulderState(directory, completedState)) {
+    return completedState
+  }
+  return null
 }

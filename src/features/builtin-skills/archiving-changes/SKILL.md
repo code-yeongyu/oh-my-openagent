@@ -11,6 +11,12 @@ description: 归档已完成的变更
 
 **Announce at start:** "I'm using the archiving-changes skill to archive this completed change."
 
+## Phase Status
+
+**State Transition**: `awaiting_user` → `completed`
+
+This skill completes the development cycle by transitioning the phase from `awaiting_user` to `completed`. After archiving, the boulder state is marked as complete and the workflow cycle ends. Phase status is tracked via `.sisyphus/boulder.json`.
+
 ## 何时使用
 
 - 所有任务已标记为 `[x]`
@@ -48,6 +54,22 @@ description: 归档已完成的变更
 - `changes/archive/YYYY-MM-DD-{name}/` 目录存在
 - `metadata.json` 包含所有 commit SHAs
 - Worktree 已清理
+
+### Step 4: 标记 Boulder 完成
+
+**CRITICAL:** 归档完成后必须调用 `markBoulderComplete()` 标记工作流结束。
+
+这将：
+- 更新 `.sisyphus/boulder.json` 中的 `phase` 为 `completed`
+- 设置 `completed_at` 时间戳
+- 清除 `active_plan` 以防止 Phase 3 重复触发
+
+```typescript
+import { markBoulderComplete } from "src/features/boulder-state"
+
+// 归档完成后调用
+markBoulderComplete(projectRoot)
+```
 
 ## metadata.json 结构
 

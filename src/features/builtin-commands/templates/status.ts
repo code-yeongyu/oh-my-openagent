@@ -14,12 +14,12 @@ Display the current change execution status.
 
 ## Execution Logic
 
-1. **Check for .superpowers/status.json**
+1. **Check for .sisyphus/boulder.json**
    - If not found, check for \`changes/\` directory with active changes
    - If no active change, report "No active change"
 
 2. **Read status data**
-   - Active change name from \`.superpowers/status.json\` or detect from \`changes/\` directory
+   - Active change name from \`.sisyphus/boulder.json\` or detect from \`changes/\` directory
    - Parse \`changes/{name}/tasks.md\` for task progress
 
 3. **Parse task progress**
@@ -66,7 +66,7 @@ Available changes in changes/:
 
 ## Error Handling
 
-- If \`.superpowers/\` doesn't exist: Check \`changes/\` directory directly
+- If \`.sisyphus/\` doesn't exist: Check \`changes/\` directory directly
 - If \`changes/\` doesn't exist: Report "No changes directory found"
 - If tasks.md is malformed: Report parse errors and show raw content
 `

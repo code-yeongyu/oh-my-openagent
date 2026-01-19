@@ -13,6 +13,12 @@ description: Use when executing plans with multiple independent waves in paralle
 
 **Announce at start:** "I'm using the wave-parallel-execution skill to execute this plan in parallel waves."
 
+## Phase Status
+
+**State Transition**: `planning` → `executing`
+
+This skill operates in the `executing` phase. When wave execution begins, the phase transitions from `planning` to `executing`. Phase status is tracked via `.sisyphus/boulder.json`.
+
 ## When to Use
 
 - tasks.md 有多个可并行的任务组

@@ -396,7 +396,7 @@ After the design is validated:
 1. **Determine Change Name**: kebab-case, verb prefix (\`add-\`, \`fix-\`, \`update-\`)
 2. **Create Directory**: \`changes/<name>/\`
 3. **Write proposal.md**: See \`reference.md\` for template
-4. **Update Status**: \`.superpowers/status.json\`
+4. **Update Status**: \`.sisyphus/boulder.json\`
 
 ## Key Principles
 
@@ -415,7 +415,7 @@ Report: "Created change: \`changes/<name>/\`. Proposal saved to \`proposal.md\`.
 
 ## References
 
-- \`reference.md\`: Templates for proposal.md, options table, status.json`,
+- \`reference.md\`: Templates for proposal.md, options table, boulder.json`,
 }
 
 const creatingChangesSkill: BuiltinSkill = {

@@ -1,6 +1,7 @@
 import { injectHookMessage } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
+import { markCompaction } from "../compaction-state"
 
 export interface SummarizeContext {
   sessionID: string
@@ -51,6 +52,10 @@ This context is critical for maintaining continuity after compaction.
 export function createCompactionContextInjector() {
   return async (ctx: SummarizeContext): Promise<void> => {
     log("[compaction-context-injector] injecting context", { sessionID: ctx.sessionID })
+
+    // Mark compaction time for cooldown tracking
+    markCompaction(ctx.sessionID)
+    log("[compaction-context-injector] marked compaction for cooldown", { sessionID: ctx.sessionID })
 
     const success = injectHookMessage(ctx.sessionID, SUMMARIZE_CONTEXT_PROMPT, {
       agent: "general",

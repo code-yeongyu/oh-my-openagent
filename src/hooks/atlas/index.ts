@@ -8,6 +8,8 @@ import {
   getPlanProgress,
   getCurrentPhase,
   isExecutingPhase,
+  markBoulderComplete,
+  updatePhaseStatus,
 } from "../../features/boulder-state"
 import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
@@ -15,6 +17,7 @@ import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
 import type { BackgroundManager } from "../../features/background-agent"
+import { isInCompactionCooldown, getCompactionCooldownRemaining } from "../compaction-state"
 
 export const HOOK_NAME = "atlas"
 
@@ -616,6 +619,18 @@ export function createAtlasHook(
         const state = getState(sessionID)
         const isAbort = isAbortError(props?.error)
         state.lastEventWasAbortError = isAbort
+        
+        // Detect context limit errors which trigger compaction
+        // Note: This is a fallback - the main compaction detection is via onSummarize hook
+        // in compaction-context-injector which uses shared compaction-state
+        const error = props?.error as Record<string, unknown> | undefined
+        const errorStr = JSON.stringify(error ?? {}).toLowerCase()
+        if (errorStr.includes("prompt is too long") || 
+            errorStr.includes("context limit") || 
+            errorStr.includes("server-side context limit") ||
+            errorStr.includes("token") && errorStr.includes("limit")) {
+          log(`[${HOOK_NAME}] Context limit error detected`, { sessionID, errorStr: errorStr.slice(0, 200) })
+        }
 
         log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
         return
@@ -669,9 +684,25 @@ export function createAtlasHook(
           return
         }
 
+        // CRITICAL: Check if boulder is already completed to prevent repeated Phase 3 triggers
+        if (boulderState.phase === "completed" || boulderState.completed_at) {
+          log(`[${HOOK_NAME}] Boulder already completed, skipping Phase 3`, { sessionID, plan: boulderState.plan_name })
+          return
+        }
+
         const progress = getPlanProgress(boulderState.active_plan)
         if (progress.isComplete) {
+          // TEMPORARILY DISABLED: Auto Phase 3 trigger was causing interference with normal work
+          // TODO: Re-enable after fixing the repeated trigger issue
+          log(`[${HOOK_NAME}] Boulder complete - Phase 3 auto-trigger DISABLED`, { sessionID, plan: boulderState.plan_name })
+          return
+          
+          /* DISABLED CODE:
           log(`[${HOOK_NAME}] Boulder complete - triggering Phase 3`, { sessionID, plan: boulderState.plan_name })
+          
+          // Mark boulder as complete FIRST to prevent repeated triggers
+          markBoulderComplete(ctx.directory)
+          log(`[${HOOK_NAME}] Boulder marked as complete`, { sessionID, plan: boulderState.plan_name })
           
           // Inject Archiver dispatch prompt when all tasks are complete
           try {
@@ -688,9 +719,18 @@ export function createAtlasHook(
             log(`[${HOOK_NAME}] Archiver dispatch prompt failed`, { sessionID, error: String(err) })
           }
           return
+          */
         }
 
         const now = Date.now()
+        
+        // Check post-compact cooldown (1 minute after compact, don't remind)
+        // Uses shared state from compaction-context-injector via onSummarize hook
+        if (isInCompactionCooldown(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: post-compact cooldown active`, { sessionID, cooldownRemaining: getCompactionCooldownRemaining(sessionID) })
+          return
+        }
+        
         if (state.lastContinuationInjectedAt && now - state.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
           log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, { sessionID, cooldownRemaining: CONTINUATION_COOLDOWN_MS - (now - state.lastContinuationInjectedAt) })
           return
@@ -705,8 +745,17 @@ export function createAtlasHook(
       if (event.type === "message.updated") {
         const info = props?.info as Record<string, unknown> | undefined
         const sessionID = info?.sessionID as string | undefined
+        const agent = info?.agent as string | undefined
 
         if (!sessionID) return
+
+        // Detect compaction agent - trigger cooldown to prevent boulder-reminder conflict
+        if (agent === "compaction") {
+          const { markCompaction } = await import("../compaction-state")
+          markCompaction(sessionID)
+          log(`[${HOOK_NAME}] Compaction agent detected, starting 1-minute cooldown`, { sessionID })
+          return
+        }
 
         const state = sessions.get(sessionID)
         if (state) {
@@ -748,6 +797,9 @@ export function createAtlasHook(
         }
         return
       }
+
+      // Note: Compaction is now tracked via shared compaction-state module
+      // which is updated by compaction-context-injector's onSummarize hook
     },
 
     "tool.execute.before": async (
@@ -831,6 +883,30 @@ You are attempting to call a **planning agent** (${subagentType}) while in **exe
       input: ToolExecuteAfterInput,
       output: ToolExecuteAfterOutput
     ): Promise<void> => {
+      // Track skill calls for phase updates (Task 13)
+      if (input.tool === "skill") {
+        const skillName = (output.metadata?.name ?? output.metadata?.skillName ?? "") as string
+        const skillNameLower = skillName.toLowerCase()
+        
+        try {
+          if (skillNameLower.includes("brainstorming")) {
+            updatePhaseStatus(ctx.directory, "planning")
+            log(`[${HOOK_NAME}] Skill phase tracking: brainstorming → planning`, { sessionID: input.sessionID })
+          } else if (skillNameLower.includes("executing-plans") || skillNameLower.includes("wave-parallel")) {
+            updatePhaseStatus(ctx.directory, "executing")
+            log(`[${HOOK_NAME}] Skill phase tracking: execution skill → executing`, { sessionID: input.sessionID })
+          } else if (skillNameLower.includes("finishing-a-development-branch")) {
+            updatePhaseStatus(ctx.directory, "awaiting_user")
+            log(`[${HOOK_NAME}] Skill phase tracking: finishing → awaiting_user`, { sessionID: input.sessionID })
+          } else if (skillNameLower.includes("archiving-changes")) {
+            updatePhaseStatus(ctx.directory, "completed")
+            log(`[${HOOK_NAME}] Skill phase tracking: archiving → completed`, { sessionID: input.sessionID })
+          }
+        } catch (err) {
+          log(`[${HOOK_NAME}] Skill phase tracking failed`, { sessionID: input.sessionID, skill: skillName, error: String(err) })
+        }
+      }
+
       if (!isCallerOrchestrator(input.sessionID)) {
         return
       }

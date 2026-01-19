@@ -94,7 +94,7 @@ Revert to a previous checkpoint.
 
 4. **Clean up**
    - Remove worktree if exists
-   - Update .superpowers/status.json
+   - Update .sisyphus/boulder.json
    - Optionally delete change directory
 
 ## Error Handling

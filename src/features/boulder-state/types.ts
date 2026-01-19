@@ -8,7 +8,7 @@
 /**
  * Phase status for workflow state machine (Task 9.1)
  */
-export type PhaseStatus = "idle" | "planning" | "reviewing" | "executing" | "completed" | "failed"
+export type PhaseStatus = "idle" | "planning" | "reviewing" | "executing" | "awaiting_user" | "completed" | "failed"
 
 /**
  * Worktree status for Wave execution (Task 10.3)
@@ -76,8 +76,26 @@ export interface BoulderState {
   last_error?: string
   /** Last updated timestamp */
   last_updated?: string
+  /** ISO timestamp when work completed (Phase 3 finished) */
+  completed_at?: string
   /** Wave execution state for parallel/sequential mode (Task 10.3) */
   wave_execution?: WaveExecutionState
+
+  // === Fields migrated from .superpowers/status.json ===
+  /** Current change name (e.g., feature being worked on) */
+  currentChange?: string
+  /** Path to the proposal.md file */
+  proposal_path?: string
+  /** Path to the design.md file */
+  design_path?: string
+  /** Path to the tasks.md file */
+  tasks_path?: string
+  /** Execution mode: sequential or parallel */
+  execution_mode?: "sequential" | "parallel"
+  /** ISO timestamp when work was archived */
+  archived_at?: string
+  /** Path to the archive directory */
+  archive_path?: string
 }
 
 export interface PlanProgress {

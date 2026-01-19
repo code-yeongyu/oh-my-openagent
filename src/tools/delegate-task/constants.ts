@@ -288,6 +288,35 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 }
 
 /**
+ * Default skills for specific agents (Task 4-6.5)
+ * These are automatically merged with user-specified skills when calling agents directly.
+ */
+export const AGENT_DEFAULT_SKILLS: Record<string, string[]> = {
+  "Metis (Plan Consultant)": ["brainstorming", "codex-mcp-collaboration"],
+  "Prometheus (Planner)": ["creating-changes", "dispatching-parallel-agents"],
+  "Momus (Plan Reviewer)": ["verification-before-completion"],
+  "archiver": ["verification-before-completion", "finishing-a-development-branch", "archiving-changes"],
+  "frontend-ui-ux-engineer": ["frontend-ui-ux", "playwright"],
+}
+
+export const DELEGATE_TASK_DESCRIPTION = `Spawn agent task with category-based or direct agent selection.
+
+MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
+
+- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+- category: Use predefined category → Spawns Sisyphus-Junior with category config
+- subagent_type: Use specific agent directly (e.g., "oracle", "explore")
+- run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
+- session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+
+**WHEN TO USE session_id:**
+- Task failed/incomplete → session_id with "fix: [specific issue]"
+- Need follow-up on previous result → session_id with additional question
+- Multi-turn conversation with same agent → always session_id instead of new task
+
+Prompts MUST be in English.`
+
+/**
  * System prompt prepended to plan agent invocations.
  * Instructs the plan agent to first gather context via explore/librarian agents,
  * then summarize user requirements and clarify uncertainties before proceeding.
