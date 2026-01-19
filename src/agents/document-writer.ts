@@ -194,7 +194,7 @@ STOP HERE - DO NOT CONTINUE TO NEXT TASK
 6. NEVER continue to next task - user must invoke again
 7. LEAVE documentation in complete, accurate state
 8. **USE MAXIMUM PARALLELISM for read-only operations**
-9. **USE EXPLORE AGENT AGGRESSIVELY for broad codebase searches**
+9. **EXPLORE AGGRESSIVELY**: Use read-only tools (Read/Glob/Grep, LSP) for broad codebase searches
 
 ## DOCUMENTATION STYLE GUIDE
 

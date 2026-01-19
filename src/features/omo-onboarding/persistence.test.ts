@@ -5,15 +5,22 @@ import path from "node:path"
 import { loadPersistedOmoOnboardingShown, persistOmoOnboardingShown } from "./persistence"
 
 describe("omo onboarding persistence", () => {
-  const originalXdg = process.env.XDG_CONFIG_HOME
+  let originalXdg: string | undefined
+  let hadOriginalXdg = false
 
   beforeEach(() => {
+    hadOriginalXdg = Object.prototype.hasOwnProperty.call(process.env, "XDG_CONFIG_HOME")
+    originalXdg = process.env.XDG_CONFIG_HOME
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omo-onboarding-"))
     process.env.XDG_CONFIG_HOME = tmp
   })
 
   afterEach(() => {
-    process.env.XDG_CONFIG_HOME = originalXdg
+    if (hadOriginalXdg) {
+      process.env.XDG_CONFIG_HOME = originalXdg
+    } else {
+      delete process.env.XDG_CONFIG_HOME
+    }
   })
 
   test("load returns false when no state file exists", () => {
@@ -29,4 +36,3 @@ describe("omo onboarding persistence", () => {
     expect(loadPersistedOmoOnboardingShown()).toBe(true)
   })
 })
-

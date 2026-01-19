@@ -5,16 +5,23 @@ import path from "node:path"
 import { isUlwEnabled, setUlwEnabled, _resetUlwForTesting } from "./state"
 
 describe("ULW state", () => {
-  const originalXdg = process.env.XDG_CONFIG_HOME
+  let originalXdg: string | undefined
+  let hadOriginalXdg = false
 
   beforeEach(() => {
+    hadOriginalXdg = Object.prototype.hasOwnProperty.call(process.env, "XDG_CONFIG_HOME")
+    originalXdg = process.env.XDG_CONFIG_HOME
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omo-ulw-"))
     process.env.XDG_CONFIG_HOME = tmp
     _resetUlwForTesting()
   })
 
   afterEach(() => {
-    process.env.XDG_CONFIG_HOME = originalXdg
+    if (hadOriginalXdg) {
+      process.env.XDG_CONFIG_HOME = originalXdg
+    } else {
+      delete process.env.XDG_CONFIG_HOME
+    }
   })
 
   test("setUlwEnabled persists and isUlwEnabled reflects it", () => {
@@ -35,4 +42,3 @@ describe("ULW state", () => {
     expect(parsed.enabled).toBe(true)
   })
 })
-
