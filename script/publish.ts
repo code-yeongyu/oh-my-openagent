@@ -171,12 +171,15 @@ async function publishPackage(cwd: string, distTag: string | null, useProvenance
   } catch (error: any) {
     const stderr = error?.stderr?.toString() || error?.message || ""
     
-    // E409 = version already exists (idempotent success)
+    // E409/E403 = version already exists (idempotent success)
+    // E404 + "Access token expired" = OIDC token expired while publishing already-published package
     if (
       stderr.includes("EPUBLISHCONFLICT") ||
       stderr.includes("E409") ||
+      stderr.includes("E403") ||
       stderr.includes("cannot publish over") ||
-      stderr.includes("already exists")
+      stderr.includes("already exists") ||
+      (stderr.includes("E404") && stderr.includes("Access token expired"))
     ) {
       return { success: true, alreadyPublished: true }
     }
