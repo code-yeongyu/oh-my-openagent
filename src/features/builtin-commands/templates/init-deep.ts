@@ -14,9 +14,9 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Workflow (High-Level)
 
-1. **Discovery + Analysis** (concurrent)
-   - Fire background explore agents immediately
-   - Main session: bash structure + LSP codemap + read existing AGENTS.md
+1. **Discovery + Analysis**
+   - Run explore subagents in parallel via native \`batch\`+\`task\` (barrier: parent waits for all)
+   - Then run main-session direct analysis (bash structure + LSP codemap + read existing AGENTS.md)
 2. **Score & Decide** - Determine AGENTS.md locations from merged findings
 3. **Generate** - Root first, then subdirs in parallel
 4. **Review** - Deduplicate, trim, validate
@@ -35,7 +35,7 @@ TodoWrite([
 
 ---
 
-## Phase 1: Discovery + Analysis (Concurrent)
+## Phase 1: Discovery + Analysis
 
 **Mark "discovery" as in_progress.**
 
@@ -87,10 +87,10 @@ batch(tool_calls=[
 \`\`\`
 </dynamic-agents>
 
-### Main Session: Concurrent Analysis
+### Main Session: Direct Analysis (After Task Batch)
 
-If you want true concurrency, include bash/LSP/read calls inside the same \`batch\` call.
-Otherwise, run them before/after the subagent batch.
+Do NOT put non-\`task\` tool calls (bash/read/LSP/etc.) inside \`batch\`.
+\`batch\` is reserved for running multiple \`task\` calls as a deterministic barrier.
 
 #### 1. Bash Structural Analysis
 \`\`\`bash
