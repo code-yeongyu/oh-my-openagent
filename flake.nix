@@ -1,0 +1,112 @@
+{
+  description = "The Best AI Agent Harness - Batteries-Included OpenCode Plugin";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+        packageJson = builtins.fromJSON (builtins.readFile ./package.json);
+        version = packageJson.version;
+
+        node_modules = pkgs.stdenvNoCC.mkDerivation {
+          name = "oh-my-opencode-node_modules-${version}";
+          src = self;
+
+          nativeBuildInputs = with pkgs; [
+            bun
+            cacert
+          ];
+
+          buildPhase = ''
+            export HOME=$(mktemp -d)
+            export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
+            bun install --frozen-lockfile --no-progress
+          '';
+
+          installPhase = ''
+            mkdir -p $out
+            cp -r node_modules $out/
+          '';
+
+          outputHashMode = "recursive";
+          outputHashAlgo = "sha256";
+          outputHash = "sha256-HMaAcUx7VhvnOIJ1Wl6f4dv/IzL6EVv17KcJ7ivVubk=";
+        };
+      in
+      {
+        packages.node_modules = node_modules;
+
+        packages.oh-my-opencode = pkgs.stdenvNoCC.mkDerivation {
+          pname = "oh-my-opencode";
+          inherit version;
+          src = self;
+
+          nativeBuildInputs = with pkgs; [
+            bun
+            nodejs_24
+            makeWrapper
+            autoPatchelfHook
+          ];
+
+          buildInputs = with pkgs; [
+            pkgs.stdenv.cc.cc.lib
+          ];
+
+          buildPhase = ''
+            cp -r ${node_modules}/node_modules .
+            chmod -R u+w node_modules
+            export HOME=$(mktemp -d)
+            bun run build
+          '';
+
+          installPhase = ''
+            mkdir -p $out/lib/oh-my-opencode
+            mkdir -p $out/bin
+
+            cp -r dist $out/lib/oh-my-opencode/
+            cp -r node_modules $out/lib/oh-my-opencode/
+            cp package.json $out/lib/oh-my-opencode/
+
+            makeWrapper ${pkgs.bun}/bin/bun $out/bin/oh-my-opencode \
+              --add-flags "$out/lib/oh-my-opencode/dist/cli/index.js" \
+              --prefix PATH : ${
+                pkgs.lib.makeBinPath [
+                  pkgs.bun
+                  pkgs.nodejs_24
+                ]
+              }
+          '';
+
+          meta = with pkgs.lib; {
+            description = "The Best AI Agent Harness - Batteries-Included OpenCode Plugin";
+            homepage = "https://github.com/code-yeongyu/oh-my-opencode";
+            license = licenses.unfree; # SUL-1.0
+            platforms = platforms.linux ++ platforms.darwin;
+          };
+        };
+
+        packages.default = self.packages.${system}.oh-my-opencode;
+
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            bun
+            nodejs_24
+          ];
+        };
+      }
+    );
+}
