@@ -200,85 +200,32 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   })
 })
 
-describe("generateOmoConfig - GitHub Copilot fallback", () => {
-  test("frontend-ui-ux-engineer uses Copilot when no native providers", () => {
-    // #given user has only Copilot (no Claude, ChatGPT, Gemini)
+describe("generateOmoConfig - v3 beta: no hardcoded models", () => {
+  test("generates minimal config with only $schema", () => {
+    // #given any install config
     const config: InstallConfig = {
-      hasClaude: false,
+      hasClaude: true,
       isMax20: false,
-      hasChatGPT: false,
+      hasChatGPT: true,
       hasGemini: false,
-      hasCopilot: true,
+      hasCopilot: false,
     }
 
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then frontend-ui-ux-engineer should use Copilot Gemini
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["frontend-ui-ux-engineer"]?.model).toBe("github-copilot/gemini-3-pro-preview")
+    // #then should only contain $schema, no agents or categories
+    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
+    expect(result.agents).toBeUndefined()
+    expect(result.categories).toBeUndefined()
   })
 
-  test("document-writer uses Copilot when no native providers", () => {
-    // #given user has only Copilot
+  test("does not include model fields regardless of provider config", () => {
+    // #given user has multiple providers
     const config: InstallConfig = {
-      hasClaude: false,
-      isMax20: false,
-      hasChatGPT: false,
-      hasGemini: false,
-      hasCopilot: true,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then document-writer should use Copilot Gemini Flash
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["document-writer"]?.model).toBe("github-copilot/gemini-3-flash-preview")
-  })
-
-  test("multimodal-looker uses Copilot when no native providers", () => {
-    // #given user has only Copilot
-    const config: InstallConfig = {
-      hasClaude: false,
-      isMax20: false,
-      hasChatGPT: false,
-      hasGemini: false,
-      hasCopilot: true,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then multimodal-looker should use Copilot Gemini Flash
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["multimodal-looker"]?.model).toBe("github-copilot/gemini-3-flash-preview")
-  })
-
-  test("explore uses Copilot grok-code when no native providers", () => {
-    // #given user has only Copilot
-    const config: InstallConfig = {
-      hasClaude: false,
-      isMax20: false,
-      hasChatGPT: false,
-      hasGemini: false,
-      hasCopilot: true,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then explore should use Copilot Grok
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["explore"]?.model).toBe("github-copilot/grok-code-fast-1")
-  })
-
-  test("native Gemini takes priority over Copilot for frontend-ui-ux-engineer", () => {
-    // #given user has both Gemini and Copilot
-    const config: InstallConfig = {
-      hasClaude: false,
-      isMax20: false,
-      hasChatGPT: false,
+      hasClaude: true,
+      isMax20: true,
+      hasChatGPT: true,
       hasGemini: true,
       hasCopilot: true,
     }
@@ -286,46 +233,27 @@ describe("generateOmoConfig - GitHub Copilot fallback", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then native Gemini should be used (NOT Copilot)
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["frontend-ui-ux-engineer"]?.model).toBe("google/antigravity-gemini-3-pro-high")
+    // #then should not have agents or categories with model fields
+    expect(result.agents).toBeUndefined()
+    expect(result.categories).toBeUndefined()
   })
 
-  test("native Claude takes priority over Copilot for frontend-ui-ux-engineer", () => {
-    // #given user has Claude and Copilot but no Gemini
-    const config: InstallConfig = {
-      hasClaude: true,
-      isMax20: false,
-      hasChatGPT: false,
-      hasGemini: false,
-      hasCopilot: true,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then native Claude should be used (NOT Copilot)
-    const agents = result.agents as Record<string, { model?: string }>
-    expect(agents["frontend-ui-ux-engineer"]?.model).toBe("anthropic/claude-opus-4-5")
-  })
-
-  test("categories use Copilot models when no native Gemini", () => {
-    // #given user has Copilot but no Gemini
+  test("does not include model fields when no providers configured", () => {
+    // #given user has no providers
     const config: InstallConfig = {
       hasClaude: false,
       isMax20: false,
       hasChatGPT: false,
       hasGemini: false,
-      hasCopilot: true,
+      hasCopilot: false,
     }
 
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then categories should use Copilot models
-    const categories = result.categories as Record<string, { model?: string }>
-    expect(categories?.["visual-engineering"]?.model).toBe("github-copilot/gemini-3-pro-preview")
-    expect(categories?.["artistry"]?.model).toBe("github-copilot/gemini-3-pro-preview")
-    expect(categories?.["writing"]?.model).toBe("github-copilot/gemini-3-flash-preview")
+    // #then should still only contain $schema
+    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
+    expect(result.agents).toBeUndefined()
+    expect(result.categories).toBeUndefined()
   })
 })

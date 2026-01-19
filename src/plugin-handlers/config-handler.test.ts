@@ -10,9 +10,9 @@ describe("Prometheus category config resolution", () => {
     // #when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // #then - DEFAULT_CATEGORIES only has temperature, not model
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2")
+    expect(config?.model).toBeUndefined()
     expect(config?.temperature).toBe(0.1)
   })
 
@@ -23,9 +23,9 @@ describe("Prometheus category config resolution", () => {
     // #when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // #then - DEFAULT_CATEGORIES only has temperature, not model
     expect(config).toBeDefined()
-    expect(config?.model).toBe("google/gemini-3-pro-preview")
+    expect(config?.model).toBeUndefined()
     expect(config?.temperature).toBe(0.7)
   })
 
@@ -71,9 +71,9 @@ describe("Prometheus category config resolution", () => {
     // #when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then
+    // #then - falls back to DEFAULT_CATEGORIES which has no model
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2")
+    expect(config?.model).toBeUndefined()
     expect(config?.temperature).toBe(0.1)
   })
 
