@@ -17,6 +17,11 @@ on:
         description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
         required: false
         type: string
+      skip_platform:
+        description: "Skip platform binary packages (use when already published)"
+        required: false
+        type: boolean
+        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -138,6 +143,7 @@ jobs:
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
+          SKIP_PLATFORM_PACKAGES: ${{ inputs.skip_platform }}
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
