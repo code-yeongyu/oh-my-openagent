@@ -9,7 +9,7 @@ import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./fro
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent } from "./metis"
-import { createOrchestratorSisyphusAgent, orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
+import { createOrchestratorSisyphusAgent } from "./orchestrator-sisyphus"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
@@ -28,7 +28,9 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   "Metis (Plan Consultant)": createMetisAgent,
   "Momus (Plan Reviewer)": createMomusAgent,
-  "orchestrator-sisyphus": orchestratorSisyphusAgent,
+  // Note: orchestrator-sisyphus is handled specially in createBuiltinAgents()
+  // because it needs OrchestratorContext, not just a model string
+  "orchestrator-sisyphus": createOrchestratorSisyphusAgent as unknown as AgentFactory,
 }
 
 /**
@@ -50,7 +52,7 @@ function isFactory(source: AgentSource): source is AgentFactory {
 
 export function buildAgent(
   source: AgentSource,
-  model?: string,
+  model: string,
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig
 ): AgentConfig {
@@ -134,6 +136,10 @@ export function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig
 ): Record<string, AgentConfig> {
+  if (!systemDefaultModel) {
+    throw new Error("createBuiltinAgents requires systemDefaultModel")
+  }
+
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
 
@@ -149,7 +155,7 @@ export function createBuiltinAgents(
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
-    const model = override?.model
+    const model = override?.model ?? systemDefaultModel
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
 
