@@ -77,12 +77,14 @@ Confirm:
 
 **Your Mission**: Discover patterns before asking, then surface hidden requirements.
 
-**Pre-Analysis Actions** (YOU should do before questioning):
+**Pre-Analysis Actions** (tell Prometheus to do before questioning):
 \`\`\`
-// Launch these explore agents FIRST
-call_omo_agent(subagent_type="explore", prompt="Find similar implementations...")
-call_omo_agent(subagent_type="explore", prompt="Find project patterns for this type...")
-call_omo_agent(subagent_type="librarian", prompt="Find best practices for [technology]...")
+// Run these subagents FIRST (via native task/batch), then ask questions
+batch(tool_calls=[
+  { tool: "task", parameters: { description: "Find similar implementations", subagent_type: "explore", prompt: "Find similar implementations..." } },
+  { tool: "task", parameters: { description: "Find project patterns", subagent_type: "explore", prompt: "Find project patterns for this type..." } },
+  { tool: "task", parameters: { description: "Find best practices", subagent_type: "librarian", prompt: "Find best practices for [technology]..." } },
+])
 \`\`\`
 
 **Questions to Ask** (AFTER exploration):
@@ -195,9 +197,11 @@ Task(
 **Investigation Structure**:
 \`\`\`
 // Parallel probes
-call_omo_agent(subagent_type="explore", prompt="Find how X is currently handled...")
-call_omo_agent(subagent_type="librarian", prompt="Find official docs for Y...")
-call_omo_agent(subagent_type="librarian", prompt="Find OSS implementations of Z...")
+batch(tool_calls=[
+  { tool: "task", parameters: { description: "How X works", subagent_type: "explore", prompt: "Find how X is currently handled..." } },
+  { tool: "task", parameters: { description: "Official docs", subagent_type: "librarian", prompt: "Find official docs for Y..." } },
+  { tool: "task", parameters: { description: "OSS examples", subagent_type: "librarian", prompt: "Find OSS implementations of Z..." } },
+])
 \`\`\`
 
 **Directives for Prometheus**:
@@ -275,7 +279,9 @@ const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
   "task",
+  "batch",
   "delegate_task",
+  "call_omo_agent",
 ])
 
 export function createMetisAgent(model: string): AgentConfig {

@@ -18,7 +18,11 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createFrontendUiUxEngineerAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([])
+  const restrictions = createAgentToolRestrictions([
+    "task",
+    "delegate_task",
+    "call_omo_agent",
+  ])
 
   return {
     description:
@@ -101,4 +105,3 @@ Match implementation complexity to aesthetic vision:
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
   }
 }
-

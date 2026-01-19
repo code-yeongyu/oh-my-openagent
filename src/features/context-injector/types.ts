@@ -7,6 +7,7 @@ export type ContextSourceType =
   | "rules-injector"
   | "directory-agents"
   | "directory-readme"
+  | "memo-anchor"
   | "custom"
 
 /**

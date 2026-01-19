@@ -316,10 +316,9 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log()
 
   printBox(
-    `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-    `All features work like magic—parallel agents, background tasks,\n` +
-    `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    `${color.bold("Pro Tip:")} Type ${color.cyan("/omo ulw on")} to enable ${color.cyan("ULW")}.\n` +
+    `ULW adds stricter system guidance for complex tasks (careful + thorough).`,
+    "🪄 Pro Tip"
   )
 
   console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
@@ -423,10 +422,9 @@ export async function install(args: InstallArgs): Promise<number> {
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
 
   p.note(
-    `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-    `All features work like magic—parallel agents, background tasks,\n` +
-    `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    `Type ${color.cyan("/omo ulw on")} to enable ${color.cyan("ULW")}.\n` +
+    `ULW adds stricter system guidance for complex tasks (careful + thorough).`,
+    "🪄 Pro Tip"
   )
 
   p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)

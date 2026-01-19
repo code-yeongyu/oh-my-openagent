@@ -12,7 +12,8 @@ You ARE the planner. You ARE NOT an implementer. You DO NOT write code. You DO N
 | Write/Edit | \`.sisyphus/**/*.md\` ONLY | Everything else |
 | Read | All files | - |
 | Bash | Research commands only | Implementation commands |
-| delegate_task | explore, librarian | - |
+| task | explore, librarian | - |
+| batch | task tool_calls (max 10) | - |
 
 **IF YOU TRY TO WRITE/EDIT OUTSIDE \`.sisyphus/\`:**
 - System will BLOCK your action
@@ -34,11 +35,13 @@ You ARE the planner. Your job: create bulletproof work plans.
 **Before drafting ANY plan, gather context via explore/librarian agents.**
 
 ### Research Protocol
-1. **Fire parallel background agents** for comprehensive context:
+1. **Run parallel subagent tasks** for comprehensive context (barrier: wait for ALL):
    \`\`\`
-   delegate_task(agent="explore", prompt="Find existing patterns for [topic] in codebase", background=true)
-   delegate_task(agent="explore", prompt="Find test infrastructure and conventions", background=true)
-   delegate_task(agent="librarian", prompt="Find official docs and best practices for [technology]", background=true)
+   batch(tool_calls=[
+     { tool: "task", parameters: { description: "Find patterns", subagent_type: "explore", prompt: "Find existing patterns for [topic] in codebase" } },
+     { tool: "task", parameters: { description: "Find tests", subagent_type: "explore", prompt: "Find test infrastructure and conventions" } },
+     { tool: "task", parameters: { description: "Docs & best practices", subagent_type: "librarian", prompt: "Find official docs and best practices for [technology]" } }
+   ])
    \`\`\`
 2. **Wait for results** before planning - rushed plans fail
 3. **Synthesize findings** into informed requirements
@@ -175,14 +178,14 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
 ## EXECUTION RULES
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
-- **PARALLEL**: Fire independent agent calls simultaneously via delegate_task(background=true) - NEVER wait sequentially.
-- **BACKGROUND FIRST**: Use delegate_task for exploration/research agents (10+ concurrent if needed).
+- **PARALLEL**: Use \`batch\` to run multiple \`task\` calls in parallel (max 10).
+- **BARRIER**: Do NOT continue until all task results are available.
 - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
 - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
-2. Spawn exploration/librarian agents via delegate_task(background=true) in PARALLEL (10+ if needed)
+2. Spawn exploration/librarian agents via \`batch\`+\`task\` in PARALLEL (max 10 per batch)
 3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
@@ -266,7 +269,9 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
   {
-    pattern: /\b(ultrawork|ulw)\b/i,
+    // NOTE: Ultrawork keyword trigger is intentionally disabled.
+    // ULW is now controlled via the OmO global toggle (/omo).
+    pattern: /(?!)/,
     message: getUltraworkMessage,
   },
   // SEARCH: EN/KO/JP/CN/VN
@@ -274,27 +279,34 @@ export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((age
     pattern:
       /\b(search|find|locate|lookup|look\s*up|explore|discover|scan|grep|query|browse|detect|trace|seek|track|pinpoint|hunt)\b|where\s+is|show\s+me|list\s+all|검색|찾아|탐색|조회|스캔|서치|뒤져|찾기|어디|추적|탐지|찾아봐|찾아내|보여줘|목록|検索|探して|見つけて|サーチ|探索|スキャン|どこ|発見|捜索|見つけ出す|一覧|搜索|查找|寻找|查询|检索|定位|扫描|发现|在哪里|找出来|列出|tìm kiếm|tra cứu|định vị|quét|phát hiện|truy tìm|tìm ra|ở đâu|liệt kê/i,
     message: `[search-mode]
-MAXIMIZE SEARCH EFFORT. Launch multiple background agents IN PARALLEL:
-- explore agents (codebase patterns, file structures, ast-grep)
-- librarian agents (remote repos, official docs, GitHub examples)
-Plus direct tools: Grep, ripgrep (rg), ast-grep (sg)
-NEVER stop at first result - be exhaustive.`,
+Search mode: maximize search effort.
+
+Parallelize deterministically:
+- Use native \`task\` for explore/librarian sub-agents.
+- For parallel work, use \`batch(tool_calls=[...])\` with ONLY \`{ tool: "task", ... }\` entries (max 10) and wait for ALL results before continuing.
+
+Direct tools:
+- Grep / ripgrep (rg) for fast keyword search
+- AST-grep (sg) for structural matches
+- LSP (\`lsp_*\`) for precise symbol navigation
+
+Do not stop at the first hit; keep going until you can explain what/where/why with confidence.`,
   },
   // ANALYZE: EN/KO/JP/CN/VN
   {
     pattern:
       /\b(analyze|analyse|investigate|examine|research|study|deep[\s-]?dive|inspect|audit|evaluate|assess|review|diagnose|scrutinize|dissect|debug|comprehend|interpret|breakdown|understand)\b|why\s+is|how\s+does|how\s+to|분석|조사|파악|연구|검토|진단|이해|설명|원인|이유|뜯어봐|따져봐|평가|해석|디버깅|디버그|어떻게|왜|살펴|分析|調査|解析|検討|研究|診断|理解|説明|検証|精査|究明|デバッグ|なぜ|どう|仕組み|调查|检查|剖析|深入|诊断|解释|调试|为什么|原理|搞清楚|弄明白|phân tích|điều tra|nghiên cứu|kiểm tra|xem xét|chẩn đoán|giải thích|tìm hiểu|gỡ lỗi|tại sao/i,
     message: `[analyze-mode]
-ANALYSIS MODE. Gather context before diving deep:
+Analysis mode: gather evidence before conclusions.
 
-CONTEXT GATHERING (parallel):
-- 1-2 explore agents (codebase patterns, implementations)
-- 1-2 librarian agents (if external library involved)
-- Direct tools: Grep, AST-grep, LSP for targeted searches
+Context gathering (parallel, barrier-style):
+- 1-2 explore \`task\` calls (code paths, patterns, implementations)
+- 0-2 librarian \`task\` calls if external APIs/docs are involved
+- Direct tools: rg/grep, sg, LSP (\`lsp_*\`)
 
-IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
-- Consult oracle for strategic guidance
+If complex (cross-system, architectural, or after repeated failures):
+- Consult oracle via \`task\`
 
-SYNTHESIZE findings before proceeding.`,
+Synthesize findings into a single clear diagnosis before proposing changes.`,
   },
 ]

@@ -319,7 +319,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
                 ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
                 task: false,
                 delegate_task: false,
-                call_omo_agent: true,
+                call_omo_agent: false,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
@@ -608,7 +608,7 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
               tools: {
                 task: false,
                 delegate_task: false,
-                call_omo_agent: true,
+                call_omo_agent: false,
               },
               parts: [{ type: "text", text: args.prompt }],
               ...(categoryModel ? { model: categoryModel } : {}),

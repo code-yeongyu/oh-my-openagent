@@ -21,27 +21,35 @@ export class ConcurrencyManager {
     this.config = config
   }
 
+  private normalizeLimit(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    if (value <= 0) return 0
+    const floored = Math.floor(value)
+    if (floored <= 0) return 0
+    return Math.min(floored, 10)
+  }
+
   getConcurrencyLimit(model: string): number {
     const modelLimit = this.config?.modelConcurrency?.[model]
     if (modelLimit !== undefined) {
-      return modelLimit === 0 ? Infinity : modelLimit
+      return this.normalizeLimit(modelLimit)
     }
     const provider = model.split('/')[0]
     const providerLimit = this.config?.providerConcurrency?.[provider]
     if (providerLimit !== undefined) {
-      return providerLimit === 0 ? Infinity : providerLimit
+      return this.normalizeLimit(providerLimit)
     }
     const defaultLimit = this.config?.defaultConcurrency
     if (defaultLimit !== undefined) {
-      return defaultLimit === 0 ? Infinity : defaultLimit
+      return this.normalizeLimit(defaultLimit)
     }
     return 5
   }
 
   async acquire(model: string): Promise<void> {
     const limit = this.getConcurrencyLimit(model)
-    if (limit === Infinity) {
-      return
+    if (limit <= 0) {
+      throw new Error("Background tasks are disabled (concurrency=0)")
     }
 
     const current = this.counts.get(model) ?? 0
@@ -70,9 +78,7 @@ export class ConcurrencyManager {
 
   release(model: string): void {
     const limit = this.getConcurrencyLimit(model)
-    if (limit === Infinity) {
-      return
-    }
+    if (limit <= 0) return
 
     const queue = this.queues.get(model)
 

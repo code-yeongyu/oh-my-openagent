@@ -71,7 +71,7 @@ features/
 
 ## ANTI-PATTERNS
 
-- **Sequential delegation**: Use `delegate_task` for parallel
+- **Sequential delegation**: Use `batch` + `task` for parallel (max 10 per batch)
 - **Trust self-reports**: ALWAYS verify agent outputs
 - **Main thread blocks**: No heavy I/O in loader init
 - **Manual versioning**: CI manages package.json version

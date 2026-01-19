@@ -141,7 +141,7 @@ describe("sisyphus-orchestrator hook", () => {
       // #then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("MANDATORY:")
-      expect(output.output).toContain("delegate_task(resume=")
+      expect(output.output).toContain("task(description=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -180,7 +180,7 @@ describe("sisyphus-orchestrator hook", () => {
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
       expect(output.output).toContain("LIE")
-      expect(output.output).toContain("delegate_task(resume=")
+      expect(output.output).toContain("task(description=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -362,7 +362,7 @@ describe("sisyphus-orchestrator hook", () => {
       )
 
       // #then - should include resume instructions and verification
-      expect(output.output).toContain("delegate_task(resume=")
+      expect(output.output).toContain("task(description=")
       expect(output.output).toContain("[x]")
       expect(output.output).toContain("MANDATORY:")
       
@@ -398,7 +398,7 @@ describe("sisyphus-orchestrator hook", () => {
         // #then
         expect(output.output).toContain("DELEGATION REQUIRED")
         expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
-        expect(output.output).toContain("delegate_task")
+        expect(output.output).toContain("task")
       })
 
       test("should append delegation reminder when orchestrator edits outside .sisyphus/", async () => {

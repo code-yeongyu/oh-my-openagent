@@ -41,16 +41,18 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait—these run async while main session works.
+Run these in parallel (barrier) using native \`batch\`+\`task\` (max 10 per batch).
+Parent blocks until ALL results return.
 
 \`\`\`
-// Fire all at once, collect results later
-delegate_task(agent="explore", prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
-delegate_task(agent="explore", prompt="Entry points: FIND main files → REPORT non-standard organization")
-delegate_task(agent="explore", prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
-delegate_task(agent="explore", prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
-delegate_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-delegate_task(agent="explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
+batch(tool_calls=[
+  { tool: "task", parameters: { description: "Project structure", subagent_type: "explore", prompt: "Project structure: PREDICT standard patterns for detected language → REPORT deviations only" } },
+  { tool: "task", parameters: { description: "Entry points", subagent_type: "explore", prompt: "Entry points: FIND main files → REPORT non-standard organization" } },
+  { tool: "task", parameters: { description: "Conventions", subagent_type: "explore", prompt: "Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules" } },
+  { tool: "task", parameters: { description: "Anti-patterns", subagent_type: "explore", prompt: "Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns" } },
+  { tool: "task", parameters: { description: "Build/CI", subagent_type: "explore", prompt: "Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns" } },
+  { tool: "task", parameters: { description: "Test patterns", subagent_type: "explore", prompt: "Test patterns: FIND test configs, test structure → REPORT unique conventions" } }
+])
 \`\`\`
 
 <dynamic-agents>
@@ -76,16 +78,19 @@ max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' |
 Example spawning:
 \`\`\`
 // 500 files, 50k lines, depth 6, 15 large files → spawn 5+5+2+1 = 13 additional agents
-delegate_task(agent="explore", prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
-delegate_task(agent="explore", prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
-delegate_task(agent="explore", prompt="Cross-cutting concerns: FIND shared utilities across directories")
+batch(tool_calls=[
+  { tool: "task", parameters: { description: "Large file analysis", subagent_type: "explore", prompt: "Large file analysis: FIND files >500 lines, REPORT complexity hotspots" } },
+  { tool: "task", parameters: { description: "Deep modules", subagent_type: "explore", prompt: "Deep modules at depth 4+: FIND hidden patterns, internal conventions" } },
+  { tool: "task", parameters: { description: "Cross-cutting", subagent_type: "explore", prompt: "Cross-cutting concerns: FIND shared utilities across directories" } }
+])
 // ... more based on calculation
 \`\`\`
 </dynamic-agents>
 
 ### Main Session: Concurrent Analysis
 
-**While background agents run**, main session does:
+If you want true concurrency, include bash/LSP/read calls inside the same \`batch\` call.
+Otherwise, run them before/after the subagent batch.
 
 #### 1. Bash Structural Analysis
 \`\`\`bash
@@ -134,8 +139,7 @@ LspFindReferences(filePath="...", line=X, character=Y)
 ### Collect Background Results
 
 \`\`\`
-// After main session analysis done, collect all task results
-for each task_id: background_output(task_id="...")
+Review the \`task\` tool outputs above (and open subagent sessions if needed).
 \`\`\`
 
 **Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**
@@ -240,7 +244,7 @@ Launch document-writer agents for each location:
 
 \`\`\`
 for loc in AGENTS_LOCATIONS (except root):
-  delegate_task(agent="document-writer", prompt=\\\`
+  task(description="Generate AGENTS.md", subagent_type="document-writer", prompt=\\\`
     Generate AGENTS.md for: \${loc.path}
     - Reason: \${loc.reason}
     - 30-80 lines max

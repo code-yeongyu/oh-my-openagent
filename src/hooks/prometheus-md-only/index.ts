@@ -87,6 +87,33 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
 
       const toolName = input.tool
 
+      // Inject read-only warning for task tools inside batch called by Prometheus
+      if (toolName === "batch") {
+        const toolCalls = output.args.tool_calls
+        if (Array.isArray(toolCalls)) {
+          for (const call of toolCalls) {
+            if (!call || typeof call !== "object") continue
+            const innerTool = (call as { tool?: unknown }).tool
+            if (typeof innerTool !== "string") continue
+            if (!TASK_TOOLS.includes(innerTool)) continue
+            const parameters = (call as { parameters?: unknown }).parameters
+            if (!parameters || typeof parameters !== "object") continue
+            const paramsObj = parameters as Record<string, unknown>
+            const prompt = paramsObj.prompt
+            if (typeof prompt !== "string") continue
+            if (prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) continue
+            paramsObj.prompt = prompt + PLANNING_CONSULT_WARNING
+          }
+
+          log(`[${HOOK_NAME}] Injected read-only planning warning into batch(...)`, {
+            sessionID: input.sessionID,
+            tool: toolName,
+            agent: agentName,
+          })
+        }
+        return
+      }
+
       // Inject read-only warning for task tools called by Prometheus
       if (TASK_TOOLS.includes(toolName)) {
         const prompt = output.args.prompt as string | undefined

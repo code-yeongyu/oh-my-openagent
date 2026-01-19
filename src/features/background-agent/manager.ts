@@ -69,7 +69,6 @@ export class BackgroundManager {
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
 
-
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
 
@@ -95,7 +94,6 @@ export class BackgroundManager {
     if (!input.agent || input.agent.trim() === "") {
       throw new Error("Agent parameter is required")
     }
-
     // Create task immediately with status="pending"
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
@@ -262,7 +260,7 @@ export class BackgroundManager {
           ...getAgentToolRestrictions(input.agent),
           task: false,
           delegate_task: false,
-          call_omo_agent: true,
+          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -330,8 +328,9 @@ export class BackgroundManager {
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
-    if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}`
+    const model = input.model ?? input.parentModel
+    if (model?.providerID && model?.modelID) {
+      return `${model.providerID}/${model.modelID}`
     }
     return input.agent
   }
@@ -508,7 +507,7 @@ export class BackgroundManager {
           ...getAgentToolRestrictions(existingTask.agent),
           task: false,
           delegate_task: false,
-          call_omo_agent: true,
+          call_omo_agent: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -762,9 +761,8 @@ export class BackgroundManager {
     }
 
     // Find and remove from queue
-    const key = task.model 
-      ? `${task.model.providerID}/${task.model.modelID}`
-      : task.agent
+    const model = task.model ?? task.parentModel
+    const key = model ? `${model.providerID}/${model.modelID}` : task.agent
     const queue = this.queuesByKey.get(key)
     if (queue) {
       const index = queue.findIndex(item => item.task.id === taskId)

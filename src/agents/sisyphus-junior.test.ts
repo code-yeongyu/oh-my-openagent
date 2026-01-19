@@ -138,8 +138,8 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
-  describe("tool safety (task/delegate_task blocked, call_omo_agent allowed)", () => {
-    test("task and delegate_task remain blocked, call_omo_agent is allowed via tools format", () => {
+  describe("tool safety (task/delegate_task/call_omo_agent blocked)", () => {
+    test("task/delegate_task/call_omo_agent remain blocked via tools format", () => {
       // #given
       const override = {
         tools: {
@@ -159,19 +159,17 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       if (tools) {
         expect(tools.task).toBe(false)
         expect(tools.delegate_task).toBe(false)
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.call_omo_agent).toBe(false)
         expect(tools.read).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
         expect(permission.delegate_task).toBe("deny")
-        // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
-        expect(permission.call_omo_agent).toBe("allow")
+        expect(permission.call_omo_agent).toBe("deny")
       }
     })
 
-    test("task and delegate_task remain blocked when using permission format override", () => {
+    test("task/delegate_task/call_omo_agent remain blocked when using permission format override", () => {
       // #given
       const override = {
         permission: {
@@ -191,12 +189,12 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       if (tools) {
         expect(tools.task).toBe(false)
         expect(tools.delegate_task).toBe(false)
-        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.call_omo_agent).toBe(false)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
         expect(permission.delegate_task).toBe("deny")
-        expect(permission.call_omo_agent).toBe("allow")
+        expect(permission.call_omo_agent).toBe("deny")
       }
     })
   })

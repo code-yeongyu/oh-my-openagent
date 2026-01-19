@@ -101,6 +101,7 @@ export function createOracleAgent(model: string): AgentConfig {
     "edit",
     "task",
     "delegate_task",
+    "call_omo_agent",
   ])
 
   const base = {

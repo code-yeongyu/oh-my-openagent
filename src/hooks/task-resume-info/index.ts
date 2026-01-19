@@ -1,4 +1,4 @@
-const TARGET_TOOLS = ["task", "Task", "call_omo_agent", "delegate_task"]
+const TARGET_TOOLS = ["task", "Task", "call_omo_agent"]
 
 const SESSION_ID_PATTERNS = [
   /Session ID: (ses_[a-zA-Z0-9_-]+)/,
@@ -27,7 +27,17 @@ export function createTaskResumeInfoHook() {
     const sessionId = extractSessionId(output.output)
     if (!sessionId) return
 
-    output.output = output.output.trimEnd() + `\n\nto resume: delegate_task(resume="${sessionId}", prompt="...")`
+    const toolName = input.tool.toLowerCase()
+    if (toolName === "call_omo_agent") {
+      output.output =
+        output.output.trimEnd() +
+        `\n\nto resume: call_omo_agent(session_id="${sessionId}", run_in_background=false, subagent_type="<same as before>", description="...", prompt="...")`
+      return
+    }
+
+    output.output =
+      output.output.trimEnd() +
+      `\n\nto resume: task(session_id="${sessionId}", subagent_type="<same as before>", description="...", prompt="...")`
   }
 
   return {

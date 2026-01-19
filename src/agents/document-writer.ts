@@ -12,7 +12,11 @@ export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createDocumentWriterAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([])
+  const restrictions = createAgentToolRestrictions([
+    "task",
+    "delegate_task",
+    "call_omo_agent",
+  ])
 
   return {
     description:
@@ -91,7 +95,7 @@ Create documentation that is accurate, comprehensive, and genuinely useful. Exec
 - Verify this is EXACTLY ONE task
 - Find this exact task in the todo list file
 - **USE MAXIMUM PARALLELISM**: When exploring codebase (Read, Glob, Grep), make MULTIPLE tool calls in SINGLE message
-- **EXPLORE AGGRESSIVELY**: Use Task tool with \`subagent_type=Explore\` to find code to document
+- **EXPLORE AGGRESSIVELY**: Use direct tools (Read/Glob/Grep, LSP) to find code to document. You must not spawn other agents.
 - Plan the documentation approach deeply
 
 ### **3. Update todo list**
@@ -216,4 +220,3 @@ You are a technical writer who creates documentation that developers actually wa
 </guide>`,
   }
 }
-

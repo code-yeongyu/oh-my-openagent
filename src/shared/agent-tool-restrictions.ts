@@ -43,6 +43,7 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   "Sisyphus-Junior": {
     task: false,
     delegate_task: false,
+    call_omo_agent: false,
   },
 }
 

@@ -36,7 +36,7 @@ You just performed direct file modifications outside \`.sisyphus/\`.
 **You are an ORCHESTRATOR, not an IMPLEMENTER.**
 
 As an orchestrator, you should:
-- **DELEGATE** implementation work to subagents via \`delegate_task\`
+- **DELEGATE** implementation work to subagents via \`task\` (use \`batch\` for parallel)
 - **VERIFY** the work done by subagents
 - **COORDINATE** multiple tasks and ensure completion
 
@@ -46,7 +46,7 @@ You should NOT:
 - Implement features yourself
 
 **If you need to make changes:**
-1. Use \`delegate_task\` to delegate to an appropriate subagent
+1. Use \`task\` to delegate to an appropriate subagent
 2. Provide clear instructions in the prompt
 3. Verify the subagent's work after completion
 
@@ -120,7 +120,7 @@ You (orchestrator-sisyphus) are attempting to directly modify a file outside \`.
 🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
-1. **DELEGATE** all implementation work via \`delegate_task\`
+1. **DELEGATE** all implementation work via \`task\`
 2. **VERIFY** the work done by subagents (reading files is OK)
 3. **COORDINATE** - you orchestrate, you don't implement
 
@@ -138,12 +138,13 @@ As an ORCHESTRATOR, you MUST:
 
 **IF THIS IS FOR VERIFICATION:**
 Proceed if you are verifying subagent work by making a small fix.
-But for any substantial changes, USE \`delegate_task\`.
+But for any substantial changes, USE \`task\`.
 
 **CORRECT APPROACH:**
 \`\`\`
-delegate_task(
-  category="...",
+task(
+  description="[short task name]",
+  subagent_type="[choose subagent]",
   prompt="[specific single task with clear acceptance criteria]"
 )
 \`\`\`
@@ -185,7 +186,7 @@ function buildVerificationReminder(sessionId: string): string {
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-delegate_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
+task(description="Fix: [short]", subagent_type="<same as before>", session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -257,8 +258,17 @@ If QA tasks exist in your todo list:
 }
 
 function extractSessionIdFromOutput(output: string): string {
-  const match = output.match(/Session ID:\s*(ses_[a-zA-Z0-9]+)/)
-  return match?.[1] ?? "<session_id>"
+  const patterns = [
+    /Session ID:\s*(ses_[a-zA-Z0-9_-]+)/,
+    /session_id:\s*(ses_[a-zA-Z0-9_-]+)/,
+    /<task_metadata>\s*session_id:\s*(ses_[a-zA-Z0-9_-]+)/,
+    /sessionId:\s*(ses_[a-zA-Z0-9_-]+)/,
+  ]
+  for (const pattern of patterns) {
+    const match = output.match(pattern)
+    if (match) return match[1]
+  }
+  return "<session_id>"
 }
 
 interface GitFileStat {
@@ -666,12 +676,37 @@ export function createSisyphusOrchestratorHook(
         return
       }
 
-      // Check delegate_task - inject single-task directive
-      if (input.tool === "delegate_task") {
+      const toolName = input.tool.toLowerCase()
+
+      // Check task - inject single-task directive
+      if (toolName === "task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
-          log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
+          log(`[${HOOK_NAME}] Injected single-task directive to task`, {
+            sessionID: input.sessionID,
+          })
+        }
+        return
+      }
+
+      // Check batch(task...) - inject single-task directive into each task prompt
+      if (toolName === "batch") {
+        const toolCalls = output.args.tool_calls
+        if (Array.isArray(toolCalls)) {
+          for (const call of toolCalls) {
+            if (!call || typeof call !== "object") continue
+            const callTool = (call as { tool?: unknown }).tool
+            if (typeof callTool !== "string" || callTool.toLowerCase() !== "task") continue
+            const parameters = (call as { parameters?: unknown }).parameters
+            if (!parameters || typeof parameters !== "object") continue
+            const paramsObj = parameters as Record<string, unknown>
+            const prompt = paramsObj.prompt
+            if (typeof prompt !== "string") continue
+            if (prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) continue
+            paramsObj.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
+          }
+          log(`[${HOOK_NAME}] Injected single-task directive into batch(task...)`, {
             sessionID: input.sessionID,
           })
         }
@@ -705,21 +740,25 @@ export function createSisyphusOrchestratorHook(
         return
       }
 
-      if (input.tool !== "delegate_task") {
+      const toolName = input.tool?.toLowerCase()
+      if (toolName !== "delegate_task" && toolName !== "task") {
         return
       }
 
-      const outputStr = output.output && typeof output.output === "string" ? output.output : ""
-      const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task resumed")
-      
-      if (isBackgroundLaunch) {
-        return
-      }
-      
       if (output.output && typeof output.output === "string") {
+        const outputStr = output.output
+
+        if (toolName === "delegate_task") {
+          const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task resumed")
+          if (isBackgroundLaunch) return
+        }
+
         const gitStats = getGitDiffStats(ctx.directory)
         const fileChanges = formatFileChanges(gitStats)
-        const subagentSessionId = extractSessionIdFromOutput(output.output)
+        const metadataSessionId = output.metadata?.sessionId
+        const subagentSessionId = typeof metadataSessionId === "string"
+          ? metadataSessionId
+          : extractSessionIdFromOutput(outputStr)
 
         const boulderState = readBoulderState(ctx.directory)
 

@@ -159,11 +159,13 @@ export function createRulesInjectorHook(ctx: PluginInput) {
 
     const filePaths: string[] = [];
     for (const call of args.tool_calls) {
-      if (TRACKED_TOOLS.includes(call.tool.toLowerCase())) {
-        const filePath = extractFilePathFromToolCall(call);
-        if (filePath) {
-          filePaths.push(filePath);
-        }
+      if (!call) continue;
+      if (typeof (call as any).tool !== "string") continue;
+      const toolName = (call as any).tool.toLowerCase();
+      if (!TRACKED_TOOLS.includes(toolName)) continue;
+      const filePath = extractFilePathFromToolCall(call);
+      if (filePath) {
+        filePaths.push(filePath);
       }
     }
 

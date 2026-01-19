@@ -68,4 +68,4 @@ agents/
 
 - **Trust reports**: NEVER trust subagent "I'm done" - verify outputs
 - **High temp**: Don't use >0.3 for code agents
-- **Sequential calls**: Use `delegate_task` with `run_in_background`
+- **Sequential calls**: Use `batch` + `task` for parallel (max 10 per batch)

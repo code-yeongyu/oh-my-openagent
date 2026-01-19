@@ -88,7 +88,12 @@
         "type": "string",
         "enum": [
           "init-deep",
-          "start-work"
+          "ralph-loop",
+          "ulw-loop",
+          "cancel-ralph",
+          "refactor",
+          "start-work",
+          "omo-help"
         ]
       }
     },
@@ -2369,7 +2374,7 @@
       "properties": {
         "defaultConcurrency": {
           "type": "number",
-          "minimum": 1
+          "minimum": 0
         },
         "providerConcurrency": {
           "type": "object",
@@ -2378,7 +2383,7 @@
           },
           "additionalProperties": {
             "type": "number",
-            "minimum": 1
+            "minimum": 0
           }
         },
         "modelConcurrency": {
@@ -2388,7 +2393,7 @@
           },
           "additionalProperties": {
             "type": "number",
-            "minimum": 1
+            "minimum": 0
           }
         },
         "staleTimeoutMs": {
@@ -2414,6 +2419,42 @@
         },
         "include_co_authored_by": {
           "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "memo": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ulw": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tips": {
+      "type": "object",
+      "properties": {
+        "omo": {
           "type": "boolean"
         }
       }

@@ -117,7 +117,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     expect(limit).toBe(4)
   })
 
-  test("should return Infinity when defaultConcurrency is 0", () => {
+  test("should return 0 when defaultConcurrency is 0 (disabled)", () => {
     // #given
     const config: BackgroundTaskConfig = { defaultConcurrency: 0 }
     const manager = new ConcurrencyManager(config)
@@ -126,10 +126,10 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const limit = manager.getConcurrencyLimit("any-model")
 
     // #then
-    expect(limit).toBe(Infinity)
+    expect(limit).toBe(0)
   })
 
-  test("should return Infinity when providerConcurrency is 0", () => {
+  test("should return 0 when providerConcurrency is 0 (disabled)", () => {
     // #given
     const config: BackgroundTaskConfig = {
       providerConcurrency: { anthropic: 0 }
@@ -140,10 +140,10 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
 
     // #then
-    expect(limit).toBe(Infinity)
+    expect(limit).toBe(0)
   })
 
-  test("should return Infinity when modelConcurrency is 0", () => {
+  test("should return 0 when modelConcurrency is 0 (disabled)", () => {
     // #given
     const config: BackgroundTaskConfig = {
       modelConcurrency: { "anthropic/claude-sonnet-4-5": 0 }
@@ -154,7 +154,27 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
 
     // #then
-    expect(limit).toBe(Infinity)
+    expect(limit).toBe(0)
+  })
+
+  test("should clamp configured limits at 10", () => {
+    // #given
+    const config: BackgroundTaskConfig = {
+      modelConcurrency: { "anthropic/claude-sonnet-4-5": 99 },
+      providerConcurrency: { anthropic: 42 },
+      defaultConcurrency: 77,
+    }
+    const manager = new ConcurrencyManager(config)
+
+    // #when
+    const modelLimit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-5")
+    const defaultLimit = manager.getConcurrencyLimit("google/gemini-3-pro")
+
+    // #then
+    expect(modelLimit).toBe(10)
+    expect(providerLimit).toBe(10)
+    expect(defaultLimit).toBe(10)
   })
 })
 
@@ -178,6 +198,21 @@ describe("ConcurrencyManager.acquire/release", () => {
 
     // #then - both resolved without waiting
     expect(true).toBe(true)
+  })
+
+  test("should reject acquire when limit is 0 (disabled)", async () => {
+    // #given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 0 }
+    manager = new ConcurrencyManager(config)
+
+    // #when
+    const error = await manager.acquire("model-a").then(
+      () => null,
+      (e) => e as Error
+    )
+
+    // #then
+    expect(error).toBeInstanceOf(Error)
   })
 
   test("should allow acquires up to default limit of 5", async () => {

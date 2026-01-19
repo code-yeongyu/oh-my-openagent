@@ -22,6 +22,7 @@ export const TARGET_TOOLS = new Set([
 ]);
 
 export const AGENT_TOOLS = new Set([
+  "batch",
   "task",
   "call_omo_agent",
   "delegate_task",
@@ -32,23 +33,23 @@ export const REMINDER_MESSAGE = `
 
 You called a search/fetch tool directly without leveraging specialized agents.
 
-RECOMMENDED: Use delegate_task with explore/librarian agents for better results:
+RECOMMENDED: Use native \`task\` (and \`batch\` for parallel) with explore/librarian agents for better results:
 
 \`\`\`
-// Parallel exploration - fire multiple agents simultaneously
-delegate_task(agent="explore", prompt="Find all files matching pattern X")
-delegate_task(agent="explore", prompt="Search for implementation of Y") 
-delegate_task(agent="librarian", prompt="Lookup documentation for Z")
-
-// Then continue your work while they run in background
-// System will notify you when each completes
+// Parallel exploration (max 10 at a time). Blocks until ALL results return.
+batch(tool_calls=[
+  { tool: "task", parameters: { description: "Find pattern X", subagent_type: "explore", prompt: "Find all files matching pattern X" } },
+  { tool: "task", parameters: { description: "Search impl Y", subagent_type: "explore", prompt: "Search for implementation of Y" } },
+  { tool: "task", parameters: { description: "Lookup docs Z", subagent_type: "librarian", prompt: "Lookup documentation for Z" } }
+])
 \`\`\`
 
 WHY:
 - Agents can perform deeper, more thorough searches
-- Background tasks run in parallel, saving time
+- \`task\` creates a visible, enterable child session in the UI
+- \`batch\` runs tasks in parallel and blocks until all complete (deterministic)
 - Specialized agents have domain expertise
 - Reduces context window usage in main session
 
-ALWAYS prefer: Multiple parallel delegate_task calls > Direct tool calls
+ALWAYS prefer: \`task\` / \`batch\` > Direct tool calls
 `;

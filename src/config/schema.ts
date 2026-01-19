@@ -92,7 +92,12 @@ export const HookNameSchema = z.enum([
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "ralph-loop",
+  "ulw-loop",
+  "cancel-ralph",
+  "refactor",
   "start-work",
+  "omo-help",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
@@ -279,9 +284,10 @@ export const RalphLoopConfigSchema = z.object({
 })
 
 export const BackgroundTaskConfigSchema = z.object({
-  defaultConcurrency: z.number().min(1).optional(),
-  providerConcurrency: z.record(z.string(), z.number().min(1)).optional(),
-  modelConcurrency: z.record(z.string(), z.number().min(1)).optional(),
+  // NOTE: Values are clamped at runtime (max 10). `0` disables background tasks for the matching scope.
+  defaultConcurrency: z.number().min(0).optional(),
+  providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
+  modelConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   /** Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 180000 = 3 minutes, minimum: 60000 = 1 minute) */
   staleTimeoutMs: z.number().min(60000).optional(),
 })
@@ -296,6 +302,18 @@ export const GitMasterConfigSchema = z.object({
   commit_footer: z.boolean().default(true),
   /** Add "Co-authored-by: Sisyphus" trailer to commit messages (default: true) */
   include_co_authored_by: z.boolean().default(true),
+})
+
+export const OmoToggleConfigSchema = z.object({
+  /** Default enabled state (global) */
+  enabled: z.boolean().optional(),
+  /** Agent allowlist for system injection (defaults: memo -> Sisyphus+planner+orchestrator; ulw -> planner+orchestrator) */
+  agents: z.array(z.string()).optional(),
+})
+
+export const TipsConfigSchema = z.object({
+  /** Show a one-time toast that teaches `/omo` (default: true) */
+  omo: z.boolean().optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -317,6 +335,9 @@ export const OhMyOpenCodeConfigSchema = z.object({
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
+  memo: OmoToggleConfigSchema.optional(),
+  ulw: OmoToggleConfigSchema.optional(),
+  tips: TipsConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>

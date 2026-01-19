@@ -116,8 +116,12 @@ export function createDirectoryReadmeInjectorHook(ctx: PluginInput) {
 
     const readFilePaths: string[] = [];
     for (const call of args.tool_calls) {
-      if (call.tool.toLowerCase() === "read" && call.parameters?.filePath) {
-        readFilePaths.push(call.parameters.filePath as string);
+      if (!call) continue;
+      if (typeof (call as any).tool !== "string") continue;
+      if ((call as any).tool.toLowerCase() !== "read") continue;
+      const filePath = (call as any).parameters?.filePath;
+      if (typeof filePath === "string" && filePath.length > 0) {
+        readFilePaths.push(filePath);
       }
     }
 

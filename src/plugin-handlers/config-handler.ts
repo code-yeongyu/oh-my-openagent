@@ -315,19 +315,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult["orchestrator-sisyphus"]) {
       const agent = agentResult["orchestrator-sisyphus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
     }
     if (agentResult.Sisyphus) {
       const agent = agentResult.Sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
     }
     if (agentResult["Prometheus (Planner)"]) {
       const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
-    }
-    if (agentResult["Sisyphus-Junior"]) {
-      const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, delegate_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny" };
     }
 
     config.permission = {
@@ -335,6 +331,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       webfetch: "allow",
       external_directory: "allow",
       delegate_task: "deny",
+    };
+
+    config.experimental = {
+      ...(config.experimental as Record<string, unknown>),
+      batch_tool: true,
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
