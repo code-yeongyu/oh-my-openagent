@@ -128,7 +128,14 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 function formatTaskStatus(task: BackgroundTask): string {
-  const duration = formatDuration(task.startedAt, task.completedAt)
+  let duration: string
+  if (task.status === "pending" && task.queuedAt) {
+    duration = formatDuration(task.queuedAt, undefined)
+  } else if (task.startedAt) {
+    duration = formatDuration(task.startedAt, task.completedAt)
+  } else {
+    duration = "N/A"
+  }
   const promptPreview = truncateText(task.prompt, 500)
   
   let progressSection = ""
@@ -152,7 +159,11 @@ ${truncated}
   }
 
   let statusNote = ""
-  if (task.status === "running") {
+  if (task.status === "pending") {
+    statusNote = `
+
+> **Queued**: Task is waiting for a concurrency slot to become available.`
+  } else if (task.status === "running") {
     statusNote = `
 
 > **Note**: No need to wait explicitly - the system will notify you when this task completes.`
@@ -162,6 +173,8 @@ ${truncated}
 > **Failed**: The task encountered an error. Check the last message for details.`
   }
 
+  const durationLabel = task.status === "pending" ? "Queued for" : "Duration"
+
   return `# Task Status
 
 | Field | Value |
@@ -170,7 +183,7 @@ ${truncated}
 | Description | ${task.description} |
 | Agent | ${task.agent} |
 | Status | **${task.status}** |
-| Duration | ${duration} |
+| ${durationLabel} | ${duration} |
 | Session ID | \`${task.sessionID}\` |${progressSection}
 ${statusNote}
 ## Original Prompt
