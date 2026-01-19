@@ -1025,11 +1025,23 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     const now = Date.now()
 
     for (const [taskId, task] of this.tasks.entries()) {
-      const age = now - task.startedAt.getTime()
+      const timestamp = task.status === "pending" 
+        ? task.queuedAt?.getTime() 
+        : task.startedAt?.getTime()
+      
+      if (!timestamp) {
+        continue
+      }
+      
+      const age = now - timestamp
       if (age > TASK_TTL_MS) {
-        log("[background-agent] Pruning stale task:", { taskId, age: Math.round(age / 1000) + "s" })
+        const errorMessage = task.status === "pending"
+          ? "Task timed out while queued (30 minutes)"
+          : "Task timed out after 30 minutes"
+        
+        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(age / 1000) + "s" })
         task.status = "error"
-        task.error = "Task timed out after 30 minutes"
+        task.error = errorMessage
         task.completedAt = new Date()
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
