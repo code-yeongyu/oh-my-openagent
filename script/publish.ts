@@ -192,32 +192,44 @@ async function publishAllPackages(version: string): Promise<void> {
   if (skipPlatform) {
     console.log("\n⏭️  Skipping platform packages (SKIP_PLATFORM_PACKAGES=true)")
   } else {
-    console.log("\n📦 Publishing platform packages in parallel...")
+    console.log("\n📦 Publishing platform packages in batches (to avoid OIDC token expiration)...")
     
-    // Publish platform packages in parallel for speed (avoids OIDC token expiration)
-    const publishPromises = PLATFORM_PACKAGES.map(async (platform) => {
-      const pkgDir = join(process.cwd(), "packages", platform)
-      const pkgName = `oh-my-opencode-${platform}`
-      
-      console.log(`  Starting ${pkgName}...`)
-      const result = await publishPackage(pkgDir, distTag)
-      
-      return { platform, pkgName, result }
-    })
-    
-    const results = await Promise.all(publishPromises)
-    
+    // Publish in batches of 2 to avoid OIDC token expiration
+    // npm processes requests sequentially even when sent in parallel,
+    // so too many parallel requests can cause token expiration
+    const BATCH_SIZE = 2
     const failures: string[] = []
-    for (const { pkgName, result } of results) {
-      if (result.success) {
-        if (result.alreadyPublished) {
-          console.log(`  ✓ ${pkgName}@${version} (already published)`)
+    
+    for (let i = 0; i < PLATFORM_PACKAGES.length; i += BATCH_SIZE) {
+      const batch = PLATFORM_PACKAGES.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(PLATFORM_PACKAGES.length / BATCH_SIZE)
+      
+      console.log(`\n  Batch ${batchNum}/${totalBatches}: ${batch.join(", ")}`)
+      
+      const publishPromises = batch.map(async (platform) => {
+        const pkgDir = join(process.cwd(), "packages", platform)
+        const pkgName = `oh-my-opencode-${platform}`
+        
+        console.log(`    Starting ${pkgName}...`)
+        const result = await publishPackage(pkgDir, distTag)
+        
+        return { platform, pkgName, result }
+      })
+      
+      const results = await Promise.all(publishPromises)
+      
+      for (const { pkgName, result } of results) {
+        if (result.success) {
+          if (result.alreadyPublished) {
+            console.log(`    ✓ ${pkgName}@${version} (already published)`)
+          } else {
+            console.log(`    ✓ ${pkgName}@${version}`)
+          }
         } else {
-          console.log(`  ✓ ${pkgName}@${version}`)
+          console.error(`    ✗ ${pkgName} failed: ${result.error}`)
+          failures.push(pkgName)
         }
-      } else {
-        console.error(`  ✗ ${pkgName} failed: ${result.error}`)
-        failures.push(pkgName)
       }
     }
     
