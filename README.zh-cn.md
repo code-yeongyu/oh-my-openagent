@@ -1,3 +1,14 @@
+> [!WARNING]
+> **安全警告：冒充网站**
+>
+> **ohmyopencode.com 与本项目无关。** 我们不运营或认可该网站。
+>
+> OhMyOpenCode 是**免费且开源的**。请**勿**在声称"官方"的第三方网站下载安装程序或输入付款信息。
+>
+> 由于该冒充网站设有付费墙，我们**无法验证其分发的内容**。请将来自该网站的任何下载视为**潜在不安全**。
+>
+> ✅ 官方下载地址：https://github.com/code-yeongyu/oh-my-opencode/releases
+
 > [!NOTE]
 >
 > [![Sisyphus Labs — Sisyphus 是像你的团队一样编码的智能体。](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
