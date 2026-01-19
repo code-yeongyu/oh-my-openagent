@@ -22,6 +22,7 @@ import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
+import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
@@ -100,9 +101,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     if (!(config.model as string | undefined)?.trim()) {
+      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
       throw new Error(
         'oh-my-opencode requires a default model.\n\n' +
-        'Add this to ~/.config/opencode/opencode.jsonc:\n\n' +
+        `Add this to ${paths.configJsonc}:\n\n` +
         '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
         '(Replace with your preferred provider/model)'
       )
