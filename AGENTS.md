@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-17T21:55:00+09:00
-**Commit:** 255f535a
+**Generated:** 2026-01-19T18:10:00+09:00
+**Commit:** 45660940
 **Branch:** dev
 
 ## OVERVIEW
@@ -69,7 +69,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern in index.ts; explicit named exports
 - **Naming**: kebab-case directories, `createXXXHook`/`createXXXTool` factories
-- **Testing**: BDD comments `#given/#when/#then`, 84 test files
+- **Testing**: BDD comments `#given/#when/#then`, 83 test files
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS (THIS PROJECT)
@@ -123,7 +123,7 @@ bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
 bun run build:schema   # Schema only
-bun test               # Run tests (84 test files)
+bun test               # Run tests (83 test files)
 ```
 
 ## DEPLOYMENT
@@ -172,7 +172,7 @@ Three-tier MCP system:
 
 ## NOTES
 
-- **Testing**: Bun native test (`bun test`), BDD-style, 84 test files
+- **Testing**: Bun native test (`bun test`), BDD-style, 83 test files
 - **OpenCode**: Requires >= 1.0.150
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
