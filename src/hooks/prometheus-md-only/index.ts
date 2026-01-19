@@ -80,7 +80,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
       const agentName = getAgentFromSession(input.sessionID)
-      
+
       if (!agentName || !PROMETHEUS_AGENTS.includes(agentName)) {
         return
       }
@@ -120,7 +120,8 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         throw new Error(
           `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files inside .sisyphus/ directory. ` +
           `Attempted to modify: ${filePath}. ` +
-          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan.`
+          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan. ` +
+          `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
         )
       }
 
