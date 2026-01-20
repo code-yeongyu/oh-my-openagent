@@ -958,6 +958,389 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
+  describe("unstable agent forced background mode", () => {
+    test("gemini model with run_in_background=false should force background but wait for result", async () => {
+      // #given - category using gemini model with run_in_background=false
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-unstable",
+            sessionID: "ses_unstable_gemini",
+            description: "Unstable gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_unstable_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Gemini task completed successfully" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_unstable_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using visual-engineering (gemini model) with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test gemini forced background",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Gemini task completed successfully")
+    }, { timeout: 20000 })
+
+    test("gemini model with run_in_background=true should not show unstable message (normal background)", async () => {
+      // #given - category using gemini model with run_in_background=true (normal background flow)
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-normal-bg",
+            sessionID: "ses_normal_bg",
+            description: "Normal background task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using visual-engineering with run_in_background=true (normal background)
+      const result = await tool.execute(
+        {
+          description: "Test normal background",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: true,  // User explicitly says true - normal background
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should NOT show unstable message (it's normal background flow)
+      expect(launchCalled).toBe(true)
+      expect(result).not.toContain("UNSTABLE AGENT MODE")
+      expect(result).toContain("task-normal-bg")
+    })
+
+    test("non-gemini model with run_in_background=false should run sync (not forced to background)", async () => {
+      // #given - category using non-gemini model with run_in_background=false
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      let promptCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_non_gemini" } }),
+          prompt: async () => {
+            promptCalled = true
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done sync" }] }]
+          }),
+          status: async () => ({ data: { "ses_sync_non_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      // Use ultrabrain which uses gpt-5.2 (non-gemini)
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using ultrabrain (gpt model) with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test non-gemini sync",
+          prompt: "Do something smart",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should run sync, NOT forced to background
+      expect(launchCalled).toBe(false)  // manager.launch should NOT be called
+      expect(promptCalled).toBe(true)   // sync mode uses session.prompt
+      expect(result).not.toContain("UNSTABLE AGENT MODE")
+    }, { timeout: 20000 })
+
+    test("artistry category (gemini) with run_in_background=false should force background but wait for result", async () => {
+      // #given - artistry also uses gemini model
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-artistry",
+            sessionID: "ses_artistry_gemini",
+            description: "Artistry gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_artistry_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Artistry result here" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_artistry_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - artistry category (gemini-3-pro-preview with max variant)
+      const result = await tool.execute(
+        {
+          description: "Test artistry forced background",
+          prompt: "Do something artistic",
+          category: "artistry",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Artistry result here")
+    }, { timeout: 20000 })
+
+    test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
+      // #given - writing uses gemini-3-flash-preview
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-writing",
+            sessionID: "ses_writing_gemini",
+            description: "Writing gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_writing_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Writing result here" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_writing_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - writing category (gemini-3-flash-preview)
+      const result = await tool.execute(
+        {
+          description: "Test writing forced background",
+          prompt: "Write something",
+          category: "writing",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Writing result here")
+    }, { timeout: 20000 })
+
+    test("is_unstable_agent=true should force background but wait for result", async () => {
+      // #given - custom category with is_unstable_agent=true but non-gemini model
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-custom-unstable",
+            sessionID: "ses_custom_unstable",
+            description: "Custom unstable task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_custom_unstable" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Custom unstable result" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_custom_unstable": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "my-unstable-cat": {
+            model: "openai/gpt-5.2",
+            is_unstable_agent: true,
+          },
+        },
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using custom unstable category with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test custom unstable",
+          prompt: "Do something",
+          category: "my-unstable-cat",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Custom unstable result")
+    }, { timeout: 20000 })
+  })
+
   describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // #given
