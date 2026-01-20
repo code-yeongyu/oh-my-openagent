@@ -85,8 +85,8 @@ describe("atlas hook", () => {
       expect(output.output).toBe("Original output")
     })
 
-     test("should not transform when caller is not atlas", async () => {
-       // #given - boulder state exists but caller agent in message storage is not atlas
+     test("should not transform when caller is not Atlas", async () => {
+       // #given - boulder state exists but caller agent in message storage is not Atlas
        const sessionID = "session-non-orchestrator-test"
        setupMessageStorage(sessionID, "other-agent")
       
@@ -120,10 +120,10 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should append standalone verification when no boulder state but caller is atlas", async () => {
-       // #given - no boulder state, but caller is atlas
+     test("should append standalone verification when no boulder state but caller is Atlas", async () => {
+       // #given - no boulder state, but caller is Atlas
        const sessionID = "session-no-boulder-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const hook = createAtlasHook(createMockPluginInput())
       const output = {
@@ -146,10 +146,10 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should transform output when caller is atlas with boulder state", async () => {
-       // #given - atlas caller with boulder state
+     test("should transform output when caller is Atlas with boulder state", async () => {
+       // #given - Atlas caller with boulder state
        const sessionID = "session-transform-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
@@ -186,9 +186,9 @@ describe("atlas hook", () => {
     })
 
      test("should still transform when plan is complete (shows progress)", async () => {
-       // #given - boulder state with complete plan, atlas caller
+       // #given - boulder state with complete plan, Atlas caller
        const sessionID = "session-complete-plan-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -223,9 +223,9 @@ describe("atlas hook", () => {
     })
 
      test("should append session ID to boulder state if not present", async () => {
-       // #given - boulder state without session-append-test, atlas caller
+       // #given - boulder state without session-append-test, Atlas caller
        const sessionID = "session-append-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -259,9 +259,9 @@ describe("atlas hook", () => {
     })
 
      test("should not duplicate existing session ID", async () => {
-       // #given - boulder state already has session-dup-test, atlas caller
+       // #given - boulder state already has session-dup-test, Atlas caller
        const sessionID = "session-dup-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -296,9 +296,9 @@ describe("atlas hook", () => {
     })
 
      test("should include boulder.json path and notepad path in transformed output", async () => {
-       // #given - boulder state, atlas caller
+       // #given - boulder state, Atlas caller
        const sessionID = "session-path-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "my-feature.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2\n- [x] Task 3")
@@ -333,9 +333,9 @@ describe("atlas hook", () => {
     })
 
      test("should include resume and checkbox instructions in reminder", async () => {
-       // #given - boulder state, atlas caller
+       // #given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
-       setupMessageStorage(sessionID, "atlas")
+       setupMessageStorage(sessionID, "Atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -373,7 +373,7 @@ describe("atlas hook", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
        beforeEach(() => {
-         setupMessageStorage(ORCHESTRATOR_SESSION, "atlas")
+         setupMessageStorage(ORCHESTRATOR_SESSION, "Atlas")
        })
 
       afterEach(() => {
@@ -601,7 +601,7 @@ describe("atlas hook", () => {
          getMainSessionID: () => MAIN_SESSION_ID,
          subagentSessions: new Set<string>(),
        }))
-       setupMessageStorage(MAIN_SESSION_ID, "atlas")
+       setupMessageStorage(MAIN_SESSION_ID, "Atlas")
      })
 
     afterEach(() => {
@@ -830,8 +830,8 @@ describe("atlas hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-     test("should not inject when last agent is not atlas", async () => {
-       // #given - boulder state with incomplete plan, but last agent is NOT atlas
+     test("should not inject when last agent is not Atlas", async () => {
+       // #given - boulder state with incomplete plan, but last agent is NOT Atlas
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -843,7 +843,7 @@ describe("atlas hook", () => {
        }
        writeBoulderState(TEST_DIR, state)
 
-       // #given - last agent is NOT atlas
+       // #given - last agent is NOT Atlas
        cleanupMessageStorage(MAIN_SESSION_ID)
        setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
 
@@ -858,7 +858,7 @@ describe("atlas hook", () => {
          },
        })
 
-       // #then - should NOT call prompt because agent is not atlas
+       // #then - should NOT call prompt because agent is not Atlas
        expect(mockInput._promptMock).not.toHaveBeenCalled()
      })
 
