@@ -188,8 +188,26 @@ I will use delegate_task with:
 - **Expected Outcome**: [what agent should return]
 
 delegate_task(
-  agent="[agent-name]",
+  subagent_type="[agent-name]",
+  skills=[],
   prompt="..."
+)
+\`\`\`
+
+**CORRECT: Background Exploration**
+
+\`\`\`
+I will use delegate_task with:
+- **Agent**: explore
+- **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
+- **Skills**: []
+- **Expected Outcome**: List of files containing auth patterns
+
+delegate_task(
+  subagent_type="explore",
+  run_in_background=true,
+  skills=[],
+  prompt="Find all authentication implementations in the codebase"
 )
 \`\`\`
 
@@ -220,15 +238,15 @@ const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-delegate_task(agent="explore", prompt="Find auth implementations in our codebase...")
-delegate_task(agent="explore", prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find auth implementations in our codebase...")
+delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find error handling patterns here...")
 // Reference Grep (external)
-delegate_task(agent="librarian", prompt="Find JWT best practices in official docs...")
-delegate_task(agent="librarian", prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find JWT best practices in official docs...")
+delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
-result = task(...)  // Never wait synchronously for explore/librarian
+result = delegate_task(...)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
