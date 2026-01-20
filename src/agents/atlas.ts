@@ -29,9 +29,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 | \`explore\` | Codebase exploration, pattern finding |
 | \`librarian\` | External docs, GitHub examples, OSS reference |
 | \`frontend-ui-ux-engineer\` | Visual design, UI implementation |
-| \`document-writer\` | README, API docs, guides |
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+| \`document-writer\` | README, API docs, guides |`
   }
 
   const rows = agents.map((a) => {
@@ -43,9 +41,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 
 | Agent | Best For |
 |-------|----------|
-${rows.join("\n")}
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+${rows.join("\n")}`
 }
 
 function buildCategorySection(userCategories?: Record<string, CategoryConfig>): string {
@@ -119,8 +115,7 @@ function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<s
   if (agentNames.includes("oracle")) rows.push("| Code review / architecture | `agent=\"oracle\"` |")
   if (agentNames.includes("explore")) rows.push("| Find code in codebase | `agent=\"explore\"` |")
   if (agentNames.includes("librarian")) rows.push("| Look up library docs | `agent=\"librarian\"` |")
-  rows.push("| Git commit | `agent=\"git-master\"` |")
-  rows.push("| Debug complex issue | `agent=\"debugging-master\"` |")
+  rows.push("| Git commit | `category=\"quick\", skills=[\"git-master\"]` |")
 
   return `##### Decision Matrix
 
@@ -1258,9 +1253,9 @@ The answer is almost always YES.
 **DELEGATION TARGETS:**
 - \`delegate_task(category="ultrabrain", background=false)\` → backend/logic implementation
 - \`delegate_task(category="visual-engineering", background=false)\` → frontend/UI implementation
-- \`delegate_task(agent="git-master", background=false)\` → ALL git commits
+- \`delegate_task(category="quick", skills=["git-master"], background=false)\` → ALL git commits
 - \`delegate_task(agent="document-writer", background=false)\` → documentation
-- \`delegate_task(agent="debugging-master", background=false)\` → complex debugging
+- \`delegate_task(agent="oracle", background=false)\` → complex debugging (consult first)
 
 **⚠️ CRITICAL: background=false is MANDATORY for all task delegations.**
 
@@ -1458,9 +1453,9 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
     .replace("{SKILLS_SECTION}", skillsSection)
 }
 
-export function createOrchestratorSisyphusAgent(ctx: OrchestratorContext): AgentConfig {
+export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   if (!ctx.model) {
-    throw new Error("createOrchestratorSisyphusAgent requires a model in context")
+    throw new Error("createAtlasAgent requires a model in context")
   }
   const restrictions = createAgentToolRestrictions([
     "task",
@@ -1479,10 +1474,10 @@ export function createOrchestratorSisyphusAgent(ctx: OrchestratorContext): Agent
   } as AgentConfig
 }
 
-export const orchestratorSisyphusPromptMetadata: AgentPromptMetadata = {
+export const atlasPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
   cost: "EXPENSIVE",
-  promptAlias: "Orchestrator Sisyphus",
+  promptAlias: "Atlas",
   triggers: [
     {
       domain: "Todo list orchestration",
