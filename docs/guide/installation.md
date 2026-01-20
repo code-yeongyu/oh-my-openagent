@@ -33,7 +33,7 @@ follow these steps:
 
 ### Step 0: Ask user about subscriptions
 
-Ask the user these 3 questions to determine CLI options:
+Ask the user these questions to determine CLI options:
 
 1. **Do you have a Claude Pro/Max Subscription?**
    - If **yes**: **Are you on max20 (20x mode)?**
@@ -41,17 +41,23 @@ Ask the user these 3 questions to determine CLI options:
      - **not max20** → `--claude=yes`
    - If **no** → `--claude=no`
 
-2. **Do you have a ChatGPT Subscription?**
-   - If **yes** → `--chatgpt=yes`
-   - If **no** → `--chatgpt=no`
-
-3. **Will you integrate Gemini models?**
+2. **Will you integrate Gemini models?**
    - If **yes** → `--gemini=yes`
    - If **no** → `--gemini=no`
 
-4. **Do you have a GitHub Copilot Subscription?**
+3. **Do you have a GitHub Copilot Subscription?**
    - If **yes** → `--copilot=yes`
    - If **no** → `--copilot=no`
+
+4. **Do you have access to OpenCode Zen (opencode/ models)?**
+   - If **yes** → `--opencode-zen=yes`
+   - If **no** → `--opencode-zen=no` (default)
+
+5. **Do you have a Z.ai Coding Plan subscription?**
+   - If **yes** → `--zai-coding-plan=yes`
+   - If **no** → `--zai-coding-plan=no` (default)
+
+**Provider Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
 
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALY.
 
@@ -74,14 +80,16 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
-- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
-- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no`
+- User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
@@ -158,22 +166,48 @@ opencode auth login
 
 #### GitHub Copilot (Fallback Provider)
 
-GitHub Copilot is supported as a **fallback provider** when native providers (Claude, ChatGPT, Gemini) are unavailable. The installer configures Copilot with lower priority than native providers.
+GitHub Copilot is supported as a **fallback provider** when native providers are unavailable.
 
-**Priority**: Native providers (Claude/ChatGPT/Gemini) > GitHub Copilot > Free models
+**Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
 
 ##### Model Mappings
 
-When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
+When GitHub Copilot is the best available provider, oh-my-opencode uses these model assignments:
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
-| **Explore**   | `grok code` (default)            |
-| **Librarian** | `glm 4.7 free` (default)         |
+| **Explore**   | `github-copilot/grok-code-fast-1`|
+| **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
+
+#### Z.ai Coding Plan
+
+Z.ai Coding Plan provides access to GLM-4.7 models. When enabled, the **Librarian agent always uses `zai-coding-plan/glm-4.7`** regardless of other available providers.
+
+If Z.ai is the only provider available, all agents will use GLM models:
+
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `zai-coding-plan/glm-4.7`        |
+| **Oracle**    | `zai-coding-plan/glm-4.7`        |
+| **Explore**   | `zai-coding-plan/glm-4.7-flash`  |
+| **Librarian** | `zai-coding-plan/glm-4.7`        |
+
+#### OpenCode Zen
+
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/grok-code`, and `opencode/glm-4.7-free`.
+
+When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
+
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `opencode/claude-opus-4-5`       |
+| **Oracle**    | `opencode/gpt-5.2`               |
+| **Explore**   | `opencode/grok-code`             |
+| **Librarian** | `opencode/glm-4.7-free`          |
 
 ##### Setup
 
