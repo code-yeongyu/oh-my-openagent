@@ -206,7 +206,6 @@ describe("generateOmoConfig - v3 beta: no hardcoded models", () => {
     const config: InstallConfig = {
       hasClaude: true,
       isMax20: false,
-      hasChatGPT: true,
       hasGemini: false,
       hasCopilot: false,
     }
@@ -225,7 +224,6 @@ describe("generateOmoConfig - v3 beta: no hardcoded models", () => {
     const config: InstallConfig = {
       hasClaude: true,
       isMax20: true,
-      hasChatGPT: true,
       hasGemini: true,
       hasCopilot: true,
     }
@@ -243,7 +241,6 @@ describe("generateOmoConfig - v3 beta: no hardcoded models", () => {
     const config: InstallConfig = {
       hasClaude: false,
       isMax20: false,
-      hasChatGPT: false,
       hasGemini: false,
       hasCopilot: false,
     }
