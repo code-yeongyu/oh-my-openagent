@@ -61,8 +61,6 @@ export type BuiltinAgentName =
   | "oracle"
   | "librarian"
   | "explore"
-  | "frontend-ui-ux-engineer"
-  | "document-writer"
   | "multimodal-looker"
   | "Metis (Plan Consultant)"
   | "Momus (Plan Reviewer)"
