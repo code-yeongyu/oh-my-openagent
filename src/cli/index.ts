@@ -24,26 +24,23 @@ program
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
-  .option("--chatgpt <value>", "ChatGPT subscription: no, yes")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no
-  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no
+  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes
 
 Model Providers:
   Claude      Required for Sisyphus (main orchestrator) and Librarian agents
-  ChatGPT     Powers the Oracle agent for debugging and architecture
   Gemini      Powers frontend, documentation, and multimodal agents
 `)
   .action(async (options) => {
     const args: InstallArgs = {
       tui: options.tui !== false,
       claude: options.claude,
-      chatgpt: options.chatgpt,
       gemini: options.gemini,
       copilot: options.copilot,
       skipAuth: options.skipAuth ?? false,

@@ -39,7 +39,6 @@ function formatConfigSummary(config: InstallConfig): string {
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
-  lines.push(formatProvider("ChatGPT", config.hasChatGPT))
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback provider"))
 
@@ -115,12 +114,6 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
   }
 
-  if (args.chatgpt === undefined) {
-    errors.push("--chatgpt is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.chatgpt)) {
-    errors.push(`Invalid --chatgpt value: ${args.chatgpt} (expected: no, yes)`)
-  }
-
   if (args.gemini === undefined) {
     errors.push("--gemini is required (values: no, yes)")
   } else if (!["no", "yes"].includes(args.gemini)) {
@@ -140,13 +133,12 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   return {
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
-    hasChatGPT: args.chatgpt === "yes",
     hasGemini: args.gemini === "yes",
     hasCopilot: args.copilot === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg; copilot: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; gemini: BooleanArg; copilot: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -154,7 +146,6 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 
   return {
     claude,
-    chatgpt: detected.hasChatGPT ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
     copilot: detected.hasCopilot ? "yes" : "no",
   }
@@ -174,20 +165,6 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   })
 
   if (p.isCancel(claude)) {
-    p.cancel("Installation cancelled.")
-    return null
-  }
-
-  const chatgpt = await p.select({
-    message: "Do you have a ChatGPT Plus/Pro subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Oracle will use fallback model" },
-      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for debugging and architecture" },
-    ],
-    initialValue: initial.chatgpt,
-  })
-
-  if (p.isCancel(chatgpt)) {
     p.cancel("Installation cancelled.")
     return null
   }
@@ -223,7 +200,6 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
-    hasChatGPT: chatgpt === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
   }
@@ -238,7 +214,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes> --copilot=<no|yes>")
+    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>")
     console.log()
     return 1
   }
@@ -264,7 +240,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    printInfo(`Current config: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    printInfo(`Current config: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const config = argsToConfig(args)
@@ -307,7 +283,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasCopilot) {
+  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
     printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
@@ -328,11 +304,10 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
       (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
-      (config.hasChatGPT ? `  ${SYMBOLS.bullet} OpenAI ${color.gray("→ ChatGPT Plus/Pro")}\n` : "") +
       (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
       (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
       "🔐 Authenticate Your Providers"
@@ -354,7 +329,7 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    p.log.info(`Existing configuration detected: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    p.log.info(`Existing configuration detected: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const s = p.spinner()
@@ -413,7 +388,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini && !config.hasCopilot) {
+  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
@@ -434,10 +409,9 @@ export async function install(args: InstallArgs): Promise<number> {
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
-    if (config.hasChatGPT) providers.push(`OpenAI ${color.gray("→ ChatGPT Plus/Pro")}`)
     if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
