@@ -17,10 +17,22 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
-  "frontend-ui-ux-engineer": "frontend-ui-ux-engineer",
-  "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
+  "orchestrator-sisyphus": "atlas",
 }
+
+export const BUILTIN_AGENT_NAMES = new Set([
+  "Sisyphus",
+  "oracle",
+  "librarian",
+  "explore",
+  "multimodal-looker",
+  "Metis (Plan Consultant)",
+  "Momus (Plan Reviewer)",
+  "Prometheus (Planner)",
+  "atlas",
+  "build",
+])
 
 // Migration map: old hook names → new hook names (for backward compatibility)
 export const HOOK_NAME_MAP: Record<string, string> = {
@@ -28,13 +40,25 @@ export const HOOK_NAME_MAP: Record<string, string> = {
   "anthropic-auto-compact": "anthropic-context-window-limit-recovery",
 }
 
-// Model to category mapping for auto-migration
+/**
+ * @deprecated LEGACY MIGRATION ONLY
+ * 
+ * This map exists solely for migrating old configs that used hardcoded model strings.
+ * It maps legacy model strings to semantic category names, allowing users to migrate
+ * from explicit model configs to category-based configs.
+ * 
+ * DO NOT add new entries here. New agents should use:
+ * - Category-based config (preferred): { category: "unspecified-high" }
+ * - Or inherit from OpenCode's config.model
+ * 
+ * This map will be removed in a future major version once migration period ends.
+ */
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
-  "anthropic/claude-opus-4-5": "most-capable",
-  "anthropic/claude-sonnet-4-5": "general",
+  "anthropic/claude-opus-4-5": "unspecified-high",
+  "anthropic/claude-sonnet-4-5": "unspecified-low",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
@@ -91,7 +115,7 @@ export function shouldDeleteAgentConfig(
   config: Record<string, unknown>,
   category: string
 ): boolean {
-  const { DEFAULT_CATEGORIES } = require("../tools/sisyphus-task/constants")
+  const { DEFAULT_CATEGORIES } = require("../tools/delegate-task/constants")
   const defaults = DEFAULT_CATEGORIES[category]
   if (!defaults) return false
 
@@ -117,26 +141,28 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
   }
 
-  if (rawConfig.agents && typeof rawConfig.agents === "object") {
-    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
-    for (const [name, config] of Object.entries(agents)) {
-      const { migrated, changed } = migrateAgentConfigToCategory(config)
-      if (changed) {
-        const category = migrated.category as string
-        if (shouldDeleteAgentConfig(migrated, category)) {
-          delete agents[name]
-        } else {
-          agents[name] = migrated
-        }
-        needsWrite = true
-      }
-    }
-  }
+
 
   if (rawConfig.omo_agent) {
     rawConfig.sisyphus_agent = rawConfig.omo_agent
     delete rawConfig.omo_agent
     needsWrite = true
+  }
+
+  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+    const migrated: string[] = []
+    let changed = false
+    for (const agent of rawConfig.disabled_agents as string[]) {
+      const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+      if (newAgent !== agent) {
+        changed = true
+      }
+      migrated.push(newAgent)
+    }
+    if (changed) {
+      rawConfig.disabled_agents = migrated
+      needsWrite = true
+    }
   }
 
   if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {

@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const ANTHROPIC_ACTUAL_LIMIT =
@@ -8,7 +9,7 @@ const ANTHROPIC_ACTUAL_LIMIT =
     : 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
-const CONTEXT_REMINDER = `[SYSTEM REMINDER - 1M Context Window]
+const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
 You are using Anthropic Claude with 1M context window.
 You have plenty of context remaining - do NOT rush or skip tasks.

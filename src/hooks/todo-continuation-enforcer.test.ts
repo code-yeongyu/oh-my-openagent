@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../features/background-agent"
-import { setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
 
 describe("todo-continuation-enforcer", () => {
@@ -60,16 +60,14 @@ describe("todo-continuation-enforcer", () => {
   }
 
   beforeEach(() => {
+    _resetForTesting()
     promptCalls = []
     toastCalls = []
     mockMessages = []
-    setMainSession(undefined)
-    subagentSessions.clear()
   })
 
   afterEach(() => {
-    setMainSession(undefined)
-    subagentSessions.clear()
+    _resetForTesting()
   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
@@ -806,5 +804,73 @@ describe("todo-continuation-enforcer", () => {
 
     // #then - no continuation (API fallback detected the abort)
     expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should pass model property in prompt call (undefined when no message context)", async () => {
+    // #given - session with incomplete todos, no prior message context available
+    const sessionID = "main-model-preserve"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // #when - session goes idle and continuation is injected
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 2500))
+
+    // #then - prompt call made, model is undefined when no context (expected behavior)
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
+    expect("model" in promptCalls[0]).toBe(true)
+  })
+
+  test("should extract model from assistant message with flat modelID/providerID", async () => {
+    // #given - session with assistant message that has flat modelID/providerID (OpenCode API format)
+    const sessionID = "main-assistant-model"
+    setMainSession(sessionID)
+
+    // OpenCode returns assistant messages with flat modelID/providerID, not nested model object
+    const mockMessagesWithAssistant = [
+      { info: { id: "msg-1", role: "user", agent: "Sisyphus", model: { providerID: "openai", modelID: "gpt-5.2" } } },
+      { info: { id: "msg-2", role: "assistant", agent: "Sisyphus", modelID: "gpt-5.2", providerID: "openai" } },
+    ]
+
+    const mockInput = {
+      client: {
+        session: {
+          todo: async () => ({
+            data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
+          }),
+          messages: async () => ({ data: mockMessagesWithAssistant }),
+          prompt: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+        },
+        tui: { showToast: async () => ({}) },
+      },
+      directory: "/tmp/test",
+    } as any
+
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      backgroundManager: createMockBackgroundManager(false),
+    })
+
+    // #when - session goes idle
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await new Promise(r => setTimeout(r, 2500))
+
+    // #then - model should be extracted from assistant message's flat modelID/providerID
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
   })
 })

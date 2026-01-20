@@ -8,14 +8,20 @@ on:
         description: "Bump major, minor, or patch"
         required: true
         type: choice
+        default: patch
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
       version:
-        description: "Override version (optional)"
+        description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
         required: false
         type: string
+      skip_platform:
+        description: "Skip platform binary packages (use when already published)"
+        required: false
+        type: boolean
+        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -76,6 +82,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Upgrade npm for OIDC trusted publishing
         run: npm install -g npm@latest
@@ -104,13 +111,16 @@ jobs:
       - name: Build
         run: |
           echo "=== Running bun build (main) ==="
-          bun build src/index.ts src/google-auth.ts --outdir dist --target bun --format esm --external @ast-grep/napi
+          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
           echo "=== Running bun build (CLI) ==="
-          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm
+          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
           echo "=== Running tsc ==="
-          tsc --emitDeclarationOnly
+          bunx tsc --emitDeclarationOnly
           echo "=== Running build:schema ==="
           bun run build:schema
+
+      - name: Build platform binaries
+        run: bun run build:binaries
       
       - name: Verify build output
         run: |
@@ -120,12 +130,20 @@ jobs:
           ls -la dist/cli/
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/cli/index.js || (echo "ERROR: dist/cli/index.js not found!" && exit 1)
+          echo "=== Platform binaries ==="
+          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl; do
+            test -f "packages/${platform}/bin/oh-my-opencode" || (echo "ERROR: packages/${platform}/bin/oh-my-opencode not found!" && exit 1)
+            echo "✓ packages/${platform}/bin/oh-my-opencode"
+          done
+          test -f "packages/windows-x64/bin/oh-my-opencode.exe" || (echo "ERROR: packages/windows-x64/bin/oh-my-opencode.exe not found!" && exit 1)
+          echo "✓ packages/windows-x64/bin/oh-my-opencode.exe"
 
       - name: Publish
         run: bun run script/publish.ts
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
+          SKIP_PLATFORM_PACKAGES: ${{ inputs.skip_platform }}
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
@@ -136,10 +154,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge to master
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION=$(jq -r '.version' package.json)
+          git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
-          git push -f origin master
+          git push -f origin master || echo "::warning::Failed to push to master. This can happen when workflow files changed. Manually sync master: git checkout master && git reset --hard v${VERSION} && git push -f"

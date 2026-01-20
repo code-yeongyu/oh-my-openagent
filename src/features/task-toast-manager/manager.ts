@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TrackedTask, TaskStatus } from "./types"
+import type { TrackedTask, TaskStatus, ModelFallbackInfo } from "./types"
 import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
@@ -25,6 +25,7 @@ export class TaskToastManager {
     isBackground: boolean
     status?: TaskStatus
     skills?: string[]
+    modelInfo?: ModelFallbackInfo
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
@@ -34,6 +35,7 @@ export class TaskToastManager {
       startedAt: new Date(),
       isBackground: task.isBackground,
       skills: task.skills,
+      modelInfo: task.modelInfo,
     }
 
     this.tasks.set(task.id, trackedTask)
@@ -105,6 +107,19 @@ export class TaskToastManager {
 
     const lines: string[] = []
 
+    const isFallback = newTask.modelInfo && (
+      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+    )
+    if (isFallback) {
+      const suffixMap: Record<"inherited" | "system-default", string> = {
+        inherited: " (inherited from parent)",
+        "system-default": " (system default fallback)",
+      }
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      lines.push(`⚠️ Model fallback: ${newTask.modelInfo!.model}${suffix}`)
+      lines.push("")
+    }
+
     if (running.length > 0) {
       lines.push(`Running (${running.length}):${concurrencyInfo}`)
       for (const task of running) {
@@ -122,7 +137,8 @@ export class TaskToastManager {
       for (const task of queued) {
         const bgIcon = task.isBackground ? "⏳" : "⏸️"
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo}`)
+        const isNew = task.id === newTask.id ? " ← NEW" : ""
+        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo} - Queued${isNew}`)
       }
     }
 

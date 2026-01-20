@@ -1,58 +1,63 @@
 # SHARED UTILITIES KNOWLEDGE BASE
 
 ## OVERVIEW
-Cross-cutting utilities for path resolution, config management, text processing, and Claude Code compatibility.
+
+43 cross-cutting utilities: path resolution, token truncation, config parsing, Claude Code compatibility.
 
 ## STRUCTURE
+
 ```
 shared/
-├── index.ts              # Barrel export
-├── claude-config-dir.ts  # ~/.claude resolution
-├── command-executor.ts   # Shell exec with variable expansion
-├── config-errors.ts      # Global error tracking
-├── config-path.ts        # User/project config paths
-├── data-path.ts          # XDG data directory
-├── deep-merge.ts         # Type-safe recursive merge
-├── dynamic-truncator.ts  # Token-aware truncation
-├── file-reference-resolver.ts  # @filename syntax
-├── file-utils.ts         # Symlink, markdown detection
-├── frontmatter.ts        # YAML frontmatter parsing
-├── hook-disabled.ts      # Check if hook disabled
-├── jsonc-parser.ts       # JSON with Comments
-├── logger.ts             # File-based logging
-├── migration.ts          # Legacy name compat (omo → Sisyphus)
-├── model-sanitizer.ts    # Normalize model names
-├── pattern-matcher.ts    # Tool name matching
-├── snake-case.ts         # Case conversion
-└── tool-name.ts          # PascalCase normalization
+├── logger.ts              # File-based logging (tmpdir/oh-my-opencode.log)
+├── permission-compat.ts   # Agent tool restrictions (ask/allow/deny)
+├── dynamic-truncator.ts   # Token-aware truncation (50% headroom)
+├── frontmatter.ts         # YAML frontmatter parsing
+├── jsonc-parser.ts        # JSON with Comments support
+├── data-path.ts           # XDG-compliant storage (~/.local/share)
+├── opencode-config-dir.ts # ~/.config/opencode resolution
+├── claude-config-dir.ts   # ~/.claude resolution
+├── migration.ts           # Legacy config migration (omo → Sisyphus)
+├── opencode-version.ts    # Version comparison (>= 1.0.150)
+├── external-plugin-detector.ts # OAuth spoofing detection
+├── env-expander.ts        # ${VAR} expansion in configs
+├── system-directive.ts    # System directive types
+├── hook-utils.ts          # Hook helper functions
+└── *.test.ts              # Test files (colocated)
 ```
 
 ## WHEN TO USE
+
 | Task | Utility |
 |------|---------|
-| Find ~/.claude | `getClaudeConfigDir()` |
-| Merge configs | `deepMerge(base, override)` |
-| Parse user files | `parseJsonc()` |
-| Check hook enabled | `isHookDisabled(name, list)` |
-| Truncate output | `dynamicTruncate(text, budget)` |
-| Resolve @file | `resolveFileReferencesInText()` |
-| Execute shell | `resolveCommandsInText()` |
-| Legacy names | `migrateLegacyAgentNames()` |
+| Debug logging | `log(message, data)` in `logger.ts` |
+| Limit context | `dynamicTruncate(ctx, sessionId, output)` |
+| Parse frontmatter | `parseFrontmatter(content)` |
+| Load JSONC config | `parseJsonc(text)` or `readJsoncFile(path)` |
+| Restrict agent tools | `createAgentToolAllowlist(tools)` |
+| Resolve paths | `getOpenCodeConfigDir()`, `getClaudeConfigDir()` |
+| Migrate config | `migrateConfigFile(path, rawConfig)` |
+| Compare versions | `isOpenCodeVersionAtLeast("1.1.0")` |
 
-## CRITICAL PATTERNS
+## KEY PATTERNS
+
 ```typescript
-// Dynamic truncation with context budget
-const output = dynamicTruncate(result, remainingTokens, 0.5)
+// Token-aware truncation
+const { result } = await dynamicTruncate(ctx, sessionID, largeBuffer)
 
-// Config resolution priority
-const final = deepMerge(deepMerge(defaults, userConfig), projectConfig)
+// JSONC config loading
+const settings = readJsoncFile<Settings>(configPath)
 
-// Safe JSONC parsing for user-edited files
-const { config, error } = parseJsoncSafe(content)
+// Version-gated features
+if (isOpenCodeVersionAtLeast("1.1.0")) { /* new feature */ }
+
+// Tool permission normalization
+const permissions = migrateToolsToPermission(legacyTools)
 ```
 
 ## ANTI-PATTERNS
-- Hardcoding paths (use `getClaudeConfigDir`, `getUserConfigPath`)
-- Using `JSON.parse` for user configs (always use `parseJsonc`)
-- Ignoring output size (large tool outputs MUST use `dynamicTruncate`)
-- Manual case conversion (use `toSnakeCase`, `normalizeToolName`)
+
+- **Raw JSON.parse**: Use `jsonc-parser.ts` for config files
+- **Hardcoded paths**: Use `*-config-dir.ts` utilities
+- **console.log**: Use `logger.ts` for background agents
+- **Unbounded output**: Always use `dynamic-truncator.ts`
+- **Manual version parse**: Use `opencode-version.ts`

@@ -10,6 +10,9 @@ import {
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
+import packageJson from "../../package.json" with { type: "json" }
+
+const VERSION = packageJson.version
 
 const SYMBOLS = {
   check: color.green("✓"),
@@ -36,25 +39,18 @@ function formatConfigSummary(config: InstallConfig): string {
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
-  lines.push(formatProvider("ChatGPT", config.hasChatGPT))
   lines.push(formatProvider("Gemini", config.hasGemini))
+  lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback provider"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
   lines.push("")
 
-  lines.push(color.bold(color.white("Agent Configuration")))
+  // v3 beta: No hardcoded models - agents use OpenCode's configured default model
+  lines.push(color.bold(color.white("Agent Models")))
   lines.push("")
-
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-  const librarianModel = "glm-4.7-free"
-  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-
-  lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Librarian    ${SYMBOLS.arrow} ${color.cyan(librarianModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Frontend     ${SYMBOLS.arrow} ${color.cyan(frontendModel)}`)
+  lines.push(`  ${SYMBOLS.info} Agents will use your OpenCode default model`)
+  lines.push(`  ${SYMBOLS.bullet} Configure specific models in ${color.cyan("oh-my-opencode.json")} if needed`)
 
   return lines.join("\n")
 }
@@ -118,16 +114,16 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
   }
 
-  if (args.chatgpt === undefined) {
-    errors.push("--chatgpt is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.chatgpt)) {
-    errors.push(`Invalid --chatgpt value: ${args.chatgpt} (expected: no, yes)`)
-  }
-
   if (args.gemini === undefined) {
     errors.push("--gemini is required (values: no, yes)")
   } else if (!["no", "yes"].includes(args.gemini)) {
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
+  }
+
+  if (args.copilot === undefined) {
+    errors.push("--copilot is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.copilot)) {
+    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
   return { valid: errors.length === 0, errors }
@@ -137,12 +133,12 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   return {
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
-    hasChatGPT: args.chatgpt === "yes",
     hasGemini: args.gemini === "yes",
+    hasCopilot: args.copilot === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; gemini: BooleanArg; copilot: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -150,8 +146,8 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 
   return {
     claude,
-    chatgpt: detected.hasChatGPT ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
+    copilot: detected.hasCopilot ? "yes" : "no",
   }
 }
 
@@ -173,20 +169,6 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
-  const chatgpt = await p.select({
-    message: "Do you have a ChatGPT Plus/Pro subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Oracle will use fallback model" },
-      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for debugging and architecture" },
-    ],
-    initialValue: initial.chatgpt,
-  })
-
-  if (p.isCancel(chatgpt)) {
-    p.cancel("Installation cancelled.")
-    return null
-  }
-
   const gemini = await p.select({
     message: "Will you integrate Google Gemini?",
     options: [
@@ -201,11 +183,25 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
+  const copilot = await p.select({
+    message: "Do you have a GitHub Copilot subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Only native providers will be used" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
+    ],
+    initialValue: initial.copilot,
+  })
+
+  if (p.isCancel(copilot)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
-    hasChatGPT: chatgpt === "yes",
     hasGemini: gemini === "yes",
+    hasCopilot: copilot === "yes",
   }
 }
 
@@ -218,7 +214,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes>")
+    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>")
     console.log()
     return 1
   }
@@ -244,20 +240,20 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    printInfo(`Current config: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    printInfo(`Current config: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const config = argsToConfig(args)
 
   printStep(step++, totalSteps, "Adding oh-my-opencode plugin...")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
     return 1
   }
   printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -287,23 +283,8 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
     printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
-  }
-
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    console.log(color.bold("Next Steps - Authenticate your providers:"))
-    console.log()
-    if (config.hasClaude) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    console.log()
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
@@ -323,6 +304,16 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    printBox(
+      `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
+      (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      "🔐 Authenticate Your Providers"
+    )
+  }
+
   return 0
 }
 
@@ -338,7 +329,7 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    p.log.info(`Existing configuration detected: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    p.log.info(`Existing configuration detected: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const s = p.spinner()
@@ -360,7 +351,7 @@ export async function install(args: InstallArgs): Promise<number> {
   if (!config) return 1
 
   s.start("Adding oh-my-opencode to OpenCode config")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     s.stop(`Failed to add plugin: ${pluginResult.error}`)
     p.outro(color.red("Installation failed."))
@@ -368,7 +359,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     s.start("Adding auth plugins (fetching latest versions)")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -397,25 +388,11 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
-
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    const steps: string[] = []
-    if (config.hasClaude) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    p.note(steps.join("\n"), "Next Steps - Authenticate your providers")
-  }
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
@@ -431,6 +408,22 @@ export async function install(args: InstallArgs): Promise<number> {
   p.log.message(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
+
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    const providers: string[] = []
+    if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+
+    console.log()
+    console.log(color.bold("🔐 Authenticate Your Providers"))
+    console.log()
+    console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
+    for (const provider of providers) {
+      console.log(`   ${SYMBOLS.bullet} ${provider}`)
+    }
+    console.log()
+  }
 
   return 0
 }

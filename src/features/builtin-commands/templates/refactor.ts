@@ -148,20 +148,15 @@ While background agents are running, use direct tools:
 ### LSP Tools for Precise Analysis:
 
 \`\`\`typescript
-// Get symbol information at target location
-lsp_hover(filePath, line, character)  // Type info, docs, signatures
-
 // Find definition(s)
-lsp_goto_definition(filePath, line, character)  // Where is it defined?
+LspGotoDefinition(filePath, line, character)  // Where is it defined?
 
 // Find ALL usages across workspace
-lsp_find_references(filePath, line, character, includeDeclaration=true)
+LspFindReferences(filePath, line, character, includeDeclaration=true)
 
 // Get file structure
-lsp_document_symbols(filePath)  // Hierarchical outline
-
-// Search symbols by name
-lsp_workspace_symbols(filePath, query="[target_symbol]")
+LspDocumentSymbols(filePath)  // Hierarchical outline
+LspWorkspaceSymbols(filePath, query="[target_symbol]")  // Search by name
 
 // Get current diagnostics
 lsp_diagnostics(filePath)  // Errors, warnings before we start
@@ -592,9 +587,9 @@ If any of these occur, **STOP and consult user**:
 You already know these tools. Use them intelligently:
 
 ## LSP Tools
-Leverage the full LSP toolset (\`lsp_*\`) for precision analysis. Key patterns:
-- **Understand before changing**: \`lsp_hover\`, \`lsp_goto_definition\` to grasp context
-- **Impact analysis**: \`lsp_find_references\` to map all usages before modification
+Leverage LSP tools for precision analysis. Key patterns:
+- **Understand before changing**: \`LspGotoDefinition\` to grasp context
+- **Impact analysis**: \`LspFindReferences\` to map all usages before modification
 - **Safe refactoring**: \`lsp_prepare_rename\` → \`lsp_rename\` for symbol renames
 - **Continuous verification**: \`lsp_diagnostics\` after every change
 

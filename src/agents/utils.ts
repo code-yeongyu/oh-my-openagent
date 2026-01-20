@@ -1,21 +1,19 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
-import type { CategoriesConfig, CategoryConfig } from "../config/schema"
+import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../config/schema"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
-import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
-import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent } from "./metis"
-import { createOrchestratorSisyphusAgent, orchestratorSisyphusAgent } from "./orchestrator-sisyphus"
+import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
-import { createSherlockAgent, SHERLOCK_PROMPT_METADATA } from "./sherlock"
-import type { AvailableAgent } from "./sisyphus-prompt-builder"
+import type { AvailableAgent } from "./dynamic-agent-prompt-builder"
 import { deepMerge } from "../shared"
-import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants"
+import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
+import { createSherlockAgent, SHERLOCK_PROMPT_METADATA } from "./sherlock"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -24,13 +22,14 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
-  "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
-  "document-writer": createDocumentWriterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
   "Metis (Plan Consultant)": createMetisAgent,
   "Momus (Plan Reviewer)": createMomusAgent,
-  "orchestrator-sisyphus": orchestratorSisyphusAgent,
+  "orchestrator-sisyphus": createSisyphusAgent,
   sherlock: createSherlockAgent,
+  // Note: atlas is handled specially in createBuiltinAgents()
+  // because it needs OrchestratorContext, not just a model string
+  atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
 /**
@@ -41,8 +40,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
-  "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
-  "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
   sherlock: SHERLOCK_PROMPT_METADATA,
 }
@@ -53,8 +50,9 @@ function isFactory(source: AgentSource): source is AgentFactory {
 
 export function buildAgent(
   source: AgentSource,
-  model?: string,
-  categories?: CategoriesConfig
+  model: string,
+  categories?: CategoriesConfig,
+  gitMasterConfig?: GitMasterConfig
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -78,7 +76,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills)
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -99,7 +97,14 @@ export function createEnvContext(): string {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
 
-  const timeStr = now.toLocaleTimeString("en-US", {
+  const dateStr = now.toLocaleDateString(locale, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+
+  const timeStr = now.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -108,6 +113,7 @@ export function createEnvContext(): string {
 
   return `
 <omo-env>
+  Current date: ${dateStr}
   Current time: ${timeStr}
   Timezone: ${timezone}
   Locale: ${locale}
@@ -133,8 +139,13 @@ export function createBuiltinAgents(
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
-  categories?: CategoriesConfig
+  categories?: CategoriesConfig,
+  gitMasterConfig?: GitMasterConfig
 ): Record<string, AgentConfig> {
+  if (!systemDefaultModel) {
+    throw new Error("createBuiltinAgents requires systemDefaultModel")
+  }
+
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
 
@@ -146,13 +157,13 @@ export function createBuiltinAgents(
     const agentName = name as BuiltinAgentName
 
     if (agentName === "Sisyphus") continue
-    if (agentName === "orchestrator-sisyphus") continue
+    if (agentName === "atlas") continue
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
-    const model = override?.model
+    const model = override?.model ?? systemDefaultModel
 
-    let config = buildAgent(source, model, mergedCategories)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()
@@ -193,19 +204,19 @@ export function createBuiltinAgents(
     result["Sisyphus"] = sisyphusConfig
   }
 
-  if (!disabledAgents.includes("orchestrator-sisyphus")) {
-    const orchestratorOverride = agentOverrides["orchestrator-sisyphus"]
-    const orchestratorModel = orchestratorOverride?.model
-    let orchestratorConfig = createOrchestratorSisyphusAgent({
-      model: orchestratorModel,
-      availableAgents,
-    })
+  if (!disabledAgents.includes("atlas")) {
+    const orchestratorOverride = agentOverrides["atlas"]
+    const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
+     let orchestratorConfig = createAtlasAgent({
+       model: orchestratorModel,
+       availableAgents,
+     })
 
     if (orchestratorOverride) {
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
     }
 
-    result["orchestrator-sisyphus"] = orchestratorConfig
+    result["atlas"] = orchestratorConfig
   }
 
   return result

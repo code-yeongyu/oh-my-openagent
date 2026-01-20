@@ -1,10 +1,10 @@
 import { dirname } from "node:path"
-import { readFileSync } from "node:fs"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
 import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
-import { discoverSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
-import { parseFrontmatter } from "../../shared/frontmatter"
+import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skill-loader/skill-content"
+import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 
@@ -48,9 +48,7 @@ async function extractSkillBody(skill: LoadedSkill): Promise<string> {
   }
 
   if (skill.path) {
-    const content = readFileSync(skill.path, "utf-8")
-    const { body } = parseFrontmatter(content)
-    return body.trim()
+    return extractSkillTemplate(skill)
   }
 
   const templateMatch = skill.definition.template?.match(/<skill-instruction>([\s\S]*?)<\/skill-instruction>/)
@@ -135,7 +133,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (options.skills) return options.skills
     if (cachedSkills) return cachedSkills
-    cachedSkills = await discoverSkills({ includeClaudeCodePaths: !options.opencodeOnly })
+    cachedSkills = await getAllSkills()
     return cachedSkills
   }
 
@@ -167,7 +165,12 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         throw new Error(`Skill "${args.name}" not found. Available skills: ${available || "none"}`)
       }
 
-      const body = await extractSkillBody(skill)
+      let body = await extractSkillBody(skill)
+
+      if (args.name === "git-master") {
+        body = injectGitMasterConfig(body, options.gitMasterConfig)
+      }
+
       const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
 
       const output = [

@@ -1,15 +1,10 @@
 import {
-  lsp_hover,
   lsp_goto_definition,
   lsp_find_references,
-  lsp_document_symbols,
-  lsp_workspace_symbols,
+  lsp_symbols,
   lsp_diagnostics,
-  lsp_servers,
   lsp_prepare_rename,
   lsp_rename,
-  lsp_code_actions,
-  lsp_code_action_resolve,
   lspManager,
 } from "./lsp"
 
@@ -50,7 +45,7 @@ type OpencodeClient = PluginInput["client"]
 
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
-export { createSisyphusTask, type SisyphusTaskToolOptions, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./sisyphus-task"
+export { createDelegateTask, type DelegateTaskToolOptions, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./delegate-task"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   return {
@@ -60,17 +55,12 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
 }
 
 export const builtinTools: Record<string, ToolDefinition> = {
-  lsp_hover,
   lsp_goto_definition,
   lsp_find_references,
-  lsp_document_symbols,
-  lsp_workspace_symbols,
+  lsp_symbols,
   lsp_diagnostics,
-  lsp_servers,
   lsp_prepare_rename,
   lsp_rename,
-  lsp_code_actions,
-  lsp_code_action_resolve,
   ast_grep_search,
   ast_grep_replace,
   grep,

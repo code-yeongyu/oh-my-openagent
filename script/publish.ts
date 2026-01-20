@@ -1,12 +1,24 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 
 const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
 const versionOverride = process.env.VERSION
 
-console.log("=== Publishing oh-my-opencode ===\n")
+const PLATFORM_PACKAGES = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-x64",
+  "linux-arm64",
+  "linux-x64-musl",
+  "linux-arm64-musl",
+  "windows-x64",
+]
+
+console.log("=== Publishing oh-my-opencode (multi-package) ===\n")
 
 async function fetchPreviousVersion(): Promise<string> {
   try {
@@ -22,7 +34,9 @@ async function fetchPreviousVersion(): Promise<string> {
 }
 
 function bumpVersion(version: string, type: "major" | "minor" | "patch"): string {
-  const [major, minor, patch] = version.split(".").map(Number)
+  // Handle prerelease versions (e.g., 3.0.0-beta.7)
+  const baseVersion = version.split("-")[0]
+  const [major, minor, patch] = baseVersion.split(".").map(Number)
   switch (type) {
     case "major":
       return `${major + 1}.0.0`
@@ -33,12 +47,40 @@ function bumpVersion(version: string, type: "major" | "minor" | "patch"): string
   }
 }
 
-async function updatePackageVersion(newVersion: string): Promise<void> {
-  const pkgPath = new URL("../package.json", import.meta.url).pathname
+async function updatePackageVersion(pkgPath: string, newVersion: string): Promise<void> {
   let pkg = await Bun.file(pkgPath).text()
   pkg = pkg.replace(/"version": "[^"]+"/, `"version": "${newVersion}"`)
-  await Bun.file(pkgPath).write(pkg)
+  await Bun.write(pkgPath, pkg)
   console.log(`Updated: ${pkgPath}`)
+}
+
+async function updateAllPackageVersions(newVersion: string): Promise<void> {
+  console.log("\nSyncing version across all packages...")
+  
+  // Update main package.json
+  const mainPkgPath = new URL("../package.json", import.meta.url).pathname
+  await updatePackageVersion(mainPkgPath, newVersion)
+  
+  // Update optionalDependencies versions in main package.json
+  let mainPkg = await Bun.file(mainPkgPath).text()
+  for (const platform of PLATFORM_PACKAGES) {
+    const pkgName = `oh-my-opencode-${platform}`
+    mainPkg = mainPkg.replace(
+      new RegExp(`"${pkgName}": "[^"]+"`),
+      `"${pkgName}": "${newVersion}"`
+    )
+  }
+  await Bun.write(mainPkgPath, mainPkg)
+  
+  // Update each platform package.json
+  for (const platform of PLATFORM_PACKAGES) {
+    const pkgPath = new URL(`../packages/${platform}/package.json`, import.meta.url).pathname
+    if (existsSync(pkgPath)) {
+      await updatePackageVersion(pkgPath, newVersion)
+    } else {
+      console.warn(`Warning: ${pkgPath} not found`)
+    }
+  }
 }
 
 async function generateChangelog(previous: string): Promise<string[]> {
@@ -113,18 +155,119 @@ function getDistTag(version: string): string | null {
   return tag || "next"
 }
 
-async function buildAndPublish(version: string): Promise<void> {
-  console.log("\nBuilding before publish...")
-  await $`bun run clean && bun run build`
+interface PublishResult {
+  success: boolean
+  alreadyPublished?: boolean
+  error?: string
+}
 
-  console.log("\nPublishing to npm...")
-  const distTag = getDistTag(version)
+async function publishPackage(cwd: string, distTag: string | null, useProvenance = true): Promise<PublishResult> {
   const tagArgs = distTag ? ["--tag", distTag] : []
+  const provenanceArgs = process.env.CI && useProvenance ? ["--provenance"] : []
   
-  if (process.env.CI) {
-    await $`npm publish --access public --provenance --ignore-scripts ${tagArgs}`
+  try {
+    await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd)
+    return { success: true }
+  } catch (error: any) {
+    const stderr = error?.stderr?.toString() || error?.message || ""
+    
+    // E409/E403 = version already exists (idempotent success)
+    // E404 + "Access token expired" = OIDC token expired while publishing already-published package
+    if (
+      stderr.includes("EPUBLISHCONFLICT") ||
+      stderr.includes("E409") ||
+      stderr.includes("E403") ||
+      stderr.includes("cannot publish over") ||
+      stderr.includes("already exists") ||
+      (stderr.includes("E404") && stderr.includes("Access token expired"))
+    ) {
+      return { success: true, alreadyPublished: true }
+    }
+    
+    return { success: false, error: stderr }
+  }
+}
+
+async function publishAllPackages(version: string): Promise<void> {
+  const distTag = getDistTag(version)
+  const skipPlatform = process.env.SKIP_PLATFORM_PACKAGES === "true"
+  
+  if (skipPlatform) {
+    console.log("\n⏭️  Skipping platform packages (SKIP_PLATFORM_PACKAGES=true)")
   } else {
-    await $`npm publish --access public --ignore-scripts ${tagArgs}`
+    console.log("\n📦 Publishing platform packages in batches (to avoid OIDC token expiration)...")
+    
+    // Publish in batches of 2 to avoid OIDC token expiration
+    // npm processes requests sequentially even when sent in parallel,
+    // so too many parallel requests can cause token expiration
+    const BATCH_SIZE = 2
+    const failures: string[] = []
+    
+    for (let i = 0; i < PLATFORM_PACKAGES.length; i += BATCH_SIZE) {
+      const batch = PLATFORM_PACKAGES.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(PLATFORM_PACKAGES.length / BATCH_SIZE)
+      
+      console.log(`\n  Batch ${batchNum}/${totalBatches}: ${batch.join(", ")}`)
+      
+      const publishPromises = batch.map(async (platform) => {
+        const pkgDir = join(process.cwd(), "packages", platform)
+        const pkgName = `oh-my-opencode-${platform}`
+        
+        console.log(`    Starting ${pkgName}...`)
+        const result = await publishPackage(pkgDir, distTag, false)
+        
+        return { platform, pkgName, result }
+      })
+      
+      const results = await Promise.all(publishPromises)
+      
+      for (const { pkgName, result } of results) {
+        if (result.success) {
+          if (result.alreadyPublished) {
+            console.log(`    ✓ ${pkgName}@${version} (already published)`)
+          } else {
+            console.log(`    ✓ ${pkgName}@${version}`)
+          }
+        } else {
+          console.error(`    ✗ ${pkgName} failed: ${result.error}`)
+          failures.push(pkgName)
+        }
+      }
+    }
+    
+    if (failures.length > 0) {
+      throw new Error(`Failed to publish: ${failures.join(", ")}`)
+    }
+  }
+  
+  // Publish main package last
+  console.log(`\n📦 Publishing main package...`)
+  const mainResult = await publishPackage(process.cwd(), distTag)
+  
+  if (mainResult.success) {
+    if (mainResult.alreadyPublished) {
+      console.log(`  ✓ ${PACKAGE_NAME}@${version} (already published)`)
+    } else {
+      console.log(`  ✓ ${PACKAGE_NAME}@${version}`)
+    }
+  } else {
+    console.error(`  ✗ ${PACKAGE_NAME} failed: ${mainResult.error}`)
+    throw new Error(`Failed to publish ${PACKAGE_NAME}`)
+  }
+}
+
+async function buildPackages(): Promise<void> {
+  const skipPlatform = process.env.SKIP_PLATFORM_PACKAGES === "true"
+  
+  console.log("\nBuilding packages...")
+  await $`bun run clean && bun run build`
+  
+  if (skipPlatform) {
+    console.log("⏭️  Skipping platform binaries (SKIP_PLATFORM_PACKAGES=true)")
+  } else {
+    console.log("Building platform binaries...")
+    await $`bun run build:binaries`
   }
 }
 
@@ -134,7 +277,12 @@ async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<vo
   console.log("\nCommitting and tagging...")
   await $`git config user.email "github-actions[bot]@users.noreply.github.com"`
   await $`git config user.name "github-actions[bot]"`
+  
+  // Add all package.json files
   await $`git add package.json assets/oh-my-opencode.schema.json`
+  for (const platform of PLATFORM_PACKAGES) {
+    await $`git add packages/${platform}/package.json`.nothrow()
+  }
 
   const hasStagedChanges = await $`git diff --cached --quiet`.nothrow()
   if (hasStagedChanges.exitCode !== 0) {
@@ -181,15 +329,16 @@ async function main() {
     process.exit(0)
   }
 
-  await updatePackageVersion(newVersion)
+  await updateAllPackageVersions(newVersion)
   const changelog = await generateChangelog(previous)
   const contributors = await getContributors(previous)
   const notes = [...changelog, ...contributors]
 
-  await buildAndPublish(newVersion)
+  await buildPackages()
+  await publishAllPackages(newVersion)
   await gitTagAndRelease(newVersion, notes)
 
-  console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} ===`)
+  console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} (8 packages) ===`)
 }
 
 main()

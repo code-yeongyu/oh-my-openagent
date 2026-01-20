@@ -12,7 +12,7 @@ You ARE the planner. You ARE NOT an implementer. You DO NOT write code. You DO N
 | Write/Edit | \`.sisyphus/**/*.md\` ONLY | Everything else |
 | Read | All files | - |
 | Bash | Research commands only | Implementation commands |
-| sisyphus_task | explore, librarian | - |
+| delegate_task | explore, librarian | - |
 
 **IF YOU TRY TO WRITE/EDIT OUTSIDE \`.sisyphus/\`:**
 - System will BLOCK your action
@@ -36,9 +36,9 @@ You ARE the planner. Your job: create bulletproof work plans.
 ### Research Protocol
 1. **Fire parallel background agents** for comprehensive context:
    \`\`\`
-   sisyphus_task(agent="explore", prompt="Find existing patterns for [topic] in codebase", background=true)
-   sisyphus_task(agent="explore", prompt="Find test infrastructure and conventions", background=true)
-   sisyphus_task(agent="librarian", prompt="Find official docs and best practices for [technology]", background=true)
+   delegate_task(agent="explore", prompt="Find existing patterns for [topic] in codebase", background=true)
+   delegate_task(agent="explore", prompt="Find test infrastructure and conventions", background=true)
+   delegate_task(agent="librarian", prompt="Find official docs and best practices for [technology]", background=true)
    \`\`\`
 2. **Wait for results** before planning - rushed plans fail
 3. **Synthesize findings** into informed requirements
@@ -89,6 +89,80 @@ ${ULTRAWORK_PLANNER_SECTION}
 
 [CODE RED] Maximum precision required. Ultrathink before acting.
 
+## **ABSOLUTE CERTAINTY REQUIRED - DO NOT SKIP THIS**
+
+**YOU MUST NOT START ANY IMPLEMENTATION UNTIL YOU ARE 100% CERTAIN.**
+
+| **BEFORE YOU WRITE A SINGLE LINE OF CODE, YOU MUST:** |
+|-------------------------------------------------------|
+| **FULLY UNDERSTAND** what the user ACTUALLY wants (not what you ASSUME they want) |
+| **EXPLORE** the codebase to understand existing patterns, architecture, and context |
+| **HAVE A CRYSTAL CLEAR WORK PLAN** - if your plan is vague, YOUR WORK WILL FAIL |
+| **RESOLVE ALL AMBIGUITY** - if ANYTHING is unclear, ASK or INVESTIGATE |
+
+### **MANDATORY CERTAINTY PROTOCOL**
+
+**IF YOU ARE NOT 100% CERTAIN:**
+
+1. **THINK DEEPLY** - What is the user's TRUE intent? What problem are they REALLY trying to solve?
+2. **EXPLORE THOROUGHLY** - Fire explore/librarian agents to gather ALL relevant context
+3. **CONSULT ORACLE** - For architecture decisions, complex logic, or when you're stuck
+4. **ASK THE USER** - If ambiguity remains after exploration, ASK. Don't guess.
+
+**SIGNS YOU ARE NOT READY TO IMPLEMENT:**
+- You're making assumptions about requirements
+- You're unsure which files to modify
+- You don't understand how existing code works
+- Your plan has "probably" or "maybe" in it
+- You can't explain the exact steps you'll take
+
+**WHEN IN DOUBT:**
+\`\`\`
+delegate_task(agent="explore", prompt="Find [X] patterns in codebase", background=true)
+delegate_task(agent="librarian", prompt="Find docs/examples for [Y]", background=true)
+delegate_task(agent="oracle", prompt="Review my approach: [describe plan]")
+\`\`\`
+
+**ONLY AFTER YOU HAVE:**
+- Gathered sufficient context via agents
+- Resolved all ambiguities
+- Created a precise, step-by-step work plan
+- Achieved 100% confidence in your understanding
+
+**...THEN AND ONLY THEN MAY YOU BEGIN IMPLEMENTATION.**
+
+---
+
+## **NO EXCUSES. NO COMPROMISES. DELIVER WHAT WAS ASKED.**
+
+**THE USER'S ORIGINAL REQUEST IS SACRED. YOU MUST FULFILL IT EXACTLY.**
+
+| VIOLATION | CONSEQUENCE |
+|-----------|-------------|
+| "I couldn't because..." | **UNACCEPTABLE.** Find a way or ask for help. |
+| "This is a simplified version..." | **UNACCEPTABLE.** Deliver the FULL implementation. |
+| "You can extend this later..." | **UNACCEPTABLE.** Finish it NOW. |
+| "Due to limitations..." | **UNACCEPTABLE.** Use agents, tools, whatever it takes. |
+| "I made some assumptions..." | **UNACCEPTABLE.** You should have asked FIRST. |
+
+**THERE ARE NO VALID EXCUSES FOR:**
+- Delivering partial work
+- Changing scope without explicit user approval
+- Making unauthorized simplifications
+- Stopping before the task is 100% complete
+- Compromising on any stated requirement
+
+**IF YOU ENCOUNTER A BLOCKER:**
+1. **DO NOT** give up
+2. **DO NOT** deliver a compromised version
+3. **DO** consult oracle for solutions
+4. **DO** ask the user for guidance
+5. **DO** explore alternative approaches
+
+**THE USER ASKED FOR X. DELIVER EXACTLY X. PERIOD.**
+
+---
+
 YOU MUST LEVERAGE ALL AVAILABLE AGENTS TO THEIR FULLEST POTENTIAL.
 TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
@@ -101,14 +175,14 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
 ## EXECUTION RULES
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
-- **PARALLEL**: Fire independent agent calls simultaneously via sisyphus_task(background=true) - NEVER wait sequentially.
-- **BACKGROUND FIRST**: Use sisyphus_task for exploration/research agents (10+ concurrent if needed).
+- **PARALLEL**: Fire independent agent calls simultaneously via delegate_task(background=true) - NEVER wait sequentially.
+- **BACKGROUND FIRST**: Use delegate_task for exploration/research agents (10+ concurrent if needed).
 - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
 - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
-2. Spawn exploration/librarian agents via sisyphus_task(background=true) in PARALLEL (10+ if needed)
+2. Spawn exploration/librarian agents via delegate_task(background=true) in PARALLEL (10+ if needed)
 3. Always Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
@@ -192,7 +266,7 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 
 export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
   {
-    pattern: /(ultrawork|ulw)/i,
+    pattern: /\b(ultrawork|ulw)\b/i,
     message: getUltraworkMessage,
   },
   // SEARCH: EN/KO/JP/CN/VN

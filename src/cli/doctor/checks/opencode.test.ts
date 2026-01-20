@@ -43,6 +43,94 @@ describe("opencode check", () => {
     })
   })
 
+  describe("command helpers", () => {
+    it("selects where on Windows", () => {
+      // #given win32 platform
+      // #when selecting lookup command
+      // #then should use where
+      expect(opencode.getBinaryLookupCommand("win32")).toBe("where")
+    })
+
+    it("selects which on non-Windows", () => {
+      // #given linux platform
+      // #when selecting lookup command
+      // #then should use which
+      expect(opencode.getBinaryLookupCommand("linux")).toBe("which")
+      expect(opencode.getBinaryLookupCommand("darwin")).toBe("which")
+    })
+
+    it("parses command output into paths", () => {
+      // #given raw output with multiple lines and spaces
+      const output = "C:\\\\bin\\\\opencode.ps1\r\nC:\\\\bin\\\\opencode.exe\n\n"
+
+      // #when parsing
+      const paths = opencode.parseBinaryPaths(output)
+
+      // #then should return trimmed, non-empty paths
+      expect(paths).toEqual(["C:\\\\bin\\\\opencode.ps1", "C:\\\\bin\\\\opencode.exe"])
+    })
+
+    it("prefers exe/cmd/bat over ps1 on Windows", () => {
+      // #given windows paths
+      const paths = [
+        "C:\\\\bin\\\\opencode.ps1",
+        "C:\\\\bin\\\\opencode.cmd",
+        "C:\\\\bin\\\\opencode.exe",
+      ]
+
+      // #when selecting binary
+      const selected = opencode.selectBinaryPath(paths, "win32")
+
+      // #then should prefer exe
+      expect(selected).toBe("C:\\\\bin\\\\opencode.exe")
+    })
+
+    it("falls back to ps1 when it is the only Windows candidate", () => {
+      // #given only ps1 path
+      const paths = ["C:\\\\bin\\\\opencode.ps1"]
+
+      // #when selecting binary
+      const selected = opencode.selectBinaryPath(paths, "win32")
+
+      // #then should return ps1 path
+      expect(selected).toBe("C:\\\\bin\\\\opencode.ps1")
+    })
+
+    it("builds PowerShell command for ps1 on Windows", () => {
+      // #given a ps1 path on Windows
+      const command = opencode.buildVersionCommand(
+        "C:\\\\bin\\\\opencode.ps1",
+        "win32"
+      )
+
+      // #when building command
+      // #then should use PowerShell
+      expect(command).toEqual([
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\\\bin\\\\opencode.ps1",
+        "--version",
+      ])
+    })
+
+    it("builds direct command for non-ps1 binaries", () => {
+      // #given an exe on Windows and a binary on linux
+      const winCommand = opencode.buildVersionCommand(
+        "C:\\\\bin\\\\opencode.exe",
+        "win32"
+      )
+      const linuxCommand = opencode.buildVersionCommand("opencode", "linux")
+
+      // #when building commands
+      // #then should execute directly
+      expect(winCommand).toEqual(["C:\\\\bin\\\\opencode.exe", "--version"])
+      expect(linuxCommand).toEqual(["opencode", "--version"])
+    })
+  })
+
   describe("getOpenCodeInfo", () => {
     it("returns installed: false when binary not found", async () => {
       // #given no opencode binary

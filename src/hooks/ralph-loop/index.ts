@@ -1,6 +1,8 @@
-import { existsSync, readFileSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { log } from "../../shared/logger"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { readState, writeState, clearState, incrementIteration } from "./storage"
 import {
   HOOK_NAME,
@@ -9,6 +11,18 @@ import {
 } from "./constants"
 import type { RalphLoopState, RalphLoopOptions } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
+import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+
+function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
+  const directPath = join(MESSAGE_STORAGE, sessionID)
+  if (existsSync(directPath)) return directPath
+  for (const dir of readdirSync(MESSAGE_STORAGE)) {
+    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+    if (existsSync(sessionPath)) return sessionPath
+  }
+  return null
+}
 
 export * from "./types"
 export * from "./constants"
@@ -29,7 +43,7 @@ interface OpenCodeSessionMessage {
   }>
 }
 
-const CONTINUATION_PROMPT = `[RALPH LOOP - ITERATION {{ITERATION}}/{{MAX}}]
+const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
 
 Your previous attempt did not output the completion promise. Continue working on the task.
 
@@ -47,7 +61,7 @@ export interface RalphLoopHook {
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string }
+    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
@@ -136,7 +150,7 @@ export function createRalphLoopHook(
   const startLoop = (
     sessionID: string,
     prompt: string,
-    loopOptions?: { maxIterations?: number; completionPromise?: string }
+    loopOptions?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
   ): boolean => {
     const state: RalphLoopState = {
       active: true,
@@ -144,6 +158,7 @@ export function createRalphLoopHook(
       max_iterations:
         loopOptions?.maxIterations ?? config?.default_max_iterations ?? DEFAULT_MAX_ITERATIONS,
       completion_promise: loopOptions?.completionPromise ?? DEFAULT_COMPLETION_PROMISE,
+      ultrawork: loopOptions?.ultrawork,
       started_at: new Date().toISOString(),
       prompt,
       session_id: sessionID,
@@ -237,11 +252,18 @@ export function createRalphLoopHook(
         })
         clearState(ctx.directory, stateDir)
 
+        const title = state.ultrawork
+          ? "ULTRAWORK LOOP COMPLETE!"
+          : "Ralph Loop Complete!"
+        const message = state.ultrawork
+          ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`
+          : `Task completed after ${state.iteration} iteration(s)`
+
         await ctx.client.tui
           .showToast({
             body: {
-              title: "Ralph Loop Complete!",
-              message: `Task completed after ${state.iteration} iteration(s)`,
+              title,
+              message,
               variant: "success",
               duration: 5000,
             },
@@ -290,6 +312,10 @@ export function createRalphLoopHook(
         .replace("{{PROMISE}}", newState.completion_promise)
         .replace("{{PROMPT}}", newState.prompt)
 
+      const finalPrompt = newState.ultrawork
+        ? `ultrawork ${continuationPrompt}`
+        : continuationPrompt
+
       await ctx.client.tui
         .showToast({
           body: {
@@ -302,10 +328,37 @@ export function createRalphLoopHook(
         .catch(() => {})
 
       try {
+        let agent: string | undefined
+        let model: { providerID: string; modelID: string } | undefined
+
+        try {
+          const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+          const messages = (messagesResp.data ?? []) as Array<{
+            info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+          }>
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const info = messages[i].info
+            if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+              agent = info.agent
+              model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+              break
+            }
+          }
+        } catch {
+          const messageDir = getMessageDir(sessionID)
+          const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+          agent = currentMessage?.agent
+          model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+            ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+            : undefined
+        }
+
         await ctx.client.session.prompt({
           path: { id: sessionID },
           body: {
-            parts: [{ type: "text", text: continuationPrompt }],
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
+            parts: [{ type: "text", text: finalPrompt }],
           },
           query: { directory: ctx.directory },
         })

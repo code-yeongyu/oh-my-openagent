@@ -5,6 +5,7 @@ import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, 
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 
 export * from "./constants"
 
@@ -60,7 +61,7 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-const TASK_TOOLS = ["sisyphus_task", "task", "call_omo_agent"]
+const TASK_TOOLS = ["delegate_task", "task", "call_omo_agent"]
 
 function getAgentFromMessageFiles(sessionID: string): string | undefined {
   const messageDir = getMessageDir(sessionID)
@@ -79,7 +80,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
       const agentName = getAgentFromSession(input.sessionID)
-      
+
       if (!agentName || !PROMETHEUS_AGENTS.includes(agentName)) {
         return
       }
@@ -89,7 +90,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       // Inject read-only warning for task tools called by Prometheus
       if (TASK_TOOLS.includes(toolName)) {
         const prompt = output.args.prompt as string | undefined
-        if (prompt && !prompt.includes("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")) {
+        if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = prompt + PLANNING_CONSULT_WARNING
           log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
             sessionID: input.sessionID,
@@ -119,7 +120,8 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         throw new Error(
           `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files inside .sisyphus/ directory. ` +
           `Attempted to modify: ${filePath}. ` +
-          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan.`
+          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan. ` +
+          `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
         )
       }
 

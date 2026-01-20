@@ -7,10 +7,14 @@ import {
   getPlanProgress,
   createBoulderState,
   getPlanName,
+  clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
+import { updateSessionAgent } from "../../features/claude-code-session-state"
 
 export const HOOK_NAME = "start-work"
+
+const KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/gi
 
 interface StartWorkHookInput {
   sessionID: string
@@ -19,6 +23,27 @@ interface StartWorkHookInput {
 
 interface StartWorkHookOutput {
   parts: Array<{ type: string; text?: string }>
+}
+
+function extractUserRequestPlanName(promptText: string): string | null {
+  const userRequestMatch = promptText.match(/<user-request>\s*([\s\S]*?)\s*<\/user-request>/i)
+  if (!userRequestMatch) return null
+  
+  const rawArg = userRequestMatch[1].trim()
+  if (!rawArg) return null
+  
+  const cleanedArg = rawArg.replace(KEYWORD_PATTERN, "").trim()
+  return cleanedArg || null
+}
+
+function findPlanByName(plans: string[], requestedName: string): string | null {
+  const lowerName = requestedName.toLowerCase()
+  
+  const exactMatch = plans.find(p => getPlanName(p).toLowerCase() === lowerName)
+  if (exactMatch) return exactMatch
+  
+  const partialMatch = plans.find(p => getPlanName(p).toLowerCase().includes(lowerName))
+  return partialMatch || null
 }
 
 export function createStartWorkHook(ctx: PluginInput) {
@@ -34,9 +59,9 @@ export function createStartWorkHook(ctx: PluginInput) {
         .join("\n")
         .trim() || ""
 
-      const isStartWorkCommand =
-        promptText.includes("Start Sisyphus work session") ||
-        promptText.includes("<session-context>")
+      // Only trigger on actual command execution (contains <session-context> tag)
+      // NOT on description text like "Start Sisyphus work session from Prometheus plan"
+      const isStartWorkCommand = promptText.includes("<session-context>")
 
       if (!isStartWorkCommand) {
         return
@@ -46,13 +71,77 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
+      updateSessionAgent(input.sessionID, "atlas")
+
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
       const timestamp = new Date().toISOString()
 
       let contextInfo = ""
+      
+      const explicitPlanName = extractUserRequestPlanName(promptText)
+      
+      if (explicitPlanName) {
+        log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, {
+          sessionID: input.sessionID,
+        })
+        
+        const allPlans = findPrometheusPlans(ctx.directory)
+        const matchedPlan = findPlanByName(allPlans, explicitPlanName)
+        
+        if (matchedPlan) {
+          const progress = getPlanProgress(matchedPlan)
+          
+          if (progress.isComplete) {
+            contextInfo = `
+## Plan Already Complete
 
-      if (existingState) {
+The requested plan "${getPlanName(matchedPlan)}" has been completed.
+All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
+          } else {
+            if (existingState) {
+              clearBoulderState(ctx.directory)
+            }
+            const newState = createBoulderState(matchedPlan, sessionId)
+            writeBoulderState(ctx.directory, newState)
+            
+            contextInfo = `
+## Auto-Selected Plan
+
+**Plan**: ${getPlanName(matchedPlan)}
+**Path**: ${matchedPlan}
+**Progress**: ${progress.completed}/${progress.total} tasks
+**Session ID**: ${sessionId}
+**Started**: ${timestamp}
+
+boulder.json has been created. Read the plan and begin execution.`
+          }
+        } else {
+          const incompletePlans = allPlans.filter(p => !getPlanProgress(p).isComplete)
+          if (incompletePlans.length > 0) {
+            const planList = incompletePlans.map((p, i) => {
+              const prog = getPlanProgress(p)
+              return `${i + 1}. [${getPlanName(p)}] - Progress: ${prog.completed}/${prog.total}`
+            }).join("\n")
+            
+            contextInfo = `
+## Plan Not Found
+
+Could not find a plan matching "${explicitPlanName}".
+
+Available incomplete plans:
+${planList}
+
+Ask the user which plan to work on.`
+          } else {
+            contextInfo = `
+## Plan Not Found
+
+Could not find a plan matching "${explicitPlanName}".
+No incomplete plans available. Create a new plan with: /plan "your task"`
+          }
+        }
+      } else if (existingState) {
         const progress = getPlanProgress(existingState.active_plan)
         
         if (!progress.isComplete) {
@@ -78,7 +167,7 @@ Looking for new plans...`
         }
       }
 
-      if (!existingState || getPlanProgress(existingState.active_plan).isComplete) {
+      if ((!existingState && !explicitPlanName) || (existingState && !explicitPlanName && getPlanProgress(existingState.active_plan).isComplete)) {
         const plans = findPrometheusPlans(ctx.directory)
         const incompletePlans = plans.filter(p => !getPlanProgress(p).isComplete)
         

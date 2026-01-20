@@ -1,9 +1,11 @@
 # AGENTS KNOWLEDGE BASE
 
 ## OVERVIEW
-AI agent definitions for multi-model orchestration, delegating tasks to specialized experts.
+
+8 AI agents for multi-model orchestration. Sisyphus (primary), oracle, librarian, explore, multimodal-looker, Prometheus, Metis, Momus.
 
 ## STRUCTURE
+
 ```
 agents/
 ├── orchestrator-sisyphus.ts # Orchestrator agent (1486 lines) - 7-section delegation, wisdom
@@ -39,24 +41,60 @@ agents/
 | Metis | claude-sonnet-4-5 | Plan Consultant. Pre-planning risk/requirement analysis. |
 | Momus | claude-sonnet-4-5 | Plan Reviewer. Validation and quality enforcement. |
 | sherlock | openai/gpt-5.2 | Hypothesis-driven debugger. Runtime evidence-based bug diagnosis. |
+├── atlas.ts    # Orchestrator (1531 lines) - 7-phase delegation
+├── sisyphus.ts                 # Main prompt (640 lines)
+├── sisyphus-junior.ts          # Delegated task executor
+├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
+├── oracle.ts                   # Strategic advisor (GPT-5.2)
+├── librarian.ts                # Multi-repo research (GLM-4.7-free)
+├── explore.ts                  # Fast grep (Grok Code)
+├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
+├── prometheus-prompt.ts        # Planning (1196 lines) - interview mode
+├── metis.ts                    # Plan consultant - pre-planning analysis
+├── momus.ts                    # Plan reviewer - validation
+├── types.ts                    # AgentModelConfig interface
+├── utils.ts                    # createBuiltinAgents(), getAgentName()
+└── index.ts                    # builtinAgents export
+```
 
-## HOW TO ADD AN AGENT
-1. Create `src/agents/my-agent.ts` exporting `AgentConfig`.
-2. Add to `builtinAgents` in `src/agents/index.ts`.
-3. Update `types.ts` if adding new config interfaces.
+## AGENT MODELS
 
-## MODEL FALLBACK LOGIC
-`createBuiltinAgents()` handles resolution:
-1. User config override (`agents.{name}.model`).
-2. Environment-specific settings (max20, antigravity).
-3. Hardcoded defaults in `index.ts`.
+| Agent | Model | Temperature | Purpose |
+|-------|-------|-------------|---------|
+| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator, todo-driven |
+| oracle | openai/gpt-5.2 | 0.1 | Read-only consultation, debugging |
+| librarian | opencode/glm-4.7-free | 0.1 | Docs, GitHub search, OSS examples |
+| explore | opencode/grok-code | 0.1 | Fast contextual grep |
+| multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
+| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning, interview mode |
+| Metis | anthropic/claude-sonnet-4-5 | 0.1 | Pre-planning gap analysis |
+| Momus | anthropic/claude-sonnet-4-5 | 0.1 | Plan validation |
+
+## HOW TO ADD
+
+1. Create `src/agents/my-agent.ts` exporting `AgentConfig`
+2. Add to `builtinAgents` in `src/agents/index.ts`
+3. Update `AgentNameSchema` in `src/config/schema.ts`
+4. Register in `src/index.ts` initialization
+
+## TOOL RESTRICTIONS
+
+| Agent | Denied Tools |
+|-------|-------------|
+| oracle | write, edit, task, delegate_task |
+| librarian | write, edit, task, delegate_task, call_omo_agent |
+| explore | write, edit, task, delegate_task, call_omo_agent |
+| multimodal-looker | Allowlist: read, glob, grep |
+
+## KEY PATTERNS
+
+- **Factory**: `createXXXAgent(model?: string): AgentConfig`
+- **Metadata**: `XXX_PROMPT_METADATA: AgentPromptMetadata`
+- **Tool restrictions**: `permission: { edit: "deny", bash: "ask" }`
+- **Thinking**: 32k budget tokens for Sisyphus, Oracle, Prometheus
 
 ## ANTI-PATTERNS
-- **Trusting reports**: NEVER trust subagent self-reports; always verify outputs.
-- **High temp**: Don't use >0.3 for code agents (Sisyphus/Prometheus use 0.1).
-- **Sequential calls**: Prefer `sisyphus_task` with `run_in_background` for parallelism.
 
-## SHARED PROMPTS
-- **build-prompt.ts**: Unified base for Sisyphus and Builder variants.
-- **plan-prompt.ts**: Core planning logic shared across planning agents.
-- **orchestrator-sisyphus.ts**: Uses a 7-section prompt structure and "wisdom notepad" to preserve learnings across turns.
+- **Trust reports**: NEVER trust subagent "I'm done" - verify outputs
+- **High temp**: Don't use >0.3 for code agents
+- **Sequential calls**: Use `delegate_task` with `run_in_background`

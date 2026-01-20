@@ -22,9 +22,11 @@ import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log } from "../shared";
+import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
+import { AGENT_NAME_MAP } from "../shared/migration";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
-import { DEFAULT_CATEGORIES } from "../tools/sisyphus-task/constants";
+import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
 
@@ -99,12 +101,28 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
+    if (!(config.model as string | undefined)?.trim()) {
+      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+      throw new Error(
+        'oh-my-opencode requires a default model.\n\n' +
+        `Add this to ${paths.configJsonc}:\n\n` +
+        '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+        '(Replace with your preferred provider/model)'
+      )
+    }
+
+    // Migrate disabled_agents from old names to new names
+    const migratedDisabledAgents = (pluginConfig.disabled_agents ?? []).map(agent => {
+      return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+    }) as typeof pluginConfig.disabled_agents
+
     const builtinAgents = createBuiltinAgents(
-      pluginConfig.disabled_agents,
+      migratedDisabledAgents,
       pluginConfig.agents,
       ctx.directory,
       config.model as string | undefined,
-      pluginConfig.categories
+      pluginConfig.categories,
+      pluginConfig.git_master
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -142,7 +160,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       explore?: { tools?: Record<string, unknown> };
       librarian?: { tools?: Record<string, unknown> };
       "multimodal-looker"?: { tools?: Record<string, unknown> };
-      "orchestrator-sisyphus"?: { tools?: Record<string, unknown> };
+      atlas?: { tools?: Record<string, unknown> };
+      Sisyphus?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
@@ -154,7 +173,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       };
 
       agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
-        pluginConfig.agents?.["Sisyphus-Junior"]
+        pluginConfig.agents?.["Sisyphus-Junior"],
+        config.model as string | undefined
       );
 
       if (builderEnabled) {
@@ -197,12 +217,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             )
           : undefined;
 
+        // Model resolution: explicit override → category config → OpenCode default
+        // No hardcoded fallback - OpenCode config.model is the terminal fallback
+        const resolvedModel = prometheusOverride?.model ?? categoryConfig?.model ?? defaultModel;
+
         const prometheusBase = {
-          model:
-            prometheusOverride?.model ??
-            categoryConfig?.model ??
-            defaultModel ??
-            "anthropic/claude-opus-4-5",
+          // Only include model if one was resolved - let OpenCode apply its own default if none
+          ...(resolvedModel ? { model: resolvedModel } : {}),
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
@@ -253,7 +274,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan
-        ? { mode: "subagent" as const, hidden: true }
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
@@ -283,33 +304,43 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     config.tools = {
       ...(config.tools as Record<string, unknown>),
       "grep_app_*": false,
+      LspHover: false,
+      LspCodeActions: false,
+      LspCodeActionResolve: false,
     };
 
+    type AgentWithPermission = { permission?: Record<string, unknown> };
+    
     if (agentResult.librarian) {
-      agentResult.librarian.tools = {
-        ...agentResult.librarian.tools,
-        "grep_app_*": true,
-      };
+      const agent = agentResult.librarian as AgentWithPermission;
+      agent.permission = { ...agent.permission, "grep_app_*": "allow" };
     }
     if (agentResult["multimodal-looker"]) {
-      agentResult["multimodal-looker"].tools = {
-        ...agentResult["multimodal-looker"].tools,
-        task: false,
-        look_at: false,
-      };
+      const agent = agentResult["multimodal-looker"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, task: "deny", look_at: "deny" };
     }
-    if (agentResult["orchestrator-sisyphus"]) {
-      agentResult["orchestrator-sisyphus"].tools = {
-        ...agentResult["orchestrator-sisyphus"].tools,
-        task: false,
-        call_omo_agent: false,
-      };
+    if (agentResult["atlas"]) {
+      const agent = agentResult["atlas"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow" };
+    }
+    if (agentResult.Sisyphus) {
+      const agent = agentResult.Sisyphus as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+    }
+    if (agentResult["Prometheus (Planner)"]) {
+      const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+    }
+    if (agentResult["Sisyphus-Junior"]) {
+      const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
+      agent.permission = { ...agent.permission, delegate_task: "allow" };
     }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
       webfetch: "allow",
       external_directory: "allow",
+      delegate_task: "deny",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)

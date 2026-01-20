@@ -1,6 +1,7 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import { log } from "../../shared"
+import { getMainSessionID } from "../claude-code-session-state"
 
 interface OutputPart {
   type: string
@@ -105,14 +106,17 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
-      const sessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
-      log("[DEBUG] Extracted sessionID from lastUserMessage.info", {
+      // Try message.info.sessionID first, fallback to mainSessionID
+      const messageSessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
+      const sessionID = messageSessionID ?? getMainSessionID()
+      log("[DEBUG] Extracted sessionID", {
+        messageSessionID,
+        mainSessionID: getMainSessionID(),
         sessionID,
         infoKeys: Object.keys(lastUserMessage.info),
-        lastUserMessageInfo: JSON.stringify(lastUserMessage.info).slice(0, 200),
       })
       if (!sessionID) {
-        log("[DEBUG] sessionID is undefined or empty")
+        log("[DEBUG] sessionID is undefined (both message.info and mainSessionID are empty)")
         return
       }
 
@@ -142,14 +146,21 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const textPart = lastUserMessage.parts[textPartIndex] as { text?: string }
-      const originalText = textPart.text ?? ""
-      textPart.text = `${pending.merged}\n\n---\n\n${originalText}`
+      // synthetic part 패턴 (minimal fields)
+      const syntheticPart = {
+        id: `synthetic_hook_${Date.now()}`,
+        messageID: lastUserMessage.info.id,
+        sessionID: (lastUserMessage.info as { sessionID?: string }).sessionID ?? "",
+        type: "text" as const,
+        text: pending.merged,
+        synthetic: true,  // UI에서 숨겨짐
+      }
 
-      log("[context-injector] Prepended context to last user message", {
+      lastUserMessage.parts.splice(textPartIndex, 0, syntheticPart as Part)
+
+      log("[context-injector] Inserted synthetic part with hook content", {
         sessionID,
-        contextLength: pending.merged.length,
-        originalTextLength: originalText.length,
+        contentLength: pending.merged.length,
       })
     },
   }

@@ -4,7 +4,8 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log } from "../../shared/logger"
+import { log, getAgentToolRestrictions } from "../../shared"
+import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 
@@ -145,10 +146,22 @@ async function executeSync(
     sessionID = args.session_id
   } else {
     log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
+    const parentSession = await ctx.client.session.get({
+      path: { id: toolContext.sessionID },
+    }).catch((err) => {
+      log(`[call_omo_agent] Failed to get parent session:`, err)
+      return null
+    })
+    log(`[call_omo_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
+    const parentDirectory = parentSession?.data?.directory ?? ctx.directory
+
     const createResult = await ctx.client.session.create({
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
+      },
+      query: {
+        directory: parentDirectory,
       },
     })
 
@@ -175,8 +188,9 @@ async function executeSync(
       body: {
         agent: args.subagent_type,
         tools: {
+          ...getAgentToolRestrictions(args.subagent_type),
           task: false,
-          sisyphus_task: false,
+          delegate_task: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
@@ -278,11 +292,17 @@ async function executeSync(
     return timeA - timeB
   })
 
+  const newMessages = consumeNewMessages(sessionID, sortedMessages)
+
+  if (newMessages.length === 0) {
+    return `No new output since last check.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+  }
+
   // Extract content from ALL messages, not just the last one
   // Tool results may be in earlier messages while the final message is empty
   const extractedContent: string[] = []
 
-  for (const message of sortedMessages) {
+  for (const message of newMessages) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const part of (message as any).parts ?? []) {
       // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
