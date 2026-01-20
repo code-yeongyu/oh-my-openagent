@@ -124,11 +124,12 @@ export function resolveCategoryConfig(
     return null
   }
 
-  // Model priority: user override > inherited from parent > default config > system default
+  // Model priority for categories: user override > category default > system default
+  // Categories have explicit models - no inheritance from parent session
   const model = resolveModel({
     userModel: userConfig?.model,
-    inheritedModel,
-    systemDefault: defaultConfig?.model ?? systemDefaultModel,
+    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
+    systemDefault: systemDefaultModel,
   })
   const config: CategoryConfig = {
     ...defaultConfig,
