@@ -42,8 +42,8 @@ Ask the user these 3 questions to determine CLI options:
    - If **no** → `--claude=no`
 
 2. **Do you have a ChatGPT Subscription?**
-   - If **yes** → `--chatgpt=yes`
-   - If **no** → `--chatgpt=no`
+  - Note: ChatGPT/OpenAI is configured via OpenCode's authentication flow (use `opencode auth login`).
+    There is no `--chatgpt` CLI flag for the installer; authenticate OpenAI after installation.
 
 3. **Will you integrate Gemini models?**
    - If **yes** → `--gemini=yes`
@@ -74,14 +74,14 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no>
 ```
 
 **Examples:**
-- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
-- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no`
+- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
@@ -188,7 +188,7 @@ bunx oh-my-opencode install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes
 ```
 
 Then authenticate with GitHub:
