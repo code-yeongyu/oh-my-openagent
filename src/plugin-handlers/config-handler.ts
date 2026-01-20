@@ -319,11 +319,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult.Sisyphus) {
       const agent = agentResult.Sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
     }
     if (agentResult["Prometheus (Planner)"]) {
       const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
     }
     if (agentResult["Sisyphus-Junior"]) {
       const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
