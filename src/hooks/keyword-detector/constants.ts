@@ -282,6 +282,8 @@ export function getUltrapowerMessage(agentName?: string): string {
 
 **MANDATORY**: You MUST say "ULTRAPOWER MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
 
+**NOTE**: The keywords "ulo" and "ultrapower" are trigger words for this mode. Do NOT ask the user what they mean - they are commands to activate this workflow. Ignore these keywords in the user's message and focus on their actual request.
+
 ## CRITICAL: YOU ARE A PLANNER, NOT AN IMPLEMENTER
 
 **IDENTITY CONSTRAINT (NON-NEGOTIABLE):**
@@ -358,6 +360,8 @@ REFUSE. Say: "I'm a planner. I create work plans, not implementations. Run \`/st
   return `<ultrapower-mode>
 
 **MANDATORY**: You MUST say "ULTRAPOWER MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+**NOTE**: The keywords "ulo" and "ultrapower" are trigger words for this mode. Do NOT ask the user what they mean - they are commands to activate this workflow. Ignore these keywords in the user's message and focus on their actual request.
 
 ## ULTRAPOWER MODE - FULL-CYCLE EXECUTOR
 
