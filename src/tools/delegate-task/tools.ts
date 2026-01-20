@@ -483,10 +483,9 @@ ${textContent || "(No text output)"}`
           : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
 
-        // Unstable agent detection - force background mode for monitoring
+        // Unstable agent detection - launch as background for monitoring but wait for result
         const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
         if (isUnstableAgent && args.run_in_background === false) {
-          // Force background mode for unstable agents
           const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
 
           try {
@@ -503,21 +502,92 @@ ${textContent || "(No text output)"}`
               skillContent: systemContent,
             })
 
+            const sessionID = task.sessionID
+            if (!sessionID) {
+              return formatDetailedError(new Error("Background task launched but no sessionID returned"), {
+                operation: "Launch background task (unstable agent)",
+                args,
+                agent: agentToUse,
+                category: args.category,
+              })
+            }
+
             ctx.metadata?.({
               title: args.description,
-              metadata: { sessionId: task.sessionID, category: args.category },
+              metadata: { sessionId: sessionID, category: args.category },
             })
 
-            return `[UNSTABLE AGENT MODE]
+            const startTime = new Date()
 
-This category uses an unstable/experimental model (${actualModel}).
-Forced to background mode for monitoring stability.
+            // Poll for completion (same logic as sync mode)
+            const POLL_INTERVAL_MS = 500
+            const MAX_POLL_TIME_MS = 10 * 60 * 1000
+            const MIN_STABILITY_TIME_MS = 10000
+            const STABILITY_POLLS_REQUIRED = 3
+            const pollStart = Date.now()
+            let lastMsgCount = 0
+            let stablePolls = 0
 
-Task ID: ${task.id}
-Session ID: ${task.sessionID}
+            while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
+              if (ctx.abort?.aborted) {
+                return `[UNSTABLE AGENT] Task aborted.\n\nSession ID: ${sessionID}`
+              }
 
-Monitor progress: Use \`background_output\` with task_id="${task.id}"
-Or watch the session directly for real-time updates.`
+              await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+
+              const statusResult = await client.session.status()
+              const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+              const sessionStatus = allStatuses[sessionID]
+
+              if (sessionStatus && sessionStatus.type !== "idle") {
+                stablePolls = 0
+                lastMsgCount = 0
+                continue
+              }
+
+              if (Date.now() - pollStart < MIN_STABILITY_TIME_MS) continue
+
+              const messagesCheck = await client.session.messages({ path: { id: sessionID } })
+              const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+              const currentMsgCount = msgs.length
+
+              if (currentMsgCount === lastMsgCount) {
+                stablePolls++
+                if (stablePolls >= STABILITY_POLLS_REQUIRED) break
+              } else {
+                stablePolls = 0
+                lastMsgCount = currentMsgCount
+              }
+            }
+
+            const messagesResult = await client.session.messages({ path: { id: sessionID } })
+            const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
+              info?: { role?: string; time?: { created?: number } }
+              parts?: Array<{ type?: string; text?: string }>
+            }>
+
+            const assistantMessages = messages
+              .filter((m) => m.info?.role === "assistant")
+              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+            const lastMessage = assistantMessages[0]
+
+            if (!lastMessage) {
+              return `[UNSTABLE AGENT] No assistant response found.\n\nSession ID: ${sessionID}`
+            }
+
+            const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+            const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+            const duration = formatDuration(startTime)
+
+            return `[UNSTABLE AGENT] Task completed in ${duration}.
+
+Model: ${actualModel} (unstable/experimental - launched via background for monitoring)
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Session ID: ${sessionID}
+
+---
+
+${textContent || "(No text output)"}`
           } catch (error) {
             return formatDetailedError(error, {
               operation: "Launch background task (unstable agent)",
