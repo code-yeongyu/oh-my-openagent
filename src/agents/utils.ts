@@ -9,10 +9,11 @@ import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
-import type { AvailableAgent } from "./dynamic-agent-prompt-builder"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 import { deepMerge } from "../shared"
-import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
+import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
+import { createBuiltinSkills } from "../features/builtin-skills"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -149,6 +150,18 @@ export function createBuiltinAgents(
     ? { ...DEFAULT_CATEGORIES, ...categories }
     : DEFAULT_CATEGORIES
 
+  const availableCategories: AvailableCategory[] = Object.entries(mergedCategories).map(([name]) => ({
+    name,
+    description: CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
+  }))
+
+  const builtinSkills = createBuiltinSkills()
+  const availableSkills: AvailableSkill[] = builtinSkills.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    location: "plugin" as const,
+  }))
+
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
@@ -186,7 +199,13 @@ export function createBuiltinAgents(
     const sisyphusOverride = agentOverrides["Sisyphus"]
     const sisyphusModel = sisyphusOverride?.model ?? systemDefaultModel
 
-    let sisyphusConfig = createSisyphusAgent(sisyphusModel, availableAgents)
+    let sisyphusConfig = createSisyphusAgent(
+      sisyphusModel,
+      availableAgents,
+      undefined,
+      availableSkills,
+      availableCategories
+    )
 
     if (directory && sisyphusConfig.prompt) {
       const envContext = createEnvContext()
@@ -206,6 +225,8 @@ export function createBuiltinAgents(
      let orchestratorConfig = createAtlasAgent({
        model: orchestratorModel,
        availableAgents,
+       availableSkills,
+       userCategories: categories,
      })
 
     if (orchestratorOverride) {
