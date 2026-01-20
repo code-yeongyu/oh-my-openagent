@@ -379,24 +379,24 @@ describe("start-work hook", () => {
   })
 
   describe("session agent management", () => {
-    test("should clear session agent when start-work command is triggered", async () => {
-      // #given - spy on clearSessionAgent
-      const clearSpy = spyOn(sessionState, "clearSessionAgent")
+    test("should update session agent to orchestrator-sisyphus when start-work command is triggered", async () => {
+      // #given
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
       
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when - start-work command is processed
+      // #when
       await hook["chat.message"](
         { sessionID: "ses-prometheus-to-sisyphus" },
         output
       )
 
-      // #then - clearSessionAgent should be called with the sessionID
-      expect(clearSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus")
-      clearSpy.mockRestore()
+      // #then
+      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "orchestrator-sisyphus")
+      updateSpy.mockRestore()
     })
   })
 })
