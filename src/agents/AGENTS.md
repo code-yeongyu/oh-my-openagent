@@ -8,8 +8,8 @@
 
 ```
 agents/
-├── atlas.ts    # Orchestrator (1531 lines) - 7-phase delegation
-├── sisyphus.ts                 # Main prompt (640 lines)
+├── atlas.ts    # Orchestrator (1383 lines) - 7-phase delegation
+├── sisyphus.ts                 # Main prompt (615 lines)
 ├── sisyphus-junior.ts          # Delegated task executor
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
