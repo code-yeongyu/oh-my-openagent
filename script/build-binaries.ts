@@ -28,6 +28,12 @@ const ENTRY_POINT = "src/cli/index.ts";
 async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
   const outfile = join("packages", platform.dir, "bin", platform.binary);
 
+  // Skip if binary already exists (e.g., from native build artifact)
+  if (existsSync(outfile)) {
+    console.log(`\n⏭️ Skipping ${platform.description} (binary already exists)`);
+    return true;
+  }
+
   console.log(`\n📦 Building ${platform.description}...`);
   console.log(`   Target: ${platform.target}`);
   console.log(`   Output: ${outfile}`);
