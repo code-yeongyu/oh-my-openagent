@@ -136,8 +136,6 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 ```json
 {
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }

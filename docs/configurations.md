@@ -63,7 +63,7 @@ Override built-in agent settings:
       "model": "anthropic/claude-haiku-4-5",
       "temperature": 0.5
     },
-    "frontend-ui-ux-engineer": {
+    "multimodal-looker": {
       "disable": true
     }
   }
@@ -116,11 +116,11 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 
 ```json
 {
-  "disabled_agents": ["oracle", "frontend-ui-ux-engineer"]
+  "disabled_agents": ["oracle", "multimodal-looker"]
 }
 ```
 
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+Available agents: `oracle`, `librarian`, `explore`, `multimodal-looker`
 
 ## Built-in Skills
 
