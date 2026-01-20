@@ -587,7 +587,6 @@ export function detectCurrentConfig(): DetectedConfig {
     isInstalled: false,
     hasClaude: true,
     isMax20: true,
-    hasChatGPT: true,
     hasGemini: false,
     hasCopilot: false,
   }
