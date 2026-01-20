@@ -26,16 +26,21 @@ program
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
+  .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
+  .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
   $ bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no
-  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes
+  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers:
-  Claude      Required for Sisyphus (main orchestrator) and Librarian agents
-  Gemini      Powers frontend, documentation, and multimodal agents
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
+  Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
+  Gemini        Native google/ models (Gemini 3 Pro, Flash)
+  Copilot       github-copilot/ models (fallback)
+  OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
+  Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -43,6 +48,8 @@ Model Providers:
       claude: options.claude,
       gemini: options.gemini,
       copilot: options.copilot,
+      opencodeZen: options.opencodeZen,
+      zaiCodingPlan: options.zaiCodingPlan,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
