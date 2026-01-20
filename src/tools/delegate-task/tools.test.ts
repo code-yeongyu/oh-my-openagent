@@ -226,21 +226,21 @@ describe("sisyphus-task", () => {
       expect(result!.config.temperature).toBe(0.3)
     })
 
-    test("inheritedModel takes precedence over systemDefaultModel", () => {
-      // #given - builtin category, parent model provided
+    test("category built-in model takes precedence over inheritedModel", () => {
+      // #given - builtin category with its own model, parent model also provided
       const categoryName = "visual-engineering"
       const inheritedModel = "cliproxy/claude-opus-4-5"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - inheritedModel wins over systemDefaultModel
+      // #then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
 
-    test("inheritedModel is used as fallback when category has no user model", () => {
-      // #given - custom category with no model defined, only inheritedModel as fallback
+    test("systemDefaultModel is used as fallback when custom category has no model", () => {
+      // #given - custom category with no model defined
       const categoryName = "my-custom-no-model"
       const userCategories = { "my-custom-no-model": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
       const inheritedModel = "cliproxy/claude-opus-4-5"
@@ -248,9 +248,9 @@ describe("sisyphus-task", () => {
       // #when
       const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - parent model is used as fallback since custom category has no user model
+      // #then - systemDefaultModel is used since custom category has no built-in model
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
     test("user model takes precedence over inheritedModel", () => {
@@ -918,18 +918,18 @@ describe("sisyphus-task", () => {
       expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
     })
 
-    test("inheritedModel takes precedence over systemDefaultModel for builtin category", () => {
-      // #given - builtin ultrabrain category, inherited model from parent
+    test("category built-in model takes precedence over inheritedModel for builtin category", () => {
+      // #given - builtin ultrabrain category with its own model, inherited model also provided
       const categoryName = "ultrabrain"
       const inheritedModel = "cliproxy/claude-opus-4-5"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then - inheritedModel wins over systemDefaultModel
+      // #then - category's built-in model wins (ultrabrain uses gpt-5.2-codex)
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("cliproxy/claude-opus-4-5")
+      expect(actualModel).toBe("openai/gpt-5.2-codex")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -977,18 +977,18 @@ describe("sisyphus-task", () => {
     // ===== TESTS FOR resolveModel() INTEGRATION (TDD GREEN) =====
     // These tests verify the NEW behavior where categories do NOT have default models
 
-    test("FIXED: inheritedModel takes precedence over systemDefaultModel", () => {
-      // #given a builtin category, and an inherited model from parent
-      // The NEW correct chain: userConfig?.model ?? inheritedModel ?? systemDefaultModel
+    test("FIXED: category built-in model takes precedence over inheritedModel", () => {
+      // #given a builtin category with its own model, and an inherited model from parent
+      // The CORRECT chain: userConfig?.model ?? categoryBuiltIn ?? systemDefaultModel
       const categoryName = "ultrabrain"
-      const inheritedModel = "anthropic/claude-opus-4-5" // inherited from parent session
+      const inheritedModel = "anthropic/claude-opus-4-5"
       
-      // #when userConfig.model is undefined and inheritedModel is set
+      // #when category has a built-in model (gpt-5.2-codex for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then inheritedModel should be used, NOT systemDefaultModel
+      // #then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe("openai/gpt-5.2-codex")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
@@ -1027,8 +1027,8 @@ describe("sisyphus-task", () => {
       expect(resolved!.model).toBe("custom/user-model")
     })
 
-    test("FIXED: empty string in userConfig.model is treated as unset and falls back", () => {
-      // #given userConfig.model is empty string ""
+    test("FIXED: empty string in userConfig.model is treated as unset and falls back to systemDefault", () => {
+      // #given userConfig.model is empty string "" for a custom category (no built-in model)
       const categoryName = "custom-empty-model"
       const userCategories = { "custom-empty-model": { model: "", temperature: 0.3 } }
       const inheritedModel = "anthropic/claude-opus-4-5"
@@ -1036,13 +1036,13 @@ describe("sisyphus-task", () => {
       // #when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then should fall back to inheritedModel since "" is normalized to undefined
+      // #then should fall back to systemDefaultModel since custom category has no built-in model
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
-    test("FIXED: undefined userConfig.model falls back to inheritedModel", () => {
-      // #given user explicitly sets a category but leaves model undefined
+    test("FIXED: undefined userConfig.model falls back to category built-in model", () => {
+      // #given user sets a builtin category but leaves model undefined
       const categoryName = "visual-engineering"
       // Using type assertion since we're testing fallback behavior for categories without model
       const userCategories = { "visual-engineering": { temperature: 0.2 } } as unknown as Record<string, CategoryConfig>
@@ -1051,9 +1051,9 @@ describe("sisyphus-task", () => {
       // #when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then should use inheritedModel
+      // #then should use category's built-in model (gemini-3-pro-preview for visual-engineering)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe("google/gemini-3-pro-preview")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {
