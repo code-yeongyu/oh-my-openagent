@@ -200,57 +200,81 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   })
 })
 
-describe("generateOmoConfig - v3 beta: no hardcoded models", () => {
-  test("generates minimal config with only $schema", () => {
-    // #given any install config
+describe("generateOmoConfig - model fallback system", () => {
+  test("generates native models when Claude available", () => {
+    // #given user has Claude subscription
     const config: InstallConfig = {
       hasClaude: true,
       isMax20: false,
       hasGemini: false,
       hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
     }
 
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then should only contain $schema, no agents or categories
+    // #then should use native anthropic models
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect(result.agents).toBeUndefined()
-    expect(result.categories).toBeUndefined()
+    expect(result.agents).toBeDefined()
+    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("anthropic/claude-opus-4-5")
   })
 
-  test("does not include model fields regardless of provider config", () => {
-    // #given user has multiple providers
+  test("uses github-copilot fallback when only copilot available", () => {
+    // #given user has only copilot
     const config: InstallConfig = {
-      hasClaude: true,
-      isMax20: true,
-      hasGemini: true,
+      hasClaude: false,
+      isMax20: false,
+      hasGemini: false,
       hasCopilot: true,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
     }
 
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then should not have agents or categories with model fields
-    expect(result.agents).toBeUndefined()
-    expect(result.categories).toBeUndefined()
+    // #then should use github-copilot models
+    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("github-copilot/claude-opus-4.5")
   })
 
-  test("does not include model fields when no providers configured", () => {
+  test("uses ultimate fallback when no providers configured", () => {
     // #given user has no providers
     const config: InstallConfig = {
       hasClaude: false,
       isMax20: false,
       hasGemini: false,
       hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
     }
 
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then should still only contain $schema
+    // #then should use ultimate fallback for all agents
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect(result.agents).toBeUndefined()
-    expect(result.categories).toBeUndefined()
+    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("opencode/glm-4.7-free")
+  })
+
+  test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
+    // #given user has Z.ai and Claude
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: true,
+    }
+
+    // #when generating config
+    const result = generateOmoConfig(config)
+
+    // #then librarian should use zai-coding-plan/glm-4.7
+    expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
+    // #then other agents should use native
+    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("anthropic/claude-opus-4-5")
   })
 })

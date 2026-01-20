@@ -6,6 +6,7 @@ import {
   type OpenCodeConfigPaths,
 } from "../shared"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
+import { generateModelConfig } from "./model-fallback"
 
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
 
@@ -306,14 +307,8 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
   return result
 }
 
-export function generateOmoConfig(_installConfig: InstallConfig): Record<string, unknown> {
-  // v3 beta: No hardcoded model strings - users rely on their OpenCode configured model
-  // Users who want specific models configure them explicitly after install
-  const config: Record<string, unknown> = {
-    $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  }
-
-  return config
+export function generateOmoConfig(installConfig: InstallConfig): Record<string, unknown> {
+  return generateModelConfig(installConfig)
 }
 
 export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
@@ -581,14 +576,14 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 }
 
 export function detectCurrentConfig(): DetectedConfig {
-  // v3 beta: Since we no longer generate hardcoded model strings,
-  // detection only checks for plugin installation and Gemini auth plugin
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
     isMax20: true,
     hasGemini: false,
     hasCopilot: false,
+    hasOpencodeZen: true,
+    hasZaiCodingPlan: false,
   }
 
   const { format, path } = detectConfigFormat()

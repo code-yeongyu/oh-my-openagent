@@ -6,6 +6,8 @@ export interface InstallArgs {
   claude?: ClaudeSubscription
   gemini?: BooleanArg
   copilot?: BooleanArg
+  opencodeZen?: BooleanArg
+  zaiCodingPlan?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -14,6 +16,8 @@ export interface InstallConfig {
   isMax20: boolean
   hasGemini: boolean
   hasCopilot: boolean
+  hasOpencodeZen: boolean
+  hasZaiCodingPlan: boolean
 }
 
 export interface ConfigMergeResult {
@@ -28,4 +32,6 @@ export interface DetectedConfig {
   isMax20: boolean
   hasGemini: boolean
   hasCopilot: boolean
+  hasOpencodeZen: boolean
+  hasZaiCodingPlan: boolean
 }
