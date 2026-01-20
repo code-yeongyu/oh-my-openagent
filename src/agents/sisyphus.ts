@@ -1,18 +1,18 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { isGptModel } from "./types"
-import type { AvailableAgent, AvailableTool, AvailableSkill } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
   buildLibrarianSection,
   buildDelegationTable,
-  buildFrontendSection,
+  buildCategorySkillsDelegationGuide,
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./sisyphus-prompt-builder"
+} from "./dynamic-agent-prompt-builder"
 
 const SISYPHUS_ROLE_SECTION = `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -126,32 +126,18 @@ const SISYPHUS_PRE_DELEGATION_PLANNING = `### Pre-Delegation Planning (MANDATORY
 
 Ask yourself:
 - What is the CORE objective of this task?
-- What domain does this belong to? (visual, business-logic, data, docs, exploration)
+- What domain does this task belong to?
 - What skills/capabilities are CRITICAL for success?
 
-#### Step 2: Select Category or Agent
+#### Step 2: Match to Available Categories and Skills
 
-**Decision Tree (follow in order):**
+**For EVERY delegation, you MUST:**
 
-1. **Is this a skill-triggering pattern?**
-   - YES → Declare skill name + reason
-   - NO → Continue to step 2
-
-2. **Is this a visual/frontend task?**
-   - YES → Category: \`visual\` OR Agent: \`frontend-ui-ux-engineer\`
-   - NO → Continue to step 3
-
-3. **Is this backend/architecture/logic task?**
-   - YES → Category: \`business-logic\` OR Agent: \`oracle\`
-   - NO → Continue to step 4
-
-4. **Is this documentation/writing task?**
-   - YES → Agent: \`document-writer\`
-   - NO → Continue to step 5
-
-5. **Is this exploration/search task?**
-   - YES → Agent: \`explore\` (internal codebase) OR \`librarian\` (external docs/repos)
-   - NO → Use default category based on context
+1. **Review the Category + Skills Delegation Guide** (above)
+2. **Read each category's description** to find the best domain match
+3. **Read each skill's description** to identify relevant expertise
+4. **Select category** whose domain BEST matches task requirements
+5. **Include ALL skills** whose expertise overlaps with task domain
 
 #### Step 3: Declare BEFORE Calling
 
@@ -159,9 +145,12 @@ Ask yourself:
 
 \`\`\`
 I will use delegate_task with:
-- **Category/Agent**: [name]
-- **Reason**: [why this choice fits the task]
-- **Skills** (if any): [skill names]
+- **Category**: [selected-category-name]
+- **Why this category**: [how category description matches task domain]
+- **Skills**: [list of selected skills]
+- **Skill evaluation**:
+  - [skill-1]: INCLUDED because [reason based on skill description]
+  - [skill-2]: OMITTED because [reason why skill domain doesn't apply]
 - **Expected Outcome**: [what success looks like]
 \`\`\`
 
@@ -169,74 +158,60 @@ I will use delegate_task with:
 
 #### Examples
 
-**✅ CORRECT: Explicit Pre-Declaration**
+**CORRECT: Full Evaluation**
 
 \`\`\`
 I will use delegate_task with:
-- **Category**: visual
-- **Reason**: This task requires building a responsive dashboard UI with animations - visual design is the core requirement
-- **Skills**: ["frontend-ui-ux"]
-- **Expected Outcome**: Fully styled, responsive dashboard component with smooth transitions
+- **Category**: [category-name]
+- **Why this category**: Category description says "[quote description]" which matches this task's requirements
+- **Skills**: ["skill-a", "skill-b"]
+- **Skill evaluation**:
+  - skill-a: INCLUDED - description says "[quote]" which applies to this task
+  - skill-b: INCLUDED - description says "[quote]" which is needed here
+  - skill-c: OMITTED - description says "[quote]" which doesn't apply because [reason]
+- **Expected Outcome**: [concrete deliverable]
 
 delegate_task(
-  category="visual",
-  skills=["frontend-ui-ux"],
-  prompt="Create a responsive dashboard component with..."
+  category="[category-name]",
+  skills=["skill-a", "skill-b"],
+  prompt="..."
 )
 \`\`\`
 
-**✅ CORRECT: Agent-Specific Delegation**
+**CORRECT: Agent-Specific (for exploration/consultation)**
 
 \`\`\`
 I will use delegate_task with:
-- **Agent**: oracle
-- **Reason**: This architectural decision involves trade-offs between scalability and complexity - requires high-IQ strategic analysis
-- **Skills**: []
-- **Expected Outcome**: Clear recommendation with pros/cons analysis
+- **Agent**: [agent-name]
+- **Reason**: This requires [agent's specialty] based on agent description
+- **Skills**: [] (agents have built-in expertise)
+- **Expected Outcome**: [what agent should return]
 
 delegate_task(
-  agent="oracle",
-  skills=[],
-  prompt="Evaluate this microservices architecture proposal..."
+  agent="[agent-name]",
+  prompt="..."
 )
 \`\`\`
 
-**✅ CORRECT: Background Exploration**
+**WRONG: No Skill Evaluation**
 
 \`\`\`
-I will use delegate_task with:
-- **Agent**: explore
-- **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
-- **Skills**: []
-- **Expected Outcome**: List of files containing auth patterns
-
-delegate_task(
-  agent="explore",
-  background=true,
-  prompt="Find all authentication implementations in the codebase"
-)
+delegate_task(category="...", skills=[], prompt="...")  // Where's the justification?
 \`\`\`
 
-**❌ WRONG: No Pre-Declaration**
+**WRONG: Vague Category Selection**
 
 \`\`\`
-// Immediately calling without explicit reasoning
-delegate_task(category="visual", prompt="Build a dashboard")
-\`\`\`
-
-**❌ WRONG: Vague Reasoning**
-
-\`\`\`
-I'll use visual category because it's frontend work.
-
-delegate_task(category="visual", ...)
+I'll use this category because it seems right.
 \`\`\`
 
 #### Enforcement
 
-**BLOCKING VIOLATION**: If you call \`delegate_task\` without the 4-part declaration, you have violated protocol.
+**BLOCKING VIOLATION**: If you call \`delegate_task\` without:
+1. Explaining WHY category was selected (based on description)
+2. Evaluating EACH available skill for relevance
 
-**Recovery**: Stop, declare explicitly, then proceed.`
+**Recovery**: Stop, evaluate properly, then proceed.`
 
 const SISYPHUS_PARALLEL_EXECUTION = `### Parallel Execution (DEFAULT behavior)
 
@@ -523,17 +498,18 @@ const SISYPHUS_SOFT_GUIDELINES = `## Soft Guidelines
 function buildDynamicSisyphusPrompt(
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = []
+  availableSkills: AvailableSkill[] = [],
+  availableCategories: AvailableCategory[] = []
 ): string {
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
   const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
   const exploreSection = buildExploreSection(availableAgents)
   const librarianSection = buildLibrarianSection(availableAgents)
-  const frontendSection = buildFrontendSection(availableAgents)
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
   const delegationTable = buildDelegationTable(availableAgents)
   const oracleSection = buildOracleSection(availableAgents)
-  const hardBlocks = buildHardBlocksSection(availableAgents)
-  const antiPatterns = buildAntiPatternsSection(availableAgents)
+  const hardBlocks = buildHardBlocksSection()
+  const antiPatterns = buildAntiPatternsSection()
 
   const sections = [
     SISYPHUS_ROLE_SECTION,
@@ -567,7 +543,7 @@ function buildDynamicSisyphusPrompt(
     "",
     SISYPHUS_PHASE2B_PRE_IMPLEMENTATION,
     "",
-    frontendSection,
+    categorySkillsGuide,
     "",
     delegationTable,
     "",
@@ -608,18 +584,20 @@ export function createSisyphusAgent(
   model: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
-  availableSkills?: AvailableSkill[]
+  availableSkills?: AvailableSkill[],
+  availableCategories?: AvailableCategory[]
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
+  const categories = availableCategories ?? []
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills)
-    : buildDynamicSisyphusPrompt([], tools, skills)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, categories)
+    : buildDynamicSisyphusPrompt([], tools, skills, categories)
 
   const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
-      "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically to specialized agents. Uses explore for internal code (parallel-friendly), librarian only for external docs, and always delegates UI work to frontend engineer.",
+      "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs.",
     mode: "primary" as const,
     model,
     maxTokens: 64000,
