@@ -71,7 +71,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      updateSessionAgent(input.sessionID, "orchestrator-sisyphus")
+      updateSessionAgent(input.sessionID, "atlas")
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
