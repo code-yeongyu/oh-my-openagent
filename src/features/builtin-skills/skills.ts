@@ -1198,6 +1198,143 @@ POTENTIAL ACTIONS:
 - Bisect without proper good/bad boundaries -> Wasted time`,
 }
 
+const mcpxSkill: BuiltinSkill = {
+  name: "mcpx",
+  description:
+    "MUST USE for MCP tool discovery and stateful MCP operations. Lightweight CLI for on-demand tool discovery without upfront token cost. REQUIRED for browser automation, database transactions, and any workflow needing persistent server connections. Triggers: 'mcp', 'tool discovery', 'browser session', 'stateful', 'daemon'.",
+  template: `# mcpx - Lightweight MCP CLI
+
+You have access to MCP servers via the \`mcpx\` CLI. This provides on-demand tool discovery without loading all schemas upfront.
+
+---
+
+## Quick Reference
+
+\`\`\`bash
+mcpx                              # List all servers and tools
+mcpx -d                           # List with descriptions
+mcpx grep "*pattern*"             # Search tools by glob pattern
+mcpx <server>                     # Show server's tools
+mcpx <server>/<tool>              # Show tool schema
+mcpx <server>/<tool> '<json>'     # Call tool with arguments
+\`\`\`
+
+---
+
+## Standard Usage (Stateless)
+
+For simple tool calls that don't require persistent state:
+
+\`\`\`bash
+# Discover available tools
+mcpx grep "*search*"
+
+# Get tool schema
+mcpx github/search_code
+
+# Call tool
+mcpx github/search_code '{"query": "async function", "repo": "owner/repo"}'
+\`\`\`
+
+---
+
+## Daemon Mode (Stateful Operations)
+
+**REQUIRED** for browser automation, database transactions, and any workflow where sequential operations share state.
+
+### Why Daemon Mode?
+
+Without daemon: Each \`mcpx server/tool\` call connects, runs, disconnects.
+With daemon: Connection stays alive, state persists across calls.
+
+### Daemon Commands
+
+\`\`\`bash
+mcpx daemon start                    # Start daemon + all servers from config
+mcpx daemon start <server...>        # Start specific server(s)
+mcpx daemon status                   # Show active servers
+mcpx daemon stop                     # Stop daemon entirely
+mcpx daemon stop <server>            # Stop specific server, keep daemon
+mcpx daemon stop --force             # Force stop (bypasses connection check)
+\`\`\`
+
+### Browser Automation Example
+
+\`\`\`bash
+# 1. Start daemon with browser server
+mcpx daemon start playwright
+
+# 2. Navigate and interact (state persists!)
+mcpx playwright/browser_navigate '{"url": "https://example.com"}'
+mcpx playwright/browser_snapshot '{}'
+mcpx playwright/browser_click '{"element": "Login", "ref": "btn-login"}'
+mcpx playwright/browser_type '{"element": "Email", "ref": "input-email", "text": "user@example.com"}'
+
+# 3. Stop when done
+mcpx daemon stop playwright
+\`\`\`
+
+### Database Transaction Example
+
+\`\`\`bash
+# Start daemon for stateful DB operations
+mcpx daemon start postgres
+
+# Multiple queries in same transaction context
+mcpx postgres/query '{"sql": "BEGIN"}'
+mcpx postgres/query '{"sql": "INSERT INTO users ..."}'
+mcpx postgres/query '{"sql": "UPDATE accounts ..."}'
+mcpx postgres/query '{"sql": "COMMIT"}'
+
+mcpx daemon stop postgres
+\`\`\`
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| MCP_TIMEOUT | 30 | Request timeout in seconds |
+| MCP_DEBUG | - | Enable debug output |
+| MCP_DAEMON_IDLE_MS | 300000 | Daemon idle timeout (5 min) |
+
+---
+
+## Decision Tree
+
+\`\`\`
+Need to call an MCP tool?
+│
+├─ Single stateless call?
+│  └─> mcpx server/tool '{"args": ...}'
+│
+├─ Multiple calls needing shared state?
+│  └─> mcpx daemon start server
+│      mcpx server/tool1 '...'
+│      mcpx server/tool2 '...'
+│      mcpx daemon stop server
+│
+├─ Don't know what tools exist?
+│  └─> mcpx                    # List all
+│      mcpx grep "*keyword*"   # Search
+│
+└─ Need tool parameter schema?
+   └─> mcpx server/tool        # Shows JSON schema
+\`\`\`
+
+---
+
+## Anti-Patterns
+
+| NEVER Do This | Do This Instead |
+|---------------|-----------------|
+| Hardcode tool schemas in prompts | Use \`mcpx server/tool\` to discover |
+| Forget daemon for browser ops | Always \`mcpx daemon start\` first |
+| Leave daemon running forever | Stop when workflow completes |
+| Guess tool parameters | Check schema with \`mcpx server/tool\` |`,
+}
+
 export function createBuiltinSkills(): BuiltinSkill[] {
-  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill]
+  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill, mcpxSkill]
 }
