@@ -53,7 +53,7 @@ Ask the user these 3 questions to determine CLI options:
    - If **yes** → `--copilot=yes`
    - If **no** → `--copilot=no`
 
-MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALY.
+MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
 
 ### Step 1: Install OpenCode (if not installed)
 
