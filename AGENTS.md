@@ -145,7 +145,7 @@ bun test               # Run tests (83 test files)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/agents/orchestrator-sisyphus.ts` | 1531 | Orchestrator agent, 7-section delegation, wisdom accumulation |
+| `src/agents/atlas.ts` | 1531 | Orchestrator agent, 7-section delegation, wisdom accumulation |
 | `src/features/builtin-skills/skills.ts` | 1203 | Skill definitions (playwright, git-master, frontend-ui-ux) |
 | `src/agents/prometheus-prompt.ts` | 1196 | Planning agent, interview mode, Momus loop |
 | `src/features/background-agent/manager.ts` | 1165 | Task lifecycle, concurrency, notification batching |

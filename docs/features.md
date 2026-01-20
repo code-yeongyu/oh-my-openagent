@@ -243,7 +243,7 @@ Everything runs at maximum intensity - parallel agents, background tasks, aggres
 /start-work [plan-name]
 ```
 
-Uses orchestrator-sisyphus agent to execute planned tasks systematically.
+Uses atlas agent to execute planned tasks systematically.
 
 ### Custom Commands
 
