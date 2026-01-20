@@ -13,7 +13,7 @@ import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import type { BackgroundManager } from "../../features/background-agent"
 
-export const HOOK_NAME = "sisyphus-orchestrator"
+export const HOOK_NAME = "atlas"
 
 /**
  * Cross-platform check if a path is inside .sisyphus/ directory.
@@ -111,7 +111,7 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
-You (orchestrator-sisyphus) are attempting to directly modify a file outside \`.sisyphus/\`.
+You (atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 
 **Path attempted:** $FILE_PATH
 
@@ -393,12 +393,12 @@ function getMessageDir(sessionID: string): string | null {
 }
 
 function isCallerOrchestrator(sessionID?: string): boolean {
-  if (!sessionID) return false
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir) return false
-  const nearest = findNearestMessageWithFields(messageDir)
-  return nearest?.agent === "orchestrator-sisyphus"
-}
+   if (!sessionID) return false
+   const messageDir = getMessageDir(sessionID)
+   if (!messageDir) return false
+   const nearest = findNearestMessageWithFields(messageDir)
+   return nearest?.agent === "atlas"
+ }
 
 interface SessionState {
   lastEventWasAbortError?: boolean
@@ -493,15 +493,15 @@ export function createSisyphusOrchestratorHook(
           : undefined
       }
 
-      await ctx.client.session.prompt({
-        path: { id: sessionID },
-        body: {
-          agent: "orchestrator-sisyphus",
-          ...(model !== undefined ? { model } : {}),
-          parts: [{ type: "text", text: prompt }],
-        },
-        query: { directory: ctx.directory },
-      })
+       await ctx.client.session.prompt({
+         path: { id: sessionID },
+         body: {
+           agent: "atlas",
+           ...(model !== undefined ? { model } : {}),
+           parts: [{ type: "text", text: prompt }],
+         },
+         query: { directory: ctx.directory },
+       })
 
       log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
     } catch (err) {
