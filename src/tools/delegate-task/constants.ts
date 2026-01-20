@@ -99,20 +99,42 @@ EXPECTED OUTPUT:
 If your prompt lacks this structure, REWRITE IT before delegating.
 </Caller_Warning>`
 
-export const MOST_CAPABLE_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on COMPLEX / MOST-CAPABLE tasks.
+export const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on tasks that don't fit specific categories but require moderate effort.
 
-Maximum capability mindset:
-- Bring full reasoning power to bear
-- Consider all edge cases and implications
-- Deep analysis before action
-- Quality over speed
+<Selection_Gate>
+BEFORE selecting this category, VERIFY ALL conditions:
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+2. Task requires more than trivial effort but is NOT system-wide
+3. Scope is contained within a few files/modules
 
-Approach:
-- Thorough understanding first
-- Comprehensive solution design
-- Meticulous execution
-- This is for the most challenging problems
+If task fits ANY other category, DO NOT select unspecified-low.
+This is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.
+</Selection_Gate>
+</Category_Context>
+
+<Caller_Warning>
+THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-5).
+
+**PROVIDE CLEAR STRUCTURE:**
+1. MUST DO: Enumerate required actions explicitly
+2. MUST NOT DO: State forbidden actions to prevent scope creep
+3. EXPECTED OUTPUT: Define concrete success criteria
+</Caller_Warning>`
+
+export const UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on tasks that don't fit specific categories but require substantial effort.
+
+<Selection_Gate>
+BEFORE selecting this category, VERIFY ALL conditions:
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+2. Task requires substantial effort across multiple systems/modules
+3. Changes have broad impact or require careful coordination
+4. NOT just "complex" - must be genuinely unclassifiable AND high-effort
+
+If task fits ANY other category, DO NOT select unspecified-high.
+If task is unclassifiable but moderate-effort, use unspecified-low instead.
+</Selection_Gate>
 </Category_Context>`
 
 export const WRITING_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -131,88 +153,16 @@ Approach:
 - Documentation, READMEs, articles, technical writing
 </Category_Context>`
 
-export const GENERAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on GENERAL tasks.
 
-Balanced execution mindset:
-- Practical, straightforward approach
-- Good enough is good enough
-- Focus on getting things done
-
-Approach:
-- Standard best practices
-- Reasonable trade-offs
-- Efficient completion
-</Category_Context>
-
-<Caller_Warning>
-THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-5).
-
-While capable, this model benefits significantly from EXPLICIT instructions.
-
-**PROVIDE CLEAR STRUCTURE:**
-1. MUST DO: Enumerate required actions explicitly - don't assume inference
-2. MUST NOT DO: State forbidden actions to prevent scope creep or wrong approaches
-3. EXPECTED OUTPUT: Define concrete success criteria and deliverables
-
-**COMMON PITFALLS WITHOUT EXPLICIT INSTRUCTIONS:**
-- Model may take shortcuts that miss edge cases
-- Implicit requirements get overlooked
-- Output format may not match expectations
-- Scope may expand beyond intended boundaries
-
-**RECOMMENDED PROMPT PATTERN:**
-\`\`\`
-TASK: [Clear, single-purpose goal]
-
-CONTEXT: [Relevant background the model needs]
-
-MUST DO:
-- [Explicit requirement 1]
-- [Explicit requirement 2]
-
-MUST NOT DO:
-- [Boundary/constraint 1]
-- [Boundary/constraint 2]
-
-EXPECTED OUTPUT:
-- [What success looks like]
-- [How to verify completion]
-\`\`\`
-
-The more explicit your prompt, the better the results.
-</Caller_Warning>`
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "visual-engineering": {
-    temperature: 0.7,
-  },
-  ultrabrain: {
-    temperature: 0.1,
-  },
-  artistry: {
-    temperature: 0.9,
-  },
-  quick: {
-    temperature: 0.3,
-  },
-  "most-capable": {
-    temperature: 0.1,
-  },
-  writing: {
-    temperature: 0.5,
-  },
-  general: {
-    temperature: 0.3,
-  },
-}
-
-export const CATEGORY_MODEL_CATALOG: Record<string, { model: string; variant?: string }> = {
+  "visual-engineering": { model: "google/gemini-3-pro-preview" },
   ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
   artistry: { model: "google/gemini-3-pro-preview", variant: "max" },
-  "most-capable": { model: "anthropic/claude-opus-4-5", variant: "max" },
+  quick: { model: "anthropic/claude-haiku-4-5" },
+  "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
+  "unspecified-high": { model: "anthropic/claude-opus-4-5", variant: "max" },
   writing: { model: "google/gemini-3-flash-preview" },
-  general: { model: "anthropic/claude-sonnet-4-5" },
 }
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
@@ -220,19 +170,19 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
-  "most-capable": MOST_CAPABLE_CATEGORY_PROMPT_APPEND,
+  "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
+  "unspecified-high": UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,
   writing: WRITING_CATEGORY_PROMPT_APPEND,
-  general: GENERAL_CATEGORY_PROMPT_APPEND,
 }
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
-  ultrabrain: "Strict architecture design, very complex business logic",
+  ultrabrain: "Deep logical reasoning, complex architecture decisions requiring extensive analysis",
   artistry: "Highly creative/artistic tasks, novel ideas",
-  quick: "Cheap & fast - small tasks with minimal overhead, budget-friendly",
-  "most-capable": "Complex tasks requiring maximum capability",
+  quick: "Trivial tasks - single file changes, typo fixes, simple modifications",
+  "unspecified-low": "Tasks that don't fit other categories, low effort required",
+  "unspecified-high": "Tasks that don't fit other categories, high effort required",
   writing: "Documentation, prose, technical writing",
-  general: "General purpose tasks",
 }
 
 const BUILTIN_CATEGORIES = Object.keys(DEFAULT_CATEGORIES).join(", ")
