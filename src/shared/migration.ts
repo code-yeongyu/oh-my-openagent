@@ -18,7 +18,8 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
-  "orchestrator-sisyphus": "atlas",
+  "orchestrator-sisyphus": "Atlas",
+  atlas: "Atlas",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
@@ -30,7 +31,7 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
   "Prometheus (Planner)",
-  "atlas",
+  "Atlas",
   "build",
 ])
 
