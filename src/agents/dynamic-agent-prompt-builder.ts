@@ -17,6 +17,11 @@ export interface AvailableSkill {
   location: "user" | "project" | "plugin"
 }
 
+export interface AvailableCategory {
+  name: string
+  description: string
+}
+
 export function categorizeTools(toolNames: string[]): AvailableTool[] {
   return toolNames.map((name) => {
     let category: AvailableTool["category"] = "other"
@@ -105,7 +110,6 @@ export function buildToolSelectionTable(
     "",
   ]
 
-  // Skills section (highest priority)
   if (skills.length > 0) {
     rows.push("#### Skills (INVOKE FIRST if matching)")
     rows.push("")
@@ -118,7 +122,6 @@ export function buildToolSelectionTable(
     rows.push("")
   }
 
-  // Tools and Agents table
   rows.push("#### Tools & Agents")
   rows.push("")
   rows.push("| Resource | Cost | When to Use |")
@@ -202,59 +205,89 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   return rows.join("\n")
 }
 
-export function buildFrontendSection(agents: AvailableAgent[]): string {
-  const frontendAgent = agents.find((a) => a.name === "frontend-ui-ux-engineer")
-  if (!frontendAgent) return ""
+export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
+  if (categories.length === 0 && skills.length === 0) return ""
 
-  return `### Frontend Files: VISUAL = HARD BLOCK (zero tolerance)
+  const categoryRows = categories.map((c) => {
+    const desc = c.description || c.name
+    return `| \`${c.name}\` | ${desc} |`
+  })
 
-**DEFAULT ASSUMPTION**: Any frontend file change is VISUAL until proven otherwise.
+  const skillRows = skills.map((s) => {
+    const desc = s.description.split(".")[0] || s.description
+    return `| \`${s.name}\` | ${desc} |`
+  })
 
-#### HARD BLOCK: Visual Changes (NEVER touch directly)
+  return `### Category + Skills Delegation System
 
-| Pattern | Action | No Exceptions |
-|---------|--------|---------------|
-| \`.tsx\`, \`.jsx\` with styling | DELEGATE | Even "just add className" |
-| \`.vue\`, \`.svelte\` | DELEGATE | Even single prop change |
-| \`.css\`, \`.scss\`, \`.sass\`, \`.less\` | DELEGATE | Even color/margin tweak |
-| Any file with visual keywords | DELEGATE | See keyword list below |
+**delegate_task() combines categories and skills for optimal task execution.**
 
-#### Keyword Detection (INSTANT DELEGATE)
+#### Available Categories (Domain-Optimized Models)
 
-If your change involves **ANY** of these keywords → **STOP. DELEGATE.**
+Each category is configured with a model optimized for that domain. Read the description to understand when to use it.
+
+| Category | Domain / Best For |
+|----------|-------------------|
+${categoryRows.join("\n")}
+
+#### Available Skills (Domain Expertise Injection)
+
+Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
+
+| Skill | Expertise Domain |
+|-------|------------------|
+${skillRows.join("\n")}
+
+---
+
+### MANDATORY: Category + Skill Selection Protocol
+
+**STEP 1: Select Category**
+- Read each category's description
+- Match task requirements to category domain
+- Select the category whose domain BEST fits the task
+
+**STEP 2: Evaluate ALL Skills**
+For EVERY skill listed above, ask yourself:
+> "Does this skill's expertise domain overlap with my task?"
+
+- If YES → INCLUDE in \`skills=[...]\`
+- If NO → You MUST justify why (see below)
+
+**STEP 3: Justify Omissions**
+
+If you choose NOT to include a skill that MIGHT be relevant, you MUST provide:
 
 \`\`\`
-style, className, tailwind, css, color, background, border, shadow,
-margin, padding, width, height, flex, grid, animation, transition,
-hover, responsive, font-size, font-weight, icon, svg, image, layout,
-position, display, opacity, z-index, transform, gradient, theme
+SKILL EVALUATION for "[skill-name]":
+- Skill domain: [what the skill description says]
+- Task domain: [what your task is about]
+- Decision: OMIT
+- Reason: [specific explanation of why domains don't overlap]
 \`\`\`
 
-**YOU CANNOT**:
-- "Just quickly fix this style"
-- "It's only one className"
-- "Too simple to delegate"
+**WHY JUSTIFICATION IS MANDATORY:**
+- Forces you to actually READ skill descriptions
+- Prevents lazy omission of potentially useful skills
+- Subagents are STATELESS - they only know what you tell them
+- Missing a relevant skill = suboptimal output
 
-#### EXCEPTION: Pure Logic Only
+---
 
-You MAY handle directly **ONLY IF ALL** conditions are met:
-1. Change is **100% logic** (API, state, event handlers, types, utils)
-2. **Zero** visual keywords in your diff
-3. No styling, layout, or appearance changes whatsoever
+### Delegation Pattern
 
-| Pure Logic Examples | Visual Examples (DELEGATE) |
-|---------------------|---------------------------|
-| Add onClick API call | Change button color |
-| Fix pagination logic | Add loading spinner animation |
-| Add form validation | Make modal responsive |
-| Update state management | Adjust spacing/margins |
+\`\`\`typescript
+delegate_task(
+  category="[selected-category]",
+  skills=["skill-1", "skill-2"],  // Include ALL relevant skills
+  prompt="..."
+)
+\`\`\`
 
-#### Mixed Changes → SPLIT
-
-If change has BOTH logic AND visual:
-1. Handle logic yourself
-2. DELEGATE visual part to \`frontend-ui-ux-engineer\`
-3. **Never** combine them into one edit`
+**ANTI-PATTERN (will produce poor results):**
+\`\`\`typescript
+delegate_task(category="...", skills=[], prompt="...")  // Empty skills without justification
+\`\`\``
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
@@ -286,21 +319,14 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
-export function buildHardBlocksSection(agents: AvailableAgent[]): string {
-  const frontendAgent = agents.find((a) => a.name === "frontend-ui-ux-engineer")
-
+export function buildHardBlocksSection(): string {
   const blocks = [
     "| Type error suppression (`as any`, `@ts-ignore`) | Never |",
     "| Commit without explicit request | Never |",
     "| Speculate about unread code | Never |",
     "| Leave code in broken state after failures | Never |",
+    "| Delegate without evaluating available skills | Never - MUST justify skill omissions |",
   ]
-
-  if (frontendAgent) {
-    blocks.unshift(
-      "| Frontend VISUAL changes (styling, className, layout, animation, any visual keyword) | **HARD BLOCK** - Always delegate to `frontend-ui-ux-engineer`. Zero tolerance. |"
-    )
-  }
 
   return `## Hard Blocks (NEVER violate)
 
@@ -309,24 +335,15 @@ export function buildHardBlocksSection(agents: AvailableAgent[]): string {
 ${blocks.join("\n")}`
 }
 
-export function buildAntiPatternsSection(agents: AvailableAgent[]): string {
-  const frontendAgent = agents.find((a) => a.name === "frontend-ui-ux-engineer")
-
+export function buildAntiPatternsSection(): string {
   const patterns = [
     "| **Type Safety** | `as any`, `@ts-ignore`, `@ts-expect-error` |",
     "| **Error Handling** | Empty catch blocks `catch(e) {}` |",
     "| **Testing** | Deleting failing tests to \"pass\" |",
     "| **Search** | Firing agents for single-line typos or obvious syntax errors |",
+    "| **Delegation** | Using `skills=[]` without justifying why no skills apply |",
     "| **Debugging** | Shotgun debugging, random changes |",
   ]
-
-  if (frontendAgent) {
-    patterns.splice(
-      4,
-      0,
-      "| **Frontend** | ANY direct edit to visual/styling code. Keyword detected = DELEGATE. Pure logic only = OK |"
-    )
-  }
 
   return `## Anti-Patterns (BLOCKING violations)
 
@@ -335,24 +352,48 @@ export function buildAntiPatternsSection(agents: AvailableAgent[]): string {
 ${patterns.join("\n")}`
 }
 
-export function buildUltraworkAgentSection(agents: AvailableAgent[]): string {
-  if (agents.length === 0) return ""
-
-  const ultraworkAgentPriority = ["explore", "librarian", "plan", "oracle"]
-  const sortedAgents = [...agents].sort((a, b) => {
-    const aIdx = ultraworkAgentPriority.indexOf(a.name)
-    const bIdx = ultraworkAgentPriority.indexOf(b.name)
-    if (aIdx === -1 && bIdx === -1) return 0
-    if (aIdx === -1) return 1
-    if (bIdx === -1) return -1
-    return aIdx - bIdx
-  })
-
+export function buildUltraworkSection(
+  agents: AvailableAgent[],
+  categories: AvailableCategory[],
+  skills: AvailableSkill[]
+): string {
   const lines: string[] = []
-  for (const agent of sortedAgents) {
-    const shortDesc = agent.description.split(".")[0] || agent.description
-    const suffix = (agent.name === "explore" || agent.name === "librarian") ? " (multiple)" : ""
-    lines.push(`- **${agent.name}${suffix}**: ${shortDesc}`)
+
+  if (categories.length > 0) {
+    lines.push("**Categories** (for implementation tasks):")
+    for (const cat of categories) {
+      const shortDesc = cat.description || cat.name
+      lines.push(`- \`${cat.name}\`: ${shortDesc}`)
+    }
+    lines.push("")
+  }
+
+  if (skills.length > 0) {
+    lines.push("**Skills** (combine with categories - EVALUATE ALL for relevance):")
+    for (const skill of skills) {
+      const shortDesc = skill.description.split(".")[0] || skill.description
+      lines.push(`- \`${skill.name}\`: ${shortDesc}`)
+    }
+    lines.push("")
+  }
+
+  if (agents.length > 0) {
+    const ultraworkAgentPriority = ["explore", "librarian", "plan", "oracle"]
+    const sortedAgents = [...agents].sort((a, b) => {
+      const aIdx = ultraworkAgentPriority.indexOf(a.name)
+      const bIdx = ultraworkAgentPriority.indexOf(b.name)
+      if (aIdx === -1 && bIdx === -1) return 0
+      if (aIdx === -1) return 1
+      if (bIdx === -1) return -1
+      return aIdx - bIdx
+    })
+
+    lines.push("**Agents** (for specialized consultation/exploration):")
+    for (const agent of sortedAgents) {
+      const shortDesc = agent.description.split(".")[0] || agent.description
+      const suffix = agent.name === "explore" || agent.name === "librarian" ? " (multiple)" : ""
+      lines.push(`- \`${agent.name}${suffix}\`: ${shortDesc}`)
+    }
   }
 
   return lines.join("\n")
