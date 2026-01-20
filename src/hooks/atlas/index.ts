@@ -569,7 +569,7 @@ export function createSisyphusOrchestratorHook(
         }
 
         if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not orchestrator-sisyphus`, { sessionID })
+          log(`[${HOOK_NAME}] Skipped: last agent is not atlas`, { sessionID })
           return
         }
 

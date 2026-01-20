@@ -118,22 +118,24 @@ export function resolveCategoryConfig(
   const { userCategories, inheritedModel, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
+  const catalogEntry = CATEGORY_MODEL_CATALOG[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
 
   if (!defaultConfig && !userConfig) {
     return null
   }
 
-  // Model priority: user override > inherited from parent > system default
+  // Model priority: user override > inherited from parent > catalog default > system default
   const model = resolveModel({
     userModel: userConfig?.model,
     inheritedModel,
-    systemDefault: systemDefaultModel,
+    systemDefault: catalogEntry?.model ?? systemDefaultModel,
   })
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
     model,
+    variant: userConfig?.variant ?? catalogEntry?.variant,
   }
 
   let promptAppend = defaultPromptAppend
