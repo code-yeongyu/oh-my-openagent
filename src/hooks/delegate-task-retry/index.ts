@@ -108,7 +108,7 @@ Example of CORRECT call:
 delegate_task(
   description="Task description",
   prompt="Detailed prompt...",
-  category="general",  // OR subagent_type="explore"
+  category="unspecified-low",  // OR subagent_type="explore"
   run_in_background=false,
   skills=[]
 )

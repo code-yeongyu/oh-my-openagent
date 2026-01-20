@@ -174,9 +174,9 @@ export const BuiltinCategoryNameSchema = z.enum([
   "ultrabrain",
   "artistry",
   "quick",
-  "most-capable",
+  "unspecified-low",
+  "unspecified-high",
   "writing",
-  "general",
 ])
 
 export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)

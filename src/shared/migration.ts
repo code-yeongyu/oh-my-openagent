@@ -52,7 +52,7 @@ export const HOOK_NAME_MAP: Record<string, string> = {
  * from explicit model configs to category-based configs.
  * 
  * DO NOT add new entries here. New agents should use:
- * - Category-based config (preferred): { category: "most-capable" }
+ * - Category-based config (preferred): { category: "unspecified-high" }
  * - Or inherit from OpenCode's config.model
  * 
  * This map will be removed in a future major version once migration period ends.
@@ -61,8 +61,8 @@ export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
-  "anthropic/claude-opus-4-5": "most-capable",
-  "anthropic/claude-sonnet-4-5": "general",
+  "anthropic/claude-opus-4-5": "unspecified-high",
+  "anthropic/claude-sonnet-4-5": "unspecified-low",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
