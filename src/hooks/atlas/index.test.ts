@@ -12,8 +12,8 @@ import type { BoulderState } from "../../features/boulder-state"
 
 import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
-describe("sisyphus-orchestrator hook", () => {
-  const TEST_DIR = join(tmpdir(), "sisyphus-orchestrator-test-" + Date.now())
+describe("atlas hook", () => {
+   const TEST_DIR = join(tmpdir(), "atlas-test-" + Date.now())
   const SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
 
   function createMockPluginInput(overrides?: { promptMock?: ReturnType<typeof mock> }) {
@@ -85,10 +85,10 @@ describe("sisyphus-orchestrator hook", () => {
       expect(output.output).toBe("Original output")
     })
 
-    test("should not transform when caller is not orchestrator-sisyphus", async () => {
-      // #given - boulder state exists but caller agent in message storage is not orchestrator
-      const sessionID = "session-non-orchestrator-test"
-      setupMessageStorage(sessionID, "other-agent")
+     test("should not transform when caller is not atlas", async () => {
+       // #given - boulder state exists but caller agent in message storage is not atlas
+       const sessionID = "session-non-orchestrator-test"
+       setupMessageStorage(sessionID, "other-agent")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -120,10 +120,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should append standalone verification when no boulder state but caller is orchestrator", async () => {
-      // #given - no boulder state, but caller is orchestrator
-      const sessionID = "session-no-boulder-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should append standalone verification when no boulder state but caller is atlas", async () => {
+       // #given - no boulder state, but caller is atlas
+       const sessionID = "session-no-boulder-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const hook = createSisyphusOrchestratorHook(createMockPluginInput())
       const output = {
@@ -146,10 +146,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should transform output when caller is orchestrator-sisyphus with boulder state", async () => {
-      // #given - orchestrator-sisyphus caller with boulder state
-      const sessionID = "session-transform-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should transform output when caller is atlas with boulder state", async () => {
+       // #given - atlas caller with boulder state
+       const sessionID = "session-transform-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
@@ -185,10 +185,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should still transform when plan is complete (shows progress)", async () => {
-      // #given - boulder state with complete plan, orchestrator caller
-      const sessionID = "session-complete-plan-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should still transform when plan is complete (shows progress)", async () => {
+       // #given - boulder state with complete plan, atlas caller
+       const sessionID = "session-complete-plan-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -222,10 +222,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should append session ID to boulder state if not present", async () => {
-      // #given - boulder state without session-append-test, orchestrator caller
-      const sessionID = "session-append-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should append session ID to boulder state if not present", async () => {
+       // #given - boulder state without session-append-test, atlas caller
+       const sessionID = "session-append-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -258,10 +258,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should not duplicate existing session ID", async () => {
-      // #given - boulder state already has session-dup-test, orchestrator caller
-      const sessionID = "session-dup-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should not duplicate existing session ID", async () => {
+       // #given - boulder state already has session-dup-test, atlas caller
+       const sessionID = "session-dup-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -295,10 +295,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should include boulder.json path and notepad path in transformed output", async () => {
-      // #given - boulder state, orchestrator caller
-      const sessionID = "session-path-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should include boulder.json path and notepad path in transformed output", async () => {
+       // #given - boulder state, atlas caller
+       const sessionID = "session-path-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "my-feature.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2\n- [x] Task 3")
@@ -332,10 +332,10 @@ describe("sisyphus-orchestrator hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-    test("should include resume and checkbox instructions in reminder", async () => {
-      // #given - boulder state, orchestrator caller
-      const sessionID = "session-resume-test"
-      setupMessageStorage(sessionID, "orchestrator-sisyphus")
+     test("should include resume and checkbox instructions in reminder", async () => {
+       // #given - boulder state, atlas caller
+       const sessionID = "session-resume-test"
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -372,9 +372,9 @@ describe("sisyphus-orchestrator hook", () => {
     describe("Write/Edit tool direct work reminder", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
-      beforeEach(() => {
-        setupMessageStorage(ORCHESTRATOR_SESSION, "orchestrator-sisyphus")
-      })
+       beforeEach(() => {
+         setupMessageStorage(ORCHESTRATOR_SESSION, "atlas")
+       })
 
       afterEach(() => {
         cleanupMessageStorage(ORCHESTRATOR_SESSION)
@@ -596,13 +596,13 @@ describe("sisyphus-orchestrator hook", () => {
   describe("session.idle handler (boulder continuation)", () => {
     const MAIN_SESSION_ID = "main-session-123"
 
-    beforeEach(() => {
-      mock.module("../../features/claude-code-session-state", () => ({
-        getMainSessionID: () => MAIN_SESSION_ID,
-        subagentSessions: new Set<string>(),
-      }))
-      setupMessageStorage(MAIN_SESSION_ID, "orchestrator-sisyphus")
-    })
+     beforeEach(() => {
+       mock.module("../../features/claude-code-session-state", () => ({
+         getMainSessionID: () => MAIN_SESSION_ID,
+         subagentSessions: new Set<string>(),
+       }))
+       setupMessageStorage(MAIN_SESSION_ID, "atlas")
+     })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)
@@ -830,37 +830,37 @@ describe("sisyphus-orchestrator hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-    test("should not inject when last agent is not orchestrator-sisyphus", async () => {
-      // #given - boulder state with incomplete plan, but last agent is NOT orchestrator-sisyphus
-      const planPath = join(TEST_DIR, "test-plan.md")
-      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+     test("should not inject when last agent is not atlas", async () => {
+       // #given - boulder state with incomplete plan, but last agent is NOT atlas
+       const planPath = join(TEST_DIR, "test-plan.md")
+       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
-      const state: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: [MAIN_SESSION_ID],
-        plan_name: "test-plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+       const state: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-02T10:00:00Z",
+         session_ids: [MAIN_SESSION_ID],
+         plan_name: "test-plan",
+       }
+       writeBoulderState(TEST_DIR, state)
 
-      // #given - last agent is NOT orchestrator-sisyphus
-      cleanupMessageStorage(MAIN_SESSION_ID)
-      setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
+       // #given - last agent is NOT atlas
+       cleanupMessageStorage(MAIN_SESSION_ID)
+       setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
 
-      const mockInput = createMockPluginInput()
-      const hook = createSisyphusOrchestratorHook(mockInput)
+       const mockInput = createMockPluginInput()
+       const hook = createSisyphusOrchestratorHook(mockInput)
 
-      // #when
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
-      })
+       // #when
+       await hook.handler({
+         event: {
+           type: "session.idle",
+           properties: { sessionID: MAIN_SESSION_ID },
+         },
+       })
 
-      // #then - should NOT call prompt because agent is not orchestrator-sisyphus
-      expect(mockInput._promptMock).not.toHaveBeenCalled()
-    })
+       // #then - should NOT call prompt because agent is not atlas
+       expect(mockInput._promptMock).not.toHaveBeenCalled()
+     })
 
     test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
       // #given - boulder state with incomplete plan
