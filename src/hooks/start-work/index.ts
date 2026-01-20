@@ -10,7 +10,7 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
-import { clearSessionAgent } from "../../features/claude-code-session-state"
+import { updateSessionAgent } from "../../features/claude-code-session-state"
 
 export const HOOK_NAME = "start-work"
 
@@ -71,8 +71,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      // Clear previous session agent (e.g., Prometheus) to allow mode transition
-      clearSessionAgent(input.sessionID)
+      updateSessionAgent(input.sessionID, "orchestrator-sisyphus")
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
