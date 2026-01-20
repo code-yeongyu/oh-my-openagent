@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
-import { DELEGATE_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_MODEL_CATALOG } from "./constants"
+import { DELEGATE_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -118,24 +118,23 @@ export function resolveCategoryConfig(
   const { userCategories, inheritedModel, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
-  const catalogEntry = CATEGORY_MODEL_CATALOG[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
 
   if (!defaultConfig && !userConfig) {
     return null
   }
 
-  // Model priority: user override > inherited from parent > catalog default > system default
+  // Model priority: user override > inherited from parent > default config > system default
   const model = resolveModel({
     userModel: userConfig?.model,
     inheritedModel,
-    systemDefault: catalogEntry?.model ?? systemDefaultModel,
+    systemDefault: defaultConfig?.model ?? systemDefaultModel,
   })
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
     model,
-    variant: userConfig?.variant ?? catalogEntry?.variant,
+    variant: userConfig?.variant ?? defaultConfig?.variant,
   }
 
   let promptAppend = defaultPromptAppend

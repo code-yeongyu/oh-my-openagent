@@ -8,24 +8,23 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
   describe("DEFAULT_CATEGORIES", () => {
-    test("visual-engineering category has temperature config only (model removed)", () => {
+    test("visual-engineering category has model config", () => {
       // #given
       const category = DEFAULT_CATEGORIES["visual-engineering"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBeUndefined()
-      expect(category.temperature).toBe(0.7)
+      expect(category.model).toBe("google/gemini-3-pro-preview")
     })
 
-    test("ultrabrain category has temperature config only (model removed)", () => {
+    test("ultrabrain category has model and variant config", () => {
       // #given
       const category = DEFAULT_CATEGORIES["ultrabrain"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBeUndefined()
-      expect(category.temperature).toBe(0.1)
+      expect(category.model).toBe("openai/gpt-5.2-codex")
+      expect(category.variant).toBe("xhigh")
     })
   })
 
@@ -61,13 +60,13 @@ describe("sisyphus-task", () => {
       }
     })
 
-    test("most-capable category exists and has description", () => {
+    test("unspecified-high category exists and has description", () => {
       // #given / #when
-      const description = CATEGORY_DESCRIPTIONS["most-capable"]
+      const description = CATEGORY_DESCRIPTIONS["unspecified-high"]
 
       // #then
       expect(description).toBeDefined()
-      expect(description).toContain("Complex")
+      expect(description).toContain("high effort")
     })
   })
 
@@ -141,16 +140,16 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("returns systemDefaultModel for builtin category (categories no longer have default models)", () => {
+    test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
       // #given
       const categoryName = "visual-engineering"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - model comes from systemDefaultModel since categories no longer have model defaults
+      // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -270,7 +269,7 @@ describe("sisyphus-task", () => {
       expect(result!.config.model).toBe("my-provider/my-model")
     })
 
-    test("systemDefaultModel is used when no user model and no inheritedModel", () => {
+    test("default model from category config is used when no user model and no inheritedModel", () => {
       // #given
       const categoryName = "visual-engineering"
 
@@ -279,7 +278,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
   })
 
@@ -907,16 +906,16 @@ describe("sisyphus-task", () => {
       expect(resolved!.config.variant).toBe("xhigh")
     })
 
-    test("systemDefaultModel is used for category without catalog entry", () => {
-      // #given - general has no catalog entry
-      const categoryName = "general"
+    test("default model is used for category with default entry", () => {
+      // #given - unspecified-low has default model
+      const categoryName = "unspecified-low"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then - systemDefaultModel is used
+      // #then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
     })
 
     test("inheritedModel takes precedence over systemDefaultModel for builtin category", () => {

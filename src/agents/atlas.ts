@@ -92,7 +92,7 @@ ${skillRows.join("\n")}
 **Usage:**
 \`\`\`typescript
 delegate_task(category="visual-engineering", skills=["frontend-ui-ux"], prompt="...")
-delegate_task(category="general", skills=["playwright"], prompt="...")  // Browser testing
+delegate_task(category="unspecified-low", skills=["playwright"], prompt="...")  // Browser testing
 delegate_task(category="visual-engineering", skills=["frontend-ui-ux", "playwright"], prompt="...")  // UI with browser testing
 \`\`\`
 
