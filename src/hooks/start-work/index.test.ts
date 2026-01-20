@@ -379,7 +379,7 @@ describe("start-work hook", () => {
   })
 
   describe("session agent management", () => {
-    test("should update session agent to orchestrator-sisyphus when start-work command is triggered", async () => {
+    test("should update session agent to atlas when start-work command is triggered", async () => {
       // #given
       const updateSpy = spyOn(sessionState, "updateSessionAgent")
       
@@ -395,7 +395,7 @@ describe("start-work hook", () => {
       )
 
       // #then
-      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "orchestrator-sisyphus")
+      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
     })
   })

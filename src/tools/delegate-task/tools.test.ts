@@ -894,17 +894,29 @@ describe("sisyphus-task", () => {
   })
 
   describe("modelInfo detection via resolveCategoryConfig", () => {
-    test("systemDefaultModel is used when no userModel and no inheritedModel", () => {
-      // #given - builtin category, no user model, no inherited model
+    test("catalog model is used for category with catalog entry", () => {
+      // #given - ultrabrain has catalog entry
       const categoryName = "ultrabrain"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then - actualModel should be systemDefaultModel (categories no longer have model defaults)
+      // #then - catalog model is used
       expect(resolved).not.toBeNull()
-      const actualModel = resolved!.config.model
-      expect(actualModel).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(resolved!.config.model).toBe("openai/gpt-5.2-codex")
+      expect(resolved!.config.variant).toBe("xhigh")
+    })
+
+    test("systemDefaultModel is used for category without catalog entry", () => {
+      // #given - general has no catalog entry
+      const categoryName = "general"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+      
+      // #then - systemDefaultModel is used
+      expect(resolved).not.toBeNull()
+      expect(resolved!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
     test("inheritedModel takes precedence over systemDefaultModel for builtin category", () => {
