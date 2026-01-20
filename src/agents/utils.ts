@@ -99,7 +99,14 @@ export function createEnvContext(): string {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
 
-  const timeStr = now.toLocaleTimeString("en-US", {
+  const dateStr = now.toLocaleDateString(locale, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+
+  const timeStr = now.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -108,6 +115,7 @@ export function createEnvContext(): string {
 
   return `
 <omo-env>
+  Current date: ${dateStr}
   Current time: ${timeStr}
   Timezone: ${timezone}
   Locale: ${locale}
