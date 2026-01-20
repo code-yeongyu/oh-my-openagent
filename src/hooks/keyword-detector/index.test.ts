@@ -770,8 +770,8 @@ describe("keyword-detector agent-specific ultrapower messages", () => {
     expect(ultrapowerEntry!.content).toContain(
       "YOU ARE A PLANNER, NOT AN IMPLEMENTER",
     );
-    expect(ultrapowerEntry!.content).toContain("brainstorming");
-    expect(ultrapowerEntry!.content).toContain("writing-plans");
+    expect(ultrapowerEntry!.content).toContain("Brainstorming");
+    expect(ultrapowerEntry!.content).toContain("Writing Plans");
     expect(ultrapowerEntry!.content).toContain("/start-work");
   });
 
@@ -795,11 +795,9 @@ describe("keyword-detector agent-specific ultrapower messages", () => {
     );
     expect(ultrapowerEntry).toBeDefined();
     expect(ultrapowerEntry!.content).toContain("FULL-CYCLE EXECUTOR");
-    expect(ultrapowerEntry!.content).toContain("brainstorming");
-    expect(ultrapowerEntry!.content).toContain("subagent-driven-development");
-    expect(ultrapowerEntry!.content).toContain(
-      "finishing-a-development-branch",
-    );
+    expect(ultrapowerEntry!.content).toContain("Brainstorming");
+    expect(ultrapowerEntry!.content).toContain("Subagent-Driven Development");
+    expect(ultrapowerEntry!.content).toContain("Finishing the Branch");
     expect(ultrapowerEntry!.content).not.toContain(
       "YOU ARE A PLANNER, NOT AN IMPLEMENTER",
     );

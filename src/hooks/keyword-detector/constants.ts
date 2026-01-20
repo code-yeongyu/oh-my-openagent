@@ -270,12 +270,160 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 
 /**
  * Generates the ultrapower message based on agent context.
- * Ultrapower mode uses the superpowers skill workflow.
- * Planner agents: brainstorming → git-worktree → writing-plans → prompt /start-work
- * Executor agents: full workflow with subagent-driven-development
+ * Ultrapower mode embeds the full workflow logic directly (no external skill calls).
+ * Planner agents: brainstorming → git-worktree → writing-plans → handoff
+ * Executor agents: full workflow with subagent-driven-development + finishing
  */
 export function getUltrapowerMessage(agentName?: string): string {
   const isPlanner = isPlannerAgent(agentName);
+
+  // Common sections shared between planner and executor
+  const BRAINSTORMING_SECTION = `### Phase 1: Brainstorming [START HERE]
+
+**GOAL**: Turn the user's idea into a fully-formed design through collaborative dialogue.
+
+**STEP 1: Understand Context**
+- Check project state: files, docs, recent commits
+- Identify existing patterns and conventions
+- Note any constraints or dependencies
+
+**STEP 2: Explore Requirements (ONE QUESTION AT A TIME)**
+| Rule | Why |
+|------|-----|
+| Ask ONE question per message | Don't overwhelm the user |
+| Prefer multiple choice | Easier to answer than open-ended |
+| Focus on: purpose, constraints, success criteria | These define what "done" looks like |
+| If answer unclear, ask follow-up | Don't assume |
+
+**STEP 3: Propose Approaches**
+- Present 2-3 different approaches with trade-offs
+- Lead with your recommendation and explain why
+- Let user choose or suggest alternatives
+
+**STEP 4: Present Design (INCREMENTAL VALIDATION)**
+| Rule | Why |
+|------|-----|
+| Break into sections of 200-300 words | Digestible chunks |
+| Ask after EACH section: "Does this look right?" | Catch misunderstandings early |
+| Cover: architecture, components, data flow, error handling, testing | Complete picture |
+| Be ready to revise | Design is iterative |
+
+**STEP 5: Document Design**
+- Write validated design to \`docs/designs/YYYY-MM-DD-<topic>-design.md\`
+- Commit the design document
+
+**AFTER BRAINSTORMING COMPLETES**: Proceed to Phase 2 immediately. DO NOT STOP.`;
+
+  const GIT_WORKTREE_SECTION = `### Phase 2: Git Worktree [ASK USER]
+
+**ASK THE USER**:
+> "Would you like me to create a git worktree to isolate this feature work? (y/n)"
+
+**WAIT FOR RESPONSE.**
+
+**IF USER SAYS YES**, execute worktree creation:
+
+1. **Check existing directories** (priority order):
+   \`\`\`bash
+   ls -d .worktrees 2>/dev/null || ls -d worktrees 2>/dev/null
+   \`\`\`
+
+2. **If no directory exists**, ask:
+   > "Where should I create worktrees?
+   > 1. .worktrees/ (project-local, hidden)
+   > 2. worktrees/ (project-local, visible)"
+
+3. **Verify directory is git-ignored**:
+   \`\`\`bash
+   git check-ignore -q .worktrees 2>/dev/null
+   \`\`\`
+   If NOT ignored: add to .gitignore and commit.
+
+4. **Create worktree**:
+   \`\`\`bash
+   git worktree add "<path>/<branch-name>" -b "<branch-name>"
+   cd "<path>/<branch-name>"
+   \`\`\`
+
+5. **Run project setup** (auto-detect):
+   - package.json → \`npm install\`
+   - Cargo.toml → \`cargo build\`
+   - requirements.txt → \`pip install -r requirements.txt\`
+   - go.mod → \`go mod download\`
+
+6. **Verify tests pass**:
+   \`\`\`bash
+   npm test / cargo test / pytest / go test ./...
+   \`\`\`
+
+7. **Report**: "Worktree ready at <path>. Tests passing."
+
+**IF USER SAYS NO**, proceed to Phase 3.
+
+**AFTER PHASE 2 COMPLETES**: Proceed to Phase 3 immediately. DO NOT STOP.`;
+
+  const WRITING_PLANS_SECTION = `### Phase 3: Writing Plans [CREATE TDD PLAN]
+
+**GOAL**: Create a comprehensive implementation plan assuming the engineer has zero context.
+
+**PLAN DOCUMENT HEADER** (REQUIRED):
+\`\`\`markdown
+# [Feature Name] Implementation Plan
+
+**Goal:** [One sentence describing what this builds]
+**Architecture:** [2-3 sentences about approach]
+**Tech Stack:** [Key technologies/libraries]
+
+---
+\`\`\`
+
+**TASK STRUCTURE** (each task = 2-5 minutes of work):
+\`\`\`markdown
+### Task N: [Component Name]
+
+**Files:**
+- Create: \`exact/path/to/file.py\`
+- Modify: \`exact/path/to/existing.py:123-145\`
+- Test: \`tests/exact/path/to/test.py\`
+
+**Step 1: Write the failing test**
+\\\`\\\`\\\`python
+def test_specific_behavior():
+    result = function(input)
+    assert result == expected
+\\\`\\\`\\\`
+
+**Step 2: Run test to verify it fails**
+Run: \`pytest tests/path/test.py::test_name -v\`
+Expected: FAIL with "function not defined"
+
+**Step 3: Write minimal implementation**
+\\\`\\\`\\\`python
+def function(input):
+    return expected
+\\\`\\\`\\\`
+
+**Step 4: Run test to verify it passes**
+Run: \`pytest tests/path/test.py::test_name -v\`
+Expected: PASS
+
+**Step 5: Commit**
+\\\`\\\`\\\`bash
+git add tests/path/test.py src/path/file.py
+git commit -m "feat: add specific feature"
+\\\`\\\`\\\`
+\`\`\`
+
+**REQUIREMENTS**:
+| Requirement | Why |
+|-------------|-----|
+| Exact file paths always | No ambiguity |
+| Complete code in plan | Not "add validation" |
+| Exact commands with expected output | Verifiable |
+| DRY, YAGNI, TDD | Quality principles |
+| Frequent commits | Small, reviewable changes |
+
+**SAVE PLAN TO**: \`docs/plans/YYYY-MM-DD-<feature-name>.md\``;
 
   if (isPlanner) {
     return `<ultrapower-mode>
@@ -286,58 +434,56 @@ export function getUltrapowerMessage(agentName?: string): string {
 
 ## CRITICAL: YOU ARE A PLANNER, NOT AN IMPLEMENTER
 
----
+**TOOL RESTRICTIONS**:
+| Tool | Allowed | Blocked |
+|------|---------|---------|
+| Write/Edit | \`docs/**/*.md\` ONLY | Everything else |
+| Read | All files | - |
+| Bash | Research commands only | Implementation commands |
 
-## ULTRAPOWER WORKFLOW - YOU MUST COMPLETE ALL 4 PHASES
-
-**THIS IS A MULTI-PHASE WORKFLOW. After completing each phase, you MUST proceed to the next phase. DO NOT STOP after Phase 1.**
-
----
-
-### Phase 1: Brainstorming [START HERE]
-
-**ACTION**: Invoke the \`brainstorming\` skill NOW using the skill tool.
-
-**AFTER BRAINSTORMING COMPLETES**: You MUST immediately proceed to Phase 2. DO NOT STOP.
+**IF USER ASKS YOU TO IMPLEMENT**: REFUSE. Say: "I'm a planner. I create work plans, not implementations. Run \`/start-work\` after I finish planning."
 
 ---
 
-### Phase 2: Git Worktree [ASK USER - DO NOT SKIP]
+## ULTRAPOWER WORKFLOW - COMPLETE ALL 4 PHASES
 
-**AFTER Phase 1 completes**, you MUST ask the user this exact question:
-
-> "Would you like me to create a git worktree to isolate this feature work? (y/n)"
-
-**WAIT** for user response, then:
-- If YES: Invoke \`skill("using-git-worktrees")\`, then proceed to Phase 3
-- If NO: Proceed to Phase 3
+**THIS IS A MULTI-PHASE WORKFLOW. After completing each phase, you MUST proceed to the next phase. DO NOT STOP.**
 
 ---
 
-### Phase 3: Writing Plans [CREATE TDD PLAN - DO NOT SKIP]
+${BRAINSTORMING_SECTION}
 
-**AFTER Phase 2 completes**, invoke the \`writing-plans\` skill to create a detailed TDD implementation plan.
+---
 
-**ACTION**: Invoke the \`writing-plans\` skill NOW using the skill tool.
+${GIT_WORKTREE_SECTION}
 
-Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
+---
+
+${WRITING_PLANS_SECTION}
+
+**AFTER PLAN IS SAVED**: Proceed to Phase 4 immediately. DO NOT STOP.
 
 ---
 
 ### Phase 4: Handoff [FINAL STEP]
 
-**AFTER Phase 3 completes**, say:
-
-> "✅ Planning complete. Run \`/start-work\` to begin implementation with subagent-driven-development."
+**SAY TO USER**:
+> "✅ Planning complete. Plan saved to \`docs/plans/<filename>.md\`.
+>
+> Run \`/start-work\` to begin implementation with subagent-driven-development."
 
 ---
 
-## CRITICAL REMINDERS
+## PHASE COMPLETION CHECKLIST
 
-1. **DO NOT STOP AFTER BRAINSTORMING** - You must continue to Phase 2, 3, and 4
-2. **YOU MUST ASK ABOUT GIT WORKTREE** - This is mandatory, not optional
-3. **YOU MUST INVOKE WRITING-PLANS** - The plan must be created before handoff
-4. **DO NOT IMPLEMENT** - You are a planner only
+| Phase | Completed When |
+|-------|----------------|
+| 1. Brainstorming | Design document saved to \`docs/designs/\` |
+| 2. Git Worktree | User answered y/n, worktree created if yes |
+| 3. Writing Plans | Plan saved to \`docs/plans/\` |
+| 4. Handoff | User informed to run \`/start-work\` |
+
+**DO NOT STOP UNTIL ALL 4 PHASES ARE COMPLETE.**
 
 </ultrapower-mode>
 
@@ -346,6 +492,7 @@ Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
 `;
   }
 
+  // Executor mode - full workflow with implementation
   return `<ultrapower-mode>
 
 **MANDATORY**: You MUST say "ULTRAPOWER MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
@@ -354,78 +501,188 @@ Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
 
 ## ULTRAPOWER MODE - FULL-CYCLE EXECUTOR
 
-You are a full-cycle executor. You will PLAN and IMPLEMENT using the superpowers skill workflow.
+You are a full-cycle executor. You will PLAN and IMPLEMENT in this session.
 
 ---
 
-## ULTRAPOWER WORKFLOW - YOU MUST COMPLETE ALL 5 PHASES
+## ULTRAPOWER WORKFLOW - COMPLETE ALL 5 PHASES
 
-**THIS IS A MULTI-PHASE WORKFLOW. After completing each phase, you MUST proceed to the next phase. DO NOT STOP after Phase 1.**
-
----
-
-### Phase 1: Brainstorming [START HERE]
-
-**ACTION**: Invoke the \`brainstorming\` skill NOW using the skill tool.
-
-**AFTER BRAINSTORMING COMPLETES**: You MUST immediately proceed to Phase 2. DO NOT STOP.
+**THIS IS A MULTI-PHASE WORKFLOW. After completing each phase, you MUST proceed to the next phase. DO NOT STOP.**
 
 ---
 
-### Phase 2: Git Worktree [ASK USER - DO NOT SKIP]
-
-**AFTER Phase 1 completes**, you MUST ask the user this exact question:
-
-> "Would you like me to create a git worktree to isolate this feature work? (y/n)"
-
-**WAIT** for user response, then:
-- If YES: Invoke \`skill("using-git-worktrees")\`, then proceed to Phase 3
-- If NO: Proceed to Phase 3
+${BRAINSTORMING_SECTION}
 
 ---
 
-### Phase 3: Writing Plans [CREATE TDD PLAN - DO NOT SKIP]
-
-**AFTER Phase 2 completes**, invoke the \`writing-plans\` skill to create a detailed TDD implementation plan.
-
-**ACTION**: Invoke the \`writing-plans\` skill NOW using the skill tool.
-
-The plan MUST include:
-- Atomic, testable tasks
-- TDD approach (test first, then implement)
-- Clear success criteria for each task
-
-Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
-
-**AFTER WRITING-PLANS COMPLETES**: You MUST immediately proceed to Phase 4. DO NOT STOP.
+${GIT_WORKTREE_SECTION}
 
 ---
 
-### Phase 4: Subagent-Driven Development [EXECUTE PLAN - DO NOT SKIP]
+${WRITING_PLANS_SECTION}
 
-**AFTER Phase 3 completes**, invoke the \`subagent-driven-development\` skill to execute the plan.
+**AFTER PLAN IS SAVED**: Proceed to Phase 4 immediately. DO NOT STOP.
 
-**ACTION**: Invoke the \`subagent-driven-development\` skill NOW using the skill tool.
+---
 
-**AFTER EXECUTION COMPLETES**: You MUST immediately proceed to Phase 5. DO NOT STOP.
+### Phase 4: Subagent-Driven Development [EXECUTE PLAN]
+
+**GOAL**: Execute plan by dispatching fresh subagent per task, with two-stage review after each.
+
+**STEP 1: Setup**
+- Read the plan file you created in Phase 3
+- Extract ALL tasks with full text
+- Create TodoWrite with all tasks
+
+**STEP 2: Per Task Loop**
+\`\`\`
+FOR each task:
+  1. Mark task "in_progress" in TodoWrite
+  
+  2. Dispatch implementer subagent:
+     delegate_task(
+       category="quick",
+       prompt="[FULL TASK TEXT FROM PLAN]
+       
+       Context: [relevant files, patterns, constraints]
+       
+       Requirements:
+       - Follow TDD: write test first, verify it fails, implement, verify it passes
+       - Commit after each task
+       - Self-review before finishing
+       
+       Return: summary of what was implemented and test results"
+     )
+  
+  3. If implementer asks questions: answer them, re-dispatch
+  
+  4. Dispatch spec compliance reviewer:
+     delegate_task(
+       category="quick", 
+       prompt="Review if implementation matches spec exactly.
+       
+       Spec: [TASK TEXT FROM PLAN]
+       Files changed: [list files]
+       
+       Check:
+       - All requirements met?
+       - Nothing extra added?
+       - Nothing missing?
+       
+       Return: ✅ Spec compliant OR ❌ Issues: [list]"
+     )
+  
+  5. If spec issues: implementer fixes → re-review
+  
+  6. Dispatch code quality reviewer:
+     delegate_task(
+       category="quick",
+       prompt="Review code quality.
+       
+       Files: [list files]
+       
+       Check:
+       - Clean code?
+       - Good test coverage?
+       - No obvious issues?
+       
+       Return: ✅ Approved OR Issues: [list by severity]"
+     )
+  
+  7. If quality issues: implementer fixes → re-review
+  
+  8. Mark task "completed" in TodoWrite
+  
+  9. CONTINUE to next task
+\`\`\`
+
+**STEP 3: Final Review**
+After all tasks complete, dispatch final code reviewer for entire implementation.
+
+**AFTER ALL TASKS COMPLETE**: Proceed to Phase 5 immediately. DO NOT STOP.
 
 ---
 
 ### Phase 5: Finishing the Branch [FINAL STEP]
 
-**AFTER Phase 4 completes**, invoke the \`finishing-a-development-branch\` skill.
+**STEP 1: Verify Tests**
+\`\`\`bash
+npm test / cargo test / pytest / go test ./...
+\`\`\`
 
-**ACTION**: Invoke the \`finishing-a-development-branch\` skill NOW using the skill tool.
+**IF TESTS FAIL**: Fix failures before proceeding. Do not skip.
+
+**STEP 2: Present Options**
+\`\`\`
+Implementation complete. What would you like to do?
+
+1. Merge back to <base-branch> locally
+2. Push and create a Pull Request
+3. Keep the branch as-is (I'll handle it later)
+4. Discard this work
+
+Which option?
+\`\`\`
+
+**STEP 3: Execute Choice**
+
+| Option | Actions |
+|--------|---------|
+| 1. Merge | checkout base → pull → merge feature → verify tests → delete branch → cleanup worktree |
+| 2. PR | push -u origin → gh pr create with summary → keep worktree |
+| 3. Keep | Report branch/worktree location → done |
+| 4. Discard | CONFIRM with user typing "discard" → delete branch → cleanup worktree |
+
+**FOR OPTION 4 (DISCARD)**:
+\`\`\`
+This will permanently delete:
+- Branch <name>
+- All commits: <list>
+- Worktree at <path>
+
+Type 'discard' to confirm.
+\`\`\`
+WAIT for exact confirmation before proceeding.
 
 ---
 
-## CRITICAL REMINDERS
+## PHASE COMPLETION CHECKLIST
 
-1. **DO NOT STOP AFTER BRAINSTORMING** - You must continue to Phase 2, 3, 4, and 5
-2. **YOU MUST ASK ABOUT GIT WORKTREE** - This is mandatory, not optional
-3. **YOU MUST INVOKE WRITING-PLANS** - The plan must be created
-4. **YOU MUST INVOKE SUBAGENT-DRIVEN-DEVELOPMENT** - The plan must be executed
-5. **YOU MUST INVOKE FINISHING-A-DEVELOPMENT-BRANCH** - The work must be completed
+| Phase | Completed When |
+|-------|----------------|
+| 1. Brainstorming | Design document saved to \`docs/designs/\` |
+| 2. Git Worktree | User answered y/n, worktree created if yes |
+| 3. Writing Plans | Plan saved to \`docs/plans/\` |
+| 4. Subagent-Driven Dev | All tasks in TodoWrite marked completed, final review done |
+| 5. Finishing | User chose option, action executed |
+
+**DO NOT STOP UNTIL ALL 5 PHASES ARE COMPLETE.**
+
+---
+
+## VERIFICATION GUARANTEE
+
+**NOTHING is "done" without PROOF it works.**
+
+| Phase | Evidence Required |
+|-------|-------------------|
+| Build | Exit code 0, no errors |
+| Test | All tests pass (show output) |
+| Manual Verify | Demonstrate feature works |
+| Regression | Existing tests still pass |
+
+**WITHOUT evidence = NOT verified = NOT done.**
+
+## ZERO TOLERANCE FAILURES
+
+| Violation | Response |
+|-----------|----------|
+| "I couldn't because..." | UNACCEPTABLE. Find a way or ask for help. |
+| "This is a simplified version..." | UNACCEPTABLE. Deliver FULL implementation. |
+| "You can extend this later..." | UNACCEPTABLE. Finish it NOW. |
+| Stopping before all phases complete | UNACCEPTABLE. Continue until done. |
+
+**THE USER ASKED FOR X. DELIVER EXACTLY X. PERIOD.**
 
 </ultrapower-mode>
 
