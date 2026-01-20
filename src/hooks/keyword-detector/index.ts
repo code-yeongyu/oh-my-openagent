@@ -1,83 +1,140 @@
-import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
-import { log } from "../../shared"
-import { isSystemDirective } from "../../shared/system-directive"
-import { getMainSessionID, getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
-import type { ContextCollector } from "../../features/context-injector"
+import type { PluginInput } from "@opencode-ai/plugin";
+import {
+  detectKeywordsWithType,
+  extractPromptText,
+  removeCodeBlocks,
+} from "./detector";
+import { log } from "../../shared";
+import { isSystemDirective } from "../../shared/system-directive";
+import {
+  getMainSessionID,
+  getSessionAgent,
+  subagentSessions,
+} from "../../features/claude-code-session-state";
+import type { ContextCollector } from "../../features/context-injector";
 
-export * from "./detector"
-export * from "./constants"
-export * from "./types"
+export * from "./detector";
+export * from "./constants";
+export * from "./types";
 
-export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextCollector) {
+export function createKeywordDetectorHook(
+  ctx: PluginInput,
+  collector?: ContextCollector,
+) {
   return {
     "chat.message": async (
       input: {
-        sessionID: string
-        agent?: string
-        model?: { providerID: string; modelID: string }
-        messageID?: string
+        sessionID: string;
+        agent?: string;
+        model?: { providerID: string; modelID: string };
+        messageID?: string;
       },
       output: {
-        message: Record<string, unknown>
-        parts: Array<{ type: string; text?: string; [key: string]: unknown }>
-      }
+        message: Record<string, unknown>;
+        parts: Array<{ type: string; text?: string; [key: string]: unknown }>;
+      },
     ): Promise<void> => {
-      const promptText = extractPromptText(output.parts)
+      const promptText = extractPromptText(output.parts);
 
       if (isSystemDirective(promptText)) {
-        log(`[keyword-detector] Skipping system directive message`, { sessionID: input.sessionID })
-        return
+        log(`[keyword-detector] Skipping system directive message`, {
+          sessionID: input.sessionID,
+        });
+        return;
       }
 
-      const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
-      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), currentAgent)
+      const currentAgent = getSessionAgent(input.sessionID) ?? input.agent;
+      let detectedKeywords = detectKeywordsWithType(
+        removeCodeBlocks(promptText),
+        currentAgent,
+      );
 
       if (detectedKeywords.length === 0) {
-        return
+        return;
       }
 
       // Skip keyword detection for background task sessions to prevent mode injection
       // (e.g., [analyze-mode]) which incorrectly triggers Prometheus restrictions
-      const isBackgroundTaskSession = subagentSessions.has(input.sessionID)
+      const isBackgroundTaskSession = subagentSessions.has(input.sessionID);
       if (isBackgroundTaskSession) {
-        return
+        return;
       }
 
-      const mainSessionID = getMainSessionID()
-      const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
+      const mainSessionID = getMainSessionID();
+      const isNonMainSession =
+        mainSessionID && input.sessionID !== mainSessionID;
 
       if (isNonMainSession) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type === "ultrawork" || k.type === "ultrapower",
+        );
         if (detectedKeywords.length === 0) {
-          log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
-            sessionID: input.sessionID,
-            mainSessionID,
-          })
-          return
+          log(
+            `[keyword-detector] Skipping non-ultrawork/ultrapower keywords in non-main session`,
+            {
+              sessionID: input.sessionID,
+              mainSessionID,
+            },
+          );
+          return;
         }
       }
 
-      const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
+      const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork");
       if (hasUltrawork) {
-        log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
+        log(`[keyword-detector] Ultrawork mode activated`, {
+          sessionID: input.sessionID,
+        });
 
         if (output.message.variant === undefined) {
-          output.message.variant = "max"
+          output.message.variant = "max";
         }
 
         ctx.client.tui
           .showToast({
             body: {
               title: "Ultrawork Mode Activated",
-              message: "Maximum precision engaged. All agents at your disposal.",
+              message:
+                "Maximum precision engaged. All agents at your disposal.",
               variant: "success" as const,
               duration: 3000,
             },
           })
           .catch((err) =>
-            log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID })
-          )
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            }),
+          );
+      }
+
+      const hasUltrapower = detectedKeywords.some(
+        (k) => k.type === "ultrapower",
+      );
+      if (hasUltrapower) {
+        log(`[keyword-detector] Ultrapower mode activated`, {
+          sessionID: input.sessionID,
+        });
+
+        if (output.message.variant === undefined) {
+          output.message.variant = "max";
+        }
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Ultrapower Mode Activated",
+              message: "Superpowers workflow engaged.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            }),
+          );
       }
 
       if (collector) {
@@ -86,15 +143,18 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
             id: `keyword-${keyword.type}`,
             source: "keyword-detector",
             content: keyword.message,
-            priority: keyword.type === "ultrawork" ? "critical" : "high",
-          })
+            priority:
+              keyword.type === "ultrawork" || keyword.type === "ultrapower"
+                ? "critical"
+                : "high",
+          });
         }
       }
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
-      })
+      });
     },
-  }
+  };
 }

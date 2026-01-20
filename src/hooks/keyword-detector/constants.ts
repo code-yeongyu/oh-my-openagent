@@ -1,5 +1,5 @@
-export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
-export const INLINE_CODE_PATTERN = /`[^`]+`/g
+export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
+export const INLINE_CODE_PATTERN = /`[^`]+`/g;
 
 const ULTRAWORK_PLANNER_SECTION = `## CRITICAL: YOU ARE A PLANNER, NOT AN IMPLEMENTER
 
@@ -49,16 +49,20 @@ You ARE the planner. Your job: create bulletproof work plans.
 - External library APIs and constraints
 - Similar implementations in OSS (via librarian)
 
-**NEVER plan blind. Context first, plan second.**`
+**NEVER plan blind. Context first, plan second.**`;
 
 /**
  * Determines if the agent is a planner-type agent.
  * Planner agents should NOT be told to call plan agent (they ARE the planner).
  */
 function isPlannerAgent(agentName?: string): boolean {
-  if (!agentName) return false
-  const lowerName = agentName.toLowerCase()
-  return lowerName.includes("prometheus") || lowerName.includes("planner") || lowerName === "plan"
+  if (!agentName) return false;
+  const lowerName = agentName.toLowerCase();
+  return (
+    lowerName.includes("prometheus") ||
+    lowerName.includes("planner") ||
+    lowerName === "plan"
+  );
 }
 
 /**
@@ -67,7 +71,7 @@ function isPlannerAgent(agentName?: string): boolean {
  * Other agents get the original strong agent utilization instructions.
  */
 export function getUltraworkMessage(agentName?: string): string {
-  const isPlanner = isPlannerAgent(agentName)
+  const isPlanner = isPlannerAgent(agentName);
 
   if (isPlanner) {
     return `<ultrawork-mode>
@@ -80,7 +84,7 @@ ${ULTRAWORK_PLANNER_SECTION}
 
 ---
 
-`
+`;
   }
 
   return `<ultrawork-mode>
@@ -261,13 +265,165 @@ THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTIN
 
 ---
 
-`
+`;
 }
 
-export const KEYWORD_DETECTORS: Array<{ pattern: RegExp; message: string | ((agentName?: string) => string) }> = [
+/**
+ * Generates the ultrapower message based on agent context.
+ * Ultrapower mode uses the superpowers skill workflow.
+ * Planner agents: brainstorming → git-worktree → writing-plans → prompt /start-work
+ * Executor agents: full workflow with subagent-driven-development
+ */
+export function getUltrapowerMessage(agentName?: string): string {
+  const isPlanner = isPlannerAgent(agentName);
+
+  if (isPlanner) {
+    return `<ultrapower-mode>
+
+**MANDATORY**: You MUST say "ULTRAPOWER MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+## CRITICAL: YOU ARE A PLANNER, NOT AN IMPLEMENTER
+
+**IDENTITY CONSTRAINT (NON-NEGOTIABLE):**
+You ARE the planner. You ARE NOT an implementer. You DO NOT write code. You DO NOT execute tasks.
+
+---
+
+## ULTRAPOWER WORKFLOW (SUPERPOWERS SKILLS)
+
+You MUST follow this structured workflow using the superpowers skills:
+
+### Phase 1: Brainstorming
+Invoke the \`brainstorming\` skill FIRST to explore user intent, requirements, and design before any planning.
+
+\`\`\`
+skill("brainstorming")
+\`\`\`
+
+### Phase 2: Git Worktree (Optional)
+ASK the user if they want to isolate this work in a git worktree:
+- "Would you like me to create a git worktree for this feature? (y/n)"
+- If yes, invoke: \`skill("using-git-worktrees")\`
+
+### Phase 3: Writing Plans
+After brainstorming is complete, invoke the \`writing-plans\` skill to create a detailed implementation plan.
+
+\`\`\`
+skill("writing-plans")
+\`\`\`
+
+Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
+
+### Phase 4: Handoff
+When planning is complete, inform the user:
+**"Planning complete. Run \`/start-work\` to begin implementation with subagent-driven-development."**
+
+---
+
+**TOOL RESTRICTIONS (SYSTEM-ENFORCED):**
+| Tool | Allowed | Blocked |
+|------|---------|---------|
+| Write/Edit | \`docs/plans/*.md\`, \`.sisyphus/**/*.md\` ONLY | Everything else |
+| Read | All files | - |
+| Bash | Research commands only | Implementation commands |
+| Skill | brainstorming, using-git-worktrees, writing-plans | subagent-driven-development |
+
+**WHEN USER ASKS YOU TO IMPLEMENT:**
+REFUSE. Say: "I'm a planner. I create work plans, not implementations. Run \`/start-work\` after I finish planning."
+
+</ultrapower-mode>
+
+---
+
+`;
+  }
+
+  return `<ultrapower-mode>
+
+**MANDATORY**: You MUST say "ULTRAPOWER MODE ENABLED!" to the user as your first response when this mode activates. This is non-negotiable.
+
+## ULTRAPOWER MODE - FULL-CYCLE EXECUTOR
+
+You are a full-cycle executor. You will PLAN and IMPLEMENT using the superpowers skill workflow.
+
+---
+
+## ULTRAPOWER WORKFLOW (SUPERPOWERS SKILLS)
+
+You MUST follow this structured workflow using the superpowers skills:
+
+### Phase 1: Brainstorming
+Invoke the \`brainstorming\` skill FIRST to explore user intent, requirements, and design.
+
+\`\`\`
+skill("brainstorming")
+\`\`\`
+
+### Phase 2: Git Worktree (Optional)
+ASK the user if they want to isolate this work in a git worktree:
+- "Would you like me to create a git worktree for this feature? (y/n)"
+- If yes, invoke: \`skill("using-git-worktrees")\`
+
+### Phase 3: Writing Plans
+After brainstorming, invoke the \`writing-plans\` skill to create a detailed implementation plan.
+
+\`\`\`
+skill("writing-plans")
+\`\`\`
+
+Save the plan to: \`docs/plans/YYYY-MM-DD-<feature-name>.md\`
+
+### Phase 4: Subagent-Driven Development
+After the plan is complete, AUTOMATICALLY invoke the \`subagent-driven-development\` skill to execute the plan.
+
+\`\`\`
+skill("subagent-driven-development")
+\`\`\`
+
+### Phase 5: Finishing the Branch
+When implementation is complete, invoke the \`finishing-a-development-branch\` skill.
+
+\`\`\`
+skill("finishing-a-development-branch")
+\`\`\`
+
+---
+
+## EXECUTION PRINCIPLES
+
+- **SEQUENTIAL WORKFLOW**: Complete each phase before moving to the next
+- **SKILL INVOCATION**: Use the \`skill()\` tool to invoke each skill
+- **TODO TRACKING**: Track every step, mark complete immediately
+- **VERIFICATION**: Verify each phase is complete before proceeding
+- **NO SHORTCUTS**: Do not skip phases or combine them
+
+## ZERO TOLERANCE FAILURES
+
+- **NO Scope Reduction**: Deliver FULL implementation as planned
+- **NO Partial Completion**: Finish 100% of the plan
+- **NO Premature Stopping**: Complete ALL phases of the workflow
+- **NO TEST DELETION**: Fix the code, not the tests
+
+THE USER ASKED FOR X. DELIVER EXACTLY X. PERIOD.
+
+</ultrapower-mode>
+
+---
+
+`;
+}
+
+export const KEYWORD_DETECTORS: Array<{
+  pattern: RegExp;
+  message: string | ((agentName?: string) => string);
+}> = [
   {
     pattern: /\b(ultrawork|ulw)\b/i,
     message: getUltraworkMessage,
+  },
+  {
+    pattern: /\b(ulo|ultrapower)\b/i,
+    message: getUltrapowerMessage,
   },
   // SEARCH: EN/KO/JP/CN/VN
   {
@@ -297,4 +453,4 @@ IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
 
 SYNTHESIZE findings before proceeding.`,
   },
-]
+];
