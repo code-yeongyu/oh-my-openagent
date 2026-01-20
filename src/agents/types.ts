@@ -64,7 +64,7 @@ export type BuiltinAgentName =
   | "multimodal-looker"
   | "Metis (Plan Consultant)"
   | "Momus (Plan Reviewer)"
-  | "atlas"
+  | "Atlas"
 
 export type OverridableAgentName =
   | "build"
