@@ -482,6 +482,51 @@ ${textContent || "(No text output)"}`
             : parsedModel)
           : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
+
+        // Unstable agent detection - force background mode for monitoring
+        const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
+        if (isUnstableAgent && args.run_in_background === false) {
+          // Force background mode for unstable agents
+          const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+
+          try {
+            const task = await manager.launch({
+              description: args.description,
+              prompt: args.prompt,
+              agent: agentToUse,
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              parentModel,
+              parentAgent,
+              model: categoryModel,
+              skills: args.skills.length > 0 ? args.skills : undefined,
+              skillContent: systemContent,
+            })
+
+            ctx.metadata?.({
+              title: args.description,
+              metadata: { sessionId: task.sessionID, category: args.category },
+            })
+
+            return `[UNSTABLE AGENT MODE]
+
+This category uses an unstable/experimental model (${actualModel}).
+Forced to background mode for monitoring stability.
+
+Task ID: ${task.id}
+Session ID: ${task.sessionID}
+
+Monitor progress: Use \`background_output\` with task_id="${task.id}"
+Or watch the session directly for real-time updates.`
+          } catch (error) {
+            return formatDetailedError(error, {
+              operation: "Launch background task (unstable agent)",
+              args,
+              agent: agentToUse,
+              category: args.category,
+            })
+          }
+        }
       } else {
         if (!args.subagent_type?.trim()) {
           return `Agent name cannot be empty.`
