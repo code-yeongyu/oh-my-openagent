@@ -207,6 +207,10 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   },
 }
 
+export const CATEGORY_MODEL_CATALOG: Record<string, { model: string; variant?: string }> = {
+  ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
+}
+
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
   ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
