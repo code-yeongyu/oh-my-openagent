@@ -209,6 +209,10 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
 
 export const CATEGORY_MODEL_CATALOG: Record<string, { model: string; variant?: string }> = {
   ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
+  artistry: { model: "google/gemini-3-pro-preview", variant: "max" },
+  "most-capable": { model: "anthropic/claude-opus-4-5", variant: "max" },
+  writing: { model: "google/gemini-3-flash-preview" },
+  general: { model: "anthropic/claude-sonnet-4-5" },
 }
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
