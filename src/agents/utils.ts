@@ -28,9 +28,9 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   "Metis (Plan Consultant)": createMetisAgent,
   "Momus (Plan Reviewer)": createMomusAgent,
-  // Note: orchestrator-sisyphus is handled specially in createBuiltinAgents()
+  // Note: atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  "orchestrator-sisyphus": createOrchestratorSisyphusAgent as unknown as AgentFactory,
+  atlas: createOrchestratorSisyphusAgent as unknown as AgentFactory,
 }
 
 /**
@@ -159,7 +159,7 @@ export function createBuiltinAgents(
     const agentName = name as BuiltinAgentName
 
     if (agentName === "Sisyphus") continue
-    if (agentName === "orchestrator-sisyphus") continue
+    if (agentName === "atlas") continue
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
@@ -206,8 +206,8 @@ export function createBuiltinAgents(
     result["Sisyphus"] = sisyphusConfig
   }
 
-  if (!disabledAgents.includes("orchestrator-sisyphus")) {
-    const orchestratorOverride = agentOverrides["orchestrator-sisyphus"]
+  if (!disabledAgents.includes("atlas")) {
+    const orchestratorOverride = agentOverrides["atlas"]
     const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
     let orchestratorConfig = createOrchestratorSisyphusAgent({
       model: orchestratorModel,
@@ -218,7 +218,7 @@ export function createBuiltinAgents(
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
     }
 
-    result["orchestrator-sisyphus"] = orchestratorConfig
+    result["atlas"] = orchestratorConfig
   }
 
   return result
