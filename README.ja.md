@@ -16,7 +16,7 @@
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
 > > **オーケストレーターがベータ版で利用可能になりました。`oh-my-opencode@3.0.0-beta.10`を使用してインストールしてください。**
 >
 > 一緒に歩みましょう！
@@ -279,7 +279,7 @@ oh-my-opencode を削除するには：
 詳細は [Features Documentation](docs/features.md) を参照してください。
 
 **概要:**
-- **エージェント**: Sisyphus（メインエージェント）、Prometheus（プランナー）、Oracle（アーキテクチャ/デバッグ）、Librarian（ドキュメント/コード検索）、Explore（高速コードベース grep）、Frontend Engineer（UI/UX）、Document Writer、Multimodal Looker
+- **エージェント**: Sisyphus（メインエージェント）、Prometheus（プランナー）、Oracle（アーキテクチャ/デバッグ）、Librarian（ドキュメント/コード検索）、Explore（高速コードベース grep）、Multimodal Looker
 - **バックグラウンドエージェント**: 本物の開発チームのように複数エージェントを並列実行
 - **LSP & AST ツール**: リファクタリング、リネーム、診断、AST 認識コード検索
 - **コンテキスト注入**: AGENTS.md、README.md、条件付きルールの自動注入
