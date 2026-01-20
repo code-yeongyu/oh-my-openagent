@@ -9,7 +9,7 @@ import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./fro
 import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent } from "./metis"
-import { createOrchestratorSisyphusAgent } from "./orchestrator-sisyphus"
+import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent } from "./sisyphus-prompt-builder"
 import { deepMerge } from "../shared"
@@ -30,7 +30,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "Momus (Plan Reviewer)": createMomusAgent,
   // Note: atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  atlas: createOrchestratorSisyphusAgent as unknown as AgentFactory,
+  atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
 /**
@@ -209,10 +209,10 @@ export function createBuiltinAgents(
   if (!disabledAgents.includes("atlas")) {
     const orchestratorOverride = agentOverrides["atlas"]
     const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
-    let orchestratorConfig = createOrchestratorSisyphusAgent({
-      model: orchestratorModel,
-      availableAgents,
-    })
+     let orchestratorConfig = createAtlasAgent({
+       model: orchestratorModel,
+       availableAgents,
+     })
 
     if (orchestratorOverride) {
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
