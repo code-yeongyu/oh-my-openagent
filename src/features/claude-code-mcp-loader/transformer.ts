@@ -30,6 +30,10 @@ export function transformMcpServer(
       config.headers = expanded.headers
     }
 
+    if (expanded.timeout !== undefined) {
+      config.timeout = expanded.timeout
+    }
+
     return config
   }
 
@@ -47,6 +51,10 @@ export function transformMcpServer(
 
   if (expanded.env && Object.keys(expanded.env).length > 0) {
     config.environment = expanded.env
+  }
+
+  if (expanded.timeout !== undefined) {
+    config.timeout = expanded.timeout
   }
 
   return config

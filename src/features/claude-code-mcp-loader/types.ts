@@ -8,6 +8,8 @@ export interface ClaudeCodeMcpServer {
   env?: Record<string, string>
   headers?: Record<string, string>
   disabled?: boolean
+  /** Timeout in ms for MCP server requests */
+  timeout?: number
 }
 
 export interface ClaudeCodeMcpConfig {
@@ -19,6 +21,14 @@ export interface McpLocalConfig {
   command: string[]
   environment?: Record<string, string>
   enabled?: boolean
+  /** Timeout in ms for MCP server requests */
+  timeout?: number
+}
+
+export interface McpOAuthConfig {
+  clientId?: string
+  clientSecret?: string
+  scope?: string
 }
 
 export interface McpRemoteConfig {
@@ -26,6 +36,10 @@ export interface McpRemoteConfig {
   url: string
   headers?: Record<string, string>
   enabled?: boolean
+  /** OAuth config, or false to disable OAuth auto-detection */
+  oauth?: McpOAuthConfig | false
+  /** Timeout in ms for MCP server requests */
+  timeout?: number
 }
 
 export type McpServerConfig = McpLocalConfig | McpRemoteConfig
