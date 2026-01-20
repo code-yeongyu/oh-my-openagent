@@ -44,7 +44,7 @@ oh-my-opencode/
 | Skill MCP | `src/features/skill-mcp-manager/` | MCP servers embedded in skills |
 | CLI installer | `src/cli/install.ts` | Interactive TUI (462 lines) |
 | Doctor checks | `src/cli/doctor/checks/` | 14 health checks across 6 categories |
-| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (771 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (771 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -109,8 +109,6 @@ oh-my-opencode/
 | oracle | openai/gpt-5.2 | Read-only consultation, high-IQ debugging |
 | librarian | opencode/glm-4.7-free | Multi-repo analysis, docs, GitHub search |
 | explore | opencode/grok-code | Fast codebase exploration (contextual grep) |
-| frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, visual design |
-| document-writer | google/gemini-3-flash | Technical documentation |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 | Prometheus (Planner) | anthropic/claude-opus-4-5 | Strategic planning, interview mode |
 | Metis (Plan Consultant) | anthropic/claude-sonnet-4-5 | Pre-planning analysis |
@@ -149,7 +147,7 @@ bun test               # Run tests (83 test files)
 | `src/features/builtin-skills/skills.ts` | 1203 | Skill definitions (playwright, git-master, frontend-ui-ux) |
 | `src/agents/prometheus-prompt.ts` | 1196 | Planning agent, interview mode, Momus loop |
 | `src/features/background-agent/manager.ts` | 1165 | Task lifecycle, concurrency, notification batching |
-| `src/hooks/sisyphus-orchestrator/index.ts` | 771 | Orchestrator hook implementation |
+| `src/hooks/atlas/index.ts` | 771 | Orchestrator hook implementation |
 | `src/tools/delegate-task/tools.ts` | 761 | Category-based task delegation |
 | `src/cli/config-manager.ts` | 730 | JSONC parsing, multi-level config |
 | `src/agents/sisyphus.ts` | 640 | Main Sisyphus prompt |

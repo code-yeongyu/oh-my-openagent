@@ -8,7 +8,7 @@
 
 ```
 hooks/
-├── sisyphus-orchestrator/      # Main orchestration & delegation (771 lines)
+├── atlas/                      # Main orchestration & delegation (771 lines)
 ├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit
 ├── todo-continuation-enforcer.ts # Force TODO completion
 ├── ralph-loop/                 # Self-referential dev loop until done

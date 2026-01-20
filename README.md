@@ -16,7 +16,7 @@
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
 > > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.10` to install it.**
 >
 > Be with us!
@@ -293,7 +293,7 @@ We have lots of features that you'll think should obviously exist, and once you 
 See the full [Features Documentation](docs/features.md) for detailed information.
 
 **Quick Overview:**
-- **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Frontend Engineer (UI/UX), Document Writer, Multimodal Looker
+- **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
 - **Background Agents**: Run multiple agents in parallel like a real dev team
 - **LSP & AST Tools**: Refactoring, rename, diagnostics, AST-aware code search
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules

@@ -407,7 +407,7 @@ interface SessionState {
 
 const CONTINUATION_COOLDOWN_MS = 5000
 
-export interface SisyphusOrchestratorHookOptions {
+export interface AtlasHookOptions {
   directory: string
   backgroundManager?: BackgroundManager
 }
@@ -433,9 +433,9 @@ function isAbortError(error: unknown): boolean {
   return false
 }
 
-export function createSisyphusOrchestratorHook(
+export function createAtlasHook(
   ctx: PluginInput,
-  options?: SisyphusOrchestratorHookOptions
+  options?: AtlasHookOptions
 ) {
   const backgroundManager = options?.backgroundManager
   const sessions = new Map<string, SessionState>()
