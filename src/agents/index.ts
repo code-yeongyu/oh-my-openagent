@@ -10,4 +10,4 @@ export { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./do
 export { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 export { createMetisAgent, METIS_SYSTEM_PROMPT, metisPromptMetadata } from "./metis"
 export { createMomusAgent, MOMUS_SYSTEM_PROMPT, momusPromptMetadata } from "./momus"
-export { createOrchestratorSisyphusAgent, orchestratorSisyphusPromptMetadata } from "./orchestrator-sisyphus"
+export { createAtlasAgent, atlasPromptMetadata } from "./atlas"
