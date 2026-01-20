@@ -345,6 +345,124 @@ describe("sisyphus-task", () => {
         variant: "xhigh",
       })
     })
+
+    test("DEFAULT_CATEGORIES variant passes to background WITHOUT userCategories", async () => {
+      // #given - NO userCategories, testing DEFAULT_CATEGORIES only
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-default-variant",
+            sessionID: "session-default-variant",
+            description: "Default variant task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      // NO userCategories - must use DEFAULT_CATEGORIES
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      await tool.execute(
+        {
+          description: "Test unspecified-high default variant",
+          prompt: "Do something",
+          category: "unspecified-high",
+          run_in_background: true,
+          skills: [],
+        },
+        toolContext
+      )
+
+      // #then - variant MUST be "max" from DEFAULT_CATEGORIES
+      expect(launchInput.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        variant: "max",
+      })
+    })
+
+    test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
+      // #given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_default_variant" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
+          }),
+          status: async () => ({ data: { "ses_sync_default_variant": { type: "idle" } } }),
+        },
+      }
+
+      // NO userCategories - must use DEFAULT_CATEGORIES
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      await tool.execute(
+        {
+          description: "Test unspecified-high sync variant",
+          prompt: "Do something",
+          category: "unspecified-high",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+
+      // #then - variant MUST be "max" from DEFAULT_CATEGORIES
+      expect(promptBody.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        variant: "max",
+      })
+    }, { timeout: 20000 })
   })
 
   describe("skills parameter", () => {
