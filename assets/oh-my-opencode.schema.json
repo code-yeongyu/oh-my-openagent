@@ -29,7 +29,7 @@
           "multimodal-looker",
           "Metis (Plan Consultant)",
           "Momus (Plan Reviewer)",
-          "orchestrator-sisyphus"
+          "atlas"
         ]
       }
     },
@@ -1859,7 +1859,7 @@
             }
           }
         },
-        "orchestrator-sisyphus": {
+        "atlas": {
           "type": "object",
           "properties": {
             "model": {

@@ -153,6 +153,22 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     needsWrite = true
   }
 
+  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+    const migrated: string[] = []
+    let changed = false
+    for (const agent of rawConfig.disabled_agents as string[]) {
+      const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+      if (newAgent !== agent) {
+        changed = true
+      }
+      migrated.push(newAgent)
+    }
+    if (changed) {
+      rawConfig.disabled_agents = migrated
+      needsWrite = true
+    }
+  }
+
   if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {
     const { migrated, changed } = migrateHookNames(rawConfig.disabled_hooks as string[])
     if (changed) {
