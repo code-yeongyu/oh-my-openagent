@@ -14,8 +14,6 @@ Oh-My-OpenCode provides 10 specialized AI agents. Each has distinct expertise, o
 | **oracle** | `openai/gpt-5.2` | Architecture decisions, code review, debugging. Read-only consultation - stellar logical reasoning and deep analysis. Inspired by AmpCode. |
 | **librarian** | `opencode/glm-4.7-free` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Inspired by AmpCode. |
 | **explore** | `opencode/grok-code` | Fast codebase exploration and contextual grep. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code. |
-| **frontend-ui-ux-engineer** | `google/gemini-3-pro-preview` | A designer turned developer. Builds gorgeous UIs with pixel-perfect details, smooth animations, and intuitive interactions. Gemini excels at creative, beautiful UI code. |
-| **document-writer** | `google/gemini-3-flash` | Technical writing expert - README, API docs, guides. Gemini is a wordsmith - writes prose that flows. |
 | **multimodal-looker** | `google/gemini-3-flash` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Saves tokens by having another agent process media. |
 
 ### Planning Agents
@@ -334,7 +332,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 | Hook | Event | Description |
 |------|-------|-------------|
 | **claude-code-hooks** | All | Executes hooks from Claude Code's settings.json. |
-| **sisyphus-orchestrator** | All | Main orchestration logic (771 lines). |
+| **atlas** | All | Main orchestration logic (771 lines). |
 | **interactive-bash-session** | PreToolUse | Manages tmux sessions for interactive CLI. |
 | **non-interactive-env** | PreToolUse | Handles non-interactive environment constraints. |
 

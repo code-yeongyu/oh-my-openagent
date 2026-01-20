@@ -21,8 +21,6 @@ export const BuiltinAgentNameSchema = z.enum([
   "oracle",
   "librarian",
   "explore",
-  "frontend-ui-ux-engineer",
-  "document-writer",
   "multimodal-looker",
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
@@ -47,8 +45,6 @@ export const OverridableAgentNameSchema = z.enum([
   "oracle",
   "librarian",
   "explore",
-  "frontend-ui-ux-engineer",
-  "document-writer",
   "multimodal-looker",
   "atlas",
 ])
@@ -87,7 +83,7 @@ export const HookNameSchema = z.enum([
   "delegate-task-retry",
   "prometheus-md-only",
   "start-work",
-  "sisyphus-orchestrator",
+  "atlas",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -130,8 +126,6 @@ export const AgentOverridesSchema = z.object({
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
-  "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
-  "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
 })
