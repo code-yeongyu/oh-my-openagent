@@ -66,6 +66,7 @@ describe("smart-failover hook", () => {
     )
 
     expect(output.message.model).toEqual({ providerID: "fallback", modelID: "model" })
+    await new Promise(resolve => setTimeout(resolve, 1600))
     expect(ctx.client.tui.showToast).toHaveBeenCalled()
   })
 
