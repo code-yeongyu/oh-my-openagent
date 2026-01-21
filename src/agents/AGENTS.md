@@ -41,8 +41,8 @@ agents/
 | Metis | claude-sonnet-4-5 | Plan Consultant. Pre-planning risk/requirement analysis. |
 | Momus | claude-sonnet-4-5 | Plan Reviewer. Validation and quality enforcement. |
 | sherlock | openai/gpt-5.2 | Hypothesis-driven debugger. Runtime evidence-based bug diagnosis. |
-├── atlas.ts    # Orchestrator (1531 lines) - 7-phase delegation
-├── sisyphus.ts                 # Main prompt (640 lines)
+├── atlas.ts    # Orchestrator (1383 lines) - 7-phase delegation
+├── sisyphus.ts                 # Main prompt (615 lines)
 ├── sisyphus-junior.ts          # Delegated task executor
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)

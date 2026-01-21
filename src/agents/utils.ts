@@ -9,11 +9,12 @@ import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
-import type { AvailableAgent } from "./dynamic-agent-prompt-builder"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 import { deepMerge } from "../shared"
-import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
+import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createSherlockAgent, SHERLOCK_PROMPT_METADATA } from "./sherlock"
+import { createBuiltinSkills } from "../features/builtin-skills"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -28,8 +29,9 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "orchestrator-sisyphus": createSisyphusAgent,
   sherlock: createSherlockAgent,
   // Note: atlas is handled specially in createBuiltinAgents()
+  // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  atlas: createAtlasAgent as unknown as AgentFactory,
+  Atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
 /**
@@ -153,11 +155,23 @@ export function createBuiltinAgents(
     ? { ...DEFAULT_CATEGORIES, ...categories }
     : DEFAULT_CATEGORIES
 
+  const availableCategories: AvailableCategory[] = Object.entries(mergedCategories).map(([name]) => ({
+    name,
+    description: CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
+  }))
+
+  const builtinSkills = createBuiltinSkills()
+  const availableSkills: AvailableSkill[] = builtinSkills.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    location: "plugin" as const,
+  }))
+
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
     if (agentName === "Sisyphus") continue
-    if (agentName === "atlas") continue
+    if (agentName === "Atlas") continue
     if (disabledAgents.includes(agentName)) continue
 
     const override = agentOverrides[agentName]
@@ -190,7 +204,13 @@ export function createBuiltinAgents(
     const sisyphusOverride = agentOverrides["Sisyphus"]
     const sisyphusModel = sisyphusOverride?.model ?? systemDefaultModel
 
-    let sisyphusConfig = createSisyphusAgent(sisyphusModel, availableAgents)
+    let sisyphusConfig = createSisyphusAgent(
+      sisyphusModel,
+      availableAgents,
+      undefined,
+      availableSkills,
+      availableCategories
+    )
 
     if (directory && sisyphusConfig.prompt) {
       const envContext = createEnvContext()
@@ -204,19 +224,21 @@ export function createBuiltinAgents(
     result["Sisyphus"] = sisyphusConfig
   }
 
-  if (!disabledAgents.includes("atlas")) {
-    const orchestratorOverride = agentOverrides["atlas"]
+  if (!disabledAgents.includes("Atlas")) {
+    const orchestratorOverride = agentOverrides["Atlas"]
     const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
      let orchestratorConfig = createAtlasAgent({
        model: orchestratorModel,
        availableAgents,
+       availableSkills,
+       userCategories: categories,
      })
 
     if (orchestratorOverride) {
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
     }
 
-    result["atlas"] = orchestratorConfig
+    result["Atlas"] = orchestratorConfig
   }
 
   return result

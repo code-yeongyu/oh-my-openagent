@@ -24,7 +24,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "multimodal-looker",
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
-  "atlas",
+  "Atlas",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -46,7 +46,7 @@ export const OverridableAgentNameSchema = z.enum([
   "librarian",
   "explore",
   "multimodal-looker",
-  "atlas",
+  "Atlas",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -127,7 +127,7 @@ export const AgentOverridesSchema = z.object({
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  atlas: AgentOverrideConfigSchema.optional(),
+  Atlas: AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
@@ -161,6 +161,8 @@ export const CategoryConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),
+  /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. */
+  is_unstable_agent: z.boolean().optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([

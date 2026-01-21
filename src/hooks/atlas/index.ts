@@ -111,7 +111,7 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
-You (atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
+You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 
 **Path attempted:** $FILE_PATH
 
@@ -414,7 +414,7 @@ function isCallerOrchestrator(sessionID?: string): boolean {
    const messageDir = getMessageDir(sessionID)
    if (!messageDir) return false
    const nearest = findNearestMessageWithFields(messageDir)
-   return nearest?.agent === "atlas"
+   return nearest?.agent === "Atlas"
  }
 
 interface SessionState {
@@ -513,7 +513,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-           agent: "atlas",
+            agent: "Atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },
@@ -586,7 +586,7 @@ export function createAtlasHook(
         }
 
         if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not atlas`, { sessionID })
+          log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
           return
         }
 

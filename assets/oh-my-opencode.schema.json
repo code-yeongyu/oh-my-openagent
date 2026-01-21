@@ -27,7 +27,7 @@
           "multimodal-looker",
           "Metis (Plan Consultant)",
           "Momus (Plan Reviewer)",
-          "atlas"
+          "Atlas"
         ]
       }
     },
@@ -1605,7 +1605,7 @@
             }
           }
         },
-        "atlas": {
+        "Atlas": {
           "type": "object",
           "properties": {
             "model": {
@@ -1805,6 +1805,9 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "is_unstable_agent": {
+            "type": "boolean"
           }
         }
       }

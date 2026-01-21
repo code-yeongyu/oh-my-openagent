@@ -64,7 +64,7 @@ describe("migrateAgentNames", () => {
     // #then: Case-insensitive lookup should migrate correctly
     expect(migrated["Sisyphus"]).toEqual({ model: "test" })
     expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
-    expect(migrated["atlas"]).toEqual({ model: "openai/gpt-5.2" })
+    expect(migrated["Atlas"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -81,7 +81,7 @@ describe("migrateAgentNames", () => {
     expect(migrated["custom-agent"]).toEqual({ model: "custom/model" })
   })
 
-  test("migrates orchestrator-sisyphus to atlas", () => {
+  test("migrates orchestrator-sisyphus to Atlas", () => {
     // #given: Config with legacy orchestrator-sisyphus agent name
     const agents = {
       "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
@@ -90,10 +90,25 @@ describe("migrateAgentNames", () => {
     // #when: Migrate agent names
     const { migrated, changed } = migrateAgentNames(agents)
 
-    // #then: orchestrator-sisyphus should be migrated to atlas
+    // #then: orchestrator-sisyphus should be migrated to Atlas
     expect(changed).toBe(true)
-    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
     expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
+  })
+
+  test("migrates lowercase atlas to Atlas", () => {
+    // #given: Config with lowercase atlas agent name
+    const agents = {
+      atlas: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: lowercase atlas should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toBeUndefined()
   })
 })
 
