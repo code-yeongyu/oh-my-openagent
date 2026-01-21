@@ -1783,7 +1783,8 @@
             "enum": [
               "low",
               "medium",
-              "high"
+              "high",
+              "xhigh"
             ]
           },
           "textVerbosity": {
