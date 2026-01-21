@@ -91,6 +91,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   const model = override?.model ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  const primaryModel = Array.isArray(model) ? model[0] : model
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append
@@ -111,7 +112,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     description: override?.description ??
       "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
     mode: "subagent" as const,
-    model,
+    model: primaryModel,
     temperature,
     maxTokens: 64000,
     prompt,
@@ -123,7 +124,7 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
-  if (isGptModel(model)) {
+  if (isGptModel(primaryModel)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
   }
 

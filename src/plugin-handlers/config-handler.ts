@@ -101,7 +101,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
-    if (!(config.model as string | undefined)?.trim()) {
+    const configModel = config.model as string | string[] | undefined
+    const systemDefaultModel = Array.isArray(configModel) ? configModel[0] : configModel
+
+    if (!systemDefaultModel?.trim()) {
       const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
       throw new Error(
         'oh-my-opencode requires a default model.\n\n' +
@@ -120,7 +123,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       migratedDisabledAgents,
       pluginConfig.agents,
       ctx.directory,
-      config.model as string | undefined,
+      systemDefaultModel,
       pluginConfig.categories,
       pluginConfig.git_master
     );
@@ -174,7 +177,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
         pluginConfig.agents?.["Sisyphus-Junior"],
-        config.model as string | undefined
+        systemDefaultModel
       );
 
       if (builderEnabled) {
@@ -205,7 +208,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           pluginConfig.agents?.["Prometheus (Planner)"] as
             | (Record<string, unknown> & { category?: string; model?: string })
             | undefined;
-        const defaultModel = config.model as string | undefined;
+        const defaultModel = systemDefaultModel;
 
         // Resolve full category config (model, temperature, top_p, tools, etc.)
         // Apply all category properties when category is specified, but explicit

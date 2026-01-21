@@ -31,6 +31,7 @@ import {
   createStartWorkHook,
   createAtlasHook,
   createPrometheusMdOnlyHook,
+  createSmartFailoverHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -202,6 +203,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createAtlasHook(ctx)
     : null;
 
+  const smartFailover = isHookEnabled("smart-failover")
+    ? createSmartFailoverHook(ctx, pluginConfig, modelCacheState)
+    : null;
+
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
     ? createPrometheusMdOnlyHook(ctx)
     : null;
@@ -326,6 +331,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+      await smartFailover?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
         const parts = (
@@ -412,6 +418,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
       await atlasHook?.handler(input);
+      await smartFailover?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;

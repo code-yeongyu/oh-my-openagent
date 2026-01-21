@@ -47,21 +47,24 @@ function isFactory(source: AgentSource): source is AgentFactory {
 
 export function buildAgent(
   source: AgentSource,
-  model: string,
+  model: string | string[],
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig
 ): AgentConfig {
-  const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
     ? { ...DEFAULT_CATEGORIES, ...categories }
     : DEFAULT_CATEGORIES
+
+  const primaryModel = Array.isArray(model) ? model[0] : model
+  const base = isFactory(source) ? source(primaryModel) : source
 
   const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[]; variant?: string }
   if (agentWithCategory.category) {
     const categoryConfig = categoryConfigs[agentWithCategory.category]
     if (categoryConfig) {
       if (!base.model) {
-        base.model = categoryConfig.model
+        const categoryModel = categoryConfig.model
+        base.model = Array.isArray(categoryModel) ? categoryModel[0] : categoryModel
       }
       if (base.temperature === undefined && categoryConfig.temperature !== undefined) {
         base.temperature = categoryConfig.temperature
@@ -121,8 +124,24 @@ function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
 ): AgentConfig {
-  const { prompt_append, ...rest } = override
+  const { prompt_append, model, ...rest } = override
+  
+  let sanitizedModel: string | undefined
+  if (model) {
+    if (Array.isArray(model)) {
+      sanitizedModel = model[0]
+    } else if (model.includes("|")) {
+      sanitizedModel = model.split("|")[0].trim()
+    } else {
+      sanitizedModel = model
+    }
+  }
+
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
+
+  if (sanitizedModel) {
+    merged.model = sanitizedModel
+  }
 
   if (prompt_append && merged.prompt) {
     merged.prompt = merged.prompt + "\n" + prompt_append
@@ -171,8 +190,9 @@ export function createBuiltinAgents(
 
     const override = agentOverrides[agentName]
     const model = override?.model ?? systemDefaultModel
+    const primaryModel = Array.isArray(model) ? model[0] : model
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
+    let config = buildAgent(source, primaryModel, mergedCategories, gitMasterConfig)
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()
@@ -198,9 +218,10 @@ export function createBuiltinAgents(
   if (!disabledAgents.includes("Sisyphus")) {
     const sisyphusOverride = agentOverrides["Sisyphus"]
     const sisyphusModel = sisyphusOverride?.model ?? systemDefaultModel
+    const sisyphusPrimaryModel = Array.isArray(sisyphusModel) ? sisyphusModel[0] : sisyphusModel
 
     let sisyphusConfig = createSisyphusAgent(
-      sisyphusModel,
+      sisyphusPrimaryModel,
       availableAgents,
       undefined,
       availableSkills,
@@ -222,8 +243,10 @@ export function createBuiltinAgents(
   if (!disabledAgents.includes("Atlas")) {
     const orchestratorOverride = agentOverrides["Atlas"]
     const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
+    const orchestratorPrimaryModel = Array.isArray(orchestratorModel) ? orchestratorModel[0] : orchestratorModel
+
      let orchestratorConfig = createAtlasAgent({
-       model: orchestratorModel,
+       model: orchestratorPrimaryModel,
        availableAgents,
        availableSkills,
        userCategories: categories,

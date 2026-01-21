@@ -8,6 +8,19 @@
     "$schema": {
       "type": "string"
     },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
     "disabled_mcps": {
       "type": "array",
       "items": {
@@ -76,7 +89,8 @@
           "delegate-task-retry",
           "prometheus-md-only",
           "start-work",
-          "atlas"
+          "atlas",
+          "smart-failover"
         ]
       }
     },
@@ -97,7 +111,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -223,7 +269,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -349,7 +427,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -475,7 +585,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -601,7 +743,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -727,7 +901,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -853,7 +1059,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -979,7 +1217,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1105,7 +1375,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1231,7 +1533,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1357,7 +1691,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1483,7 +1849,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1609,7 +2007,39 @@
           "type": "object",
           "properties": {
             "model": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            "failover": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "strategy": {
+                  "default": "auto",
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "aggressive",
+                    "conservative"
+                  ]
+                },
+                "cooldown_ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "variant": {
               "type": "string"
@@ -1742,7 +2172,39 @@
         "type": "object",
         "properties": {
           "model": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "failover": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "strategy": {
+                "default": "auto",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "aggressive",
+                  "conservative"
+                ]
+              },
+              "cooldown_ms": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
           },
           "variant": {
             "type": "string"
@@ -2164,6 +2626,28 @@
         "include_co_authored_by": {
           "default": true,
           "type": "boolean"
+        }
+      }
+    },
+    "failover": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "strategy": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "aggressive",
+            "conservative"
+          ]
+        },
+        "cooldown_ms": {
+          "type": "number",
+          "minimum": 0
         }
       }
     }
