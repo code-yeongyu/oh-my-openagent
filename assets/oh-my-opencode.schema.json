@@ -123,28 +123,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -280,28 +258,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -439,28 +395,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -596,28 +530,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -755,28 +667,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -912,28 +802,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -1071,28 +939,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -1228,28 +1074,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -1387,28 +1211,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -1544,28 +1346,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -1703,28 +1483,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -1861,28 +1619,6 @@
                 }
               ]
             },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
             "variant": {
               "type": "string"
             },
@@ -2018,28 +1754,6 @@
                   }
                 }
               ]
-            },
-            "failover": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "type": "boolean"
-                },
-                "strategy": {
-                  "default": "auto",
-                  "type": "string",
-                  "enum": [
-                    "auto",
-                    "aggressive",
-                    "conservative"
-                  ]
-                },
-                "cooldown_ms": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
             },
             "variant": {
               "type": "string"
@@ -2183,28 +1897,6 @@
                 }
               }
             ]
-          },
-          "failover": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "default": true,
-                "type": "boolean"
-              },
-              "strategy": {
-                "default": "auto",
-                "type": "string",
-                "enum": [
-                  "auto",
-                  "aggressive",
-                  "conservative"
-                ]
-              },
-              "cooldown_ms": {
-                "type": "number",
-                "minimum": 0
-              }
-            }
           },
           "variant": {
             "type": "string"
@@ -2626,28 +2318,6 @@
         "include_co_authored_by": {
           "default": true,
           "type": "boolean"
-        }
-      }
-    },
-    "failover": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "default": true,
-          "type": "boolean"
-        },
-        "strategy": {
-          "default": "auto",
-          "type": "string",
-          "enum": [
-            "auto",
-            "aggressive",
-            "conservative"
-          ]
-        },
-        "cooldown_ms": {
-          "type": "number",
-          "minimum": 0
         }
       }
     }

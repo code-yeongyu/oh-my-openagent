@@ -92,16 +92,9 @@ export const BuiltinCommandNameSchema = z.enum([
   "start-work",
 ])
 
-export const FailoverConfigSchema = z.object({
-  enabled: z.boolean().default(true),
-  strategy: z.enum(["auto", "aggressive", "conservative"]).default("auto"),
-  cooldown_ms: z.number().min(0).optional(),
-})
-
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.union([z.string(), z.array(z.string())]).optional(),
-  failover: FailoverConfigSchema.optional(),
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
@@ -157,7 +150,6 @@ export const SisyphusAgentConfigSchema = z.object({
 
 export const CategoryConfigSchema = z.object({
   model: z.union([z.string(), z.array(z.string())]).optional(),
-  failover: FailoverConfigSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
@@ -323,7 +315,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
-  failover: FailoverConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -343,7 +334,6 @@ export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
-export type FailoverConfig = z.infer<typeof FailoverConfigSchema>
 export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
 export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
 export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
