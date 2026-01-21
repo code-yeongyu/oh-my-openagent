@@ -24,6 +24,7 @@ program
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
+  .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
@@ -32,11 +33,12 @@ program
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
+  OpenAI        Native openai/ models (GPT-5.2 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
@@ -46,6 +48,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
     const args: InstallArgs = {
       tui: options.tui !== false,
       claude: options.claude,
+      openai: options.openai,
       gemini: options.gemini,
       copilot: options.copilot,
       opencodeZen: options.opencodeZen,
