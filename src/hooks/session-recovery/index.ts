@@ -125,10 +125,9 @@ function extractMessageIndex(error: unknown): number | null {
 export function detectErrorType(error: unknown): RecoveryErrorType {
   const message = getErrorMessage(error)
 
-  if (message.includes("tool_use") && message.includes("tool_result")) {
-    return "tool_result_missing"
-  }
-
+  // IMPORTANT: Check thinking_block_order BEFORE tool_result_missing
+  // because Anthropic's extended thinking error messages contain "tool_use" and "tool_result"
+  // in the documentation URL, which would incorrectly match tool_result_missing
   if (
     message.includes("thinking") &&
     (message.includes("first block") ||
@@ -143,6 +142,10 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
 
   if (message.includes("thinking is disabled") && message.includes("cannot contain")) {
     return "thinking_disabled_violation"
+  }
+
+  if (message.includes("tool_use") && message.includes("tool_result")) {
+    return "tool_result_missing"
   }
 
   return null
