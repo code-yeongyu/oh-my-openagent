@@ -7,7 +7,7 @@ export const PROMETHEUS_AGENTS = ["prometheus"]
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
-export const ALLOWED_PATH_PREFIX = ".sisyphus"
+export const ALLOWED_PATH_PREFIXES = ["changes"]
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 

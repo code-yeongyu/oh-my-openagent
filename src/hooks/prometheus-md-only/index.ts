@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
-import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIXES, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
@@ -13,11 +13,11 @@ export * from "./constants"
 /**
  * Cross-platform path validator for Prometheus file writes.
  * Uses path.resolve/relative instead of string matching to handle:
- * - Windows backslashes (e.g., .sisyphus\\plans\\x.md)
- * - Mixed separators (e.g., .sisyphus\\plans/x.md)
+ * - Windows backslashes (e.g., changes\\name\\tasks.md)
+ * - Mixed separators (e.g., changes\\drafts/x.md)
  * - Case-insensitive directory/extension matching
  * - Workspace confinement (blocks paths outside root or via traversal)
- * - Nested project paths (e.g., parent/.sisyphus/... when ctx.directory is parent)
+ * - Nested project paths (e.g., changes/name/tasks.md, changes/drafts/x.md)
  */
 function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
   // 1. Resolve to absolute path
@@ -31,9 +31,12 @@ function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
     return false
   }
 
-  // 4. Check if .sisyphus/ or .sisyphus\ exists anywhere in the path (case-insensitive)
-  // This handles both direct paths (.sisyphus/x.md) and nested paths (project/.sisyphus/x.md)
-  if (!/\.sisyphus[/\\]/i.test(rel)) {
+  // 4. Check if path is in allowed directory (changes/)
+  const isInAllowedDir = ALLOWED_PATH_PREFIXES.some(prefix => {
+    const pattern = new RegExp(`^${prefix}[/\\\\]`, "i")
+    return pattern.test(rel)
+  })
+  if (!isInAllowedDir) {
     return false
   }
 
@@ -111,33 +114,21 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         return
       }
 
-       if (!isAllowedFile(filePath, ctx.directory)) {
-         log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .sisyphus/*.md`, {
-           sessionID: input.sessionID,
-           tool: toolName,
-           filePath,
-           agent: agentName,
-         })
-         throw new Error(
-           `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} can only write/edit .md files inside .sisyphus/ directory. ` +
-           `Attempted to modify: ${filePath}. ` +
-           `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
-           `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
-         )
-       }
-
-      const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
-      if (normalizedPath.includes(".sisyphus/plans/") || normalizedPath.includes(".sisyphus\\plans\\")) {
-        log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
+      if (!isAllowedFile(filePath, ctx.directory)) {
+        log(`[${HOOK_NAME}] Blocked: Prometheus can only write to changes/*.md`, {
           sessionID: input.sessionID,
           tool: toolName,
           filePath,
           agent: agentName,
         })
-        output.message = (output.message || "") + PROMETHEUS_WORKFLOW_REMINDER
+        throw new Error(
+          `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files inside changes/ directory. ` +
+          `Attempted to modify: ${filePath}. ` +
+          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan.`
+        )
       }
 
-      log(`[${HOOK_NAME}] Allowed: .sisyphus/*.md write permitted`, {
+      log(`[${HOOK_NAME}] Allowed: changes/*.md write permitted`, {
         sessionID: input.sessionID,
         tool: toolName,
         filePath,
