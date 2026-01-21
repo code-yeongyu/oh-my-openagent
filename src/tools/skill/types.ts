@@ -18,7 +18,7 @@ export interface SkillInfo {
 }
 
 export interface SkillLoadOptions {
-  /** When true, only load from OpenCode paths (.opencode/skill/, ~/.config/opencode/skill/) */
+  /** When true, only load from OpenCode paths (.opencode/skills/, ~/.config/opencode/skills/) */
   opencodeOnly?: boolean
   /** Pre-merged skills to use instead of discovering */
   skills?: LoadedSkill[]

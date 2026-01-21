@@ -36,7 +36,7 @@ features/
 | Type | Priority (highest first) |
 |------|--------------------------|
 | Commands | `.opencode/command/` > `~/.config/opencode/command/` > `.claude/commands/` > `~/.claude/commands/` |
-| Skills | `.opencode/skill/` > `~/.config/opencode/skill/` > `.claude/skills/` > `~/.claude/skills/` |
+| Skills | `.opencode/skills/` > `~/.config/opencode/skills/` > `.claude/skills/` > `~/.claude/skills/` |
 | Agents | `.claude/agents/` > `~/.claude/agents/` |
 | MCPs | `.claude/.mcp.json` > `.mcp.json` > `~/.claude/.mcp.json` |
 
