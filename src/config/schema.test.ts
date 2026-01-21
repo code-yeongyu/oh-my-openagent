@@ -347,7 +347,7 @@ describe("CategoryConfigSchema", () => {
 
   test("accepts reasoningEffort as optional string with xhigh", () => {
     // #given
-    const config = { model: "openai/gpt-5.2", reasoningEffort: "xhigh" }
+    const config = { reasoningEffort: "xhigh" }
 
     // #when
     const result = CategoryConfigSchema.safeParse(config)
