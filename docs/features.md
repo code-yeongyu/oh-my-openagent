@@ -147,8 +147,8 @@ Three specializations in one:
 ### Custom Skills
 
 Load custom skills from:
-- `.opencode/skill/*/SKILL.md` (project)
-- `~/.config/opencode/skill/*/SKILL.md` (user)
+- `.opencode/skills/*/SKILL.md` (project)
+- `~/.config/opencode/skills/*/SKILL.md` (user)
 - `.claude/skills/*/SKILL.md` (Claude Code compat)
 - `~/.claude/skills/*/SKILL.md` (Claude Code user)
 
