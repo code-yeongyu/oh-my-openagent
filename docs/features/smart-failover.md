@@ -6,11 +6,12 @@ The Smart Failover system provides an automated detection and recovery mechanism
 
 ## 2. Key Features
 - **Pipe Syntax (`|`)**: Minimalist fallback chain definitions.
+- **Array Syntax (`string[]`)**: Equivalent to pipe syntax, easier to edit.
 - **Instant Failover**: Aborts OpenCode's internal retry loops to trigger immediate model swapping.
-- **Error Diagnosis**: Parses `Retry-After` headers and vendor-specific error payloads.
+- **Error Diagnosis (Best-Effort)**: Classifies common failures (rate-limit, quota, balance) via pattern matching.
 - **Guardrails**:
   - **Context Compatibility**: Skips fallbacks with insufficient context windows.
-  - **Half-Open Probation**: Tests cooling providers with a single probe before full recovery.
+  - **Probation Recovery**: After a cooldown elapses, a model becomes eligible again (PROBATION) and is cleared back to healthy after the session becomes idle.
   - **Memory Safety**: Automatic cleanup upon session deletion.
 
 ## 3. Configuration
@@ -27,10 +28,7 @@ Both forms are equivalent: the first entry is the primary model, and the rest ar
 ### Example
 ```jsonc
 {
-  "model": "openai/gpt-5.2-codex | google/gemini-3-pro",
-  "failover": {
-    "strategy": "auto"
-  }
+  "model": "openai/gpt-5.2-codex | google/gemini-3-pro"
 }
 ```
 
@@ -43,14 +41,16 @@ Both forms are equivalent: the first entry is the primary model, and the rest ar
 
 `model` can also be configured per-agent (e.g. `agents.Sisyphus.model`) and in category configs. Those locations also accept either pipe syntax or an array.
 
-### 3.2 Failover Strategy
-`failover.strategy` currently does not change runtime behavior. It is accepted by the config schema for forward-compatibility.
+## 4. Default Behavior
+- **Triggers**: Retry-loop detection (`session.status: retry`) and certain session errors (`session.error`) mark the current `provider/model` as unavailable and switch to the next available fallback.
+- **Cooling + Backoff**: A cooling period is applied with exponential backoff based on repeated failures.
+- **Locking**: Balance/quota exhaustion signals lock a specific `provider/model` pair (model key) until reset.
+- **Fallback Selection**: Only HEALTHY/PROBATION models are eligible; fallbacks with too-small context windows are skipped.
 
-Current behavior matches an “auto” style flow:
-- Detects retry loops and certain provider errors (e.g. 429 / 5xx, quota/rate-limit signals).
-- Moves providers into COOLING with exponential backoff, then PROBATION, and finally HEALTHY after a successful probe.
-- Locks providers on balance/quota exhaustion signals and avoids them until reset.
+## 5. Limitations
+- **Retry-After**: The implementation does not reliably receive response headers in events, so header-based cooldown is best-effort.
+- **Probation**: Recovery is approximated by the session becoming idle, not a dedicated health-check request.
 
-## 4. UI/UX
+## 6. UI/UX
 - **Notification**: A yellow toast appears: `⚠️ Switched to google/gemini-3-pro`.
 - **Throttling**: Toasts are shown only once per session to prevent UI spam.
