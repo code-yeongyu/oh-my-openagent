@@ -10,6 +10,7 @@ import {
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
+import { shouldShowChatGPTOnlyWarning } from "./model-fallback"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -39,6 +40,7 @@ function formatConfigSummary(config: InstallConfig): string {
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
+  lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.2 for Oracle"))
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
@@ -127,6 +129,10 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
+  if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
+    errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  }
+
   if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
     errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
   }
@@ -142,6 +148,7 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   return {
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
+    hasOpenAI: args.openai === "yes",
     hasGemini: args.gemini === "yes",
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
@@ -149,7 +156,7 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; openai: BooleanArg; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -157,6 +164,7 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 
   return {
     claude,
+    openai: detected.hasOpenAI ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
@@ -178,6 +186,20 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   })
 
   if (p.isCancel(claude)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const openai = await p.select({
+    message: "Do you have an OpenAI/ChatGPT Plus subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Oracle will use fallback models" },
+      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for Oracle (high-IQ debugging)" },
+    ],
+    initialValue: initial.openai,
+  })
+
+  if (p.isCancel(openai)) {
     p.cancel("Installation cancelled.")
     return null
   }
@@ -241,6 +263,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
+    hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasOpencodeZen: opencodeZen === "yes",
@@ -326,7 +349,21 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
+  if (!config.hasClaude) {
+    console.log()
+    console.log(color.bgRed(color.white(color.bold(" ⚠️  CRITICAL WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
+    console.log(color.dim("    • Reduced orchestration quality"))
+    console.log(color.dim("    • Weaker tool selection and delegation"))
+    console.log(color.dim("    • Less reliable task completion"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
+  }
+
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
     printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
@@ -431,7 +468,21 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasGemini && !config.hasCopilot) {
+  if (!config.hasClaude) {
+    console.log()
+    console.log(color.bgRed(color.white(color.bold(" ⚠️  CRITICAL WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
+    console.log(color.dim("    • Reduced orchestration quality"))
+    console.log(color.dim("    • Weaker tool selection and delegation"))
+    console.log(color.dim("    • Less reliable task completion"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
+  }
+
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 

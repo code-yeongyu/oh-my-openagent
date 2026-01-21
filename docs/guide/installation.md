@@ -41,19 +41,23 @@ Ask the user these questions to determine CLI options:
      - **not max20** → `--claude=yes`
    - If **no** → `--claude=no`
 
-2. **Will you integrate Gemini models?**
+2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
+   - If **yes** → `--openai=yes` (GPT-5.2 for Oracle agent)
+   - If **no** → `--openai=no` (default)
+
+3. **Will you integrate Gemini models?**
    - If **yes** → `--gemini=yes`
    - If **no** → `--gemini=no`
 
-3. **Do you have a GitHub Copilot Subscription?**
+4. **Do you have a GitHub Copilot Subscription?**
    - If **yes** → `--copilot=yes`
    - If **no** → `--copilot=no`
 
-4. **Do you have access to OpenCode Zen (opencode/ models)?**
+5. **Do you have access to OpenCode Zen (opencode/ models)?**
    - If **yes** → `--opencode-zen=yes`
    - If **no** → `--opencode-zen=no` (default)
 
-5. **Do you have a Z.ai Coding Plan subscription?**
+6. **Do you have a Z.ai Coding Plan subscription?**
    - If **yes** → `--zai-coding-plan=yes`
    - If **no** → `--zai-coding-plan=no` (default)
 
@@ -80,12 +84,13 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
-- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --gemini=yes --copilot=no`
+- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
 - User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI: `bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
 - User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
 - User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
 - User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`

@@ -575,11 +575,36 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
+function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean } {
+  const omoConfigPath = getOmoConfig()
+  if (!existsSync(omoConfigPath)) {
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+  }
+
+  try {
+    const content = readFileSync(omoConfigPath, "utf-8")
+    const omoConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!omoConfig || typeof omoConfig !== "object") {
+      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+    }
+
+    const configStr = JSON.stringify(omoConfig)
+    const hasOpenAI = configStr.includes('"openai/')
+    const hasOpencodeZen = configStr.includes('"opencode/')
+    const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
+
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan }
+  } catch {
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+  }
+}
+
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
     isMax20: true,
+    hasOpenAI: true,
     hasGemini: false,
     hasCopilot: false,
     hasOpencodeZen: true,
@@ -606,6 +631,11 @@ export function detectCurrentConfig(): DetectedConfig {
 
   // Gemini auth plugin detection still works via plugin presence
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
+
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan } = detectProvidersFromOmoConfig()
+  result.hasOpenAI = hasOpenAI
+  result.hasOpencodeZen = hasOpencodeZen
+  result.hasZaiCodingPlan = hasZaiCodingPlan
 
   return result
 }
