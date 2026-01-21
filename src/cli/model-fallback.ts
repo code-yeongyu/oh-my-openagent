@@ -1,15 +1,15 @@
 import type { InstallConfig } from "./types"
 
-type ProviderTier = "native" | "github-copilot" | "opencode" | "zai-coding-plan"
+type NativeProvider = "claude" | "openai" | "gemini"
 
 type ModelCapability =
-  | "opus-level"
-  | "sonnet-level"
-  | "haiku-level"
-  | "reasoning"
-  | "codex"
-  | "visual"
-  | "fast"
+  | "unspecified-high"
+  | "unspecified-low"
+  | "quick"
+  | "ultrabrain"
+  | "visual-engineering"
+  | "artistry"
+  | "writing"
   | "glm"
 
 interface ProviderAvailability {
@@ -18,79 +18,127 @@ interface ProviderAvailability {
     openai: boolean
     gemini: boolean
   }
+  opencodeZen: boolean
   copilot: boolean
-  opencode: boolean
   zai: boolean
+  isMaxPlan: boolean
+}
+
+interface AgentConfig {
+  model: string
+  variant?: string
+}
+
+interface CategoryConfig {
+  model: string
+  variant?: string
 }
 
 export interface GeneratedOmoConfig {
   $schema: string
-  agents?: Record<string, { model: string }>
-  categories?: Record<string, { model: string }>
+  agents?: Record<string, AgentConfig>
+  categories?: Record<string, CategoryConfig>
   [key: string]: unknown
 }
 
-const MODEL_CATALOG: Record<ProviderTier, Partial<Record<ModelCapability, string>>> = {
-  native: {
-    "opus-level": "anthropic/claude-opus-4-5",
-    "sonnet-level": "anthropic/claude-sonnet-4-5",
-    "haiku-level": "anthropic/claude-haiku-4-5",
-    reasoning: "openai/gpt-5.2",
-    codex: "openai/gpt-5.2-codex",
-    visual: "google/gemini-3-pro-preview",
-    fast: "google/gemini-3-flash-preview",
-  },
-  "github-copilot": {
-    "opus-level": "github-copilot/claude-opus-4.5",
-    "sonnet-level": "github-copilot/claude-sonnet-4.5",
-    "haiku-level": "github-copilot/claude-haiku-4.5",
-    reasoning: "github-copilot/gpt-5.2",
-    codex: "github-copilot/gpt-5.2-codex",
-    visual: "github-copilot/gemini-3-pro-preview",
-    fast: "github-copilot/grok-code-fast-1",
-  },
-  opencode: {
-    "opus-level": "opencode/claude-opus-4-5",
-    "sonnet-level": "opencode/claude-sonnet-4-5",
-    "haiku-level": "opencode/claude-haiku-4-5",
-    reasoning: "opencode/gpt-5.2",
-    codex: "opencode/gpt-5.2-codex",
-    visual: "opencode/gemini-3-pro",
-    fast: "opencode/grok-code",
-    glm: "opencode/glm-4.7-free",
-  },
-  "zai-coding-plan": {
-    "opus-level": "zai-coding-plan/glm-4.7",
-    "sonnet-level": "zai-coding-plan/glm-4.7",
-    "haiku-level": "zai-coding-plan/glm-4.7-flash",
-    reasoning: "zai-coding-plan/glm-4.7",
-    codex: "zai-coding-plan/glm-4.7",
-    visual: "zai-coding-plan/glm-4.7",
-    fast: "zai-coding-plan/glm-4.7-flash",
-    glm: "zai-coding-plan/glm-4.7",
-  },
+interface NativeFallbackEntry {
+  provider: NativeProvider
+  model: string
 }
 
-const AGENT_REQUIREMENTS: Record<string, ModelCapability> = {
-  Sisyphus: "opus-level",
-  oracle: "reasoning",
-  librarian: "glm",
-  explore: "fast",
-  "multimodal-looker": "visual",
-  "Prometheus (Planner)": "opus-level",
-  "Metis (Plan Consultant)": "sonnet-level",
-  "Momus (Plan Reviewer)": "sonnet-level",
-  Atlas: "opus-level",
+const NATIVE_FALLBACK_CHAINS: Record<ModelCapability, NativeFallbackEntry[]> = {
+  "unspecified-high": [
+    { provider: "claude", model: "anthropic/claude-opus-4-5" },
+    { provider: "openai", model: "openai/gpt-5.2" },
+    { provider: "gemini", model: "google/gemini-3-pro-preview" },
+  ],
+  "unspecified-low": [
+    { provider: "claude", model: "anthropic/claude-sonnet-4-5" },
+    { provider: "openai", model: "openai/gpt-5.2" },
+    { provider: "gemini", model: "google/gemini-3-flash-preview" },
+  ],
+  quick: [
+    { provider: "claude", model: "anthropic/claude-haiku-4-5" },
+    { provider: "openai", model: "openai/gpt-5.1-codex-mini" },
+    { provider: "gemini", model: "google/gemini-3-flash-preview" },
+  ],
+  ultrabrain: [
+    { provider: "openai", model: "openai/gpt-5.2-codex" },
+    { provider: "claude", model: "anthropic/claude-opus-4-5" },
+    { provider: "gemini", model: "google/gemini-3-pro-preview" },
+  ],
+  "visual-engineering": [
+    { provider: "gemini", model: "google/gemini-3-pro-preview" },
+    { provider: "openai", model: "openai/gpt-5.2" },
+    { provider: "claude", model: "anthropic/claude-sonnet-4-5" },
+  ],
+  artistry: [
+    { provider: "gemini", model: "google/gemini-3-pro-preview" },
+    { provider: "openai", model: "openai/gpt-5.2" },
+    { provider: "claude", model: "anthropic/claude-opus-4-5" },
+  ],
+  writing: [
+    { provider: "gemini", model: "google/gemini-3-flash-preview" },
+    { provider: "openai", model: "openai/gpt-5.2" },
+    { provider: "claude", model: "anthropic/claude-sonnet-4-5" },
+  ],
+  glm: [],
 }
 
-const CATEGORY_REQUIREMENTS: Record<string, ModelCapability> = {
-  "visual-engineering": "visual",
-  ultrabrain: "codex",
-  artistry: "visual",
-  quick: "haiku-level",
-  "unspecified-low": "sonnet-level",
-  "unspecified-high": "opus-level",
-  writing: "fast",
+const OPENCODE_ZEN_MODELS: Record<ModelCapability, string> = {
+  "unspecified-high": "opencode/claude-opus-4-5",
+  "unspecified-low": "opencode/claude-sonnet-4-5",
+  quick: "opencode/claude-haiku-4-5",
+  ultrabrain: "opencode/gpt-5.2-codex",
+  "visual-engineering": "opencode/gemini-3-pro",
+  artistry: "opencode/gemini-3-pro",
+  writing: "opencode/gemini-3-flash",
+  glm: "opencode/glm-4.7-free",
+}
+
+const GITHUB_COPILOT_MODELS: Record<ModelCapability, string> = {
+  "unspecified-high": "github-copilot/claude-opus-4.5",
+  "unspecified-low": "github-copilot/claude-sonnet-4.5",
+  quick: "github-copilot/claude-haiku-4.5",
+  ultrabrain: "github-copilot/gpt-5.2-codex",
+  "visual-engineering": "github-copilot/gemini-3-pro-preview",
+  artistry: "github-copilot/gemini-3-pro-preview",
+  writing: "github-copilot/gemini-3-flash-preview",
+  glm: "github-copilot/gpt-5.2",
+}
+
+const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+
+interface AgentRequirement {
+  capability: ModelCapability
+  variant?: string
+}
+
+const AGENT_REQUIREMENTS: Record<string, AgentRequirement> = {
+  Sisyphus: { capability: "unspecified-high" },
+  oracle: { capability: "ultrabrain", variant: "high" },
+  librarian: { capability: "glm" },
+  explore: { capability: "quick" },
+  "multimodal-looker": { capability: "visual-engineering" },
+  "Prometheus (Planner)": { capability: "unspecified-high" },
+  "Metis (Plan Consultant)": { capability: "unspecified-high" },
+  "Momus (Plan Reviewer)": { capability: "ultrabrain", variant: "medium" },
+  Atlas: { capability: "unspecified-high" },
+}
+
+interface CategoryRequirement {
+  capability: ModelCapability
+  variant?: string
+}
+
+const CATEGORY_REQUIREMENTS: Record<string, CategoryRequirement> = {
+  "visual-engineering": { capability: "visual-engineering" },
+  ultrabrain: { capability: "ultrabrain" },
+  artistry: { capability: "artistry", variant: "max" },
+  quick: { capability: "quick" },
+  "unspecified-low": { capability: "unspecified-low" },
+  "unspecified-high": { capability: "unspecified-high" },
+  writing: { capability: "writing" },
 }
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
@@ -100,63 +148,41 @@ function toProviderAvailability(config: InstallConfig): ProviderAvailability {
   return {
     native: {
       claude: config.hasClaude,
-      openai: config.hasClaude,
+      openai: config.hasOpenAI,
       gemini: config.hasGemini,
     },
+    opencodeZen: config.hasOpencodeZen,
     copilot: config.hasCopilot,
-    opencode: config.hasOpencodeZen,
     zai: config.hasZaiCodingPlan,
+    isMaxPlan: config.isMax20,
   }
-}
-
-function getProviderPriority(avail: ProviderAvailability): ProviderTier[] {
-  const tiers: ProviderTier[] = []
-
-  if (avail.native.claude || avail.native.openai || avail.native.gemini) {
-    tiers.push("native")
-  }
-  if (avail.copilot) tiers.push("github-copilot")
-  if (avail.opencode) tiers.push("opencode")
-  if (avail.zai) tiers.push("zai-coding-plan")
-
-  return tiers
-}
-
-function hasCapability(
-  tier: ProviderTier,
-  capability: ModelCapability,
-  avail: ProviderAvailability
-): boolean {
-  if (tier === "native") {
-    switch (capability) {
-      case "opus-level":
-      case "sonnet-level":
-      case "haiku-level":
-        return avail.native.claude
-      case "reasoning":
-      case "codex":
-        return avail.native.openai || avail.native.claude
-      case "visual":
-      case "fast":
-        return avail.native.gemini
-      case "glm":
-        return false
-    }
-  }
-  return true
 }
 
 function resolveModel(capability: ModelCapability, avail: ProviderAvailability): string {
-  const tiers = getProviderPriority(avail)
-
-  for (const tier of tiers) {
-    if (hasCapability(tier, capability, avail)) {
-      const model = MODEL_CATALOG[tier][capability]
-      if (model) return model
+  const nativeChain = NATIVE_FALLBACK_CHAINS[capability]
+  for (const entry of nativeChain) {
+    if (avail.native[entry.provider]) {
+      return entry.model
     }
   }
 
+  if (avail.opencodeZen) {
+    return OPENCODE_ZEN_MODELS[capability]
+  }
+
+  if (avail.copilot) {
+    return GITHUB_COPILOT_MODELS[capability]
+  }
+
+  if (avail.zai) {
+    return ZAI_MODEL
+  }
+
   return ULTIMATE_FALLBACK
+}
+
+function resolveClaudeCapability(avail: ProviderAvailability): ModelCapability {
+  return avail.isMaxPlan ? "unspecified-high" : "unspecified-low"
 }
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
@@ -165,8 +191,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.claude ||
     avail.native.openai ||
     avail.native.gemini ||
+    avail.opencodeZen ||
     avail.copilot ||
-    avail.opencode ||
     avail.zai
 
   if (!hasAnyProvider) {
@@ -181,19 +207,31 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  const agents: Record<string, { model: string }> = {}
-  const categories: Record<string, { model: string }> = {}
+  const agents: Record<string, AgentConfig> = {}
+  const categories: Record<string, CategoryConfig> = {}
 
-  for (const [role, capability] of Object.entries(AGENT_REQUIREMENTS)) {
+  const claudeCapability = resolveClaudeCapability(avail)
+
+  for (const [role, req] of Object.entries(AGENT_REQUIREMENTS)) {
     if (role === "librarian" && avail.zai) {
-      agents[role] = { model: "zai-coding-plan/glm-4.7" }
+      agents[role] = { model: ZAI_MODEL }
+    } else if (role === "explore") {
+      if (avail.native.claude && avail.isMaxPlan) {
+        agents[role] = { model: "anthropic/claude-haiku-4-5" }
+      } else {
+        agents[role] = { model: "opencode/grok-code" }
+      }
     } else {
-      agents[role] = { model: resolveModel(capability, avail) }
+      const capability = req.capability === "unspecified-high" ? claudeCapability : req.capability
+      const model = resolveModel(capability, avail)
+      agents[role] = req.variant ? { model, variant: req.variant } : { model }
     }
   }
 
-  for (const [cat, capability] of Object.entries(CATEGORY_REQUIREMENTS)) {
-    categories[cat] = { model: resolveModel(capability, avail) }
+  for (const [cat, req] of Object.entries(CATEGORY_REQUIREMENTS)) {
+    const capability = req.capability === "unspecified-high" ? claudeCapability : req.capability
+    const model = resolveModel(capability, avail)
+    categories[cat] = req.variant ? { model, variant: req.variant } : { model }
   }
 
   return {
@@ -201,4 +239,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     agents,
     categories,
   }
+}
+
+export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {
+  return !config.hasClaude && !config.hasGemini && config.hasOpenAI
 }
