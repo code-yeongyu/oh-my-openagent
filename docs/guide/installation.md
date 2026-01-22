@@ -227,7 +227,7 @@ bunx oh-my-opencode install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
 ```
 
 Then authenticate with GitHub:
