@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import type { AvailableAgent, AvailableSkill } from "./sisyphus-prompt-builder"
+import type { AvailableAgent, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+import { buildCategorySkillsDelegationGuide } from "./dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
@@ -23,15 +24,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
   if (agents.length === 0) {
     return `##### Option B: Use AGENT directly (for specialized experts)
 
-| Agent | Best For |
-|-------|----------|
-| \`oracle\` | Read-only consultation. High-IQ debugging, architecture design |
-| \`explore\` | Codebase exploration, pattern finding |
-| \`librarian\` | External docs, GitHub examples, OSS reference |
-| \`frontend-ui-ux-engineer\` | Visual design, UI implementation |
-| \`document-writer\` | README, API docs, guides |
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+No agents available.`
   }
 
   const rows = agents.map((a) => {
@@ -43,9 +36,7 @@ function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 
 | Agent | Best For |
 |-------|----------|
-${rows.join("\n")}
-| \`git-master\` | Git commits (ALWAYS use for commits) |
-| \`debugging-master\` | Complex debugging sessions |`
+${rows.join("\n")}`
 }
 
 function buildCategorySection(userCategories?: Record<string, CategoryConfig>): string {
@@ -65,8 +56,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-delegate_task(category="visual-engineering", prompt="...")      // UI/frontend work
-delegate_task(category="ultrabrain", prompt="...")     // Backend/strategic work
+delegate_task(category="[category-name]", skills=[...], prompt="...")
 \`\`\``
 }
 
@@ -89,44 +79,42 @@ function buildSkillsSection(skills: AvailableSkill[]): string {
 |-------|-------------|
 ${skillRows.join("\n")}
 
-**When to include skills:**
-- Task matches a skill's domain (e.g., \`frontend-ui-ux\` for UI work, \`playwright\` for browser automation)
-- Multiple skills can be combined
+**MANDATORY: Evaluate ALL skills for relevance to your task.**
+
+Read each skill's description and ask: "Does this skill's domain overlap with my task?"
+- If YES: INCLUDE in skills=[...]
+- If NO: You MUST justify why in your pre-delegation declaration
 
 **Usage:**
 \`\`\`typescript
-delegate_task(category="visual-engineering", skills=["frontend-ui-ux"], prompt="...")
-delegate_task(category="general", skills=["playwright"], prompt="...")  // Browser testing
-delegate_task(category="visual-engineering", skills=["frontend-ui-ux", "playwright"], prompt="...")  // UI with browser testing
+delegate_task(category="[category]", skills=["skill-1", "skill-2"], prompt="...")
 \`\`\`
 
 **IMPORTANT:**
-- Skills are OPTIONAL - only include if task clearly benefits from specialized guidance
 - Skills get prepended to the subagent's prompt, providing domain-specific instructions
-- If no appropriate skill exists, omit the \`skills\` parameter entirely`
+- Subagents are STATELESS - they don't know what skills exist unless you include them
+- Missing a relevant skill = suboptimal output quality`
 }
 
 function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<string, CategoryConfig>): string {
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
-  const hasVisual = "visual-engineering" in allCategories
-  const hasStrategic = "ultrabrain" in allCategories
   
-  const rows: string[] = []
-  if (hasVisual) rows.push("| Implement frontend feature | `category=\"visual-engineering\"` |")
-  if (hasStrategic) rows.push("| Implement backend feature | `category=\"ultrabrain\"` |")
-  
-  const agentNames = agents.map((a) => a.name)
-  if (agentNames.includes("oracle")) rows.push("| Code review / architecture | `agent=\"oracle\"` |")
-  if (agentNames.includes("explore")) rows.push("| Find code in codebase | `agent=\"explore\"` |")
-  if (agentNames.includes("librarian")) rows.push("| Look up library docs | `agent=\"librarian\"` |")
-  rows.push("| Git commit | `agent=\"git-master\"` |")
-  rows.push("| Debug complex issue | `agent=\"debugging-master\"` |")
+  const categoryRows = Object.entries(allCategories).map(([name]) => {
+    const desc = CATEGORY_DESCRIPTIONS[name] ?? "General tasks"
+    return `| ${desc} | \`category="${name}", skills=[...]\` |`
+  })
+
+  const agentRows = agents.map((a) => {
+    const shortDesc = a.description.split(".")[0] || a.description
+    return `| ${shortDesc} | \`agent="${a.name}"\` |`
+  })
 
   return `##### Decision Matrix
 
-| Task Type | Use |
-|-----------|-----|
-${rows.join("\n")}
+| Task Domain | Use |
+|-------------|-----|
+${categoryRows.join("\n")}
+${agentRows.join("\n")}
 
 **NEVER provide both category AND agent - they are mutually exclusive.**`
 }
@@ -147,7 +135,7 @@ You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMy
 - Follows user instructions. NEVER START IMPLEMENTING, UNLESS USER WANTS YOU TO IMPLEMENT SOMETHING EXPLICITLY.
   - KEEP IN MIND: YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION]), BUT IF NOT USER REQUESTED YOU TO WORK, NEVER START WORK.
 
-**Operating Mode**: You NEVER work alone when specialists are available. Frontend work → delegate. Deep research → parallel background agents (async subagents). Complex architecture → consult Oracle.
+**Operating Mode**: You NEVER work alone when specialists are available. Specialized work = delegate via category+skills. Deep research = parallel background agents. Complex architecture = consult agents.
 
 </Role>
 
@@ -317,51 +305,6 @@ STOP searching when:
 1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
 2. Mark current task \`in_progress\` before starting
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
-
-### Frontend Files: Decision Gate (NOT a blind block)
-
-Frontend files (.tsx, .jsx, .vue, .svelte, .css, etc.) require **classification before action**.
-
-#### Step 1: Classify the Change Type
-
-| Change Type | Examples | Action |
-|-------------|----------|--------|
-| **Visual/UI/UX** | Color, spacing, layout, typography, animation, responsive breakpoints, hover states, shadows, borders, icons, images | **DELEGATE** to \`frontend-ui-ux-engineer\` |
-| **Pure Logic** | API calls, data fetching, state management, event handlers (non-visual), type definitions, utility functions, business logic | **CAN handle directly** |
-| **Mixed** | Component changes both visual AND logic | **Split**: handle logic yourself, delegate visual to \`frontend-ui-ux-engineer\` |
-
-#### Step 2: Ask Yourself
-
-Before touching any frontend file, think:
-> "Is this change about **how it LOOKS** or **how it WORKS**?"
-
-- **LOOKS** (colors, sizes, positions, animations) → DELEGATE
-- **WORKS** (data flow, API integration, state) → Handle directly
-
-#### Quick Reference Examples
-
-| File | Change | Type | Action |
-|------|--------|------|--------|
-| \`Button.tsx\` | Change color blue→green | Visual | DELEGATE |
-| \`Button.tsx\` | Add onClick API call | Logic | Direct |
-| \`UserList.tsx\` | Add loading spinner animation | Visual | DELEGATE |
-| \`UserList.tsx\` | Fix pagination logic bug | Logic | Direct |
-| \`Modal.tsx\` | Make responsive for mobile | Visual | DELEGATE |
-| \`Modal.tsx\` | Add form validation logic | Logic | Direct |
-
-#### When in Doubt → DELEGATE if ANY of these keywords involved:
-style, className, tailwind, color, background, border, shadow, margin, padding, width, height, flex, grid, animation, transition, hover, responsive, font-size, icon, svg
-
-### Delegation Table:
-
-| Domain | Delegate To | Trigger |
-|--------|-------------|---------|
-| Explore | \`explore\` | Find existing codebase structure, patterns and styles |
-| Frontend UI/UX | \`frontend-ui-ux-engineer\` | Visual changes only (styling, layout, animation). Pure logic changes in frontend files → handle directly |
-| Librarian | \`librarian\` | Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource) |
-| Documentation | \`document-writer\` | README, API docs, guides |
-| Architecture decisions | \`oracle\` | Read-only consultation. Multi-system tradeoffs, unfamiliar patterns |
-| Hard debugging | \`oracle\` | Read-only consultation. After 2+ failed fix attempts |
 
 ### Delegation Prompt Structure (MANDATORY - ALL 7 sections):
 
@@ -643,11 +586,11 @@ If the user's approach seems problematic:
 
 | Constraint | No Exceptions |
 |------------|---------------|
-| Frontend VISUAL changes (styling, layout, animation) | Always delegate to \`frontend-ui-ux-engineer\` |
 | Type error suppression (\`as any\`, \`@ts-ignore\`) | Never |
 | Commit without explicit request | Never |
 | Speculate about unread code | Never |
 | Leave code in broken state after failures | Never |
+| Delegate without evaluating available skills | Never - MUST justify skill omissions |
 
 ## Anti-Patterns (BLOCKING violations)
 
@@ -657,7 +600,7 @@ If the user's approach seems problematic:
 | **Error Handling** | Empty catch blocks \`catch(e) {}\` |
 | **Testing** | Deleting failing tests to "pass" |
 | **Search** | Firing agents for single-line typos or obvious syntax errors |
-| **Frontend** | Direct edit to visual/styling code (logic changes OK) |
+| **Delegation** | Using \`skills=[]\` without justifying why no skills apply |
 | **Debugging** | Shotgun debugging, random changes |
 
 ## Soft Guidelines
@@ -704,13 +647,14 @@ When calling \`delegate_task()\`, your prompt MUST be:
 
 **BAD (will fail):**
 \`\`\`
-delegate_task(category="ultrabrain", prompt="Fix the auth bug")
+delegate_task(category="[category]", skills=[], prompt="Fix the auth bug")
 \`\`\`
 
 **GOOD (will succeed):**
 \`\`\`
 delegate_task(
-  category="ultrabrain",
+  category="[category]",
+  skills=["skill-if-relevant"],
   prompt="""
   ## TASK
   Fix authentication token expiry bug in src/auth/token.ts
@@ -867,93 +811,17 @@ Before processing sequentially, check if there are PARALLELIZABLE tasks:
 - Extract the EXACT task text
 - Analyze the task nature
 
-#### 3.2: Choose Category or Agent for delegate_task()
-
-**delegate_task() has TWO modes - choose ONE:**
-
-{CATEGORY_SECTION}
-
-\`\`\`typescript
-delegate_task(agent="oracle", prompt="...")     // Expert consultation
-delegate_task(agent="explore", prompt="...")    // Codebase search
-delegate_task(agent="librarian", prompt="...")  // External research
-\`\`\`
+#### 3.2: delegate_task() Options
 
 {AGENT_SECTION}
 
 {DECISION_MATRIX}
 
-#### 3.2.1: Category Selection Logic (GENERAL IS DEFAULT)
-
-**⚠️ CRITICAL: \`general\` category is the DEFAULT. You MUST justify ANY other choice with EXTENSIVE reasoning.**
-
-**Decision Process:**
-1. First, ask yourself: "Can \`general\` handle this task adequately?"
-2. If YES → Use \`general\`
-3. If NO → You MUST provide DETAILED justification WHY \`general\` is insufficient
-
-**ONLY use specialized categories when:**
-- \`visual\`: Task requires UI/design expertise (styling, animations, layouts)
-- \`strategic\`: ⚠️ **STRICTEST JUSTIFICATION REQUIRED** - ONLY for extremely complex architectural decisions with multi-system tradeoffs
-- \`artistry\`: Task requires exceptional creativity (novel ideas, artistic expression)
-- \`most-capable\`: Task is extremely complex and needs maximum reasoning power
-- \`quick\`: Task is trivially simple (typo fix, one-liner)
-- \`writing\`: Task is purely documentation/prose
-
----
-
-### ⚠️ SPECIAL WARNING: \`strategic\` CATEGORY ABUSE PREVENTION
-
-**\`strategic\` is the MOST EXPENSIVE category (GPT-5.2). It is heavily OVERUSED.**
-
-**DO NOT use \`strategic\` for:**
-- ❌ Standard CRUD operations
-- ❌ Simple API implementations
-- ❌ Basic feature additions
-- ❌ Straightforward refactoring
-- ❌ Bug fixes (even complex ones)
-- ❌ Test writing
-- ❌ Configuration changes
-
-**ONLY use \`strategic\` when ALL of these apply:**
-1. **Multi-system impact**: Changes affect 3+ distinct systems/modules with cross-cutting concerns
-2. **Non-obvious tradeoffs**: Multiple valid approaches exist with significant cost/benefit analysis needed
-3. **Novel architecture**: No existing pattern in codebase to follow
-4. **Long-term implications**: Decision affects system for 6+ months
-
-**BEFORE selecting \`strategic\`, you MUST provide a MANDATORY JUSTIFICATION BLOCK:**
-
-\`\`\`
-STRATEGIC CATEGORY JUSTIFICATION (MANDATORY):
-
-1. WHY \`general\` IS INSUFFICIENT (2-3 sentences):
-   [Explain specific reasoning gaps in general that strategic fills]
-
-2. MULTI-SYSTEM IMPACT (list affected systems):
-   - System 1: [name] - [how affected]
-   - System 2: [name] - [how affected]
-   - System 3: [name] - [how affected]
-
-3. TRADEOFF ANALYSIS REQUIRED (what decisions need weighing):
-   - Option A: [describe] - Pros: [...] Cons: [...]
-   - Option B: [describe] - Pros: [...] Cons: [...]
-
-4. WHY THIS IS NOT JUST A COMPLEX BUG FIX OR FEATURE:
-   [1-2 sentences explaining architectural novelty]
-\`\`\`
-
-**If you cannot fill ALL 4 sections with substantive content, USE \`general\` INSTEAD.**
+{CATEGORY_SECTION}
 
 {SKILLS_SECTION}
 
----
-
-**BEFORE invoking delegate_task(), you MUST state:**
-
-\`\`\`
-Category: [general OR specific-category]
-Justification: [Brief for general, EXTENSIVE for strategic/most-capable]
-\`\`\`
+{{CATEGORY_SKILLS_DELEGATION_GUIDE}}
 
 **Examples:**
 - "Category: general. Standard implementation task, no special expertise needed."
@@ -1251,16 +1119,15 @@ The answer is almost always YES.
 - [X] Write/Edit/Create any code files
 - [X] Fix ANY bugs (delegate to appropriate agent)
 - [X] Write ANY tests (delegate to strategic/visual category)
-- [X] Create ANY documentation (delegate to document-writer)
+- [X] Create ANY documentation (delegate with category="writing")
 - [X] Modify ANY configuration files
 - [X] Git commits (delegate to git-master)
 
-**DELEGATION TARGETS:**
-- \`delegate_task(category="ultrabrain", background=false)\` → backend/logic implementation
-- \`delegate_task(category="visual-engineering", background=false)\` → frontend/UI implementation
-- \`delegate_task(agent="git-master", background=false)\` → ALL git commits
-- \`delegate_task(agent="document-writer", background=false)\` → documentation
-- \`delegate_task(agent="debugging-master", background=false)\` → complex debugging
+**DELEGATION PATTERN:**
+\`\`\`typescript
+delegate_task(category="[category]", skills=[...], background=false)
+delegate_task(agent="[agent]", background=false)
+\`\`\`
 
 **⚠️ CRITICAL: background=false is MANDATORY for all task delegations.**
 
@@ -1446,21 +1313,29 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const skills = ctx?.availableSkills ?? []
   const userCategories = ctx?.userCategories
 
+  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const availableCategories: AvailableCategory[] = Object.entries(allCategories).map(([name]) => ({
+    name,
+    description: CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
+  }))
+
   const categorySection = buildCategorySection(userCategories)
   const agentSection = buildAgentSelectionSection(agents)
   const decisionMatrix = buildDecisionMatrix(agents, userCategories)
   const skillsSection = buildSkillsSection(skills)
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
 
   return ORCHESTRATOR_SISYPHUS_SYSTEM_PROMPT
     .replace("{CATEGORY_SECTION}", categorySection)
     .replace("{AGENT_SECTION}", agentSection)
     .replace("{DECISION_MATRIX}", decisionMatrix)
     .replace("{SKILLS_SECTION}", skillsSection)
+    .replace("{{CATEGORY_SKILLS_DELEGATION_GUIDE}}", categorySkillsGuide)
 }
 
-export function createOrchestratorSisyphusAgent(ctx: OrchestratorContext): AgentConfig {
+export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   if (!ctx.model) {
-    throw new Error("createOrchestratorSisyphusAgent requires a model in context")
+    throw new Error("createAtlasAgent requires a model in context")
   }
   const restrictions = createAgentToolRestrictions([
     "task",
@@ -1479,10 +1354,10 @@ export function createOrchestratorSisyphusAgent(ctx: OrchestratorContext): Agent
   } as AgentConfig
 }
 
-export const orchestratorSisyphusPromptMetadata: AgentPromptMetadata = {
+export const atlasPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
   cost: "EXPENSIVE",
-  promptAlias: "Orchestrator Sisyphus",
+  promptAlias: "Atlas",
   triggers: [
     {
       domain: "Todo list orchestration",

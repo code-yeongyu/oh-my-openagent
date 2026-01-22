@@ -8,24 +8,23 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
   describe("DEFAULT_CATEGORIES", () => {
-    test("visual-engineering category has temperature config only (model removed)", () => {
+    test("visual-engineering category has model config", () => {
       // #given
       const category = DEFAULT_CATEGORIES["visual-engineering"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBeUndefined()
-      expect(category.temperature).toBe(0.7)
+      expect(category.model).toBe("google/gemini-3-pro-preview")
     })
 
-    test("ultrabrain category has temperature config only (model removed)", () => {
+    test("ultrabrain category has model and variant config", () => {
       // #given
       const category = DEFAULT_CATEGORIES["ultrabrain"]
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBeUndefined()
-      expect(category.temperature).toBe(0.1)
+      expect(category.model).toBe("openai/gpt-5.2-codex")
+      expect(category.variant).toBe("xhigh")
     })
   })
 
@@ -61,13 +60,13 @@ describe("sisyphus-task", () => {
       }
     })
 
-    test("most-capable category exists and has description", () => {
+    test("unspecified-high category exists and has description", () => {
       // #given / #when
-      const description = CATEGORY_DESCRIPTIONS["most-capable"]
+      const description = CATEGORY_DESCRIPTIONS["unspecified-high"]
 
       // #then
       expect(description).toBeDefined()
-      expect(description).toContain("Complex")
+      expect(description).toContain("high effort")
     })
   })
 
@@ -141,16 +140,16 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("returns systemDefaultModel for builtin category (categories no longer have default models)", () => {
+    test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
       // #given
       const categoryName = "visual-engineering"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - model comes from systemDefaultModel since categories no longer have model defaults
+      // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -227,21 +226,21 @@ describe("sisyphus-task", () => {
       expect(result!.config.temperature).toBe(0.3)
     })
 
-    test("inheritedModel takes precedence over systemDefaultModel", () => {
-      // #given - builtin category, parent model provided
+    test("category built-in model takes precedence over inheritedModel", () => {
+      // #given - builtin category with its own model, parent model also provided
       const categoryName = "visual-engineering"
       const inheritedModel = "cliproxy/claude-opus-4-5"
 
       // #when
       const result = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - inheritedModel wins over systemDefaultModel
+      // #then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
 
-    test("inheritedModel is used as fallback when category has no user model", () => {
-      // #given - custom category with no model defined, only inheritedModel as fallback
+    test("systemDefaultModel is used as fallback when custom category has no model", () => {
+      // #given - custom category with no model defined
       const categoryName = "my-custom-no-model"
       const userCategories = { "my-custom-no-model": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
       const inheritedModel = "cliproxy/claude-opus-4-5"
@@ -249,9 +248,9 @@ describe("sisyphus-task", () => {
       // #when
       const result = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // #then - parent model is used as fallback since custom category has no user model
+      // #then - systemDefaultModel is used since custom category has no built-in model
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("cliproxy/claude-opus-4-5")
+      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
     test("user model takes precedence over inheritedModel", () => {
@@ -270,7 +269,7 @@ describe("sisyphus-task", () => {
       expect(result!.config.model).toBe("my-provider/my-model")
     })
 
-    test("systemDefaultModel is used when no user model and no inheritedModel", () => {
+    test("default model from category config is used when no user model and no inheritedModel", () => {
       // #given
       const categoryName = "visual-engineering"
 
@@ -279,7 +278,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
     })
   })
 
@@ -346,6 +345,124 @@ describe("sisyphus-task", () => {
         variant: "xhigh",
       })
     })
+
+    test("DEFAULT_CATEGORIES variant passes to background WITHOUT userCategories", async () => {
+      // #given - NO userCategories, testing DEFAULT_CATEGORIES only
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-default-variant",
+            sessionID: "session-default-variant",
+            description: "Default variant task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      // NO userCategories - must use DEFAULT_CATEGORIES
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      await tool.execute(
+        {
+          description: "Test unspecified-high default variant",
+          prompt: "Do something",
+          category: "unspecified-high",
+          run_in_background: true,
+          skills: [],
+        },
+        toolContext
+      )
+
+      // #then - variant MUST be "max" from DEFAULT_CATEGORIES
+      expect(launchInput.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        variant: "max",
+      })
+    })
+
+    test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
+      // #given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_default_variant" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
+          }),
+          status: async () => ({ data: { "ses_sync_default_variant": { type: "idle" } } }),
+        },
+      }
+
+      // NO userCategories - must use DEFAULT_CATEGORIES
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      await tool.execute(
+        {
+          description: "Test unspecified-high sync variant",
+          prompt: "Do something",
+          category: "unspecified-high",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+
+      // #then - variant MUST be "max" from DEFAULT_CATEGORIES
+      expect(promptBody.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        variant: "max",
+      })
+    }, { timeout: 20000 })
   })
 
   describe("skills parameter", () => {
@@ -841,6 +958,389 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
+  describe("unstable agent forced background mode", () => {
+    test("gemini model with run_in_background=false should force background but wait for result", async () => {
+      // #given - category using gemini model with run_in_background=false
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-unstable",
+            sessionID: "ses_unstable_gemini",
+            description: "Unstable gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_unstable_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Gemini task completed successfully" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_unstable_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using visual-engineering (gemini model) with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test gemini forced background",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Gemini task completed successfully")
+    }, { timeout: 20000 })
+
+    test("gemini model with run_in_background=true should not show unstable message (normal background)", async () => {
+      // #given - category using gemini model with run_in_background=true (normal background flow)
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-normal-bg",
+            sessionID: "ses_normal_bg",
+            description: "Normal background task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using visual-engineering with run_in_background=true (normal background)
+      const result = await tool.execute(
+        {
+          description: "Test normal background",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: true,  // User explicitly says true - normal background
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should NOT show unstable message (it's normal background flow)
+      expect(launchCalled).toBe(true)
+      expect(result).not.toContain("UNSTABLE AGENT MODE")
+      expect(result).toContain("task-normal-bg")
+    })
+
+    test("non-gemini model with run_in_background=false should run sync (not forced to background)", async () => {
+      // #given - category using non-gemini model with run_in_background=false
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      let promptCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return { id: "should-not-be-called", sessionID: "x", description: "x", agent: "x", status: "running" }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_non_gemini" } }),
+          prompt: async () => {
+            promptCalled = true
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done sync" }] }]
+          }),
+          status: async () => ({ data: { "ses_sync_non_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      // Use ultrabrain which uses gpt-5.2 (non-gemini)
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using ultrabrain (gpt model) with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test non-gemini sync",
+          prompt: "Do something smart",
+          category: "ultrabrain",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should run sync, NOT forced to background
+      expect(launchCalled).toBe(false)  // manager.launch should NOT be called
+      expect(promptCalled).toBe(true)   // sync mode uses session.prompt
+      expect(result).not.toContain("UNSTABLE AGENT MODE")
+    }, { timeout: 20000 })
+
+    test("artistry category (gemini) with run_in_background=false should force background but wait for result", async () => {
+      // #given - artistry also uses gemini model
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-artistry",
+            sessionID: "ses_artistry_gemini",
+            description: "Artistry gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_artistry_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Artistry result here" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_artistry_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - artistry category (gemini-3-pro-preview with max variant)
+      const result = await tool.execute(
+        {
+          description: "Test artistry forced background",
+          prompt: "Do something artistic",
+          category: "artistry",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Artistry result here")
+    }, { timeout: 20000 })
+
+    test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
+      // #given - writing uses gemini-3-flash-preview
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-writing",
+            sessionID: "ses_writing_gemini",
+            description: "Writing gemini task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_writing_gemini" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Writing result here" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_writing_gemini": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - writing category (gemini-3-flash-preview)
+      const result = await tool.execute(
+        {
+          description: "Test writing forced background",
+          prompt: "Write something",
+          category: "writing",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Writing result here")
+    }, { timeout: 20000 })
+
+    test("is_unstable_agent=true should force background but wait for result", async () => {
+      // #given - custom category with is_unstable_agent=true but non-gemini model
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+      
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-custom-unstable",
+            sessionID: "ses_custom_unstable",
+            description: "Custom unstable task",
+            agent: "Sisyphus-Junior",
+            status: "running",
+          }
+        },
+      }
+      
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_custom_unstable" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Custom unstable result" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_custom_unstable": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "my-unstable-cat": {
+            model: "openai/gpt-5.2",
+            is_unstable_agent: true,
+          },
+        },
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - using custom unstable category with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test custom unstable",
+          prompt: "Do something",
+          category: "my-unstable-cat",
+          run_in_background: false,
+          skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("Custom unstable result")
+    }, { timeout: 20000 })
+  })
+
   describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // #given
@@ -894,31 +1394,43 @@ describe("sisyphus-task", () => {
   })
 
   describe("modelInfo detection via resolveCategoryConfig", () => {
-    test("systemDefaultModel is used when no userModel and no inheritedModel", () => {
-      // #given - builtin category, no user model, no inherited model
+    test("catalog model is used for category with catalog entry", () => {
+      // #given - ultrabrain has catalog entry
       const categoryName = "ultrabrain"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then - actualModel should be systemDefaultModel (categories no longer have model defaults)
+      // #then - catalog model is used
       expect(resolved).not.toBeNull()
-      const actualModel = resolved!.config.model
-      expect(actualModel).toBe(SYSTEM_DEFAULT_MODEL)
+      expect(resolved!.config.model).toBe("openai/gpt-5.2-codex")
+      expect(resolved!.config.variant).toBe("xhigh")
     })
 
-    test("inheritedModel takes precedence over systemDefaultModel for builtin category", () => {
-      // #given - builtin ultrabrain category, inherited model from parent
+    test("default model is used for category with default entry", () => {
+      // #given - unspecified-low has default model
+      const categoryName = "unspecified-low"
+      
+      // #when
+      const resolved = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+      
+      // #then - default model from DEFAULT_CATEGORIES is used
+      expect(resolved).not.toBeNull()
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
+    })
+
+    test("category built-in model takes precedence over inheritedModel for builtin category", () => {
+      // #given - builtin ultrabrain category with its own model, inherited model also provided
       const categoryName = "ultrabrain"
       const inheritedModel = "cliproxy/claude-opus-4-5"
       
       // #when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then - inheritedModel wins over systemDefaultModel
+      // #then - category's built-in model wins (ultrabrain uses gpt-5.2-codex)
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("cliproxy/claude-opus-4-5")
+      expect(actualModel).toBe("openai/gpt-5.2-codex")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -966,18 +1478,18 @@ describe("sisyphus-task", () => {
     // ===== TESTS FOR resolveModel() INTEGRATION (TDD GREEN) =====
     // These tests verify the NEW behavior where categories do NOT have default models
 
-    test("FIXED: inheritedModel takes precedence over systemDefaultModel", () => {
-      // #given a builtin category, and an inherited model from parent
-      // The NEW correct chain: userConfig?.model ?? inheritedModel ?? systemDefaultModel
+    test("FIXED: category built-in model takes precedence over inheritedModel", () => {
+      // #given a builtin category with its own model, and an inherited model from parent
+      // The CORRECT chain: userConfig?.model ?? categoryBuiltIn ?? systemDefaultModel
       const categoryName = "ultrabrain"
-      const inheritedModel = "anthropic/claude-opus-4-5" // inherited from parent session
+      const inheritedModel = "anthropic/claude-opus-4-5"
       
-      // #when userConfig.model is undefined and inheritedModel is set
+      // #when category has a built-in model (gpt-5.2-codex for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then inheritedModel should be used, NOT systemDefaultModel
+      // #then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe("openai/gpt-5.2-codex")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
@@ -1016,8 +1528,8 @@ describe("sisyphus-task", () => {
       expect(resolved!.model).toBe("custom/user-model")
     })
 
-    test("FIXED: empty string in userConfig.model is treated as unset and falls back", () => {
-      // #given userConfig.model is empty string ""
+    test("FIXED: empty string in userConfig.model is treated as unset and falls back to systemDefault", () => {
+      // #given userConfig.model is empty string "" for a custom category (no built-in model)
       const categoryName = "custom-empty-model"
       const userCategories = { "custom-empty-model": { model: "", temperature: 0.3 } }
       const inheritedModel = "anthropic/claude-opus-4-5"
@@ -1025,13 +1537,13 @@ describe("sisyphus-task", () => {
       // #when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then should fall back to inheritedModel since "" is normalized to undefined
+      // #then should fall back to systemDefaultModel since custom category has no built-in model
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe(SYSTEM_DEFAULT_MODEL)
     })
 
-    test("FIXED: undefined userConfig.model falls back to inheritedModel", () => {
-      // #given user explicitly sets a category but leaves model undefined
+    test("FIXED: undefined userConfig.model falls back to category built-in model", () => {
+      // #given user sets a builtin category but leaves model undefined
       const categoryName = "visual-engineering"
       // Using type assertion since we're testing fallback behavior for categories without model
       const userCategories = { "visual-engineering": { temperature: 0.2 } } as unknown as Record<string, CategoryConfig>
@@ -1040,9 +1552,9 @@ describe("sisyphus-task", () => {
       // #when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then should use inheritedModel
+      // #then should use category's built-in model (gemini-3-pro-preview for visual-engineering)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-opus-4-5")
+      expect(resolved!.model).toBe("google/gemini-3-pro-preview")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {

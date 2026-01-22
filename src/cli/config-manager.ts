@@ -6,6 +6,7 @@ import {
   type OpenCodeConfigPaths,
 } from "../shared"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
+import { generateModelConfig } from "./model-fallback"
 
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
 
@@ -306,14 +307,8 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
   return result
 }
 
-export function generateOmoConfig(_installConfig: InstallConfig): Record<string, unknown> {
-  // v3 beta: No hardcoded model strings - users rely on their OpenCode configured model
-  // Users who want specific models configure them explicitly after install
-  const config: Record<string, unknown> = {
-    $schema: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  }
-
-  return config
+export function generateOmoConfig(installConfig: InstallConfig): Record<string, unknown> {
+  return generateModelConfig(installConfig)
 }
 
 export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
@@ -580,16 +575,40 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
+function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean } {
+  const omoConfigPath = getOmoConfig()
+  if (!existsSync(omoConfigPath)) {
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+  }
+
+  try {
+    const content = readFileSync(omoConfigPath, "utf-8")
+    const omoConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!omoConfig || typeof omoConfig !== "object") {
+      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+    }
+
+    const configStr = JSON.stringify(omoConfig)
+    const hasOpenAI = configStr.includes('"openai/')
+    const hasOpencodeZen = configStr.includes('"opencode/')
+    const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
+
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan }
+  } catch {
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+  }
+}
+
 export function detectCurrentConfig(): DetectedConfig {
-  // v3 beta: Since we no longer generate hardcoded model strings,
-  // detection only checks for plugin installation and Gemini auth plugin
   const result: DetectedConfig = {
     isInstalled: false,
     hasClaude: true,
     isMax20: true,
-    hasChatGPT: true,
+    hasOpenAI: true,
     hasGemini: false,
     hasCopilot: false,
+    hasOpencodeZen: true,
+    hasZaiCodingPlan: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -612,6 +631,11 @@ export function detectCurrentConfig(): DetectedConfig {
 
   // Gemini auth plugin detection still works via plugin presence
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
+
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan } = detectProvidersFromOmoConfig()
+  result.hasOpenAI = hasOpenAI
+  result.hasOpencodeZen = hasOpencodeZen
+  result.hasZaiCodingPlan = hasZaiCodingPlan
 
   return result
 }

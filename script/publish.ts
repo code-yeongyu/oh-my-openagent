@@ -7,6 +7,8 @@ import { join } from "node:path"
 const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
 const versionOverride = process.env.VERSION
+const republishMode = process.env.REPUBLISH === "true"
+const prepareOnly = process.argv.includes("--prepare-only")
 
 const PLATFORM_PACKAGES = [
   "darwin-arm64",
@@ -83,11 +85,36 @@ async function updateAllPackageVersions(newVersion: string): Promise<void> {
   }
 }
 
-async function generateChangelog(previous: string): Promise<string[]> {
+async function findPreviousTag(currentVersion: string): Promise<string | null> {
+  // For beta versions, find the previous beta tag (e.g., 3.0.0-beta.11 for 3.0.0-beta.12)
+  const betaMatch = currentVersion.match(/^(\d+\.\d+\.\d+)-beta\.(\d+)$/)
+  if (betaMatch) {
+    const [, base, num] = betaMatch
+    const prevNum = parseInt(num) - 1
+    if (prevNum >= 1) {
+      const prevTag = `${base}-beta.${prevNum}`
+      const exists = await $`git rev-parse v${prevTag}`.nothrow()
+      if (exists.exitCode === 0) return prevTag
+    }
+  }
+  return null
+}
+
+async function generateChangelog(previous: string, currentVersion?: string): Promise<string[]> {
   const notes: string[] = []
 
+  // Try to find the most accurate previous tag for comparison
+  let compareTag = previous
+  if (currentVersion) {
+    const prevBetaTag = await findPreviousTag(currentVersion)
+    if (prevBetaTag) {
+      compareTag = prevBetaTag
+      console.log(`Using previous beta tag for comparison: v${compareTag}`)
+    }
+  }
+
   try {
-    const log = await $`git log v${previous}..HEAD --oneline --format="%h %s"`.text()
+    const log = await $`git log v${compareTag}..HEAD --oneline --format="%h %s"`.text()
     const commits = log
       .split("\n")
       .filter((line) => line && !line.match(/^\w+ (ignore:|test:|chore:|ci:|release:)/i))
@@ -161,29 +188,60 @@ interface PublishResult {
   error?: string
 }
 
-async function publishPackage(cwd: string, distTag: string | null, useProvenance = true): Promise<PublishResult> {
+async function checkPackageVersionExists(pkgName: string, version: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/${pkgName}/${version}`)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+async function publishPackage(cwd: string, distTag: string | null, useProvenance = true, pkgName?: string, version?: string): Promise<PublishResult> {
+  // In republish mode, skip if package already exists on npm
+  if (republishMode && pkgName && version) {
+    const exists = await checkPackageVersionExists(pkgName, version)
+    if (exists) {
+      return { success: true, alreadyPublished: true }
+    }
+    console.log(`    ${pkgName}@${version} not found on npm, publishing...`)
+  }
+
   const tagArgs = distTag ? ["--tag", distTag] : []
   const provenanceArgs = process.env.CI && useProvenance ? ["--provenance"] : []
+  const env = useProvenance ? {} : { NPM_CONFIG_PROVENANCE: "false" }
   
   try {
-    await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd)
+    await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd).env({ ...process.env, ...env })
     return { success: true }
   } catch (error: any) {
     const stderr = error?.stderr?.toString() || error?.message || ""
     
-    // E409/E403 = version already exists (idempotent success)
-    // E404 + "Access token expired" = OIDC token expired while publishing already-published package
+    // Only treat as "already published" if we're certain the package exists
+    // E409/EPUBLISHCONFLICT = definitive "version already exists"
     if (
       stderr.includes("EPUBLISHCONFLICT") ||
       stderr.includes("E409") ||
-      stderr.includes("E403") ||
       stderr.includes("cannot publish over") ||
-      stderr.includes("already exists") ||
-      (stderr.includes("E404") && stderr.includes("Access token expired"))
+      stderr.includes("You cannot publish over the previously published versions")
     ) {
       return { success: true, alreadyPublished: true }
     }
     
+    // E403 can mean "already exists" OR "no permission" - verify by checking npm registry
+    if (stderr.includes("E403")) {
+      if (pkgName && version) {
+        const exists = await checkPackageVersionExists(pkgName, version)
+        if (exists) {
+          return { success: true, alreadyPublished: true }
+        }
+      }
+      // If we can't verify or it doesn't exist, it's a real error
+      return { success: false, error: stderr }
+    }
+    
+    // 404 errors are NEVER "already published" - they indicate the package doesn't exist
+    // or OIDC token issues. Always treat as failure.
     return { success: false, error: stderr }
   }
 }
@@ -215,7 +273,7 @@ async function publishAllPackages(version: string): Promise<void> {
         const pkgName = `oh-my-opencode-${platform}`
         
         console.log(`    Starting ${pkgName}...`)
-        const result = await publishPackage(pkgDir, distTag, false)
+        const result = await publishPackage(pkgDir, distTag, false, pkgName, version)
         
         return { platform, pkgName, result }
       })
@@ -243,7 +301,7 @@ async function publishAllPackages(version: string): Promise<void> {
   
   // Publish main package last
   console.log(`\n📦 Publishing main package...`)
-  const mainResult = await publishPackage(process.cwd(), distTag)
+  const mainResult = await publishPackage(process.cwd(), distTag, true, PACKAGE_NAME, version)
   
   if (mainResult.success) {
     if (mainResult.alreadyPublished) {
@@ -298,7 +356,16 @@ async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<vo
     console.log(`Tag v${newVersion} already exists`)
   }
 
-  await $`git push origin HEAD --tags`
+  // Push tags first (critical for release), then try branch push (non-critical)
+  console.log("Pushing tags...")
+  await $`git push origin --tags`
+  
+  console.log("Pushing branch...")
+  const branchPush = await $`git push origin HEAD`.nothrow()
+  if (branchPush.exitCode !== 0) {
+    console.log(`⚠️  Branch push failed (remote may have new commits). Tag was pushed successfully.`)
+    console.log(`   To sync manually: git pull --rebase && git push`)
+  }
 
   console.log("\nCreating GitHub release...")
   const releaseNotes = notes.length > 0 ? notes.join("\n") : "No notable changes"
@@ -324,13 +391,25 @@ async function main() {
   const newVersion = versionOverride || (bump ? bumpVersion(previous, bump) : bumpVersion(previous, "patch"))
   console.log(`New version: ${newVersion}\n`)
 
+  if (prepareOnly) {
+    console.log("=== Prepare-only mode: updating versions ===")
+    await updateAllPackageVersions(newVersion)
+    console.log(`\n=== Versions updated to ${newVersion} ===`)
+    return
+  }
+
   if (await checkVersionExists(newVersion)) {
-    console.log(`Version ${newVersion} already exists on npm. Skipping publish.`)
-    process.exit(0)
+    if (republishMode) {
+      console.log(`Version ${newVersion} exists on npm. REPUBLISH mode: checking for missing platform packages...`)
+    } else {
+      console.log(`Version ${newVersion} already exists on npm. Skipping publish.`)
+      console.log(`(Use REPUBLISH=true to publish missing platform packages)`)
+      process.exit(0)
+    }
   }
 
   await updateAllPackageVersions(newVersion)
-  const changelog = await generateChangelog(previous)
+  const changelog = await generateChangelog(previous, newVersion)
   const contributors = await getContributors(previous)
   const notes = [...changelog, ...contributors]
 

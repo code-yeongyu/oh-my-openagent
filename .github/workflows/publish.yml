@@ -1,5 +1,5 @@
 name: publish
-run-name: "${{ format('release {0}', inputs.bump) }}"
+run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
 
 on:
   workflow_dispatch:
@@ -14,11 +14,11 @@ on:
           - minor
           - major
       version:
-        description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
+        description: "Override version (e.g., 3.0.0-beta.6). Takes precedence over bump."
         required: false
         type: string
       skip_platform:
-        description: "Skip platform binary packages (use when already published)"
+        description: "Skip platform binary packages"
         required: false
         type: boolean
         default: false
@@ -28,6 +28,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 permissions:
   contents: write
   id-token: write
+  actions: write
 
 jobs:
   test:
@@ -64,10 +65,13 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
-  publish:
+  publish-main:
     runs-on: ubuntu-latest
     needs: [test, typecheck]
     if: github.repository == 'code-yeongyu/oh-my-opencode'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist_tag: ${{ steps.version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,72 +88,152 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
-
-      - name: Configure npm registry
-        run: npm config set registry https://registry.npmjs.org
-
       - name: Install dependencies
         run: bun install
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
-      - name: Debug environment
+      - name: Calculate version
+        id: version
         run: |
-          echo "=== Bun version ==="
-          bun --version
-          echo "=== Node version ==="
-          node --version
-          echo "=== Current directory ==="
-          pwd
-          echo "=== List src/ ==="
-          ls -la src/
-          echo "=== package.json scripts ==="
-          cat package.json | jq '.scripts'
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            PREV=$(curl -s https://registry.npmjs.org/oh-my-opencode/latest | jq -r '.version // "0.0.0"')
+            BASE="${PREV%%-*}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "${{ inputs.bump }}" in
+              major) VERSION="$((MAJOR+1)).0.0" ;;
+              minor) VERSION="${MAJOR}.$((MINOR+1)).0" ;;
+              *) VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+            esac
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          if [[ "$VERSION" == *"-"* ]]; then
+            DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Version: $VERSION"
 
-      - name: Build
+      - name: Check if already published
+        id: check
         run: |
-          echo "=== Running bun build (main) ==="
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-opencode@${VERSION} already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update version
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          
+          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64; do
+            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
+            mv tmp.json "packages/${platform}/package.json"
+          done
+          
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Build main package
+        if: steps.check.outputs.skip != 'true'
+        run: |
           bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
-          echo "=== Running bun build (CLI) ==="
           bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
-          echo "=== Running tsc ==="
           bunx tsc --emitDeclarationOnly
-          echo "=== Running build:schema ==="
           bun run build:schema
 
-      - name: Build platform binaries
-        run: bun run build:binaries
-      
-      - name: Verify build output
+      - name: Publish main package
+        if: steps.check.outputs.skip != 'true'
         run: |
-          echo "=== dist/ contents ==="
-          ls -la dist/
-          echo "=== dist/cli/ contents ==="
-          ls -la dist/cli/
-          test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
-          test -f dist/cli/index.js || (echo "ERROR: dist/cli/index.js not found!" && exit 1)
-          echo "=== Platform binaries ==="
-          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl; do
-            test -f "packages/${platform}/bin/oh-my-opencode" || (echo "ERROR: packages/${platform}/bin/oh-my-opencode not found!" && exit 1)
-            echo "✓ packages/${platform}/bin/oh-my-opencode"
-          done
-          test -f "packages/windows-x64/bin/oh-my-opencode.exe" || (echo "ERROR: packages/windows-x64/bin/oh-my-opencode.exe not found!" && exit 1)
-          echo "✓ packages/windows-x64/bin/oh-my-opencode.exe"
-
-      - name: Publish
-        run: bun run script/publish.ts
+          TAG_ARG=""
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+          fi
+          npm publish --access public --provenance $TAG_ARG
         env:
-          BUMP: ${{ inputs.bump }}
-          VERSION: ${{ inputs.version }}
-          SKIP_PLATFORM_PACKAGES: ${{ inputs.skip_platform }}
-          CI: true
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
+      - name: Git commit and tag
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json assets/oh-my-opencode.schema.json packages/*/package.json || true
+          git diff --cached --quiet || git commit -m "release: v${{ steps.version.outputs.version }}"
+          git tag -f "v${{ steps.version.outputs.version }}"
+          git push origin --tags --force
+          git push origin HEAD || echo "Branch push failed (non-critical)"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trigger-platform:
+    runs-on: ubuntu-latest
+    needs: publish-main
+    if: inputs.skip_platform != true
+    steps:
+      - name: Trigger platform publish workflow
+        run: |
+          gh workflow run publish-platform.yml \
+            --repo ${{ github.repository }} \
+            --ref ${{ github.ref }} \
+            -f version=${{ needs.publish-main.outputs.version }} \
+            -f dist_tag=${{ needs.publish-main.outputs.dist_tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: publish-main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.publish-main.outputs.version }}"
+          
+          PREV_TAG=""
+          if [[ "$VERSION" == *"-beta."* ]]; then
+            BASE="${VERSION%-beta.*}"
+            NUM="${VERSION##*-beta.}"
+            PREV_NUM=$((NUM - 1))
+            if [ $PREV_NUM -ge 1 ]; then
+              PREV_TAG="${BASE}-beta.${PREV_NUM}"
+              git rev-parse "v${PREV_TAG}" >/dev/null 2>&1 || PREV_TAG=""
+            fi
+          fi
+          
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(curl -s https://registry.npmjs.org/oh-my-opencode/latest | jq -r '.version // "0.0.0"')
+          fi
+          
+          echo "Comparing v${PREV_TAG}..v${VERSION}"
+          
+          NOTES=$(git log "v${PREV_TAG}..v${VERSION}" --oneline --format="- %h %s" 2>/dev/null | grep -vE "^- \w+ (ignore:|test:|chore:|ci:|release:)" || echo "No notable changes")
+          
+          echo "$NOTES" > /tmp/changelog.md
+
+      - name: Create GitHub release
+        run: |
+          VERSION="${{ needs.publish-main.outputs.version }}"
+          gh release view "v${VERSION}" >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Delete draft release
-        run: gh release delete next --yes 2>/dev/null || echo "No draft release to delete"
+        run: gh release delete next --yes 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -158,8 +242,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          VERSION=$(jq -r '.version' package.json)
+          VERSION="${{ needs.publish-main.outputs.version }}"
           git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
-          git push -f origin master || echo "::warning::Failed to push to master. This can happen when workflow files changed. Manually sync master: git checkout master && git reset --hard v${VERSION} && git push -f"
+          git push -f origin master || echo "::warning::Failed to push to master"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

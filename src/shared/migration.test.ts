@@ -64,7 +64,7 @@ describe("migrateAgentNames", () => {
     // #then: Case-insensitive lookup should migrate correctly
     expect(migrated["Sisyphus"]).toEqual({ model: "test" })
     expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
-    expect(migrated["orchestrator-sisyphus"]).toEqual({ model: "openai/gpt-5.2" })
+    expect(migrated["Atlas"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -79,6 +79,36 @@ describe("migrateAgentNames", () => {
     // #then: Unknown names should pass through
     expect(changed).toBe(false)
     expect(migrated["custom-agent"]).toEqual({ model: "custom/model" })
+  })
+
+  test("migrates orchestrator-sisyphus to Atlas", () => {
+    // #given: Config with legacy orchestrator-sisyphus agent name
+    const agents = {
+      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: orchestrator-sisyphus should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
+  })
+
+  test("migrates lowercase atlas to Atlas", () => {
+    // #given: Config with lowercase atlas agent name
+    const agents = {
+      atlas: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: lowercase atlas should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toBeUndefined()
   })
 })
 
@@ -310,7 +340,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "most-capable", "general"]
+    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
 
     // #when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
@@ -370,10 +400,9 @@ describe("shouldDeleteAgentConfig", () => {
 
   test("returns true when all fields match category defaults", () => {
     // #given: Config with fields matching category defaults
-    // Note: DEFAULT_CATEGORIES only has temperature, not model
     const config = {
       category: "visual-engineering",
-      temperature: 0.7,
+      model: "google/gemini-3-pro-preview",
     }
 
     // #when: Check if config should be deleted
@@ -384,10 +413,10 @@ describe("shouldDeleteAgentConfig", () => {
   })
 
   test("returns false when fields differ from category defaults", () => {
-    // #given: Config with custom temperature override
+    // #given: Config with custom model override
     const config = {
       category: "visual-engineering",
-      temperature: 0.9, // Different from default (0.7)
+      model: "anthropic/claude-opus-4-5",
     }
 
     // #when: Check if config should be deleted
@@ -400,10 +429,10 @@ describe("shouldDeleteAgentConfig", () => {
   test("handles different categories with their defaults", () => {
     // #given: Configs for different categories
     const configs = [
-      { category: "ultrabrain", temperature: 0.1 },
-      { category: "quick", temperature: 0.3 },
-      { category: "most-capable", temperature: 0.1 },
-      { category: "general", temperature: 0.3 },
+      { category: "ultrabrain" },
+      { category: "quick" },
+      { category: "unspecified-high" },
+      { category: "unspecified-low" },
     ]
 
     // #when: Check each config
