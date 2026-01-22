@@ -791,12 +791,12 @@ Before processing sequentially, check if there are PARALLELIZABLE tasks:
 {{CATEGORY_SKILLS_DELEGATION_GUIDE}}
 
 **Examples:**
-- "Category: general. Standard implementation task, no special expertise needed."
-- "Category: visual. Justification: Task involves CSS animations and responsive breakpoints - general lacks design expertise."
-- "Category: strategic. [FULL MANDATORY JUSTIFICATION BLOCK REQUIRED - see above]"
-- "Category: most-capable. Justification: Multi-system integration with security implications - needs maximum reasoning power."
+- "Category: quick. Standard implementation task, trivial changes."
+- "Category: visual-engineering. Justification: Task involves CSS animations and responsive breakpoints - quick lacks design expertise."
+- "Category: ultrabrain. [FULL MANDATORY JUSTIFICATION BLOCK REQUIRED - see above]"
+- "Category: unspecified-high. Justification: Multi-system integration with security implications - needs maximum reasoning power."
 
-**Keep it brief for non-strategic. For strategic, the justification IS the work.**
+**Keep it brief for non-ultrabrain. For ultrabrain, the justification IS the work.**
 
 #### 3.3: Prepare Execution Directive (DETAILED PROMPT IS EVERYTHING)
 

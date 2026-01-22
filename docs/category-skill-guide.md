@@ -19,14 +19,15 @@ A Category is an agent configuration preset optimized for specific domains.
 
 ### Available Built-in Categories
 
-| Category | Optimal Model | Characteristics | Use Cases |
-|----------|---------------|-----------------|-----------|
-| `visual-engineering` | `gemini-3-pro` | High creativity (Temp 0.7) | Frontend, UI/UX, animations, styling |
-| `ultrabrain` | `gpt-5.2` | Maximum logical reasoning (Temp 0.1) | Architecture design, complex business logic, debugging |
-| `artistry` | `gemini-3-pro` | Artistic (Temp 0.9) | Creative ideation, design concepts, storytelling |
-| `quick` | `claude-haiku` | Fast (Temp 0.3) | Simple tasks, refactoring, script writing |
-| `writing` | `gemini-3-flash` | Natural flow (Temp 0.5) | Documentation, technical blogs, README writing |
-| `most-capable` | `claude-opus` | High performance (Temp 0.1) | Extremely difficult complex tasks |
+| Category | Default Model | Use Cases |
+|----------|---------------|-----------|
+| `visual-engineering` | `google/gemini-3-pro-preview` | Frontend, UI/UX, design, styling, animation |
+| `ultrabrain` | `openai/gpt-5.2-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
+| `artistry` | `google/gemini-3-pro-preview` (max) | Highly creative/artistic tasks, novel ideas |
+| `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
+| `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
+| `unspecified-high` | `anthropic/claude-opus-4-5` (max) | Tasks that don't fit other categories, high effort required |
+| `writing` | `google/gemini-3-flash-preview` | Documentation, prose, technical writing |
 
 ### Usage
 
@@ -156,12 +157,18 @@ You can fine-tune categories in `oh-my-opencode.json`.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `description` | string | Human-readable description of the category's purpose. Shown in delegate_task prompt. |
 | `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-5`) |
+| `variant` | string | Model variant (e.g., `max`, `xhigh`) |
 | `temperature` | number | Creativity level (0.0 ~ 2.0). Lower is more deterministic. |
+| `top_p` | number | Nucleus sampling parameter (0.0 ~ 1.0) |
 | `prompt_append` | string | Content to append to system prompt when this category is selected |
 | `thinking` | object | Thinking model configuration (`{ type: "enabled", budgetTokens: 16000 }`) |
+| `reasoningEffort` | string | Reasoning effort level (`low`, `medium`, `high`) |
+| `textVerbosity` | string | Text verbosity level (`low`, `medium`, `high`) |
 | `tools` | object | Tool usage control (disable with `{ "tool_name": false }`) |
 | `maxTokens` | number | Maximum response token count |
+| `is_unstable_agent` | boolean | Mark agent as unstable - forces background mode for monitoring |
 
 ### Example Configuration
 
