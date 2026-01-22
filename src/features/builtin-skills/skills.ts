@@ -9,7 +9,7 @@ This skill provides browser automation capabilities via the Playwright MCP serve
   mcpConfig: {
     playwright: {
       command: "npx",
-      args: ["@playwright/mcp@latest"],
+      args: ["--yes", "--quiet", "@playwright/mcp@latest"],
     },
   },
 }

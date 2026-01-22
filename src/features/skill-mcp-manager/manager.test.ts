@@ -608,4 +608,84 @@ describe("SkillMcpManager", () => {
       expect(getOrCreateSpy).toHaveBeenCalledTimes(1) // No retry
     })
   })
+
+  describe("error rate limiting", () => {
+    it("should detect killed client and throw descriptive error", async () => {
+      // #given: a client that was killed due to error flooding
+      const info: SkillMcpClientInfo = {
+        serverName: "flooded-server",
+        skillName: "flooded-skill",
+        sessionID: "session-flooded-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://example.com/mcp",
+        },
+        skillName: "flooded-skill",
+      }
+
+      // Manually inject a killed client into the manager's internal state
+      const key = `${info.sessionID}:${info.skillName}:${info.serverName}`
+      const mockClient = {
+        close: mock(() => Promise.resolve()),
+      }
+      const mockTransport = {
+        close: mock(() => Promise.resolve()),
+      }
+      const killedManagedClient = {
+        client: mockClient,
+        transport: mockTransport,
+        skillName: info.skillName,
+        lastUsedAt: Date.now(),
+        connectionType: "http" as const,
+        errorRateTracker: {
+          count: 100,
+          windowStart: Date.now(),
+          killed: true,
+        },
+      }
+      ;(manager as any).clients.set(key, killedManagedClient)
+
+      // #when / #then: operation should fail with clear error message
+      await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
+        /MCP server "flooded-server" was terminated due to excessive errors/
+      )
+    })
+
+    it("should include helpful hints in killed client error message", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "bad-mcp",
+        skillName: "bad-skill",
+        sessionID: "session-bad-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://example.com/mcp",
+        },
+        skillName: "bad-skill",
+      }
+
+      const key = `${info.sessionID}:${info.skillName}:${info.serverName}`
+      ;(manager as any).clients.set(key, {
+        client: { close: mock(() => Promise.resolve()) },
+        transport: { close: mock(() => Promise.resolve()) },
+        skillName: info.skillName,
+        lastUsedAt: Date.now(),
+        connectionType: "http" as const,
+        errorRateTracker: { count: 100, windowStart: Date.now(), killed: true },
+      })
+
+      // #when / #then: error should contain helpful diagnostic info
+      try {
+        await manager.callTool(info, context, "test-tool", {})
+        expect(true).toBe(false) // Should not reach here
+      } catch (error) {
+        const message = (error as Error).message
+        expect(message).toContain("outputting invalid data to stdout")
+        expect(message).toContain("npm/npx")
+        expect(message).toContain("JSON-RPC")
+      }
+    })
+  })
 })
