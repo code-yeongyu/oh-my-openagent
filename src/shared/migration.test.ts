@@ -118,13 +118,14 @@ describe("migrateHookNames", () => {
     const hooks = ["anthropic-auto-compact", "comment-checker"]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Legacy hook name should be migrated
     expect(changed).toBe(true)
     expect(migrated).toContain("anthropic-context-window-limit-recovery")
     expect(migrated).toContain("comment-checker")
     expect(migrated).not.toContain("anthropic-auto-compact")
+    expect(removed).toEqual([])
   })
 
   test("preserves current hook names unchanged", () => {
@@ -136,11 +137,12 @@ describe("migrateHookNames", () => {
     ]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Current names should remain unchanged
     expect(changed).toBe(false)
     expect(migrated).toEqual(hooks)
+    expect(removed).toEqual([])
   })
 
   test("handles empty hooks array", () => {
@@ -148,11 +150,12 @@ describe("migrateHookNames", () => {
     const hooks: string[] = []
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Should return empty array with no changes
     expect(changed).toBe(false)
     expect(migrated).toEqual([])
+    expect(removed).toEqual([])
   })
 
   test("migrates multiple legacy hook names", () => {
@@ -165,6 +168,51 @@ describe("migrateHookNames", () => {
     // #then: All legacy names should be migrated
     expect(changed).toBe(true)
     expect(migrated).toEqual(["anthropic-context-window-limit-recovery"])
+  })
+
+  test("migrates sisyphus-orchestrator to atlas", () => {
+    // #given: Config with legacy sisyphus-orchestrator hook
+    const hooks = ["sisyphus-orchestrator", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: sisyphus-orchestrator should be migrated to atlas
+    expect(changed).toBe(true)
+    expect(migrated).toContain("atlas")
+    expect(migrated).toContain("comment-checker")
+    expect(migrated).not.toContain("sisyphus-orchestrator")
+    expect(removed).toEqual([])
+  })
+
+  test("removes obsolete hooks and returns them in removed array", () => {
+    // #given: Config with removed hooks from v3.0.0
+    const hooks = ["preemptive-compaction", "empty-message-sanitizer", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Removed hooks should be filtered out
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toContain("preemptive-compaction")
+    expect(removed).toContain("empty-message-sanitizer")
+    expect(removed).toHaveLength(2)
+  })
+
+  test("handles mixed migration and removal", () => {
+    // #given: Config with both legacy rename and removed hooks
+    const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Legacy should be renamed, removed should be filtered
+    expect(changed).toBe(true)
+    expect(migrated).toContain("anthropic-context-window-limit-recovery")
+    expect(migrated).toContain("atlas")
+    expect(migrated).not.toContain("preemptive-compaction")
+    expect(removed).toEqual(["preemptive-compaction"])
   })
 })
 
