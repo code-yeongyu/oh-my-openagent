@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-43 cross-cutting utilities: path resolution, token truncation, config parsing, Claude Code compatibility.
+50 cross-cutting utilities: path resolution, token truncation, config parsing, model resolution, Claude Code compatibility.
 
 ## STRUCTURE
 
@@ -22,6 +22,11 @@ shared/
 ├── env-expander.ts        # ${VAR} expansion in configs
 ├── system-directive.ts    # System directive types
 ├── hook-utils.ts          # Hook helper functions
+├── model-requirements.ts  # Agent/Category model requirements (providers + model)
+├── model-availability.ts  # Available models fetch + fuzzy matching
+├── model-resolver.ts      # 3-step model resolution (override → provider fallback → default)
+├── shell-env.ts           # Cross-platform shell environment
+├── prompt-parts-helper.ts # Prompt parts manipulation
 └── *.test.ts              # Test files (colocated)
 ```
 
@@ -37,6 +42,11 @@ shared/
 | Resolve paths | `getOpenCodeConfigDir()`, `getClaudeConfigDir()` |
 | Migrate config | `migrateConfigFile(path, rawConfig)` |
 | Compare versions | `isOpenCodeVersionAtLeast("1.1.0")` |
+| Get agent model requirements | `AGENT_MODEL_REQUIREMENTS` in `model-requirements.ts` |
+| Get category model requirements | `CATEGORY_MODEL_REQUIREMENTS` in `model-requirements.ts` |
+| Resolve model with fallback | `resolveModelWithFallback()` in `model-resolver.ts` |
+| Fuzzy match model names | `fuzzyMatchModel()` in `model-availability.ts` |
+| Fetch available models | `fetchAvailableModels(client)` in `model-availability.ts` |
 
 ## KEY PATTERNS
 
@@ -52,6 +62,9 @@ if (isOpenCodeVersionAtLeast("1.1.0")) { /* new feature */ }
 
 // Tool permission normalization
 const permissions = migrateToolsToPermission(legacyTools)
+
+// Model resolution with fallback chain
+const model = await resolveModelWithFallback(client, requirements, override)
 ```
 
 ## ANTI-PATTERNS

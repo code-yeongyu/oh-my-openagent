@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-20+ tools: LSP (11), AST-Grep (2), Search (2), Session (4), Agent delegation (3), System (2). High-performance C++ bindings via @ast-grep/napi.
+20+ tools: LSP (6), AST-Grep (2), Search (2), Session (4), Agent delegation (4), System (2), Skill (3). High-performance C++ bindings via @ast-grep/napi.
 
 ## STRUCTURE
 
@@ -13,9 +13,9 @@ tools/
 │   ├── tools.ts      # Business logic, ToolDefinition
 │   ├── types.ts      # Zod schemas
 │   └── constants.ts  # Fixed values, descriptions
-├── lsp/              # 11 tools: goto_definition, references, symbols, diagnostics, rename
+├── lsp/              # 6 tools: goto_definition, references, symbols, diagnostics, prepare_rename, rename
 ├── ast-grep/         # 2 tools: search, replace (25 languages via NAPI)
-├── delegate-task/    # Category-based agent routing (761 lines)
+├── delegate-task/    # Category-based agent routing (1027 lines)
 ├── session-manager/  # 4 tools: list, read, search, info
 ├── grep/             # Custom grep with timeout/truncation
 ├── glob/             # Custom glob with 60s timeout, 100 file limit
