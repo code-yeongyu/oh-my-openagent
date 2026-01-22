@@ -65,9 +65,8 @@ export const builtinTools: Record<string, ToolDefinition> = {
   ast_grep_replace,
   grep,
   glob,
-  // Session tools - PascalCase to override OpenCode's built-in HTTP-based session tools
-  SessionList: session_list,
-  SessionRead: session_read,
-  SessionSearch: session_search,
-  SessionInfo: session_info,
+  session_list,
+  session_read,
+  session_search,
+  session_info,
 }
