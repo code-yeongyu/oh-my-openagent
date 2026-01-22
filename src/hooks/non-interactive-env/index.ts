@@ -37,7 +37,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
 
       const bannedCmd = detectBannedCommand(command)
       if (bannedCmd) {
-        output.message = `⚠️ Warning: '${bannedCmd}' is an interactive command that may hang in non-interactive environments.`
+        output.message = `Warning: '${bannedCmd}' is an interactive command that may hang in non-interactive environments.`
       }
 
       // Only prepend env vars for git commands (editor blocking, pager, etc.)

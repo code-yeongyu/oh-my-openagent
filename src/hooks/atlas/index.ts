@@ -68,7 +68,7 @@ const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ CRITICAL: Subagents FREQUENTLY LIE about completion.
+CRITICAL: Subagents FREQUENTLY LIE about completion.
 Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -107,7 +107,7 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ---
 
-⚠️⚠️⚠️ ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)} ⚠️⚠️⚠️
+${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
@@ -117,7 +117,7 @@ You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
+**THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
 1. **DELEGATE** all implementation work via \`delegate_task\`
@@ -148,7 +148,7 @@ delegate_task(
 )
 \`\`\`
 
-⚠️⚠️⚠️ DELEGATE. DON'T IMPLEMENT. ⚠️⚠️⚠️
+DELEGATE. DON'T IMPLEMENT.
 
 ---
 `
