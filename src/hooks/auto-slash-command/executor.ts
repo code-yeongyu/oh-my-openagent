@@ -1,12 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
-import { homedir } from "os"
 import {
   parseFrontmatter,
   resolveCommandsInText,
   resolveFileReferencesInText,
   sanitizeModelField,
   getClaudeConfigDir,
+  getOpenCodeConfigDir,
 } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
@@ -101,9 +101,10 @@ export interface ExecutorOptions {
 }
 
 async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
-  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
+  const opencodeGlobalDir = join(configDir, "command")
   const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")

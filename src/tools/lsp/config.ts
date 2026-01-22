@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
-import { homedir } from "os"
 import { BUILTIN_SERVERS, EXT_TO_LANG, LSP_INSTALL_HINTS } from "./constants"
 import type { ResolvedServer, ServerLookupResult } from "./types"
+import { getOpenCodeConfigDir } from "../../shared"
 
 interface LspEntry {
   disabled?: boolean
@@ -34,10 +34,11 @@ function loadJsonFile<T>(path: string): T | null {
 
 function getConfigPaths(): { project: string; user: string; opencode: string } {
   const cwd = process.cwd()
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   return {
     project: join(cwd, ".opencode", "oh-my-opencode.json"),
-    user: join(homedir(), ".config", "opencode", "oh-my-opencode.json"),
-    opencode: join(homedir(), ".config", "opencode", "opencode.json"),
+    user: join(configDir, "oh-my-opencode.json"),
+    opencode: join(configDir, "opencode.json"),
   }
 }
 
@@ -199,10 +200,11 @@ export function isServerInstalled(command: string[]): boolean {
   }
 
   const cwd = process.cwd()
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const additionalBases = [
     join(cwd, "node_modules", ".bin"),
-    join(homedir(), ".config", "opencode", "bin"),
-    join(homedir(), ".config", "opencode", "node_modules", ".bin"),
+    join(configDir, "bin"),
+    join(configDir, "node_modules", ".bin"),
   ]
 
   for (const base of additionalBases) {
