@@ -8,6 +8,7 @@ const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
 const versionOverride = process.env.VERSION
 const republishMode = process.env.REPUBLISH === "true"
+const prepareOnly = process.argv.includes("--prepare-only")
 
 const PLATFORM_PACKAGES = [
   "darwin-arm64",
@@ -389,6 +390,13 @@ async function main() {
   const previous = await fetchPreviousVersion()
   const newVersion = versionOverride || (bump ? bumpVersion(previous, bump) : bumpVersion(previous, "patch"))
   console.log(`New version: ${newVersion}\n`)
+
+  if (prepareOnly) {
+    console.log("=== Prepare-only mode: updating versions ===")
+    await updateAllPackageVersions(newVersion)
+    console.log(`\n=== Versions updated to ${newVersion} ===`)
+    return
+  }
 
   if (await checkVersionExists(newVersion)) {
     if (republishMode) {
