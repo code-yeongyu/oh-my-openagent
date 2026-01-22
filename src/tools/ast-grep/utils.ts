@@ -17,7 +17,7 @@ export function formatSearchResult(result: SgResult): string {
       : result.truncatedReason === "max_output_bytes"
       ? "output exceeded 1MB limit"
       : "search timed out"
-    lines.push(`⚠️ Results truncated (${reason})\n`)
+    lines.push(`[TRUNCATED] Results truncated (${reason})\n`)
   }
 
   lines.push(`Found ${result.matches.length} match(es)${result.truncated ? ` (truncated from ${result.totalMatches})` : ""}:\n`)
@@ -50,7 +50,7 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean): string
       : result.truncatedReason === "max_output_bytes"
       ? "output exceeded 1MB limit"
       : "search timed out"
-    lines.push(`⚠️ Results truncated (${reason})\n`)
+    lines.push(`[TRUNCATED] Results truncated (${reason})\n`)
   }
 
   lines.push(`${prefix}${result.matches.length} replacement(s):\n`)
