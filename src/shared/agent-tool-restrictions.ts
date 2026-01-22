@@ -28,18 +28,6 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     read: true,
   },
 
-  "document-writer": {
-    task: false,
-    delegate_task: false,
-    call_omo_agent: false,
-  },
-
-  "frontend-ui-ux-engineer": {
-    task: false,
-    delegate_task: false,
-    call_omo_agent: false,
-  },
-
   "Sisyphus-Junior": {
     task: false,
     delegate_task: false,

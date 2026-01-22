@@ -122,10 +122,8 @@ describe("buildAgent with category and skills", () => {
     // #when
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
-    // #then - DEFAULT_CATEGORIES only has temperature, not model
-    // Model remains undefined since neither factory nor category provides it
-    expect(agent.model).toBeUndefined()
-    expect(agent.temperature).toBe(0.7)
+    // #then - category's built-in model is applied
+    expect(agent.model).toBe("google/gemini-3-pro-preview")
   })
 
   test("agent with category and existing model keeps existing model", () => {
@@ -142,9 +140,8 @@ describe("buildAgent with category and skills", () => {
     // #when
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
-    // #then
+    // #then - explicit model takes precedence over category
     expect(agent.model).toBe("custom/model")
-    expect(agent.temperature).toBe(0.7)
   })
 
   test("agent with category inherits variant", () => {
@@ -247,9 +244,9 @@ describe("buildAgent with category and skills", () => {
     // #when
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
-    // #then - DEFAULT_CATEGORIES["ultrabrain"] only has temperature, not model
-    expect(agent.model).toBeUndefined()
-    expect(agent.temperature).toBe(0.1)
+    // #then - category's built-in model and skills are applied
+    expect(agent.model).toBe("openai/gpt-5.2-codex")
+    expect(agent.variant).toBe("xhigh")
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
     expect(agent.prompt).toContain("Task description")
   })
