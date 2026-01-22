@@ -199,5 +199,25 @@ describe("detectErrorType", () => {
       // #then should return thinking_block_order
       expect(result).toBe("thinking_block_order")
     })
+
+    it("should detect thinking_block_order even when error message contains tool_use/tool_result in docs URL", () => {
+      // #given Anthropic's extended thinking error with tool_use/tool_result in the documentation text
+      const error = {
+        error: {
+          type: "invalid_request_error",
+          message:
+            "messages.1.content.0.type: Expected `thinking` or `redacted_thinking`, but found `text`. " +
+            "When `thinking` is enabled, a final `assistant` message must start with a thinking block " +
+            "(preceeding the lastmost set of `tool_use` and `tool_result` blocks). " +
+            "We recommend you include thinking blocks from previous turns.",
+        },
+      }
+
+      // #when detectErrorType is called
+      const result = detectErrorType(error)
+
+      // #then should return thinking_block_order (NOT tool_result_missing)
+      expect(result).toBe("thinking_block_order")
+    })
   })
 })

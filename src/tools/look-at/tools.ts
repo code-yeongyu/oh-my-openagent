@@ -5,6 +5,27 @@ import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared/logger"
 
+interface LookAtArgsWithAlias extends LookAtArgs {
+  path?: string
+}
+
+export function normalizeArgs(args: LookAtArgsWithAlias): LookAtArgs {
+  return {
+    file_path: args.file_path ?? args.path ?? "",
+    goal: args.goal ?? "",
+  }
+}
+
+export function validateArgs(args: LookAtArgs): string | null {
+  if (!args.file_path) {
+    return `Error: Missing required parameter 'file_path'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
+  }
+  if (!args.goal) {
+    return `Error: Missing required parameter 'goal'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
+  }
+  return null
+}
+
 function inferMimeType(filePath: string): string {
   const ext = extname(filePath).toLowerCase()
   const mimeTypes: Record<string, string> = {
@@ -50,7 +71,14 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       file_path: tool.schema.string().describe("Absolute path to the file to analyze"),
       goal: tool.schema.string().describe("What specific information to extract from the file"),
     },
-    async execute(args: LookAtArgs, toolContext) {
+    async execute(rawArgs: LookAtArgs, toolContext) {
+      const args = normalizeArgs(rawArgs as LookAtArgsWithAlias)
+      const validationError = validateArgs(args)
+      if (validationError) {
+        log(`[look_at] Validation failed: ${validationError}`)
+        return validationError
+      }
+
       log(`[look_at] Analyzing file: ${args.file_path}, goal: ${args.goal}`)
 
       const mimeType = inferMimeType(args.file_path)
@@ -65,10 +93,18 @@ Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
 
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
+      const parentSession = await ctx.client.session.get({
+        path: { id: toolContext.sessionID },
+      }).catch(() => null)
+      const parentDirectory = parentSession?.data?.directory ?? ctx.directory
+
       const createResult = await ctx.client.session.create({
         body: {
           parentID: toolContext.sessionID,
           title: `look_at: ${args.goal.substring(0, 50)}`,
+        },
+        query: {
+          directory: parentDirectory,
         },
       })
 

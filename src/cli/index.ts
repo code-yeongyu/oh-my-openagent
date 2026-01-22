@@ -4,13 +4,12 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
-import { listAccounts, removeAccount } from "./commands/auth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import packageJson from "../../package.json" with { type: "json" }
 
-const packageJson = await import("../../package.json")
 const VERSION = packageJson.version
 
 const program = new Command()
@@ -25,26 +24,35 @@ program
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
-  .option("--chatgpt <value>", "ChatGPT subscription: no, yes")
+  .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
+  .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
+  .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
+  .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes
-  $ bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers:
-  Claude      Required for Sisyphus (main orchestrator) and Librarian agents
-  ChatGPT     Powers the Oracle agent for debugging and architecture
-  Gemini      Powers frontend, documentation, and multimodal agents
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
+  Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
+  OpenAI        Native openai/ models (GPT-5.2 for Oracle)
+  Gemini        Native google/ models (Gemini 3 Pro, Flash)
+  Copilot       github-copilot/ models (fallback)
+  OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
+  Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
       tui: options.tui !== false,
       claude: options.claude,
-      chatgpt: options.chatgpt,
+      openai: options.openai,
       gemini: options.gemini,
+      copilot: options.copilot,
+      opencodeZen: options.opencodeZen,
+      zaiCodingPlan: options.zaiCodingPlan,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
@@ -132,45 +140,6 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
-    process.exit(exitCode)
-  })
-
-const authCommand = program
-  .command("auth")
-  .description("Manage Google Antigravity accounts")
-
-authCommand
-  .command("list")
-  .description("List all Google Antigravity accounts")
-  .addHelpText("after", `
-Examples:
-  $ bunx oh-my-opencode auth list
-
-Shows:
-  - Account index and email
-  - Account tier (free/paid)
-  - Active account (marked with *)
-  - Rate limit status per model family
-`)
-  .action(async () => {
-    const exitCode = await listAccounts()
-    process.exit(exitCode)
-  })
-
-authCommand
-  .command("remove <index-or-email>")
-  .description("Remove an account by index or email")
-  .addHelpText("after", `
-Examples:
-  $ bunx oh-my-opencode auth remove 0
-  $ bunx oh-my-opencode auth remove user@example.com
-
-Note:
-  - Use 'auth list' to see account indices
-  - Removing the active account will switch to the next available account
-`)
-  .action(async (indexOrEmail: string) => {
-    const exitCode = await removeAccount(indexOrEmail)
     process.exit(exitCode)
   })
 

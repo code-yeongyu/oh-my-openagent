@@ -11,8 +11,8 @@ export const BLOCKED_TMUX_SUBCOMMANDS = [
   "pipep",
 ]
 
-export const INTERACTIVE_BASH_DESCRIPTION = `Execute tmux commands. Use "omo-{name}" session pattern.
+export const INTERACTIVE_BASH_DESCRIPTION = `WARNING: This is TMUX ONLY. Pass tmux subcommands directly (without 'tmux' prefix).
 
-For: server processes, long-running tasks, background jobs, interactive CLI tools.
+Examples: new-session -d -s omo-dev, send-keys -t omo-dev "vim" Enter
 
-Blocked (use bash instead): capture-pane, save-buffer, show-buffer, pipe-pane.`
+For TUI apps needing ongoing interaction (vim, htop, pudb). One-shot commands → use Bash with &.`

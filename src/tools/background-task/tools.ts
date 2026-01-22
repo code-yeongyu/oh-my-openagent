@@ -4,7 +4,10 @@ import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+import { log } from "../../shared/logger"
+import { consumeNewMessages } from "../../shared/session-cursor"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -57,12 +60,25 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
       const ctx = toolContext as ToolContextWithMetadata
 
       if (!args.agent || args.agent.trim() === "") {
-        return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
+        return `[ERROR] Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
       }
 
       try {
         const messageDir = getMessageDir(ctx.sessionID)
         const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+        const sessionAgent = getSessionAgent(ctx.sessionID)
+        const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
+        
+        log("[background_task] parentAgent resolution", {
+          sessionID: ctx.sessionID,
+          ctxAgent: ctx.agent,
+          sessionAgent,
+          firstMessageAgent,
+          prevMessageAgent: prevMessage?.agent,
+          resolvedParentAgent: parentAgent,
+        })
+        
         const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
           ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
           : undefined
@@ -74,7 +90,7 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           parentSessionID: ctx.sessionID,
           parentMessageID: ctx.messageID,
           parentModel,
-          parentAgent: ctx.agent ?? prevMessage?.agent,
+          parentAgent,
         })
 
         ctx.metadata?.({
@@ -96,7 +112,7 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 - block=true: Wait for completion (rarely needed since system notifies)`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        return `❌ Failed to launch background task: ${message}`
+        return `[ERROR] Failed to launch background task: ${message}`
       }
     },
   })
@@ -112,7 +128,14 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 function formatTaskStatus(task: BackgroundTask): string {
-  const duration = formatDuration(task.startedAt, task.completedAt)
+  let duration: string
+  if (task.status === "pending" && task.queuedAt) {
+    duration = formatDuration(task.queuedAt, undefined)
+  } else if (task.startedAt) {
+    duration = formatDuration(task.startedAt, task.completedAt)
+  } else {
+    duration = "N/A"
+  }
   const promptPreview = truncateText(task.prompt, 500)
   
   let progressSection = ""
@@ -136,7 +159,11 @@ ${truncated}
   }
 
   let statusNote = ""
-  if (task.status === "running") {
+  if (task.status === "pending") {
+    statusNote = `
+
+> **Queued**: Task is waiting for a concurrency slot to become available.`
+  } else if (task.status === "running") {
     statusNote = `
 
 > **Note**: No need to wait explicitly - the system will notify you when this task completes.`
@@ -146,6 +173,8 @@ ${truncated}
 > **Failed**: The task encountered an error. Check the last message for details.`
   }
 
+  const durationLabel = task.status === "pending" ? "Queued for" : "Duration"
+
   return `# Task Status
 
 | Field | Value |
@@ -154,7 +183,7 @@ ${truncated}
 | Description | ${task.description} |
 | Agent | ${task.agent} |
 | Status | **${task.status}** |
-| Duration | ${duration} |
+| ${durationLabel} | ${duration} |
 | Session ID | \`${task.sessionID}\` |${progressSection}
 ${statusNote}
 ## Original Prompt
@@ -165,6 +194,10 @@ ${promptPreview}
 }
 
 async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
+  if (!task.sessionID) {
+    return `Error: Task has no sessionID`
+  }
+  
   const messagesResult = await client.session.messages({
     path: { id: task.sessionID },
   })
@@ -190,7 +223,7 @@ async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): P
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
 Session ID: ${task.sessionID}
 
 ---
@@ -209,7 +242,7 @@ Session ID: ${task.sessionID}
 
 Task ID: ${task.id}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
 Session ID: ${task.sessionID}
 
 ---
@@ -224,11 +257,26 @@ Session ID: ${task.sessionID}
     return timeA.localeCompare(timeB)
   })
   
+  const newMessages = consumeNewMessages(task.sessionID, sortedMessages)
+  if (newMessages.length === 0) {
+    const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${duration}
+Session ID: ${task.sessionID}
+
+---
+
+(No new output since last check)`
+  }
+
   // Extract content from ALL messages, not just the last one
   // Tool results may be in earlier messages while the final message is empty
   const extractedContent: string[] = []
   
-  for (const message of sortedMessages) {
+  for (const message of newMessages) {
     for (const part of message.parts ?? []) {
       // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
       if ((part.type === "text" || part.type === "reasoning") && part.text) {
@@ -255,7 +303,7 @@ Session ID: ${task.sessionID}
     .filter((text) => text.length > 0)
     .join("\n\n")
 
-  const duration = formatDuration(task.startedAt, task.completedAt)
+  const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
   return `Task Result
 
@@ -347,60 +395,84 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
         const cancelAll = args.all === true
 
         if (!cancelAll && !args.taskId) {
-          return `❌ Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
+          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
         }
 
         if (cancelAll) {
           const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
-          const runningTasks = tasks.filter(t => t.status === "running")
+          const cancellableTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
 
-          if (runningTasks.length === 0) {
-            return `✅ No running background tasks to cancel.`
+          if (cancellableTasks.length === 0) {
+            return `No running or pending background tasks to cancel.`
           }
 
           const results: string[] = []
-          for (const task of runningTasks) {
-            client.session.abort({
-              path: { id: task.sessionID },
-            }).catch(() => {})
+          for (const task of cancellableTasks) {
+            if (task.status === "pending") {
+              // Pending task: use manager method (no session to abort)
+              manager.cancelPendingTask(task.id)
+              results.push(`- ${task.id}: ${task.description} (pending)`)
+            } else if (task.sessionID) {
+              // Running task: abort session
+              client.session.abort({
+                path: { id: task.sessionID },
+              }).catch(() => {})
 
-            task.status = "cancelled"
-            task.completedAt = new Date()
-            results.push(`- ${task.id}: ${task.description}`)
+              task.status = "cancelled"
+              task.completedAt = new Date()
+              results.push(`- ${task.id}: ${task.description} (running)`)
+            }
           }
 
-          return `✅ Cancelled ${runningTasks.length} background task(s):
+          return `Cancelled ${cancellableTasks.length} background task(s):
 
 ${results.join("\n")}`
         }
 
         const task = manager.getTask(args.taskId!)
         if (!task) {
-          return `❌ Task not found: ${args.taskId}`
+          return `[ERROR] Task not found: ${args.taskId}`
         }
 
-        if (task.status !== "running") {
-          return `❌ Cannot cancel task: current status is "${task.status}".
-Only running tasks can be cancelled.`
+        if (task.status !== "running" && task.status !== "pending") {
+          return `[ERROR] Cannot cancel task: current status is "${task.status}".
+Only running or pending tasks can be cancelled.`
         }
 
+        if (task.status === "pending") {
+          // Pending task: use manager method (no session to abort, no slot to release)
+          const cancelled = manager.cancelPendingTask(task.id)
+          if (!cancelled) {
+            return `[ERROR] Failed to cancel pending task: ${task.id}`
+          }
+
+          return `Pending task cancelled successfully
+
+Task ID: ${task.id}
+Description: ${task.description}
+Status: ${task.status}`
+        }
+
+        // Running task: abort session
         // Fire-and-forget: abort 요청을 보내고 await 하지 않음
         // await 하면 메인 세션까지 abort 되는 문제 발생
-        client.session.abort({
-          path: { id: task.sessionID },
-        }).catch(() => {})
+        if (task.sessionID) {
+          client.session.abort({
+            path: { id: task.sessionID },
+          }).catch(() => {})
+        }
 
         task.status = "cancelled"
         task.completedAt = new Date()
 
-        return `✅ Task cancelled successfully
+        return `Task cancelled successfully
 
 Task ID: ${task.id}
 Description: ${task.description}
 Session ID: ${task.sessionID}
 Status: ${task.status}`
       } catch (error) {
-        return `❌ Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
+        return `[ERROR] Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
       }
     },
   })

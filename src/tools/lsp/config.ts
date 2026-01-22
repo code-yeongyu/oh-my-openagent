@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
-import { homedir } from "os"
 import { BUILTIN_SERVERS, EXT_TO_LANG, LSP_INSTALL_HINTS } from "./constants"
 import type { ResolvedServer, ServerLookupResult } from "./types"
+import { getOpenCodeConfigDir } from "../../shared"
 
 interface LspEntry {
   disabled?: boolean
@@ -34,10 +34,11 @@ function loadJsonFile<T>(path: string): T | null {
 
 function getConfigPaths(): { project: string; user: string; opencode: string } {
   const cwd = process.cwd()
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   return {
     project: join(cwd, ".opencode", "oh-my-opencode.json"),
-    user: join(homedir(), ".config", "opencode", "oh-my-opencode.json"),
-    opencode: join(homedir(), ".config", "opencode", "opencode.json"),
+    user: join(configDir, "oh-my-opencode.json"),
+    opencode: join(configDir, "opencode.json"),
   }
 }
 
@@ -170,31 +171,47 @@ export function isServerInstalled(command: string[]): boolean {
   }
 
   const isWindows = process.platform === "win32"
-  const ext = isWindows ? ".exe" : ""
+  
+  let exts = [""]
+  if (isWindows) {
+    const pathExt = process.env.PATHEXT || ""
+    if (pathExt) {
+       const systemExts = pathExt.split(";").filter(Boolean)
+       exts = [...new Set([...exts, ...systemExts, ".exe", ".cmd", ".bat", ".ps1"])]
+    } else {
+       exts = ["", ".exe", ".cmd", ".bat", ".ps1"]
+    }
+  }
 
-  const pathEnv = process.env.PATH || ""
+  let pathEnv = process.env.PATH || ""
+  if (isWindows && !pathEnv) {
+    pathEnv = process.env.Path || ""
+  }
+  
   const pathSeparator = isWindows ? ";" : ":"
   const paths = pathEnv.split(pathSeparator)
 
   for (const p of paths) {
-    if (existsSync(join(p, cmd)) || existsSync(join(p, cmd + ext))) {
-      return true
+    for (const suffix of exts) {
+      if (existsSync(join(p, cmd + suffix))) {
+        return true
+      }
     }
   }
 
   const cwd = process.cwd()
-  const additionalPaths = [
-    join(cwd, "node_modules", ".bin", cmd),
-    join(cwd, "node_modules", ".bin", cmd + ext),
-    join(homedir(), ".config", "opencode", "bin", cmd),
-    join(homedir(), ".config", "opencode", "bin", cmd + ext),
-    join(homedir(), ".config", "opencode", "node_modules", ".bin", cmd),
-    join(homedir(), ".config", "opencode", "node_modules", ".bin", cmd + ext),
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const additionalBases = [
+    join(cwd, "node_modules", ".bin"),
+    join(configDir, "bin"),
+    join(configDir, "node_modules", ".bin"),
   ]
 
-  for (const p of additionalPaths) {
-    if (existsSync(p)) {
-      return true
+  for (const base of additionalBases) {
+    for (const suffix of exts) {
+      if (existsSync(join(base, cmd + suffix))) {
+        return true
+      }
     }
   }
 

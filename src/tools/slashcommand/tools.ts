@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
-import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
+import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
@@ -52,10 +52,10 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 }
 
 export function discoverCommandsSync(): CommandInfo[] {
-  const { homedir } = require("os")
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
-  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
+  const opencodeGlobalDir = join(configDir, "command")
   const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")

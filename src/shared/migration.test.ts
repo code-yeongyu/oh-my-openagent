@@ -55,6 +55,7 @@ describe("migrateAgentNames", () => {
     const agents = {
       SISYPHUS: { model: "test" },
       "planner-sisyphus": { prompt: "test" },
+      "Orchestrator-Sisyphus": { model: "openai/gpt-5.2" },
     }
 
     // #when: Migrate agent names
@@ -63,6 +64,7 @@ describe("migrateAgentNames", () => {
     // #then: Case-insensitive lookup should migrate correctly
     expect(migrated["Sisyphus"]).toEqual({ model: "test" })
     expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
+    expect(migrated["Atlas"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -78,6 +80,36 @@ describe("migrateAgentNames", () => {
     expect(changed).toBe(false)
     expect(migrated["custom-agent"]).toEqual({ model: "custom/model" })
   })
+
+  test("migrates orchestrator-sisyphus to Atlas", () => {
+    // #given: Config with legacy orchestrator-sisyphus agent name
+    const agents = {
+      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: orchestrator-sisyphus should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
+  })
+
+  test("migrates lowercase atlas to Atlas", () => {
+    // #given: Config with lowercase atlas agent name
+    const agents = {
+      atlas: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: lowercase atlas should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toBeUndefined()
+  })
 })
 
 describe("migrateHookNames", () => {
@@ -86,13 +118,14 @@ describe("migrateHookNames", () => {
     const hooks = ["anthropic-auto-compact", "comment-checker"]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Legacy hook name should be migrated
     expect(changed).toBe(true)
     expect(migrated).toContain("anthropic-context-window-limit-recovery")
     expect(migrated).toContain("comment-checker")
     expect(migrated).not.toContain("anthropic-auto-compact")
+    expect(removed).toEqual([])
   })
 
   test("preserves current hook names unchanged", () => {
@@ -104,11 +137,12 @@ describe("migrateHookNames", () => {
     ]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Current names should remain unchanged
     expect(changed).toBe(false)
     expect(migrated).toEqual(hooks)
+    expect(removed).toEqual([])
   })
 
   test("handles empty hooks array", () => {
@@ -116,11 +150,12 @@ describe("migrateHookNames", () => {
     const hooks: string[] = []
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Should return empty array with no changes
     expect(changed).toBe(false)
     expect(migrated).toEqual([])
+    expect(removed).toEqual([])
   })
 
   test("migrates multiple legacy hook names", () => {
@@ -133,6 +168,51 @@ describe("migrateHookNames", () => {
     // #then: All legacy names should be migrated
     expect(changed).toBe(true)
     expect(migrated).toEqual(["anthropic-context-window-limit-recovery"])
+  })
+
+  test("migrates sisyphus-orchestrator to atlas", () => {
+    // #given: Config with legacy sisyphus-orchestrator hook
+    const hooks = ["sisyphus-orchestrator", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: sisyphus-orchestrator should be migrated to atlas
+    expect(changed).toBe(true)
+    expect(migrated).toContain("atlas")
+    expect(migrated).toContain("comment-checker")
+    expect(migrated).not.toContain("sisyphus-orchestrator")
+    expect(removed).toEqual([])
+  })
+
+  test("removes obsolete hooks and returns them in removed array", () => {
+    // #given: Config with removed hooks from v3.0.0
+    const hooks = ["preemptive-compaction", "empty-message-sanitizer", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Removed hooks should be filtered out
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toContain("preemptive-compaction")
+    expect(removed).toContain("empty-message-sanitizer")
+    expect(removed).toHaveLength(2)
+  })
+
+  test("handles mixed migration and removal", () => {
+    // #given: Config with both legacy rename and removed hooks
+    const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Legacy should be renamed, removed should be filtered
+    expect(changed).toBe(true)
+    expect(migrated).toContain("anthropic-context-window-limit-recovery")
+    expect(migrated).toContain("atlas")
+    expect(migrated).not.toContain("preemptive-compaction")
+    expect(removed).toEqual(["preemptive-compaction"])
   })
 })
 
@@ -308,7 +388,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "most-capable", "general"]
+    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
 
     // #when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
@@ -371,7 +451,6 @@ describe("shouldDeleteAgentConfig", () => {
     const config = {
       category: "visual-engineering",
       model: "google/gemini-3-pro-preview",
-      temperature: 0.7,
     }
 
     // #when: Check if config should be deleted
@@ -382,10 +461,10 @@ describe("shouldDeleteAgentConfig", () => {
   })
 
   test("returns false when fields differ from category defaults", () => {
-    // #given: Config with custom temperature override
+    // #given: Config with custom model override
     const config = {
       category: "visual-engineering",
-      temperature: 0.9, // Different from default (0.7)
+      model: "anthropic/claude-opus-4-5",
     }
 
     // #when: Check if config should be deleted
@@ -398,10 +477,10 @@ describe("shouldDeleteAgentConfig", () => {
   test("handles different categories with their defaults", () => {
     // #given: Configs for different categories
     const configs = [
-      { category: "ultrabrain", temperature: 0.1 },
-      { category: "quick", temperature: 0.3 },
-      { category: "most-capable", temperature: 0.1 },
-      { category: "general", temperature: 0.3 },
+      { category: "ultrabrain" },
+      { category: "quick" },
+      { category: "unspecified-high" },
+      { category: "unspecified-low" },
     ]
 
     // #when: Check each config
@@ -457,13 +536,13 @@ describe("migrateConfigFile with backup", () => {
     })
   })
 
-  test("creates backup file with timestamp when migration needed", () => {
-    // #given: Config file path and config needing migration
+  test("creates backup file with timestamp when legacy migration needed", () => {
+    // #given: Config file path with legacy agent names needing migration
     const testConfigPath = "/tmp/test-config-migration.json"
-    const testConfigContent = globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2)
+    const testConfigContent = globalThis.JSON.stringify({ agents: { omo: { model: "test" } } }, null, 2)
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: { model: "openai/gpt-5.2" },
+        omo: { model: "test" },
       },
     }
 
@@ -492,70 +571,54 @@ describe("migrateConfigFile with backup", () => {
     expect(backupContent).toBe(testConfigContent)
   })
 
-  test("deletes agent config when all fields match category defaults", () => {
-    // #given: Config with agent matching category defaults
-    const testConfigPath = "/tmp/test-config-delete.json"
+  test("preserves model setting without auto-conversion to category", () => {
+    // #given: Config with model setting (should NOT be converted to category)
+    const testConfigPath = "/tmp/test-config-preserve-model.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: {
-          model: "openai/gpt-5.2",
-          temperature: 0.1,
-        },
+        "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
+        oracle: { model: "openai/gpt-5.2" },
+        "my-custom-agent": { model: "google/gemini-3-pro-preview" },
       },
     }
 
-    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2))
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
     cleanupPaths.push(testConfigPath)
 
     // #when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // #then: Agent should be deleted (matches strategic category defaults)
-    expect(needsWrite).toBe(true)
+    // #then: No migration needed - model settings should be preserved as-is
+    expect(needsWrite).toBe(false)
 
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    expect(migratedConfig.agents).toEqual({})
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
+    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+    expect(agents["multimodal-looker"].model).toBe("anthropic/claude-haiku-4-5")
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    expect(agents["my-custom-agent"].model).toBe("google/gemini-3-pro-preview")
   })
 
-  test("keeps agent config with category when fields differ from defaults", () => {
-    // #given: Config with agent having custom temperature override
-    const testConfigPath = "/tmp/test-config-keep.json"
+  test("preserves category setting when explicitly set", () => {
+    // #given: Config with explicit category setting
+    const testConfigPath = "/tmp/test-config-preserve-category.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
-        oracle: {
-          model: "openai/gpt-5.2",
-          temperature: 0.5,
-        },
+        "multimodal-looker": { category: "quick" },
+        oracle: { category: "ultrabrain" },
       },
     }
 
-    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { oracle: { model: "openai/gpt-5.2" } } }, null, 2))
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
     cleanupPaths.push(testConfigPath)
 
     // #when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // #then: Agent should be kept with category and custom override
-    expect(needsWrite).toBe(true)
+    // #then: No migration needed - category settings should be preserved as-is
+    expect(needsWrite).toBe(false)
 
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    const agents = migratedConfig.agents as Record<string, unknown>
-    expect(agents.oracle).toBeDefined()
-    expect((agents.oracle as Record<string, unknown>).category).toBe("ultrabrain")
-    expect((agents.oracle as Record<string, unknown>).temperature).toBe(0.5)
-    expect((agents.oracle as Record<string, unknown>).model).toBeUndefined()
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
+    const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+    expect(agents["multimodal-looker"].category).toBe("quick")
+    expect(agents.oracle.category).toBe("ultrabrain")
   })
 
   test("does not write when no migration needed", () => {
@@ -583,56 +646,5 @@ describe("migrateConfigFile with backup", () => {
     expect(backupFiles.length).toBe(0)
   })
 
-  test("handles multiple agent migrations correctly", () => {
-    // #given: Config with multiple agents needing migration
-    const testConfigPath = "/tmp/test-config-multi-agent.json"
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "openai/gpt-5.2" },
-        librarian: { model: "anthropic/claude-sonnet-4-5" },
-        frontend: {
-          model: "google/gemini-3-pro-preview",
-          temperature: 0.9,
-        },
-      },
-    }
 
-    fs.writeFileSync(
-      testConfigPath,
-      globalThis.JSON.stringify(
-        {
-          agents: {
-            oracle: { model: "openai/gpt-5.2" },
-            librarian: { model: "anthropic/claude-sonnet-4-5" },
-            frontend: { model: "google/gemini-3-pro-preview" },
-          },
-        },
-        null,
-        2,
-      ),
-    )
-    cleanupPaths.push(testConfigPath)
-
-    // #when: Migrate config file
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
-
-    // #then: Should migrate correctly
-    expect(needsWrite).toBe(true)
-
-    const migratedConfig = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"))
-    const agents = migratedConfig.agents as Record<string, unknown>
-
-    expect(agents.oracle).toBeUndefined()
-    expect(agents.librarian).toBeUndefined()
-
-    expect(agents.frontend).toBeDefined()
-    expect((agents.frontend as Record<string, unknown>).category).toBe("visual-engineering")
-    expect((agents.frontend as Record<string, unknown>).temperature).toBe(0.9)
-
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    backupFiles.forEach((f) => cleanupPaths.push(path.join(dir, f)))
-  })
 })

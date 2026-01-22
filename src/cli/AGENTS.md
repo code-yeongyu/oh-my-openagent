@@ -2,71 +2,70 @@
 
 ## OVERVIEW
 
-CLI for oh-my-opencode: interactive installer, health diagnostics (doctor), runtime launcher. Entry: `bunx oh-my-opencode`.
+CLI entry: `bunx oh-my-opencode`. Interactive installer, doctor diagnostics. Commander.js + @clack/prompts.
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry, subcommand routing
-├── install.ts            # Interactive TUI installer (436 lines)
-├── config-manager.ts     # JSONC parsing, env detection (725 lines)
-├── types.ts              # CLI-specific types
-├── commands/             # CLI subcommands
-├── doctor/               # Health check system
-│   ├── index.ts          # Doctor command entry
-│   ├── runner.ts         # Health check orchestration
-│   ├── constants.ts      # Check categories
-│   ├── types.ts          # Check result interfaces
-│   └── checks/           # 17+ individual checks (auth, config, dependencies, gh, lsp, mcp, opencode, plugin, version)
-├── get-local-version/    # Version detection
-└── run/                  # OpenCode session launcher
-    ├── completion.ts     # Completion logic
-    └── events.ts         # Event handling
+├── index.ts              # Commander.js entry
+├── install.ts            # Interactive TUI (520 lines)
+├── config-manager.ts     # JSONC parsing (641 lines)
+├── types.ts              # InstallArgs, InstallConfig
+├── doctor/
+│   ├── index.ts          # Doctor entry
+│   ├── runner.ts         # Check orchestration
+│   ├── formatter.ts      # Colored output
+│   ├── constants.ts      # Check IDs, symbols
+│   ├── types.ts          # CheckResult, CheckDefinition
+│   └── checks/           # 14 checks, 21 files
+│       ├── version.ts    # OpenCode + plugin version
+│       ├── config.ts     # JSONC validity, Zod
+│       ├── auth.ts       # Anthropic, OpenAI, Google
+│       ├── dependencies.ts # AST-Grep, Comment Checker
+│       ├── lsp.ts        # LSP connectivity
+│       ├── mcp.ts        # MCP validation
+│       └── gh.ts         # GitHub CLI
+├── run/
+│   └── index.ts          # Session launcher
+└── get-local-version/
+    └── index.ts          # Version detection
 ```
 
-## CLI COMMANDS
+## COMMANDS
 
 | Command | Purpose |
 |---------|---------|
-| `install` | Interactive setup wizard |
-| `doctor` | Environment health checks |
-| `run` | Launch OpenCode session |
+| `install` | Interactive setup |
+| `doctor` | 14 health checks |
+| `run` | Launch session |
+| `get-local-version` | Version check |
 
-## DOCTOR CHECKS
+## DOCTOR CATEGORIES
 
-17+ checks in `doctor/checks/`:
-- version.ts (OpenCode >= 1.0.150)
-- config.ts (plugin registered)
-- bun.ts, node.ts, git.ts
-- anthropic-auth.ts, openai-auth.ts, google-auth.ts
-- lsp-*.ts, mcp-*.ts
-
-## CONFIG-MANAGER (669 lines)
-
-- JSONC support (comments, trailing commas)
-- Multi-source: User (~/.config/opencode/) + Project (.opencode/)
-- Zod validation
-- Legacy format migration
-- Error aggregation for doctor
+| Category | Checks |
+|----------|--------|
+| installation | opencode, plugin |
+| configuration | config validity, Zod |
+| authentication | anthropic, openai, google |
+| dependencies | ast-grep, comment-checker |
+| tools | LSP, MCP |
+| updates | version comparison |
 
 ## HOW TO ADD CHECK
 
-1. Create `src/cli/doctor/checks/my-check.ts`:
-   ```typescript
-   export const myCheck: DoctorCheck = {
-     name: "my-check",
-     category: "environment",
-     check: async () => {
-       return { status: "pass" | "warn" | "fail", message: "..." }
-     }
-   }
-   ```
-2. Add to `src/cli/doctor/checks/index.ts`
+1. Create `src/cli/doctor/checks/my-check.ts`
+2. Export from `checks/index.ts`
+3. Add to `getAllCheckDefinitions()`
+
+## TUI FRAMEWORK
+
+- **@clack/prompts**: `select()`, `spinner()`, `intro()`
+- **picocolors**: Terminal colors
+- **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn)
 
 ## ANTI-PATTERNS
 
-- Blocking prompts in non-TTY (check `process.stdout.isTTY`)
-- Hardcoded paths (use shared utilities)
-- JSON.parse for user files (use parseJsonc)
-- Silent failures in doctor checks
+- **Blocking in non-TTY**: Check `process.stdout.isTTY`
+- **Direct JSON.parse**: Use `parseJsonc()`
+- **Silent failures**: Return warn/fail in doctor

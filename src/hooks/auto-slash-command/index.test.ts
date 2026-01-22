@@ -41,52 +41,49 @@ describe("createAutoSlashCommandHook", () => {
   })
 
   describe("slash command replacement", () => {
-    it("should replace message with error when command not found", async () => {
+    it("should not modify message when command not found", async () => {
       // #given a slash command that doesn't exist
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-notfound-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/nonexistent-command args")
+      const originalText = output.parts[0].text
 
       // #when hook is called
       await hook["chat.message"](input, output)
 
-      // #then should replace with error message
-      const textPart = output.parts.find((p) => p.type === "text")
-      expect(textPart?.text).toContain("<auto-slash-command>")
-      expect(textPart?.text).toContain("not found")
+      // #then should NOT modify the message (feature inactive when command not found)
+      expect(output.parts[0].text).toBe(originalText)
     })
 
-    it("should wrap replacement in auto-slash-command tags", async () => {
-      // #given any slash command
+    it("should not modify message for unknown command (feature inactive)", async () => {
+      // #given unknown slash command
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-tags-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/some-command")
+      const originalText = output.parts[0].text
 
       // #when hook is called
       await hook["chat.message"](input, output)
 
-      // #then should wrap in tags
-      const textPart = output.parts.find((p) => p.type === "text")
-      expect(textPart?.text).toContain("<auto-slash-command>")
-      expect(textPart?.text).toContain("</auto-slash-command>")
+      // #then should NOT modify (command not found = feature inactive)
+      expect(output.parts[0].text).toBe(originalText)
     })
 
-    it("should completely replace original message text", async () => {
-      // #given slash command
+    it("should not modify for unknown command (no prepending)", async () => {
+      // #given unknown slash command
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-replace-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/test-cmd some args")
+      const originalText = output.parts[0].text
 
       // #when hook is called
       await hook["chat.message"](input, output)
 
-      // #then original text should be replaced, not prepended
-      const textPart = output.parts.find((p) => p.type === "text")
-      expect(textPart?.text).not.toContain("/test-cmd some args\n<auto-slash-command>")
-      expect(textPart?.text?.startsWith("<auto-slash-command>")).toBe(true)
+      // #then should not modify (feature inactive for unknown commands)
+      expect(output.parts[0].text).toBe(originalText)
     })
   })
 
@@ -218,41 +215,40 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toBe(originalText)
     })
 
-    it("should handle command with special characters in args", async () => {
-      // #given command with special characters
+    it("should handle command with special characters in args (not found = no modification)", async () => {
+      // #given command with special characters that doesn't exist
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-special-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput('/execute "test & stuff <tag>"')
+      const originalText = output.parts[0].text
 
       // #when hook is called
       await hook["chat.message"](input, output)
 
-      // #then should handle gracefully (not found, but processed)
-      const textPart = output.parts.find((p) => p.type === "text")
-      expect(textPart?.text).toContain("<auto-slash-command>")
-      expect(textPart?.text).toContain("/execute")
+      // #then should not modify (command not found = feature inactive)
+      expect(output.parts[0].text).toBe(originalText)
     })
 
-    it("should handle multiple text parts", async () => {
-      // #given multiple text parts
+    it("should handle multiple text parts (unknown command = no modification)", async () => {
+      // #given multiple text parts with unknown command
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-multi-${Date.now()}`
       const input = createMockInput(sessionID)
       const output: AutoSlashCommandHookOutput = {
         message: {},
         parts: [
-          { type: "text", text: "/commit " },
-          { type: "text", text: "fix bug" },
+          { type: "text", text: "/truly-nonexistent-xyz-cmd " },
+          { type: "text", text: "some args" },
         ],
       }
+      const originalText = output.parts[0].text
 
       // #when hook is called
       await hook["chat.message"](input, output)
 
-      // #then should detect from combined text and modify first text part
-      const firstTextPart = output.parts.find((p) => p.type === "text")
-      expect(firstTextPart?.text).toContain("<auto-slash-command>")
+      // #then should not modify (command not found = feature inactive)
+      expect(output.parts[0].text).toBe(originalText)
     })
   })
 })

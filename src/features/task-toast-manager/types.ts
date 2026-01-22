@@ -1,4 +1,12 @@
+import type { ModelSource } from "../../shared/model-resolver"
+
 export type TaskStatus = "running" | "queued" | "completed" | "error"
+
+export interface ModelFallbackInfo {
+  model: string
+  type: "user-defined" | "inherited" | "category-default" | "system-default"
+  source?: ModelSource
+}
 
 export interface TrackedTask {
   id: string
@@ -7,7 +15,9 @@ export interface TrackedTask {
   status: TaskStatus
   startedAt: Date
   isBackground: boolean
+  category?: string
   skills?: string[]
+  modelInfo?: ModelFallbackInfo
 }
 
 export interface TaskToastOptions {

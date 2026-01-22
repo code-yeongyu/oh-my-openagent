@@ -10,15 +10,19 @@ import {
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
+import { shouldShowChatGPTOnlyWarning } from "./model-fallback"
+import packageJson from "../../package.json" with { type: "json" }
+
+const VERSION = packageJson.version
 
 const SYMBOLS = {
-  check: color.green("✓"),
-  cross: color.red("✗"),
-  arrow: color.cyan("→"),
-  bullet: color.dim("•"),
-  info: color.blue("ℹ"),
-  warn: color.yellow("⚠"),
-  star: color.yellow("★"),
+  check: color.green("[OK]"),
+  cross: color.red("[X]"),
+  arrow: color.cyan("->"),
+  bullet: color.dim("*"),
+  info: color.blue("[i]"),
+  warn: color.yellow("[!]"),
+  star: color.yellow("*"),
 }
 
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
@@ -36,25 +40,20 @@ function formatConfigSummary(config: InstallConfig): string {
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
-  lines.push(formatProvider("ChatGPT", config.hasChatGPT))
+  lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.2 for Oracle"))
   lines.push(formatProvider("Gemini", config.hasGemini))
+  lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
+  lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
+  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian: glm-4.7"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
   lines.push("")
 
-  lines.push(color.bold(color.white("Agent Configuration")))
+  lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
-
-  const sisyphusModel = config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free"
-  const oracleModel = config.hasChatGPT ? "gpt-5.2" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-  const librarianModel = "glm-4.7-free"
-  const frontendModel = config.hasGemini ? "antigravity-gemini-3-pro-high" : (config.hasClaude ? "claude-opus-4-5" : "glm-4.7-free")
-
-  lines.push(`  ${SYMBOLS.bullet} Sisyphus     ${SYMBOLS.arrow} ${color.cyan(sisyphusModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Oracle       ${SYMBOLS.arrow} ${color.cyan(oracleModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Librarian    ${SYMBOLS.arrow} ${color.cyan(librarianModel)}`)
-  lines.push(`  ${SYMBOLS.bullet} Frontend     ${SYMBOLS.arrow} ${color.cyan(frontendModel)}`)
+  lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
 
   return lines.join("\n")
 }
@@ -118,16 +117,28 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
   }
 
-  if (args.chatgpt === undefined) {
-    errors.push("--chatgpt is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.chatgpt)) {
-    errors.push(`Invalid --chatgpt value: ${args.chatgpt} (expected: no, yes)`)
-  }
-
   if (args.gemini === undefined) {
     errors.push("--gemini is required (values: no, yes)")
   } else if (!["no", "yes"].includes(args.gemini)) {
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
+  }
+
+  if (args.copilot === undefined) {
+    errors.push("--copilot is required (values: no, yes)")
+  } else if (!["no", "yes"].includes(args.copilot)) {
+    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
+  }
+
+  if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
+    errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  }
+
+  if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
+    errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
+  }
+
+  if (args.zaiCodingPlan !== undefined && !["no", "yes"].includes(args.zaiCodingPlan)) {
+    errors.push(`Invalid --zai-coding-plan value: ${args.zaiCodingPlan} (expected: no, yes)`)
   }
 
   return { valid: errors.length === 0, errors }
@@ -137,12 +148,15 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   return {
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
-    hasChatGPT: args.chatgpt === "yes",
+    hasOpenAI: args.openai === "yes",
     hasGemini: args.gemini === "yes",
+    hasCopilot: args.copilot === "yes",
+    hasOpencodeZen: args.opencodeZen === "yes",
+    hasZaiCodingPlan: args.zaiCodingPlan === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; chatgpt: BooleanArg; gemini: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; openai: BooleanArg; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -150,8 +164,11 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 
   return {
     claude,
-    chatgpt: detected.hasChatGPT ? "yes" : "no",
+    openai: detected.hasOpenAI ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
+    copilot: detected.hasCopilot ? "yes" : "no",
+    opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
+    zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
   }
 }
 
@@ -173,16 +190,16 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
-  const chatgpt = await p.select({
-    message: "Do you have a ChatGPT Plus/Pro subscription?",
+  const openai = await p.select({
+    message: "Do you have an OpenAI/ChatGPT Plus subscription?",
     options: [
-      { value: "no" as const, label: "No", hint: "Oracle will use fallback model" },
-      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for debugging and architecture" },
+      { value: "no" as const, label: "No", hint: "Oracle will use fallback models" },
+      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for Oracle (high-IQ debugging)" },
     ],
-    initialValue: initial.chatgpt,
+    initialValue: initial.openai,
   })
 
-  if (p.isCancel(chatgpt)) {
+  if (p.isCancel(openai)) {
     p.cancel("Installation cancelled.")
     return null
   }
@@ -201,11 +218,56 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
+  const copilot = await p.select({
+    message: "Do you have a GitHub Copilot subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Only native providers will be used" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
+    ],
+    initialValue: initial.copilot,
+  })
+
+  if (p.isCancel(copilot)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const opencodeZen = await p.select({
+    message: "Do you have access to OpenCode Zen (opencode/ models)?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+      { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-5, opencode/gpt-5.2, etc." },
+    ],
+    initialValue: initial.opencodeZen,
+  })
+
+  if (p.isCancel(opencodeZen)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  const zaiCodingPlan = await p.select({
+    message: "Do you have a Z.ai Coding Plan subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+      { value: "yes" as const, label: "Yes", hint: "zai-coding-plan/glm-4.7 for Librarian" },
+    ],
+    initialValue: initial.zaiCodingPlan,
+  })
+
+  if (p.isCancel(zaiCodingPlan)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
-    hasChatGPT: chatgpt === "yes",
+    hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
+    hasCopilot: copilot === "yes",
+    hasOpencodeZen: opencodeZen === "yes",
+    hasZaiCodingPlan: zaiCodingPlan === "yes",
   }
 }
 
@@ -218,7 +280,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       console.log(`  ${SYMBOLS.bullet} ${err}`)
     }
     console.log()
-    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --chatgpt=<no|yes> --gemini=<no|yes>")
+    printInfo("Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>")
     console.log()
     return 1
   }
@@ -233,31 +295,30 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
   const installed = await isOpenCodeInstalled()
-  if (!installed) {
-    printError("OpenCode is not installed on this system.")
-    printInfo("Visit https://opencode.ai/docs for installation instructions")
-    return 1
-  }
-
   const version = await getOpenCodeVersion()
-  printSuccess(`OpenCode ${version ?? ""} detected`)
+  if (!installed) {
+    printWarning("OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.")
+    printInfo("Visit https://opencode.ai/docs for installation instructions")
+  } else {
+    printSuccess(`OpenCode ${version ?? ""} detected`)
+  }
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    printInfo(`Current config: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    printInfo(`Current config: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const config = argsToConfig(args)
 
   printStep(step++, totalSteps, "Adding oh-my-opencode plugin...")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
     return 1
   }
   printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -287,23 +348,22 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
-    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+  if (!config.hasClaude) {
+    console.log()
+    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
+    console.log(color.dim("    • Reduced orchestration quality"))
+    console.log(color.dim("    • Weaker tool selection and delegation"))
+    console.log(color.dim("    • Less reliable task completion"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
   }
 
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    console.log(color.bold("Next Steps - Authenticate your providers:"))
-    console.log()
-    if (config.hasClaude) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      console.log(`  ${SYMBOLS.arrow} ${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    console.log()
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
+    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
@@ -314,7 +374,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
     `All features work like magic—parallel agents, background tasks,\n` +
     `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    "The Magic Word"
   )
 
   console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
@@ -322,6 +382,16 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
+
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    printBox(
+      `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
+      (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      "Authenticate Your Providers"
+    )
+  }
 
   return 0
 }
@@ -338,29 +408,27 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
-    p.log.info(`Existing configuration detected: Claude=${initial.claude}, ChatGPT=${initial.chatgpt}, Gemini=${initial.gemini}`)
+    p.log.info(`Existing configuration detected: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
   const s = p.spinner()
   s.start("Checking OpenCode installation")
 
   const installed = await isOpenCodeInstalled()
-  if (!installed) {
-    s.stop("OpenCode is not installed")
-    p.log.error("OpenCode is not installed on this system.")
-    p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
-    p.outro(color.red("Please install OpenCode first."))
-    return 1
-  }
-
   const version = await getOpenCodeVersion()
-  s.stop(`OpenCode ${version ?? "installed"} ${color.green("✓")}`)
+  if (!installed) {
+    s.stop(`OpenCode binary not found ${color.yellow("[!]")}`)
+    p.log.warn("OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.")
+    p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
+  } else {
+    s.stop(`OpenCode ${version ?? "installed"} ${color.green("[OK]")}`)
+  }
 
   const config = await runTuiMode(detected)
   if (!config) return 1
 
   s.start("Adding oh-my-opencode to OpenCode config")
-  const pluginResult = addPluginToOpenCodeConfig()
+  const pluginResult = await addPluginToOpenCodeConfig(VERSION)
   if (!pluginResult.success) {
     s.stop(`Failed to add plugin: ${pluginResult.error}`)
     p.outro(color.red("Installation failed."))
@@ -368,7 +436,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini || config.hasChatGPT) {
+  if (config.hasGemini) {
     s.start("Adding auth plugins (fetching latest versions)")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -397,25 +465,25 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude && !config.hasChatGPT && !config.hasGemini) {
+  if (!config.hasClaude) {
+    console.log()
+    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
+    console.log()
+    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
+    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
+    console.log(color.dim("    • Reduced orchestration quality"))
+    console.log(color.dim("    • Weaker tool selection and delegation"))
+    console.log(color.dim("    • Less reliable task completion"))
+    console.log()
+    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
+    console.log()
+  }
+
+  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
     p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
-
-  if ((config.hasClaude || config.hasChatGPT || config.hasGemini) && !args.skipAuth) {
-    const steps: string[] = []
-    if (config.hasClaude) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Anthropic → Claude Pro/Max)")}`)
-    }
-    if (config.hasChatGPT) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select OpenAI → ChatGPT Plus/Pro)")}`)
-    }
-    if (config.hasGemini) {
-      steps.push(`${color.dim("opencode auth login")} ${color.gray("(select Google → OAuth with Antigravity)")}`)
-    }
-    p.note(steps.join("\n"), "Next Steps - Authenticate your providers")
-  }
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
@@ -424,13 +492,29 @@ export async function install(args: InstallArgs): Promise<number> {
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
     `All features work like magic—parallel agents, background tasks,\n` +
     `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    "The Magic Word"
   )
 
   p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
   p.log.message(`  ${color.dim("gh repo star code-yeongyu/oh-my-opencode")}`)
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
+
+  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+    const providers: string[] = []
+    if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+
+    console.log()
+    console.log(color.bold("Authenticate Your Providers"))
+    console.log()
+    console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
+    for (const provider of providers) {
+      console.log(`   ${SYMBOLS.bullet} ${provider}`)
+    }
+    console.log()
+  }
 
   return 0
 }

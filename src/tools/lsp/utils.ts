@@ -5,19 +5,16 @@ import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
 import type {
-  HoverResult,
-  DocumentSymbol,
-  SymbolInfo,
   Location,
   LocationLink,
+  DocumentSymbol,
+  SymbolInfo,
   Diagnostic,
   PrepareRenameResult,
   PrepareRenameDefaultBehavior,
   Range,
   WorkspaceEdit,
   TextEdit,
-  CodeAction,
-  Command,
   ServerLookupResult,
 } from "./types"
 
@@ -62,7 +59,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
       `Supported extensions: ${server.extensions.join(", ")}`,
       ``,
       `After installation, the server will be available automatically.`,
-      `Run 'lsp_servers' tool to verify installation status.`,
+      `Run 'LspServers' tool to verify installation status.`,
     ].join("\n")
   }
 
@@ -111,28 +108,6 @@ export async function withLspClient<T>(filePath: string, fn: (client: LSPClient)
   } finally {
     lspManager.releaseClient(root, server.id)
   }
-}
-
-export function formatHoverResult(result: HoverResult | null): string {
-  if (!result) return "No hover information available"
-
-  const contents = result.contents
-  if (typeof contents === "string") {
-    return contents
-  }
-
-  if (Array.isArray(contents)) {
-    return contents
-      .map((c) => (typeof c === "string" ? c : c.value))
-      .filter(Boolean)
-      .join("\n\n")
-  }
-
-  if (typeof contents === "object" && "value" in contents) {
-    return contents.value
-  }
-
-  return "No hover information available"
 }
 
 export function formatLocation(loc: Location | LocationLink): string {
@@ -288,38 +263,6 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit | null): string {
   }
 
   if (lines.length === 0) return "No changes"
-
-  return lines.join("\n")
-}
-
-export function formatCodeAction(action: CodeAction): string {
-  let result = `[${action.kind || "action"}] ${action.title}`
-
-  if (action.isPreferred) {
-    result += " ⭐"
-  }
-
-  if (action.disabled) {
-    result += ` (disabled: ${action.disabled.reason})`
-  }
-
-  return result
-}
-
-export function formatCodeActions(actions: (CodeAction | Command)[] | null): string {
-  if (!actions || actions.length === 0) return "No code actions available"
-
-  const lines: string[] = []
-
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i]
-
-    if ("command" in action && typeof action.command === "string" && !("kind" in action)) {
-      lines.push(`${i + 1}. [command] ${(action as Command).title}`)
-    } else {
-      lines.push(`${i + 1}. ${formatCodeAction(action as CodeAction)}`)
-    }
-  }
 
   return lines.join("\n")
 }

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TrackedTask, TaskStatus } from "./types"
+import type { TrackedTask, TaskStatus, ModelFallbackInfo } from "./types"
 import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
@@ -24,7 +24,9 @@ export class TaskToastManager {
     agent: string
     isBackground: boolean
     status?: TaskStatus
+    category?: string
     skills?: string[]
+    modelInfo?: ModelFallbackInfo
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
@@ -33,7 +35,9 @@ export class TaskToastManager {
       status: task.status ?? "running",
       startedAt: new Date(),
       isBackground: task.isBackground,
+      category: task.category,
       skills: task.skills,
+      modelInfo: task.modelInfo,
     }
 
     this.tasks.set(task.id, trackedTask)
@@ -105,14 +109,28 @@ export class TaskToastManager {
 
     const lines: string[] = []
 
+    const isFallback = newTask.modelInfo && (
+      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+    )
+    if (isFallback) {
+      const suffixMap: Record<"inherited" | "system-default", string> = {
+        inherited: " (inherited from parent)",
+        "system-default": " (system default fallback)",
+      }
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      lines.push(`[FALLBACK] Model: ${newTask.modelInfo!.model}${suffix}`)
+      lines.push("")
+    }
+
     if (running.length > 0) {
       lines.push(`Running (${running.length}):${concurrencyInfo}`)
       for (const task of running) {
         const duration = this.formatDuration(task.startedAt)
-        const bgIcon = task.isBackground ? "⚡" : "🔄"
+        const bgIcon = task.isBackground ? "[BG]" : "[RUN]"
         const isNew = task.id === newTask.id ? " ← NEW" : ""
+        const categoryInfo = task.category ? `/${task.category}` : ""
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo} - ${duration}${isNew}`)
+        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - ${duration}${isNew}`)
       }
     }
 
@@ -120,9 +138,11 @@ export class TaskToastManager {
       if (lines.length > 0) lines.push("")
       lines.push(`Queued (${queued.length}):`)
       for (const task of queued) {
-        const bgIcon = task.isBackground ? "⏳" : "⏸️"
+        const bgIcon = task.isBackground ? "[Q]" : "[W]"
+        const categoryInfo = task.category ? `/${task.category}` : ""
         const skillsInfo = task.skills?.length ? ` [${task.skills.join(", ")}]` : ""
-        lines.push(`${bgIcon} ${task.description} (${task.agent})${skillsInfo}`)
+        const isNew = task.id === newTask.id ? " ← NEW" : ""
+        lines.push(`${bgIcon} ${task.description} (${task.agent}${categoryInfo})${skillsInfo} - Queued${isNew}`)
       }
     }
 
@@ -142,8 +162,8 @@ export class TaskToastManager {
     const queued = this.getQueuedTasks()
 
     const title = newTask.isBackground
-      ? `⚡ New Background Task`
-      : `🔄 New Task Executed`
+      ? `New Background Task`
+      : `New Task Executed`
 
     tuiClient.tui.showToast({
       body: {
@@ -168,7 +188,7 @@ export class TaskToastManager {
     const remaining = this.getRunningTasks()
     const queued = this.getQueuedTasks()
 
-    let message = `✅ "${task.description}" finished in ${task.duration}`
+    let message = `"${task.description}" finished in ${task.duration}`
     if (remaining.length > 0 || queued.length > 0) {
       message += `\n\nStill running: ${remaining.length} | Queued: ${queued.length}`
     }

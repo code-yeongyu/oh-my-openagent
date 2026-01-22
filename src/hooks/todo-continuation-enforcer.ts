@@ -6,8 +6,10 @@ import { getMainSessionID, subagentSessions } from "../features/claude-code-sess
 import {
     findNearestMessageWithFields,
     MESSAGE_STORAGE,
+    type ToolPermission,
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
+import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -36,9 +38,10 @@ interface SessionState {
   countdownInterval?: ReturnType<typeof setInterval>
   isRecovering?: boolean
   countdownStartedAt?: number
+  abortDetectedAt?: number
 }
 
-const CONTINUATION_PROMPT = `[SYSTEM REMINDER - TODO CONTINUATION]
+const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
 
@@ -150,15 +153,24 @@ export function createTodoContinuationEnforcer(
     }).catch(() => {})
   }
 
-  async function injectContinuation(sessionID: string, incompleteCount: number, total: number): Promise<void> {
+  interface ResolvedMessageInfo {
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    tools?: Record<string, ToolPermission>
+  }
+
+  async function injectContinuation(
+    sessionID: string,
+    incompleteCount: number,
+    total: number,
+    resolvedInfo?: ResolvedMessageInfo
+  ): Promise<void> {
     const state = sessions.get(sessionID)
 
     if (state?.isRecovering) {
       log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
       return
     }
-
-
 
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
@@ -184,35 +196,45 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const messageDir = getMessageDir(sessionID)
-    const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    let agentName = resolvedInfo?.agent
+    let model = resolvedInfo?.model
+    let tools = resolvedInfo?.tools
 
-    const agentName = prevMessage?.agent
+    if (!agentName || !model) {
+      const messageDir = getMessageDir(sessionID)
+      const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+      agentName = agentName ?? prevMessage?.agent
+      model = model ?? (prevMessage?.model?.providerID && prevMessage?.model?.modelID
+        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        : undefined)
+      tools = tools ?? prevMessage?.tools
+    }
+
     if (agentName && skipAgents.includes(agentName)) {
       log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
       return
     }
 
-    const editPermission = prevMessage?.tools?.edit
-    const writePermission = prevMessage?.tools?.write
-    const hasWritePermission = !prevMessage?.tools ||
+    const editPermission = tools?.edit
+    const writePermission = tools?.write
+    const hasWritePermission = !tools ||
       ((editPermission !== false && editPermission !== "deny") &&
        (writePermission !== false && writePermission !== "deny"))
     if (!hasWritePermission) {
-      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: prevMessage?.agent })
+      log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: agentName })
       return
     }
 
     const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
 
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: prevMessage?.agent, incompleteCount: freshIncompleteCount })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })
 
-      // Don't pass model - let OpenCode use session's existing lastModel
       await ctx.client.session.prompt({
         path: { id: sessionID },
         body: {
-          agent: prevMessage?.agent,
+          agent: agentName,
+          ...(model !== undefined ? { model } : {}),
           parts: [{ type: "text", text: prompt }],
         },
         query: { directory: ctx.directory },
@@ -224,7 +246,12 @@ export function createTodoContinuationEnforcer(
     }
   }
 
-  function startCountdown(sessionID: string, incompleteCount: number, total: number): void {
+  function startCountdown(
+    sessionID: string,
+    incompleteCount: number,
+    total: number,
+    resolvedInfo?: ResolvedMessageInfo
+  ): void {
     const state = getState(sessionID)
     cancelCountdown(sessionID)
 
@@ -241,7 +268,7 @@ export function createTodoContinuationEnforcer(
 
     state.countdownTimer = setTimeout(() => {
       cancelCountdown(sessionID)
-      injectContinuation(sessionID, incompleteCount, total)
+      injectContinuation(sessionID, incompleteCount, total, resolvedInfo)
     }, COUNTDOWN_SECONDS * 1000)
 
     log(`[${HOOK_NAME}] Countdown started`, { sessionID, seconds: COUNTDOWN_SECONDS, incompleteCount })
@@ -253,6 +280,13 @@ export function createTodoContinuationEnforcer(
     if (event.type === "session.error") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
+
+      const error = props?.error as { name?: string } | undefined
+      if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
+        const state = getState(sessionID)
+        state.abortDetectedAt = Date.now()
+        log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
+      }
 
       cancelCountdown(sessionID)
       log(`[${HOOK_NAME}] session.error`, { sessionID })
@@ -281,6 +315,18 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 1: Event-based abort detection (primary, most reliable)
+      if (state.abortDetectedAt) {
+        const timeSinceAbort = Date.now() - state.abortDetectedAt
+        const ABORT_WINDOW_MS = 3000
+        if (timeSinceAbort < ABORT_WINDOW_MS) {
+          log(`[${HOOK_NAME}] Skipped: abort detected via event ${timeSinceAbort}ms ago`, { sessionID })
+          state.abortDetectedAt = undefined
+          return
+        }
+        state.abortDetectedAt = undefined
+      }
+
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -290,6 +336,7 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 2: API-based abort detection (fallback, for cases where event was missed)
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
@@ -298,7 +345,7 @@ export function createTodoContinuationEnforcer(
         const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
 
         if (isLastAssistantMessageAborted(messages)) {
-          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted`, { sessionID })
+          log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
           return
         }
       } catch (err) {
@@ -325,15 +372,28 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      let agentName: string | undefined
+      let resolvedInfo: ResolvedMessageInfo | undefined
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
         })
-        const messages = (messagesResp.data ?? []) as Array<{ info?: { agent?: string } }>
+        const messages = (messagesResp.data ?? []) as Array<{
+          info?: {
+            agent?: string
+            model?: { providerID: string; modelID: string }
+            modelID?: string
+            providerID?: string
+            tools?: Record<string, ToolPermission>
+          }
+        }>
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i].info?.agent) {
-            agentName = messages[i].info?.agent
+          const info = messages[i].info
+          if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+            resolvedInfo = {
+              agent: info.agent,
+              model: info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined),
+              tools: info.tools,
+            }
             break
           }
         }
@@ -341,13 +401,13 @@ export function createTodoContinuationEnforcer(
         log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(err) })
       }
 
-      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName, skipAgents })
-      if (agentName && skipAgents.includes(agentName)) {
-        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
+      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents })
+      if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
+        log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
         return
       }
 
-      startCountdown(sessionID, incompleteCount, todos.length)
+      startCountdown(sessionID, incompleteCount, todos.length, resolvedInfo)
       return
     }
 
@@ -367,10 +427,13 @@ export function createTodoContinuationEnforcer(
             return
           }
         }
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
 
       if (role === "assistant") {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
@@ -382,6 +445,8 @@ export function createTodoContinuationEnforcer(
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
@@ -390,6 +455,8 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return

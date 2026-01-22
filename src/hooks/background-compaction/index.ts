@@ -55,7 +55,9 @@ export function createBackgroundCompactionHook(manager: BackgroundManager) {
         sections.push("## Running Background Tasks")
         sections.push("")
         for (const t of running) {
-          const elapsed = Math.floor((Date.now() - t.startedAt.getTime()) / 1000)
+          const elapsed = t.startedAt 
+            ? Math.floor((Date.now() - t.startedAt.getTime()) / 1000)
+            : 0
           sections.push(`- **\`${t.id}\`** (${t.agent}): ${t.description} [${elapsed}s elapsed]`)
         }
         sections.push("")
@@ -69,8 +71,8 @@ export function createBackgroundCompactionHook(manager: BackgroundManager) {
         sections.push("## Recently Completed Tasks")
         sections.push("")
         for (const t of completed) {
-          const statusEmoji = t.status === "completed" ? "✅" : t.status === "error" ? "❌" : "⏱️"
-          sections.push(`- ${statusEmoji} **\`${t.id}\`**: ${t.description}`)
+          const statusLabel = t.status === "completed" ? "[DONE]" : t.status === "error" ? "[ERROR]" : "[PENDING]"
+          sections.push(`- ${statusLabel} **\`${t.id}\`**: ${t.description}`)
         }
         sections.push("")
       }

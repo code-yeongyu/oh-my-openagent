@@ -52,14 +52,6 @@ export interface Diagnostic {
   message: string
 }
 
-export interface HoverResult {
-  contents:
-    | { kind?: string; value: string }
-    | string
-    | Array<{ kind?: string; value: string } | string>
-  range?: Range
-}
-
 export interface TextDocumentIdentifier {
   uri: string
 }
@@ -109,31 +101,6 @@ export interface PrepareRenameResult {
 
 export interface PrepareRenameDefaultBehavior {
   defaultBehavior: boolean
-}
-
-export interface Command {
-  title: string
-  command: string
-  arguments?: unknown[]
-}
-
-export interface CodeActionContext {
-  diagnostics: Diagnostic[]
-  only?: string[]
-  triggerKind?: CodeActionTriggerKind
-}
-
-export type CodeActionTriggerKind = 1 | 2
-
-export interface CodeAction {
-  title: string
-  kind?: string
-  diagnostics?: Diagnostic[]
-  isPreferred?: boolean
-  disabled?: { reason: string }
-  edit?: WorkspaceEdit
-  command?: Command
-  data?: unknown
 }
 
 export interface ServerLookupInfo {

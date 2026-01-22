@@ -1,11 +1,11 @@
 import { promises as fs } from "fs"
 import { join, basename } from "path"
-import { homedir } from "os"
 import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
@@ -63,7 +63,7 @@ async function loadSkillFromPath(
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
-    const { data } = parseFrontmatter<SkillMetadata>(content)
+    const { data, body } = parseFrontmatter<SkillMetadata>(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -73,14 +73,7 @@ async function loadSkillFromPath(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
-    const lazyContent: LazyContentLoader = {
-      loaded: false,
-      content: undefined,
-      load: async () => {
-        if (!lazyContent.loaded) {
-          const fileContent = await fs.readFile(skillPath, "utf-8")
-          const { body } = parseFrontmatter<SkillMetadata>(fileContent)
-          lazyContent.content = `<skill-instruction>
+    const templateContent = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
@@ -90,16 +83,20 @@ ${body.trim()}
 <user-request>
 $ARGUMENTS
 </user-request>`
-          lazyContent.loaded = true
-        }
-        return lazyContent.content!
-      },
+
+    // RATIONALE: We read the file eagerly to ensure atomic consistency between
+    // metadata and body. We maintain the LazyContentLoader interface for
+    // compatibility, but the state is effectively eager.
+    const eagerLoader: LazyContentLoader = {
+      loaded: true,
+      content: templateContent,
+      load: async () => templateContent,
     }
 
     const definition: CommandDefinition = {
       name: skillName,
       description: formattedDescription,
-      template: "",
+      template: templateContent,
       model: sanitizeModelField(data.model, isOpencodeSource ? "opencode" : "claude-code"),
       agent: data.agent,
       subtask: data.subtask,
@@ -117,7 +114,7 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
-      lazyContent,
+      lazyContent: eagerLoader,
     }
   } catch {
     return null
@@ -190,13 +187,14 @@ export async function loadProjectSkills(): Promise<Record<string, CommandDefinit
 }
 
 export async function loadOpencodeGlobalSkills(): Promise<Record<string, CommandDefinition>> {
-  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const opencodeSkillsDir = join(configDir, "skills")
   const skills = await loadSkillsFromDir(opencodeSkillsDir, "opencode")
   return skillsToRecord(skills)
 }
 
 export async function loadOpencodeProjectSkills(): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skills")
   const skills = await loadSkillsFromDir(opencodeProjectDir, "opencode-project")
   return skillsToRecord(skills)
 }
@@ -252,11 +250,12 @@ export async function discoverProjectClaudeSkills(): Promise<LoadedSkill[]> {
 }
 
 export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
-  const opencodeSkillsDir = join(homedir(), ".config", "opencode", "skill")
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const opencodeSkillsDir = join(configDir, "skills")
   return loadSkillsFromDir(opencodeSkillsDir, "opencode")
 }
 
 export async function discoverOpencodeProjectSkills(): Promise<LoadedSkill[]> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skill")
+  const opencodeProjectDir = join(process.cwd(), ".opencode", "skills")
   return loadSkillsFromDir(opencodeProjectDir, "opencode-project")
 }

@@ -48,6 +48,35 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
   return null
 }
 
+/**
+ * Finds the FIRST (oldest) message in the session with agent field.
+ * This is used to get the original agent that started the session,
+ * avoiding issues where newer messages may have a different agent
+ * due to OpenCode's internal agent switching.
+ */
+export function findFirstMessageWithAgent(messageDir: string): string | null {
+  try {
+    const files = readdirSync(messageDir)
+      .filter((f) => f.endsWith(".json"))
+      .sort() // Oldest first (no reverse)
+
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(messageDir, file), "utf-8")
+        const msg = JSON.parse(content) as StoredMessage
+        if (msg.agent) {
+          return msg.agent
+        }
+      } catch {
+        continue
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 function generateMessageId(): string {
   const timestamp = Date.now().toString(16)
   const random = Math.random().toString(36).substring(2, 14)
