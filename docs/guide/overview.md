@@ -72,7 +72,7 @@ For complex or critical tasks, press **Tab** to switch to Prometheus (Planner) m
 
 ### Always Use Prometheus + Orchestrator Together
 
-**Do NOT use `orchestrator-sisyphus` without `/start-work`.**
+**Do NOT use `atlas` without `/start-work`.**
 
 The orchestrator is designed to execute work plans created by Prometheus. Using it directly without a plan leads to unpredictable behavior.
 

@@ -1,0 +1,108 @@
+name: publish-platform
+run-name: "platform packages ${{ inputs.version }}"
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      dist_tag:
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 3.0.0-beta.12)"
+        required: true
+        type: string
+      dist_tag:
+        description: "npm dist tag (e.g., beta, latest)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-platform:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Check if already published
+        id: check
+        run: |
+          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
+          VERSION="${{ inputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ ${PKG_NAME}@${VERSION} already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "→ ${PKG_NAME}@${VERSION} needs publishing"
+          fi
+
+      - name: Update version
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          VERSION="${{ inputs.version }}"
+          cd packages/${{ matrix.platform }}
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Build binary
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          case "$PLATFORM" in
+            darwin-arm64) TARGET="bun-darwin-arm64" ;;
+            darwin-x64) TARGET="bun-darwin-x64" ;;
+            linux-x64) TARGET="bun-linux-x64" ;;
+            linux-arm64) TARGET="bun-linux-arm64" ;;
+            linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
+            linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
+            windows-x64) TARGET="bun-windows-x64" ;;
+          esac
+          
+          if [ "$PLATFORM" = "windows-x64" ]; then
+            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+          else
+            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+          fi
+          
+          bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
+
+      - name: Publish ${{ matrix.platform }}
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          cd packages/${{ matrix.platform }}
+          TAG_ARG=""
+          if [ -n "${{ inputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ inputs.dist_tag }}"
+          fi
+          npm publish --access public $TAG_ARG
+        env:
+          NPM_CONFIG_PROVENANCE: false

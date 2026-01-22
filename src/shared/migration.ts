@@ -17,10 +17,9 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
-  "frontend-ui-ux-engineer": "frontend-ui-ux-engineer",
-  "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
-  "orchestrator-sisyphus": "orchestrator-sisyphus",
+  "orchestrator-sisyphus": "Atlas",
+  atlas: "Atlas",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
@@ -28,13 +27,11 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "oracle",
   "librarian",
   "explore",
-  "frontend-ui-ux-engineer",
-  "document-writer",
   "multimodal-looker",
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
   "Prometheus (Planner)",
-  "orchestrator-sisyphus",
+  "Atlas",
   "build",
 ])
 
@@ -52,7 +49,7 @@ export const HOOK_NAME_MAP: Record<string, string> = {
  * from explicit model configs to category-based configs.
  * 
  * DO NOT add new entries here. New agents should use:
- * - Category-based config (preferred): { category: "most-capable" }
+ * - Category-based config (preferred): { category: "unspecified-high" }
  * - Or inherit from OpenCode's config.model
  * 
  * This map will be removed in a future major version once migration period ends.
@@ -61,8 +58,8 @@ export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
-  "anthropic/claude-opus-4-5": "most-capable",
-  "anthropic/claude-sonnet-4-5": "general",
+  "anthropic/claude-opus-4-5": "unspecified-high",
+  "anthropic/claude-sonnet-4-5": "unspecified-low",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
@@ -151,6 +148,22 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     rawConfig.sisyphus_agent = rawConfig.omo_agent
     delete rawConfig.omo_agent
     needsWrite = true
+  }
+
+  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+    const migrated: string[] = []
+    let changed = false
+    for (const agent of rawConfig.disabled_agents as string[]) {
+      const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+      if (newAgent !== agent) {
+        changed = true
+      }
+      migrated.push(newAgent)
+    }
+    if (changed) {
+      rawConfig.disabled_agents = migrated
+      needsWrite = true
+    }
   }
 
   if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {

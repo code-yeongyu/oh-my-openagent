@@ -1,161 +1,351 @@
 # Oh-My-OpenCode Features
 
-## Agents: Your Teammates
+---
 
-- **Sisyphus** (`anthropic/claude-opus-4-5`): **The default agent.** A powerful AI orchestrator for OpenCode. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Emphasizes background task delegation and todo-driven workflow. Uses Claude Opus 4.5 with extended thinking (32k budget) for maximum reasoning capability.
-- **oracle** (`openai/gpt-5.2`): Architecture, code review, strategy. Uses GPT-5.2 for its stellar logical reasoning and deep analysis. Inspired by AmpCode.
-- **librarian** (`opencode/glm-4.7-free`): Multi-repo analysis, doc lookup, implementation examples. Uses GLM-4.7 Free for deep codebase understanding and GitHub research with evidence-based answers. Inspired by AmpCode.
-- **explore** (`opencode/grok-code`, `google/gemini-3-flash`, or `anthropic/claude-haiku-4-5`): Fast codebase exploration and pattern matching. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code.
-- **frontend-ui-ux-engineer** (`google/gemini-3-pro-preview`): A designer turned developer. Builds gorgeous UIs. Gemini excels at creative, beautiful UI code.
-- **document-writer** (`google/gemini-3-flash`): Technical writing expert. Gemini is a wordsmith—writes prose that flows.
-- **multimodal-looker** (`google/gemini-3-flash`): Visual content specialist. Analyzes PDFs, images, diagrams to extract information.
+## Agents: Your AI Team
+
+Oh-My-OpenCode provides 10 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
+
+### Core Agents
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| **Sisyphus** | `anthropic/claude-opus-4-5` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). |
+| **oracle** | `openai/gpt-5.2` | Architecture decisions, code review, debugging. Read-only consultation - stellar logical reasoning and deep analysis. Inspired by AmpCode. |
+| **librarian** | `opencode/glm-4.7-free` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Inspired by AmpCode. |
+| **explore** | `opencode/grok-code` | Fast codebase exploration and contextual grep. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code. |
+| **multimodal-looker** | `google/gemini-3-flash` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Saves tokens by having another agent process media. |
+
+### Planning Agents
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| **Prometheus** | `anthropic/claude-opus-4-5` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. |
+| **Metis** | `anthropic/claude-sonnet-4-5` | Plan consultant - pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. |
+| **Momus** | `anthropic/claude-sonnet-4-5` | Plan reviewer - validates plans against clarity, verifiability, and completeness standards. |
+
+### Invoking Agents
 
 The main agent invokes these automatically, but you can call them explicitly:
 
 ```
 Ask @oracle to review this design and propose an architecture
-Ask @librarian how this is implemented—why does the behavior keep changing?
+Ask @librarian how this is implemented - why does the behavior keep changing?
 Ask @explore for the policy on this feature
 ```
 
-Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](../README.md#configuration).
+### Tool Restrictions
+
+| Agent | Restrictions |
+|-------|-------------|
+| oracle | Read-only: cannot write, edit, or delegate |
+| librarian | Cannot write, edit, or delegate |
+| explore | Cannot write, edit, or delegate |
+| multimodal-looker | Allowlist only: read, glob, grep |
+
+### Background Agents
+
+Run agents in the background and continue working:
+
+- Have GPT debug while Claude tries different approaches
+- Gemini writes frontend while Claude handles backend
+- Fire massive parallel searches, continue implementation, use results when ready
+
+```
+# Launch in background
+delegate_task(agent="explore", background=true, prompt="Find auth implementations")
+
+# Continue working...
+# System notifies on completion
+
+# Retrieve results when needed
+background_output(task_id="bg_abc123")
+```
+
+Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](configurations.md#agents).
 
 ---
 
-## Background Agents: Work Like a Team
+## Skills: Specialized Knowledge
 
-What if you could run these agents relentlessly, never letting them idle?
+Skills provide specialized workflows with embedded MCP servers and detailed instructions.
 
-- Have GPT debug while Claude tries different approaches to find the root cause
-- Gemini writes the frontend while Claude handles the backend
-- Kick off massive parallel searches, continue implementation on other parts, then finish using the search results
+### Built-in Skills
 
-These workflows are possible with OhMyOpenCode.
+| Skill | Trigger | Description |
+|-------|---------|-------------|
+| **playwright** | Browser tasks, testing, screenshots | Browser automation via Playwright MCP. MUST USE for any browser-related tasks - verification, browsing, web scraping, testing, screenshots. |
+| **frontend-ui-ux** | UI/UX tasks, styling | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes. |
+| **git-master** | commit, rebase, squash, blame | MUST USE for ANY git operations. Atomic commits with automatic splitting, rebase/squash workflows, history search (blame, bisect, log -S). |
 
-Run subagents in the background. The main agent gets notified on completion. Wait for results if needed.
+### Skill: playwright
 
-**Make your agents work like your team works.**
+**Trigger**: Any browser-related request
 
----
-
-## The Tools: Your Teammates Deserve Better
-
-### Why Are You the Only One Using an IDE?
-
-Syntax highlighting, autocomplete, refactoring, navigation, analysis—and now agents writing code...
-
-**Why are you the only one with these tools?**
-**Give them to your agents and watch them level up.**
-
-[OpenCode provides LSP](https://opencode.ai/docs/lsp/), but only for analysis.
-
-The features in your editor? Other agents can't touch them.
-Hand your best tools to your best colleagues. Now they can properly refactor, navigate, and analyze.
-
-- **lsp_diagnostics**: Get errors/warnings before build
-- **lsp_prepare_rename**: Validate rename operation
-- **lsp_rename**: Rename symbol across workspace
-- **ast_grep_search**: AST-aware code pattern search (25 languages)
-- **ast_grep_replace**: AST-aware code replacement
-- **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
-- **delegate_task**: Category-based task delegation with specialized agents. Supports pre-configured categories (visual, business-logic) or direct agent targeting. Use `background_output` to retrieve results and `background_cancel` to cancel tasks. See [Categories](../README.md#categories).
-
-### Session Management
-
-Tools to navigate and search your OpenCode session history:
-
-- **session_list**: List all OpenCode sessions with filtering by date and limit
-- **session_read**: Read messages and history from a specific session
-- **session_search**: Full-text search across session messages
-- **session_info**: Get metadata and statistics about a session
-
-These tools enable agents to reference previous conversations and maintain continuity across sessions.
-
-### Context Is All You Need
-
-- **Directory AGENTS.md / README.md Injector**: Auto-injects `AGENTS.md` and `README.md` when reading files. Walks from file directory to project root, collecting **all** `AGENTS.md` files along the path. Supports nested directory-specific instructions:
-  ```
-  project/
-  ├── AGENTS.md              # Project-wide context
-  ├── src/
-  │   ├── AGENTS.md          # src-specific context
-  │   └── components/
-  │       ├── AGENTS.md      # Component-specific context
-  │       └── Button.tsx     # Reading this injects all 3 AGENTS.md files
-  ```
-  Reading `Button.tsx` injects in order: `project/AGENTS.md` → `src/AGENTS.md` → `components/AGENTS.md`. Each directory's context is injected once per session.
-- **Conditional Rules Injector**: Not all rules apply all the time. Injects rules from `.claude/rules/` when conditions match.
-  - Walks upward from file directory to project root, plus `~/.claude/rules/` (user).
-  - Supports `.md` and `.mdc` files.
-  - Matches via `globs` field in frontmatter.
-  - `alwaysApply: true` for rules that should always fire.
-  - Example rule file:
-    ```markdown
-    ---
-    globs: ["*.ts", "src/**/*.js"]
-    description: "TypeScript/JavaScript coding rules"
-    ---
-    - Use PascalCase for interface names
-    - Use camelCase for function names
-    ```
-- **Online**: Project rules aren't everything. Built-in MCPs for extended capabilities:
-  - **websearch**: Real-time web search powered by [Exa AI](https://exa.ai)
-  - **context7**: Official documentation lookup
-  - **grep_app**: Ultra-fast code search across public GitHub repos (great for finding implementation examples)
-
-### Be Multimodal. Save Tokens.
-
-The look_at tool from AmpCode, now in OhMyOpenCode.
-Instead of the agent reading massive files and bloating context, it internally leverages another agent to extract just what it needs.
-
-### I Removed Their Blockers
-
-- Replaces built-in grep and glob tools. Default implementation has no timeout—can hang forever.
-
-### Skill-Embedded MCP Support
-
-Skills can now bring their own MCP servers. Define MCP configurations directly in skill frontmatter or via `mcp.json` files:
+Provides browser automation via Playwright MCP server:
 
 ```yaml
----
-description: Browser automation skill
 mcp:
   playwright:
     command: npx
-    args: ["-y", "@anthropic-ai/mcp-playwright"]
----
+    args: ["@playwright/mcp@latest"]
 ```
 
-When you load a skill with embedded MCP, its tools become available automatically. The `skill_mcp` tool lets you invoke these MCP operations with full schema discovery.
+**Capabilities**:
+- Navigate and interact with web pages
+- Take screenshots and PDFs
+- Fill forms and click elements
+- Wait for network requests
+- Scrape content
 
-**Built-in Skills:**
-- **playwright**: Browser automation, web scraping, testing, and screenshots out of the box
+**Usage**:
+```
+/playwright Navigate to example.com and take a screenshot
+```
 
-Disable built-in skills via `disabled_skills: ["playwright"]` in your config.
+### Skill: frontend-ui-ux
+
+**Trigger**: UI design tasks, visual changes
+
+A designer-turned-developer who crafts stunning interfaces:
+
+- **Design Process**: Purpose, Tone, Constraints, Differentiation
+- **Aesthetic Direction**: Choose extreme - brutalist, maximalist, retro-futuristic, luxury, playful
+- **Typography**: Distinctive fonts, avoid generic (Inter, Roboto, Arial)
+- **Color**: Cohesive palettes with sharp accents, avoid purple-on-white AI slop
+- **Motion**: High-impact staggered reveals, scroll-triggering, surprising hover states
+- **Anti-Patterns**: Generic fonts, predictable layouts, cookie-cutter design
+
+### Skill: git-master
+
+**Trigger**: commit, rebase, squash, "who wrote", "when was X added"
+
+Three specializations in one:
+
+1. **Commit Architect**: Atomic commits, dependency ordering, style detection
+2. **Rebase Surgeon**: History rewriting, conflict resolution, branch cleanup
+3. **History Archaeologist**: Finding when/where specific changes were introduced
+
+**Core Principle - Multiple Commits by Default**:
+```
+3+ files -> MUST be 2+ commits
+5+ files -> MUST be 3+ commits
+10+ files -> MUST be 5+ commits
+```
+
+**Automatic Style Detection**:
+- Analyzes last 30 commits for language (Korean/English) and style (semantic/plain/short)
+- Matches your repo's commit conventions automatically
+
+**Usage**:
+```
+/git-master commit these changes
+/git-master rebase onto main
+/git-master who wrote this authentication code?
+```
+
+### Custom Skills
+
+Load custom skills from:
+- `.opencode/skills/*/SKILL.md` (project)
+- `~/.config/opencode/skills/*/SKILL.md` (user)
+- `.claude/skills/*/SKILL.md` (Claude Code compat)
+- `~/.claude/skills/*/SKILL.md` (Claude Code user)
+
+Disable built-in skills via `disabled_skills: ["playwright"]` in config.
 
 ---
 
-## Goodbye Claude Code. Hello Oh My OpenCode.
+## Commands: Slash Workflows
 
-Oh My OpenCode has a Claude Code compatibility layer.
-If you were using Claude Code, your existing config just works.
+Commands are slash-triggered workflows that execute predefined templates.
 
-### Hooks Integration
+### Built-in Commands
 
-Run custom scripts via Claude Code's `settings.json` hook system.
-Oh My OpenCode reads and executes hooks from:
+| Command | Description |
+|---------|-------------|
+| `/init-deep` | Initialize hierarchical AGENTS.md knowledge base |
+| `/ralph-loop` | Start self-referential development loop until completion |
+| `/ulw-loop` | Start ultrawork loop - continues with ultrawork mode |
+| `/cancel-ralph` | Cancel active Ralph Loop |
+| `/refactor` | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification |
+| `/start-work` | Start Sisyphus work session from Prometheus plan |
 
-- `~/.claude/settings.json` (user)
-- `./.claude/settings.json` (project)
-- `./.claude/settings.local.json` (local, git-ignored)
+### Command: /init-deep
 
-Supported hook events:
-- **PreToolUse**: Runs before tool execution. Can block or modify tool input.
-- **PostToolUse**: Runs after tool execution. Can add warnings or context.
-- **UserPromptSubmit**: Runs when user submits prompt. Can block or inject messages.
-- **Stop**: Runs when session goes idle. Can inject follow-up prompts.
+**Purpose**: Generate hierarchical AGENTS.md files throughout your project
 
-Example `settings.json`:
+**Usage**:
+```
+/init-deep [--create-new] [--max-depth=N]
+```
+
+Creates directory-specific context files that agents automatically read:
+```
+project/
+├── AGENTS.md              # Project-wide context
+├── src/
+│   ├── AGENTS.md          # src-specific context
+│   └── components/
+│       └── AGENTS.md      # Component-specific context
+```
+
+### Command: /ralph-loop
+
+**Purpose**: Self-referential development loop that runs until task completion
+
+**Named after**: Anthropic's Ralph Wiggum plugin
+
+**Usage**:
+```
+/ralph-loop "Build a REST API with authentication"
+/ralph-loop "Refactor the payment module" --max-iterations=50
+```
+
+**Behavior**:
+- Agent works continuously toward the goal
+- Detects `<promise>DONE</promise>` to know when complete
+- Auto-continues if agent stops without completion
+- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+
+**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+
+### Command: /ulw-loop
+
+**Purpose**: Same as ralph-loop but with ultrawork mode active
+
+Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+
+### Command: /refactor
+
+**Purpose**: Intelligent refactoring with full toolchain
+
+**Usage**:
+```
+/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
+```
+
+**Features**:
+- LSP-powered rename and navigation
+- AST-grep for pattern matching
+- Architecture analysis before changes
+- TDD verification after changes
+- Codemap generation
+
+### Command: /start-work
+
+**Purpose**: Start execution from a Prometheus-generated plan
+
+**Usage**:
+```
+/start-work [plan-name]
+```
+
+Uses atlas agent to execute planned tasks systematically.
+
+### Custom Commands
+
+Load custom commands from:
+- `.opencode/command/*.md` (project)
+- `~/.config/opencode/command/*.md` (user)
+- `.claude/commands/*.md` (Claude Code compat)
+- `~/.claude/commands/*.md` (Claude Code user)
+
+---
+
+## Hooks: Lifecycle Automation
+
+Hooks intercept and modify behavior at key points in the agent lifecycle.
+
+### Hook Events
+
+| Event | When | Can |
+|-------|------|-----|
+| **PreToolUse** | Before tool execution | Block, modify input, inject context |
+| **PostToolUse** | After tool execution | Add warnings, modify output, inject messages |
+| **UserPromptSubmit** | When user submits prompt | Block, inject messages, transform prompt |
+| **Stop** | When session goes idle | Inject follow-up prompts |
+
+### Built-in Hooks
+
+#### Context & Injection
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **directory-agents-injector** | PostToolUse | Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files. |
+| **directory-readme-injector** | PostToolUse | Auto-injects README.md for directory context. |
+| **rules-injector** | PostToolUse | Injects rules from `.claude/rules/` when conditions match. Supports globs and alwaysApply. |
+| **compaction-context-injector** | Stop | Preserves critical context during session compaction. |
+
+#### Productivity & Control
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **keyword-detector** | UserPromptSubmit | Detects keywords and activates modes: `ultrawork`/`ulw` (max performance), `search`/`find` (parallel exploration), `analyze`/`investigate` (deep analysis). |
+| **think-mode** | UserPromptSubmit | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings. |
+| **ralph-loop** | Stop | Manages self-referential loop continuation. |
+| **start-work** | PostToolUse | Handles /start-work command execution. |
+| **auto-slash-command** | UserPromptSubmit | Automatically executes slash commands from prompts. |
+
+#### Quality & Safety
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **comment-checker** | PostToolUse | Reminds agents to reduce excessive comments. Smartly ignores BDD, directives, docstrings. |
+| **thinking-block-validator** | PreToolUse | Validates thinking blocks to prevent API errors. |
+| **empty-message-sanitizer** | PreToolUse | Prevents API errors from empty chat messages. |
+| **edit-error-recovery** | PostToolUse | Recovers from edit tool failures. |
+
+#### Recovery & Stability
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **session-recovery** | Stop | Recovers from session errors - missing tool results, thinking block issues, empty messages. |
+| **anthropic-context-window-limit-recovery** | Stop | Handles Claude context window limits gracefully. |
+| **background-compaction** | Stop | Auto-compacts sessions hitting token limits. |
+
+#### Truncation & Context Management
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **grep-output-truncator** | PostToolUse | Dynamically truncates grep output based on context window. Keeps 50% headroom, caps at 50k tokens. |
+| **tool-output-truncator** | PostToolUse | Truncates output from Grep, Glob, LSP, AST-grep tools. |
+
+#### Notifications & UX
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **auto-update-checker** | UserPromptSubmit | Checks for new versions, shows startup toast with version and Sisyphus status. |
+| **background-notification** | Stop | Notifies when background agent tasks complete. |
+| **session-notification** | Stop | OS notifications when agents go idle. Works on macOS, Linux, Windows. |
+| **agent-usage-reminder** | PostToolUse | Reminds you to leverage specialized agents for better results. |
+
+#### Task Management
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **task-resume-info** | PostToolUse | Provides task resume information for continuity. |
+| **delegate-task-retry** | PostToolUse | Retries failed delegate_task calls. |
+
+#### Integration
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **claude-code-hooks** | All | Executes hooks from Claude Code's settings.json. |
+| **atlas** | All | Main orchestration logic (771 lines). |
+| **interactive-bash-session** | PreToolUse | Manages tmux sessions for interactive CLI. |
+| **non-interactive-env** | PreToolUse | Handles non-interactive environment constraints. |
+
+#### Specialized
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **prometheus-md-only** | PostToolUse | Enforces markdown-only output for Prometheus planner. |
+
+### Claude Code Hooks Integration
+
+Run custom scripts via Claude Code's `settings.json`:
+
 ```json
 {
   "hooks": {
@@ -169,37 +359,161 @@ Example `settings.json`:
 }
 ```
 
+**Hook locations**:
+- `~/.claude/settings.json` (user)
+- `./.claude/settings.json` (project)
+- `./.claude/settings.local.json` (local, git-ignored)
+
+### Disabling Hooks
+
+Disable specific hooks in config:
+
+```json
+{
+  "disabled_hooks": [
+    "comment-checker",
+    "auto-update-checker",
+    "startup-toast"
+  ]
+}
+```
+
+---
+
+## Tools: Agent Capabilities
+
+### LSP Tools (IDE Features for Agents)
+
+| Tool | Description |
+|------|-------------|
+| **lsp_diagnostics** | Get errors/warnings before build |
+| **lsp_prepare_rename** | Validate rename operation |
+| **lsp_rename** | Rename symbol across workspace |
+| **lsp_goto_definition** | Jump to symbol definition |
+| **lsp_find_references** | Find all usages across workspace |
+| **lsp_symbols** | Get file outline or workspace symbol search |
+
+### AST-Grep Tools
+
+| Tool | Description |
+|------|-------------|
+| **ast_grep_search** | AST-aware code pattern search (25 languages) |
+| **ast_grep_replace** | AST-aware code replacement |
+
+### Delegation Tools
+
+| Tool | Description |
+|------|-------------|
+| **call_omo_agent** | Spawn explore/librarian agents. Supports `run_in_background`. |
+| **delegate_task** | Category-based task delegation. Supports categories (visual, business-logic) or direct agent targeting. |
+| **background_output** | Retrieve background task results |
+| **background_cancel** | Cancel running background tasks |
+
+### Session Tools
+
+| Tool | Description |
+|------|-------------|
+| **session_list** | List all OpenCode sessions |
+| **session_read** | Read messages and history from a session |
+| **session_search** | Full-text search across session messages |
+| **session_info** | Get session metadata and statistics |
+
+---
+
+## MCPs: Built-in Servers
+
+### websearch (Exa AI)
+
+Real-time web search powered by [Exa AI](https://exa.ai).
+
+### context7
+
+Official documentation lookup for any library/framework.
+
+### grep_app
+
+Ultra-fast code search across public GitHub repos. Great for finding implementation examples.
+
+### Skill-Embedded MCPs
+
+Skills can bring their own MCP servers:
+
+```yaml
+---
+description: Browser automation skill
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@anthropic-ai/mcp-playwright"]
+---
+```
+
+The `skill_mcp` tool invokes these operations with full schema discovery.
+
+---
+
+## Context Injection
+
+### Directory AGENTS.md
+
+Auto-injects AGENTS.md when reading files. Walks from file directory to project root:
+
+```
+project/
+├── AGENTS.md              # Injected first
+├── src/
+│   ├── AGENTS.md          # Injected second
+│   └── components/
+│       ├── AGENTS.md      # Injected third
+│       └── Button.tsx     # Reading this injects all 3
+```
+
+### Conditional Rules
+
+Inject rules from `.claude/rules/` when conditions match:
+
+```markdown
+---
+globs: ["*.ts", "src/**/*.js"]
+description: "TypeScript/JavaScript coding rules"
+---
+- Use PascalCase for interface names
+- Use camelCase for function names
+```
+
+Supports:
+- `.md` and `.mdc` files
+- `globs` field for pattern matching
+- `alwaysApply: true` for unconditional rules
+- Walks upward from file to project root, plus `~/.claude/rules/`
+
+---
+
+## Claude Code Compatibility
+
+Full compatibility layer for Claude Code configurations.
+
 ### Config Loaders
 
-**Command Loader**: Loads markdown-based slash commands from 4 directories:
-- `~/.claude/commands/` (user)
-- `./.claude/commands/` (project)
-- `~/.config/opencode/command/` (opencode global)
-- `./.opencode/command/` (opencode project)
+| Type | Locations |
+|------|-----------|
+| **Commands** | `~/.claude/commands/`, `.claude/commands/` |
+| **Skills** | `~/.claude/skills/*/SKILL.md`, `.claude/skills/*/SKILL.md` |
+| **Agents** | `~/.claude/agents/*.md`, `.claude/agents/*.md` |
+| **MCPs** | `~/.claude/.mcp.json`, `.mcp.json`, `.claude/.mcp.json` |
 
-**Skill Loader**: Loads directory-based skills with `SKILL.md`:
-- `~/.claude/skills/` (user)
-- `./.claude/skills/` (project)
-
-**Agent Loader**: Loads custom agent definitions from markdown files:
-- `~/.claude/agents/*.md` (user)
-- `./.claude/agents/*.md` (project)
-
-**MCP Loader**: Loads MCP server configs from `.mcp.json` files:
-- `~/.claude/.mcp.json` (user)
-- `./.mcp.json` (project)
-- `./.claude/.mcp.json` (local)
-- Supports environment variable expansion (`${VAR}` syntax)
+MCP configs support environment variable expansion: `${VAR}`.
 
 ### Data Storage
 
-**Todo Management**: Session todos stored in `~/.claude/todos/` in Claude Code compatible format.
-
-**Transcript**: Session activity logged to `~/.claude/transcripts/` in JSONL format for replay and analysis.
+| Data | Location | Format |
+|------|----------|--------|
+| Todos | `~/.claude/todos/` | Claude Code compatible |
+| Transcripts | `~/.claude/transcripts/` | JSONL |
 
 ### Compatibility Toggles
 
-Disable specific Claude Code compatibility features with the `claude_code` config object:
+Disable specific features:
 
 ```json
 {
@@ -214,64 +528,23 @@ Disable specific Claude Code compatibility features with the `claude_code` confi
 }
 ```
 
-| Toggle     | When `false`, stops loading from...                                                   | Unaffected                                            |
-| ---------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `mcp`      | `~/.claude/.mcp.json`, `./.mcp.json`, `./.claude/.mcp.json`                           | Built-in MCP (context7, grep_app)                     |
-| `commands` | `~/.claude/commands/*.md`, `./.claude/commands/*.md`                                  | `~/.config/opencode/command/`, `./.opencode/command/` |
-| `skills`   | `~/.claude/skills/*/SKILL.md`, `./.claude/skills/*/SKILL.md`                          | -                                                     |
-| `agents`   | `~/.claude/agents/*.md`, `./.claude/agents/*.md`                                      | Built-in agents (oracle, librarian, etc.)             |
-| `hooks`    | `~/.claude/settings.json`, `./.claude/settings.json`, `./.claude/settings.local.json` | -                                                     |
-| `plugins`  | `~/.claude/plugins/` (Claude Code marketplace plugins)                                | -                                                     |
+| Toggle | Disables |
+|--------|----------|
+| `mcp` | `.mcp.json` files (keeps built-in MCPs) |
+| `commands` | `~/.claude/commands/`, `.claude/commands/` |
+| `skills` | `~/.claude/skills/`, `.claude/skills/` |
+| `agents` | `~/.claude/agents/` (keeps built-in agents) |
+| `hooks` | settings.json hooks |
+| `plugins` | Claude Code marketplace plugins |
 
-All toggles default to `true` (enabled). Omit the `claude_code` object for full Claude Code compatibility.
-
-**Selectively disable specific plugins** using `plugins_override`:
+Disable specific plugins:
 
 ```json
 {
   "claude_code": {
     "plugins_override": {
-      "claude-mem@thedotmack": false,
-      "some-other-plugin@marketplace": false
+      "claude-mem@thedotmack": false
     }
   }
 }
 ```
-
-This allows you to keep the plugin system enabled while disabling specific plugins by their full identifier (`plugin-name@marketplace-name`).
-
----
-
-## Not Just for the Agents
-
-When agents thrive, you thrive. But I want to help you directly too.
-
-- **Ralph Loop**: Self-referential development loop that runs until task completion. Inspired by Anthropic's Ralph Wiggum plugin. **Supports all programming languages.**
-  - Start with `/ralph-loop "Build a REST API"` and let the agent work continuously
-  - Loop detects `<promise>DONE</promise>` to know when complete
-  - Auto-continues if agent stops without completion promise
-  - Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
-  - Configure in `oh-my-opencode.json`: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
-- **Keyword Detector**: Automatically detects keywords in your prompts and activates specialized modes:
-  - `ultrawork` / `ulw`: Maximum performance mode with parallel agent orchestration
-  - `search` / `find` / `찾아` / `検索`: Maximized search effort with parallel explore and librarian agents
-  - `analyze` / `investigate` / `분석` / `調査`: Deep analysis mode with multi-phase expert consultation
-- **Todo Continuation Enforcer**: Makes agents finish all TODOs before stopping. Kills the chronic LLM habit of quitting halfway.
-- **Comment Checker**: LLMs love comments. Too many comments. This reminds them to cut the noise. Smartly ignores valid patterns (BDD, directives, docstrings) and demands justification for the rest. Clean code wins.
-- **Think Mode**: Auto-detects when extended thinking is needed and switches modes. Catches phrases like "think deeply" or "ultrathink" and dynamically adjusts model settings for maximum reasoning.
-- **Context Window Monitor**: Implements [Context Window Anxiety Management](https://agentic-patterns.com/patterns/context-window-anxiety-management/).
-  - At 70%+ usage, reminds agents there's still headroom—prevents rushed, sloppy work.
-- **Agent Usage Reminder**: When you call search tools directly, reminds you to leverage specialized agents via background tasks for better results.
-- **Anthropic Auto Compact**: When Claude models hit token limits, automatically summarizes and compacts the session—no manual intervention needed.
-- **Session Recovery**: Automatically recovers from session errors (missing tool results, thinking block issues, empty messages). Sessions don't crash mid-run. Even if they do, they recover.
-- **Auto Update Checker**: Automatically checks for new versions of oh-my-opencode and can auto-update your configuration. Shows startup toast notifications displaying current version and Sisyphus status ("Sisyphus on steroids is steering OpenCode" when enabled, or "OpenCode is now on Steroids. oMoMoMoMo..." otherwise). Disable all features with `"auto-update-checker"` in `disabled_hooks`, or disable just toast notifications with `"startup-toast"` in `disabled_hooks`. See [Configuration > Hooks](../README.md#hooks).
-- **Background Notification**: Get notified when background agent tasks complete.
-- **Session Notification**: Sends OS notifications when agents go idle. Works on macOS, Linux, and Windows—never miss when your agent needs input.
-- **Empty Task Response Detector**: Catches when Task tool returns nothing. Warns you about potential agent failures so you don't wait forever for a response that already came back empty.
-- **Empty Message Sanitizer**: Prevents API errors from empty chat messages by automatically sanitizing message content before sending.
-- **Grep Output Truncator**: Grep can return mountains of text. This dynamically truncates output based on your remaining context window—keeps 50% headroom, caps at 50k tokens.
-- **Tool Output Truncator**: Same idea, broader scope. Truncates output from Grep, Glob, LSP tools, and AST-grep. Prevents one verbose search from eating your entire context.
-- **Preemptive Compaction**: Compacts session proactively before hitting hard token limits. Runs at 85% context window usage. **Enabled by default.** Disable via `disabled_hooks: ["preemptive-compaction"]`.
-- **Compaction Context Injector**: Preserves critical context (AGENTS.md, current directory info) during session compaction so you don't lose important state.
-- **Thinking Block Validator**: Validates thinking blocks to ensure proper formatting and prevent API errors from malformed thinking content.
-- **Claude Code Hooks**: Executes hooks from Claude Code's settings.json - this is the compatibility layer that runs PreToolUse/PostToolUse/UserPromptSubmit/Stop hooks.

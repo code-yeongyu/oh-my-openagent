@@ -4,7 +4,7 @@ import { join } from "path"
 import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "skill-loader-test-" + Date.now())
-const SKILLS_DIR = join(TEST_DIR, ".opencode", "skill")
+const SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
 
 function createTestSkill(name: string, content: string, mcpJson?: object): string {
   const skillDir = join(SKILLS_DIR, name)

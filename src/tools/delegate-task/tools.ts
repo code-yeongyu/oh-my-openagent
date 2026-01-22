@@ -124,16 +124,18 @@ export function resolveCategoryConfig(
     return null
   }
 
-  // Model priority: user override > inherited from parent > system default
+  // Model priority for categories: user override > category default > system default
+  // Categories have explicit models - no inheritance from parent session
   const model = resolveModel({
     userModel: userConfig?.model,
-    inheritedModel,
+    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
     systemDefault: systemDefaultModel,
   })
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
     model,
+    variant: userConfig?.variant ?? defaultConfig?.variant,
   }
 
   let promptAppend = defaultPromptAppend
@@ -480,6 +482,121 @@ ${textContent || "(No text output)"}`
             : parsedModel)
           : undefined
         categoryPromptAppend = resolved.promptAppend || undefined
+
+        // Unstable agent detection - launch as background for monitoring but wait for result
+        const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
+        if (isUnstableAgent && args.run_in_background === false) {
+          const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+
+          try {
+            const task = await manager.launch({
+              description: args.description,
+              prompt: args.prompt,
+              agent: agentToUse,
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              parentModel,
+              parentAgent,
+              model: categoryModel,
+              skills: args.skills.length > 0 ? args.skills : undefined,
+              skillContent: systemContent,
+            })
+
+            const sessionID = task.sessionID
+            if (!sessionID) {
+              return formatDetailedError(new Error("Background task launched but no sessionID returned"), {
+                operation: "Launch background task (unstable agent)",
+                args,
+                agent: agentToUse,
+                category: args.category,
+              })
+            }
+
+            ctx.metadata?.({
+              title: args.description,
+              metadata: { sessionId: sessionID, category: args.category },
+            })
+
+            const startTime = new Date()
+
+            // Poll for completion (same logic as sync mode)
+            const POLL_INTERVAL_MS = 500
+            const MAX_POLL_TIME_MS = 10 * 60 * 1000
+            const MIN_STABILITY_TIME_MS = 10000
+            const STABILITY_POLLS_REQUIRED = 3
+            const pollStart = Date.now()
+            let lastMsgCount = 0
+            let stablePolls = 0
+
+            while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
+              if (ctx.abort?.aborted) {
+                return `[UNSTABLE AGENT] Task aborted.\n\nSession ID: ${sessionID}`
+              }
+
+              await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+
+              const statusResult = await client.session.status()
+              const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+              const sessionStatus = allStatuses[sessionID]
+
+              if (sessionStatus && sessionStatus.type !== "idle") {
+                stablePolls = 0
+                lastMsgCount = 0
+                continue
+              }
+
+              if (Date.now() - pollStart < MIN_STABILITY_TIME_MS) continue
+
+              const messagesCheck = await client.session.messages({ path: { id: sessionID } })
+              const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+              const currentMsgCount = msgs.length
+
+              if (currentMsgCount === lastMsgCount) {
+                stablePolls++
+                if (stablePolls >= STABILITY_POLLS_REQUIRED) break
+              } else {
+                stablePolls = 0
+                lastMsgCount = currentMsgCount
+              }
+            }
+
+            const messagesResult = await client.session.messages({ path: { id: sessionID } })
+            const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
+              info?: { role?: string; time?: { created?: number } }
+              parts?: Array<{ type?: string; text?: string }>
+            }>
+
+            const assistantMessages = messages
+              .filter((m) => m.info?.role === "assistant")
+              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+            const lastMessage = assistantMessages[0]
+
+            if (!lastMessage) {
+              return `[UNSTABLE AGENT] No assistant response found.\n\nSession ID: ${sessionID}`
+            }
+
+            const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+            const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+            const duration = formatDuration(startTime)
+
+            return `[UNSTABLE AGENT] Task completed in ${duration}.
+
+Model: ${actualModel} (unstable/experimental - launched via background for monitoring)
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Session ID: ${sessionID}
+
+---
+
+${textContent || "(No text output)"}`
+          } catch (error) {
+            return formatDetailedError(error, {
+              operation: "Launch background task (unstable agent)",
+              args,
+              agent: agentToUse,
+              category: args.category,
+            })
+          }
+        }
       } else {
         if (!args.subagent_type?.trim()) {
           return `Agent name cannot be empty.`

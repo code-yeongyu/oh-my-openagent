@@ -1,12 +1,12 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-19T18:10:00+09:00
-**Commit:** 45660940
+**Generated:** 2026-01-20T17:18:00+09:00
+**Commit:** 3d3d3e49
 **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin implementing multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3, Grok, GLM-4.7). 31 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 10 specialized agents, Claude Code compatibility layer. "oh-my-zsh" for OpenCode.
+ClaudeCode plugin implementing multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3, Grok, GLM-4.7). 31 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 10 specialized agents, Claude Code compatibility layer. "oh-my-zsh" for ClaudeCode.
 
 ## STRUCTURE
 
@@ -21,7 +21,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor, run - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs: websearch, context7, grep_app
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (568 lines)
+│   └── index.ts       # Main plugin entry (589 lines)
 ├── script/            # build-schema.ts, publish.ts, build-binaries.ts
 ├── packages/          # 7 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
@@ -44,7 +44,7 @@ oh-my-opencode/
 | Skill MCP | `src/features/skill-mcp-manager/` | MCP servers embedded in skills |
 | CLI installer | `src/cli/install.ts` | Interactive TUI (462 lines) |
 | Doctor checks | `src/cli/doctor/checks/` | 14 health checks across 6 categories |
-| Orchestrator | `src/hooks/sisyphus-orchestrator/` | Main orchestration hook (771 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (771 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -109,8 +109,6 @@ oh-my-opencode/
 | oracle | openai/gpt-5.2 | Read-only consultation, high-IQ debugging |
 | librarian | opencode/glm-4.7-free | Multi-repo analysis, docs, GitHub search |
 | explore | opencode/grok-code | Fast codebase exploration (contextual grep) |
-| frontend-ui-ux-engineer | google/gemini-3-pro-preview | UI generation, visual design |
-| document-writer | google/gemini-3-flash | Technical documentation |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 | Prometheus (Planner) | anthropic/claude-opus-4-5 | Strategic planning, interview mode |
 | Metis (Plan Consultant) | anthropic/claude-sonnet-4-5 | Pre-planning analysis |
@@ -145,14 +143,14 @@ bun test               # Run tests (83 test files)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/agents/orchestrator-sisyphus.ts` | 1531 | Orchestrator agent, 7-section delegation, wisdom accumulation |
+| `src/agents/atlas.ts` | 1383 | Orchestrator agent, 7-section delegation, wisdom accumulation |
 | `src/features/builtin-skills/skills.ts` | 1203 | Skill definitions (playwright, git-master, frontend-ui-ux) |
 | `src/agents/prometheus-prompt.ts` | 1196 | Planning agent, interview mode, Momus loop |
 | `src/features/background-agent/manager.ts` | 1165 | Task lifecycle, concurrency, notification batching |
-| `src/hooks/sisyphus-orchestrator/index.ts` | 771 | Orchestrator hook implementation |
-| `src/tools/delegate-task/tools.ts` | 761 | Category-based task delegation |
-| `src/cli/config-manager.ts` | 730 | JSONC parsing, multi-level config |
-| `src/agents/sisyphus.ts` | 640 | Main Sisyphus prompt |
+| `src/hooks/atlas/index.ts` | 771 | Orchestrator hook implementation |
+| `src/tools/delegate-task/tools.ts` | 770 | Category-based task delegation |
+| `src/cli/config-manager.ts` | 616 | JSONC parsing, multi-level config |
+| `src/agents/sisyphus.ts` | 615 | Main Sisyphus prompt |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactoring command template |
 | `src/tools/lsp/client.ts` | 596 | LSP protocol, JSON-RPC |
 
@@ -173,7 +171,7 @@ Three-tier MCP system:
 ## NOTES
 
 - **Testing**: Bun native test (`bun test`), BDD-style, 83 test files
-- **OpenCode**: Requires >= 1.0.150
+- **ClaudeCode**: Requires >= 1.0.150
 - **Multi-lang docs**: README.md (EN), README.ko.md (KO), README.ja.md (JA), README.zh-cn.md (ZH-CN)
 - **Config**: `~/.config/opencode/oh-my-opencode.json` (user) or `.opencode/oh-my-opencode.json` (project)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
