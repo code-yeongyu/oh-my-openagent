@@ -148,6 +148,8 @@ export const SisyphusAgentConfigSchema = z.object({
 })
 
 export const CategoryConfigSchema = z.object({
+  /** Human-readable description of the category's purpose. Shown in delegate_task prompt. */
+  description: z.string().optional(),
   model: z.string().optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
