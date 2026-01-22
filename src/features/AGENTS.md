@@ -8,11 +8,11 @@ Core feature modules + Claude Code compatibility layer. Background agents, skill
 
 ```
 features/
-├── background-agent/           # Task lifecycle (1165 lines manager.ts)
+├── background-agent/           # Task lifecycle (1335 lines manager.ts)
 │   ├── manager.ts              # Launch → poll → complete orchestration
 │   ├── concurrency.ts          # Per-provider/model limits
 │   └── types.ts                # BackgroundTask, LaunchInput
-├── skill-mcp-manager/          # MCP client lifecycle
+├── skill-mcp-manager/          # MCP client lifecycle (520 lines)
 │   ├── manager.ts              # Lazy loading, idle cleanup
 │   └── types.ts                # SkillMcpConfig, transports
 ├── builtin-skills/             # Playwright, git-master, frontend-ui-ux
@@ -24,7 +24,7 @@ features/
 ├── claude-code-mcp-loader/     # .mcp.json with ${VAR} expansion
 ├── claude-code-plugin-loader/  # installed_plugins.json
 ├── claude-code-session-state/  # Session state persistence
-├── opencode-skill-loader/      # Skills from 6 directories
+├── opencode-skill-loader/      # Skills from 6 directories (12 files)
 ├── context-injector/           # AGENTS.md/README.md injection
 ├── boulder-state/              # Todo state persistence
 ├── task-toast-manager/         # Toast notifications

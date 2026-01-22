@@ -12,7 +12,7 @@ hooks/
 ├── anthropic-context-window-limit-recovery/  # Auto-summarize at token limit
 ├── todo-continuation-enforcer.ts # Force TODO completion
 ├── ralph-loop/                 # Self-referential dev loop until done
-├── claude-code-hooks/          # settings.json hook compat layer (13 files)
+├── claude-code-hooks/          # settings.json hook compat layer (14 files) - see AGENTS.md
 ├── comment-checker/            # Prevents AI slop/excessive comments
 ├── auto-slash-command/         # Detects /command patterns
 ├── rules-injector/             # Conditional rules from .claude/rules/
@@ -26,6 +26,9 @@ hooks/
 ├── think-mode/                 # Dynamic thinking budget
 ├── keyword-detector/           # ultrawork/search/analyze modes
 ├── background-notification/    # OS notification on task completion
+├── prometheus-md-only/         # Enforces planner read-only mode
+├── agent-usage-reminder/       # Reminds to use specialized agents
+├── auto-update-checker/        # Checks for plugin updates
 └── tool-output-truncator.ts    # Prevents context bloat
 ```
 

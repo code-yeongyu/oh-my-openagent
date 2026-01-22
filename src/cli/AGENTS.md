@@ -9,8 +9,8 @@ CLI entry point: `bunx oh-my-opencode`. Interactive installer, doctor diagnostic
 ```
 cli/
 ├── index.ts              # Commander.js entry, 5 subcommands
-├── install.ts            # Interactive TUI installer (462 lines)
-├── config-manager.ts     # JSONC parsing, multi-level merge (730 lines)
+├── install.ts            # Interactive TUI installer (520 lines)
+├── config-manager.ts     # JSONC parsing, multi-level merge (641 lines)
 ├── types.ts              # InstallArgs, InstallConfig, DetectedConfig
 ├── doctor/
 │   ├── index.ts          # Doctor command entry
@@ -18,7 +18,7 @@ cli/
 │   ├── formatter.ts      # Colored output, symbols
 │   ├── constants.ts      # Check IDs, categories, symbols
 │   ├── types.ts          # CheckResult, CheckDefinition
-│   └── checks/           # 14 checks across 6 categories
+│   └── checks/           # 14 checks across 6 categories (21 files)
 │       ├── version.ts    # OpenCode + plugin version
 │       ├── config.ts     # JSONC validity, Zod validation
 │       ├── auth.ts       # Anthropic, OpenAI, Google

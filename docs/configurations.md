@@ -308,267 +308,127 @@ Add custom categories in `oh-my-opencode.json`:
 
 Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`.
 
-## Model Selection System
+## Model Resolution System
 
-The installer automatically configures optimal models based on your subscriptions. This section explains how models are selected for each agent and category.
+At runtime, Oh My OpenCode uses a 3-step resolution process to determine which model to use for each agent and category. This happens dynamically based on your configuration and available models.
 
 ### Overview
 
-**Problem**: Users have different subscription combinations (Claude, OpenAI, Gemini, etc.). The system needs to automatically select the best available model for each task.
+**Problem**: Users have different provider configurations. The system needs to select the best available model for each task at runtime.
 
-**Solution**: A tiered fallback system that:
-1. Prioritizes native provider subscriptions (Claude, OpenAI, Gemini)
-2. Falls back through alternative providers in priority order
-3. Applies capability-specific logic (e.g., Oracle prefers GPT, visual tasks prefer Gemini)
+**Solution**: A simple 3-step resolution flow:
+1. **Step 1: User Override** — If you specify a model in `oh-my-opencode.json`, use exactly that
+2. **Step 2: Provider Fallback** — Try each provider in the requirement's priority order until one is available
+3. **Step 3: System Default** — Fall back to OpenCode's configured default model
 
-### Provider Priority
+### Resolution Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     MODEL SELECTION FLOW                        │
+│                     MODEL RESOLUTION FLOW                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
+│   Step 1: USER OVERRIDE                                         │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │              TIER 1: NATIVE PROVIDERS                   │   │
-│   │         (Your direct subscriptions)                     │   │
-│   │                                                         │   │
-│   │   Claude (anthropic/) ──► OpenAI (openai/) ──► Gemini   │   │
-│   │         │                      │              (google/) │   │
-│   │         ▼                      ▼                   │    │   │
-│   │   Opus/Sonnet/Haiku    GPT-5.2/Codex      Gemini 3 Pro │   │
+│   │ User specified model in oh-my-opencode.json?            │   │
+│   │         YES → Use exactly as specified                  │   │
+│   │         NO  → Continue to Step 2                        │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                              │                                  │
-│                              ▼ (if no native available)         │
+│                              ▼                                  │
+│   Step 2: PROVIDER PRIORITY FALLBACK                            │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │              TIER 2: OPENCODE ZEN                       │   │
-│   │         (opencode/ prefix models)                       │   │
+│   │ For each provider in requirement.providers order:       │   │
 │   │                                                         │   │
-│   │   opencode/claude-opus-4-5, opencode/gpt-5.2, etc.      │   │
+│   │ Example for Sisyphus:                                   │   │
+│   │ anthropic → github-copilot → opencode → antigravity     │   │
+│   │     │            │              │            │          │   │
+│   │     ▼            ▼              ▼            ▼          │   │
+│   │ Try: anthropic/claude-opus-4-5                          │   │
+│   │ Try: github-copilot/claude-opus-4-5                     │   │
+│   │ Try: opencode/claude-opus-4-5                           │   │
+│   │ ...                                                     │   │
+│   │                                                         │   │
+│   │ Found in available models? → Return matched model       │   │
+│   │ Not found? → Try next provider                          │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                              │                                  │
-│                              ▼ (if no OpenCode Zen)             │
+│                              ▼ (all providers exhausted)        │
+│   Step 3: SYSTEM DEFAULT                                        │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │              TIER 3: GITHUB COPILOT                     │   │
-│   │         (github-copilot/ prefix models)                 │   │
-│   │                                                         │   │
-│   │   github-copilot/claude-opus-4.5, etc.                  │   │
-│   └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼ (if no Copilot)                  │
-│   ┌─────────────────────────────────────────────────────────┐   │
-│   │              TIER 4: Z.AI CODING PLAN                   │   │
-│   │         (zai-coding-plan/ prefix models)                │   │
-│   │                                                         │   │
-│   │   zai-coding-plan/glm-4.7 (GLM models only)             │   │
-│   └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼ (ultimate fallback)              │
-│   ┌─────────────────────────────────────────────────────────┐   │
-│   │              FALLBACK: FREE TIER                        │   │
-│   │                                                         │   │
-│   │   opencode/glm-4.7-free                                 │   │
+│   │ Return systemDefaultModel (from opencode.json)          │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Native Tier Cross-Fallback
+### Agent Provider Chains
 
-Within the Native tier, models fall back based on capability requirements:
+Each agent has a defined provider priority chain. The system tries providers in order until it finds an available model:
 
-| Capability | 1st Choice | 2nd Choice | 3rd Choice |
-|------------|------------|------------|------------|
-| **High-tier tasks** (Sisyphus, Atlas) | Claude Opus | OpenAI GPT-5.2 | Gemini 3 Pro |
-| **Standard tasks** | Claude Sonnet | OpenAI GPT-5.2 | Gemini 3 Flash |
-| **Quick tasks** | Claude Haiku | OpenAI GPT-5.1-mini | Gemini 3 Flash |
-| **Deep reasoning** (Oracle) | OpenAI GPT-5.2-Codex | Claude Opus | Gemini 3 Pro |
-| **Visual/UI tasks** | Gemini 3 Pro | OpenAI GPT-5.2 | Claude Sonnet |
-| **Writing tasks** | Gemini 3 Flash | OpenAI GPT-5.2 | Claude Sonnet |
+| Agent | Model (no prefix) | Provider Priority Chain |
+|-------|-------------------|-------------------------|
+| **Sisyphus** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **oracle** | `gpt-5.2` | openai → anthropic → google → github-copilot → opencode |
+| **librarian** | `glm-4.7-free` | opencode → github-copilot → anthropic |
+| **explore** | `grok-code` | opencode → anthropic → github-copilot |
+| **multimodal-looker** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Metis (Plan Consultant)** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Momus (Plan Reviewer)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Atlas** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 
-### Agent-Specific Rules
+### Category Provider Chains
 
-#### Standard Agents
+Categories follow the same resolution logic:
 
-| Agent | Capability | Example (Claude + OpenAI + Gemini) |
-|-------|------------|-------------------------------------|
-| **Sisyphus** | High-tier (isMax20) or Standard | `anthropic/claude-opus-4-5` or `anthropic/claude-sonnet-4-5` |
-| **Oracle** | Deep reasoning | `openai/gpt-5.2-codex` |
-| **Prometheus** | High-tier/Standard | Same as Sisyphus |
-| **Metis** | High-tier/Standard | Same as Sisyphus |
-| **Momus** | Deep reasoning | `openai/gpt-5.2-codex` |
-| **Atlas** | High-tier/Standard | Same as Sisyphus |
-| **multimodal-looker** | Visual | `google/gemini-3-pro-preview` |
+| Category | Model (no prefix) | Provider Priority Chain |
+|----------|-------------------|-------------------------|
+| **visual-engineering** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **ultrabrain** | `gpt-5.2-codex` | openai → anthropic → google → github-copilot → opencode |
+| **artistry** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **quick** | `claude-haiku-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **unspecified-low** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **unspecified-high** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **writing** | `gemini-3-flash-preview` | google → openai → anthropic → github-copilot → opencode |
 
-#### Special Case: explore Agent
+### Checking Your Configuration
 
-The `explore` agent has unique logic for cost optimization:
+Use the `doctor` command to see how models resolve with your current configuration:
 
-```
-┌────────────────────────────────────────┐
-│           EXPLORE AGENT LOGIC          │
-├────────────────────────────────────────┤
-│                                        │
-│   Has Claude + isMax20?                │
-│         │                              │
-│    YES  │  NO                          │
-│    ▼    │  ▼                           │
-│ ┌──────┐│┌────────────────────┐        │
-│ │Haiku ││ │ opencode/grok-code │        │
-│ │4.5   │││ (free & fast)       │        │
-│ └──────┘│└────────────────────┘        │
-│                                        │
-│ Rationale:                             │
-│ • max20 users want to use Claude quota │
-│ • Others save quota with free grok     │
-└────────────────────────────────────────┘
+```bash
+bunx oh-my-opencode doctor --verbose
 ```
 
-#### Special Case: librarian Agent
-
-The `librarian` agent prioritizes Z.ai when available:
-
-```
-┌────────────────────────────────────────┐
-│          LIBRARIAN AGENT LOGIC         │
-├────────────────────────────────────────┤
-│                                        │
-│   Has Z.ai Coding Plan?                │
-│         │                              │
-│    YES  │  NO                          │
-│    ▼    │  ▼                           │
-│ ┌──────────────┐ ┌──────────────────┐  │
-│ │zai-coding-   │ │ Normal fallback  │  │
-│ │plan/glm-4.7  │ │ chain applies    │  │
-│ └──────────────┘ └──────────────────┘  │
-│                                        │
-│ Rationale:                             │
-│ • GLM excels at documentation tasks    │
-│ • Z.ai provides dedicated GLM access   │
-└────────────────────────────────────────┘
-```
-
-### Category-Specific Rules
-
-Categories follow the same fallback logic as agents:
-
-| Category | Primary Capability | Fallback Chain |
-|----------|-------------------|----------------|
-| `visual-engineering` | Visual | Gemini → OpenAI → Claude |
-| `ultrabrain` | Deep reasoning | OpenAI → Claude → Gemini |
-| `artistry` | Visual/Creative | Gemini → OpenAI → Claude |
-| `quick` | Quick tasks | Claude Haiku → OpenAI mini → Gemini Flash |
-| `unspecified-low` | Standard | Claude Sonnet → OpenAI → Gemini Flash |
-| `unspecified-high` | High-tier | Claude Opus → OpenAI → Gemini Pro |
-| `writing` | Writing | Gemini Flash → OpenAI → Claude |
-
-### Subscription Scenarios
-
-#### Scenario 1: Claude Only (Standard Plan)
-
-```json
-// User has: Claude Pro (not max20)
-{
-  "agents": {
-    "Sisyphus": { "model": "anthropic/claude-sonnet-4-5" },
-    "oracle": { "model": "anthropic/claude-opus-4-5" },
-    "explore": { "model": "opencode/grok-code" },
-    "librarian": { "model": "opencode/glm-4.7-free" }
-  }
-}
-```
-
-#### Scenario 2: Claude Only (Max20 Plan)
-
-```json
-// User has: Claude Max (max20 mode)
-{
-  "agents": {
-    "Sisyphus": { "model": "anthropic/claude-opus-4-5" },
-    "oracle": { "model": "anthropic/claude-opus-4-5" },
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "librarian": { "model": "opencode/glm-4.7-free" }
-  }
-}
-```
-
-#### Scenario 3: ChatGPT Only
-
-```json
-// User has: OpenAI/ChatGPT Plus only
-{
-  "agents": {
-    "Sisyphus": { "model": "openai/gpt-5.2" },
-    "oracle": { "model": "openai/gpt-5.2-codex" },
-    "explore": { "model": "opencode/grok-code" },
-    "multimodal-looker": { "model": "openai/gpt-5.2" },
-    "librarian": { "model": "opencode/glm-4.7-free" }
-  }
-}
-```
-
-#### Scenario 4: Full Stack (Claude + OpenAI + Gemini)
-
-```json
-// User has: All native providers
-{
-  "agents": {
-    "Sisyphus": { "model": "anthropic/claude-opus-4-5" },
-    "oracle": { "model": "openai/gpt-5.2-codex" },
-    "explore": { "model": "anthropic/claude-haiku-4-5" },
-    "multimodal-looker": { "model": "google/gemini-3-pro-preview" },
-    "librarian": { "model": "opencode/glm-4.7-free" }
-  }
-}
-```
-
-#### Scenario 5: GitHub Copilot Only
-
-```json
-// User has: GitHub Copilot only (no native providers)
-{
-  "agents": {
-    "Sisyphus": { "model": "github-copilot/claude-sonnet-4.5" },
-    "oracle": { "model": "github-copilot/gpt-5.2-codex" },
-    "explore": { "model": "opencode/grok-code" },
-    "librarian": { "model": "github-copilot/gpt-5.2" }
-  }
-}
-```
-
-### isMax20 Flag Impact
-
-The `isMax20` flag (Claude Max 20x mode) affects high-tier task model selection:
-
-| isMax20 | High-tier Capability | Result |
-|---------|---------------------|--------|
-| `true` | Uses `unspecified-high` | Opus-class models |
-| `false` | Uses `unspecified-low` | Sonnet-class models |
-
-**Affected agents**: Sisyphus, Prometheus, Metis, Atlas
-
-**Why?**: Max20 users have 20x more Claude usage, so they can afford Opus for orchestration. Standard users should conserve quota with Sonnet.
+The "Model Resolution" check shows:
+- Each agent/category's model requirement
+- Provider fallback chain
+- User overrides (if configured)
+- Effective resolution path
 
 ### Manual Override
 
-You can always override automatic selection in `oh-my-opencode.json`:
+Override any agent or category model in `oh-my-opencode.json`:
 
 ```json
 {
   "agents": {
     "Sisyphus": {
-      "model": "anthropic/claude-sonnet-4-5"  // Force specific model
+      "model": "anthropic/claude-sonnet-4-5"
     },
     "oracle": {
-      "model": "openai/o3"  // Use different model
+      "model": "openai/o3"
     }
   },
   "categories": {
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-5"  // Override category default
+      "model": "anthropic/claude-opus-4-5"
     }
   }
 }
 ```
+
+When you specify a model override, it takes precedence (Step 1) and the provider fallback chain is skipped entirely.
 
 ## Hooks
 
