@@ -80,16 +80,16 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
           )
       }
 
-      if (collector) {
-        for (const keyword of detectedKeywords) {
-          collector.register(input.sessionID, {
-            id: `keyword-${keyword.type}`,
-            source: "keyword-detector",
-            content: keyword.message,
-            priority: keyword.type === "ultrawork" ? "critical" : "high",
-          })
-        }
+      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+      if (textPartIndex === -1) {
+        log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
+        return
       }
+
+      const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
+      const originalText = output.parts[textPartIndex].text ?? ""
+
+      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
