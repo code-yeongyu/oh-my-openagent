@@ -121,7 +121,7 @@ export function detectExternalNotificationPlugin(directory: string): ExternalNot
 export function getNotificationConflictWarning(pluginName: string): string {
   return `[oh-my-opencode] External notification plugin detected: ${pluginName}
 
-⚠️  Both oh-my-opencode and ${pluginName} listen to session.idle events.
+Both oh-my-opencode and ${pluginName} listen to session.idle events.
    Running both simultaneously can cause crashes on Windows.
 
    oh-my-opencode's session-notification has been auto-disabled.
