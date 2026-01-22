@@ -44,16 +44,20 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
   >()
 
   return {
-    PostToolUse: async (
+    "tool.execute.after": async (
       input: {
         sessionID: string
         agent?: string
-        tool: { name: string; input: Record<string, unknown> }
+        tool: string
+        args?: Record<string, unknown>
       },
-      output: { result: unknown }
-    ): Promise<{ messages?: Array<{ type: string; text: string }> } | void> => {
+      output: { result?: unknown; output: string }
+    ): Promise<void> => {
+      // Adapt to new interface - tool name is now input.tool, args is input.args
+      const toolName = input.tool
+      const toolInput = input.args ?? {}
       // Only monitor sisyphus_task calls
-      if (input.tool.name !== "sisyphus_task") {
+      if (toolName !== "sisyphus_task") {
         return
       }
 
@@ -63,7 +67,7 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
         return
       }
 
-      const targetAgent = input.tool.input.subagent_type as string | undefined
+      const targetAgent = toolInput.subagent_type as string | undefined
       if (!targetAgent) {
         return
       }
@@ -195,8 +199,10 @@ sisyphus_task(
         momusRejected: state.momusRejected,
       })
 
+      // Append messages to output instead of returning (tool.execute.after doesn't support return messages)
       if (messages.length > 0) {
-        return { messages }
+        const messageText = messages.map(m => m.text).join("\n\n")
+        output.output += `\n\n${messageText}`
       }
     },
   }

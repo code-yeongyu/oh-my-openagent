@@ -113,7 +113,7 @@ export function createTddGuardHook(
       output: {
         parts?: Array<{ type: string; text?: string }>
         blocked?: boolean
-        message?: string
+        message?: string | Record<string, unknown>
       }
     ): Promise<void> => {
       // Extract prompt text from parts
@@ -134,7 +134,8 @@ export function createTddGuardHook(
           output.blocked = true
         }
         if (result.message) {
-          output.message = result.message
+          // Type assertion needed for compatibility
+          (output as { message?: string }).message = result.message
         }
       }
     },
@@ -232,9 +233,9 @@ ${TDD_SKILL_CONTENT}`,
     },
 
     "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string },
+      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
       output: {
-        args: Record<string, unknown>
+        args?: Record<string, unknown>
         output?: string
       }
     ): Promise<void> => {
@@ -255,8 +256,9 @@ ${TDD_SKILL_CONTENT}`,
         return
       }
 
-      // Get file path from args
-      const filePath = (output.args.filePath ?? output.args.file_path ?? output.args.path) as string | undefined
+      // Get file path from args (try output.args first, then input.args)
+      const args = output.args ?? input.args ?? {}
+      const filePath = (args.filePath ?? args.file_path ?? args.path) as string | undefined
       if (!filePath) {
         return
       }

@@ -36,6 +36,10 @@ import {
   createQuestionLabelTruncatorHook,
   // TDD Guard hook
   createTddGuardHook,
+  createPlanningFlowGuideHook,
+  createPlanReorganizerHook,
+  createPlanUpdateReminderHook,
+  createPlanAttentionRefresherHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -240,6 +244,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createTddGuardHook({ cwd: ctx.directory }, { config: pluginConfig.tdd_guard })
     : null;
 
+  const planningFlowGuide = isHookEnabled("planning-flow-guide")
+    ? createPlanningFlowGuideHook(ctx)
+    : null;
+
+  const planReorganizer = isHookEnabled("plan-reorganizer")
+    ? createPlanReorganizerHook(ctx)
+    : null;
+
+  const planUpdateReminder = isHookEnabled("plan-update-reminder")
+    ? createPlanUpdateReminderHook(ctx)
+    : null;
+
+  const planAttentionRefresher = isHookEnabled("plan-attention-refresher")
+    ? createPlanAttentionRefresherHook(ctx)
+    : null;
+
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
@@ -414,6 +434,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       await keywordDetector?.["chat.message"]?.(input, output);
+      await tddGuard?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
@@ -503,6 +524,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await tddGuard?.event?.(input);
+      await planReorganizer?.handler(input);
+      await planAttentionRefresher?.handler(input);
       await atlasHook?.handler(input);
 
       const { event } = input;
@@ -585,6 +609,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await tddGuard?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
@@ -671,6 +696,9 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);
         await atlasHook?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
+      await planUpdateReminder?.["tool.execute.after"]?.(input, output);
+      await tddGuard?.["tool.execute.after"]?.(input, output);
+      await planningFlowGuide?.["tool.execute.after"]?.(input, output);
     },
   };
 };
