@@ -208,9 +208,10 @@ async function publishPackage(cwd: string, distTag: string | null, useProvenance
 
   const tagArgs = distTag ? ["--tag", distTag] : []
   const provenanceArgs = process.env.CI && useProvenance ? ["--provenance"] : []
+  const env = useProvenance ? {} : { NPM_CONFIG_PROVENANCE: "false" }
   
   try {
-    await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd)
+    await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd).env({ ...process.env, ...env })
     return { success: true }
   } catch (error: any) {
     const stderr = error?.stderr?.toString() || error?.message || ""
