@@ -11,7 +11,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase } from "../../shared"
 import { fetchAvailableModels } from "../../shared/model-availability"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -716,7 +716,7 @@ To resume this session: resume="${sessionID}"`
         }
         const agentName = args.subagent_type.trim()
 
-        if (agentName === SISYPHUS_JUNIOR_AGENT) {
+        if (equalsIgnoreCase(agentName, SISYPHUS_JUNIOR_AGENT)) {
           return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
@@ -725,25 +725,32 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
         agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
+        // Uses case-insensitive matching to allow "Oracle", "oracle", "ORACLE" etc.
         try {
           const agentsResult = await client.app.agents()
           type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
           const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
 
           const callableAgents = agents.filter((a) => a.mode !== "primary")
-          const callableNames = callableAgents.map((a) => a.name)
 
-          if (!callableNames.includes(agentToUse)) {
-            const isPrimaryAgent = agents.some((a) => a.name === agentToUse && a.mode === "primary")
+          const matchedAgent = findByNameCaseInsensitive(callableAgents, agentToUse)
+          if (!matchedAgent) {
+            const isPrimaryAgent = findByNameCaseInsensitive(
+              agents.filter((a) => a.mode === "primary"),
+              agentToUse
+            )
             if (isPrimaryAgent) {
-              return `Cannot call primary agent "${agentToUse}" via delegate_task. Primary agents are top-level orchestrators.`
+              return `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`
             }
 
-            const availableAgents = callableNames
+            const availableAgents = callableAgents
+              .map((a) => a.name)
               .sort()
               .join(", ")
             return `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
           }
+          // Use the canonical agent name from registration
+          agentToUse = matchedAgent.name
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }

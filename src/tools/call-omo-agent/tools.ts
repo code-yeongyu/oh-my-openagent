@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { log, getAgentToolRestrictions, includesCaseInsensitive } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -46,7 +46,7 @@ export function createCallOmoAgent(
       description: tool.schema.string().describe("A short (3-5 words) description of the task"),
       prompt: tool.schema.string().describe("The task for the agent to perform"),
       subagent_type: tool.schema
-        .enum(ALLOWED_AGENTS)
+        .string()
         .describe("The type of specialized agent to use for this task (explore or librarian only)"),
       run_in_background: tool.schema
         .boolean()
@@ -57,9 +57,13 @@ export function createCallOmoAgent(
       const toolCtx = toolContext as ToolContextWithMetadata
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
-      if (!ALLOWED_AGENTS.includes(args.subagent_type as typeof ALLOWED_AGENTS[number])) {
+      // Case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
+      if (!includesCaseInsensitive([...ALLOWED_AGENTS], args.subagent_type)) {
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
+      
+      const normalizedAgent = args.subagent_type.toLowerCase() as typeof ALLOWED_AGENTS[number]
+      args = { ...args, subagent_type: normalizedAgent }
 
       if (args.run_in_background) {
         if (args.session_id) {
