@@ -185,21 +185,4 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   writing: "Documentation, prose, technical writing",
 }
 
-const BUILTIN_CATEGORIES = Object.keys(DEFAULT_CATEGORIES).join(", ")
 
-export const DELEGATE_TASK_DESCRIPTION = `Spawn agent task with category-based or direct agent selection.
-
-MUTUALLY EXCLUSIVE: Provide EITHER category OR agent, not both (unless resuming).
-
-- category: Use predefined category (${BUILTIN_CATEGORIES}) → Spawns Sisyphus-Junior with category config
-- agent: Use specific agent directly (e.g., "oracle", "explore")
-- background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
-- resume: Session ID to resume (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
-- skills: Array of skill names to prepend to prompt (e.g., ["playwright", "frontend-ui-ux"]). Use [] (empty array) if no skills needed.
-
-**WHEN TO USE resume:**
-- Task failed/incomplete → resume with "fix: [specific issue]"
-- Need follow-up on previous result → resume with additional question
-- Multi-turn conversation with same agent → always resume instead of new task
-
-Prompts MUST be in English.`
