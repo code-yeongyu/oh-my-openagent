@@ -57,3 +57,18 @@ export { createPlanUpdateReminderHook } from "./plan-update-reminder";
 
 // Plan Attention Refresher Hook - refreshes tasks.md into attention window
 export { createPlanAttentionRefresherHook } from "./plan-attention-refresher";
+
+// Subagent Verification Hook - reminds orchestrator to verify delegated work
+export { createSubagentVerificationHook } from "./subagent-verification";
+
+// Background Compaction Hook - preserves background task state during context compaction
+export { createBackgroundCompactionHook } from "./background-compaction";
+
+// Codebase Assessment Hook - evaluates project state at session start
+export { createCodebaseAssessmentHook } from "./codebase-assessment";
+
+// LSP Diagnostics Enforcer Hook - ensures diagnostics run before task completion
+export { createLspDiagnosticsEnforcerHook } from "./lsp-diagnostics-enforcer";
+
+// Phase Flow Enforcer Hook - warns when boulder phase transitions are skipped
+export { createPhaseFlowEnforcerHook } from "./phase-flow-enforcer";
