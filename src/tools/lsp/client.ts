@@ -5,6 +5,20 @@ import { pathToFileURL } from "node:url"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
 
+/**
+ * Normalize Windows path to ensure consistent URI generation.
+ * Windows paths are case-insensitive, but file:// URIs are case-sensitive.
+ * This ensures the drive letter is always uppercase (D: not d:).
+ */
+function normalizePath(filePath: string): string {
+  const resolved = resolve(filePath)
+  // On Windows, normalize drive letter to uppercase
+  if (process.platform === "win32" && /^[a-z]:/.test(resolved)) {
+    return resolved[0].toUpperCase() + resolved.slice(1)
+  }
+  return resolved
+}
+
 interface ManagedClient {
   client: LSPClient
   lastUsedAt: number
@@ -489,7 +503,7 @@ export class LSPClient {
   }
 
   async openFile(filePath: string): Promise<void> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     if (this.openedFiles.has(absPath)) return
 
     const text = readFileSync(absPath, "utf-8")
@@ -510,7 +524,7 @@ export class LSPClient {
   }
 
   async definition(filePath: string, line: number, character: number): Promise<unknown> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/definition", {
       textDocument: { uri: pathToFileURL(absPath).href },
@@ -519,7 +533,7 @@ export class LSPClient {
   }
 
   async references(filePath: string, line: number, character: number, includeDeclaration = true): Promise<unknown> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/references", {
       textDocument: { uri: pathToFileURL(absPath).href },
@@ -529,7 +543,7 @@ export class LSPClient {
   }
 
   async documentSymbols(filePath: string): Promise<unknown> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/documentSymbol", {
       textDocument: { uri: pathToFileURL(absPath).href },
@@ -541,7 +555,7 @@ export class LSPClient {
   }
 
   async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     const uri = pathToFileURL(absPath).href
     await this.openFile(absPath)
     await new Promise((r) => setTimeout(r, 500))
@@ -560,7 +574,7 @@ export class LSPClient {
   }
 
   async prepareRename(filePath: string, line: number, character: number): Promise<unknown> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/prepareRename", {
       textDocument: { uri: pathToFileURL(absPath).href },
@@ -569,7 +583,7 @@ export class LSPClient {
   }
 
   async rename(filePath: string, line: number, character: number, newName: string): Promise<unknown> {
-    const absPath = resolve(filePath)
+    const absPath = normalizePath(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/rename", {
       textDocument: { uri: pathToFileURL(absPath).href },
