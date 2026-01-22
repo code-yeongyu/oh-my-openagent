@@ -54,7 +54,7 @@ For complex or critical tasks, press **Tab** to switch to Prometheus (Planner) m
 
 2. **Plan generation** - Based on the interview, Prometheus generates a detailed work plan with tasks, acceptance criteria, and guardrails. Optionally reviewed by Momus (plan reviewer) for high-accuracy validation.
 
-3. **Run `/start-work`** - The Orchestrator-Sisyphus takes over:
+3. **Run `/start-work`** - The Atlas takes over:
    - Distributes tasks to specialized sub-agents
    - Verifies each task completion independently
    - Accumulates learnings across tasks
@@ -84,7 +84,7 @@ The orchestrator is designed to execute work plans created by Prometheus. Using 
 4. Run /start-work → Orchestrator executes
 ```
 
-**Prometheus and Orchestrator-Sisyphus are a pair. Always use them together.**
+**Prometheus and Atlas are a pair. Always use them together.**
 
 ---
 
