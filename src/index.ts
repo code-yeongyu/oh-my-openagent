@@ -248,7 +248,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills().filter((skill) => {
+  const browserProvider = pluginConfig.browser_automation?.provider ?? "playwright";
+  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill) => {
     if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {

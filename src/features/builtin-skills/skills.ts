@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs"
+import { join, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { BuiltinSkill } from "./types"
+import type { BrowserAutomationProvider } from "../../config/schema"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const playwrightSkill: BuiltinSkill = {
   name: "playwright",
@@ -12,6 +18,32 @@ This skill provides browser automation capabilities via the Playwright MCP serve
       args: ["@playwright/mcp@latest"],
     },
   },
+}
+
+function loadAgentBrowserSkillTemplate(): string {
+  try {
+    const skillPath = join(__dirname, "agent-browser", "SKILL.md")
+    const content = readFileSync(skillPath, "utf-8")
+    const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n*/m, "")
+    return contentWithoutFrontmatter.trim()
+  } catch {
+    return `# Browser Automation with agent-browser
+
+Use \`agent-browser\` CLI for web automation. Run \`agent-browser --help\` for all commands.
+
+Core workflow:
+1. \`agent-browser open <url>\` - Navigate to page
+2. \`agent-browser snapshot -i\` - Get interactive elements with refs (@e1, @e2)
+3. \`agent-browser click @e1\` / \`fill @e2 "text"\` - Interact using refs
+4. Re-snapshot after page changes`
+  }
+}
+
+const agentBrowserSkill: BuiltinSkill = {
+  name: "agent-browser",
+  description: "MUST USE for any browser-related tasks. Browser automation via agent-browser CLI - verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.",
+  template: loadAgentBrowserSkillTemplate(),
+  allowedTools: ["Bash(agent-browser:*)"],
 }
 
 const frontendUiUxSkill: BuiltinSkill = {
@@ -1198,6 +1230,14 @@ POTENTIAL ACTIONS:
 - Bisect without proper good/bad boundaries -> Wasted time`,
 }
 
-export function createBuiltinSkills(): BuiltinSkill[] {
-  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill]
+export interface CreateBuiltinSkillsOptions {
+  browserProvider?: BrowserAutomationProvider
+}
+
+export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
+  const { browserProvider = "playwright" } = options
+
+  const browserSkill = browserProvider === "agent-browser" ? agentBrowserSkill : playwrightSkill
+
+  return [browserSkill, frontendUiUxSkill, gitMasterSkill]
 }
