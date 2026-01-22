@@ -10,7 +10,7 @@ import type { Diagnostic, ResolvedServer } from "./types"
  * Windows paths are case-insensitive, but file:// URIs are case-sensitive.
  * This ensures the drive letter is always uppercase (D: not d:).
  */
-function normalizePath(filePath: string): string {
+export function normalizePath(filePath: string): string {
   const resolved = resolve(filePath)
   // On Windows, normalize drive letter to uppercase
   if (process.platform === "win32" && /^[a-z]:/.test(resolved)) {

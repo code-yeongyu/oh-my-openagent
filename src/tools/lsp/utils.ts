@@ -1,7 +1,7 @@
 import { extname, resolve } from "path"
 import { fileURLToPath } from "node:url"
 import { existsSync, readFileSync, writeFileSync } from "fs"
-import { LSPClient, lspManager } from "./client"
+import { LSPClient, lspManager, normalizePath } from "./client"
 import { findServerForExtension } from "./config"
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
 import type {
@@ -19,7 +19,7 @@ import type {
 } from "./types"
 
 export function findWorkspaceRoot(filePath: string): string {
-  let dir = resolve(filePath)
+  let dir = normalizePath(filePath)
 
   if (!existsSync(dir) || !require("fs").statSync(dir).isDirectory()) {
     dir = require("path").dirname(dir)
@@ -80,7 +80,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
 }
 
 export async function withLspClient<T>(filePath: string, fn: (client: LSPClient) => Promise<T>): Promise<T> {
-  const absPath = resolve(filePath)
+  const absPath = normalizePath(filePath)
   const ext = extname(absPath)
   const result = findServerForExtension(ext)
 
