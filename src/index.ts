@@ -288,7 +288,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const configHandler = createConfigHandler({
-    ctx,
+    ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
   });

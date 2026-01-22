@@ -12,6 +12,10 @@ import {
   loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  discoverUserClaudeSkills,
+  discoverProjectClaudeSkills,
+  discoverOpencodeGlobalSkills,
+  discoverOpencodeProjectSkills,
 } from "../features/opencode-skill-loader";
 import {
   loadUserAgents,
@@ -31,7 +35,7 @@ import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
 
 export interface ConfigHandlerDeps {
-  ctx: { directory: string };
+  ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
 }
@@ -116,13 +120,35 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
     }) as typeof pluginConfig.disabled_agents
 
-    const builtinAgents = createBuiltinAgents(
+    const includeClaudeSkillsForAwareness = pluginConfig.claude_code?.skills ?? true;
+    const [
+      discoveredUserSkills,
+      discoveredProjectSkills,
+      discoveredOpencodeGlobalSkills,
+      discoveredOpencodeProjectSkills,
+    ] = await Promise.all([
+      includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
+      includeClaudeSkillsForAwareness ? discoverProjectClaudeSkills() : Promise.resolve([]),
+      discoverOpencodeGlobalSkills(),
+      discoverOpencodeProjectSkills(),
+    ]);
+
+    const allDiscoveredSkills = [
+      ...discoveredOpencodeProjectSkills,
+      ...discoveredProjectSkills,
+      ...discoveredOpencodeGlobalSkills,
+      ...discoveredUserSkills,
+    ];
+
+    const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
       ctx.directory,
       config.model as string | undefined,
       pluginConfig.categories,
-      pluginConfig.git_master
+      pluginConfig.git_master,
+      allDiscoveredSkills,
+      ctx.client
     );
 
     // Claude Code agents: Do NOT apply permission migration
