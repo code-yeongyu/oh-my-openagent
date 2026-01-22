@@ -16,6 +16,7 @@ export type ModelSource =
 export type ModelResolutionResult = {
 	model: string
 	source: ModelSource
+	variant?: string
 }
 
 export type ExtendedModelResolutionInput = {
@@ -57,23 +58,14 @@ export function resolveModelWithFallback(
 				const fullModel = `${provider}/${entry.model}`
 				const match = fuzzyMatchModel(fullModel, availableModels, [provider])
 				if (match) {
-					log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match })
-					return { model: match, source: "provider-fallback" }
+					log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
+					return { model: match, source: "provider-fallback", variant: entry.variant }
 				}
 			}
 		}
-
-		// Step 3: Use first entry in fallbackChain as fallback (no availability match found)
-		// This ensures category/agent intent is honored even if availableModels is incomplete
-		const firstEntry = fallbackChain[0]
-		if (firstEntry.providers.length > 0) {
-			const fallbackModel = `${firstEntry.providers[0]}/${firstEntry.model}`
-			log("Model resolved via fallback chain first entry (no availability match)", { model: fallbackModel })
-			return { model: fallbackModel, source: "provider-fallback" }
-		}
 	}
 
-	// Step 4: System default
+	// Step 3: System default
 	log("Model resolved via system default", { model: systemDefaultModel })
 	return { model: systemDefaultModel, source: "system-default" }
 }

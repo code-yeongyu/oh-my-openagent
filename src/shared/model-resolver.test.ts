@@ -206,7 +206,7 @@ describe("resolveModelWithFallback", () => {
       // #then
       expect(result.model).toBe("github-copilot/claude-opus-4-5-preview")
       expect(result.source).toBe("provider-fallback")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain", {
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (availability confirmed)", {
         provider: "github-copilot",
         model: "claude-opus-4-5",
         match: "github-copilot/claude-opus-4-5-preview",
