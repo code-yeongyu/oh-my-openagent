@@ -511,8 +511,8 @@ To resume this session: resume="${args.resume}"`
          if (!requirement) {
            actualModel = resolved.model
            modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
-         } else {
-          const { model: resolvedModel, source } = resolveModelWithFallback({
+          } else {
+          const { model: resolvedModel, source, variant: resolvedVariant } = resolveModelWithFallback({
               userModel: userCategories?.[args.category]?.model,
               fallbackChain: requirement.fallbackChain,
               availableModels,
@@ -539,15 +539,19 @@ To resume this session: resume="${args.resume}"`
            }
 
            modelInfo = { model: actualModel, type, source }
+           
+           const parsedModel = parseModelString(actualModel)
+           const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+           categoryModel = parsedModel
+             ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+             : undefined
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT
-         const parsedModel = parseModelString(actualModel)
-         categoryModel = parsedModel
-           ? (requirement?.variant
-             ? { ...parsedModel, variant: requirement.variant }
-             : parsedModel)
-           : undefined
+         if (!categoryModel) {
+           const parsedModel = parseModelString(actualModel)
+           categoryModel = parsedModel ?? undefined
+         }
          categoryPromptAppend = resolved.promptAppend || undefined
 
          const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
