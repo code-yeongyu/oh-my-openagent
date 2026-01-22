@@ -233,9 +233,9 @@ export function formatEnvironmentCheck(result: EnvironmentCheckResult): string {
 
   // CLI status
   if (result.cli.available) {
-    lines.push(`✓ CLI: Available (${result.cli.path})`)
+    lines.push(`[OK] CLI: Available (${result.cli.path})`)
   } else {
-    lines.push(`✗ CLI: Not available`)
+    lines.push(`[X] CLI: Not available`)
     if (result.cli.error) {
       lines.push(`  Error: ${result.cli.error}`)
     }
@@ -244,9 +244,9 @@ export function formatEnvironmentCheck(result: EnvironmentCheckResult): string {
 
   // NAPI status
   if (result.napi.available) {
-    lines.push(`✓ NAPI: Available`)
+    lines.push(`[OK] NAPI: Available`)
   } else {
-    lines.push(`✗ NAPI: Not available`)
+    lines.push(`[X] NAPI: Not available`)
     if (result.napi.error) {
       lines.push(`  Error: ${result.napi.error}`)
     }

@@ -15,17 +15,17 @@ function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
   if (lang === "python") {
     if (src.startsWith("class ") && src.endsWith(":")) {
       const withoutColon = src.slice(0, -1)
-      return `💡 Hint: Remove trailing colon. Try: "${withoutColon}"`
+      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
     }
     if ((src.startsWith("def ") || src.startsWith("async def ")) && src.endsWith(":")) {
       const withoutColon = src.slice(0, -1)
-      return `💡 Hint: Remove trailing colon. Try: "${withoutColon}"`
+      return `Hint: Remove trailing colon. Try: "${withoutColon}"`
     }
   }
 
   if (["javascript", "typescript", "tsx"].includes(lang)) {
     if (/^(export\s+)?(async\s+)?function\s+\$[A-Z_]+\s*$/i.test(src)) {
-      return `💡 Hint: Function patterns need params and body. Try "function $NAME($$$) { $$$ }"`
+      return `Hint: Function patterns need params and body. Try "function $NAME($$$) { $$$ }"`
     }
   }
 
