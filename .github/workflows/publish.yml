@@ -1,5 +1,5 @@
 name: publish
-run-name: "${{ format('release {0}', inputs.bump) }}"
+run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
 
 on:
   workflow_dispatch:
@@ -14,16 +14,11 @@ on:
           - minor
           - major
       version:
-        description: "Override version (e.g., 3.0.0-beta.6 for beta release). Takes precedence over bump."
+        description: "Override version (e.g., 3.0.0-beta.6). Takes precedence over bump."
         required: false
         type: string
       skip_platform:
-        description: "Skip platform binary packages (use when already published)"
-        required: false
-        type: boolean
-        default: false
-      republish:
-        description: "Re-publish mode: skip version check, only publish missing packages"
+        description: "Skip platform binary packages"
         required: false
         type: boolean
         default: false
@@ -33,6 +28,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 permissions:
   contents: write
   id-token: write
+  actions: write
 
 jobs:
   test:
@@ -69,8 +65,7 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
-  # Build everything and upload artifacts
-  build:
+  publish-main:
     runs-on: ubuntu-latest
     needs: [test, typecheck]
     if: github.repository == 'code-yeongyu/oh-my-opencode'
@@ -87,6 +82,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: bun install
@@ -109,7 +109,6 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           
-          # Calculate dist tag
           if [[ "$VERSION" == *"-"* ]]; then
             DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
             echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
@@ -119,43 +118,52 @@ jobs:
           
           echo "Version: $VERSION"
 
-      - name: Update versions in package.json files
-        run: bun run script/publish.ts --prepare-only
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ oh-my-opencode@${VERSION} already published"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update version
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          
+          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64; do
+            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
+            mv tmp.json "packages/${platform}/package.json"
+          done
+          
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build main package
+        if: steps.check.outputs.skip != 'true'
         run: |
           bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
           bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
           bunx tsc --emitDeclarationOnly
           bun run build:schema
 
-      - name: Build platform binaries
-        if: inputs.skip_platform != true
-        run: bun run build:binaries
-
-      - name: Upload main package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: main-package
-          path: |
-            dist/
-            package.json
-            assets/
-            README.md
-            LICENSE.md
-          retention-days: 1
-
-      - name: Upload platform artifacts
-        if: inputs.skip_platform != true
-        uses: actions/upload-artifact@v4
-        with:
-          name: platform-packages
-          path: packages/
-          retention-days: 1
+      - name: Publish main package
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          TAG_ARG=""
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+          fi
+          npm publish --access public --provenance $TAG_ARG
+        env:
+          NPM_CONFIG_PROVENANCE: true
 
       - name: Git commit and tag
+        if: steps.check.outputs.skip != 'true'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -167,98 +175,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Publish platform packages in parallel (each job gets fresh OIDC token)
-  publish-platform:
+  trigger-platform:
     runs-on: ubuntu-latest
-    needs: build
+    needs: publish-main
     if: inputs.skip_platform != true
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Download platform artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: platform-packages
-          path: packages/
-
-      - name: Check if already published
-        id: check
+      - name: Trigger platform publish workflow
         run: |
-          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
-          VERSION="${{ needs.build.outputs.version }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
-          if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ ${PKG_NAME}@${VERSION} already published"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "→ ${PKG_NAME}@${VERSION} needs publishing"
-          fi
-
-      - name: Publish ${{ matrix.platform }}
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          cd packages/${{ matrix.platform }}
-          TAG_ARG=""
-          if [ -n "${{ needs.build.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ needs.build.outputs.dist_tag }}"
-          fi
-          npm publish --access public $TAG_ARG
+          gh workflow run publish-platform.yml \
+            --repo ${{ github.repository }} \
+            --ref ${{ github.ref }} \
+            -f version=${{ needs.publish-main.outputs.version }} \
+            -f dist_tag=${{ needs.publish-main.outputs.dist_tag }}
         env:
-          NPM_CONFIG_PROVENANCE: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Publish main package after all platform packages
-  publish-main:
-    runs-on: ubuntu-latest
-    needs: [build, publish-platform]
-    if: always() && needs.build.result == 'success' && (inputs.skip_platform == true || needs.publish-platform.result == 'success' || needs.publish-platform.result == 'skipped')
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Download main package artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: main-package
-          path: .
-
-      - name: Check if already published
-        id: check
-        run: |
-          VERSION="${{ needs.build.outputs.version }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
-          if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ oh-my-opencode@${VERSION} already published"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Publish main package
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          TAG_ARG=""
-          if [ -n "${{ needs.build.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ needs.build.outputs.dist_tag }}"
-          fi
-          npm publish --access public --provenance $TAG_ARG
-        env:
-          NPM_CONFIG_PROVENANCE: true
-
-  # Create release and cleanup
   release:
     runs-on: ubuntu-latest
-    needs: [build, publish-main]
-    if: always() && needs.build.result == 'success'
+    needs: publish-main
     steps:
       - uses: actions/checkout@v4
         with:
@@ -267,9 +201,8 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          VERSION="${{ needs.build.outputs.version }}"
+          VERSION="${{ needs.publish-main.outputs.version }}"
           
-          # Find previous tag
           PREV_TAG=""
           if [[ "$VERSION" == *"-beta."* ]]; then
             BASE="${VERSION%-beta.*}"
@@ -289,13 +222,11 @@ jobs:
           
           NOTES=$(git log "v${PREV_TAG}..v${VERSION}" --oneline --format="- %h %s" 2>/dev/null | grep -vE "^- \w+ (ignore:|test:|chore:|ci:|release:)" || echo "No notable changes")
           
-          # Write to file for multiline support
           echo "$NOTES" > /tmp/changelog.md
-          echo "notes_file=/tmp/changelog.md" >> $GITHUB_OUTPUT
 
       - name: Create GitHub release
         run: |
-          VERSION="${{ needs.build.outputs.version }}"
+          VERSION="${{ needs.publish-main.outputs.version }}"
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
             gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
         env:
@@ -311,7 +242,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          VERSION="${{ needs.build.outputs.version }}"
+          VERSION="${{ needs.publish-main.outputs.version }}"
           git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
