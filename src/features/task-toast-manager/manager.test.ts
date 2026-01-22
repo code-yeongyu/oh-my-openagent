@@ -160,7 +160,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show warning - category default is expected
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️")
+      expect(call.body.message).not.toContain("[FALLBACK]")
       expect(call.body.message).not.toContain("(category default)")
     })
 
@@ -180,7 +180,7 @@ describe("TaskToastManager", () => {
       // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("⚠️")
+      expect(call.body.message).toContain("[FALLBACK]")
       expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
       expect(call.body.message).toContain("(system default fallback)")
     })
@@ -201,7 +201,7 @@ describe("TaskToastManager", () => {
       // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("⚠️")
+      expect(call.body.message).toContain("[FALLBACK]")
       expect(call.body.message).toContain("cliproxy/claude-opus-4-5")
       expect(call.body.message).toContain("(inherited from parent)")
     })
@@ -222,7 +222,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️ Model:")
+      expect(call.body.message).not.toContain("[FALLBACK] Model:")
       expect(call.body.message).not.toContain("(inherited)")
       expect(call.body.message).not.toContain("(category default)")
       expect(call.body.message).not.toContain("(system default)")
@@ -243,7 +243,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️ Model:")
+      expect(call.body.message).not.toContain("[FALLBACK] Model:")
     })
   })
 })
