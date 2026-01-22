@@ -1,12 +1,11 @@
 import { existsSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import type { CheckResult, CheckDefinition, ConfigInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import { parseJsonc, detectConfigFile } from "../../../shared"
+import { parseJsonc, detectConfigFile, getOpenCodeConfigDir } from "../../../shared"
 import { OhMyOpenCodeConfigSchema } from "../../../config"
 
-const USER_CONFIG_DIR = join(homedir(), ".config", "opencode")
+const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 const USER_CONFIG_BASE = join(USER_CONFIG_DIR, `${PACKAGE_NAME}`)
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
 
