@@ -218,7 +218,7 @@ export function createClaudeCodeHooksHook(
             .showToast({
               body: {
                 title: "PreToolUse Hook Executed",
-                message: `✗ ${result.toolName ?? input.tool} ${result.hookName ?? "hook"}: BLOCKED ${result.elapsedMs ?? 0}ms\n${result.inputLines ?? ""}`,
+                message: `[BLOCKED] ${result.toolName ?? input.tool} ${result.hookName ?? "hook"}: ${result.elapsedMs ?? 0}ms\n${result.inputLines ?? ""}`,
                 variant: "error",
                 duration: 4000,
               },
