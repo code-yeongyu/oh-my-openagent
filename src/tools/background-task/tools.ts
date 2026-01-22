@@ -60,7 +60,7 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
       const ctx = toolContext as ToolContextWithMetadata
 
       if (!args.agent || args.agent.trim() === "") {
-        return `❌ Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
+        return `[ERROR] Agent parameter is required. Please specify which agent to use (e.g., "explore", "librarian", "build", etc.)`
       }
 
       try {
@@ -112,7 +112,7 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 - block=true: Wait for completion (rarely needed since system notifies)`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        return `❌ Failed to launch background task: ${message}`
+        return `[ERROR] Failed to launch background task: ${message}`
       }
     },
   })
@@ -395,7 +395,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
         const cancelAll = args.all === true
 
         if (!cancelAll && !args.taskId) {
-          return `❌ Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
+          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
         }
 
         if (cancelAll) {
@@ -403,7 +403,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
           const cancellableTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
 
           if (cancellableTasks.length === 0) {
-            return `✅ No running or pending background tasks to cancel.`
+            return `No running or pending background tasks to cancel.`
           }
 
           const results: string[] = []
@@ -424,18 +424,18 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
             }
           }
 
-          return `✅ Cancelled ${cancellableTasks.length} background task(s):
+          return `Cancelled ${cancellableTasks.length} background task(s):
 
 ${results.join("\n")}`
         }
 
         const task = manager.getTask(args.taskId!)
         if (!task) {
-          return `❌ Task not found: ${args.taskId}`
+          return `[ERROR] Task not found: ${args.taskId}`
         }
 
         if (task.status !== "running" && task.status !== "pending") {
-          return `❌ Cannot cancel task: current status is "${task.status}".
+          return `[ERROR] Cannot cancel task: current status is "${task.status}".
 Only running or pending tasks can be cancelled.`
         }
 
@@ -443,10 +443,10 @@ Only running or pending tasks can be cancelled.`
           // Pending task: use manager method (no session to abort, no slot to release)
           const cancelled = manager.cancelPendingTask(task.id)
           if (!cancelled) {
-            return `❌ Failed to cancel pending task: ${task.id}`
+            return `[ERROR] Failed to cancel pending task: ${task.id}`
           }
 
-          return `✅ Pending task cancelled successfully
+          return `Pending task cancelled successfully
 
 Task ID: ${task.id}
 Description: ${task.description}
@@ -465,14 +465,14 @@ Status: ${task.status}`
         task.status = "cancelled"
         task.completedAt = new Date()
 
-        return `✅ Task cancelled successfully
+        return `Task cancelled successfully
 
 Task ID: ${task.id}
 Description: ${task.description}
 Session ID: ${task.sessionID}
 Status: ${task.status}`
       } catch (error) {
-        return `❌ Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
+        return `[ERROR] Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
       }
     },
   })
