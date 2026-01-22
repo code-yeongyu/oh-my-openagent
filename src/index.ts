@@ -19,6 +19,7 @@ import {
   createAutoUpdateCheckerHook,
   createKeywordDetectorHook,
   createAgentUsageReminderHook,
+  createAgentSkillReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
 
@@ -40,6 +41,13 @@ import {
   createPlanReorganizerHook,
   createPlanUpdateReminderHook,
   createPlanAttentionRefresherHook,
+  // Phase 2: High-priority hooks
+  createSubagentVerificationHook,
+  createBackgroundCompactionHook,
+  // Phase 3: Optional hooks
+  createCodebaseAssessmentHook,
+  createLspDiagnosticsEnforcerHook,
+  createPhaseFlowEnforcerHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -195,6 +203,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
     ? createAgentUsageReminderHook(ctx)
     : null;
+  const agentSkillReminder = isHookEnabled("agent-skill-reminder")
+    ? createAgentSkillReminderHook(ctx, contextCollector)
+    : null;
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
     ? createNonInteractiveEnvHook(ctx)
     : null;
@@ -260,6 +271,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createPlanAttentionRefresherHook(ctx)
     : null;
 
+  // Phase 2: High-priority hooks
+  // Subagent Verification hook - reminds orchestrator to verify delegated work
+  const subagentVerification = isHookEnabled("subagent-verification")
+    ? createSubagentVerificationHook(ctx)
+    : null;
+
+  // Phase 3: Optional hooks (disabled by default via config)
+  // Codebase Assessment hook - evaluates project state at session start
+  const codebaseAssessment = isHookEnabled("codebase-assessment")
+    ? createCodebaseAssessmentHook(ctx)
+    : null;
+
+  // LSP Diagnostics Enforcer hook - ensures diagnostics run before task completion
+  const lspDiagnosticsEnforcer = isHookEnabled("lsp-diagnostics-enforcer")
+    ? createLspDiagnosticsEnforcerHook(ctx)
+    : null;
+
+  // Phase Flow Enforcer hook - warns when boulder phase transitions are skipped
+  const phaseFlowEnforcer = isHookEnabled("phase-flow-enforcer")
+    ? createPhaseFlowEnforcerHook(ctx)
+    : null;
+
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
@@ -313,6 +346,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
+  
+  // Background Compaction hook - preserves task state during context compaction
+  const backgroundCompaction = isHookEnabled("background-compaction")
+    ? createBackgroundCompactionHook(backgroundManager)
+    : null;
+
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
@@ -434,6 +473,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       await keywordDetector?.["chat.message"]?.(input, output);
+      await agentSkillReminder?.["chat.message"]?.(input, output);
       await tddGuard?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
@@ -521,6 +561,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await thinkMode?.event(input);
       await anthropicContextWindowLimitRecovery?.event(input);
       await agentUsageReminder?.event(input);
+      await agentSkillReminder?.event(input);
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
@@ -610,6 +651,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await tddGuard?.["tool.execute.before"]?.(input, output);
+      await codebaseAssessment?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
@@ -699,6 +741,9 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
       await planUpdateReminder?.["tool.execute.after"]?.(input, output);
       await tddGuard?.["tool.execute.after"]?.(input, output);
       await planningFlowGuide?.["tool.execute.after"]?.(input, output);
+      await subagentVerification?.["tool.execute.after"]?.(input, output);
+      await lspDiagnosticsEnforcer?.["tool.execute.after"]?.(input, output);
+      await phaseFlowEnforcer?.["tool.execute.after"]?.(input, output);
     },
   };
 };

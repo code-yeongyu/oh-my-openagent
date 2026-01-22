@@ -17,14 +17,15 @@ export function createSubagentVerificationHook(_ctx: PluginInput) {
       input: {
         sessionID: string
         tool: string
-        args: Record<string, unknown>
+        args?: Record<string, unknown>
       },
       output: {
-        result: unknown
+        result?: unknown
         output: string
       }
     ): Promise<void> => {
-      const { sessionID, tool, args } = input
+      const { sessionID, tool } = input
+      const args = input.args ?? {}
 
       // Only inject reminder for delegate_task completions
       if (tool !== DELEGATE_TASK_TOOL) {

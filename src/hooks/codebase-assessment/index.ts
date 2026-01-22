@@ -26,10 +26,11 @@ export function createCodebaseAssessmentHook(ctx: PluginInput) {
       input: {
         sessionID: string
         tool: string
-        args: Record<string, unknown>
+        args?: Record<string, unknown>
       },
       output: {
-        parts: Array<{ type: string; text?: string }>
+        parts?: Array<{ type: string; text?: string }>
+        args?: Record<string, unknown>
       }
     ): Promise<void> => {
       const { sessionID, tool } = input
@@ -51,7 +52,7 @@ export function createCodebaseAssessmentHook(ctx: PluginInput) {
       const cached = assessmentCache.get(ctx.directory)
       if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         log(`[${HOOK_NAME}] Using cached assessment`, { sessionID })
-        output.parts.push({ type: "text", text: cached.result })
+        output.parts?.push({ type: "text", text: cached.result })
         return
       }
 
@@ -85,7 +86,7 @@ export function createCodebaseAssessmentHook(ctx: PluginInput) {
           configCount: assessment.configFilesFound.length,
         })
         
-        output.parts.push({ type: "text", text: assessmentText })
+        output.parts?.push({ type: "text", text: assessmentText })
       } catch (err) {
         log(`[${HOOK_NAME}] Assessment failed`, { sessionID, error: String(err) })
       }

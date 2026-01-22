@@ -19,14 +19,15 @@ export function createPhaseFlowEnforcerHook(ctx: PluginInput) {
       input: {
         sessionID: string
         tool: string
-        args: Record<string, unknown>
+        args?: Record<string, unknown>
       },
       output: {
-        result: unknown
+        result?: unknown
         output: string
       }
     ): Promise<void> => {
       const { sessionID, tool } = input
+      const args = input.args ?? {}
 
       // Only monitor tools that might change phase
       // We check after Write/Edit to .sisyphus/boulder.json
@@ -34,7 +35,7 @@ export function createPhaseFlowEnforcerHook(ctx: PluginInput) {
         return
       }
 
-      const filePath = input.args.filePath as string | undefined
+      const filePath = args.filePath as string | undefined
       if (!filePath?.includes("boulder.json")) {
         return
       }

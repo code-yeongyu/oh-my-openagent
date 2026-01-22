@@ -1,4 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { existsSync, readFileSync } from "node:fs"
+import { join, dirname } from "node:path"
 import {
   readBoulderState,
   writeBoulderState,
@@ -15,6 +17,64 @@ import { updateSessionAgent } from "../../features/claude-code-session-state"
 export const HOOK_NAME = "start-work"
 
 const KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/gi
+
+/**
+ * Count tasks in a plan file by counting markdown checkboxes
+ */
+function countPlanTasks(planPath: string): number {
+  if (!existsSync(planPath)) return 0
+  
+  try {
+    const content = readFileSync(planPath, "utf-8")
+    // Count all checkboxes (checked and unchecked)
+    const unchecked = (content.match(/^\s*[-*]\s*\[\s*\]/gm) || []).length
+    const checked = (content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []).length
+    return unchecked + checked
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Generate execution mode selection prompt for the agent to ask user
+ */
+function generateExecutionModePrompt(taskCount: number): string {
+  const recommendedMode = taskCount <= 5 ? "sequential" : "parallel"
+  const sequentialLabel = taskCount <= 5 
+    ? "Sequential execution (Recommended)" 
+    : "Sequential execution"
+  const parallelLabel = taskCount > 5 
+    ? "Parallel execution (Recommended)" 
+    : "Parallel execution"
+
+  return `
+## Execution Mode Selection Required
+
+**Task Count**: ${taskCount} tasks detected
+
+Before starting execution, ask the user to choose an execution mode using the \`question\` tool:
+
+\`\`\`
+question({
+  questions: [{
+    header: "Execution Mode",
+    question: "How would you like to execute the ${taskCount} tasks in this plan?",
+    options: [
+      { label: "${sequentialLabel}", description: "Execute tasks one by one in order. Best for dependent tasks or ≤5 tasks." },
+      { label: "${parallelLabel}", description: "Execute independent tasks in parallel waves. Best for >5 independent tasks." },
+      { label: "Auto-select", description: "Let the system decide based on task count and dependencies." }
+    ]
+  }]
+})
+\`\`\`
+
+**After user selection**:
+- If "Sequential" → Load skill: \`skill("executing-plans")\`
+- If "Parallel" → Load skill: \`skill("wave-parallel-execution")\`
+- If "Auto-select" → Use "${recommendedMode}" mode based on task count (${taskCount} tasks)
+
+**DO NOT proceed with execution until user has selected a mode.**`
+}
 
 interface StartWorkHookInput {
   sessionID: string
@@ -114,7 +174,8 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
 **Session ID**: ${sessionId}
 **Started**: ${timestamp}
 
-boulder.json has been created. Read the plan and begin execution.`
+boulder.json has been created.
+${generateExecutionModePrompt(progress.total)}`
           }
         } else {
           const incompletePlans = allPlans.filter(p => !getPlanProgress(p).isComplete)
@@ -146,6 +207,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
         
         if (!progress.isComplete) {
           appendSessionId(ctx.directory, sessionId)
+          const remainingTasks = progress.total - progress.completed
           contextInfo = `
 ## Active Work Session Found
 
@@ -157,7 +219,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
 **Started**: ${existingState.started_at}
 
 The current session (${sessionId}) has been added to session_ids.
-Read the plan file and continue from the first unchecked task.`
+${generateExecutionModePrompt(remainingTasks)}`
         } else {
           contextInfo = `
 ## Previous Work Complete
@@ -200,7 +262,8 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
 **Session ID**: ${sessionId}
 **Started**: ${timestamp}
 
-boulder.json has been created. Read the plan and begin execution.`
+boulder.json has been created.
+${generateExecutionModePrompt(progress.total)}`
         } else {
           const planList = incompletePlans.map((p, i) => {
             const progress = getPlanProgress(p)

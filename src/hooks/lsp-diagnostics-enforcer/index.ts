@@ -41,14 +41,15 @@ export function createLspDiagnosticsEnforcerHook(_ctx: PluginInput) {
       input: {
         sessionID: string
         tool: string
-        args: Record<string, unknown>
+        args?: Record<string, unknown>
       },
       output: {
-        result: unknown
+        result?: unknown
         output: string
       }
     ): Promise<void> => {
-      const { sessionID, tool, args } = input
+      const { sessionID, tool } = input
+      const args = input.args ?? {}
       const state = getSessionState(sessionID)
 
       // Track file modifications

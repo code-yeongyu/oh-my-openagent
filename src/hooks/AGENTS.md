@@ -1,7 +1,7 @@
 # HOOKS KNOWLEDGE BASE
 
 ## OVERVIEW
-32 lifecycle hooks intercepting/modifying agent behavior. Events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, onSummarize.
+38 lifecycle hooks intercepting/modifying agent behavior. Events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, onSummarize.
 
 ## STRUCTURE
 ```
@@ -22,7 +22,7 @@ hooks/
 ├── session-recovery/           # Auto-recovers from crashes
 ├── think-mode/                 # Dynamic thinking budget
 ├── keyword-detector/           # ultrawork/search/analyze modes
-├── background-notification/    # OS notification
+├── background-notification/    # OS notification on task completion
 ├── prometheus-md-only/         # Planner read-only mode
 ├── agent-usage-reminder/       # Specialized agent hints
 ├── auto-update-checker/        # Plugin update check
@@ -37,6 +37,17 @@ hooks/
 ├── category-skill-reminder/    # Reminds of category skills
 ├── empty-task-response-detector.ts # Detects empty responses
 ├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
+├── skill-suggestion/           # Suggests relevant skills based on context
+├── planning-flow-guide/        # Guides planning workflow phases
+├── tdd-guard/                  # Enforces test-driven development (opt-in)
+├── subagent-verification/      # Verifies subagent task completion
+├── background-compaction/      # Compacts background agent sessions
+├── codebase-assessment/        # Assesses codebase patterns (opt-in)
+├── lsp-diagnostics-enforcer/   # Enforces LSP diagnostics checks (opt-in)
+├── phase-flow-enforcer/        # Enforces phase-based workflow (opt-in)
+├── plan-reorganizer/           # Moves completed phases to bottom of tasks.md
+├── plan-update-reminder/       # Reminds to update tasks.md after code changes
+├── plan-attention-refresher/   # Refreshes tasks.md into attention window
 └── index.ts                    # Hook aggregation + registration
 ```
 
@@ -50,9 +61,9 @@ hooks/
 | onSummarize | Compaction | No | Preserve state, inject summary context |
 
 ## EXECUTION ORDER
-- **UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
-- **PreToolUse**: questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → atlasHook
-- **PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo
+- **chat.message**: keywordDetector → agentSkillReminder → tddGuard → claudeCodeHooks → autoSlashCommand → startWork → ralphLoop
+- **tool.execute.before**: questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → tddGuard → codebaseAssessment → sisyphusJuniorNotepad → atlasHook
+- **tool.execute.after**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → categorySkillReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo → planUpdateReminder → tddGuard → planningFlowGuide → subagentVerification → lspDiagnosticsEnforcer → phaseFlowEnforcer
 
 ## HOW TO ADD
 1. Create `src/hooks/name/` with `index.ts` exporting `createMyHook(ctx)`
