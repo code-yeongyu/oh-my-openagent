@@ -154,7 +154,7 @@ function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
       const input = toolProps?.input ?? {}
       const inputStr = JSON.stringify(input).slice(0, 150)
       console.error(
-        pc.cyan(`${sessionTag} ⚡ TOOL.EXECUTE: ${pc.bold(toolName)}`)
+        pc.cyan(`${sessionTag} TOOL.EXECUTE: ${pc.bold(toolName)}`)
       )
       console.error(pc.dim(`   input: ${inputStr}${inputStr.length >= 150 ? "..." : ""}`))
       break
@@ -165,7 +165,7 @@ function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
       const output = resultProps?.output ?? ""
       const preview = output.slice(0, 200).replace(/\n/g, "\\n")
       console.error(
-        pc.green(`${sessionTag} ✓ TOOL.RESULT: "${preview}${output.length > 200 ? "..." : ""}"`)
+        pc.green(`${sessionTag} TOOL.RESULT: "${preview}${output.length > 200 ? "..." : ""}"`)
       )
       break
     }
@@ -173,7 +173,7 @@ function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
     case "session.error": {
       const errorProps = props as SessionErrorProps | undefined
       const errorMsg = serializeError(errorProps?.error)
-      console.error(pc.red(`${sessionTag} ❌ SESSION.ERROR: ${errorMsg}`))
+      console.error(pc.red(`${sessionTag} SESSION.ERROR: ${errorMsg}`))
       break
     }
 
@@ -296,7 +296,7 @@ function handleToolExecute(
     }
   }
 
-  process.stdout.write(`\n${pc.cyan("⚡")} ${pc.bold(toolName)}${inputPreview}\n`)
+  process.stdout.write(`\n${pc.cyan(">")} ${pc.bold(toolName)}${inputPreview}\n`)
 }
 
 function handleToolResult(
