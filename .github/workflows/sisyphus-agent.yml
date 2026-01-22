@@ -114,6 +114,7 @@ jobs:
 
           OPENCODE_JSON=~/.config/opencode/opencode.json
           jq --arg baseURL "$ANTHROPIC_BASE_URL" --arg apiKey "$ANTHROPIC_API_KEY" '
+            .model = "anthropic/claude-opus-4-5" |
             .provider.anthropic = {
               "name": "Anthropic",
               "npm": "@ai-sdk/anthropic",
