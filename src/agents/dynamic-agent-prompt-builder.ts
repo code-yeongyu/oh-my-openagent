@@ -62,68 +62,29 @@ function formatToolsForPrompt(tools: AvailableTool[]): string {
   return parts.join(", ")
 }
 
-export function buildKeyTriggersSection(agents: AvailableAgent[], skills: AvailableSkill[] = []): string {
+export function buildKeyTriggersSection(agents: AvailableAgent[], _skills: AvailableSkill[] = []): string {
   const keyTriggers = agents
     .filter((a) => a.metadata.keyTrigger)
     .map((a) => `- ${a.metadata.keyTrigger}`)
 
-  const skillTriggers = skills
-    .filter((s) => s.description)
-    .map((s) => `- **Skill \`${s.name}\`**: ${extractTriggerFromDescription(s.description)}`)
-
-  const allTriggers = [...keyTriggers, ...skillTriggers]
-
-  if (allTriggers.length === 0) return ""
+  if (keyTriggers.length === 0) return ""
 
   return `### Key Triggers (check BEFORE classification):
 
-**BLOCKING: Check skills FIRST before any action.**
-If a skill matches, invoke it IMMEDIATELY via \`skill\` tool.
-
-${allTriggers.join("\n")}
-- **GitHub mention (@mention in issue/PR)** → This is a WORK REQUEST. Plan full cycle: investigate → implement → create PR
+${keyTriggers.join("\n")}
 - **"Look into" + "create PR"** → Not just research. Full implementation cycle expected.`
-}
-
-function extractTriggerFromDescription(description: string): string {
-  const triggerMatch = description.match(/Trigger[s]?[:\s]+([^.]+)/i)
-  if (triggerMatch) return triggerMatch[1].trim()
-
-  const activateMatch = description.match(/Activate when[:\s]+([^.]+)/i)
-  if (activateMatch) return activateMatch[1].trim()
-
-  const useWhenMatch = description.match(/Use (?:this )?when[:\s]+([^.]+)/i)
-  if (useWhenMatch) return useWhenMatch[1].trim()
-
-  return description.split(".")[0] || description
 }
 
 export function buildToolSelectionTable(
   agents: AvailableAgent[],
   tools: AvailableTool[] = [],
-  skills: AvailableSkill[] = []
+  _skills: AvailableSkill[] = []
 ): string {
   const rows: string[] = [
-    "### Tool & Skill Selection:",
-    "",
-    "**Priority Order**: Skills → Direct Tools → Agents",
+    "### Tool & Agent Selection:",
     "",
   ]
 
-  if (skills.length > 0) {
-    rows.push("#### Skills (INVOKE FIRST if matching)")
-    rows.push("")
-    rows.push("| Skill | When to Use |")
-    rows.push("|-------|-------------|")
-    for (const skill of skills) {
-      const shortDesc = extractTriggerFromDescription(skill.description)
-      rows.push(`| \`${skill.name}\` | ${shortDesc} |`)
-    }
-    rows.push("")
-  }
-
-  rows.push("#### Tools & Agents")
-  rows.push("")
   rows.push("| Resource | Cost | When to Use |")
   rows.push("|----------|------|-------------|")
 
@@ -143,7 +104,7 @@ export function buildToolSelectionTable(
   }
 
   rows.push("")
-  rows.push("**Default flow**: skill (if match) → explore/librarian (background) + tools → oracle (if required)")
+  rows.push("**Default flow**: explore/librarian (background) + tools → oracle (if required)")
 
   return rows.join("\n")
 }
@@ -251,7 +212,7 @@ ${skillRows.join("\n")}
 For EVERY skill listed above, ask yourself:
 > "Does this skill's expertise domain overlap with my task?"
 
-- If YES → INCLUDE in \`skills=[...]\`
+- If YES → INCLUDE in \`load_skills=[...]\`
 - If NO → You MUST justify why (see below)
 
 **STEP 3: Justify Omissions**
@@ -279,14 +240,14 @@ SKILL EVALUATION for "[skill-name]":
 \`\`\`typescript
 delegate_task(
   category="[selected-category]",
-  skills=["skill-1", "skill-2"],  // Include ALL relevant skills
+  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
   prompt="..."
 )
 \`\`\`
 
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
-delegate_task(category="...", skills=[], prompt="...")  // Empty skills without justification
+delegate_task(category="...", load_skills=[], prompt="...")  // Empty load_skills without justification
 \`\`\``
 }
 
@@ -325,7 +286,6 @@ export function buildHardBlocksSection(): string {
     "| Commit without explicit request | Never |",
     "| Speculate about unread code | Never |",
     "| Leave code in broken state after failures | Never |",
-    "| Delegate without evaluating available skills | Never - MUST justify skill omissions |",
   ]
 
   return `## Hard Blocks (NEVER violate)
@@ -341,7 +301,6 @@ export function buildAntiPatternsSection(): string {
     "| **Error Handling** | Empty catch blocks `catch(e) {}` |",
     "| **Testing** | Deleting failing tests to \"pass\" |",
     "| **Search** | Firing agents for single-line typos or obvious syntax errors |",
-    "| **Delegation** | Using `skills=[]` without justifying why no skills apply |",
     "| **Debugging** | Shotgun debugging, random changes |",
   ]
 
