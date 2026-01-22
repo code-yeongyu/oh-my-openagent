@@ -9,7 +9,7 @@ import { log } from "../../shared/logger"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
 import { transformMcpServer } from "../claude-code-mcp-loader/transformer"
 import type { CommandDefinition, CommandFrontmatter } from "../claude-code-command-loader/types"
-import type { SkillMetadata } from "../opencode-skill-loader/types"
+import type { SkillMetadata, LoadedSkill } from "../opencode-skill-loader/types"
 import type { AgentFrontmatter } from "../claude-code-agent-loader/types"
 import type { ClaudeCodeMcpConfig, McpServerConfig } from "../claude-code-mcp-loader/types"
 import type {
@@ -327,6 +327,81 @@ $ARGUMENTS
   return skills
 }
 
+export function discoverPluginSkills(options?: PluginLoaderOptions): LoadedSkill[] {
+  const { plugins } = discoverInstalledPlugins(options)
+  const skills: LoadedSkill[] = []
+
+  for (const plugin of plugins) {
+    if (!plugin.skillsDir || !existsSync(plugin.skillsDir)) continue
+
+    const entries = readdirSync(plugin.skillsDir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue
+
+      const skillPath = join(plugin.skillsDir, entry.name)
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+
+      const resolvedPath = resolveSymlink(skillPath)
+      const skillMdPath = join(resolvedPath, "SKILL.md")
+      if (!existsSync(skillMdPath)) continue
+
+      try {
+        const content = readFileSync(skillMdPath, "utf-8")
+        const { data, body } = parseFrontmatter<SkillMetadata>(content)
+
+        const skillName = data.name || entry.name
+        const namespacedName = `${plugin.name}:${skillName}`
+        const originalDescription = data.description || ""
+        const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
+
+        const wrappedTemplate = `<skill-instruction>
+Base directory for this skill: ${resolvedPath}/
+File references (@path) in this skill are relative to this directory.
+
+${body.trim()}
+</skill-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`
+
+        const allowedTools = data["allowed-tools"]
+          ? data["allowed-tools"].split(/\s+/).filter(Boolean)
+          : undefined
+
+        const loadedSkill: LoadedSkill = {
+          name: namespacedName,
+          path: skillMdPath,
+          resolvedPath,
+          definition: {
+            name: namespacedName,
+            description: formattedDescription,
+            template: wrappedTemplate,
+            model: sanitizeModelField(data.model),
+            agent: data.agent,
+            subtask: data.subtask,
+            argumentHint: data["argument-hint"],
+          },
+          scope: "plugin",
+          license: data.license,
+          compatibility: data.compatibility,
+          metadata: data.metadata,
+          allowedTools,
+          mcpConfig: data.mcp,
+        }
+
+        skills.push(loadedSkill)
+        log(`Discovered plugin skill: ${namespacedName}`, { path: resolvedPath })
+      } catch (error) {
+        log(`Failed to discover plugin skill: ${skillPath}`, error)
+      }
+    }
+  }
+
+  return skills
+}
+
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
 
@@ -453,7 +528,7 @@ export function loadPluginHooksConfigs(
 
 export interface PluginComponentsResult {
   commands: Record<string, CommandDefinition>
-  skills: Record<string, CommandDefinition>
+  skills: LoadedSkill[]
   agents: Record<string, AgentConfig>
   mcpServers: Record<string, McpServerConfig>
   hooksConfigs: HooksConfig[]
@@ -466,13 +541,13 @@ export async function loadAllPluginComponents(options?: PluginLoaderOptions): Pr
 
   const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
     Promise.resolve(loadPluginCommands(plugins)),
-    Promise.resolve(loadPluginSkillsAsCommands(plugins)),
+    Promise.resolve(discoverPluginSkills(options)),
     Promise.resolve(loadPluginAgents(plugins)),
     loadPluginMcpServers(plugins),
     Promise.resolve(loadPluginHooksConfigs(plugins)),
   ])
 
-  log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${Object.keys(skills).length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
+  log(`Loaded ${plugins.length} plugins with ${Object.keys(commands).length} commands, ${skills.length} skills, ${Object.keys(agents).length} agents, ${Object.keys(mcpServers).length} MCP servers`)
 
   return {
     commands,

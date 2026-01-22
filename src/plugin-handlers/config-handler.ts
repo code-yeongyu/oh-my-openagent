@@ -13,6 +13,8 @@ import {
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
 } from "../features/opencode-skill-loader";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
+import type { CommandDefinition } from "../features/claude-code-command-loader/types";
 import {
   loadUserAgents,
   loadProjectAgents,
@@ -83,7 +85,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         })
       : {
           commands: {},
-          skills: {},
+          skills: [] as LoadedSkill[],
           agents: {},
           mcpServers: {},
           hooksConfigs: [],
@@ -381,6 +383,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       loadOpencodeProjectSkills(),
     ]);
 
+    const pluginSkillsAsCommands = pluginComponents.skills.reduce<Record<string, CommandDefinition>>(
+      (acc, skill) => {
+        const { name: _name, ...rest } = skill.definition;
+        acc[skill.name] = rest as CommandDefinition;
+        return acc;
+      },
+      {}
+    );
+
     config.command = {
       ...builtinCommands,
       ...userCommands,
@@ -393,7 +404,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ...opencodeProjectCommands,
       ...opencodeProjectSkills,
       ...pluginComponents.commands,
-      ...pluginComponents.skills,
+      ...pluginSkillsAsCommands,
     };
   };
 }

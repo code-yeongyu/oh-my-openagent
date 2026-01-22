@@ -9,6 +9,7 @@ import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
+import { discoverPluginSkills } from "../claude-code-plugin-loader"
 
 function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -201,29 +202,32 @@ export async function loadOpencodeProjectSkills(): Promise<Record<string, Comman
 
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
+  includePlugins?: boolean
 }
 
 export async function discoverAllSkills(): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills] = await Promise.all([
+  const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills, pluginSkills] = await Promise.all([
     discoverOpencodeProjectSkills(),
     discoverProjectClaudeSkills(),
     discoverOpencodeGlobalSkills(),
     discoverUserClaudeSkills(),
+    Promise.resolve(discoverPluginSkills()),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  return [...pluginSkills, ...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
-  const { includeClaudeCodePaths = true } = options
+  const { includeClaudeCodePaths = true, includePlugins = true } = options
 
-  const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, pluginSkills] = await Promise.all([
     discoverOpencodeProjectSkills(),
     discoverOpencodeGlobalSkills(),
+    includePlugins ? Promise.resolve(discoverPluginSkills()) : Promise.resolve([]),
   ])
 
   if (!includeClaudeCodePaths) {
-    return [...opencodeProjectSkills, ...opencodeGlobalSkills]
+    return [...pluginSkills, ...opencodeProjectSkills, ...opencodeGlobalSkills]
   }
 
   const [projectSkills, userSkills] = await Promise.all([
@@ -231,7 +235,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverUserClaudeSkills(),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  return [...pluginSkills, ...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
 }
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
