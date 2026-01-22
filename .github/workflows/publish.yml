@@ -162,7 +162,7 @@ jobs:
           git add package.json assets/oh-my-opencode.schema.json packages/*/package.json || true
           git diff --cached --quiet || git commit -m "release: v${{ steps.version.outputs.version }}"
           git tag -f "v${{ steps.version.outputs.version }}"
-          git push origin --tags
+          git push origin --tags --force
           git push origin HEAD || echo "Branch push failed (non-critical)"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
