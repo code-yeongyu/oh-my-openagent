@@ -1741,6 +1741,9 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "description": {
+            "type": "string"
+          },
           "model": {
             "type": "string"
           },
