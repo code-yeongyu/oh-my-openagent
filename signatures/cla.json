@@ -695,6 +695,14 @@
       "created_at": "2026-01-21T17:06:15Z",
       "repoId": 1108837393,
       "pullRequestNo": 971
+    },
+    {
+      "name": "kilhyeonjun",
+      "id": 41348539,
+      "comment_id": 3781992292,
+      "created_at": "2026-01-22T01:29:22Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 974
     }
   ]
 }
