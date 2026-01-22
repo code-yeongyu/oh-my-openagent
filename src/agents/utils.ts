@@ -10,7 +10,7 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -44,22 +44,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
 
 function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
-}
-
-function findCaseInsensitive<T>(obj: Record<string, T> | undefined, key: string): T | undefined {
-  if (!obj) return undefined
-  const exactMatch = obj[key]
-  if (exactMatch !== undefined) return exactMatch
-  const lowerKey = key.toLowerCase()
-  for (const [k, v] of Object.entries(obj)) {
-    if (k.toLowerCase() === lowerKey) return v
-  }
-  return undefined
-}
-
-function includesCaseInsensitive(arr: string[], value: string): boolean {
-  const lowerValue = value.toLowerCase()
-  return arr.some((item) => item.toLowerCase() === lowerValue)
 }
 
 export function buildAgent(
