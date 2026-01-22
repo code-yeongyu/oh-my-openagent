@@ -217,6 +217,135 @@ describe("boulder-state", () => {
       // #then
       expect(progress.total).toBe(0)
       expect(progress.isComplete).toBe(true)
+})
+  })
+
+  describe("getPlanProgress - phase parsing", () => {
+    test("should parse backtick syntax phases", () => {
+      // #given - plan with backtick status
+      const planPath = join(TEST_DIR, "backtick-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup \`complete\`
+- [x] Task 1
+
+## Phase 2: Implementation \`in_progress\`
+- [ ] Task 2
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases).toBeDefined()
+      expect(progress.phases?.length).toBe(2)
+      expect(progress.phases?.[0].name).toBe("Phase 1: Setup")
+      expect(progress.phases?.[0].status).toBe("complete")
+      expect(progress.phases?.[1].name).toBe("Phase 2: Implementation")
+      expect(progress.phases?.[1].status).toBe("in_progress")
+    })
+
+    test("should parse Status line syntax", () => {
+      // #given - plan with Status line
+      const planPath = join(TEST_DIR, "status-line-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup
+- **Status:** complete
+- [x] Task 1
+
+## Phase 2: Implementation
+- **Status:** in_progress
+- [ ] Task 2
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases?.length).toBe(2)
+      expect(progress.phases?.[0].status).toBe("complete")
+      expect(progress.phases?.[1].status).toBe("in_progress")
+    })
+
+    test("should prioritize backtick over Status line", () => {
+      // #given - plan with both syntaxes (backtick wins)
+      const planPath = join(TEST_DIR, "mixed-syntax-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup \`complete\`
+- **Status:** pending
+- [x] Task 1
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases?.[0].status).toBe("complete") // backtick wins
+    })
+
+    test("should default to pending when no status", () => {
+      // #given - plan with no status
+      const planPath = join(TEST_DIR, "no-status-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup
+- [ ] Task 1
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases?.[0].status).toBe("pending")
+    })
+
+    test("should be case insensitive", () => {
+      // #given - plan with mixed case
+      const planPath = join(TEST_DIR, "case-insensitive-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup \`COMPLETE\`
+## Phase 2: Work \`In_Progress\`
+## Phase 3: Review \`PENDING\`
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases?.[0].status).toBe("complete")
+      expect(progress.phases?.[1].status).toBe("in_progress")
+      expect(progress.phases?.[2].status).toBe("pending")
+    })
+
+    test("should calculate phase boundaries correctly", () => {
+      // #given - plan with multiple phases
+      const planPath = join(TEST_DIR, "boundaries-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup \`complete\`
+- [x] Task 1
+- [x] Task 2
+
+## Phase 2: Implementation \`pending\`
+- [ ] Task 3
+
+---
+## Notes
+Some notes here
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      expect(progress.phases?.length).toBe(2)
+      expect(progress.phases?.[0].line).toBe(2) // Line number of Phase 1 header
+      expect(progress.phases?.[1].line).toBe(6) // Line number of Phase 2 header
+    })
+
+    test("should combine checkboxes and phases for isComplete", () => {
+      // #given - all checkboxes done but phase not marked complete
+      const planPath = join(TEST_DIR, "combined-check-plan.md")
+      writeFileSync(planPath, `# Plan
+## Phase 1: Setup \`complete\`
+- [x] Task 1
+
+## Phase 2: Implementation \`in_progress\`
+- [x] Task 2
+- [x] Task 3
+`)
+      // #when
+      const progress = getPlanProgress(planPath)
+      // #then
+      // All checkboxes complete, but Phase 2 is in_progress, so NOT complete
+      expect(progress.completed).toBe(3)
+      expect(progress.total).toBe(3)
+      expect(progress.isComplete).toBe(false) // Phase 2 is not complete
     })
   })
 

@@ -48,3 +48,12 @@ export { createSkillSuggestionHook } from "./skill-suggestion";
 
 // Planning Flow Guide Hook - guides Metis → Prometheus → Momus planning flow
 export { createPlanningFlowGuideHook } from "./planning-flow-guide";
+
+// Plan Reorganizer Hook - moves completed phases to bottom of tasks.md
+export { createPlanReorganizerHook } from "./plan-reorganizer";
+
+// Plan Update Reminder Hook - reminds to update tasks.md after code changes
+export { createPlanUpdateReminderHook } from "./plan-update-reminder";
+
+// Plan Attention Refresher Hook - refreshes tasks.md into attention window
+export { createPlanAttentionRefresherHook } from "./plan-attention-refresher";

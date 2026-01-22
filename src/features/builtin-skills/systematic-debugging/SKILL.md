@@ -349,3 +349,56 @@ From debugging sessions:
 - Random fixes approach: 2-3 hours of thrashing
 - First-time fix rate: 95% vs 40%
 - New bugs introduced: Near zero vs common
+
+---
+
+## Manus Principles Integration
+
+### 3-Strike Protocol (Reinforced)
+
+This skill's Phase 4.4-4.5 already embodies the 3-Strike Protocol:
+
+| Strike | Action |
+|--------|--------|
+| 1st fix fails | Return to Phase 1, re-analyze with new information |
+| 2nd fix fails | Return to Phase 1, deeper investigation |
+| 3rd fix fails | **STOP. Question architecture. Discuss with human.** |
+
+**Critical:** The 3-Strike Protocol is NOT about giving up. It's about recognizing when the problem is architectural, not tactical.
+
+### Error Logging to progress.md
+
+When debugging within a planned change (`changes/{name}/`), log all debug attempts:
+
+```markdown
+## Debug Log: [Issue Description]
+
+### Attempt 1 - YYYY-MM-DD HH:MM
+- **Hypothesis:** [What you thought was wrong]
+- **Action:** [What you tried]
+- **Result:** ❌ Failed - [Why it didn't work]
+
+### Attempt 2 - YYYY-MM-DD HH:MM
+- **Hypothesis:** [Refined hypothesis]
+- **Action:** [What you tried]
+- **Result:** ❌ Failed - [Why it didn't work]
+
+### Attempt 3 - YYYY-MM-DD HH:MM
+- **Hypothesis:** [Further refined]
+- **Action:** [What you tried]
+- **Result:** ❌ Failed - [Why it didn't work]
+
+### Escalation
+**3-Strike threshold reached. Architectural review needed.**
+- Pattern observed: [What the 3 failures revealed]
+- Suggested discussion: [What to ask human]
+```
+
+### Findings Documentation
+
+During root cause investigation, document discoveries in `findings.md`:
+
+- API behaviors discovered
+- Undocumented dependencies found
+- Environmental differences identified
+- Working patterns that could be reused

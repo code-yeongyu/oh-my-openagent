@@ -21,7 +21,7 @@
 ## Session Management
 
 - Keep separate sessions for different purposes
-- Track SESSION_IDs in `.superpowers/status.json`
+- Track SESSION_IDs in `.sisyphus/boulder.json`
 - Don't mix planning and implementation sessions
 
 ## Anti-Patterns

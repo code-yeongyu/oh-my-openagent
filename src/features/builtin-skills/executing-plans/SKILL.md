@@ -222,6 +222,57 @@ See `implementer.ts` for full agent definition.
 - Track commit SHAs from Implementer's COMPLETED reports
 - Stop when BLOCKED, don't guess
  
+## Manus Principles
+
+### File Updates During Execution
+
+During plan execution, maintain these files in `changes/{change-name}/`:
+
+- **findings.md**: Update after research, discoveries, or browser operations
+- **progress.md**: Update after completing each task/phase, log all errors
+
+### 2-Action Rule
+
+After every 2 view/browser operations, save findings to `findings.md`.
+This prevents information loss in long context.
+
+**Example:**
+```
+1. Read API docs → note in memory
+2. Read implementation example → SAVE to findings.md
+3. Read test patterns → note in memory  
+4. Read error handling → SAVE to findings.md
+```
+
+### 3-Strike Protocol
+
+After 3 consecutive failures on the same task:
+
+1. **STOP** attempting further fixes
+2. **Document** the failure in `progress.md` with:
+   - What was attempted
+   - What failed
+   - Error messages
+   - Potential root causes
+3. **Move** to next task or ask for help
+
+**Do NOT:** Try a 4th fix without human input or architectural review.
+
+### Error Logging
+
+Log ALL errors to `progress.md` immediately with:
+
+| Field | Description |
+|-------|-------------|
+| Task ID | Which task failed |
+| Attempt # | 1st, 2nd, or 3rd attempt |
+| What was attempted | Specific action taken |
+| What failed | Actual error or unexpected behavior |
+| Error message | Full error text |
+| Solutions tried | What was done to fix |
+
+---
+
 ## 下一步
  
 所有任务完成后：

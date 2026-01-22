@@ -45,7 +45,7 @@ Risk-Tier: {0-3}
 
 ## Status File Format
 
-`.superpowers/status.json`:
+`.sisyphus/boulder.json`:
 
 ```json
 {

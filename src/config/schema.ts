@@ -104,6 +104,13 @@ export const HookNameSchema = z.enum([
   "failure-counter",
   "skill-suggestion",
   "planning-flow-guide",
+  "lsp-diagnostics-enforcer",
+  "subagent-verification",
+  "codebase-assessment",
+  "phase-flow-enforcer",
+  "plan-reorganizer",
+  "plan-update-reminder",
+  "plan-attention-refresher",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -382,6 +389,10 @@ export const TddGuardConfigSchema = z.object({
   /** Inject TDD Skill when edit is blocked (default: true) */
   inject_skill_on_block: z.boolean().optional(),
 })
+export const CheckboxEnforcementConfigSchema = z.object({
+  /** Enable checkbox update enforcement (default: true) */
+  enabled: z.boolean().default(true),
+})
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -404,6 +415,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   tdd_guard: TddGuardConfigSchema.optional(),
+  checkbox_enforcement: CheckboxEnforcementConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -432,5 +444,6 @@ export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type TddGuardConfig = z.infer<typeof TddGuardConfigSchema>
 export type RiskTier = z.infer<typeof RiskTierSchema>
+export type CheckboxEnforcementConfig = z.infer<typeof CheckboxEnforcementConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

@@ -165,7 +165,7 @@ try {
 
 ## 状态文件格式
 
-### .superpowers/wave-status.json
+### .sisyphus/wave-status.json
 
 ```json
 {

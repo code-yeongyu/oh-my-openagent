@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress, PhaseStatus } from "./types"
+import type { BoulderState, PlanProgress, PhaseStatus, TaskPhaseInfo, TaskPhaseStatus } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR, LEGACY_CHANGES_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
@@ -138,8 +138,42 @@ export function findPrometheusPlans(directory: string): string[] {
 }
 
 /**
+ * Parse phase status from text (backtick or Status line)
+ * Priority: backtick > Status line > default pending
+ */
+function parsePhaseStatus(headerLine: string, contentLines: string[]): TaskPhaseStatus {
+  // 1. Check backtick syntax: `complete`, `in_progress`, `pending`
+  const backtickMatch = headerLine.match(/`(complete|in_progress|pending)`/i)
+  if (backtickMatch) {
+    return backtickMatch[1].toLowerCase().replace(" ", "_") as TaskPhaseStatus
+  }
+  
+  // 2. Check Status line: - **Status:** complete
+  for (const line of contentLines) {
+    const statusMatch = line.match(/\*\*Status:\*\*\s*(complete|in_progress|pending)/i)
+    if (statusMatch) {
+      return statusMatch[1].toLowerCase().replace(" ", "_") as TaskPhaseStatus
+    }
+  }
+  
+  // 3. Default to pending
+  return "pending"
+}
+
+/**
+ * Extract phase name from header line (remove backtick status)
+ */
+function extractPhaseName(headerLine: string): string {
+  return headerLine
+    .replace(/^#{2,3}\s*/, "")
+    .replace(/\s*`[^`]+`\s*$/, "")
+    .trim()
+}
+
+/**
  * Parse a plan file and count checkbox progress.
  * Detects checkboxes at ALL indentation levels (including sub-task acceptance criteria).
+ * Also parses phase information from Manus-style syntax.
  */
 export function getPlanProgress(planPath: string): PlanProgress {
   if (!existsSync(planPath)) {
@@ -148,6 +182,7 @@ export function getPlanProgress(planPath: string): PlanProgress {
 
   try {
     const content = readFileSync(planPath, "utf-8")
+    const lines = content.split(/\r?\n/)
     
     // Match markdown checkboxes at ANY indentation level:
     // - [ ] unchecked or - [x]/- [X] checked
@@ -158,10 +193,43 @@ export function getPlanProgress(planPath: string): PlanProgress {
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
 
+    // Parse phases
+    const phases: TaskPhaseInfo[] = []
+    const phaseHeaderRegex = /^#{2,3}\s+Phase\s+\d+:/i
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (phaseHeaderRegex.test(line)) {
+        // Find phase end (next phase header, ---, or EOF)
+        let endLine = lines.length
+        for (let j = i + 1; j < lines.length; j++) {
+          if (phaseHeaderRegex.test(lines[j]) || lines[j].trim() === "---") {
+            endLine = j
+            break
+          }
+        }
+        
+        // Get content lines between header and end
+        const contentLines = lines.slice(i + 1, endLine)
+        
+        phases.push({
+          name: extractPhaseName(line),
+          status: parsePhaseStatus(line, contentLines),
+          line: i + 1, // 1-indexed line number
+          endLine: endLine,
+        })
+      }
+    }
+
+    // Calculate isComplete: checkboxes AND phases
+    const checkboxesComplete = total === 0 || completed === total
+    const phasesComplete = phases.length === 0 || phases.every(p => p.status === "complete")
+
     return {
       total,
       completed,
-      isComplete: total === 0 || completed === total,
+      isComplete: checkboxesComplete && phasesComplete,
+      phases: phases.length > 0 ? phases : undefined,
     }
   } catch {
     return { total: 0, completed: 0, isComplete: true }

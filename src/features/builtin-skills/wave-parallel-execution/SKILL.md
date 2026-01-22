@@ -386,6 +386,51 @@ Wave 2 agent → .worktrees/feature-auth-wave2 → 1 task
 
 **时间节省:** 5 个并行化任务 = 串行时间的 ~40%
 
+## Manus Principles
+
+### File Updates During Execution
+
+During wave execution, maintain these files in `changes/{change-name}/`:
+
+- **findings.md**: Update after research, discoveries, or browser operations
+- **progress.md**: Update after completing each task/phase, log all errors
+
+### 2-Action Rule
+
+After every 2 view/browser operations, save findings to `findings.md`.
+This prevents information loss in long context.
+
+**In Wave context:** Each Wave agent should update findings.md with discoveries before completing.
+
+### 3-Strike Protocol
+
+After 3 consecutive failures on the same task within a Wave:
+
+1. **STOP** attempting further fixes
+2. **Report** `WAVE_BLOCKED` with failure details
+3. **Document** in `progress.md`:
+   - Wave ID and Task ID
+   - What was attempted (all 3 attempts)
+   - Error messages
+   - Potential root causes
+
+**Wave Orchestrator:** When receiving `WAVE_BLOCKED`, do NOT retry automatically. Stop and report to user.
+
+### Error Logging
+
+Each Wave agent logs errors to `progress.md` with:
+
+| Field | Description |
+|-------|-------------|
+| Wave ID | Which wave |
+| Task ID | Which task failed |
+| Attempt # | 1st, 2nd, or 3rd attempt |
+| What was attempted | Specific action taken |
+| What failed | Actual error or unexpected behavior |
+| Error message | Full error text |
+
+---
+
 ## 下一步
 
 所有 Waves 完成后：

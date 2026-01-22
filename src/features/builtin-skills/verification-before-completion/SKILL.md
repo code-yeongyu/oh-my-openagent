@@ -81,3 +81,46 @@ If Codex was involved, summarize:
 
 Unverified areas: None
 ```
+
+---
+
+## Manus Principles Integration
+
+### 5-File Completeness Check
+
+When verifying a change that used the creating-changes workflow, confirm all 5 files exist and are current:
+
+```markdown
+## File Completeness Checklist
+
+- [ ] `changes/{name}/proposal.md` - Initial proposal exists
+- [ ] `changes/{name}/design.md` - Design document complete
+- [ ] `changes/{name}/tasks.md` - All tasks marked [x] or [-]
+- [ ] `changes/{name}/findings.md` - Research findings documented
+- [ ] `changes/{name}/progress.md` - Progress log updated with final status
+```
+
+### Progress Log Final Entry
+
+Before marking complete, ensure `progress.md` has a final summary:
+
+```markdown
+## Final Status
+
+**Completed:** YYYY-MM-DD HH:MM
+
+### Summary
+- Total tasks: N
+- Completed: N
+- Cancelled: 0
+
+### Test Results
+| Suite | Status |
+|-------|--------|
+| Unit tests | ✅ Pass |
+| Type check | ✅ Pass |
+| Build | ✅ Pass |
+
+### Known Issues
+None (or list any deferred items)
+```

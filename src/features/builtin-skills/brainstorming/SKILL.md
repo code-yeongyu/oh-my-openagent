@@ -1,5 +1,5 @@
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design, then creates change directory with proposal."
+description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design through conversation."
 ---
 
 # Brainstorming Ideas Into Designs
@@ -20,9 +20,9 @@ Trigger when any of these applies:
 
 ## Overview
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue, then create a structured change directory with proposal document.
+Help turn ideas into fully formed designs and specs through natural collaborative dialogue. This skill focuses on **conversation and exploration only** - file creation happens in the creating-changes skill.
 
-**Announce at start:** "I'm using the brainstorming skill to explore requirements and create a proposal."
+**Announce at start:** "I'm using the brainstorming skill to explore requirements and design."
 
 ## The Process
 
@@ -45,14 +45,15 @@ Help turn ideas into fully formed designs and specs through natural collaborativ
 2. Ask after each section whether it looks right so far
 3. Cover: architecture, components, data flow, error handling, testing
 
-### Phase 4: Create Change Directory and Proposal
+### Phase 4: Hand Off to Creating-Changes
 
-After the design is validated:
+After the design is validated through conversation:
 
-1. **Determine Change Name**: kebab-case, verb prefix (`add-`, `fix-`, `update-`)
-2. **Create Directory**: `changes/<name>/`
-3. **Write proposal.md**: See `reference.md` for template
-4. **Update Status**: `.superpowers/status.json`
+1. **Confirm change name**: Suggest kebab-case name with verb prefix (`add-`, `fix-`, `update-`)
+2. **Summarize decisions**: Recap key decisions made during brainstorming
+3. **Hand off**: Invoke creating-changes skill to create all files
+
+**Note**: This skill does NOT create files. File creation (proposal.md, design.md, tasks.md, findings.md, progress.md) is handled by the creating-changes skill.
 
 ## Key Principles
 
@@ -60,15 +61,16 @@ After the design is validated:
 - **Multiple choice preferred** - Easier to answer
 - **YAGNI ruthlessly** - Remove unnecessary features
 - **Explore alternatives** - Always propose 2-3 approaches
+- **Conversation only** - No file creation in this skill
 
 ## Completion
 
-Report: "Created change: `changes/<name>/`. Proposal saved to `proposal.md`."
+Report: "Brainstorming complete. Key decisions captured. Ready to create change directory."
 
 ## Next Step
 
-**REQUIRED SUB-SKILL:** Use superpowers:creating-changes to write design and task breakdown.
+**REQUIRED SUB-SKILL:** Use superpowers:creating-changes to create the change directory and all planning documents.
 
 ## References
 
-- `reference.md`: Templates for proposal.md, options table, status.json
+- `reference.md`: Example conversation flows and decision tables

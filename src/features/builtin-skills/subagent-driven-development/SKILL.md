@@ -316,3 +316,31 @@ PROMPT:
 变更:
 {diff}
 ```
+
+---
+
+## Manus Principles
+
+### Subagent Discovery Recording
+
+When subagents discover important information during implementation:
+
+1. **Record to findings.md**: Subagent discoveries, API quirks, pattern insights
+2. **Record to progress.md**: Task completion status, errors encountered
+
+### Controller Responsibility
+
+The controller (you) must:
+- Update `progress.md` after each task completion
+- Aggregate subagent discoveries into `findings.md`
+- Log any BLOCKED responses with full context
+
+### 3-Strike Protocol for Subagents
+
+If an implementer subagent fails 3 times on the same task:
+
+1. **STOP** dispatching more fix subagents
+2. **Document** failure in `progress.md`
+3. **Escalate** to human for architectural discussion
+
+**Do NOT:** Dispatch a 4th subagent hoping for different results.

@@ -16,6 +16,26 @@ export type PhaseStatus = "idle" | "planning" | "reviewing" | "executing" | "awa
 export type WorktreeStatus = "pending" | "ready" | "in_progress" | "completed" | "failed" | "cleaned"
 
 /**
+ * Phase status in tasks.md (different from workflow PhaseStatus)
+ * Used for tracking task plan phases, not workflow state machine.
+ */
+export type TaskPhaseStatus = "complete" | "in_progress" | "pending"
+
+/**
+ * Single phase info parsed from tasks.md
+ */
+export interface TaskPhaseInfo {
+  /** Phase name (e.g., "Phase 1: Setup") */
+  name: string
+  /** Phase status */
+  status: TaskPhaseStatus
+  /** Line number of phase header in file */
+  line: number
+  /** End line number (exclusive) */
+  endLine?: number
+}
+
+/**
  * Wave worktree tracking information (Task 10.3)
  */
 export interface WaveWorktree {
@@ -105,4 +125,6 @@ export interface PlanProgress {
   completed: number
   /** Whether all tasks are done */
   isComplete: boolean
+  /** Phase information parsed from tasks.md */
+  phases?: TaskPhaseInfo[]
 }

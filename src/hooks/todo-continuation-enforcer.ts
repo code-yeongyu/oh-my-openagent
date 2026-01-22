@@ -1,8 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { existsSync, readdirSync } from "node:fs"
+import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { execSync } from "node:child_process"
 import type { BackgroundManager } from "../features/background-agent"
 import { readBoulderState } from "../features/boulder-state"
+import { readPlanProgress } from "../features/plan-progress-reader"
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
     findNearestMessageWithFields,
@@ -41,6 +43,15 @@ interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  /** Checkbox enforcement state */
+  checkboxEnforcement?: {
+    /** Last git diff hash (to detect code changes) */
+    lastCodeDiffHash?: string
+    /** Last tasks.md mtime */
+    lastTasksMtime?: number
+    /** Consecutive reminder count */
+    reminderCount: number
+  }
 }
 
 const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
@@ -385,6 +396,101 @@ export function createTodoContinuationEnforcer(
       if (boulderState?.phase === "awaiting_user" || boulderState?.phase === "completed") {
         log(`[${HOOK_NAME}] Skipped: boulder in terminal state (${boulderState.phase})`, { sessionID, plan: boulderState.plan_name })
         return
+      }
+
+      // Check 1.7: Plan progress check (File is Source of Truth)
+      // Priority: boulder.phase === "completed" > tasks.md > OpenCode todos
+      const planProgress = readPlanProgress(ctx.directory)
+      if (planProgress) {
+        // tasks.md exists - use it as source of truth (ignore OpenCode todos)
+        const checkboxesComplete = planProgress.completed === planProgress.total || planProgress.total === 0
+        const phasesComplete = !planProgress.phases || planProgress.phases.length === 0 || 
+          planProgress.phases.every(p => p.status === "complete")
+        
+        if (checkboxesComplete && phasesComplete) {
+          log(`[${HOOK_NAME}] Skipped: plan complete (tasks.md is source of truth)`, { 
+            sessionID, 
+            planPath: planProgress.planPath,
+            checkboxes: `${planProgress.completed}/${planProgress.total}`,
+            phases: planProgress.phases?.length ?? 0
+          })
+          return
+        }
+        
+        // Plan not complete - will inject continuation below
+        log(`[${HOOK_NAME}] Plan incomplete (tasks.md)`, {
+          sessionID,
+          checkboxes: `${planProgress.completed}/${planProgress.total}`,
+          phasesComplete,
+          incompleteTasks: planProgress.total - planProgress.completed
+        })
+
+        // Check 1.8: Checkbox update enforcement (3-strike system)
+        // Detect code changes without tasks.md update
+        const state = getState(sessionID)
+        if (!state.checkboxEnforcement) {
+          state.checkboxEnforcement = { reminderCount: 0 }
+        }
+        const enforcement = state.checkboxEnforcement
+
+        try {
+          // Get current tasks.md mtime
+          const currentTasksMtime = existsSync(planProgress.planPath) 
+            ? statSync(planProgress.planPath).mtimeMs 
+            : 0
+
+          // Get git diff hash for code files (excluding .md files)
+          let currentDiffHash = ""
+          try {
+            const diffOutput = execSync("git diff --name-only", { 
+              cwd: ctx.directory, 
+              encoding: "utf-8",
+              timeout: 5000
+            }).trim()
+            // Filter to code files only (exclude .md)
+            const codeFiles = diffOutput.split("\n").filter(f => f && !f.endsWith(".md"))
+            currentDiffHash = codeFiles.join(",")
+          } catch {
+            // Git not available or not a repo - skip enforcement
+            currentDiffHash = ""
+          }
+
+          // Check if code changed but tasks.md didn't
+          const codeChanged = currentDiffHash && currentDiffHash !== enforcement.lastCodeDiffHash
+          const tasksUpdated = currentTasksMtime !== enforcement.lastTasksMtime
+
+          if (codeChanged && !tasksUpdated && enforcement.lastTasksMtime !== undefined) {
+            enforcement.reminderCount++
+            log(`[${HOOK_NAME}] Code changed but tasks.md not updated`, {
+              sessionID,
+              reminderCount: enforcement.reminderCount,
+              codeFiles: currentDiffHash.slice(0, 100)
+            })
+
+            if (enforcement.reminderCount >= 3) {
+              // 3rd strike - refuse auto-continuation
+              log(`[${HOOK_NAME}] Checkbox enforcement: 3-strike limit reached, refusing auto-continue`, { sessionID })
+              await ctx.client.tui.showToast({
+                body: {
+                  title: "Tasks.md Update Required",
+                  message: "Code changed 3+ times without updating tasks.md. Please update manually.",
+                  variant: "error" as const,
+                  duration: 5000,
+                },
+              }).catch(() => {})
+              return
+            }
+          } else if (tasksUpdated) {
+            // tasks.md updated - reset counter
+            enforcement.reminderCount = 0
+          }
+
+          // Update tracking state
+          enforcement.lastCodeDiffHash = currentDiffHash
+          enforcement.lastTasksMtime = currentTasksMtime
+        } catch (err) {
+          log(`[${HOOK_NAME}] Checkbox enforcement check failed`, { sessionID, error: String(err) })
+        }
       }
 
       const hasRunningBgTasks = backgroundManager
