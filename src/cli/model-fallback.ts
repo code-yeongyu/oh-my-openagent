@@ -65,6 +65,17 @@ function isProviderAvailable(provider: string, avail: ProviderAvailability): boo
   return mapping[provider] ?? false
 }
 
+function transformModelForProvider(provider: string, model: string): string {
+  if (provider === "github-copilot") {
+    return model
+      .replace("claude-opus-4-5", "claude-opus-4.5")
+      .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
+      .replace("claude-haiku-4-5", "claude-haiku-4.5")
+      .replace("claude-sonnet-4", "claude-sonnet-4")
+  }
+  return model
+}
+
 function resolveModelFromChain(
   fallbackChain: FallbackEntry[],
   avail: ProviderAvailability
@@ -72,8 +83,9 @@ function resolveModelFromChain(
   for (const entry of fallbackChain) {
     for (const provider of entry.providers) {
       if (isProviderAvailable(provider, avail)) {
+        const transformedModel = transformModelForProvider(provider, entry.model)
         return {
-          model: `${provider}/${entry.model}`,
+          model: `${provider}/${transformedModel}`,
           variant: entry.variant,
         }
       }

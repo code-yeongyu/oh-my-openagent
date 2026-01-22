@@ -25,6 +25,13 @@ import { log } from "./logger"
  * fuzzyMatchModel("gpt-5.2", available) // → "openai/gpt-5.2"
  * fuzzyMatchModel("claude", available, ["openai"]) // → null (provider filter excludes anthropic)
  */
+function normalizeModelName(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
+		.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4.5")
+}
+
 export function fuzzyMatchModel(
 	target: string,
 	available: Set<string>,
@@ -37,7 +44,7 @@ export function fuzzyMatchModel(
 		return null
 	}
 
-	const targetLower = target.toLowerCase()
+	const targetNormalized = normalizeModelName(target)
 
 	// Filter by providers if specified
 	let candidates = Array.from(available)
@@ -55,19 +62,19 @@ export function fuzzyMatchModel(
 		return null
 	}
 
-	// Find all matches (case-insensitive substring match)
+	// Find all matches (case-insensitive substring match with normalization)
 	const matches = candidates.filter((model) =>
-		model.toLowerCase().includes(targetLower),
+		normalizeModelName(model).includes(targetNormalized),
 	)
 
-	log("[fuzzyMatchModel] substring matches", { targetLower, matchCount: matches.length, matches })
+	log("[fuzzyMatchModel] substring matches", { targetNormalized, matchCount: matches.length, matches })
 
 	if (matches.length === 0) {
 		return null
 	}
 
-	// Priority 1: Exact match
-	const exactMatch = matches.find((model) => model.toLowerCase() === targetLower)
+	// Priority 1: Exact match (normalized)
+	const exactMatch = matches.find((model) => normalizeModelName(model) === targetNormalized)
 	if (exactMatch) {
 		log("[fuzzyMatchModel] exact match found", { exactMatch })
 		return exactMatch
