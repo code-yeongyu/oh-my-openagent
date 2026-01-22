@@ -75,7 +75,7 @@ export function formatSessionMessages(
   if (includeTodos && todos && todos.length > 0) {
     lines.push("\n\n=== Todos ===")
     for (const todo of todos) {
-      const status = todo.status === "completed" ? "✓" : todo.status === "in_progress" ? "→" : "○"
+      const status = todo.status === "completed" ? "[x]" : todo.status === "in_progress" ? "[-]" : "[ ]"
       lines.push(`${status} [${todo.status}] ${todo.content}`)
     }
   }
