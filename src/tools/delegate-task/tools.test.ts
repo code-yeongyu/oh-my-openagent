@@ -1,12 +1,18 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
+import { __resetModelCache } from "../../shared/model-availability"
 
 // Test constants - systemDefaultModel is required by resolveCategoryConfig
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
+  // Reset model cache before each test to prevent cross-test pollution
+  beforeEach(() => {
+    __resetModelCache()
+  })
+
   describe("DEFAULT_CATEGORIES", () => {
     test("visual-engineering category has model config", () => {
       // #given
