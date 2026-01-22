@@ -103,7 +103,7 @@ jobs:
           opencode --version
 
           # Run local oh-my-opencode install (uses built dist)
-          bun run dist/cli/index.js install --no-tui --claude=max20 --chatgpt=no --gemini=no --copilot=no
+          bun run dist/cli/index.js install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no
 
           # Override plugin to use local file reference
           OPENCODE_JSON=~/.config/opencode/opencode.json
