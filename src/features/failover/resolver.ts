@@ -6,12 +6,13 @@ export function resolveModelChain(modelConfig?: string | string[]): ModelChain |
   let models: string[] = []
 
   if (Array.isArray(modelConfig)) {
-    models = modelConfig
+    models = modelConfig.map(m => m.trim()).filter(m => m.length > 0)
   } else if (typeof modelConfig === "string") {
     if (modelConfig.includes("|")) {
-      models = modelConfig.split("|").map(m => m.trim()).filter(Boolean)
+      models = modelConfig.split("|").map(m => m.trim()).filter(m => m.length > 0)
     } else {
-      models = [modelConfig]
+      const trimmed = modelConfig.trim()
+      models = trimmed.length > 0 ? [trimmed] : []
     }
   }
 

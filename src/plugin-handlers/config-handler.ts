@@ -101,8 +101,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       log(`Plugin load errors`, { errors: pluginComponents.errors });
     }
 
-    const configModel = config.model as string | string[] | undefined
-    const systemDefaultModel = Array.isArray(configModel) ? configModel[0] : configModel
+    const configModel = config.model as string | string[] | undefined;
+    const systemDefaultModel = Array.isArray(configModel)
+      ? configModel[0]
+      : configModel;
 
     if (!systemDefaultModel?.trim()) {
       const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })

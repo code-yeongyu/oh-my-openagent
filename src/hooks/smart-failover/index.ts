@@ -6,10 +6,19 @@ import { resolveModelChain } from "../../features/failover/resolver"
 import { log } from "../../shared"
 import type { ModelCacheState } from "../../plugin-state"
 
-// Store both model key and agent name for context during events
-const sessionContext = new Map<string, { modelKey: string; agent: string }>()
-const toastedSessions = new Set<string>()
-const pendingFailovers = new Set<string>()
+const TOAST_DELAY_MS = 1500
+const FAILOVER_TOAST_DURATION_MS = 5000
+const SWAP_TOAST_DURATION_MS = 10000
+const PROVIDER_LOCKED_TOAST_DURATION_MS = 6000
+const SESSION_PROMPT_INITIAL_DELAY_MS = 500
+const SESSION_PROMPT_BUSY_RETRY_DELAY_MS = 300
+const SESSION_PROMPT_MAX_RETRIES = 5
+const SESSION_PROMPT_BUSY_RETRY_BACKOFF_FACTOR = 1
+const RETRY_LOOP_COOLDOWN_MS = 300000
+const DEFAULT_COOLDOWN_MS = 300000
+const MAX_BACKOFF_EXPONENT = 14
+const MAX_COOLDOWN_MS = 21600000
+const CONTEXT_WINDOW_MIN_RATIO = 0.5
 
 export function createSmartFailoverHook(
   ctx: PluginInput,
@@ -17,11 +26,16 @@ export function createSmartFailoverHook(
   modelCacheState: ModelCacheState
 ) {
   const statusManager = ProviderStatusManager.getInstance()
+  const sessionContext = new Map<string, { modelKey: string; agent: string }>()
+  const toastedSessions = new Set<string>()
+  const pendingFailovers = new Set<string>()
 
   const findFallback = (agentName: string, currentModelKey: string, sessionID: string) => {
     const getModelConfig = (agent: string) => {
-      // @ts-ignore
-      return config.agents?.[agent]?.model
+      const agents = config.agents
+      if (!agents) return undefined
+      const agentConfig = agents[agent as keyof typeof agents]
+      return agentConfig?.model
     }
 
     let modelConfig = getModelConfig(agentName) ?? config.model
@@ -39,7 +53,11 @@ export function createSmartFailoverHook(
       const primaryLimit = modelCacheState.modelContextLimitsCache.get(currentModelKey)
       const fallbackLimit = modelCacheState.modelContextLimitsCache.get(m)
 
-      if (primaryLimit && fallbackLimit && fallbackLimit < primaryLimit * 0.5) {
+      if (
+        primaryLimit &&
+        fallbackLimit &&
+        fallbackLimit < primaryLimit * CONTEXT_WINDOW_MIN_RATIO
+      ) {
         log(`[SmartFailover] Skipping fallback ${m} due to small context window (${fallbackLimit} < ${primaryLimit})`, { sessionID })
         return false
       }
@@ -47,7 +65,12 @@ export function createSmartFailoverHook(
     })
   }
 
-  const performFailover = async (sessionID: string, currentModelKey: string, agent: string, reason: string) => {
+  const performFailover = async (
+    sessionID: string,
+    currentModelKey: string,
+    agent: string,
+    reason: string
+  ) => {
     if (pendingFailovers.has(sessionID)) return false
     pendingFailovers.add(sessionID)
 
@@ -66,10 +89,10 @@ export function createSmartFailoverHook(
                   title: "Failover Active",
                   message: `⚠️ ${currentModelKey} unavailable. Switched to ${fallback}.`,
                   variant: "warning",
-                  duration: 5000
+                  duration: FAILOVER_TOAST_DURATION_MS
                 }
               }).catch(() => {})
-            }, 1500)
+            }, TOAST_DELAY_MS)
             toastedSessions.add(sessionID)
           }
 
@@ -78,7 +101,6 @@ export function createSmartFailoverHook(
           await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
           let retryAttempt = 0
-          const maxRetries = 5
           const checkAndPrompt = async () => {
             try {
               await ctx.client.session.prompt({
@@ -91,9 +113,12 @@ export function createSmartFailoverHook(
               })
               pendingFailovers.delete(sessionID)
             } catch (e: any) {
-              if (e.message?.includes("busy") && retryAttempt < maxRetries) {
+              if (e.message?.includes("busy") && retryAttempt < SESSION_PROMPT_MAX_RETRIES) {
                 retryAttempt++
-                setTimeout(checkAndPrompt, 300)
+                const backoffDelay =
+                  SESSION_PROMPT_BUSY_RETRY_DELAY_MS +
+                  retryAttempt * SESSION_PROMPT_BUSY_RETRY_BACKOFF_FACTOR * 100
+                setTimeout(checkAndPrompt, backoffDelay)
               } else {
                 log("[SmartFailover] Retry prompt failed", e)
                 pendingFailovers.delete(sessionID)
@@ -101,15 +126,16 @@ export function createSmartFailoverHook(
             }
           }
           
-          setTimeout(checkAndPrompt, 500)
+          setTimeout(checkAndPrompt, SESSION_PROMPT_INITIAL_DELAY_MS)
           return true
         }
       }
       pendingFailovers.delete(sessionID)
       return false
     } catch (e) {
+      log("[SmartFailover] Failover error", e)
       pendingFailovers.delete(sessionID)
-      throw e
+      return false
     }
   }
 
@@ -155,10 +181,10 @@ export function createSmartFailoverHook(
                   title: "Failover Active",
                   message: `⚠️ ${currentModelKey} unavailable. Switched to ${fallback}.`,
                   variant: "warning",
-                  duration: 10000
+                  duration: SWAP_TOAST_DURATION_MS
                 }
               }).catch(() => {})
-            }, 1500)
+            }, TOAST_DELAY_MS)
             toastedSessions.add(input.sessionID)
           }
         }
@@ -188,14 +214,15 @@ export function createSmartFailoverHook(
       }
 
       if (input.event.type === "session.status") {
-        const props = input.event.properties as { status: { type: string; message?: string }, sessionID: string }
-        if (props.status.type === "retry") {
+        const props = input.event.properties as { status?: { type?: string; message?: string }, sessionID?: string }
+        if (props.status?.type === "retry") {
            const sessionID = props.sessionID
+           if (!sessionID) return
            const sessionCtx = sessionContext.get(sessionID)
            
            if (sessionCtx && statusManager.getStatus(sessionCtx.modelKey) !== "COOLING") {
              const reason = props.status.message || "Retry loop detected"
-             statusManager.markCooling(sessionCtx.modelKey, 300000, reason)
+             statusManager.markCooling(sessionCtx.modelKey, RETRY_LOOP_COOLDOWN_MS, reason)
              await performFailover(sessionID, sessionCtx.modelKey, sessionCtx.agent, reason)
            }
         }
@@ -217,8 +244,11 @@ export function createSmartFailoverHook(
 
           const currentState = statusManager.getState(sessionCtx.modelKey)
           const retryCount = currentState?.retryCount ?? 0
-          const backoffMultiplier = Math.pow(2, Math.min(retryCount, 14))
-          const duration = (result.cooldownMs ?? 300000) * backoffMultiplier
+          const backoffMultiplier = Math.pow(2, Math.min(retryCount, MAX_BACKOFF_EXPONENT))
+          const duration = Math.min(
+            (result.cooldownMs ?? DEFAULT_COOLDOWN_MS) * backoffMultiplier,
+            MAX_COOLDOWN_MS
+          )
           
           statusManager.markCooling(sessionCtx.modelKey, duration, result.reason)
           
@@ -233,7 +263,7 @@ export function createSmartFailoverHook(
               title: "Provider Locked",
               message: `🛑 ${sessionCtx.modelKey} locked (Balance/Quota). Update config to reset.`,
               variant: "error",
-              duration: 6000
+              duration: PROVIDER_LOCKED_TOAST_DURATION_MS
             }
           }).catch(() => {})
         }
