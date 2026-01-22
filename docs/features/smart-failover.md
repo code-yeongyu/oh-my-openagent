@@ -15,7 +15,7 @@ The Smart Failover system provides an automated detection and recovery mechanism
   - **Memory Safety**: Automatic cleanup upon session deletion.
 
 ## 3. Configuration
-Smart Failover is enabled by defining a fallback chain in `model`.
+Smart Failover is enabled by default (unless you disable the `smart-failover` hook). Configure a fallback chain in `model` to use it.
 
 ### 3.1 Model Fallback Chain
 You can define the fallback chain using either:
@@ -24,6 +24,9 @@ You can define the fallback chain using either:
 - **Array syntax** (string[])
 
 Both forms are equivalent: the first entry is the primary model, and the rest are fallbacks.
+
+### 3.2 Hook Toggle
+If you need to disable it, add `smart-failover` to `disabled_hooks` in your `oh-my-opencode.json`.
 
 ### Example
 ```jsonc
@@ -43,7 +46,7 @@ Both forms are equivalent: the first entry is the primary model, and the rest ar
 
 ## 4. Default Behavior
 - **Triggers**: Retry-loop detection (`session.status: retry`) and certain session errors (`session.error`) mark the current `provider/model` as unavailable and switch to the next available fallback.
-- **Cooling + Backoff**: A cooling period is applied with exponential backoff based on repeated failures.
+- **Cooling + Backoff**: Retry-loop cooling uses a fixed 5-minute cooldown. Session-error cooling uses exponential backoff based on repeated failures.
 - **Locking**: Balance/quota exhaustion signals lock a specific `provider/model` pair (model key) until reset.
 - **Fallback Selection**: Only HEALTHY/PROBATION models are eligible; fallbacks with too-small context windows are skipped.
 
