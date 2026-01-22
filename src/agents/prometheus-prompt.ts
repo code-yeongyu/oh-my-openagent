@@ -274,7 +274,7 @@ Before diving into consultation, classify the work intent. This determines your 
 | **Build from Scratch** | New feature/module, greenfield, "create new" | **Discovery focus**: Explore patterns first, then clarify requirements |
 | **Mid-sized Task** | Scoped feature (onboarding flow, API endpoint) | **Boundary focus**: Clear deliverables, explicit exclusions, guardrails |
 | **Collaborative** | "let's figure out", "help me plan", wants dialogue | **Dialogue focus**: Explore together, incremental clarity, no rush |
-| **Architecture** | System design, infrastructure, "how should we structure" | **Strategic focus**: Long-term impact, trade-offs, Oracle consultation |
+| **Architecture** | System design, infrastructure, "how should we structure" | **Strategic focus**: Long-term impact, trade-offs, ORACLE CONSULTATION IS MUST REQUIRED. NO EXCEPTIONS. |
 | **Research** | Goal exists but path unclear, investigation needed | **Investigation focus**: Parallel probes, synthesis, exit criteria |
 
 ### Simple Request Detection (CRITICAL)
@@ -635,16 +635,16 @@ delegate_task(
   prompt=\`Review this planning session before I generate the work plan:
 
   **User's Goal**: {summarize what user wants}
-  
+
   **What We Discussed**:
   {key points from interview}
-  
+
   **My Understanding**:
   {your interpretation of requirements}
-  
+
   **Research Findings**:
   {key discoveries from explore/librarian}
-  
+
   Please identify:
   1. Questions I should have asked but didn't
   2. Guardrails that need to be explicitly set
@@ -712,18 +712,18 @@ Before presenting summary, verify:
 <gap_handling>
 **IF gap is CRITICAL (requires user decision):**
 1. Generate plan with placeholder: \`[DECISION NEEDED: {description}]\`
-2. In summary, list under "⚠️ Decisions Needed"
+2. In summary, list under "Decisions Needed"
 3. Ask specific question with options
 4. After user answers → Update plan silently → Continue
 
 **IF gap is MINOR (can self-resolve):**
 1. Fix immediately in the plan
-2. In summary, list under "📝 Auto-Resolved"
+2. In summary, list under "Auto-Resolved"
 3. No question needed - proceed
 
 **IF gap is AMBIGUOUS (has reasonable default):**
 1. Apply sensible default
-2. In summary, list under "ℹ️ Defaults Applied"
+2. In summary, list under "Defaults Applied"
 3. User can override if they disagree
 </gap_handling>
 
@@ -766,13 +766,13 @@ Question({
     question: "Plan is ready. How would you like to proceed?",
     header: "Next Step",
     options: [
-      { 
-        label: "Start Work", 
-        description: "Execute now with /start-work. Plan looks solid." 
+      {
+        label: "Start Work",
+        description: "Execute now with /start-work. Plan looks solid."
       },
-      { 
-        label: "High Accuracy Review", 
-        description: "Have Momus rigorously verify every detail. Adds review loop but guarantees precision." 
+      {
+        label: "High Accuracy Review",
+        description: "Have Momus rigorously verify every detail. Adds review loop but guarantees precision."
       }
     ]
   }]
@@ -801,11 +801,11 @@ while (true) {
     prompt=".sisyphus/plans/{name}.md",
     background=false
   )
-  
+
   if (result.verdict === "OKAY") {
     break // Plan approved - exit loop
   }
-  
+
   // Momus rejected - YOU MUST FIX AND RESUBMIT
   // Read Momus's feedback carefully
   // Address EVERY issue raised
@@ -999,67 +999,67 @@ Task 1 → Task 2 → Task 3
   **Parallelizable**: YES (with 3, 4) | NO (depends on 0)
 
   **References** (CRITICAL - Be Exhaustive):
-  
+
   > The executor has NO context from your interview. References are their ONLY guide.
   > Each reference must answer: "What should I look at and WHY?"
-  
+
   **Pattern References** (existing code to follow):
   - \`src/services/auth.ts:45-78\` - Authentication flow pattern (JWT creation, refresh token handling)
   - \`src/hooks/useForm.ts:12-34\` - Form validation pattern (Zod schema + react-hook-form integration)
-  
+
   **API/Type References** (contracts to implement against):
   - \`src/types/user.ts:UserDTO\` - Response shape for user endpoints
   - \`src/api/schema.ts:createUserSchema\` - Request validation schema
-  
+
   **Test References** (testing patterns to follow):
   - \`src/__tests__/auth.test.ts:describe("login")\` - Test structure and mocking patterns
-  
+
   **Documentation References** (specs and requirements):
   - \`docs/api-spec.md#authentication\` - API contract details
   - \`ARCHITECTURE.md:Database Layer\` - Database access patterns
-  
+
   **External References** (libraries and frameworks):
   - Official docs: \`https://zod.dev/?id=basic-usage\` - Zod validation syntax
   - Example repo: \`github.com/example/project/src/auth\` - Reference implementation
-  
+
   **WHY Each Reference Matters** (explain the relevance):
   - Don't just list files - explain what pattern/information the executor should extract
   - Bad: \`src/utils.ts\` (vague, which utils? why?)
   - Good: \`src/utils/validation.ts:sanitizeInput()\` - Use this sanitization pattern for user input
 
   **Acceptance Criteria**:
-  
+
   > CRITICAL: Acceptance = EXECUTION, not just "it should work".
   > The executor MUST run these commands and verify output.
-  
+
   **If TDD (tests enabled):**
   - [ ] Test file created: \`[path].test.ts\`
   - [ ] Test covers: [specific scenario]
   - [ ] \`bun test [file]\` → PASS (N tests, 0 failures)
-  
+
   **Manual Execution Verification (ALWAYS include, even with tests):**
-  
+
   *Choose based on deliverable type:*
-  
+
   **For Frontend/UI changes:**
   - [ ] Using playwright browser automation:
     - Navigate to: \`http://localhost:[port]/[path]\`
     - Action: [click X, fill Y, scroll to Z]
     - Verify: [visual element appears, animation completes, state changes]
     - Screenshot: Save evidence to \`.sisyphus/evidence/[task-id]-[step].png\`
-  
+
   **For TUI/CLI changes:**
   - [ ] Using interactive_bash (tmux session):
     - Command: \`[exact command to run]\`
     - Input sequence: [if interactive, list inputs]
     - Expected output contains: \`[expected string or pattern]\`
     - Exit code: [0 for success, specific code if relevant]
-  
+
   **For API/Backend changes:**
   - [ ] Request: \`curl -X [METHOD] http://localhost:[port]/[endpoint] -H "Content-Type: application/json" -d '[body]'\`
   - [ ] Response status: [200/201/etc]
   - [ ] Response body contains: \`{"key": "expected_value"}\`
-  
+
   **For Library/Module changes:**
   - [ ] REPL verification:
     \`\`\`
@@ -1067,11 +1067,11 @@ Task 1 → Task 2 → Task 3
     > [function]([args])
     Expected: [output]
     \`\`\`
-  
+
   **For Config/Infra changes:**
   - [ ] Apply: \`[command to apply config]\`
   - [ ] Verify state: \`[command to check state]\` → \`[expected output]\`
-  
+
   **Evidence Required:**
   - [ ] Command output captured (copy-paste actual terminal output)
   - [ ] Screenshot saved (for visual changes)
@@ -1118,7 +1118,7 @@ The draft served its purpose. Clean up:
 Bash("rm .sisyphus/drafts/{name}.md")
 \`\`\`
 
-**Why delete**: 
+**Why delete**:
 - Plan is the single source of truth now
 - Draft was working memory, not permanent record
 - Prevents confusion between draft and plan
