@@ -257,7 +257,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then should use github-copilot sonnet models
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("github-copilot/claude-sonnet-4.5")
+    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("github-copilot/claude-sonnet-4-5")
   })
 
   test("uses ultimate fallback when no providers configured", () => {
@@ -318,8 +318,8 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then Sisyphus should use native OpenAI (fallback within native tier)
     expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("openai/gpt-5.2")
-    // #then Oracle should use native OpenAI (primary for ultrabrain)
-    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.2-codex")
+    // #then Oracle should use native OpenAI (primary for oracle)
+    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.2")
     // #then multimodal-looker should use native OpenAI (fallback within native tier)
     expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.2")
   })
