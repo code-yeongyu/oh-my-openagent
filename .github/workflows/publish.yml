@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      republish:
+        description: "Re-publish mode: skip version check, only publish missing packages"
+        required: false
+        type: boolean
+        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -144,6 +149,7 @@ jobs:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
           SKIP_PLATFORM_PACKAGES: ${{ inputs.skip_platform }}
+          REPUBLISH: ${{ inputs.republish }}
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
