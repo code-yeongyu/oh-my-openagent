@@ -1,37 +1,36 @@
-# CLAUDE CODE HOOKS COMPATIBILITY LAYER
+# CLAUDE CODE HOOKS COMPATIBILITY
 
 ## OVERVIEW
 
-Full Claude Code settings.json hook compatibility. Executes user-defined hooks at 5 lifecycle events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, PreCompact.
+Full Claude Code settings.json hook compatibility. 5 lifecycle events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, PreCompact.
 
 ## STRUCTURE
 
 ```
 claude-code-hooks/
-├── index.ts              # Main factory (401 lines) - createClaudeCodeHooksHook()
+├── index.ts              # Main factory (401 lines)
 ├── config.ts             # Loads ~/.claude/settings.json
-├── config-loader.ts      # Extended config from multiple sources
-├── pre-tool-use.ts       # PreToolUse hook executor (172 lines)
-├── post-tool-use.ts      # PostToolUse hook executor (199 lines)
-├── user-prompt-submit.ts # UserPromptSubmit hook executor
-├── stop.ts               # Stop hook executor (session idle)
-├── pre-compact.ts        # PreCompact hook executor (context compaction)
-├── transcript.ts         # Tool use recording (252 lines)
-├── tool-input-cache.ts   # Caches tool inputs between pre/post
-├── types.ts              # Hook types, context interfaces
-├── todo.ts               # Todo JSON parsing fix
-└── plugin-config.ts      # Plugin config access
+├── config-loader.ts      # Extended config
+├── pre-tool-use.ts       # PreToolUse executor
+├── post-tool-use.ts      # PostToolUse executor
+├── user-prompt-submit.ts # UserPromptSubmit executor
+├── stop.ts               # Stop hook executor
+├── pre-compact.ts        # PreCompact executor
+├── transcript.ts         # Tool use recording
+├── tool-input-cache.ts   # Pre→post caching
+├── types.ts              # Hook types
+└── todo.ts               # Todo JSON fix
 ```
 
 ## HOOK LIFECYCLE
 
-| Event | When | Can Block | Context Fields |
-|-------|------|-----------|----------------|
-| **PreToolUse** | Before tool | Yes | sessionId, toolName, toolInput, cwd |
-| **PostToolUse** | After tool | Warn only | + toolOutput, transcriptPath |
-| **UserPromptSubmit** | On user message | Yes | sessionId, prompt, parts, cwd |
-| **Stop** | Session idle | inject_prompt | sessionId, parentSessionId |
-| **PreCompact** | Before summarize | No | sessionId, cwd |
+| Event | When | Can Block | Context |
+|-------|------|-----------|---------|
+| PreToolUse | Before tool | Yes | sessionId, toolName, toolInput |
+| PostToolUse | After tool | Warn | + toolOutput, transcriptPath |
+| UserPromptSubmit | On message | Yes | sessionId, prompt, parts |
+| Stop | Session idle | inject | sessionId, parentSessionId |
+| PreCompact | Before summarize | No | sessionId |
 
 ## CONFIG SOURCES
 
@@ -39,32 +38,14 @@ Priority (highest first):
 1. `.claude/settings.json` (project)
 2. `~/.claude/settings.json` (user)
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [{ "matcher": "Edit", "command": "./check.sh" }],
-    "PostToolUse": [{ "command": "post-hook.sh $TOOL_NAME" }]
-  }
-}
-```
-
 ## HOOK EXECUTION
 
-1. User-defined hooks loaded from settings.json
-2. Matchers filter by tool name (supports wildcards)
-3. Commands executed via subprocess with environment:
-   - `$SESSION_ID`, `$TOOL_NAME`, `$TOOL_INPUT`, `$CWD`
+1. Hooks loaded from settings.json
+2. Matchers filter by tool name
+3. Commands via subprocess with `$SESSION_ID`, `$TOOL_NAME`
 4. Exit codes: 0=pass, 1=warn, 2=block
-
-## KEY PATTERNS
-
-- **Session tracking**: `Map<sessionID, state>` for first-message, error, interrupt
-- **Input caching**: Tool inputs cached pre→post via `tool-input-cache.ts`
-- **Transcript recording**: All tool uses logged for debugging
-- **Todowrite fix**: Parses string todos to array (line 174-196)
 
 ## ANTI-PATTERNS
 
-- **Heavy PreToolUse logic**: Runs before EVERY tool call
-- **Blocking non-critical**: Use warnings in PostToolUse instead
-- **Missing error handling**: Always wrap subprocess calls
+- **Heavy PreToolUse**: Runs before EVERY tool call
+- **Blocking non-critical**: Use PostToolUse warnings
