@@ -508,11 +508,13 @@ To resume this session: resume="${args.resume}"`
          const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category]
          let actualModel: string
 
+         let resolvedVariant: string | undefined
+
          if (!requirement) {
            actualModel = resolved.model
            modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
          } else {
-          const { model: resolvedModel, source } = resolveModelWithFallback({
+          const { model: resolvedModel, source, variant } = resolveModelWithFallback({
               userModel: userCategories?.[args.category]?.model,
               fallbackChain: requirement.fallbackChain,
               availableModels,
@@ -520,6 +522,8 @@ To resume this session: resume="${args.resume}"`
             })
 
            actualModel = resolvedModel
+           // Priority: user-defined variant > fallback chain entry variant > requirement default variant
+           resolvedVariant = userCategories?.[args.category]?.variant ?? variant ?? requirement.variant
 
            if (!parseModelString(actualModel)) {
              return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
@@ -544,8 +548,8 @@ To resume this session: resume="${args.resume}"`
          agentToUse = SISYPHUS_JUNIOR_AGENT
          const parsedModel = parseModelString(actualModel)
          categoryModel = parsedModel
-           ? (requirement?.variant
-             ? { ...parsedModel, variant: requirement.variant }
+           ? (resolvedVariant
+             ? { ...parsedModel, variant: resolvedVariant }
              : parsedModel)
            : undefined
          categoryPromptAppend = resolved.promptAppend || undefined
