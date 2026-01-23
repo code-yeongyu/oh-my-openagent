@@ -54,19 +54,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("glm-4.7")
   })
 
-  test("explore has valid fallbackChain with gemini-3-flash-preview as primary", () => {
+  test("explore has valid fallbackChain with claude-haiku-4-5 as primary", () => {
     // #given - explore agent requirement
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // #when - accessing explore requirement
-    // #then - fallbackChain exists with gemini-3-flash-preview as first entry
+    // #then - fallbackChain exists with claude-haiku-4-5 as first entry
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
     expect(explore.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = explore.fallbackChain[0]
-    expect(primary.providers).toContain("google")
-    expect(primary.model).toBe("gemini-3-flash-preview")
+    expect(primary.providers).toContain("anthropic")
+    expect(primary.model).toBe("claude-haiku-4-5")
   })
 
   test("multimodal-looker has valid fallbackChain with gemini-3-flash-preview as primary", () => {

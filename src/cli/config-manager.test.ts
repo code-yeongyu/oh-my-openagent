@@ -343,7 +343,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")
   })
 
-  test("uses grok-code for explore when not max20", () => {
+  test("uses haiku for explore regardless of max20 flag", () => {
     // #given user has Claude but not max20
     const config: InstallConfig = {
       hasClaude: true,
@@ -358,7 +358,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then explore should use grok-code (preserve Claude quota)
-    expect((result.agents as Record<string, { model: string }>).explore.model).toBe("opencode/grok-code")
+    // #then explore should use haiku (isMax20 doesn't affect explore anymore)
+    expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")
   })
 })
