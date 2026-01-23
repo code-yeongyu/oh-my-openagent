@@ -139,12 +139,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       continue
     }
 
-    // Special case: explore has custom Gemini → Claude → Grok logic
+    // Special case: explore uses Claude haiku → OpenCode grok-code
     if (role === "explore") {
-      if (avail.native.gemini) {
-        agents[role] = { model: "google/gemini-3-flash-preview" }
-      } else if (avail.native.claude && avail.isMaxPlan) {
+      if (avail.native.claude) {
         agents[role] = { model: "anthropic/claude-haiku-4-5" }
+      } else if (avail.opencodeZen) {
+        agents[role] = { model: "opencode/claude-haiku-4-5" }
       } else {
         agents[role] = { model: "opencode/grok-code" }
       }
