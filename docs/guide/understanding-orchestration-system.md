@@ -1,6 +1,6 @@
 # Understanding the Orchestration System
 
-Oh My OpenCode's orchestration system transforms a simple AI agent into a coordinated development team. This document explains how the Prometheus → Orchestrator → Junior workflow creates high-quality, reliable code output.
+Oh My OpenCode's orchestration system transforms a simple AI agent into a coordinated development team. This document explains how the Prometheus → Atlas → Junior workflow creates high-quality, reliable code output.
 
 ---
 
@@ -29,7 +29,7 @@ flowchart TB
     end
     
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator["⚡ Orchestrator-Sisyphus<br/>(Conductor)<br/>Claude Opus 4.5"]
+        Orchestrator["⚡ Atlas<br/>(Conductor)<br/>Claude Opus 4.5"]
     end
     
     subgraph Workers["Worker Layer (Specialized Agents)"]
@@ -152,7 +152,7 @@ If REJECTED, Prometheus fixes issues and resubmits. **No maximum retry limit.**
 
 ---
 
-## Layer 2: Execution (Orchestrator-Sisyphus)
+## Layer 2: Execution (Atlas)
 
 ### The Conductor Mindset
 
@@ -160,7 +160,7 @@ The Orchestrator is like an orchestra conductor: **it doesn't play instruments, 
 
 ```mermaid
 flowchart LR
-    subgraph Orchestrator["Orchestrator-Sisyphus"]
+    subgraph Orchestrator["Atlas"]
         Read["1. Read Plan"]
         Analyze["2. Analyze Tasks"]
         Wisdom["3. Accumulate Wisdom"]
@@ -352,7 +352,7 @@ delegate_task(
 ```mermaid
 sequenceDiagram
     participant User
-    participant Orchestrator as Orchestrator-Sisyphus
+    participant Orchestrator as Atlas
     participant Junior as Sisyphus-Junior
     participant Notepad as .sisyphus/notepads/
     
@@ -392,7 +392,7 @@ sequenceDiagram
 ### 1. Separation of Concerns
 
 - **Planning** (Prometheus): High reasoning, interview, strategic thinking
-- **Orchestration** (Sisyphus): Coordination, verification, wisdom accumulation
+- **Orchestration** (Atlas): Coordination, verification, wisdom accumulation
 - **Execution** (Junior): Focused implementation, no distractions
 
 ### 2. Explicit Over Implicit
