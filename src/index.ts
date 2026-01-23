@@ -230,7 +230,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
-  const lookAt = createLookAt(ctx);
+  const isMultimodalLookerEnabled = !includesCaseInsensitive(
+    pluginConfig.disabled_agents ?? [],
+    "multimodal-looker"
+  );
+  const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -300,7 +304,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...builtinTools,
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
-      look_at: lookAt,
+      ...(lookAt ? { look_at: lookAt } : {}),
       delegate_task: delegateTask,
       skill: skillTool,
       skill_mcp: skillMcpTool,
