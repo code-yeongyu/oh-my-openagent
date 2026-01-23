@@ -15,7 +15,7 @@ tools/
 │   └── constants.ts  # Fixed values
 ├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename
 ├── ast-grep/         # 2 tools: search, replace (25 languages)
-├── delegate-task/    # Category-based routing (1038 lines)
+├── delegate-task/    # Category-based routing (1039 lines)
 ├── session-manager/  # 4 tools: list, read, search, info
 ├── grep/             # Custom grep with timeout
 ├── glob/             # 60s timeout, 100 file limit
