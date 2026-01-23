@@ -88,6 +88,77 @@ The orchestrator is designed to execute work plans created by Prometheus. Using 
 
 ---
 
+## Model Configuration
+
+Oh My OpenCode automatically configures models based on your available providers. You don't need to manually specify every model.
+
+### How Models Are Determined
+
+**1. At Installation Time (Interactive Installer)**
+
+When you run `bunx oh-my-opencode install`, the installer asks which providers you have:
+- Claude Pro/Max subscription?
+- OpenAI/ChatGPT Plus?
+- Google Gemini?
+- GitHub Copilot?
+- OpenCode Zen?
+- Z.ai Coding Plan?
+
+Based on your answers, it generates `~/.config/opencode/oh-my-opencode.json` with optimal model assignments for each agent and category.
+
+**2. At Runtime (Fallback Chain)**
+
+Each agent has a **provider priority chain**. The system tries providers in order until it finds an available model:
+
+```
+Example: multimodal-looker
+google → anthropic → zai → openai → github-copilot → opencode
+   ↓         ↓         ↓        ↓           ↓            ↓
+gemini   haiku     glm-4.6v  gpt-5.2    fallback     fallback
+```
+
+If you have Gemini, it uses `google/gemini-3-flash-preview`. No Gemini but have Claude? Uses `anthropic/claude-haiku-4-5`. And so on.
+
+### Example Configuration
+
+Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** all available:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "agents": {
+    // Override specific agents only - rest use fallback chain
+    "Atlas": { "model": "anthropic/claude-sonnet-4-5", "variant": "max" },
+    "librarian": { "model": "zai-coding-plan/glm-4.7" },
+    "explore": { "model": "opencode/grok-code" },
+    "multimodal-looker": { "model": "zai-coding-plan/glm-4.6v" }
+  },
+  "categories": {
+    // Override categories for cost optimization
+    "quick": { "model": "opencode/grok-code" },
+    "unspecified-low": { "model": "zai-coding-plan/glm-4.7" }
+  },
+  "experimental": {
+    "aggressive_truncation": true
+  }
+}
+```
+
+**Key points:**
+- You only need to override what you want to change
+- Unspecified agents/categories use the automatic fallback chain
+- Mix providers freely (Claude for main work, Z.ai for cheap tasks, etc.)
+
+### Finding Available Models
+
+Run `opencode models` to see all available models in your environment. Model names follow the format `provider/model-name`.
+
+### Learn More
+
+For detailed configuration options including per-agent settings, category customization, and more, see the [Configuration Guide](../configurations.md).
+
+---
+
 ## Next Steps
 
 - [Understanding the Orchestration System](./understanding-orchestration-system.md) - Deep dive into Prometheus → Orchestrator → Junior workflow
