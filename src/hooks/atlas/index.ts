@@ -498,7 +498,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-            agent: "Atlas",
+            agent: "atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },
