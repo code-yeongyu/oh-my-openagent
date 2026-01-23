@@ -197,7 +197,7 @@ export async function createBuiltinAgents(
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
     
     // Use resolver to determine model
-    const { model } = resolveModelWithFallback({
+    const { model, variant: resolvedVariant } = resolveModelWithFallback({
       userModel: override?.model,
       fallbackChain: requirement?.fallbackChain,
       availableModels,
@@ -206,11 +206,11 @@ export async function createBuiltinAgents(
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
     
-    // Apply variant from override or requirement
+    // Apply variant from override or resolved fallback chain
     if (override?.variant) {
       config = { ...config, variant: override.variant }
-    } else if (requirement?.variant) {
-      config = { ...config, variant: requirement.variant }
+    } else if (resolvedVariant) {
+      config = { ...config, variant: resolvedVariant }
     }
 
     if (agentName === "librarian" && directory && config.prompt) {
@@ -239,7 +239,7 @@ export async function createBuiltinAgents(
     const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["Sisyphus"]
     
     // Use resolver to determine model
-    const { model: sisyphusModel } = resolveModelWithFallback({
+    const { model: sisyphusModel, variant: sisyphusResolvedVariant } = resolveModelWithFallback({
       userModel: sisyphusOverride?.model,
       fallbackChain: sisyphusRequirement?.fallbackChain,
       availableModels,
@@ -254,11 +254,11 @@ export async function createBuiltinAgents(
       availableCategories
     )
     
-    // Apply variant from override or requirement
+    // Apply variant from override or resolved fallback chain
     if (sisyphusOverride?.variant) {
       sisyphusConfig = { ...sisyphusConfig, variant: sisyphusOverride.variant }
-    } else if (sisyphusRequirement?.variant) {
-      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusRequirement.variant }
+    } else if (sisyphusResolvedVariant) {
+      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
     }
 
     if (directory && sisyphusConfig.prompt) {
@@ -278,7 +278,7 @@ export async function createBuiltinAgents(
     const atlasRequirement = AGENT_MODEL_REQUIREMENTS["Atlas"]
     
     // Use resolver to determine model
-    const { model: atlasModel } = resolveModelWithFallback({
+    const { model: atlasModel, variant: atlasResolvedVariant } = resolveModelWithFallback({
       userModel: orchestratorOverride?.model,
       fallbackChain: atlasRequirement?.fallbackChain,
       availableModels,
@@ -292,11 +292,11 @@ export async function createBuiltinAgents(
       userCategories: categories,
     })
     
-    // Apply variant from override or requirement
+    // Apply variant from override or resolved fallback chain
     if (orchestratorOverride?.variant) {
       orchestratorConfig = { ...orchestratorConfig, variant: orchestratorOverride.variant }
-    } else if (atlasRequirement?.variant) {
-      orchestratorConfig = { ...orchestratorConfig, variant: atlasRequirement.variant }
+    } else if (atlasResolvedVariant) {
+      orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
     }
 
     if (orchestratorOverride) {
