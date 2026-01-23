@@ -1,0 +1,11 @@
+{
+  "Common": {
+    "title": "Oh My OpenCode",
+    "description": "AI エージェントのための究極の開発環境",
+    "getStarted": "始める",
+    "learnMore": "もっと詳しく"
+  },
+  "LanguageSwitcher": {
+    "label": "言語を切り替える"
+  }
+}
