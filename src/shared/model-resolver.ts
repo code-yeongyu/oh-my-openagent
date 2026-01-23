@@ -53,6 +53,15 @@ export function resolveModelWithFallback(
 
 	// Step 2: Provider fallback chain (with availability check)
 	if (fallbackChain && fallbackChain.length > 0) {
+		// If availableModels is empty (no cache), use first fallback entry directly without availability check
+		if (availableModels.size === 0) {
+			const firstEntry = fallbackChain[0]
+			const firstProvider = firstEntry.providers[0]
+			const model = `${firstProvider}/${firstEntry.model}`
+			log("Model resolved via fallback chain (no cache, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
+			return { model, source: "provider-fallback", variant: firstEntry.variant }
+		}
+
 		for (const entry of fallbackChain) {
 			for (const provider of entry.providers) {
 				const fullModel = `${provider}/${entry.model}`

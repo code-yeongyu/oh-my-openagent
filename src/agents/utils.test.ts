@@ -45,17 +45,17 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
   })
 
-  test("Oracle uses system default when no availableModels provided", async () => {
-    // #given - no available models, falls back to system default
+  test("Oracle uses first fallback entry when no availableModels provided (no cache scenario)", async () => {
+    // #given - no available models simulates CI without model cache
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - falls back to system default (anthropic/claude-opus-4-5)
-    expect(agents.oracle.model).toBe("anthropic/claude-opus-4-5")
-    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-    expect(agents.oracle.reasoningEffort).toBeUndefined()
-    expect(agents.oracle.textVerbosity).toBeUndefined()
+    // #then - uses first fallback entry (openai/gpt-5.2) instead of system default
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    expect(agents.oracle.reasoningEffort).toBe("medium")
+    expect(agents.oracle.textVerbosity).toBe("high")
+    expect(agents.oracle.thinking).toBeUndefined()
   })
 
   test("Oracle with GPT model override has reasoningEffort, no thinking", async () => {
