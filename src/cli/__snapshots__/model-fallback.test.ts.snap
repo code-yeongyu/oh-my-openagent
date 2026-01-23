@@ -860,7 +860,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "zai-coding-plan/glm-4.7",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
       "model": "opencode/glm-4.7-free",
@@ -918,7 +918,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "zai-coding-plan/glm-4.7",
     },
     "multimodal-looker": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
       "model": "opencode/glm-4.7-free",
