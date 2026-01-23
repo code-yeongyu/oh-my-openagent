@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: [],
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['e2e/**/*', 'node_modules/**/*'],
+    exclude: ['**/node_modules/**', '**/e2e/**', '**/.next/**'],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
