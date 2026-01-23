@@ -3,6 +3,9 @@
  * Supports substring matching with provider filtering and priority-based selection
  */
 
+import { existsSync, readFileSync } from "fs"
+import { homedir } from "os"
+import { join } from "path"
 import { log } from "./logger"
 
 /**
@@ -90,33 +93,54 @@ export function fuzzyMatchModel(
 
 let cachedModels: Set<string> | null = null
 
-export async function fetchAvailableModels(client: any): Promise<Set<string>> {
+function getOpenCodeCacheDir(): string {
+	const xdgCache = process.env.XDG_CACHE_HOME
+	if (xdgCache) return join(xdgCache, "opencode")
+	return join(homedir(), ".cache", "opencode")
+}
+
+export async function fetchAvailableModels(_client?: any): Promise<Set<string>> {
+	log("[fetchAvailableModels] CALLED")
+	
 	if (cachedModels !== null) {
 		log("[fetchAvailableModels] returning cached models", { count: cachedModels.size, models: Array.from(cachedModels).slice(0, 20) })
 		return cachedModels
 	}
 
+	const modelSet = new Set<string>()
+	const cacheFile = join(getOpenCodeCacheDir(), "models.json")
+
+	log("[fetchAvailableModels] reading cache file", { cacheFile })
+
+	if (!existsSync(cacheFile)) {
+		log("[fetchAvailableModels] cache file not found, returning empty set")
+		return modelSet
+	}
+
 	try {
-		const models = await client.model.list()
-		const modelSet = new Set<string>()
+		const content = readFileSync(cacheFile, "utf-8")
+		const data = JSON.parse(content) as Record<string, { id?: string; models?: Record<string, { id?: string }> }>
 
-		log("[fetchAvailableModels] raw response", { isArray: Array.isArray(models), length: Array.isArray(models) ? models.length : 0, sample: Array.isArray(models) ? models.slice(0, 5) : models })
+		const providerIds = Object.keys(data)
+		log("[fetchAvailableModels] providers found", { count: providerIds.length, providers: providerIds.slice(0, 10) })
 
-		if (Array.isArray(models)) {
-			for (const model of models) {
-				if (model.id && typeof model.id === "string") {
-					modelSet.add(model.id)
-				}
+		for (const providerId of providerIds) {
+			const provider = data[providerId]
+			const models = provider?.models
+			if (!models || typeof models !== "object") continue
+
+			for (const modelKey of Object.keys(models)) {
+				modelSet.add(`${providerId}/${modelKey}`)
 			}
 		}
 
-		log("[fetchAvailableModels] parsed models", { count: modelSet.size, models: Array.from(modelSet) })
+		log("[fetchAvailableModels] parsed models", { count: modelSet.size, models: Array.from(modelSet).slice(0, 20) })
 
 		cachedModels = modelSet
 		return modelSet
 	} catch (err) {
 		log("[fetchAvailableModels] error", { error: String(err) })
-		return new Set<string>()
+		return modelSet
 	}
 }
 

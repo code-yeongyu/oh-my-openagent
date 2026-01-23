@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, existsSync } from "node:fs"
 import type { CheckResult, CheckDefinition } from "../types"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import { parseJsonc, detectConfigFile } from "../../../shared"
@@ -9,6 +9,38 @@ import {
 } from "../../../shared/model-requirements"
 import { homedir } from "node:os"
 import { join } from "node:path"
+
+function getOpenCodeCacheDir(): string {
+  const xdgCache = process.env.XDG_CACHE_HOME
+  if (xdgCache) return join(xdgCache, "opencode")
+  return join(homedir(), ".cache", "opencode")
+}
+
+function loadAvailableModels(): { providers: string[]; modelCount: number; cacheExists: boolean } {
+  const cacheFile = join(getOpenCodeCacheDir(), "models.json")
+  
+  if (!existsSync(cacheFile)) {
+    return { providers: [], modelCount: 0, cacheExists: false }
+  }
+
+  try {
+    const content = readFileSync(cacheFile, "utf-8")
+    const data = JSON.parse(content) as Record<string, { models?: Record<string, unknown> }>
+    
+    const providers = Object.keys(data)
+    let modelCount = 0
+    for (const providerId of providers) {
+      const models = data[providerId]?.models
+      if (models && typeof models === "object") {
+        modelCount += Object.keys(models).length
+      }
+    }
+    
+    return { providers, modelCount, cacheExists: true }
+  } catch {
+    return { providers: [], modelCount: 0, cacheExists: false }
+  }
+}
 
 const PACKAGE_NAME = "oh-my-opencode"
 const USER_CONFIG_DIR = join(homedir(), ".config", "opencode")
@@ -155,10 +187,28 @@ function getEffectiveVariant(requirement: ModelRequirement): string | undefined 
   return firstEntry?.variant ?? requirement.variant
 }
 
-function buildDetailsArray(info: ModelResolutionInfo): string[] {
+interface AvailableModelsInfo {
+  providers: string[]
+  modelCount: number
+  cacheExists: boolean
+}
+
+function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo): string[] {
   const details: string[] = []
 
-  details.push("═══ Current Models ═══")
+  details.push("═══ Available Models (from cache) ═══")
+  details.push("")
+  if (available.cacheExists) {
+    details.push(`  Providers: ${available.providers.length} (${available.providers.slice(0, 8).join(", ")}${available.providers.length > 8 ? "..." : ""})`)
+    details.push(`  Total models: ${available.modelCount}`)
+    details.push(`  Cache: ~/.cache/opencode/models.json`)
+    details.push(`  Refresh: opencode models --refresh`)
+  } else {
+    details.push("  ⚠ Cache not found. Run 'opencode' to populate.")
+  }
+  details.push("")
+
+  details.push("═══ Configured Models ═══")
   details.push("")
   details.push("Agents:")
   for (const agent of info.agents) {
@@ -182,6 +232,7 @@ function buildDetailsArray(info: ModelResolutionInfo): string[] {
 export async function checkModelResolution(): Promise<CheckResult> {
   const config = loadConfig() ?? {}
   const info = getModelResolutionInfoWithOverrides(config)
+  const available = loadAvailableModels()
 
   const agentCount = info.agents.length
   const categoryCount = info.categories.length
@@ -190,12 +241,13 @@ export async function checkModelResolution(): Promise<CheckResult> {
   const totalOverrides = agentOverrides + categoryOverrides
 
   const overrideNote = totalOverrides > 0 ? ` (${totalOverrides} override${totalOverrides > 1 ? "s" : ""})` : ""
+  const cacheNote = available.cacheExists ? `, ${available.modelCount} available` : ", cache not found"
 
   return {
     name: CHECK_NAMES[CHECK_IDS.MODEL_RESOLUTION],
-    status: "pass",
-    message: `${agentCount} agents, ${categoryCount} categories${overrideNote}`,
-    details: buildDetailsArray(info),
+    status: available.cacheExists ? "pass" : "warn",
+    message: `${agentCount} agents, ${categoryCount} categories${overrideNote}${cacheNote}`,
+    details: buildDetailsArray(info, available),
   }
 }
 

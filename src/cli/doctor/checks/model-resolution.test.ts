@@ -115,8 +115,9 @@ describe("model-resolution check", () => {
       // #then: Details should contain agent/category resolution info
       expect(result.details).toBeDefined()
       expect(result.details!.length).toBeGreaterThan(0)
-      // Should have Current Models header and sections
-      expect(result.details!.some((d) => d.includes("Current Models"))).toBe(true)
+      // Should have Available Models and Configured Models headers
+      expect(result.details!.some((d) => d.includes("Available Models"))).toBe(true)
+      expect(result.details!.some((d) => d.includes("Configured Models"))).toBe(true)
       expect(result.details!.some((d) => d.includes("Agents:"))).toBe(true)
       expect(result.details!.some((d) => d.includes("Categories:"))).toBe(true)
       // Should have legend
