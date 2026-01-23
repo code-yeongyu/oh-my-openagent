@@ -8,7 +8,7 @@
 
 ```
 agents/
-├── atlas.ts                    # Master Orchestrator (1383 lines)
+├── atlas.ts                    # Master Orchestrator (543 lines)
 ├── sisyphus.ts                 # Main prompt (615 lines)
 ├── sisyphus-junior.ts          # Delegated task executor
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
