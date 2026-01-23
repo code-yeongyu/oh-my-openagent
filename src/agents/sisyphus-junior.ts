@@ -90,8 +90,15 @@ export function createSisyphusJuniorAgentWithOverrides(
     override = undefined
   }
 
-  const model = override?.model ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
-  const primaryModel = Array.isArray(model) ? model[0] : model
+  const overrideModel = override?.model
+  const primaryOverrideModel = Array.isArray(overrideModel)
+    ? overrideModel.map((m) => m.trim()).find((m) => m.length > 0)
+    : typeof overrideModel === "string"
+      ? overrideModel.trim() || undefined
+      : undefined
+
+  const trimmedSystemDefaultModel = systemDefaultModel?.trim() || undefined
+  const primaryModel = primaryOverrideModel ?? trimmedSystemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append

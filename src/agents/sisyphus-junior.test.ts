@@ -14,6 +14,18 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.model).toBe("openai/gpt-5.2")
     })
 
+    test("applies model override from array (uses first non-empty)", () => {
+      // #given
+      const override = { model: ["", "openai/gpt-5.2", "google/gemini-3-pro"] }
+
+      // #when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // #then
+      expect(result.model).toBe("openai/gpt-5.2")
+    })
+
+
     test("applies temperature override", () => {
       // #given
       const override = { temperature: 0.5 }
@@ -82,6 +94,29 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // #then
       expect(result.model).toBe(SISYPHUS_JUNIOR_DEFAULTS.model)
     })
+
+    test("uses systemDefaultModel when override.model is empty array", () => {
+      // #given
+      const override = { model: [] as string[] }
+
+      // #when
+      const result = createSisyphusJuniorAgentWithOverrides(override, "openai/gpt-5.2")
+
+      // #then
+      expect(result.model).toBe("openai/gpt-5.2")
+    })
+
+    test("falls back to defaults when override.model is empty array and systemDefaultModel missing", () => {
+      // #given
+      const override = { model: [] as string[] }
+
+      // #when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // #then
+      expect(result.model).toBe(SISYPHUS_JUNIOR_DEFAULTS.model)
+    })
+
 
     test("uses default temperature when no override", () => {
       // #given
