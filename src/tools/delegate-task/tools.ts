@@ -156,6 +156,7 @@ export interface DelegateTaskToolOptions {
   directory: string
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
+  sisyphusJuniorModel?: string
 }
 
 export interface BuildSystemContentInput {
@@ -178,7 +179,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig } = options
+  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel } = options
 
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const categoryNames = Object.keys(allCategories)
@@ -513,7 +514,7 @@ To resume this session: resume="${args.resume}"`
            modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
           } else {
           const { model: resolvedModel, source, variant: resolvedVariant } = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model,
+              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
