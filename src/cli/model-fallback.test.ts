@@ -310,19 +310,19 @@ describe("generateModelConfig", () => {
   })
 
   describe("explore agent special cases", () => {
-    test("explore uses Gemini flash when Gemini available", () => {
-      // #given Gemini is available
+    test("explore uses grok-code when only Gemini available (no Claude)", () => {
+      // #given only Gemini is available (no Claude)
       const config = createConfig({ hasGemini: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use gemini-3-flash-preview
-      expect(result.agents?.explore?.model).toBe("google/gemini-3-flash-preview")
+      // #then explore should use grok-code (Claude haiku not available)
+      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
     })
 
-    test("explore uses Claude haiku when Claude + isMax20 but no Gemini", () => {
-      // #given Claude is available with Max 20 plan but no Gemini
+    test("explore uses Claude haiku when Claude available", () => {
+      // #given Claude is available
       const config = createConfig({ hasClaude: true, isMax20: true })
 
       // #when generateModelConfig is called
@@ -332,15 +332,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
     })
 
-    test("explore uses grok-code when Claude without isMax20 and no Gemini", () => {
-      // #given Claude is available without Max 20 plan and no Gemini
+    test("explore uses Claude haiku regardless of isMax20 flag", () => {
+      // #given Claude is available without Max 20 plan
       const config = createConfig({ hasClaude: true, isMax20: false })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use grok-code
-      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
+      // #then explore should use claude-haiku-4-5 (isMax20 doesn't affect explore)
+      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
     })
 
     test("explore uses grok-code when only OpenAI available", () => {

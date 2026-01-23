@@ -80,7 +80,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -230,17 +230,19 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "openai/gpt-5.2",
     },
     "quick": {
-      "model": "openai/gpt-5.1-codex-mini",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.2-codex",
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.2-codex",
+      "variant": "medium",
     },
     "unspecified-low": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.2-codex",
+      "variant": "medium",
     },
     "visual-engineering": {
       "model": "openai/gpt-5.2",
@@ -273,8 +275,8 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "high",
     },
     "Sisyphus": {
-      "model": "openai/gpt-5.2",
-      "variant": "high",
+      "model": "openai/gpt-5.2-codex",
+      "variant": "medium",
     },
     "explore": {
       "model": "opencode/grok-code",
@@ -295,7 +297,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "openai/gpt-5.2",
     },
     "quick": {
-      "model": "openai/gpt-5.1-codex-mini",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.2-codex",
@@ -306,7 +308,8 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "high",
     },
     "unspecified-low": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.2-codex",
+      "variant": "medium",
     },
     "visual-engineering": {
       "model": "openai/gpt-5.2",
@@ -328,9 +331,11 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "Metis (Plan Consultant)": {
       "model": "google/gemini-3-pro-preview",
+      "variant": "max",
     },
     "Momus (Plan Reviewer)": {
       "model": "google/gemini-3-pro-preview",
+      "variant": "max",
     },
     "Prometheus (Planner)": {
       "model": "google/gemini-3-pro-preview",
@@ -339,7 +344,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3-pro-preview",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/grok-code",
     },
     "librarian": {
       "model": "opencode/glm-4.7-free",
@@ -387,9 +392,11 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "Metis (Plan Consultant)": {
       "model": "google/gemini-3-pro-preview",
+      "variant": "max",
     },
     "Momus (Plan Reviewer)": {
       "model": "google/gemini-3-pro-preview",
+      "variant": "max",
     },
     "Prometheus (Planner)": {
       "model": "google/gemini-3-pro-preview",
@@ -398,7 +405,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "google/gemini-3-pro-preview",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/grok-code",
     },
     "librarian": {
       "model": "opencode/glm-4.7-free",
@@ -460,7 +467,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -525,7 +532,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "max",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -590,7 +597,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
       "model": "opencode/glm-4.7-free",
@@ -655,7 +662,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "max",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
       "model": "opencode/glm-4.7-free",
@@ -879,7 +886,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/glm-4.7-free",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-4.7",
     },
   },
 }
@@ -902,7 +909,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "Sisyphus": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-4.7",
     },
     "explore": {
       "model": "opencode/grok-code",
@@ -937,7 +944,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-4.7",
     },
   },
 }
@@ -966,7 +973,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "opencode/glm-4.7-free",
@@ -1093,7 +1100,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "zai-coding-plan/glm-4.7",
@@ -1157,7 +1164,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -1221,7 +1228,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "explore": {
-      "model": "opencode/grok-code",
+      "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
       "model": "zai-coding-plan/glm-4.7",
@@ -1285,7 +1292,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "zai-coding-plan/glm-4.7",
@@ -1350,7 +1357,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "max",
     },
     "explore": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
       "model": "zai-coding-plan/glm-4.7",
