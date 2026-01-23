@@ -199,7 +199,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       };
 
       agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
-        pluginConfig.agents?.["Sisyphus-Junior"],
+        pluginConfig.agents?.["sisyphus-junior"],
         config.model as string | undefined
       );
 
@@ -228,7 +228,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           planConfigWithoutName as Record<string, unknown>
         );
         const prometheusOverride =
-          pluginConfig.agents?.["Prometheus (Planner)"] as
+          pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & { category?: string; model?: string })
             | undefined;
         const defaultModel = config.model as string | undefined;
