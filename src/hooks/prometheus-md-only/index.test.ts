@@ -82,6 +82,47 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
+    test("should inject workflow reminder when Prometheus writes to .sisyphus/plans/", async () => {
+      // #given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: "/tmp/test/.sisyphus/plans/work-plan.md" },
+      }
+
+      // #when
+      await hook["tool.execute.before"](input, output)
+
+      // #then
+      expect(output.message).toContain("PROMETHEUS MANDATORY WORKFLOW REMINDER")
+      expect(output.message).toContain("INTERVIEW")
+      expect(output.message).toContain("METIS CONSULTATION")
+      expect(output.message).toContain("MOMUS REVIEW")
+    })
+
+    test("should NOT inject workflow reminder for .sisyphus/drafts/", async () => {
+      // #given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: "/tmp/test/.sisyphus/drafts/notes.md" },
+      }
+
+      // #when
+      await hook["tool.execute.before"](input, output)
+
+      // #then
+      expect(output.message).toBeUndefined()
+    })
+
     test("should block Prometheus from writing .md files outside .sisyphus/", async () => {
       // #given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())

@@ -63,7 +63,7 @@ Override built-in agent settings:
       "model": "anthropic/claude-haiku-4-5",
       "temperature": 0.5
     },
-    "frontend-ui-ux-engineer": {
+    "multimodal-looker": {
       "disable": true
     }
   }
@@ -116,11 +116,11 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 
 ```json
 {
-  "disabled_agents": ["oracle", "frontend-ui-ux-engineer"]
+  "disabled_agents": ["oracle", "multimodal-looker"]
 }
 ```
 
-Available agents: `oracle`, `librarian`, `explore`, `frontend-ui-ux-engineer`, `document-writer`, `multimodal-looker`
+Available agents: `oracle`, `librarian`, `explore`, `multimodal-looker`
 
 ## Built-in Skills
 
@@ -307,6 +307,128 @@ Add custom categories in `oh-my-opencode.json`:
 ```
 
 Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`.
+
+## Model Resolution System
+
+At runtime, Oh My OpenCode uses a 3-step resolution process to determine which model to use for each agent and category. This happens dynamically based on your configuration and available models.
+
+### Overview
+
+**Problem**: Users have different provider configurations. The system needs to select the best available model for each task at runtime.
+
+**Solution**: A simple 3-step resolution flow:
+1. **Step 1: User Override** — If you specify a model in `oh-my-opencode.json`, use exactly that
+2. **Step 2: Provider Fallback** — Try each provider in the requirement's priority order until one is available
+3. **Step 3: System Default** — Fall back to OpenCode's configured default model
+
+### Resolution Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     MODEL RESOLUTION FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Step 1: USER OVERRIDE                                         │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │ User specified model in oh-my-opencode.json?            │   │
+│   │         YES → Use exactly as specified                  │   │
+│   │         NO  → Continue to Step 2                        │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                  │
+│                              ▼                                  │
+│   Step 2: PROVIDER PRIORITY FALLBACK                            │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │ For each provider in requirement.providers order:       │   │
+│   │                                                         │   │
+│   │ Example for Sisyphus:                                   │   │
+│   │ anthropic → github-copilot → opencode → antigravity     │   │
+│   │     │            │              │            │          │   │
+│   │     ▼            ▼              ▼            ▼          │   │
+│   │ Try: anthropic/claude-opus-4-5                          │   │
+│   │ Try: github-copilot/claude-opus-4-5                     │   │
+│   │ Try: opencode/claude-opus-4-5                           │   │
+│   │ ...                                                     │   │
+│   │                                                         │   │
+│   │ Found in available models? → Return matched model       │   │
+│   │ Not found? → Try next provider                          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                  │
+│                              ▼ (all providers exhausted)        │
+│   Step 3: SYSTEM DEFAULT                                        │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │ Return systemDefaultModel (from opencode.json)          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Agent Provider Chains
+
+Each agent has a defined provider priority chain. The system tries providers in order until it finds an available model:
+
+| Agent | Model (no prefix) | Provider Priority Chain |
+|-------|-------------------|-------------------------|
+| **Sisyphus** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **oracle** | `gpt-5.2` | openai → anthropic → google → github-copilot → opencode |
+| **librarian** | `glm-4.7-free` | opencode → github-copilot → anthropic |
+| **explore** | `grok-code` | opencode → anthropic → github-copilot |
+| **multimodal-looker** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Metis (Plan Consultant)** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Momus (Plan Reviewer)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Atlas** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+
+### Category Provider Chains
+
+Categories follow the same resolution logic:
+
+| Category | Model (no prefix) | Provider Priority Chain |
+|----------|-------------------|-------------------------|
+| **visual-engineering** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **ultrabrain** | `gpt-5.2-codex` | openai → anthropic → google → github-copilot → opencode |
+| **artistry** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **quick** | `claude-haiku-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **unspecified-low** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **unspecified-high** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **writing** | `gemini-3-flash-preview` | google → openai → anthropic → github-copilot → opencode |
+
+### Checking Your Configuration
+
+Use the `doctor` command to see how models resolve with your current configuration:
+
+```bash
+bunx oh-my-opencode doctor --verbose
+```
+
+The "Model Resolution" check shows:
+- Each agent/category's model requirement
+- Provider fallback chain
+- User overrides (if configured)
+- Effective resolution path
+
+### Manual Override
+
+Override any agent or category model in `oh-my-opencode.json`:
+
+```json
+{
+  "agents": {
+    "Sisyphus": {
+      "model": "anthropic/claude-sonnet-4-5"
+    },
+    "oracle": {
+      "model": "openai/o3"
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "anthropic/claude-opus-4-5"
+    }
+  }
+}
+```
+
+When you specify a model override, it takes precedence (Step 1) and the provider fallback chain is skipped entirely.
 
 ## Hooks
 

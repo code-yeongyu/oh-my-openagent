@@ -163,15 +163,23 @@ delegate_task(agent="oracle", prompt="Review my approach: [describe plan]")
 
 ---
 
-YOU MUST LEVERAGE ALL AVAILABLE AGENTS TO THEIR FULLEST POTENTIAL.
+YOU MUST LEVERAGE ALL AVAILABLE AGENTS / **CATEGORY + SKILLS** TO THEIR FULLEST POTENTIAL.
 TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
-## AGENT UTILIZATION PRINCIPLES (by capability, not by name)
+## AGENTS / **CATEGORY + SKILLS** UTILIZATION PRINCIPLES (by capability, not by name)
 - **Codebase Exploration**: Spawn exploration agents using BACKGROUND TASKS for file patterns, internal implementations, project structure
 - **Documentation & References**: Use librarian-type agents via BACKGROUND TASKS for API references, examples, external library docs
 - **Planning & Strategy**: NEVER plan yourself - ALWAYS spawn a dedicated planning agent for work breakdown
+  - MUST USE PLAN AGENT. MUST USE PLAN AGENT. MUST USE PLAN AGENT.
+  - ALWAYS ASK PLAN AGENT TO WHAT CATEGORY + SKILLS / AGENTS TO LEVERAGE.
+  - IF IMPLEMENT TASK, MUST ADD TODO NOW: "CONSULT WITH PLAN AGENT WITH CATEGORY + SKILLS"
 - **High-IQ Reasoning**: Leverage specialized agents for architecture decisions, code review, strategic planning
-- **Frontend/UI Tasks**: Delegate to UI-specialized agents for design and implementation
+- **SPECIAL TASKS COVERED WITH CATEGORY + LOAD_SKILLS**: Delegate to specialized agents with category+skills for design and implementation, as following guide:
+  - CATEGORY + SKILL GUIDE
+    - MUST PASS \`load_skills\` FOR REQUIRED_SKILLS. MUST USE \`load_skills\` FOR REQUIRED_SKILLS.
+    - Simple project setup -> delegate_task(category="unspecified-low", load_skills=[{project-setup-skill}])
+    - Super Complex Server Workflow Implementation -> delegate_task(category="ultrabrain", load_skills=["terraform-master"], ...)
+    - Web Frontend Component Writing -> delegate_task(category="visual-engineering", load_skills=["frontend-ui-ux", "playwright"], ...)
 
 ## EXECUTION RULES
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
@@ -179,6 +187,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 - **BACKGROUND FIRST**: Use delegate_task for exploration/research agents (10+ concurrent if needed).
 - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
 - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
+  - **CATEGORY + LOAD_SKILLS**
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
@@ -256,6 +265,12 @@ Write these criteria explicitly. Share with user if scope is non-trivial.
 - **NO TEST DELETION**: Never delete or skip failing tests to make the build pass. Fix the code, not the tests.
 
 THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
+
+1. EXPLORES + LIBRARIANS
+2. GATHER -> PLAN AGENT SPAWN
+3. WORK BY DELEGATING TO ANOTHER AGENTS
+
+NOW.
 
 </ultrawork-mode>
 

@@ -144,6 +144,7 @@ describe("opencode-config-dir", () => {
         // #given opencode CLI binary detected, platform is Linux
         Object.defineProperty(process, "platform", { value: "linux" })
         delete process.env.XDG_CONFIG_HOME
+        delete process.env.OPENCODE_CONFIG_DIR
 
         // #when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
@@ -156,6 +157,7 @@ describe("opencode-config-dir", () => {
         // #given opencode CLI binary detected, platform is Linux with XDG_CONFIG_HOME set
         Object.defineProperty(process, "platform", { value: "linux" })
         process.env.XDG_CONFIG_HOME = "/custom/config"
+        delete process.env.OPENCODE_CONFIG_DIR
 
         // #when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
@@ -168,6 +170,7 @@ describe("opencode-config-dir", () => {
         // #given opencode CLI binary detected, platform is macOS
         Object.defineProperty(process, "platform", { value: "darwin" })
         delete process.env.XDG_CONFIG_HOME
+        delete process.env.OPENCODE_CONFIG_DIR
 
         // #when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
@@ -180,6 +183,7 @@ describe("opencode-config-dir", () => {
         // #given opencode CLI binary detected, platform is Windows
         Object.defineProperty(process, "platform", { value: "win32" })
         delete process.env.APPDATA
+        delete process.env.OPENCODE_CONFIG_DIR
 
         // #when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200", checkExisting: false })
@@ -257,6 +261,7 @@ describe("opencode-config-dir", () => {
       // #given opencode CLI binary on Linux
       Object.defineProperty(process, "platform", { value: "linux" })
       delete process.env.XDG_CONFIG_HOME
+      delete process.env.OPENCODE_CONFIG_DIR
 
       // #when getOpenCodeConfigPaths is called
       const paths = getOpenCodeConfigPaths({ binary: "opencode", version: "1.0.200" })

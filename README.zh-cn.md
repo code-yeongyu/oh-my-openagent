@@ -16,7 +16,7 @@
 
 > [!TIP]
 >
-> [![Orchestrator 现已进入测试阶段。](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
+> [![Orchestrator 现已进入测试阶段。](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
 > > **Orchestrator 现已进入测试阶段。使用 `oh-my-opencode@3.0.0-beta.10` 安装。**
 >
 > 加入我们！
@@ -289,7 +289,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 详细信息请参阅 [Features Documentation](docs/features.md)。
 
 **概览：**
-- **智能体**：Sisyphus（主智能体）、Prometheus（规划器）、Oracle（架构/调试）、Librarian（文档/代码搜索）、Explore（快速代码库 grep）、Frontend Engineer（UI/UX）、Document Writer、Multimodal Looker
+- **智能体**：Sisyphus（主智能体）、Prometheus（规划器）、Oracle（架构/调试）、Librarian（文档/代码搜索）、Explore（快速代码库 grep）、Multimodal Looker
 - **后台智能体**：像真正的开发团队一样并行运行多个智能体
 - **LSP & AST 工具**：重构、重命名、诊断、AST 感知代码搜索
 - **上下文注入**：自动注入 AGENTS.md、README.md、条件规则

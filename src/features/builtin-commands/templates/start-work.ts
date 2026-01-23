@@ -31,7 +31,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 When listing plans for selection:
 \`\`\`
-📋 Available Work Plans
+Available Work Plans
 
 Current Time: {ISO timestamp}
 Session ID: {current session id}
@@ -44,7 +44,7 @@ Which plan would you like to work on? (Enter number or plan name)
 
 When resuming existing work:
 \`\`\`
-🔄 Resuming Work Session
+Resuming Work Session
 
 Active Plan: {plan-name}
 Progress: {completed}/{total} tasks
@@ -55,7 +55,7 @@ Reading plan and continuing from last incomplete task...
 
 When auto-selecting single plan:
 \`\`\`
-🚀 Starting Work Session
+Starting Work Session
 
 Plan: {plan-name}
 Session ID: {session_id}

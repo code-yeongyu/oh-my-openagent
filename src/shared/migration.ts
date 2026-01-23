@@ -17,10 +17,9 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
-  "frontend-ui-ux-engineer": "frontend-ui-ux-engineer",
-  "document-writer": "document-writer",
   "multimodal-looker": "multimodal-looker",
-  "orchestrator-sisyphus": "orchestrator-sisyphus",
+  "orchestrator-sisyphus": "Atlas",
+  atlas: "Atlas",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
@@ -28,20 +27,24 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "oracle",
   "librarian",
   "explore",
-  "frontend-ui-ux-engineer",
-  "document-writer",
   "multimodal-looker",
   "Metis (Plan Consultant)",
   "Momus (Plan Reviewer)",
   "Prometheus (Planner)",
-  "orchestrator-sisyphus",
+  "Atlas",
   "build",
 ])
 
 // Migration map: old hook names → new hook names (for backward compatibility)
-export const HOOK_NAME_MAP: Record<string, string> = {
+// null means the hook was removed and should be filtered out from disabled_hooks
+export const HOOK_NAME_MAP: Record<string, string | null> = {
   // Legacy names (backward compatibility)
   "anthropic-auto-compact": "anthropic-context-window-limit-recovery",
+  "sisyphus-orchestrator": "atlas",
+
+  // Removed hooks (v3.0.0) - will be filtered out and user warned
+  "preemptive-compaction": null,
+  "empty-message-sanitizer": null,
 }
 
 /**
@@ -52,7 +55,7 @@ export const HOOK_NAME_MAP: Record<string, string> = {
  * from explicit model configs to category-based configs.
  * 
  * DO NOT add new entries here. New agents should use:
- * - Category-based config (preferred): { category: "most-capable" }
+ * - Category-based config (preferred): { category: "unspecified-high" }
  * - Or inherit from OpenCode's config.model
  * 
  * This map will be removed in a future major version once migration period ends.
@@ -61,8 +64,8 @@ export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro-preview": "visual-engineering",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
-  "anthropic/claude-opus-4-5": "most-capable",
-  "anthropic/claude-sonnet-4-5": "general",
+  "anthropic/claude-opus-4-5": "unspecified-high",
+  "anthropic/claude-sonnet-4-5": "unspecified-low",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
@@ -80,19 +83,28 @@ export function migrateAgentNames(agents: Record<string, unknown>): { migrated: 
   return { migrated, changed }
 }
 
-export function migrateHookNames(hooks: string[]): { migrated: string[]; changed: boolean } {
+export function migrateHookNames(hooks: string[]): { migrated: string[]; changed: boolean; removed: string[] } {
   const migrated: string[] = []
+  const removed: string[] = []
   let changed = false
 
   for (const hook of hooks) {
-    const newHook = HOOK_NAME_MAP[hook] ?? hook
+    const mapping = HOOK_NAME_MAP[hook]
+
+    if (mapping === null) {
+      removed.push(hook)
+      changed = true
+      continue
+    }
+
+    const newHook = mapping ?? hook
     if (newHook !== hook) {
       changed = true
     }
     migrated.push(newHook)
   }
 
-  return { migrated, changed }
+  return { migrated, changed, removed }
 }
 
 export function migrateAgentConfigToCategory(config: Record<string, unknown>): {
@@ -153,11 +165,30 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     needsWrite = true
   }
 
+  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+    const migrated: string[] = []
+    let changed = false
+    for (const agent of rawConfig.disabled_agents as string[]) {
+      const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+      if (newAgent !== agent) {
+        changed = true
+      }
+      migrated.push(newAgent)
+    }
+    if (changed) {
+      rawConfig.disabled_agents = migrated
+      needsWrite = true
+    }
+  }
+
   if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {
-    const { migrated, changed } = migrateHookNames(rawConfig.disabled_hooks as string[])
+    const { migrated, changed, removed } = migrateHookNames(rawConfig.disabled_hooks as string[])
     if (changed) {
       rawConfig.disabled_hooks = migrated
       needsWrite = true
+    }
+    if (removed.length > 0) {
+      log(`Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`)
     }
   }
 

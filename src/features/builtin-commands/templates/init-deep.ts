@@ -236,11 +236,11 @@ AGENTS_LOCATIONS = [
 
 ### Subdirectory AGENTS.md (Parallel)
 
-Launch document-writer agents for each location:
+Launch writing tasks for each location:
 
 \`\`\`
 for loc in AGENTS_LOCATIONS (except root):
-  delegate_task(agent="document-writer", prompt=\\\`
+  delegate_task(category="writing", prompt=\\\`
     Generate AGENTS.md for: \${loc.path}
     - Reason: \${loc.reason}
     - 30-80 lines max
@@ -275,8 +275,8 @@ For each generated file:
 Mode: {update | create-new}
 
 Files:
-  ✓ ./AGENTS.md (root, {N} lines)
-  ✓ ./src/hooks/AGENTS.md ({N} lines)
+  [OK] ./AGENTS.md (root, {N} lines)
+  [OK] ./src/hooks/AGENTS.md ({N} lines)
 
 Dirs Analyzed: {N}
 AGENTS.md Created: {N}

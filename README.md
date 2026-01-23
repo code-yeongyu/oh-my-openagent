@@ -16,7 +16,7 @@
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-sisyphus.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
+> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
 > > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.10` to install it.**
 >
 > Be with us!
@@ -75,7 +75,7 @@ Yes, technically possible. But I cannot recommend using it.
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
-[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
 </div>
 
@@ -120,7 +120,7 @@ Yes, technically possible. But I cannot recommend using it.
     - [For LLM Agents](#for-llm-agents)
   - [Uninstallation](#uninstallation)
   - [Features](#features)
-  - [Configuration](#configuration)
+   - [Configuration](#configuration)
     - [JSONC Support](#jsonc-support)
     - [Google Auth](#google-auth)
     - [Agents](#agents)
@@ -293,7 +293,7 @@ We have lots of features that you'll think should obviously exist, and once you 
 See the full [Features Documentation](docs/features.md) for detailed information.
 
 **Quick Overview:**
-- **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Frontend Engineer (UI/UX), Document Writer, Multimodal Looker
+- **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
 - **Background Agents**: Run multiple agents in parallel like a real dev team
 - **LSP & AST Tools**: Refactoring, rename, diagnostics, AST-aware code search
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules

@@ -1,8 +1,8 @@
 import { existsSync } from "fs"
-import { homedir } from "os"
 import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
+import { getOpenCodeConfigDir } from "../../shared"
 
 export interface DisabledHooksConfig {
   Stop?: string[]
@@ -16,7 +16,7 @@ export interface PluginExtendedConfig {
   disabledHooks?: DisabledHooksConfig
 }
 
-const USER_CONFIG_PATH = join(homedir(), ".config", "opencode", "opencode-cc-plugin.json")
+const USER_CONFIG_PATH = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
 
 function getProjectConfigPath(): string {
   return join(process.cwd(), ".opencode", "opencode-cc-plugin.json")

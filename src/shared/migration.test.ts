@@ -64,7 +64,7 @@ describe("migrateAgentNames", () => {
     // #then: Case-insensitive lookup should migrate correctly
     expect(migrated["Sisyphus"]).toEqual({ model: "test" })
     expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
-    expect(migrated["orchestrator-sisyphus"]).toEqual({ model: "openai/gpt-5.2" })
+    expect(migrated["Atlas"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -80,6 +80,36 @@ describe("migrateAgentNames", () => {
     expect(changed).toBe(false)
     expect(migrated["custom-agent"]).toEqual({ model: "custom/model" })
   })
+
+  test("migrates orchestrator-sisyphus to Atlas", () => {
+    // #given: Config with legacy orchestrator-sisyphus agent name
+    const agents = {
+      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: orchestrator-sisyphus should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
+  })
+
+  test("migrates lowercase atlas to Atlas", () => {
+    // #given: Config with lowercase atlas agent name
+    const agents = {
+      atlas: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // #when: Migrate agent names
+    const { migrated, changed } = migrateAgentNames(agents)
+
+    // #then: lowercase atlas should be migrated to Atlas
+    expect(changed).toBe(true)
+    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toBeUndefined()
+  })
 })
 
 describe("migrateHookNames", () => {
@@ -88,13 +118,14 @@ describe("migrateHookNames", () => {
     const hooks = ["anthropic-auto-compact", "comment-checker"]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Legacy hook name should be migrated
     expect(changed).toBe(true)
     expect(migrated).toContain("anthropic-context-window-limit-recovery")
     expect(migrated).toContain("comment-checker")
     expect(migrated).not.toContain("anthropic-auto-compact")
+    expect(removed).toEqual([])
   })
 
   test("preserves current hook names unchanged", () => {
@@ -106,11 +137,12 @@ describe("migrateHookNames", () => {
     ]
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Current names should remain unchanged
     expect(changed).toBe(false)
     expect(migrated).toEqual(hooks)
+    expect(removed).toEqual([])
   })
 
   test("handles empty hooks array", () => {
@@ -118,11 +150,12 @@ describe("migrateHookNames", () => {
     const hooks: string[] = []
 
     // #when: Migrate hook names
-    const { migrated, changed } = migrateHookNames(hooks)
+    const { migrated, changed, removed } = migrateHookNames(hooks)
 
     // #then: Should return empty array with no changes
     expect(changed).toBe(false)
     expect(migrated).toEqual([])
+    expect(removed).toEqual([])
   })
 
   test("migrates multiple legacy hook names", () => {
@@ -135,6 +168,51 @@ describe("migrateHookNames", () => {
     // #then: All legacy names should be migrated
     expect(changed).toBe(true)
     expect(migrated).toEqual(["anthropic-context-window-limit-recovery"])
+  })
+
+  test("migrates sisyphus-orchestrator to atlas", () => {
+    // #given: Config with legacy sisyphus-orchestrator hook
+    const hooks = ["sisyphus-orchestrator", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: sisyphus-orchestrator should be migrated to atlas
+    expect(changed).toBe(true)
+    expect(migrated).toContain("atlas")
+    expect(migrated).toContain("comment-checker")
+    expect(migrated).not.toContain("sisyphus-orchestrator")
+    expect(removed).toEqual([])
+  })
+
+  test("removes obsolete hooks and returns them in removed array", () => {
+    // #given: Config with removed hooks from v3.0.0
+    const hooks = ["preemptive-compaction", "empty-message-sanitizer", "comment-checker"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Removed hooks should be filtered out
+    expect(changed).toBe(true)
+    expect(migrated).toEqual(["comment-checker"])
+    expect(removed).toContain("preemptive-compaction")
+    expect(removed).toContain("empty-message-sanitizer")
+    expect(removed).toHaveLength(2)
+  })
+
+  test("handles mixed migration and removal", () => {
+    // #given: Config with both legacy rename and removed hooks
+    const hooks = ["anthropic-auto-compact", "preemptive-compaction", "sisyphus-orchestrator"]
+
+    // #when: Migrate hook names
+    const { migrated, changed, removed } = migrateHookNames(hooks)
+
+    // #then: Legacy should be renamed, removed should be filtered
+    expect(changed).toBe(true)
+    expect(migrated).toContain("anthropic-context-window-limit-recovery")
+    expect(migrated).toContain("atlas")
+    expect(migrated).not.toContain("preemptive-compaction")
+    expect(removed).toEqual(["preemptive-compaction"])
   })
 })
 
@@ -310,7 +388,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "most-capable", "general"]
+    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
 
     // #when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
@@ -370,10 +448,9 @@ describe("shouldDeleteAgentConfig", () => {
 
   test("returns true when all fields match category defaults", () => {
     // #given: Config with fields matching category defaults
-    // Note: DEFAULT_CATEGORIES only has temperature, not model
     const config = {
       category: "visual-engineering",
-      temperature: 0.7,
+      model: "google/gemini-3-pro-preview",
     }
 
     // #when: Check if config should be deleted
@@ -384,10 +461,10 @@ describe("shouldDeleteAgentConfig", () => {
   })
 
   test("returns false when fields differ from category defaults", () => {
-    // #given: Config with custom temperature override
+    // #given: Config with custom model override
     const config = {
       category: "visual-engineering",
-      temperature: 0.9, // Different from default (0.7)
+      model: "anthropic/claude-opus-4-5",
     }
 
     // #when: Check if config should be deleted
@@ -400,10 +477,10 @@ describe("shouldDeleteAgentConfig", () => {
   test("handles different categories with their defaults", () => {
     // #given: Configs for different categories
     const configs = [
-      { category: "ultrabrain", temperature: 0.1 },
-      { category: "quick", temperature: 0.3 },
-      { category: "most-capable", temperature: 0.1 },
-      { category: "general", temperature: 0.3 },
+      { category: "ultrabrain" },
+      { category: "quick" },
+      { category: "unspecified-high" },
+      { category: "unspecified-low" },
     ]
 
     // #when: Check each config
