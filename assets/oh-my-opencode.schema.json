@@ -20,14 +20,15 @@
       "items": {
         "type": "string",
         "enum": [
-          "Sisyphus",
+          "sisyphus",
+          "prometheus",
           "oracle",
           "librarian",
           "explore",
           "multimodal-looker",
-          "Metis (Plan Consultant)",
-          "Momus (Plan Reviewer)",
-          "Atlas"
+          "metis",
+          "momus",
+          "atlas"
         ]
       }
     },
@@ -345,7 +346,7 @@
             }
           }
         },
-        "Sisyphus": {
+        "sisyphus": {
           "type": "object",
           "properties": {
             "model": {
@@ -471,7 +472,7 @@
             }
           }
         },
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           "type": "object",
           "properties": {
             "model": {
@@ -723,7 +724,7 @@
             }
           }
         },
-        "Prometheus (Planner)": {
+        "prometheus": {
           "type": "object",
           "properties": {
             "model": {
@@ -849,7 +850,7 @@
             }
           }
         },
-        "Metis (Plan Consultant)": {
+        "metis": {
           "type": "object",
           "properties": {
             "model": {
@@ -975,7 +976,7 @@
             }
           }
         },
-        "Momus (Plan Reviewer)": {
+        "momus": {
           "type": "object",
           "properties": {
             "model": {
@@ -1605,7 +1606,7 @@
             }
           }
         },
-        "Atlas": {
+        "atlas": {
           "type": "object",
           "properties": {
             "model": {
