@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { BUILTIN_SERVERS, EXT_TO_LANG, LSP_INSTALL_HINTS } from "./constants"
 import type { ResolvedServer, ServerLookupResult } from "./types"
-import { getOpenCodeConfigDir } from "../../shared"
+import { getOpenCodeConfigDir, getDataDir } from "../../shared"
 
 interface LspEntry {
   disabled?: boolean
@@ -201,10 +201,12 @@ export function isServerInstalled(command: string[]): boolean {
 
   const cwd = process.cwd()
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const dataDir = join(getDataDir(), "opencode")
   const additionalBases = [
     join(cwd, "node_modules", ".bin"),
     join(configDir, "bin"),
     join(configDir, "node_modules", ".bin"),
+    join(dataDir, "bin"),
   ]
 
   for (const base of additionalBases) {
