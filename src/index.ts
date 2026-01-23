@@ -199,10 +199,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createStartWorkHook(ctx)
     : null;
 
-  const atlasHook = isHookEnabled("atlas")
-    ? createAtlasHook(ctx)
-    : null;
-
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
     ? createPrometheusMdOnlyHook(ctx)
     : null;
@@ -210,6 +206,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const backgroundManager = new BackgroundManager(ctx);
+
+  const atlasHook = isHookEnabled("atlas")
+    ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
+    : null;
 
   initTaskToastManager(ctx.client);
 
@@ -487,6 +487,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
