@@ -336,8 +336,8 @@ describe("resolveModelWithFallback", () => {
       expect(logSpy).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
     })
 
-    test("returns system default when availableModels is empty", () => {
-      // #given
+    test("uses first fallback entry when availableModels is empty (no cache scenario)", () => {
+      // #given - empty availableModels simulates CI environment without model cache
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["anthropic"], model: "claude-opus-4-5" },
@@ -349,9 +349,9 @@ describe("resolveModelWithFallback", () => {
       // #when
       const result = resolveModelWithFallback(input)
 
-      // #then
-      expect(result.model).toBe("google/gemini-3-pro")
-      expect(result.source).toBe("system-default")
+      // #then - should use first fallback entry, not system default
+      expect(result.model).toBe("anthropic/claude-opus-4-5")
+      expect(result.source).toBe("provider-fallback")
     })
 
     test("returns system default when fallbackChain is not provided", () => {
