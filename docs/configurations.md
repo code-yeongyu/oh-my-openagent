@@ -37,14 +37,18 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 
 ## Config File Locations
 
-Config file locations (priority order):
-1. `.opencode/oh-my-opencode.json` (project)
-2. User config (platform-specific):
+Config file locations (priority order, later overrides earlier):
+1. User config (platform-specific)
+2. `OH_MY_OPENCODE_CONFIG` (explicit config path)
+3. Project config(s) from project root → current directory (searches upward for `.opencode/oh-my-opencode.jsonc|.json`)
+4. `OH_MY_OPENCODE_CONFIG_CONTENT` (inline JSONC string)
 
 | Platform        | User Config Path                                                                                            |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Windows**     | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                                    |
+
+You can override the user config directory via `OH_MY_OPENCODE_CONFIG_DIR`.
 
 Schema autocomplete supported:
 
@@ -542,6 +546,9 @@ Opt-in experimental features that may change or be removed in future versions. U
 
 ## Environment Variables
 
-| Variable              | Description                                                                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OPENCODE_CONFIG_DIR` | Override the OpenCode configuration directory. Useful for profile isolation with tools like [OCX](https://github.com/kdcokenny/ocx) ghost mode. |
+| Variable                        | Description                                                                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OH_MY_OPENCODE_CONFIG_DIR`     | Override the Oh My OpenCode user config directory. Falls back to OpenCode's config dir when unset.                                             |
+| `OH_MY_OPENCODE_CONFIG`         | Explicit config file path (JSON or JSONC). Overrides user config, overridden by project config.                                                |
+| `OH_MY_OPENCODE_CONFIG_CONTENT` | Inline JSONC config string with highest precedence.                                                                                           |
+| `OPENCODE_CONFIG_DIR`           | Override the OpenCode configuration directory. Used as a fallback when `OH_MY_OPENCODE_CONFIG_DIR` is not set.                                |
