@@ -12,7 +12,7 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfo()
 
       // #then: Should have agent entries
-      const sisyphus = info.agents.find((a) => a.name === "Sisyphus")
+      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
       expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-5")
       expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
@@ -84,7 +84,7 @@ describe("model-resolution check", () => {
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
       // #then: Should show provider fallback chain
-      const sisyphus = info.agents.find((a) => a.name === "Sisyphus")
+      const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
       expect(sisyphus!.userOverride).toBeUndefined()
       expect(sisyphus!.effectiveResolution).toContain("Provider fallback:")
