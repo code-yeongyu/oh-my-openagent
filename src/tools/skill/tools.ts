@@ -165,7 +165,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         throw new Error(`Skill "${args.name}" not found. Available skills: ${available || "none"}`)
       }
 
-      if (skill.definition.agent && ctx?.agent && skill.definition.agent !== ctx.agent) {
+      if (skill.definition.agent && (!ctx?.agent || skill.definition.agent !== ctx.agent)) {
         throw new Error(`Skill "${args.name}" is restricted to agent "${skill.definition.agent}"`)
       }
 

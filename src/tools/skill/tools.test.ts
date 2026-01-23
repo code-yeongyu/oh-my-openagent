@@ -96,6 +96,18 @@ describe("skill tool - agent restriction", () => {
     )
   })
 
+  it("throws error when context agent is undefined for restricted skill", async () => {
+    // #given
+    const loadedSkills = [createMockSkill("sisyphus-only-skill", { agent: "sisyphus" })]
+    const tool = createSkillTool({ skills: loadedSkills })
+    const contextWithoutAgent = { ...mockContext, agent: undefined as unknown as string }
+
+    // #when / #then
+    await expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
+      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
+    )
+  })
+
 })
 
 describe("skill tool - MCP schema display", () => {
