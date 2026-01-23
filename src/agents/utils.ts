@@ -139,7 +139,7 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
 }
 
 export async function createBuiltinAgents(
-  disabledAgents: BuiltinAgentName[] = [],
+  disabledAgents: string[] = [],
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
