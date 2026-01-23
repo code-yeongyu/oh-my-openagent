@@ -395,7 +395,7 @@ describe("start-work hook", () => {
       )
 
       // #then
-      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "Atlas")
+      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
     })
   })
