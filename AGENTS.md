@@ -1,12 +1,12 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-23T02:09:00+09:00
-**Commit:** 0e18efc7
+**Generated:** 2026-01-23T15:59:00+09:00
+**Commit:** 599fad0e
 **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3, Grok, GLM-4.7). 31 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 10 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
+OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash, Grok Code, GLM-4.7). 31 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 10 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
@@ -21,7 +21,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (590 lines)
+│   └── index.ts       # Main plugin entry (593 lines)
 ├── script/            # build-schema.ts, build-binaries.ts
 ├── packages/          # 7 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
@@ -38,7 +38,7 @@ oh-my-opencode/
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
 | Background agents | `src/features/background-agent/` | manager.ts (1335 lines) |
-| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (771 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (773 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -113,12 +113,12 @@ bun test               # 90 test files
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/agents/atlas.ts` | 1383 | Orchestrator, 7-section delegation |
 | `src/features/background-agent/manager.ts` | 1335 | Task lifecycle, concurrency |
 | `src/features/builtin-skills/skills.ts` | 1203 | Skill definitions |
 | `src/agents/prometheus-prompt.ts` | 1196 | Planning agent |
-| `src/tools/delegate-task/tools.ts` | 1038 | Category-based delegation |
-| `src/hooks/atlas/index.ts` | 771 | Orchestrator hook |
+| `src/tools/delegate-task/tools.ts` | 1039 | Category-based delegation |
+| `src/hooks/atlas/index.ts` | 773 | Orchestrator hook |
+| `src/cli/config-manager.ts` | 641 | JSONC config parsing |
 
 ## MCP ARCHITECTURE
 

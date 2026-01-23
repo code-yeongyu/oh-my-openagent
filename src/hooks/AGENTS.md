@@ -8,7 +8,7 @@
 
 ```
 hooks/
-├── atlas/                      # Main orchestration (771 lines)
+├── atlas/                      # Main orchestration (773 lines)
 ├── anthropic-context-window-limit-recovery/  # Auto-summarize
 ├── todo-continuation-enforcer.ts # Force TODO completion
 ├── ralph-loop/                 # Self-referential dev loop
