@@ -1,0 +1,11 @@
+{
+  "Common": {
+    "title": "Oh My OpenCode",
+    "description": "AI 에이전트를 위한 궁극의 개발 환경",
+    "getStarted": "시작하기",
+    "learnMore": "더 알아보기"
+  },
+  "LanguageSwitcher": {
+    "label": "언어 변경"
+  }
+}
