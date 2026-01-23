@@ -35,7 +35,7 @@
 
 > 📍 参考流程图: PHASE 3 完成阶段 (第 1466-1521 行)
 
-- [ ] **Task 1.1**: 将 `archiver` agent 接入 `sisyphus-orchestrator` 完成钩子
+- [x] **Task 1.1**: 将 `archiver` agent 接入 `sisyphus-orchestrator` 完成钩子 ✅ (已实现: src/hooks/sisyphus-orchestrator/index.ts:712-736)
   - **原因**: 目前 Archiver agent 已存在 (`src/agents/archiver.ts`)，但未被编排器自动触发。Phase 3 完成时需要自动执行归档流程（Git 策略、清理、移动到 `changes/archive/`）。
   - 文件: `src/hooks/sisyphus-orchestrator/index.ts`
   - 验收: Phase 3 完成时自动触发 Archiver
@@ -94,7 +94,7 @@
 
 > 📍 参考流程图: PHASE 0 意图门控 (第 1275-1283 行)
 
-- [ ] **Task 2.1**: 实现 Skill 建议机制 (关键词检测 + UserPromptSubmit)
+- [x] **Task 2.1**: 实现 Skill 建议机制 (关键词检测 + UserPromptSubmit) ✅ (已实现: src/hooks/skill-suggestion/)
   - **目标**: 通过智能建议机制增强 Skill 调用概率，不阻塞工作流
   - **实现方式**: `UserPromptSubmit` hook + 关键词检测
   
@@ -120,7 +120,7 @@
     - [ ] 建议不阻塞工具调用
     - [ ] 同一 Skill 每轮只建议一次
 
-- [ ] **Task 2.2**: 增强歧义检测逻辑 (提示增强)
+- [x] **Task 2.2**: 增强歧义检测逻辑 (提示增强) ✅ (已实现: src/agents/orchestrator-sisyphus.ts:175-241)
   - **目标**: 当存在多种解释且工作量差异 2x+ 时，引导 LLM 询问用户
   - **实现方式**: 在系统提示中强调歧义检测原则
   - 文件: `src/agents/orchestrator-sisyphus.ts`
@@ -130,7 +130,7 @@
 
 > 📍 参考流程图: PLANNING PHASE (第 1290-1336 行)
 
-- [ ] **Task 3.1**: 实现 Metis → Prometheus → Momus 流程引导 (警告提醒)
+- [x] **Task 3.1**: 实现 Metis → Prometheus → Momus 流程引导 (警告提醒) ✅ (已实现: src/hooks/planning-flow-guide/)
   - **目标**: 检测到非常规顺序时发出警告，但不阻塞执行
   - **实现方式**: 在 sisyphus_task 调用时检测目标 agent，记录流程状态
   - 文件: 新建 `src/hooks/planning-flow-guide/index.ts`
@@ -139,7 +139,7 @@
     - [ ] 警告不阻塞执行
     - [ ] 记录流程状态用于调试
 
-- [ ] **Task 3.2**: Momus REJECT 时引导返回 Prometheus
+- [x] **Task 3.2**: Momus REJECT 时引导返回 Prometheus ✅ (已实现: src/hooks/planning-flow-guide/index.ts:139-189)
   - **目标**: 计划审查失败时注入建议，引导重新规划
   - **实现方式**: 检测 Momus 返回 REJECT 后注入提示
   - 验收: 计划审查失败时注入返回建议

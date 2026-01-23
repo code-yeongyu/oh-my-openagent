@@ -124,3 +124,15 @@ Before marking complete, ensure `progress.md` has a final summary:
 ### Known Issues
 None (or list any deferred items)
 ```
+
+---
+
+## Next Step
+
+After verification is complete and all checks pass:
+
+| Condition | Next Skill | Action |
+|-----------|------------|--------|
+| All checks passed | `finishing-a-development-branch` | `skill("finishing-a-development-branch")` to present merge/PR options |
+
+**REQUIRED:** Invoke finishing-a-development-branch to complete the integration workflow.

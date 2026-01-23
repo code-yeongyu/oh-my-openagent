@@ -273,10 +273,14 @@ Log ALL errors to `progress.md` immediately with:
 
 ---
 
-## 下一步
- 
-所有任务完成后：
+## Next Step
 
-1. **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-2. 完成后运行 `/archive {change-name}` 归档变更
-3. **REQUIRED SUB-SKILL:** Use superpowers:archiving-changes
+After all tasks are completed and verified:
+
+| Condition | Next Skill | Action |
+|-----------|------------|--------|
+| All tasks complete | `verification-before-completion` | `skill("verification-before-completion")` to verify deliverables |
+| Verification passed | `finishing-a-development-branch` | `skill("finishing-a-development-branch")` to complete the work |
+| Branch finished | `archiving-changes` | `skill("archiving-changes")` or `/archive {change-name}` |
+
+**REQUIRED:** Follow the complete workflow chain to ensure proper completion and archival.

@@ -291,11 +291,21 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
  * Default skills for specific agents (Task 4-6.5)
  * These are automatically merged with user-specified skills when calling agents directly.
  */
+/**
+ * Default skills for specific agents.
+ * These are automatically merged with user-specified skills when calling agents directly.
+ * 
+ * IMPORTANT: defaultSkills generate REMINDERS only (not full content injection).
+ * Full content injection only happens when user explicitly passes `skills` parameter.
+ */
 export const AGENT_DEFAULT_SKILLS: Record<string, string[]> = {
+  // Metis: Pre-planning analysis - needs brainstorming for requirements exploration
   "Metis (Plan Consultant)": ["brainstorming", "codex-mcp-collaboration"],
-  "Prometheus (Planner)": ["creating-changes", "dispatching-parallel-agents"],
+  // Prometheus: Planning - needs brainstorming FIRST, then creating-changes
+  "Prometheus (Planner)": ["brainstorming", "creating-changes", "dispatching-parallel-agents"],
   "Momus (Plan Reviewer)": ["verification-before-completion"],
-  "archiver": ["verification-before-completion", "finishing-a-development-branch", "archiving-changes"],
+  // Archiver: ONLY archiving - verification and git strategy are handled by main agent (Sisyphus)
+  "archiver": ["archiving-changes"],
   "frontend-ui-ux-engineer": ["frontend-ui-ux", "playwright"],
 }
 

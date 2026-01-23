@@ -69,7 +69,13 @@ Report: "Brainstorming complete. Key decisions captured. Ready to create change 
 
 ## Next Step
 
-**REQUIRED SUB-SKILL:** Use superpowers:creating-changes to create the change directory and all planning documents.
+After brainstorming is complete, invoke the next skill in the workflow:
+
+| Condition | Next Skill | Action |
+|-----------|------------|--------|
+| Design validated | `creating-changes` | `skill("creating-changes")` to create change directory and planning documents |
+
+**REQUIRED:** Do NOT skip this step. The creating-changes skill creates all necessary planning files.
 
 ## References
 

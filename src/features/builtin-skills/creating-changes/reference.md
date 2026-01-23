@@ -307,10 +307,22 @@ Each task should be:
 ```markdown
 # Findings: <name>
 
+<!-- 
+  WHAT: Your knowledge base for the task. Stores everything you discover and decide.
+  WHY: Context windows are limited. This file is your "external memory" - persistent and unlimited.
+  WHEN: Update after ANY discovery, especially after 2 view/browser/search operations (2-Action Rule).
+-->
+
 > This file tracks research discoveries, decisions, and issues during planning and execution.
 > **2-Action Rule**: After every 2 browser/view operations, save findings here.
 
 ## Requirements
+
+<!-- 
+  WHAT: What the user asked for, broken down into specific requirements.
+  WHY: Keeps requirements visible so you don't forget what you're building.
+  WHEN: Fill this in during brainstorming/planning phase.
+-->
 
 [Captured from brainstorming conversation]
 
@@ -319,6 +331,12 @@ Each task should be:
 - Requirement 3: [description]
 
 ## Research Findings
+
+<!-- 
+  WHAT: Key discoveries from web searches, documentation reading, or exploration.
+  WHY: Multimodal content (images, browser results) doesn't persist. Write it down immediately.
+  WHEN: After EVERY 2 view/browser/search operations, update this section (2-Action Rule).
+-->
 
 ### [Topic 1]
 
@@ -334,12 +352,24 @@ Each task should be:
 
 ## Technical Decisions
 
+<!-- 
+  WHAT: Architecture and implementation choices you've made, with reasoning.
+  WHY: You'll forget why you chose a technology or approach. This table preserves that knowledge.
+  WHEN: Update whenever you make a significant technical choice.
+-->
+
 | Decision | Choice | Rationale | Alternatives Considered |
 |----------|--------|-----------|------------------------|
 | [Decision 1] | [What was chosen] | [Why] | [Other options] |
 | [Decision 2] | [What was chosen] | [Why] | [Other options] |
 
 ## Issues Encountered
+
+<!-- 
+  WHAT: Problems you ran into and how you solved them.
+  WHY: Prevents repeating the same mistakes. Builds institutional knowledge.
+  WHEN: Document when you encounter blockers or unexpected challenges.
+-->
 
 | Issue | Status | Resolution |
 |-------|--------|------------|
@@ -348,11 +378,23 @@ Each task should be:
 
 ## Resources
 
+<!-- 
+  WHAT: URLs, file paths, API references, documentation links you've found useful.
+  WHY: Easy reference for later. Don't lose important links in context.
+  WHEN: Add as you discover useful resources.
+-->
+
 - [Link 1]: [Description]
 - [Link 2]: [Description]
 - [Documentation reference]: [Description]
 
 ## Visual/Browser Findings
+
+<!-- 
+  WHAT: Information you learned from viewing images, PDFs, or browser results.
+  WHY: CRITICAL - Visual/multimodal content doesn't persist in context. Must be captured as text.
+  WHEN: IMMEDIATELY after viewing images or browser results. Don't wait!
+-->
 
 > For UI work: Record what you see after browser operations.
 
@@ -365,6 +407,11 @@ Each task should be:
 - **URL/Page**: [where]
 - **Observation**: [what you saw]
 - **Action Needed**: [what to do about it]
+
+---
+
+*Update this file after every 2 view/browser/search operations*
+*This prevents visual information from being lost*
 ```
 
 ### progress.md Template
@@ -372,12 +419,24 @@ Each task should be:
 ```markdown
 # Progress: <name>
 
+<!-- 
+  WHAT: Your session log - a chronological record of what you did, when, and what happened.
+  WHY: Answers "What have I done?" in the 5-Question Reboot Test. Helps you resume after breaks.
+  WHEN: Update after completing each task/phase or encountering errors.
+-->
+
 > This file tracks execution progress, test results, and errors.
 > Update after completing each task or encountering issues.
 
 ## Session Log
 
 ### [YYYY-MM-DD] Session 1
+
+<!-- 
+  WHAT: Detailed log of actions taken during this session.
+  WHY: Provides context for what was done, making it easier to resume or debug.
+  WHEN: Update as you work through tasks, or at least when you complete them.
+-->
 
 **Focus**: [What was worked on]
 **Duration**: [Approximate time]
@@ -387,6 +446,14 @@ Each task should be:
 - [x] Action 1
 - [x] Action 2
 - [ ] Action 3 (pending)
+
+#### Files Created/Modified
+<!-- 
+  WHAT: Which files you created or changed.
+  WHY: Quick reference for what was touched. Helps with debugging and review.
+-->
+- `path/to/file.ts` (created)
+- `path/to/other.ts` (modified)
 
 #### Phase Progress
 - Phase 1: ✅ Complete (2/2 tasks)
@@ -409,6 +476,12 @@ Each task should be:
 
 ## Test Results
 
+<!-- 
+  WHAT: Table of tests you ran, what you expected, what actually happened.
+  WHY: Documents verification of functionality. Helps catch regressions.
+  WHEN: Update as you test features.
+-->
+
 | Test Suite | Pass | Fail | Skip | Notes |
 |------------|------|------|------|-------|
 | [Suite 1] | 5 | 0 | 0 | All passing |
@@ -416,12 +489,33 @@ Each task should be:
 
 ## Error Log
 
-| Timestamp | Error | Context | Resolution |
-|-----------|-------|---------|------------|
-| [time] | [error message] | [what was happening] | [how it was fixed] |
-| [time] | [error message] | [what was happening] | [pending] |
+<!-- 
+  WHAT: Detailed log of every error encountered, with timestamps and resolution attempts.
+  WHY: More detailed error tracking. Helps you learn from mistakes and avoid repetition.
+  WHEN: Add immediately when an error occurs, even if you fix it quickly.
+  
+  IMPORTANT: Keep ALL errors - they help avoid repetition (Manus Principle 5)
+-->
+
+| Timestamp | Error | Attempt | Context | Resolution |
+|-----------|-------|---------|---------|------------|
+| [time] | [error message] | 1 | [what was happening] | [how it was fixed] |
+| [time] | [error message] | 2 | [what was happening] | [pending] |
 
 ## 5-Question Reboot Check
+
+<!-- 
+  WHAT: Five questions that verify your context is solid. If you can answer these, you're on track.
+  WHY: This is the "reboot test" - if you can answer all 5, you can resume work effectively.
+  WHEN: Update periodically, especially when resuming after a break or context reset.
+  
+  THE 5 QUESTIONS:
+  1. Where am I? → Current phase in tasks.md
+  2. Where am I going? → Remaining phases
+  3. What's the goal? → Goal statement in design.md
+  4. What have I learned? → See findings.md
+  5. What have I done? → See progress.md (this file)
+-->
 
 > Answer these when resuming work after a break or session change.
 
@@ -442,4 +536,9 @@ Each task should be:
 ## Notes
 
 [Any additional notes, observations, or reminders]
+
+---
+
+*Update after completing each task/phase or encountering errors*
+*Be detailed - this is your "what happened" log*
 ```

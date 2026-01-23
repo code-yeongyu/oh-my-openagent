@@ -456,6 +456,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       interactive_bash,
     },
 
+    // onSummarize hook - injects context preservation prompt during compaction
+    onSummarize: compactionContextInjector,
+
     "chat.message": async (input, output) => {
       if (input.agent) {
         setSessionAgent(input.sessionID, input.agent);

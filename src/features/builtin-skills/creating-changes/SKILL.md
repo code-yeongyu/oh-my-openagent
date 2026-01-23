@@ -150,46 +150,21 @@ Files created:
 
 Ready for implementation."
 
-## Next Step: Automatic Execution Mode Selection
+## Next Step
 
-**AUTOMATIC DECISION (Task 8.2):**
+After creating all planning documents, select execution mode based on task count:
 
-Count the number of tasks in `tasks.md` and automatically select the execution mode:
+| Condition | Next Skill | Action |
+|-----------|------------|--------|
+| Task count ≤ 5 | `executing-plans` | `skill("executing-plans")` for sequential execution |
+| Task count > 5 | `wave-parallel-execution` | `skill("wave-parallel-execution")` for parallel waves |
 
-```
-Task Count ≤ 5  →  Sequential Mode (executing-plans)
-Task Count > 5  →  Wave-Parallel Mode (wave-parallel-execution)
-```
+**Auto-Selection Logic:**
+- Count tasks in `tasks.md`
+- Announce: "Task count: [N] → Using [Sequential/Wave-Parallel] mode"
+- User can override with "use sequential" or "use parallel"
 
-**Announce the decision:**
-
-"Based on task count analysis:
-- Total tasks: [N]
-- Selected mode: [Sequential/Wave-Parallel]
-- Reason: [≤5 tasks favor sequential | >5 tasks benefit from parallelism]
-
-Proceeding with [mode] execution."
-
-### If Sequential Mode (≤5 tasks):
-
-→ 自动创建单个 worktree
-→ 逐个任务执行，每任务自动 git checkpoint
-→ **REQUIRED SUB-SKILL:** Use superpowers:executing-plans
-
-### If Wave-Parallel Mode (>5 tasks):
-
-→ 自动分析任务依赖，分组为 Waves
-→ 为每个 Wave 创建独立 worktree
-→ Wave 间并行执行
-→ **REQUIRED SUB-SKILL:** Use superpowers:wave-parallel-execution
-
-**Override Option:**
-
-If user explicitly requests a different mode, respect their choice:
-- "use sequential" → Force executing-plans regardless of task count
-- "use parallel" / "use wave" → Force wave-parallel-execution regardless of task count
-
-**注意**: 两个选项都会自动创建 worktree，无需单独选择。
+**REQUIRED:** Invoke the appropriate execution skill after planning is complete.
 
 ## Key Principles
 

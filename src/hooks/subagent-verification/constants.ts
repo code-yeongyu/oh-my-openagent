@@ -2,6 +2,7 @@
  * Subagent Verification Hook Constants
  *
  * Reminds orchestrator to verify subagent claims after delegation.
+ * Also reminds to update planning files after task completion.
  * Implements Task 6.2 from SUBAGENTS-COMPARISON.md
  */
 
@@ -27,6 +28,16 @@ You MUST verify independently:
 
 4. **Check for regressions** - related tests still pass
 
-**Only proceed when ALL verifications pass. You are the QA gate.**`
+**Only proceed when ALL verifications pass. You are the QA gate.**
+
+---
+
+📝 **PLANNING FILES UPDATE REQUIRED**
+
+After verification, update your planning files:
+
+1. **tasks.md**: Check off completed task: \`- [x]\`
+2. **findings.md**: Record any discoveries or issues from this task
+3. **progress.md**: Log the action taken and any errors encountered`
 
 export const DELEGATE_TASK_TOOL = "delegate_task"

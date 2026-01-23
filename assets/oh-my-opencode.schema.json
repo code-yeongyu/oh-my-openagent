@@ -67,10 +67,12 @@
           "anthropic-context-window-limit-recovery",
           "rules-injector",
           "background-notification",
+          "background-compaction",
           "auto-update-checker",
           "startup-toast",
           "keyword-detector",
           "agent-usage-reminder",
+          "agent-skill-reminder",
           "non-interactive-env",
           "interactive-bash-session",
           "thinking-block-validator",
@@ -90,7 +92,14 @@
           "debugging-injector",
           "failure-counter",
           "skill-suggestion",
-          "planning-flow-guide"
+          "planning-flow-guide",
+          "lsp-diagnostics-enforcer",
+          "subagent-verification",
+          "codebase-assessment",
+          "phase-flow-enforcer",
+          "plan-reorganizer",
+          "plan-update-reminder",
+          "plan-attention-refresher"
         ]
       }
     },
@@ -3130,6 +3139,15 @@
           "type": "boolean"
         },
         "inject_skill_on_block": {
+          "type": "boolean"
+        }
+      }
+    },
+    "checkbox_enforcement": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
           "type": "boolean"
         }
       }

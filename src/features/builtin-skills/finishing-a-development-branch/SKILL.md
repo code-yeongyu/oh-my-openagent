@@ -202,10 +202,23 @@ This triggers the archive workflow to save metadata and create Git tags.
 **Pairs with:**
 - **using-git-worktrees** - Cleans up worktree created by that skill
 
-## 下一步
+## Next Step
 
-完成后：
+After executing the Git strategy (merge/pr/keep/discard), **delegate archiving to Archiver agent**:
 
-**REQUIRED:** 运行 `/archive {change-name}` 归档变更
+| Condition | Action |
+|-----------|--------|
+| Option 1 (Merge) completed | `delegate_task(agent="archiver", prompt="Archive change {change-name}. Merge completed successfully.")` |
+| Option 2 (PR) created | `delegate_task(agent="archiver", prompt="Archive change {change-name}. PR created, pending merge.")` |
+| Option 3 (Keep) selected | `delegate_task(agent="archiver", prompt="Archive change {change-name}. Branch kept for manual handling.")` |
+| Option 4 (Discard) selected | No archival needed - branch discarded |
 
-调用 `superpowers:archiving-changes` 完成归档流程。
+**Archiver responsibilities (archiving-changes skill only):**
+- Move to archive directory `changes/archive/YYYY-MM-DD-{name}/`
+- Generate metadata.json
+- Create git tag (if configured)
+
+**Your responsibilities (before delegating to Archiver):**
+- Run lsp_diagnostics / build verification
+- Execute Git strategy (merge/pr/keep/discard)
+- Merge/delete Worktree

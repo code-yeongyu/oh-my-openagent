@@ -16,6 +16,7 @@ import { fetchAvailableModels } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { generateSkillReminder } from "../../shared/skill-reminder-generator"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -786,7 +787,10 @@ To continue this session: session_id="${sessionID}"`
 
       mergedSkills = Array.from(new Set([...args.load_skills, ...categoryDefaultSkills]))
 
-      if (mergedSkills.length > 0) {
+      const userSpecifiedSkills = args.load_skills
+      const hasUserSpecifiedSkills = userSpecifiedSkills.length > 0
+
+      if (hasUserSpecifiedSkills) {
         const { resolved, notFound } = await resolveMultipleSkillsAsync(mergedSkills, { gitMasterConfig, browserProvider })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
@@ -794,6 +798,8 @@ To continue this session: session_id="${sessionID}"`
           return `Skills not found: ${notFound.join(", ")}. Available: ${available}`
         }
         skillContent = Array.from(resolved.values()).join("\n\n")
+      } else if (categoryDefaultSkills.length > 0) {
+        skillContent = generateSkillReminder(agentToUse, categoryDefaultSkills)
       }
 
       const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })

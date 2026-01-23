@@ -431,10 +431,14 @@ Each Wave agent logs errors to `progress.md` with:
 
 ---
 
-## 下一步
+## Next Step
 
-所有 Waves 完成后：
+After all Waves are completed and merged:
 
-1. **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-2. 完成后运行 `/archive {change-name}` 归档变更
-3. **REQUIRED SUB-SKILL:** Use superpowers:archiving-changes
+| Condition | Next Skill | Action |
+|-----------|------------|--------|
+| All waves complete | `verification-before-completion` | `skill("verification-before-completion")` to verify deliverables |
+| Verification passed | `finishing-a-development-branch` | `skill("finishing-a-development-branch")` to merge and cleanup |
+| Branch finished | `archiving-changes` | `skill("archiving-changes")` or `/archive {change-name}` |
+
+**REQUIRED:** Follow the complete workflow chain to ensure proper completion and archival.

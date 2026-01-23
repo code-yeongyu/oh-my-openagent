@@ -4,6 +4,8 @@
  * PreToolUse hook that refreshes tasks.md into the agent's attention window
  * before major tool operations. Implements Manus principle of "Attention Manipulation".
  *
+ * NOTE: Only triggers for main session (Sisyphus), not for subagents.
+ *
  * Based on planning-with-files v2.4.1:
  * ```yaml
  * PreToolUse:
@@ -18,6 +20,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { readBoulderState } from "../../features/boulder-state"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "plan-attention-refresher"
@@ -74,6 +77,13 @@ export function createPlanAttentionRefresherHook(ctx: PluginInput) {
         return
       }
       
+      const sessionId = sessionID ?? "unknown"
+      
+      // Skip subagent sessions - they don't need plan context refresh
+      if (subagentSessions.has(sessionId)) {
+        return
+      }
+      
       const props = event.properties as {
         tool?: string
         input?: Record<string, unknown>
@@ -88,8 +98,6 @@ export function createPlanAttentionRefresherHook(ctx: PluginInput) {
       if (!toolName || !TRIGGER_TOOLS.has(toolName)) {
         return
       }
-      
-      const sessionId = sessionID ?? "unknown"
       
       // Check refresh interval
       if (!shouldRefresh(sessionId)) {
