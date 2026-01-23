@@ -12,24 +12,24 @@ describe("createBuiltinAgents with model overrides", () => {
     const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
     // #then
-    expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
-    expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-    expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.sisyphus.reasoningEffort).toBeUndefined()
   })
 
   test("Sisyphus with GPT model override has reasoningEffort, no thinking", async () => {
     // #given
     const overrides = {
-      Sisyphus: { model: "github-copilot/gpt-5.2" },
+      sisyphus: { model: "github-copilot/gpt-5.2" },
     }
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
-    expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
-    expect(agents.Sisyphus.reasoningEffort).toBe("medium")
-    expect(agents.Sisyphus.thinking).toBeUndefined()
+    expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
+    expect(agents.sisyphus.reasoningEffort).toBe("medium")
+    expect(agents.sisyphus.thinking).toBeUndefined()
   })
 
   test("Sisyphus uses system default when no availableModels provided", async () => {
@@ -40,9 +40,9 @@ describe("createBuiltinAgents with model overrides", () => {
     const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel)
 
     // #then - falls back to system default when no availability match
-    expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
-    expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-    expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.sisyphus.reasoningEffort).toBeUndefined()
   })
 
   test("Oracle uses first fallback entry when no availableModels provided (no cache scenario)", async () => {
@@ -90,19 +90,19 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.oracle.textVerbosity).toBeUndefined()
   })
 
-  test("non-model overrides are still applied after factory rebuild", async () => {
-    // #given
-    const overrides = {
-      Sisyphus: { model: "github-copilot/gpt-5.2", temperature: 0.5 },
-    }
+   test("non-model overrides are still applied after factory rebuild", async () => {
+     // #given
+     const overrides = {
+       sisyphus: { model: "github-copilot/gpt-5.2", temperature: 0.5 },
+     }
 
-    // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+     // #when
+     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then
-    expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
-    expect(agents.Sisyphus.temperature).toBe(0.5)
-  })
+     // #then
+     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
+     expect(agents.sisyphus.temperature).toBe(0.5)
+   })
 })
 
 describe("buildAgent with category and skills", () => {
