@@ -23,9 +23,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("high")
   })
 
-  test("Sisyphus has valid fallbackChain with claude-opus-4-5 as primary", () => {
-    // #given - Sisyphus agent requirement
-    const sisyphus = AGENT_MODEL_REQUIREMENTS["Sisyphus"]
+  test("sisyphus has valid fallbackChain with claude-opus-4-5 as primary", () => {
+    // #given - sisyphus agent requirement
+    const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
     // #then - fallbackChain exists with claude-opus-4-5 as first entry
@@ -84,9 +84,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("gemini-3-flash-preview")
   })
 
-  test("Prometheus (Planner) has valid fallbackChain with claude-opus-4-5 as primary", () => {
-    // #given - Prometheus agent requirement
-    const prometheus = AGENT_MODEL_REQUIREMENTS["Prometheus (Planner)"]
+  test("prometheus has valid fallbackChain with claude-opus-4-5 as primary", () => {
+    // #given - prometheus agent requirement
+    const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
     // #when - accessing Prometheus requirement
     // #then - fallbackChain exists with claude-opus-4-5 as first entry
@@ -100,9 +100,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
   })
 
-  test("Metis (Plan Consultant) has valid fallbackChain with claude-opus-4-5 as primary", () => {
-    // #given - Metis agent requirement
-    const metis = AGENT_MODEL_REQUIREMENTS["Metis (Plan Consultant)"]
+  test("metis has valid fallbackChain with claude-opus-4-5 as primary", () => {
+    // #given - metis agent requirement
+    const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
     // #when - accessing Metis requirement
     // #then - fallbackChain exists with claude-opus-4-5 as first entry
@@ -116,9 +116,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
   })
 
-  test("Momus (Plan Reviewer) has valid fallbackChain with gpt-5.2 as primary", () => {
-    // #given - Momus agent requirement
-    const momus = AGENT_MODEL_REQUIREMENTS["Momus (Plan Reviewer)"]
+  test("momus has valid fallbackChain with gpt-5.2 as primary", () => {
+    // #given - momus agent requirement
+    const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // #when - accessing Momus requirement
     // #then - fallbackChain exists with gpt-5.2 as first entry, variant medium
@@ -132,9 +132,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("Atlas has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
-    // #given - Atlas agent requirement
-    const atlas = AGENT_MODEL_REQUIREMENTS["Atlas"]
+  test("atlas has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
+    // #given - atlas agent requirement
+    const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // #when - accessing Atlas requirement
     // #then - fallbackChain exists with claude-sonnet-4-5 as first entry
@@ -150,15 +150,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
   test("all 9 builtin agents have valid fallbackChain arrays", () => {
     // #given - list of 9 agent names
     const expectedAgents = [
-      "Sisyphus",
+      "sisyphus",
       "oracle",
       "librarian",
       "explore",
       "multimodal-looker",
-      "Prometheus (Planner)",
-      "Metis (Plan Consultant)",
-      "Momus (Plan Reviewer)",
-      "Atlas",
+      "prometheus",
+      "metis",
+      "momus",
+      "atlas",
     ]
 
     // #when - checking AGENT_MODEL_REQUIREMENTS
