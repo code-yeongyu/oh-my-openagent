@@ -29,7 +29,12 @@ permissions:
 
 jobs:
   publish-platform:
-    runs-on: ubuntu-latest
+    # Use windows-latest for Windows to avoid cross-compilation segfault (oven-sh/bun#18416)
+    # Fixes: #873, #844
+    runs-on: ${{ matrix.platform == 'windows-x64' && 'windows-latest' || 'ubuntu-latest' }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       max-parallel: 2
