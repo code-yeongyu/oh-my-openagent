@@ -30,7 +30,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Test task",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: true,
         skills: ["playwright", "git-master"],
       }
@@ -127,7 +127,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Full info task",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: true,
         skills: ["frontend-ui-ux"],
       }
@@ -149,7 +149,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Task with category default model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "google/gemini-3-pro-preview", type: "category-default" as const },
       }
@@ -169,7 +169,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1b",
         description: "Task with system default model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
       }
@@ -190,7 +190,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_2",
         description: "Task with inherited model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "cliproxy/claude-opus-4-5", type: "inherited" as const },
       }
@@ -211,7 +211,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_3",
         description: "Task with user model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "my-provider/my-model", type: "user-defined" as const },
       }

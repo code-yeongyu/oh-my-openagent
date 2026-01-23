@@ -288,7 +288,7 @@ describe("sisyphus-task", () => {
             id: "task-variant",
             sessionID: "session-variant",
             description: "Variant task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -351,7 +351,7 @@ describe("sisyphus-task", () => {
             id: "task-default-variant",
             sessionID: "session-default-variant",
             description: "Default variant task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -951,7 +951,7 @@ describe("sisyphus-task", () => {
             id: "task-unstable",
             sessionID: "ses_unstable_gemini",
             description: "Unstable gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1016,7 +1016,7 @@ describe("sisyphus-task", () => {
             id: "task-normal-bg",
             sessionID: "ses_normal_bg",
             description: "Normal background task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1135,7 +1135,7 @@ describe("sisyphus-task", () => {
             id: "task-artistry",
             sessionID: "ses_artistry_gemini",
             description: "Artistry gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1200,7 +1200,7 @@ describe("sisyphus-task", () => {
             id: "task-writing",
             sessionID: "ses_writing_gemini",
             description: "Writing gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1265,7 +1265,7 @@ describe("sisyphus-task", () => {
             id: "task-custom-unstable",
             sessionID: "ses_custom_unstable",
             description: "Custom unstable task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
