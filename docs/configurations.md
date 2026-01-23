@@ -2,6 +2,39 @@
 
 Highly opinionated, but adjustable to taste.
 
+## Quick Start
+
+**Most users don't need to configure anything manually.** Run the interactive installer:
+
+```bash
+bunx oh-my-opencode install
+```
+
+It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optimal config automatically.
+
+**Want to customize?** Here's the common patterns:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  
+  // Override specific agent models
+  "agents": {
+    "oracle": { "model": "openai/gpt-5.2" },           // Use GPT for debugging
+    "librarian": { "model": "zai-coding-plan/glm-4.7" }, // Cheap model for research
+    "explore": { "model": "opencode/grok-code" }        // Free model for grep
+  },
+  
+  // Override category models (used by delegate_task)
+  "categories": {
+    "quick": { "model": "opencode/grok-code" },         // Fast/cheap for trivial tasks
+    "visual-engineering": { "model": "google/gemini-3-pro-preview" } // Gemini for UI
+  }
+}
+```
+
+**Find available models:** Run `opencode models` to see all models in your environment.
+
 ## Config File Locations
 
 Config file locations (priority order):
