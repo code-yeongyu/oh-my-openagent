@@ -12,7 +12,7 @@ import {
 } from "./migration"
 
 describe("migrateAgentNames", () => {
-  test("migrates legacy OmO names to Sisyphus", () => {
+  test("migrates legacy OmO names to lowercase", () => {
     // #given: Config with legacy OmO agent names
     const agents = {
       omo: { model: "anthropic/claude-opus-4-5" },
@@ -23,10 +23,10 @@ describe("migrateAgentNames", () => {
     // #when: Migrate agent names
     const { migrated, changed } = migrateAgentNames(agents)
 
-    // #then: Legacy names should be migrated to Sisyphus/Prometheus
+    // #then: Legacy names should be migrated to lowercase
     expect(changed).toBe(true)
-    expect(migrated["Sisyphus"]).toEqual({ temperature: 0.5 })
-    expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "custom prompt" })
+    expect(migrated["sisyphus"]).toEqual({ temperature: 0.5 })
+    expect(migrated["prometheus"]).toEqual({ prompt: "custom prompt" })
     expect(migrated["omo"]).toBeUndefined()
     expect(migrated["OmO"]).toBeUndefined()
     expect(migrated["OmO-Plan"]).toBeUndefined()
@@ -62,9 +62,9 @@ describe("migrateAgentNames", () => {
     const { migrated, changed } = migrateAgentNames(agents)
 
     // #then: Case-insensitive lookup should migrate correctly
-    expect(migrated["Sisyphus"]).toEqual({ model: "test" })
-    expect(migrated["Prometheus (Planner)"]).toEqual({ prompt: "test" })
-    expect(migrated["Atlas"]).toEqual({ model: "openai/gpt-5.2" })
+    expect(migrated["sisyphus"]).toEqual({ model: "test" })
+    expect(migrated["prometheus"]).toEqual({ prompt: "test" })
+    expect(migrated["atlas"]).toEqual({ model: "openai/gpt-5.2" })
   })
 
   test("passes through unknown agent names unchanged", () => {
@@ -81,7 +81,7 @@ describe("migrateAgentNames", () => {
     expect(migrated["custom-agent"]).toEqual({ model: "custom/model" })
   })
 
-  test("migrates orchestrator-sisyphus to Atlas", () => {
+  test("migrates orchestrator-sisyphus to atlas", () => {
     // #given: Config with legacy orchestrator-sisyphus agent name
     const agents = {
       "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
@@ -90,13 +90,13 @@ describe("migrateAgentNames", () => {
     // #when: Migrate agent names
     const { migrated, changed } = migrateAgentNames(agents)
 
-    // #then: orchestrator-sisyphus should be migrated to Atlas
+    // #then: orchestrator-sisyphus should be migrated to atlas
     expect(changed).toBe(true)
-    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
     expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
   })
 
-  test("migrates lowercase atlas to Atlas", () => {
+  test("migrates lowercase atlas to atlas", () => {
     // #given: Config with lowercase atlas agent name
     const agents = {
       atlas: { model: "anthropic/claude-opus-4-5" },
@@ -105,10 +105,96 @@ describe("migrateAgentNames", () => {
     // #when: Migrate agent names
     const { migrated, changed } = migrateAgentNames(agents)
 
-    // #then: lowercase atlas should be migrated to Atlas
+    // #then: lowercase atlas should remain atlas (no change needed)
+    expect(changed).toBe(false)
+    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+  })
+
+  test("migrates Sisyphus variants to lowercase", () => {
+    // #given agents config with "Sisyphus" key
+    // #when migrateAgentNames called
+    // #then key becomes "sisyphus"
+    const agents = { "Sisyphus": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
     expect(changed).toBe(true)
-    expect(migrated["Atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
-    expect(migrated["atlas"]).toBeUndefined()
+    expect(migrated["sisyphus"]).toEqual({ model: "test" })
+    expect(migrated["Sisyphus"]).toBeUndefined()
+  })
+
+  test("migrates omo key to sisyphus", () => {
+    // #given agents config with "omo" key
+    // #when migrateAgentNames called
+    // #then key becomes "sisyphus"
+    const agents = { "omo": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["sisyphus"]).toEqual({ model: "test" })
+    expect(migrated["omo"]).toBeUndefined()
+  })
+
+  test("migrates Atlas variants to lowercase", () => {
+    // #given agents config with "Atlas" key
+    // #when migrateAgentNames called
+    // #then key becomes "atlas"
+    const agents = { "Atlas": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["atlas"]).toEqual({ model: "test" })
+    expect(migrated["Atlas"]).toBeUndefined()
+  })
+
+  test("migrates Prometheus variants to lowercase", () => {
+    // #given agents config with "Prometheus (Planner)" key
+    // #when migrateAgentNames called
+    // #then key becomes "prometheus"
+    const agents = { "Prometheus (Planner)": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["prometheus"]).toEqual({ model: "test" })
+    expect(migrated["Prometheus (Planner)"]).toBeUndefined()
+  })
+
+  test("migrates Metis variants to lowercase", () => {
+    // #given agents config with "Metis (Plan Consultant)" key
+    // #when migrateAgentNames called
+    // #then key becomes "metis"
+    const agents = { "Metis (Plan Consultant)": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["metis"]).toEqual({ model: "test" })
+    expect(migrated["Metis (Plan Consultant)"]).toBeUndefined()
+  })
+
+  test("migrates Momus variants to lowercase", () => {
+    // #given agents config with "Momus (Plan Reviewer)" key
+    // #when migrateAgentNames called
+    // #then key becomes "momus"
+    const agents = { "Momus (Plan Reviewer)": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["momus"]).toEqual({ model: "test" })
+    expect(migrated["Momus (Plan Reviewer)"]).toBeUndefined()
+  })
+
+  test("migrates Sisyphus-Junior to lowercase", () => {
+    // #given agents config with "Sisyphus-Junior" key
+    // #when migrateAgentNames called
+    // #then key becomes "sisyphus-junior"
+    const agents = { "Sisyphus-Junior": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["sisyphus-junior"]).toEqual({ model: "test" })
+    expect(migrated["Sisyphus-Junior"]).toBeUndefined()
+  })
+
+  test("preserves lowercase passthrough", () => {
+    // #given agents config with "oracle" key
+    // #when migrateAgentNames called
+    // #then key remains "oracle" (no change needed)
+    const agents = { "oracle": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(false)
+    expect(migrated["oracle"]).toEqual({ model: "test" })
   })
 })
 
@@ -249,7 +335,7 @@ describe("migrateConfigFile", () => {
     // #then: Agent names should be migrated
     expect(needsWrite).toBe(true)
     const agents = rawConfig.agents as Record<string, unknown>
-    expect(agents["Sisyphus"]).toBeDefined()
+    expect(agents["sisyphus"]).toBeDefined()
   })
 
   test("migrates legacy hook names in disabled_hooks", () => {
@@ -272,7 +358,7 @@ describe("migrateConfigFile", () => {
     const rawConfig: Record<string, unknown> = {
       sisyphus_agent: { disabled: false },
       agents: {
-        Sisyphus: { model: "test" },
+        sisyphus: { model: "test" },
       },
       disabled_hooks: ["anthropic-context-window-limit-recovery"],
     }
@@ -303,8 +389,8 @@ describe("migrateConfigFile", () => {
     expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
     expect(rawConfig.omo_agent).toBeUndefined()
     const agents = rawConfig.agents as Record<string, unknown>
-    expect(agents["Sisyphus"]).toBeDefined()
-    expect(agents["Prometheus (Planner)"]).toBeDefined()
+    expect(agents["sisyphus"]).toBeDefined()
+    expect(agents["prometheus"]).toBeDefined()
     expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
   })
 })
@@ -312,13 +398,13 @@ describe("migrateConfigFile", () => {
 describe("migration maps", () => {
   test("AGENT_NAME_MAP contains all expected legacy mappings", () => {
     // #given/#when: Check AGENT_NAME_MAP
-    // #then: Should contain all legacy → current mappings
-    expect(AGENT_NAME_MAP["omo"]).toBe("Sisyphus")
-    expect(AGENT_NAME_MAP["OmO"]).toBe("Sisyphus")
-    expect(AGENT_NAME_MAP["OmO-Plan"]).toBe("Prometheus (Planner)")
-    expect(AGENT_NAME_MAP["omo-plan"]).toBe("Prometheus (Planner)")
-    expect(AGENT_NAME_MAP["Planner-Sisyphus"]).toBe("Prometheus (Planner)")
-    expect(AGENT_NAME_MAP["plan-consultant"]).toBe("Metis (Plan Consultant)")
+    // #then: Should contain all legacy → lowercase mappings
+    expect(AGENT_NAME_MAP["omo"]).toBe("sisyphus")
+    expect(AGENT_NAME_MAP["OmO"]).toBe("sisyphus")
+    expect(AGENT_NAME_MAP["OmO-Plan"]).toBe("prometheus")
+    expect(AGENT_NAME_MAP["omo-plan"]).toBe("prometheus")
+    expect(AGENT_NAME_MAP["Planner-Sisyphus"]).toBe("prometheus")
+    expect(AGENT_NAME_MAP["plan-consultant"]).toBe("metis")
   })
 
   test("HOOK_NAME_MAP contains anthropic-auto-compact migration", () => {
@@ -622,29 +708,41 @@ describe("migrateConfigFile with backup", () => {
   })
 
   test("does not write when no migration needed", () => {
-    // #given: Config with no migrations needed
-    const testConfigPath = "/tmp/test-config-no-migration.json"
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        Sisyphus: { model: "test" },
-      },
-    }
+     // #given: Config with no migrations needed
+     const testConfigPath = "/tmp/test-config-no-migration.json"
+     const rawConfig: Record<string, unknown> = {
+       agents: {
+         sisyphus: { model: "test" },
+       },
+     }
 
-    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { Sisyphus: { model: "test" } } }, null, 2))
-    cleanupPaths.push(testConfigPath)
+     fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { sisyphus: { model: "test" } } }, null, 2))
+     cleanupPaths.push(testConfigPath)
 
-    // #when: Migrate config file
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+     // Clean up any existing backup files from previous test runs
+     const dir = path.dirname(testConfigPath)
+     const basename = path.basename(testConfigPath)
+     const existingFiles = fs.readdirSync(dir)
+     const existingBackups = existingFiles.filter((f) => f.startsWith(`${basename}.bak.`))
+     existingBackups.forEach((f) => {
+       const backupPath = path.join(dir, f)
+       try {
+         fs.unlinkSync(backupPath)
+         cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
+       } catch {
+       }
+     })
 
-    // #then: Should not write or create backup
-    expect(needsWrite).toBe(false)
+     // #when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    const dir = path.dirname(testConfigPath)
-    const basename = path.basename(testConfigPath)
-    const files = fs.readdirSync(dir)
-    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
-    expect(backupFiles.length).toBe(0)
-  })
+     // #then: Should not write or create backup
+     expect(needsWrite).toBe(false)
+
+     const files = fs.readdirSync(dir)
+     const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
+     expect(backupFiles.length).toBe(0)
+   })
 
 
 })
