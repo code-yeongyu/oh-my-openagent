@@ -106,13 +106,38 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     if (!(config.model as string | undefined)?.trim()) {
-      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
-      throw new Error(
-        'oh-my-opencode requires a default model.\n\n' +
-        `Add this to ${paths.configJsonc}:\n\n` +
-        '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
-        '(Replace with your preferred provider/model)'
-      )
+      let fallbackModel: string | undefined
+
+      for (const agentConfig of Object.values(pluginConfig.agents ?? {})) {
+        const model = (agentConfig as { model?: string })?.model
+        if (model && typeof model === 'string' && model.trim()) {
+          fallbackModel = model.trim()
+          break
+        }
+      }
+
+      if (!fallbackModel) {
+        for (const categoryConfig of Object.values(pluginConfig.categories ?? {})) {
+          const model = (categoryConfig as { model?: string })?.model
+          if (model && typeof model === 'string' && model.trim()) {
+            fallbackModel = model.trim()
+            break
+          }
+        }
+      }
+
+      if (fallbackModel) {
+        config.model = fallbackModel
+        log(`No default model specified, using fallback from config: ${fallbackModel}`)
+      } else {
+        const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+        throw new Error(
+          'oh-my-opencode requires a default model.\n\n' +
+          `Add this to ${paths.configJsonc}:\n\n` +
+          '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+          '(Replace with your preferred provider/model)'
+        )
+      }
     }
 
     // Migrate disabled_agents from old names to new names
