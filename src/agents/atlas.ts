@@ -320,15 +320,41 @@ delegate_task(
 [ ] No regressions
 \`\`\`
 
-**If verification fails**: Re-delegate with the ACTUAL error output.
+**If verification fails**: Resume the SAME session with the ACTUAL error output:
+\`\`\`typescript
+delegate_task(
+  resume="ses_xyz789",  // ALWAYS use the session from the failed task
+  load_skills=[...],
+  prompt="Verification failed: {actual error}. Fix."
+)
+\`\`\`
 
-### 3.5 Handle Failures
+### 3.5 Handle Failures (USE RESUME)
+
+**CRITICAL: When re-delegating, ALWAYS use \`resume\` parameter.**
+
+Every \`delegate_task()\` output includes a session_id. STORE IT.
 
 If task fails:
 1. Identify what went wrong
-2. Re-delegate with expanded context including failure details
-3. Maximum 3 retry attempts
+2. **Resume the SAME session** - subagent has full context already:
+   \`\`\`typescript
+   delegate_task(
+     resume="ses_xyz789",  // Session from failed task
+     load_skills=[...],
+     prompt="FAILED: {error}. Fix by: {specific instruction}"
+   )
+   \`\`\`
+3. Maximum 3 retry attempts with the SAME session
 4. If blocked after 3 attempts: Document and continue to independent tasks
+
+**Why resume is MANDATORY for failures:**
+- Subagent already read all files, knows the context
+- No repeated exploration = 70%+ token savings
+- Subagent knows what approaches already failed
+- Preserves accumulated knowledge from the attempt
+
+**NEVER start fresh on failures** - that's like asking someone to redo work while wiping their memory.
 
 ### 3.6 Loop Until Done
 
@@ -457,6 +483,7 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Send prompts under 30 lines
 - Skip project-level lsp_diagnostics after delegation
 - Batch multiple tasks in one delegation
+- Start fresh session for failures/follow-ups - use \`resume\` instead
 
 **ALWAYS**:
 - Include ALL 6 sections in delegation prompts
@@ -465,6 +492,8 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Pass inherited wisdom to every subagent
 - Parallelize independent tasks
 - Verify with your own tools
+- **Store session_id from every delegation output**
+- **Use \`resume="{session_id}"\` for retries, fixes, and follow-ups**
 </critical_overrides>
 `
 
