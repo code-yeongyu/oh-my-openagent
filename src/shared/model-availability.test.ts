@@ -1,26 +1,43 @@
-import { describe, it, expect, beforeEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { mkdtempSync, writeFileSync, rmSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 import { fetchAvailableModels, fuzzyMatchModel, __resetModelCache } from "./model-availability"
 
 describe("fetchAvailableModels", () => {
-  let mockClient: any
+  let tempDir: string
+  let originalXdgCache: string | undefined
 
   beforeEach(() => {
     __resetModelCache()
+    tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
+    originalXdgCache = process.env.XDG_CACHE_HOME
+    process.env.XDG_CACHE_HOME = tempDir
   })
 
-  it("#given API returns list of models #when fetchAvailableModels called #then returns Set of model IDs", async () => {
-    const mockModels = [
-      { id: "openai/gpt-5.2", name: "GPT-5.2" },
-      { id: "anthropic/claude-opus-4-5", name: "Claude Opus 4.5" },
-      { id: "google/gemini-3-pro", name: "Gemini 3 Pro" },
-    ]
-    mockClient = {
-      model: {
-        list: async () => mockModels,
-      },
+  afterEach(() => {
+    if (originalXdgCache !== undefined) {
+      process.env.XDG_CACHE_HOME = originalXdgCache
+    } else {
+      delete process.env.XDG_CACHE_HOME
     }
+    rmSync(tempDir, { recursive: true, force: true })
+  })
 
-    const result = await fetchAvailableModels(mockClient)
+  function writeModelsCache(data: Record<string, any>) {
+    const cacheDir = join(tempDir, "opencode")
+    require("fs").mkdirSync(cacheDir, { recursive: true })
+    writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
+  }
+
+  it("#given cache file with models #when fetchAvailableModels called #then returns Set of model IDs", async () => {
+    writeModelsCache({
+      openai: { id: "openai", models: { "gpt-5.2": { id: "gpt-5.2" } } },
+      anthropic: { id: "anthropic", models: { "claude-opus-4-5": { id: "claude-opus-4-5" } } },
+      google: { id: "google", models: { "gemini-3-pro": { id: "gemini-3-pro" } } },
+    })
+
+    const result = await fetchAvailableModels()
 
     expect(result).toBeInstanceOf(Set)
     expect(result.size).toBe(3)
@@ -29,77 +46,50 @@ describe("fetchAvailableModels", () => {
     expect(result.has("google/gemini-3-pro")).toBe(true)
   })
 
-  it("#given API fails #when fetchAvailableModels called #then returns empty Set without throwing", async () => {
-    mockClient = {
-      model: {
-        list: async () => {
-          throw new Error("API connection failed")
-        },
-      },
-    }
-
-    const result = await fetchAvailableModels(mockClient)
+  it("#given cache file not found #when fetchAvailableModels called #then returns empty Set", async () => {
+    const result = await fetchAvailableModels()
 
     expect(result).toBeInstanceOf(Set)
     expect(result.size).toBe(0)
   })
 
-  it("#given API called twice #when second call made #then uses cached result without re-fetching", async () => {
-    let callCount = 0
-    const mockModels = [
-      { id: "openai/gpt-5.2", name: "GPT-5.2" },
-      { id: "anthropic/claude-opus-4-5", name: "Claude Opus 4.5" },
-    ]
-    mockClient = {
-      model: {
-        list: async () => {
-          callCount++
-          return mockModels
-        },
-      },
-    }
+  it("#given cache read twice #when second call made #then uses cached result", async () => {
+    writeModelsCache({
+      openai: { id: "openai", models: { "gpt-5.2": { id: "gpt-5.2" } } },
+      anthropic: { id: "anthropic", models: { "claude-opus-4-5": { id: "claude-opus-4-5" } } },
+    })
 
-    const result1 = await fetchAvailableModels(mockClient)
-    const result2 = await fetchAvailableModels(mockClient)
+    const result1 = await fetchAvailableModels()
+    const result2 = await fetchAvailableModels()
 
-    expect(callCount).toBe(1)
     expect(result1).toEqual(result2)
     expect(result1.has("openai/gpt-5.2")).toBe(true)
   })
 
-  it("#given empty model list from API #when fetchAvailableModels called #then returns empty Set", async () => {
-    mockClient = {
-      model: {
-        list: async () => [],
-      },
-    }
+  it("#given empty providers in cache #when fetchAvailableModels called #then returns empty Set", async () => {
+    writeModelsCache({})
 
-    const result = await fetchAvailableModels(mockClient)
+    const result = await fetchAvailableModels()
 
     expect(result).toBeInstanceOf(Set)
     expect(result.size).toBe(0)
   })
 
-  it("#given API returns models with various formats #when fetchAvailableModels called #then extracts all IDs correctly", async () => {
-    const mockModels = [
-      { id: "openai/gpt-5.2-codex", name: "GPT-5.2 Codex" },
-      { id: "anthropic/claude-sonnet-4-5", name: "Claude Sonnet 4.5" },
-      { id: "google/gemini-3-flash", name: "Gemini 3 Flash" },
-      { id: "opencode/grok-code", name: "Grok Code" },
-    ]
-    mockClient = {
-      model: {
-        list: async () => mockModels,
-      },
-    }
+  it("#given cache file with various providers #when fetchAvailableModels called #then extracts all IDs correctly", async () => {
+    writeModelsCache({
+      openai: { id: "openai", models: { "gpt-5.2-codex": { id: "gpt-5.2-codex" } } },
+      anthropic: { id: "anthropic", models: { "claude-sonnet-4-5": { id: "claude-sonnet-4-5" } } },
+      google: { id: "google", models: { "gemini-3-flash": { id: "gemini-3-flash" } } },
+      opencode: { id: "opencode", models: { "grok-code": { id: "grok-code" } } },
+    })
 
-    const result = await fetchAvailableModels(mockClient)
+    const result = await fetchAvailableModels()
 
     expect(result.size).toBe(4)
     expect(result.has("openai/gpt-5.2-codex")).toBe(true)
     expect(result.has("anthropic/claude-sonnet-4-5")).toBe(true)
     expect(result.has("google/gemini-3-flash")).toBe(true)
-	expect(result.has("opencode/grok-code")).toBe(true)
+    expect(result.has("opencode/grok-code")).toBe(true)
   })
 })
 
