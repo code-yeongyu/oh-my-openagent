@@ -97,13 +97,14 @@ describe("model-resolution check", () => {
     // #when: Running the model resolution check
     // #then: Returns pass with details showing resolution flow
 
-    it("returns pass status with agent and category counts", async () => {
+    it("returns pass or warn status with agent and category counts", async () => {
       const { checkModelResolution } = await import("./model-resolution")
 
       const result = await checkModelResolution()
 
-      // #then: Should pass and show counts
-      expect(result.status).toBe("pass")
+      // #then: Should pass (with cache) or warn (no cache) and show counts
+      // In CI without model cache, status is "warn"; locally with cache, status is "pass"
+      expect(["pass", "warn"]).toContain(result.status)
       expect(result.message).toMatch(/\d+ agents?, \d+ categories?/)
     })
 
