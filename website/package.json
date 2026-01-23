@@ -20,7 +20,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.974.0",
+    "@opennextjs/cloudflare": "^1.15.1",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
