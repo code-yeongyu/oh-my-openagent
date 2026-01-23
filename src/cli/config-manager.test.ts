@@ -219,7 +219,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #then should use native anthropic sonnet (cost-efficient for standard plan)
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
     expect(result.agents).toBeDefined()
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("anthropic/claude-sonnet-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-sonnet-4-5")
   })
 
   test("generates native opus models when Claude max20 subscription", () => {
@@ -238,7 +238,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then should use native anthropic opus (max power for max20 plan)
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-5")
   })
 
   test("uses github-copilot sonnet fallback when only copilot available", () => {
@@ -257,7 +257,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then should use github-copilot sonnet models (copilot fallback)
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("github-copilot/claude-sonnet-4.5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-sonnet-4.5")
   })
 
   test("uses ultimate fallback when no providers configured", () => {
@@ -277,7 +277,7 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then should use ultimate fallback for all agents
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("opencode/glm-4.7-free")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("opencode/glm-4.7-free")
   })
 
   test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
@@ -298,7 +298,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #then librarian should use zai-coding-plan/glm-4.7
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
     // #then other agents should use native opus (max20 plan)
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-5")
   })
 
   test("uses native OpenAI models when only ChatGPT available", () => {
@@ -317,7 +317,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then Sisyphus should use native OpenAI (fallback within native tier)
-    expect((result.agents as Record<string, { model: string }>).Sisyphus.model).toBe("openai/gpt-5.2")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("openai/gpt-5.2")
     // #then Oracle should use native OpenAI (first fallback entry)
     expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.2")
     // #then multimodal-looker should use native OpenAI (fallback within native tier)

@@ -364,7 +364,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then Sisyphus should use opus (sisyphus-high)
-      expect(result.agents?.Sisyphus?.model).toBe("anthropic/claude-opus-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-5")
     })
 
     test("Sisyphus uses sisyphus-low capability when isMax20 is false", () => {
@@ -375,7 +375,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then Sisyphus should use sonnet (sisyphus-low)
-      expect(result.agents?.Sisyphus?.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-sonnet-4-5")
     })
   })
 

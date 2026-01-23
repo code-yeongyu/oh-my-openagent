@@ -97,7 +97,7 @@ function resolveModelFromChain(
 function getSisyphusFallbackChain(isMaxPlan: boolean): FallbackEntry[] {
   // Sisyphus uses opus when isMaxPlan, sonnet otherwise
   if (isMaxPlan) {
-    return AGENT_MODEL_REQUIREMENTS.Sisyphus.fallbackChain
+    return AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
   }
   // For non-max plan, use sonnet instead of opus
   return [
@@ -153,7 +153,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
     // Special case: Sisyphus uses different fallbackChain based on isMaxPlan
     const fallbackChain =
-      role === "Sisyphus" ? getSisyphusFallbackChain(avail.isMaxPlan) : req.fallbackChain
+      role === "sisyphus" ? getSisyphusFallbackChain(avail.isMaxPlan) : req.fallbackChain
 
     const resolved = resolveModelFromChain(fallbackChain, avail)
     if (resolved) {
