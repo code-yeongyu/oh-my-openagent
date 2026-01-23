@@ -1,0 +1,11 @@
+{
+  "Common": {
+    "title": "Oh My OpenCode",
+    "description": "AI 代理的终极开发环境",
+    "getStarted": "开始使用",
+    "learnMore": "了解更多"
+  },
+  "LanguageSwitcher": {
+    "label": "切换语言"
+  }
+}
