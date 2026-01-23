@@ -63,15 +63,8 @@ export function resolveModelWithFallback(
 				}
 			}
 		}
-
-		// Step 3: Use first entry in fallbackChain as fallback (no availability match found)
-		// This ensures category/agent intent is honored even if availableModels is incomplete
-		const firstEntry = fallbackChain[0]
-		if (firstEntry.providers.length > 0) {
-			const fallbackModel = `${firstEntry.providers[0]}/${firstEntry.model}`
-			log("Model resolved via fallback chain first entry (no availability match)", { model: fallbackModel, variant: firstEntry.variant })
-			return { model: fallbackModel, source: "provider-fallback", variant: firstEntry.variant }
-		}
+		// No match found in fallback chain - fall through to system default
+		log("No available model found in fallback chain, falling through to system default")
 	}
 
 	// Step 4: System default
