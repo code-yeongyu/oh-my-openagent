@@ -147,3 +147,8 @@ export async function fetchAvailableModels(_client?: any): Promise<Set<string>> 
 export function __resetModelCache(): void {
 	cachedModels = null
 }
+
+export function isModelCacheAvailable(): boolean {
+	const cacheFile = join(getOpenCodeCacheDir(), "models.json")
+	return existsSync(cacheFile)
+}
