@@ -42,6 +42,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash-preview" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["zai-coding-plan"], model: "glm-4.6v" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
     ],
   },
