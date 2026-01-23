@@ -32,30 +32,30 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.Sisyphus.thinking).toBeUndefined()
   })
 
-  test("Sisyphus uses first fallbackChain entry when no availableModels provided", async () => {
+  test("Sisyphus uses system default when no availableModels provided", async () => {
     // #given
-    const systemDefaultModel = "openai/gpt-5.2"
+    const systemDefaultModel = "anthropic/claude-opus-4-5"
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel)
 
-    // #then - Sisyphus first fallbackChain entry is anthropic/claude-opus-4-5
+    // #then - falls back to system default when no availability match
     expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
     expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
   })
 
-  test("Oracle uses first fallbackChain entry when no availableModels provided", async () => {
-    // #given - Oracle's first fallbackChain entry is openai/gpt-5.2
+  test("Oracle uses system default when no availableModels provided", async () => {
+    // #given - no available models, falls back to system default
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - Oracle first fallbackChain entry is openai/gpt-5.2
-    expect(agents.oracle.model).toBe("openai/gpt-5.2")
-    expect(agents.oracle.reasoningEffort).toBe("medium")
-    expect(agents.oracle.textVerbosity).toBe("high")
-    expect(agents.oracle.thinking).toBeUndefined()
+    // #then - falls back to system default (anthropic/claude-opus-4-5)
+    expect(agents.oracle.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.oracle.reasoningEffort).toBeUndefined()
+    expect(agents.oracle.textVerbosity).toBeUndefined()
   })
 
   test("Oracle with GPT model override has reasoningEffort, no thinking", async () => {

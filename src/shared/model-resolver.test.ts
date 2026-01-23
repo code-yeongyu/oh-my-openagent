@@ -316,8 +316,8 @@ describe("resolveModelWithFallback", () => {
     })
   })
 
-  describe("Step 3: First fallback entry (no availability match)", () => {
-    test("returns first fallbackChain entry when no availability match found", () => {
+  describe("Step 3: System default fallback (no availability match)", () => {
+    test("returns system default when no availability match found in fallback chain", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -331,12 +331,12 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // #then
-      expect(result.model).toBe("anthropic/nonexistent-model")
-      expect(result.source).toBe("provider-fallback")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain first entry (no availability match)", { model: "anthropic/nonexistent-model", variant: undefined })
+      expect(result.model).toBe("google/gemini-3-pro")
+      expect(result.source).toBe("system-default")
+      expect(logSpy).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
     })
 
-    test("returns first fallbackChain entry when availableModels is empty", () => {
+    test("returns system default when availableModels is empty", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -350,8 +350,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // #then
-      expect(result.model).toBe("anthropic/claude-opus-4-5")
-      expect(result.source).toBe("provider-fallback")
+      expect(result.model).toBe("google/gemini-3-pro")
+      expect(result.source).toBe("system-default")
     })
 
     test("returns system default when fallbackChain is not provided", () => {
@@ -431,7 +431,7 @@ describe("resolveModelWithFallback", () => {
       expect(result.source).toBe("provider-fallback")
     })
 
-    test("falls through to first fallbackChain entry when none match availability", () => {
+    test("falls through to system default when none match availability", () => {
       // #given
       const availableModels = new Set(["other/model"])
 
@@ -447,8 +447,8 @@ describe("resolveModelWithFallback", () => {
       })
 
       // #then
-      expect(result.model).toBe("openai/gpt-5.2")
-      expect(result.source).toBe("provider-fallback")
+      expect(result.model).toBe("system/default")
+      expect(result.source).toBe("system-default")
     })
   })
 
