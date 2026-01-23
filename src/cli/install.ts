@@ -44,7 +44,7 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
-  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian: glm-4.7"))
+  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -250,7 +250,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     message: "Do you have a Z.ai Coding Plan subscription?",
     options: [
       { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "zai-coding-plan/glm-4.7 for Librarian" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback for Librarian and Multimodal Looker" },
     ],
     initialValue: initial.zaiCodingPlan,
   })
