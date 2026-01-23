@@ -310,7 +310,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       if (input.agent) {
-        updateSessionAgent(input.sessionID, input.agent);
+        setSessionAgent(input.sessionID, input.agent);
       }
 
       const message = (output as { message: { variant?: string } }).message
