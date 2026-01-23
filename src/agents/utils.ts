@@ -19,16 +19,16 @@ import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/
 type AgentSource = AgentFactory | AgentConfig
 
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
-  Sisyphus: createSisyphusAgent,
+  sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
   "multimodal-looker": createMultimodalLookerAgent,
-  "Metis (Plan Consultant)": createMetisAgent,
-  "Momus (Plan Reviewer)": createMomusAgent,
+  metis: createMetisAgent,
+  momus: createMomusAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  Atlas: createAtlasAgent as unknown as AgentFactory,
+  atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
 /**
@@ -186,12 +186,12 @@ export async function createBuiltinAgents(
 
   const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
 
-  for (const [name, source] of Object.entries(agentSources)) {
-    const agentName = name as BuiltinAgentName
+   for (const [name, source] of Object.entries(agentSources)) {
+     const agentName = name as BuiltinAgentName
 
-    if (agentName === "Sisyphus") continue
-    if (agentName === "Atlas") continue
-    if (includesCaseInsensitive(disabledAgents, agentName)) continue
+     if (agentName === "sisyphus") continue
+     if (agentName === "atlas") continue
+     if (includesCaseInsensitive(disabledAgents, agentName)) continue
 
     const override = findCaseInsensitive(agentOverrides, agentName)
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
@@ -234,9 +234,9 @@ export async function createBuiltinAgents(
     }
   }
 
-  if (!disabledAgents.includes("Sisyphus")) {
-    const sisyphusOverride = agentOverrides["Sisyphus"]
-    const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["Sisyphus"]
+   if (!disabledAgents.includes("sisyphus")) {
+     const sisyphusOverride = agentOverrides["sisyphus"]
+     const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
     
     // Use resolver to determine model
     const { model: sisyphusModel, variant: sisyphusResolvedVariant } = resolveModelWithFallback({
@@ -270,12 +270,12 @@ export async function createBuiltinAgents(
       sisyphusConfig = mergeAgentConfig(sisyphusConfig, sisyphusOverride)
     }
 
-    result["Sisyphus"] = sisyphusConfig
-  }
+     result["sisyphus"] = sisyphusConfig
+   }
 
-  if (!disabledAgents.includes("Atlas")) {
-    const orchestratorOverride = agentOverrides["Atlas"]
-    const atlasRequirement = AGENT_MODEL_REQUIREMENTS["Atlas"]
+   if (!disabledAgents.includes("atlas")) {
+     const orchestratorOverride = agentOverrides["atlas"]
+     const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
     
     // Use resolver to determine model
     const { model: atlasModel, variant: atlasResolvedVariant } = resolveModelWithFallback({
@@ -303,8 +303,8 @@ export async function createBuiltinAgents(
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
     }
 
-    result["Atlas"] = orchestratorConfig
-  }
+     result["atlas"] = orchestratorConfig
+   }
 
-  return result
-}
+   return result
+ }
