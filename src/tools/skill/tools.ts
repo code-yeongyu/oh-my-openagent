@@ -156,13 +156,17 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     args: {
       name: tool.schema.string().describe("The skill identifier from available_skills (e.g., 'code-review')"),
     },
-    async execute(args: SkillArgs) {
+    async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
       const skill = skills.find(s => s.name === args.name)
 
       if (!skill) {
         const available = skills.map(s => s.name).join(", ")
         throw new Error(`Skill "${args.name}" not found. Available skills: ${available || "none"}`)
+      }
+
+      if (skill.definition.agent && (!ctx?.agent || skill.definition.agent !== ctx.agent)) {
+        throw new Error(`Skill "${args.name}" is restricted to agent "${skill.definition.agent}"`)
       }
 
       let body = await extractSkillBody(skill)
