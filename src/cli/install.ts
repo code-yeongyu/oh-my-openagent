@@ -178,7 +178,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   const claude = await p.select({
     message: "Do you have a Claude Pro/Max subscription?",
     options: [
-      { value: "no" as const, label: "No", hint: "Will use opencode/glm-4.7-free as fallback" },
+      { value: "no" as const, label: "No", hint: "Will use opencode/big-pickle as fallback" },
       { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
       { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.5 for Librarian" },
     ],
@@ -363,7 +363,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   }
 
   if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
-    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
@@ -480,7 +480,7 @@ export async function install(args: InstallArgs): Promise<number> {
   }
 
   if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
-    p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")

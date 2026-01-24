@@ -151,7 +151,7 @@ describe("TaskToastManager", () => {
         description: "Task with category default model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "google/gemini-3-pro-preview", type: "category-default" as const },
+        modelInfo: { model: "google/gemini-3-pro", type: "category-default" as const },
       }
 
       // #when - addTask is called

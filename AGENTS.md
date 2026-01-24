@@ -88,9 +88,9 @@ oh-my-opencode/
 | Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
 | Atlas | anthropic/claude-opus-4-5 | Master orchestrator |
 | oracle | openai/gpt-5.2 | Consultation, debugging |
-| librarian | opencode/glm-4.7-free | Docs, GitHub search |
-| explore | opencode/grok-code | Fast codebase grep |
-| multimodal-looker | google/gemini-3-flash-preview | PDF/image analysis |
+| librarian | opencode/big-pickle | Docs, GitHub search |
+| explore | opencode/gpt-5-nano | Fast codebase grep |
+| multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 | Prometheus | anthropic/claude-opus-4-5 | Strategic planning |
 
 ## COMMANDS

@@ -31,9 +31,9 @@ agents/
 | Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator |
 | Atlas | anthropic/claude-opus-4-5 | 0.1 | Master orchestrator |
 | oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
-| librarian | opencode/glm-4.7-free | 0.1 | Docs, GitHub search |
-| explore | opencode/grok-code | 0.1 | Fast contextual grep |
-| multimodal-looker | google/gemini-3-flash-preview | 0.1 | PDF/image analysis |
+| librarian | opencode/big-pickle | 0.1 | Docs, GitHub search |
+| explore | opencode/gpt-5-nano | 0.1 | Fast contextual grep |
+| multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
 | Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning |
 | Metis | anthropic/claude-sonnet-4-5 | 0.3 | Pre-planning analysis |
 | Momus | anthropic/claude-sonnet-4-5 | 0.1 | Plan validation |

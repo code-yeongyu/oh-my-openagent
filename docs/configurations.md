@@ -22,13 +22,13 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
   "agents": {
     "oracle": { "model": "openai/gpt-5.2" },           // Use GPT for debugging
     "librarian": { "model": "zai-coding-plan/glm-4.7" }, // Cheap model for research
-    "explore": { "model": "opencode/grok-code" }        // Free model for grep
+    "explore": { "model": "opencode/gpt-5-nano" }        // Free model for grep
   },
   
   // Override category models (used by delegate_task)
   "categories": {
-    "quick": { "model": "opencode/grok-code" },         // Fast/cheap for trivial tasks
-    "visual-engineering": { "model": "google/gemini-3-pro-preview" } // Gemini for UI
+    "quick": { "model": "opencode/gpt-5-nano" },         // Fast/cheap for trivial tasks
+    "visual-engineering": { "model": "google/gemini-3-pro" } // Gemini for UI
   }
 }
 ```
@@ -75,7 +75,7 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
       "model": "openai/gpt-5.2"  // GPT for strategic reasoning
     },
     "explore": {
-      "model": "opencode/grok-code"  // Free & fast for exploration
+      "model": "opencode/gpt-5-nano"  // Free & fast for exploration
     },
   },
 }
@@ -305,7 +305,7 @@ Categories enable domain-specific task delegation via the `delegate_task` tool. 
 
 | Category         | Model                         | Description                                                                  |
 | ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `visual`         | `google/gemini-3-pro-preview` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7).           |
+| `visual`         | `google/gemini-3-pro` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7).           |
 | `business-logic` | `openai/gpt-5.2`              | Backend logic, architecture, strategic reasoning. Low creativity (temp 0.1). |
 
 **Usage:**
@@ -332,7 +332,7 @@ Add custom categories in `oh-my-opencode.json`:
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
     "visual": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3-pro",
       "prompt_append": "Use shadcn/ui components and Tailwind CSS."
     }
   }
@@ -403,9 +403,9 @@ Each agent has a defined provider priority chain. The system tries providers in 
 |-------|-------------------|-------------------------|
 | **Sisyphus** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **oracle** | `gpt-5.2` | openai → anthropic → google → github-copilot → opencode |
-| **librarian** | `glm-4.7-free` | opencode → github-copilot → anthropic |
-| **explore** | `grok-code` | opencode → anthropic → github-copilot |
-| **multimodal-looker** | `gemini-3-flash-preview` | google → anthropic → zai → openai → github-copilot → opencode |
+| **librarian** | `big-pickle` | opencode → github-copilot → anthropic |
+| **explore** | `gpt-5-nano` | opencode → anthropic → github-copilot |
+| **multimodal-looker** | `gemini-3-flash` | google → anthropic → zai → openai → github-copilot → opencode |
 | **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **Metis (Plan Consultant)** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **Momus (Plan Reviewer)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
@@ -417,13 +417,13 @@ Categories follow the same resolution logic:
 
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
-| **visual-engineering** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **visual-engineering** | `gemini-3-pro` | google → openai → anthropic → github-copilot → opencode |
 | **ultrabrain** | `gpt-5.2-codex` | openai → anthropic → google → github-copilot → opencode |
-| **artistry** | `gemini-3-pro-preview` | google → openai → anthropic → github-copilot → opencode |
+| **artistry** | `gemini-3-pro` | google → openai → anthropic → github-copilot → opencode |
 | **quick** | `claude-haiku-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **unspecified-low** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **unspecified-high** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **writing** | `gemini-3-flash-preview` | google → openai → anthropic → github-copilot → opencode |
+| **writing** | `gemini-3-flash` | google → openai → anthropic → github-copilot → opencode |
 
 ### Checking Your Configuration
 

@@ -20,7 +20,7 @@ describe("sisyphus-task", () => {
 
       // #when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3-pro-preview")
+      expect(category.model).toBe("google/gemini-3-pro")
     })
 
     test("ultrabrain category has model and variant config", () => {
@@ -142,7 +142,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBe("google/gemini-3-pro")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -166,7 +166,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro-preview",
+          model: "google/gemini-3-pro",
           prompt_append: "Custom instructions here",
         },
       }
@@ -206,7 +206,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro-preview",
+          model: "google/gemini-3-pro",
           temperature: 0.3,
         },
       }
@@ -229,7 +229,7 @@ describe("sisyphus-task", () => {
 
       // #then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBe("google/gemini-3-pro")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -271,7 +271,7 @@ describe("sisyphus-task", () => {
 
       // #then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.config.model).toBe("google/gemini-3-pro")
     })
   })
 
@@ -960,7 +960,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-pro-preview" }] },
+        model: { list: async () => [{ id: "google/gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -1144,7 +1144,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-pro-preview" }] },
+        model: { list: async () => [{ id: "google/gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -1170,7 +1170,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // #when - artistry category (gemini-3-pro-preview with max variant)
+      // #when - artistry category (gemini-3-pro with max variant)
       const result = await tool.execute(
         {
           description: "Test artistry forced background",
@@ -1189,7 +1189,7 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
 
     test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
-      // #given - writing uses gemini-3-flash-preview
+      // #given - writing uses gemini-3-flash
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
@@ -1209,7 +1209,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-flash-preview" }] },
+        model: { list: async () => [{ id: "google/gemini-3-flash" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_writing_gemini" } }),
@@ -1235,7 +1235,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // #when - writing category (gemini-3-flash-preview)
+      // #when - writing category (gemini-3-flash)
       const result = await tool.execute(
         {
           description: "Test writing forced background",
@@ -1535,9 +1535,9 @@ describe("sisyphus-task", () => {
       // #when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // #then should use category's built-in model (gemini-3-pro-preview for visual-engineering)
+      // #then should use category's built-in model (gemini-3-pro for visual-engineering)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("google/gemini-3-pro-preview")
+      expect(resolved!.model).toBe("google/gemini-3-pro")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {
