@@ -128,8 +128,13 @@ $ARGUMENTS
   }
 }
 
-function parseAllowedTools(allowedTools: string | undefined): string[] | undefined {
+function parseAllowedTools(allowedTools: string | string[] | undefined): string[] | undefined {
   if (!allowedTools) return undefined
+
+  if (Array.isArray(allowedTools)) {
+    return allowedTools.map(t => t.trim()).filter(Boolean)
+  }
+
   return allowedTools.split(/\s+/).filter(Boolean)
 }
 

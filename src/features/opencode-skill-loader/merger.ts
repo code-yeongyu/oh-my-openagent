@@ -9,6 +9,16 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { deepMerge } from "../../shared/deep-merge"
 
+function parseAllowedTools(allowedTools: string | string[] | undefined): string[] | undefined {
+  if (!allowedTools) return undefined
+
+  if (Array.isArray(allowedTools)) {
+    return allowedTools.map(t => t.trim()).filter(Boolean)
+  }
+
+  return allowedTools.split(/\s+/).filter(Boolean)
+}
+
 const SCOPE_PRIORITY: Record<SkillScope, number> = {
   builtin: 1,
   config: 2,
@@ -119,7 +129,7 @@ $ARGUMENTS
   }
 
   const allowedTools = entry["allowed-tools"] ||
-    (fileMetadata["allowed-tools"] ? fileMetadata["allowed-tools"].split(/\s+/).filter(Boolean) : undefined)
+    parseAllowedTools(fileMetadata["allowed-tools"])
 
   return {
     name,

@@ -270,4 +270,121 @@ Skill body.
       }
     })
   })
+
+  describe("allowed-tools parsing", () => {
+    it("parses space-separated string format", async () => {
+      // #given
+      const skillContent = `---
+name: space-separated-tools
+description: Skill with space-separated allowed-tools
+allowed-tools: Read Write Edit Bash
+---
+Skill body.
+`
+      createTestSkill("space-separated-tools", skillContent)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "space-separated-tools")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("parses YAML array format", async () => {
+      // #given
+      const skillContent = `---
+name: yaml-array-tools
+description: Skill with YAML array allowed-tools
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+---
+Skill body.
+`
+      createTestSkill("yaml-array-tools", skillContent)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "yaml-array-tools")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("parses inline YAML array format", async () => {
+      // #given
+      const skillContent = `---
+name: inline-array-tools
+description: Skill with inline YAML array allowed-tools
+allowed-tools: [Read, Write, Edit, Bash]
+---
+Skill body.
+`
+      createTestSkill("inline-array-tools", skillContent)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "inline-array-tools")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("returns undefined when allowed-tools is not specified", async () => {
+      // #given
+      const skillContent = `---
+name: no-tools
+description: Skill without allowed-tools
+---
+Skill body.
+`
+      createTestSkill("no-tools", skillContent)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "no-tools")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.allowedTools).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
 })
