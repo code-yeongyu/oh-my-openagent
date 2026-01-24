@@ -113,6 +113,7 @@ export const HookNameSchema = z.enum([
   "plan-reorganizer",
   "plan-update-reminder",
   "plan-attention-refresher",
+  "mdsel-reminder",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

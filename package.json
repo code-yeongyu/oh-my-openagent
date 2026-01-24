@@ -15,7 +15,6 @@
     "src/features/builtin-skills/**/SKILL.md",
     "src/features/builtin-skills/**/reference.md"
   ],
-
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -28,6 +27,7 @@
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
+    "build:mdsel-cli": "bun run script/build-mdsel-cli.ts",
     "clean": "rm -rf dist",
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
@@ -73,7 +73,15 @@
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
-    "typescript": "^5.7.3"
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-markdown": "^2.1.2",
+    "mdast-util-to-string": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "typescript": "^5.7.3",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.1.0",
+    "unist-util-visit-parents": "^6.0.2"
   },
   "optionalDependencies": {
     "oh-my-opencode-darwin-arm64": "3.1.0",

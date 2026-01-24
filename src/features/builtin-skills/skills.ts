@@ -603,6 +603,13 @@ const executingPlansSkill: BuiltinSkill = {
   template: readBuiltinSkillTemplate("executing-plans"),
 }
 
+const mdselSkill: BuiltinSkill = {
+  name: "mdsel",
+  description:
+    "Declarative Markdown semantic selection CLI for token-efficient reading. Use for .md files over 200 words. Triggers: markdown, .md, README, documentation, docs, large markdown",
+  template: readBuiltinSkillTemplate("mdsel"),
+}
+
 const gitMasterSkill: BuiltinSkill = {
   name: "git-master",
   description:
@@ -1959,6 +1966,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     gitMasterSkill,
     waveParallelExecutionSkill,
     executingPlansSkill,
+    mdselSkill,
     devBrowserSkill,
   ]
 }

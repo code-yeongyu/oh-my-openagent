@@ -99,7 +99,8 @@
           "phase-flow-enforcer",
           "plan-reorganizer",
           "plan-update-reminder",
-          "plan-attention-refresher"
+          "plan-attention-refresher",
+          "mdsel-reminder"
         ]
       }
     },

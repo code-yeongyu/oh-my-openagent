@@ -48,6 +48,8 @@ import {
   createCodebaseAssessmentHook,
   createLspDiagnosticsEnforcerHook,
   createPhaseFlowEnforcerHook,
+  // mdsel reminder hook
+  createMdselReminderHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -291,6 +293,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   // Phase Flow Enforcer hook - warns when boulder phase transitions are skipped
   const phaseFlowEnforcer = isHookEnabled("phase-flow-enforcer")
     ? createPhaseFlowEnforcerHook(ctx)
+    : null;
+
+  // mdsel Reminder hook - reminds to use mdsel for large markdown files
+  const mdselReminder = isHookEnabled("mdsel-reminder")
+    ? createMdselReminderHook(ctx)
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
@@ -747,6 +754,7 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
       await subagentVerification?.["tool.execute.after"]?.(input, output);
       await lspDiagnosticsEnforcer?.["tool.execute.after"]?.(input, output);
       await phaseFlowEnforcer?.["tool.execute.after"]?.(input, output);
+      await mdselReminder?.["tool.execute.after"]?.(input, output);
     },
   };
 };

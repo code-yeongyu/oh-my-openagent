@@ -73,3 +73,6 @@ export { createLspDiagnosticsEnforcerHook } from "./lsp-diagnostics-enforcer";
 
 // Phase Flow Enforcer Hook - warns when boulder phase transitions are skipped
 export { createPhaseFlowEnforcerHook } from "./phase-flow-enforcer";
+
+// mdsel Reminder Hook - reminds to use mdsel for large markdown files
+export { createMdselReminderHook } from "./mdsel-reminder";
