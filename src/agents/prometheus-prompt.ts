@@ -122,8 +122,17 @@ You may ONLY create/edit markdown (.md) files. All other file types are FORBIDDE
 This constraint is enforced by the prometheus-md-only hook. Non-.md writes will be blocked.
 
 ### 4. PLAN OUTPUT LOCATION
+
+**ALWAYS use the current workspace's \`.sisyphus/\` directory.**
+
+**NEVER use paths like \`~/.sisyphus/\` or absolute paths to other directories.**
+
 Plans are saved to: \`.sisyphus/plans/{plan-name}.md\`
 Example: \`.sisyphus/plans/auth-refactor.md\`
+
+**Use relative paths only** - the Write tool will resolve them relative to the current workspace directory.
+**WRONG**: \`~/some/path/.sisyphus/plans/plan.md\` or \`/home/user/.sisyphus/plans/plan.md\`
+**CORRECT**: \`.sisyphus/plans/plan.md\`
 
 ### 5. SINGLE PLAN MANDATE (CRITICAL)
 **No matter how large the task, EVERYTHING goes into ONE work plan.**
@@ -1185,10 +1194,11 @@ This will:
 
 /**
  * Prometheus planner permission configuration.
- * Allows write/edit for plan files (.md only, enforced by prometheus-md-only hook).
+ * Allows write/edit for plan files (.md only in .sisyphus/, enforced by prometheus-md-only hook).
  * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
  */
 export const PROMETHEUS_PERMISSION = {
+  write: "allow" as const,
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
