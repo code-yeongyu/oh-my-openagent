@@ -41,6 +41,8 @@ export interface BackgroundTask {
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Number of times stability was reached but session was not idle (for deadlock detection) */
+  stabilityResets?: number
 }
 
 export interface LaunchInput {

@@ -1233,13 +1233,29 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
                 const currentStatus = recheckData[sessionID]
                 
                 if (currentStatus?.type !== "idle") {
+                  task.stabilityResets = (task.stabilityResets ?? 0) + 1
+                  const maxResets = this.config?.maxStabilityResets ?? 10
+
+                  if (task.stabilityResets >= maxResets) {
+                    log("[background-agent] DEADLOCK - Force completing after max stability resets:", {
+                      taskId: task.id,
+                      stabilityResets: task.stabilityResets,
+                      sessionStatus: currentStatus?.type ?? "not_in_status"
+                    })
+                    task.error = `Force-completed after ${task.stabilityResets} stability resets (deadlock detected)`
+                    await this.tryCompleteTask(task, "deadlock detection")
+                    continue
+                  }
+
                   log("[background-agent] Stability reached but session not idle, resetting:", { 
-                    taskId: task.id, 
+                    taskId: task.id,
+                    stabilityResets: task.stabilityResets,
                     sessionStatus: currentStatus?.type ?? "not_in_status" 
                   })
                   task.stablePolls = 0
                   continue
                 }
+                task.stabilityResets = 0
 
                 // Edge guard: Validate session has actual output before completing
                 const hasValidOutput = await this.validateSessionHasOutput(sessionID)
@@ -1259,6 +1275,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               }
             } else {
               task.stablePolls = 0
+              task.stabilityResets = 0
             }
           }
           task.lastMsgCount = currentMsgCount
