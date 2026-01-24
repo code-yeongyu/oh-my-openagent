@@ -54,6 +54,8 @@ import {
   setSessionAgent,
   updateSessionAgent,
   clearSessionAgent,
+  consumePreviousAgent,
+  subagentSessions,
 } from "./features/claude-code-session-state";
 import {
   builtinTools,
@@ -318,6 +320,23 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       if (input.agent) {
         setSessionAgent(input.sessionID, input.agent);
+      }
+
+      // Agent switch reminder injection
+      if (!subagentSessions.has(input.sessionID)) {
+        const previousAgent = consumePreviousAgent(input.sessionID)
+        if (previousAgent !== undefined && previousAgent !== input.agent) {
+          const reminder = `<system-reminder>
+[AGENT SWITCH] ${previousAgent} → ${input.agent}
+You are now operating as ${input.agent}. Adjust your behavior accordingly.
+</system-reminder>
+
+`
+          const idx = output.parts.findIndex((p) => p.type === "text" && "text" in p && p.text)
+          if (idx >= 0 && "text" in output.parts[idx] && output.parts[idx].text) {
+            (output.parts[idx] as { text: string }).text = reminder + (output.parts[idx] as { text: string }).text
+          }
+        }
       }
 
       const message = (output as { message: { variant?: string } }).message
