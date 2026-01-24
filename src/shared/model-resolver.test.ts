@@ -236,9 +236,9 @@ describe("resolveModelWithFallback", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["anthropic", "opencode", "github-copilot"], model: "grok-code" },
+          { providers: ["anthropic", "opencode", "github-copilot"], model: "gpt-5-nano" },
         ],
-        availableModels: new Set(["opencode/grok-code", "github-copilot/grok-code-preview"]),
+        availableModels: new Set(["opencode/gpt-5-nano", "github-copilot/gpt-5-nano-preview"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -246,7 +246,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // #then
-      expect(result.model).toBe("opencode/grok-code")
+      expect(result.model).toBe("opencode/gpt-5-nano")
       expect(result.source).toBe("provider-fallback")
     })
 
@@ -392,20 +392,20 @@ describe("resolveModelWithFallback", () => {
 
     test("tries all providers in first entry before moving to second entry", () => {
       // #given
-      const availableModels = new Set(["google/gemini-3-pro-preview"])
+      const availableModels = new Set(["google/gemini-3-pro"])
 
       // #when
       const result = resolveModelWithFallback({
         fallbackChain: [
           { providers: ["openai", "anthropic"], model: "gpt-5.2" },
-          { providers: ["google"], model: "gemini-3-pro-preview" },
+          { providers: ["google"], model: "gemini-3-pro" },
         ],
         availableModels,
         systemDefaultModel: "system/default",
       })
 
       // #then
-      expect(result.model).toBe("google/gemini-3-pro-preview")
+      expect(result.model).toBe("google/gemini-3-pro")
       expect(result.source).toBe("provider-fallback")
     })
 

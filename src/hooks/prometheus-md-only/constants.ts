@@ -1,8 +1,9 @@
 import { createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 export const HOOK_NAME = "prometheus-md-only"
 
-export const PROMETHEUS_AGENTS = ["Prometheus (Planner)"]
+export const PROMETHEUS_AGENTS = ["prometheus"]
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
@@ -16,7 +17,7 @@ export const PLANNING_CONSULT_WARNING = `
 
 ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 
-You are being invoked by Prometheus (Planner), a READ-ONLY planning agent.
+You are being invoked by ${getAgentDisplayName("prometheus")}, a READ-ONLY planning agent.
 
 **CRITICAL CONSTRAINTS:**
 - DO NOT modify any files (no Write, Edit, or any file mutations)

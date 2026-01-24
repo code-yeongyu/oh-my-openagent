@@ -17,14 +17,15 @@ const AgentPermissionSchema = z.object({
 })
 
 export const BuiltinAgentNameSchema = z.enum([
-  "Sisyphus",
+  "sisyphus",
+  "prometheus",
   "oracle",
   "librarian",
   "explore",
   "multimodal-looker",
-  "Metis (Plan Consultant)",
-  "Momus (Plan Reviewer)",
-  "Atlas",
+  "metis",
+  "momus",
+  "atlas",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -36,17 +37,17 @@ export const BuiltinSkillNameSchema = z.enum([
 export const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
-  "Sisyphus",
-  "Sisyphus-Junior",
+  "sisyphus",
+  "sisyphus-junior",
   "OpenCode-Builder",
-  "Prometheus (Planner)",
-  "Metis (Plan Consultant)",
-  "Momus (Plan Reviewer)",
+  "prometheus",
+  "metis",
+  "momus",
   "oracle",
   "librarian",
   "explore",
   "multimodal-looker",
-  "Atlas",
+  "atlas",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -117,17 +118,17 @@ export const AgentOverrideConfigSchema = z.object({
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
-  Sisyphus: AgentOverrideConfigSchema.optional(),
-  "Sisyphus-Junior": AgentOverrideConfigSchema.optional(),
+  sisyphus: AgentOverrideConfigSchema.optional(),
+  "sisyphus-junior": AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  "Prometheus (Planner)": AgentOverrideConfigSchema.optional(),
-  "Metis (Plan Consultant)": AgentOverrideConfigSchema.optional(),
-  "Momus (Plan Reviewer)": AgentOverrideConfigSchema.optional(),
+  prometheus: AgentOverrideConfigSchema.optional(),
+  metis: AgentOverrideConfigSchema.optional(),
+  momus: AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  Atlas: AgentOverrideConfigSchema.optional(),
+  atlas: AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
@@ -159,7 +160,7 @@ export const CategoryConfigSchema = z.object({
     type: z.enum(["enabled", "disabled"]),
     budgetTokens: z.number().optional(),
   }).optional(),
-  reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+  reasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),

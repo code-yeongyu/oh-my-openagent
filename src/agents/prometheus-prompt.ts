@@ -319,8 +319,8 @@ Or should I just note down this single fix?"
 
 **Research First:**
 \`\`\`typescript
-delegate_task(agent="explore", prompt="Find all usages of [target] using lsp_find_references pattern...", background=true)
-delegate_task(agent="explore", prompt="Find test coverage for [affected code]...", background=true)
+delegate_task(subagent_type="explore", prompt="Find all usages of [target] using lsp_find_references pattern...", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="Find test coverage for [affected code]...", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -343,9 +343,9 @@ delegate_task(agent="explore", prompt="Find test coverage for [affected code]...
 **Pre-Interview Research (MANDATORY):**
 \`\`\`typescript
 // Launch BEFORE asking user questions
-delegate_task(agent="explore", prompt="Find similar implementations in codebase...", background=true)
-delegate_task(agent="explore", prompt="Find project patterns for [feature type]...", background=true)
-delegate_task(agent="librarian", prompt="Find best practices for [technology]...", background=true)
+delegate_task(subagent_type="explore", prompt="Find similar implementations in codebase...", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="Find project patterns for [feature type]...", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="Find best practices for [technology]...", run_in_background=true)
 \`\`\`
 
 **Interview Focus** (AFTER research):
@@ -384,7 +384,7 @@ Based on your stack, I'd recommend NextAuth.js - it integrates well with Next.js
 
 Run this check:
 \`\`\`typescript
-delegate_task(agent="explore", prompt="Find test infrastructure: package.json test scripts, test config files (jest.config, vitest.config, pytest.ini, etc.), existing test files (*.test.*, *.spec.*, test_*). Report: 1) Does test infra exist? 2) What framework? 3) Example test file patterns.", background=true)
+delegate_task(subagent_type="explore", prompt="Find test infrastructure: package.json test scripts, test config files (jest.config, vitest.config, pytest.ini, etc.), existing test files (*.test.*, *.spec.*, test_*). Report: 1) Does test infra exist? 2) What framework? 3) Example test file patterns.", run_in_background=true)
 \`\`\`
 
 #### Step 2: Ask the Test Question (MANDATORY)
@@ -473,13 +473,13 @@ Add to draft immediately:
 
 **Research First:**
 \`\`\`typescript
-delegate_task(agent="explore", prompt="Find current system architecture and patterns...", background=true)
-delegate_task(agent="librarian", prompt="Find architectural best practices for [domain]...", background=true)
+delegate_task(subagent_type="explore", prompt="Find current system architecture and patterns...", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="Find architectural best practices for [domain]...", run_in_background=true)
 \`\`\`
 
 **Oracle Consultation** (recommend when stakes are high):
 \`\`\`typescript
-delegate_task(agent="oracle", prompt="Architecture consultation needed: [context]...", background=false)
+delegate_task(subagent_type="oracle", prompt="Architecture consultation needed: [context]...", run_in_background=false)
 \`\`\`
 
 **Interview Focus:**
@@ -496,9 +496,9 @@ delegate_task(agent="oracle", prompt="Architecture consultation needed: [context
 
 **Parallel Investigation:**
 \`\`\`typescript
-delegate_task(agent="explore", prompt="Find how X is currently handled...", background=true)
-delegate_task(agent="librarian", prompt="Find official docs for Y...", background=true)
-delegate_task(agent="librarian", prompt="Find OSS implementations of Z...", background=true)
+delegate_task(subagent_type="explore", prompt="Find how X is currently handled...", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="Find official docs for Y...", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="Find OSS implementations of Z...", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -524,17 +524,17 @@ delegate_task(agent="librarian", prompt="Find OSS implementations of Z...", back
 
 **For Understanding Codebase:**
 \`\`\`typescript
-delegate_task(agent="explore", prompt="Find all files related to [topic]. Show patterns, conventions, and structure.", background=true)
+delegate_task(subagent_type="explore", prompt="Find all files related to [topic]. Show patterns, conventions, and structure.", run_in_background=true)
 \`\`\`
 
 **For External Knowledge:**
 \`\`\`typescript
-delegate_task(agent="librarian", prompt="Find official documentation for [library]. Focus on [specific feature] and best practices.", background=true)
+delegate_task(subagent_type="librarian", prompt="Find official documentation for [library]. Focus on [specific feature] and best practices.", run_in_background=true)
 \`\`\`
 
 **For Implementation Examples:**
 \`\`\`typescript
-delegate_task(agent="librarian", prompt="Find open source implementations of [feature]. Look for production-quality examples.", background=true)
+delegate_task(subagent_type="librarian", prompt="Find open source implementations of [feature]. Look for production-quality examples.", run_in_background=true)
 \`\`\`
 
 ## Interview Mode Anti-Patterns
@@ -631,7 +631,7 @@ todoWrite([
 
 \`\`\`typescript
 delegate_task(
-  agent="Metis (Plan Consultant)",
+  subagent_type="metis",
   prompt=\`Review this planning session before I generate the work plan:
 
   **User's Goal**: {summarize what user wants}
@@ -652,7 +652,7 @@ delegate_task(
   4. Assumptions I'm making that need validation
   5. Missing acceptance criteria
   6. Edge cases not addressed\`,
-  background=false
+  run_in_background=false
 )
 \`\`\`
 
@@ -797,9 +797,9 @@ Question({
 // After generating initial plan
 while (true) {
   const result = delegate_task(
-    agent="Momus (Plan Reviewer)",
+    subagent_type="momus",
     prompt=".sisyphus/plans/{name}.md",
-    background=false
+    run_in_background=false
   )
 
   if (result.verdict === "OKAY") {

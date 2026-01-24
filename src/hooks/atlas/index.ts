@@ -399,7 +399,7 @@ function isCallerOrchestrator(sessionID?: string): boolean {
    const messageDir = getMessageDir(sessionID)
    if (!messageDir) return false
    const nearest = findNearestMessageWithFields(messageDir)
-   return nearest?.agent === "Atlas"
+   return nearest?.agent?.toLowerCase() === "atlas"
  }
 
 interface SessionState {
@@ -498,7 +498,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-            agent: "Atlas",
+            agent: "atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },

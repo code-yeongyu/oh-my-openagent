@@ -112,12 +112,12 @@ Each agent has a **provider priority chain**. The system tries providers in orde
 
 ```
 Example: multimodal-looker
-google → anthropic → zai → openai → github-copilot → opencode
-   ↓         ↓         ↓        ↓           ↓            ↓
-gemini   haiku     glm-4.6v  gpt-5.2    fallback     fallback
+google → openai → zai-coding-plan → anthropic → opencode
+   ↓        ↓           ↓              ↓           ↓
+gemini   gpt-5.2     glm-4.6v       haiku     gpt-5-nano
 ```
 
-If you have Gemini, it uses `google/gemini-3-flash-preview`. No Gemini but have Claude? Uses `anthropic/claude-haiku-4-5`. And so on.
+If you have Gemini, it uses `google/gemini-3-flash`. No Gemini but have Claude? Uses `anthropic/claude-haiku-4-5`. And so on.
 
 ### Example Configuration
 
@@ -130,12 +130,12 @@ Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** 
     // Override specific agents only - rest use fallback chain
     "Atlas": { "model": "anthropic/claude-sonnet-4-5", "variant": "max" },
     "librarian": { "model": "zai-coding-plan/glm-4.7" },
-    "explore": { "model": "opencode/grok-code" },
+    "explore": { "model": "opencode/gpt-5-nano" },
     "multimodal-looker": { "model": "zai-coding-plan/glm-4.6v" }
   },
   "categories": {
     // Override categories for cost optimization
-    "quick": { "model": "opencode/grok-code" },
+    "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "zai-coding-plan/glm-4.7" }
   },
   "experimental": {

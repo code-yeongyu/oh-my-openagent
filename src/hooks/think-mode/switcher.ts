@@ -89,12 +89,10 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
   "claude-sonnet-4-5": "claude-sonnet-4-5-high",
   "claude-opus-4-5": "claude-opus-4-5-high",
-  // Gemini
-  "gemini-3-pro": "gemini-3-pro-high",
-  "gemini-3-pro-low": "gemini-3-pro-high",
-  "gemini-3-pro-preview": "gemini-3-pro-preview-high",
-  "gemini-3-flash": "gemini-3-flash-high",
-  "gemini-3-flash-preview": "gemini-3-flash-preview-high",
+   // Gemini
+   "gemini-3-pro": "gemini-3-pro-high",
+   "gemini-3-pro-low": "gemini-3-pro-high",
+   "gemini-3-flash": "gemini-3-flash-high",
   // GPT-5
   "gpt-5": "gpt-5-high",
   "gpt-5-mini": "gpt-5-mini-high",

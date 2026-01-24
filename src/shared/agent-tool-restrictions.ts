@@ -30,7 +30,7 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     read: true,
   },
 
-  "Sisyphus-Junior": {
+  "sisyphus-junior": {
     task: false,
     delegate_task: false,
   },

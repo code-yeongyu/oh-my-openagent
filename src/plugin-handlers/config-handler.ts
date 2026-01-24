@@ -106,13 +106,38 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     if (!(config.model as string | undefined)?.trim()) {
-      const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
-      throw new Error(
-        'oh-my-opencode requires a default model.\n\n' +
-        `Add this to ${paths.configJsonc}:\n\n` +
-        '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
-        '(Replace with your preferred provider/model)'
-      )
+      let fallbackModel: string | undefined
+
+      for (const agentConfig of Object.values(pluginConfig.agents ?? {})) {
+        const model = (agentConfig as { model?: string })?.model
+        if (model && typeof model === 'string' && model.trim()) {
+          fallbackModel = model.trim()
+          break
+        }
+      }
+
+      if (!fallbackModel) {
+        for (const categoryConfig of Object.values(pluginConfig.categories ?? {})) {
+          const model = (categoryConfig as { model?: string })?.model
+          if (model && typeof model === 'string' && model.trim()) {
+            fallbackModel = model.trim()
+            break
+          }
+        }
+      }
+
+      if (fallbackModel) {
+        config.model = fallbackModel
+        log(`No default model specified, using fallback from config: ${fallbackModel}`)
+      } else {
+        const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+        throw new Error(
+          'oh-my-opencode requires a default model.\n\n' +
+          `Add this to ${paths.configJsonc}:\n\n` +
+          '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+          '(Replace with your preferred provider/model)'
+        )
+      }
     }
 
     // Migrate disabled_agents from old names to new names
@@ -186,20 +211,20 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       explore?: { tools?: Record<string, unknown> };
       librarian?: { tools?: Record<string, unknown> };
       "multimodal-looker"?: { tools?: Record<string, unknown> };
-      Atlas?: { tools?: Record<string, unknown> };
-      Sisyphus?: { tools?: Record<string, unknown> };
+      atlas?: { tools?: Record<string, unknown> };
+      sisyphus?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
-    if (isSisyphusEnabled && builtinAgents.Sisyphus) {
-      (config as { default_agent?: string }).default_agent = "Sisyphus";
+    if (isSisyphusEnabled && builtinAgents.sisyphus) {
+      (config as { default_agent?: string }).default_agent = "sisyphus";
 
       const agentConfig: Record<string, unknown> = {
-        Sisyphus: builtinAgents.Sisyphus,
+        sisyphus: builtinAgents.sisyphus,
       };
 
-      agentConfig["Sisyphus-Junior"] = createSisyphusJuniorAgentWithOverrides(
-        pluginConfig.agents?.["Sisyphus-Junior"],
+      agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
+        pluginConfig.agents?.["sisyphus-junior"],
         config.model as string | undefined
       );
 
@@ -228,7 +253,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           planConfigWithoutName as Record<string, unknown>
         );
         const prometheusOverride =
-          pluginConfig.agents?.["Prometheus (Planner)"] as
+          pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & { category?: string; model?: string })
             | undefined;
         const defaultModel = config.model as string | undefined;
@@ -275,7 +300,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             : {}),
         };
 
-        agentConfig["Prometheus (Planner)"] = prometheusOverride
+        agentConfig["prometheus"] = prometheusOverride
           ? { ...prometheusBase, ...prometheusOverride }
           : prometheusBase;
       }
@@ -310,7 +335,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
-          Object.entries(builtinAgents).filter(([k]) => k !== "Sisyphus")
+          Object.entries(builtinAgents).filter(([k]) => k !== "sisyphus")
         ),
         ...userAgents,
         ...projectAgents,
@@ -349,20 +374,20 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const agent = agentResult["multimodal-looker"] as AgentWithPermission;
       agent.permission = { ...agent.permission, task: "deny", look_at: "deny" };
     }
-    if (agentResult["Atlas"]) {
-      const agent = agentResult["Atlas"] as AgentWithPermission;
+    if (agentResult["atlas"]) {
+      const agent = agentResult["atlas"] as AgentWithPermission;
       agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow" };
     }
-    if (agentResult.Sisyphus) {
-      const agent = agentResult.Sisyphus as AgentWithPermission;
+    if (agentResult.sisyphus) {
+      const agent = agentResult.sisyphus as AgentWithPermission;
       agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
     }
-    if (agentResult["Prometheus (Planner)"]) {
-      const agent = agentResult["Prometheus (Planner)"] as AgentWithPermission;
+    if (agentResult["prometheus"]) {
+      const agent = agentResult["prometheus"] as AgentWithPermission;
       agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
     }
-    if (agentResult["Sisyphus-Junior"]) {
-      const agent = agentResult["Sisyphus-Junior"] as AgentWithPermission;
+    if (agentResult["sisyphus-junior"]) {
+      const agent = agentResult["sisyphus-junior"] as AgentWithPermission;
       agent.permission = { ...agent.permission, delegate_task: "allow" };
     }
 

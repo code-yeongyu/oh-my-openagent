@@ -154,7 +154,7 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 }
 ```
 
-**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
+**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro`, `google/gemini-3-flash`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
 
 Then authenticate:
 
@@ -183,7 +183,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
-| **Explore**   | `github-copilot/grok-code-fast-1`|
+| **Explore**   | `github-copilot/gpt-5-nano-fast-1`|
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
@@ -203,7 +203,7 @@ If Z.ai is the only provider available, all agents will use GLM models:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/grok-code`, and `opencode/glm-4.7-free`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/big-pickle`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
@@ -211,8 +211,8 @@ When OpenCode Zen is the best available provider (no native or Copilot), these m
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `opencode/claude-opus-4-5`       |
 | **Oracle**    | `opencode/gpt-5.2`               |
-| **Explore**   | `opencode/grok-code`             |
-| **Librarian** | `opencode/glm-4.7-free`          |
+| **Explore**   | `opencode/gpt-5-nano`             |
+| **Librarian** | `opencode/big-pickle`          |
 
 ##### Setup
 

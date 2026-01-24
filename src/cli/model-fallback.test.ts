@@ -310,15 +310,15 @@ describe("generateModelConfig", () => {
   })
 
   describe("explore agent special cases", () => {
-    test("explore uses grok-code when only Gemini available (no Claude)", () => {
+    test("explore uses gpt-5-nano when only Gemini available (no Claude)", () => {
       // #given only Gemini is available (no Claude)
       const config = createConfig({ hasGemini: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use grok-code (Claude haiku not available)
-      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
+      // #then explore should use gpt-5-nano (Claude haiku not available)
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
 
     test("explore uses Claude haiku when Claude available", () => {
@@ -343,15 +343,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
     })
 
-    test("explore uses grok-code when only OpenAI available", () => {
+    test("explore uses gpt-5-nano when only OpenAI available", () => {
       // #given only OpenAI is available
       const config = createConfig({ hasOpenAI: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use grok-code (fallback)
-      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
+      // #then explore should use gpt-5-nano (fallback)
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
   })
 
@@ -364,7 +364,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then Sisyphus should use opus (sisyphus-high)
-      expect(result.agents?.Sisyphus?.model).toBe("anthropic/claude-opus-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-5")
     })
 
     test("Sisyphus uses sisyphus-low capability when isMax20 is false", () => {
@@ -375,7 +375,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then Sisyphus should use sonnet (sisyphus-low)
-      expect(result.agents?.Sisyphus?.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-sonnet-4-5")
     })
   })
 

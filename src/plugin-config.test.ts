@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { OhMyOpenCodeConfig } from "./config";
 import { loadPluginConfig, mergeConfigs } from "./plugin-config";
 
@@ -76,7 +76,7 @@ describe("mergeConfigs", () => {
 						temperature: 0.3,
 					},
 					visual: {
-						model: "google/gemini-3-pro-preview",
+						model: "google/gemini-3-pro",
 					},
 				},
 			} as unknown as OhMyOpenCodeConfig;
@@ -92,9 +92,7 @@ describe("mergeConfigs", () => {
 				"anthropic/claude-haiku-4-5",
 			);
 			// #then visual should be added from override
-			expect(result.categories?.visual?.model).toBe(
-				"google/gemini-3-pro-preview",
-			);
+			expect(result.categories?.visual?.model).toBe("google/gemini-3-pro");
 		});
 
 		it("should preserve base categories when override has no categories", () => {
