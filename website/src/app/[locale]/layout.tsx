@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
+import { Header, Sidebar, Footer } from '@/components/layout';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,7 +50,14 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <div className="relative flex min-h-screen flex-col">
+              <Header />
+              <div className="flex-1 flex">
+                <Sidebar />
+                <main className="flex-1">{children}</main>
+              </div>
+              <Footer />
+            </div>
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>
