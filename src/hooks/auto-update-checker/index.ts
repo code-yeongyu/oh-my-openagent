@@ -5,6 +5,7 @@ import { PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getConfigLoadErrors, clearConfigLoadErrors } from "../../shared/config-errors"
 import { runBunInstall } from "../../cli/config-manager"
+import { isModelCacheAvailable } from "../../shared/model-availability"
 import type { AutoUpdateCheckerOptions } from "./types"
 
 const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
@@ -75,6 +76,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
         const displayVersion = localDevVersion ?? cachedVersion
 
         await showConfigErrorsIfAny(ctx)
+        await showModelCacheWarningIfNeeded(ctx)
 
         if (localDevVersion) {
           if (showStartupToast) {
@@ -165,6 +167,23 @@ async function runBunInstallSafe(): Promise<boolean> {
     log("[auto-update-checker] bun install error:", errorMessage)
     return false
   }
+}
+
+async function showModelCacheWarningIfNeeded(ctx: PluginInput): Promise<void> {
+  if (isModelCacheAvailable()) return
+
+  await ctx.client.tui
+    .showToast({
+      body: {
+        title: "Model Cache Not Found",
+        message: "Run 'opencode models --refresh' or restart OpenCode to populate the models cache for optimal agent model selection.",
+        variant: "warning" as const,
+        duration: 10000,
+      },
+    })
+    .catch(() => {})
+
+  log("[auto-update-checker] Model cache warning shown")
 }
 
 async function showConfigErrorsIfAny(ctx: PluginInput): Promise<void> {

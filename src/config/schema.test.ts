@@ -375,7 +375,7 @@ describe("Sisyphus-Junior agent override", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           model: "openai/gpt-5.2",
           temperature: 0.2,
         },
@@ -388,18 +388,18 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]).toBeDefined()
-      expect(result.data.agents?.["Sisyphus-Junior"]?.model).toBe("openai/gpt-5.2")
-      expect(result.data.agents?.["Sisyphus-Junior"]?.temperature).toBe(0.2)
+      expect(result.data.agents?.["sisyphus-junior"]).toBeDefined()
+      expect(result.data.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.["sisyphus-junior"]?.temperature).toBe(0.2)
     }
   })
 
-  test("schema accepts Sisyphus-Junior with prompt_append", () => {
+  test("schema accepts sisyphus-junior with prompt_append", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
-          prompt_append: "Additional instructions for Sisyphus-Junior",
+        "sisyphus-junior": {
+          prompt_append: "Additional instructions for sisyphus-junior",
         },
       },
     }
@@ -410,17 +410,17 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.prompt_append).toBe(
-        "Additional instructions for Sisyphus-Junior"
+      expect(result.data.agents?.["sisyphus-junior"]?.prompt_append).toBe(
+        "Additional instructions for sisyphus-junior"
       )
     }
   })
 
-  test("schema accepts Sisyphus-Junior with tools override", () => {
+  test("schema accepts sisyphus-junior with tools override", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           tools: {
             read: true,
             write: false,
@@ -435,10 +435,62 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.tools).toEqual({
+      expect(result.data.agents?.["sisyphus-junior"]?.tools).toEqual({
         read: true,
         write: false,
       })
+    }
+  })
+
+  test("schema accepts lowercase agent names (sisyphus, atlas, prometheus)", () => {
+    // #given
+    const config = {
+      agents: {
+        sisyphus: {
+          temperature: 0.1,
+        },
+        atlas: {
+          temperature: 0.2,
+        },
+        prometheus: {
+          temperature: 0.3,
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.sisyphus?.temperature).toBe(0.1)
+      expect(result.data.agents?.atlas?.temperature).toBe(0.2)
+      expect(result.data.agents?.prometheus?.temperature).toBe(0.3)
+    }
+  })
+
+  test("schema accepts lowercase metis and momus agent names", () => {
+    // #given
+    const config = {
+      agents: {
+        metis: {
+          category: "ultrabrain",
+        },
+        momus: {
+          category: "quick",
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.metis?.category).toBe("ultrabrain")
+      expect(result.data.agents?.momus?.category).toBe("quick")
     }
   })
 })

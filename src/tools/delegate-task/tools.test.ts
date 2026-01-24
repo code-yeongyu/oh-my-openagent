@@ -1,12 +1,18 @@
-import { describe, test, expect } from "bun:test"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, DELEGATE_TASK_DESCRIPTION } from "./constants"
+import { describe, test, expect, beforeEach } from "bun:test"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
+import { __resetModelCache } from "../../shared/model-availability"
 
 // Test constants - systemDefaultModel is required by resolveCategoryConfig
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
+  // Reset model cache before each test to prevent cross-test pollution
+  beforeEach(() => {
+    __resetModelCache()
+  })
+
   describe("DEFAULT_CATEGORIES", () => {
     test("visual-engineering category has model config", () => {
       // #given
@@ -70,19 +76,6 @@ describe("sisyphus-task", () => {
     })
   })
 
-  describe("DELEGATE_TASK_DESCRIPTION", () => {
-    test("documents background parameter as required with default false", () => {
-      // #given / #when / #then
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("background")
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("Default: false")
-    })
-
-    test("warns about parallel exploration usage", () => {
-      // #given / #when / #then
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("5+")
-    })
-  })
-
   describe("category delegation config validation", () => {
     test("returns error when systemDefaultModel is not configured", async () => {
       // #given a mock client with no model in config
@@ -118,7 +111,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -295,7 +288,7 @@ describe("sisyphus-task", () => {
             id: "task-variant",
             sessionID: "session-variant",
             description: "Variant task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -333,7 +326,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: true,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -358,7 +351,7 @@ describe("sisyphus-task", () => {
             id: "task-default-variant",
             sessionID: "session-default-variant",
             description: "Default variant task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -367,6 +360,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -394,7 +388,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "unspecified-high",
           run_in_background: true,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -417,6 +411,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_default_variant" } }),
@@ -451,7 +446,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "unspecified-high",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -466,14 +461,7 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("DELEGATE_TASK_DESCRIPTION documents skills parameter with empty array option", () => {
-      // #given / #when / #then
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("skills")
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("Array of skill names")
-      expect(DELEGATE_TASK_DESCRIPTION).toContain("[] (empty array) if no skills needed")
-    })
-
-    test("skills parameter is required - returns error when not provided", async () => {
+    test("skills parameter is required - throws error when not provided", async () => {
       // #given
       const { createDelegateTask } = require("./tools")
       
@@ -501,7 +489,8 @@ describe("sisyphus-task", () => {
       }
       
       // #when - skills not provided (undefined)
-      const result = await tool.execute(
+      // #then - should throw error about missing skills
+      await expect(tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
@@ -509,14 +498,10 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )
-      
-      // #then - should return error about missing skills
-      expect(result).toContain("skills")
-      expect(result).toContain("REQUIRED")
+      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
     })
 
-    test("null skills returns error", async () => {
+    test("null skills throws error", async () => {
       // #given
       const { createDelegateTask } = require("./tools")
       
@@ -544,22 +529,17 @@ describe("sisyphus-task", () => {
       }
       
       // #when - null passed
-      const result = await tool.execute(
+      // #then - should throw error about null
+      await expect(tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: null,
+          load_skills: null,
         },
         toolContext
-      )
-      
-      // #then - should return error about null
-      expect(result).toContain("Invalid arguments")
-      expect(result).toContain("skills=null")
-      expect(result).toContain("not allowed")
-      expect(result).toContain("skills=[]")
+      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
     })
 
     test("empty array [] is allowed and proceeds without skill content", async () => {
@@ -597,14 +577,14 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // #when - empty array skills passed
+      // #when - empty array passed
       await tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: [],
         },
         toolContext
       )
@@ -670,7 +650,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue the task",
         resume: "ses_resume_test",
         run_in_background: false,
-        skills: [],
+        load_skills: ["git-master"],
       },
       toolContext
     )
@@ -725,7 +705,7 @@ describe("sisyphus-task", () => {
         prompt: "Continue in background",
         resume: "ses_bg_resume",
         run_in_background: true,
-        skills: [],
+        load_skills: ["git-master"],
       },
       toolContext
     )
@@ -780,7 +760,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -840,7 +820,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -893,7 +873,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -947,7 +927,7 @@ describe("sisyphus-task", () => {
         prompt: "test",
         category: "custom-cat",
         run_in_background: false,
-        skills: []
+        load_skills: ["git-master"]
       }, toolContext)
 
       // #then
@@ -971,7 +951,7 @@ describe("sisyphus-task", () => {
             id: "task-unstable",
             sessionID: "ses_unstable_gemini",
             description: "Unstable gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -980,6 +960,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: "google/gemini-3-pro-preview" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -1012,14 +993,14 @@ describe("sisyphus-task", () => {
           prompt: "Do something visual",
           category: "visual-engineering",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
       
       // #then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
-      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Gemini task completed successfully")
     }, { timeout: 20000 })
 
@@ -1035,7 +1016,7 @@ describe("sisyphus-task", () => {
             id: "task-normal-bg",
             sessionID: "ses_normal_bg",
             description: "Normal background task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1070,7 +1051,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something visual",
           category: "visual-engineering",
           run_in_background: true,  // User explicitly says true - normal background
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -1131,7 +1112,7 @@ describe("sisyphus-task", () => {
           prompt: "Do something smart",
           category: "ultrabrain",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
@@ -1154,7 +1135,7 @@ describe("sisyphus-task", () => {
             id: "task-artistry",
             sessionID: "ses_artistry_gemini",
             description: "Artistry gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1163,6 +1144,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: "google/gemini-3-pro-preview" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -1195,14 +1177,14 @@ describe("sisyphus-task", () => {
           prompt: "Do something artistic",
           category: "artistry",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
       
       // #then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
-      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
@@ -1218,7 +1200,7 @@ describe("sisyphus-task", () => {
             id: "task-writing",
             sessionID: "ses_writing_gemini",
             description: "Writing gemini task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1227,6 +1209,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: "google/gemini-3-flash-preview" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_writing_gemini" } }),
@@ -1259,14 +1242,14 @@ describe("sisyphus-task", () => {
           prompt: "Write something",
           category: "writing",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
       
       // #then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
-      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Writing result here")
     }, { timeout: 20000 })
 
@@ -1282,7 +1265,7 @@ describe("sisyphus-task", () => {
             id: "task-custom-unstable",
             sessionID: "ses_custom_unstable",
             description: "Custom unstable task",
-            agent: "Sisyphus-Junior",
+            agent: "sisyphus-junior",
             status: "running",
           }
         },
@@ -1329,14 +1312,14 @@ describe("sisyphus-task", () => {
           prompt: "Do something",
           category: "my-unstable-cat",
           run_in_background: false,
-          skills: [],
+          load_skills: ["git-master"],
         },
         toolContext
       )
       
       // #then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
-      expect(result).toContain("UNSTABLE AGENT")
+      expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Custom unstable result")
     }, { timeout: 20000 })
   })

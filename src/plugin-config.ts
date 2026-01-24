@@ -4,7 +4,7 @@ import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
 import {
   log,
   deepMerge,
-  getUserConfigDir,
+  getOpenCodeConfigDir,
   addConfigLoadError,
   parseJsonc,
   detectConfigFile,
@@ -94,12 +94,9 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path (OS-specific) - prefer .jsonc over .json
-  const userBasePath = path.join(
-    getUserConfigDir(),
-    "opencode",
-    "oh-my-opencode"
-  );
+  // User-level config path - prefer .jsonc over .json
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" });
+  const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
     userDetected.format !== "none"

@@ -4,11 +4,7 @@ import * as fs from "fs"
 
 /**
  * Returns the user-level config directory based on the OS.
- * - Linux/macOS: XDG_CONFIG_HOME or ~/.config
- * - Windows: Checks ~/.config first (cross-platform), then %APPDATA% (fallback)
- *
- * On Windows, prioritizes ~/.config for cross-platform consistency.
- * Falls back to %APPDATA% for backward compatibility with existing installations.
+ * @deprecated Use getOpenCodeConfigDir() from opencode-config-dir.ts instead.
  */
 export function getUserConfigDir(): string {
   if (process.platform === "win32") {

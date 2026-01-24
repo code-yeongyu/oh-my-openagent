@@ -16,13 +16,13 @@ import packageJson from "../../package.json" with { type: "json" }
 const VERSION = packageJson.version
 
 const SYMBOLS = {
-  check: color.green("✓"),
-  cross: color.red("✗"),
-  arrow: color.cyan("→"),
-  bullet: color.dim("•"),
-  info: color.blue("ℹ"),
-  warn: color.yellow("⚠"),
-  star: color.yellow("★"),
+  check: color.green("[OK]"),
+  cross: color.red("[X]"),
+  arrow: color.cyan("->"),
+  bullet: color.dim("*"),
+  info: color.blue("[i]"),
+  warn: color.yellow("[!]"),
+  star: color.yellow("*"),
 }
 
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
@@ -44,7 +44,7 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
-  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian: glm-4.7"))
+  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -250,7 +250,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     message: "Do you have a Z.ai Coding Plan subscription?",
     options: [
       { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "zai-coding-plan/glm-4.7 for Librarian" },
+      { value: "yes" as const, label: "Yes", hint: "Fallback for Librarian and Multimodal Looker" },
     ],
     initialValue: initial.zaiCodingPlan,
   })
@@ -295,14 +295,13 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
   const installed = await isOpenCodeInstalled()
-  if (!installed) {
-    printError("OpenCode is not installed on this system.")
-    printInfo("Visit https://opencode.ai/docs for installation instructions")
-    return 1
-  }
-
   const version = await getOpenCodeVersion()
-  printSuccess(`OpenCode ${version ?? ""} detected`)
+  if (!installed) {
+    printWarning("OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.")
+    printInfo("Visit https://opencode.ai/docs for installation instructions")
+  } else {
+    printSuccess(`OpenCode ${version ?? ""} detected`)
+  }
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
@@ -351,7 +350,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   if (!config.hasClaude) {
     console.log()
-    console.log(color.bgRed(color.white(color.bold(" ⚠️  CRITICAL WARNING "))))
+    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
     console.log()
     console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
     console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
@@ -375,7 +374,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
     `All features work like magic—parallel agents, background tasks,\n` +
     `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    "The Magic Word"
   )
 
   console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
@@ -390,7 +389,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
       (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
       (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
-      "🔐 Authenticate Your Providers"
+      "Authenticate Your Providers"
     )
   }
 
@@ -416,16 +415,14 @@ export async function install(args: InstallArgs): Promise<number> {
   s.start("Checking OpenCode installation")
 
   const installed = await isOpenCodeInstalled()
-  if (!installed) {
-    s.stop("OpenCode is not installed")
-    p.log.error("OpenCode is not installed on this system.")
-    p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
-    p.outro(color.red("Please install OpenCode first."))
-    return 1
-  }
-
   const version = await getOpenCodeVersion()
-  s.stop(`OpenCode ${version ?? "installed"} ${color.green("✓")}`)
+  if (!installed) {
+    s.stop(`OpenCode binary not found ${color.yellow("[!]")}`)
+    p.log.warn("OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.")
+    p.note("Visit https://opencode.ai/docs for installation instructions", "Installation Guide")
+  } else {
+    s.stop(`OpenCode ${version ?? "installed"} ${color.green("[OK]")}`)
+  }
 
   const config = await runTuiMode(detected)
   if (!config) return 1
@@ -470,7 +467,7 @@ export async function install(args: InstallArgs): Promise<number> {
 
   if (!config.hasClaude) {
     console.log()
-    console.log(color.bgRed(color.white(color.bold(" ⚠️  CRITICAL WARNING "))))
+    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
     console.log()
     console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
     console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
@@ -495,7 +492,7 @@ export async function install(args: InstallArgs): Promise<number> {
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
     `All features work like magic—parallel agents, background tasks,\n` +
     `deep exploration, and relentless execution until completion.`,
-    "🪄 The Magic Word"
+    "The Magic Word"
   )
 
   p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
@@ -510,7 +507,7 @@ export async function install(args: InstallArgs): Promise<number> {
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
     console.log()
-    console.log(color.bold("🔐 Authenticate Your Providers"))
+    console.log(color.bold("Authenticate Your Providers"))
     console.log()
     console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
     for (const provider of providers) {

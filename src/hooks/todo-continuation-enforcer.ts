@@ -13,7 +13,7 @@ import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-di
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
-const DEFAULT_SKIP_AGENTS = ["Prometheus (Planner)"]
+const DEFAULT_SKIP_AGENTS = ["prometheus"]
 
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager

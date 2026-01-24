@@ -30,7 +30,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Test task",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: true,
         skills: ["playwright", "git-master"],
       }
@@ -127,7 +127,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Full info task",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: true,
         skills: ["frontend-ui-ux"],
       }
@@ -149,7 +149,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1",
         description: "Task with category default model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "google/gemini-3-pro-preview", type: "category-default" as const },
       }
@@ -160,7 +160,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show warning - category default is expected
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️")
+      expect(call.body.message).not.toContain("[FALLBACK]")
       expect(call.body.message).not.toContain("(category default)")
     })
 
@@ -169,7 +169,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_1b",
         description: "Task with system default model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
       }
@@ -180,7 +180,7 @@ describe("TaskToastManager", () => {
       // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("⚠️")
+      expect(call.body.message).toContain("[FALLBACK]")
       expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
       expect(call.body.message).toContain("(system default fallback)")
     })
@@ -190,7 +190,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_2",
         description: "Task with inherited model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "cliproxy/claude-opus-4-5", type: "inherited" as const },
       }
@@ -201,7 +201,7 @@ describe("TaskToastManager", () => {
       // #then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).toContain("⚠️")
+      expect(call.body.message).toContain("[FALLBACK]")
       expect(call.body.message).toContain("cliproxy/claude-opus-4-5")
       expect(call.body.message).toContain("(inherited from parent)")
     })
@@ -211,7 +211,7 @@ describe("TaskToastManager", () => {
       const task = {
         id: "task_3",
         description: "Task with user model",
-        agent: "Sisyphus-Junior",
+        agent: "sisyphus-junior",
         isBackground: false,
         modelInfo: { model: "my-provider/my-model", type: "user-defined" as const },
       }
@@ -222,7 +222,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️ Model:")
+      expect(call.body.message).not.toContain("[FALLBACK] Model:")
       expect(call.body.message).not.toContain("(inherited)")
       expect(call.body.message).not.toContain("(category default)")
       expect(call.body.message).not.toContain("(system default)")
@@ -243,7 +243,7 @@ describe("TaskToastManager", () => {
       // #then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
-      expect(call.body.message).not.toContain("⚠️ Model:")
+      expect(call.body.message).not.toContain("[FALLBACK] Model:")
     })
   })
 })

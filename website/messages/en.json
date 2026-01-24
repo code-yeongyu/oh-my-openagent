@@ -1,0 +1,11 @@
+{
+  "Common": {
+    "title": "Oh My OpenCode",
+    "description": "The ultimate development environment for AI agents",
+    "getStarted": "Get Started",
+    "learnMore": "Learn More"
+  },
+  "LanguageSwitcher": {
+    "label": "Switch Language"
+  }
+}

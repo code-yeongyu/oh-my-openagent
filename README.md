@@ -75,7 +75,7 @@ Yes, technically possible. But I cannot recommend using it.
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
-[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
 </div>
 
@@ -120,7 +120,7 @@ Yes, technically possible. But I cannot recommend using it.
     - [For LLM Agents](#for-llm-agents)
   - [Uninstallation](#uninstallation)
   - [Features](#features)
-  - [Configuration](#configuration)
+   - [Configuration](#configuration)
     - [JSONC Support](#jsonc-support)
     - [Google Auth](#google-auth)
     - [Agents](#agents)

@@ -16,10 +16,10 @@ describe("dependencies check", () => {
   })
 
   describe("checkAstGrepNapi", () => {
-    it("returns dependency info", () => {
+    it("returns dependency info", async () => {
       // #given
       // #when checking ast-grep napi
-      const info = deps.checkAstGrepNapi()
+      const info = await deps.checkAstGrepNapi()
 
       // #then should return valid info
       expect(info.name).toBe("AST-Grep NAPI")
@@ -95,7 +95,7 @@ describe("dependencies check", () => {
 
     it("returns pass when installed", async () => {
       // #given napi installed
-      checkSpy = spyOn(deps, "checkAstGrepNapi").mockReturnValue({
+      checkSpy = spyOn(deps, "checkAstGrepNapi").mockResolvedValue({
         name: "AST-Grep NAPI",
         required: false,
         installed: true,

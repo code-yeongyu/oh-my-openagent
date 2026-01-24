@@ -5,67 +5,67 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
 describe("createBuiltinAgents with model overrides", () => {
-  test("Sisyphus with default model has thinking config", () => {
+  test("Sisyphus with default model has thinking config", async () => {
     // #given - no overrides, using systemDefaultModel
 
     // #when
-    const agents = createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
     // #then
-    expect(agents.Sisyphus.model).toBe("anthropic/claude-opus-4-5")
-    expect(agents.Sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-    expect(agents.Sisyphus.reasoningEffort).toBeUndefined()
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.sisyphus.reasoningEffort).toBeUndefined()
   })
 
-  test("Sisyphus with GPT model override has reasoningEffort, no thinking", () => {
+  test("Sisyphus with GPT model override has reasoningEffort, no thinking", async () => {
     // #given
     const overrides = {
-      Sisyphus: { model: "github-copilot/gpt-5.2" },
+      sisyphus: { model: "github-copilot/gpt-5.2" },
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
-    expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
-    expect(agents.Sisyphus.reasoningEffort).toBe("medium")
-    expect(agents.Sisyphus.thinking).toBeUndefined()
+    expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
+    expect(agents.sisyphus.reasoningEffort).toBe("medium")
+    expect(agents.sisyphus.thinking).toBeUndefined()
   })
 
-  test("Sisyphus with systemDefaultModel GPT has reasoningEffort, no thinking", () => {
+  test("Sisyphus uses system default when no availableModels provided", async () => {
     // #given
-    const systemDefaultModel = "openai/gpt-5.2"
+    const systemDefaultModel = "anthropic/claude-opus-4-5"
 
     // #when
-    const agents = createBuiltinAgents([], {}, undefined, systemDefaultModel)
+    const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel)
 
-    // #then
-    expect(agents.Sisyphus.model).toBe("openai/gpt-5.2")
-    expect(agents.Sisyphus.reasoningEffort).toBe("medium")
-    expect(agents.Sisyphus.thinking).toBeUndefined()
+    // #then - falls back to system default when no availability match
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.sisyphus.reasoningEffort).toBeUndefined()
   })
 
-  test("Oracle with default model has reasoningEffort", () => {
-    // #given - no overrides, using systemDefaultModel for other agents
-    // Oracle uses its own default model (openai/gpt-5.2) from the factory singleton
+  test("Oracle uses first fallback entry when no availableModels provided (no cache scenario)", async () => {
+    // #given - no available models simulates CI without model cache
 
     // #when
-    const agents = createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - Oracle uses systemDefaultModel since model is now required
-    expect(agents.oracle.model).toBe("anthropic/claude-opus-4-5")
-    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-    expect(agents.oracle.reasoningEffort).toBeUndefined()
+    // #then - uses first fallback entry (openai/gpt-5.2) instead of system default
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    expect(agents.oracle.reasoningEffort).toBe("medium")
+    expect(agents.oracle.textVerbosity).toBe("high")
+    expect(agents.oracle.thinking).toBeUndefined()
   })
 
-  test("Oracle with GPT model override has reasoningEffort, no thinking", () => {
+  test("Oracle with GPT model override has reasoningEffort, no thinking", async () => {
     // #given
     const overrides = {
       oracle: { model: "openai/gpt-5.2" },
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
@@ -74,14 +74,14 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.oracle.thinking).toBeUndefined()
   })
 
-  test("Oracle with Claude model override has thinking, no reasoningEffort", () => {
+  test("Oracle with Claude model override has thinking, no reasoningEffort", async () => {
     // #given
     const overrides = {
       oracle: { model: "anthropic/claude-sonnet-4" },
     }
 
     // #when
-    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
     // #then
     expect(agents.oracle.model).toBe("anthropic/claude-sonnet-4")
@@ -90,19 +90,19 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.oracle.textVerbosity).toBeUndefined()
   })
 
-  test("non-model overrides are still applied after factory rebuild", () => {
-    // #given
-    const overrides = {
-      Sisyphus: { model: "github-copilot/gpt-5.2", temperature: 0.5 },
-    }
+   test("non-model overrides are still applied after factory rebuild", async () => {
+     // #given
+     const overrides = {
+       sisyphus: { model: "github-copilot/gpt-5.2", temperature: 0.5 },
+     }
 
-    // #when
-    const agents = createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+     // #when
+     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then
-    expect(agents.Sisyphus.model).toBe("github-copilot/gpt-5.2")
-    expect(agents.Sisyphus.temperature).toBe(0.5)
-  })
+     // #then
+     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
+     expect(agents.sisyphus.temperature).toBe(0.5)
+   })
 })
 
 describe("buildAgent with category and skills", () => {

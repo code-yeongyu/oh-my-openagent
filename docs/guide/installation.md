@@ -63,7 +63,7 @@ Ask the user these questions to determine CLI options:
 
 **Provider Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
 
-MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALY.
+MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
 
 ### Step 1: Install OpenCode (if not installed)
 
@@ -227,7 +227,7 @@ bunx oh-my-opencode install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
 ```
 
 Then authenticate with GitHub:

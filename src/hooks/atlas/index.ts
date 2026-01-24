@@ -68,7 +68,7 @@ const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ CRITICAL: Subagents FREQUENTLY LIE about completion.
+CRITICAL: Subagents FREQUENTLY LIE about completion.
 Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -107,7 +107,7 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ---
 
-⚠️⚠️⚠️ ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)} ⚠️⚠️⚠️
+${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
@@ -117,7 +117,7 @@ You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
+**THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
 1. **DELEGATE** all implementation work via \`delegate_task\`
@@ -148,7 +148,7 @@ delegate_task(
 )
 \`\`\`
 
-⚠️⚠️⚠️ DELEGATE. DON'T IMPLEMENT. ⚠️⚠️⚠️
+DELEGATE. DON'T IMPLEMENT.
 
 ---
 `
@@ -268,28 +268,13 @@ interface GitFileStat {
   status: "modified" | "added" | "deleted"
 }
 
-function isGitRepo(directory: string): boolean {
-  try {
-    execSync("git rev-parse --git-dir", {
-      cwd: directory,
-      stdio: "ignore",
-      timeout: 1000,
-    })
-    return true
-  } catch {
-    return false
-  }
-}
-
 function getGitDiffStats(directory: string): GitFileStat[] {
   try {
-    if (!isGitRepo(directory)) return []
-
     const output = execSync("git diff --numstat HEAD", {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
     if (!output) return []
@@ -298,7 +283,7 @@ function getGitDiffStats(directory: string): GitFileStat[] {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
     const statusMap = new Map<string, "modified" | "added" | "deleted">()
@@ -414,7 +399,7 @@ function isCallerOrchestrator(sessionID?: string): boolean {
    const messageDir = getMessageDir(sessionID)
    if (!messageDir) return false
    const nearest = findNearestMessageWithFields(messageDir)
-   return nearest?.agent === "Atlas"
+   return nearest?.agent?.toLowerCase() === "atlas"
  }
 
 interface SessionState {
@@ -513,7 +498,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-            agent: "Atlas",
+            agent: "atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },

@@ -275,8 +275,8 @@ For each generated file:
 Mode: {update | create-new}
 
 Files:
-  ✓ ./AGENTS.md (root, {N} lines)
-  ✓ ./src/hooks/AGENTS.md ({N} lines)
+  [OK] ./AGENTS.md (root, {N} lines)
+  [OK] ./src/hooks/AGENTS.md ({N} lines)
 
 Dirs Analyzed: {N}
 AGENTS.md Created: {N}
