@@ -180,6 +180,33 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       }
     }
   })
+
+  test("sisyphus claude-opus-4-5 entry includes github provider for GitHub Models support", () => {
+    // #given - sisyphus agent requirement
+    const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
+
+    // #when - accessing the first fallbackChain entry (claude-opus-4-5)
+    const claudeOpusEntry = sisyphus.fallbackChain[0]
+
+    // #then - github provider is included alongside github-copilot
+    expect(claudeOpusEntry.model).toBe("claude-opus-4-5")
+    expect(claudeOpusEntry.providers).toContain("anthropic")
+    expect(claudeOpusEntry.providers).toContain("github-copilot")
+    expect(claudeOpusEntry.providers).toContain("github")
+  })
+
+  test("explore agent includes github provider for claude-haiku-4-5", () => {
+    // #given - explore agent requirement
+    const explore = AGENT_MODEL_REQUIREMENTS["explore"]
+
+    // #when - accessing the first fallbackChain entry (claude-haiku-4-5)
+    const claudeHaikuEntry = explore.fallbackChain[0]
+
+    // #then - github provider is included
+    expect(claudeHaikuEntry.model).toBe("claude-haiku-4-5")
+    expect(claudeHaikuEntry.providers).toContain("anthropic")
+    expect(claudeHaikuEntry.providers).toContain("github")
+  })
 })
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
@@ -321,6 +348,20 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         expect(entry.model.length).toBeGreaterThan(0)
       }
     }
+  })
+
+  test("quick category includes github provider for claude-haiku-4-5", () => {
+    // #given - quick category requirement
+    const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
+
+    // #when - accessing the first fallbackChain entry (claude-haiku-4-5)
+    const claudeHaikuEntry = quick.fallbackChain[0]
+
+    // #then - github provider is included alongside github-copilot
+    expect(claudeHaikuEntry.model).toBe("claude-haiku-4-5")
+    expect(claudeHaikuEntry.providers).toContain("anthropic")
+    expect(claudeHaikuEntry.providers).toContain("github-copilot")
+    expect(claudeHaikuEntry.providers).toContain("github")
   })
 })
 
