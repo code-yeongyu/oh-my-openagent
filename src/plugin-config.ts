@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+
+import { type OhMyOpenCodeConfig, OhMyOpenCodeConfigSchema } from "./config";
 import { findProjectRoot } from "./hooks/rules-injector/finder";
 import {
 	addConfigLoadError,
