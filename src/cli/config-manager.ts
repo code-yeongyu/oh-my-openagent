@@ -609,6 +609,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasCopilot: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
+    isolated: !!process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim(),
   }
 
   const { format, path } = detectConfigFormat()

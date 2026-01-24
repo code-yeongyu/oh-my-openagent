@@ -23,6 +23,7 @@ program
   .command("install")
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
+  .option("--isolated", "Use isolated config directory (~/.config/oh-my-opencode/)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
@@ -33,8 +34,13 @@ program
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ bunx oh-my-opencode install --isolated
+  $ bunx oh-my-opencode install --no-tui --isolated --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+
+Config Mode:
+  --isolated    Use isolated config directory (~/.config/oh-my-opencode/)
+                Default: shared (~/.config/opencode/)
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
@@ -43,10 +49,11 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
   Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
-`)
+  `)
   .action(async (options) => {
     const args: InstallArgs = {
       tui: options.tui !== false,
+      isolated: options.isolated ?? false,
       claude: options.claude,
       openai: options.openai,
       gemini: options.gemini,

@@ -33,9 +33,16 @@ follow these steps:
 
 ### Step 0: Ask user about subscriptions
 
-Ask the user these questions to determine CLI options:
+Ask user these questions to determine CLI options:
 
-1. **Do you have a Claude Pro/Max Subscription?**
+**NEW: Configuration Mode**
+1. **Choose configuration mode:**
+   - **Shared (default)** → Use `~/.config/opencode/` (recommended, shared with plain OpenCode)
+   - **Isolated** → Use `~/.config/oh-my-opencode/` (no conflicts with plain OpenCode)
+
+Isolated mode creates a separate configuration directory for oh-my-opencode to avoid conflicts with plain OpenCode installations.
+
+2. **Do you have a Claude Pro/Max Subscription?**
    - If **yes**: **Are you on max20 (20x mode)?**
      - **max20** → `--claude=max20`
      - **not max20** → `--claude=yes`
@@ -84,17 +91,17 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui --isolated --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
-- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
-- User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
-- User has Claude + OpenAI: `bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
-- User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
-- User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no`
+- User has all native subscriptions (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=max20 --openai=yes --gemini=yes --copilot=no`
+- User has only Claude (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --openai=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has no subscriptions (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
@@ -107,6 +114,20 @@ The CLI will:
 opencode --version  # Should be 1.0.150 or higher
 cat ~/.config/opencode/opencode.json  # Should contain "oh-my-opencode" in plugin array
 ```
+
+## Quick Start: Isolated Mode
+
+**Convenience Command:** Use `ohmyoc` for isolated mode without flags:
+
+```bash
+ohmyoc install  # Automatically uses ~/.config/oh-my-opencode/
+ohmyoc run "Implement feature"  # Runs in isolated mode
+```
+
+**Using `ohmyoc`**:
+- Sets `OH_MY_OPENCODE_CONFIG_DIR=~/.config/oh-my-opencode/` automatically
+- Passes all arguments through to the oh-my-opencode binary
+- No need to remember `--isolated` flag
 
 ### Step 4: Configure Authentication
 

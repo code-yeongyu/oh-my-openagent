@@ -9,8 +9,11 @@ import {
   addAuthPlugins,
   addProviderConfig,
   detectCurrentConfig,
+  resetConfigContext,
+  initConfigContext,
 } from "./config-manager"
 import { shouldShowChatGPTOnlyWarning } from "./model-fallback"
+import { getOmoDefaultIsolatedDir } from "../shared/opencode-config-dir"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -34,10 +37,16 @@ function formatProvider(name: string, enabled: boolean, detail?: string): string
 
 function formatConfigSummary(config: InstallConfig): string {
   const lines: string[] = []
-
+  
   lines.push(color.bold(color.white("Configuration Summary")))
   lines.push("")
-
+  
+  const modeLabel = config.isolated
+    ? color.cyan("Isolated (~/.config/oh-my-opencode/)")
+    : color.green("Shared (~/.config/opencode/)")
+  lines.push(`  ${SYMBOLS.info} Config Mode: ${modeLabel}`)
+  lines.push("")
+  
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
   lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.2 for Oracle"))
@@ -45,16 +54,16 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
-
+  
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
   lines.push("")
-
+  
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
   lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
-
+  
   return lines.join("\n")
 }
 
@@ -153,6 +162,7 @@ function argsToConfig(args: InstallArgs): InstallConfig {
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
+    isolated: args.isolated,
   }
 }
 
@@ -174,6 +184,35 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 
 async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | null> {
   const initial = detectedToInitialValues(detected)
+
+  const configMode = await p.select({
+    message: "Choose configuration mode:",
+    options: [
+      {
+        value: "shared" as const,
+        label: "Shared (default)",
+        hint: "Use ~/.config/opencode/ (recommended, shared with plain OpenCode)",
+      },
+      {
+        value: "isolated" as const,
+        label: "Isolated",
+        hint: "Use ~/.config/oh-my-opencode/ (no conflicts with plain OpenCode)",
+      },
+    ],
+    initialValue: "shared" as const,
+  })
+
+  if (p.isCancel(configMode)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
+  if (configMode === "isolated") {
+    const omoDefaultDir = getOmoDefaultIsolatedDir()
+    process.env.OH_MY_OPENCODE_CONFIG_DIR = omoDefaultDir
+    resetConfigContext()
+    initConfigContext("opencode", null)
+  }
 
   const claude = await p.select({
     message: "Do you have a Claude Pro/Max subscription?",
@@ -268,6 +307,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     hasCopilot: copilot === "yes",
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
+    isolated: configMode === "isolated",
   }
 }
 
@@ -289,6 +329,13 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   const isUpdate = detected.isInstalled
 
   printHeader(isUpdate)
+
+  if (args.isolated) {
+    const omoDefaultDir = getOmoDefaultIsolatedDir()
+    process.env.OH_MY_OPENCODE_CONFIG_DIR = omoDefaultDir
+    resetConfigContext()
+    initConfigContext("opencode", null)
+  }
 
   const totalSteps = 6
   let step = 1

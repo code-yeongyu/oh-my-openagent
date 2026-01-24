@@ -26,6 +26,20 @@ npx oh-my-opencode
 | `auth` | Google Antigravity authentication management |
 | `version` | Display version information |
 
+### `ohmyoc` - Isolated Mode Convenience Wrapper
+
+**NEW:** The `ohmyoc` command automatically uses isolated mode without needing to set flags.
+
+```bash
+ohmyoc install  # Same as: bunx oh-my-opencode install --isolated
+ohmyoc run "Implement feature"  # Same as: OH_MY_OPENCODE_CONFIG_DIR=~/.config/oh-my-opencode/ bunx oh-my-opencode run "Implement feature"
+```
+
+**Behavior:**
+- Automatically sets `OH_MY_OPENCODE_CONFIG_DIR=~/.config/oh-my-opencode/`
+- Passes all arguments to the `oh-my-opencode` binary
+- No need to remember `--isolated` flag
+
 ---
 
 ## 3. `install` - Interactive Setup Wizard
@@ -49,6 +63,7 @@ bunx oh-my-opencode install
 
 | Option | Description |
 |--------|-------------|
+| `--isolated` | Use isolated config directory (~/.config/oh-my-opencode/) instead of shared (~/.config/opencode/) |
 | `--no-tui` | Run in non-interactive mode without TUI (for CI/CD environments) |
 | `--verbose` | Display detailed logs |
 

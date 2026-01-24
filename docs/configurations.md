@@ -46,6 +46,38 @@ Config file locations (priority order):
 | **Windows**     | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                                    |
 
+### Isolated Config Mode
+
+**NEW:** oh-my-opencode now supports isolated configuration mode to avoid conflicts with plain OpenCode installations.
+
+**Environment Variable:**
+Set `OH_MY_OPENCODE_CONFIG_DIR` to use a custom isolated config directory:
+
+```bash
+export OH_MY_OPENCODE_CONFIG_DIR=/custom/path
+bunx oh-my-opencode install
+```
+
+**Isolated Config Paths (when `OH_MY_OPENCODE_CONFIG_DIR` is set or `--isolated` flag used):**
+
+| Platform        | Isolated Config Path                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Windows**     | `~/.config/oh-my-opencode/oh-my-opencode.json`                                                  |
+| **macOS/Linux** | `~/.config/oh-my-opencode/oh-my-opencode.json`                                                                      |
+
+**Priority Order:**
+1. `OH_MY_OPENCODE_CONFIG_DIR` (highest - isolated mode)
+2. `OPENCODE_CONFIG_DIR` (generic opencode override)
+3. Platform-specific default path
+
+**Using `ohmyoc` Command:**
+
+```bash
+ohmyoc install  # Uses isolated mode automatically
+```
+
+This convenience wrapper automatically sets `OH_MY_OPENCODE_CONFIG_DIR=~/.config/oh-my-opencode/` before executing.
+
 Schema autocomplete supported:
 
 ```json

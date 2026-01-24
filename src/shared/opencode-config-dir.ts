@@ -4,6 +4,8 @@ import { join, resolve } from "node:path"
 
 export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
 
+export const OMO_ISOLATED_DIR_NAME = "oh-my-opencode"
+
 export interface OpenCodeConfigDirOptions {
   binary: OpenCodeBinaryType
   version?: string | null
@@ -20,6 +22,23 @@ export interface OpenCodeConfigPaths {
 
 export const TAURI_APP_IDENTIFIER = "ai.opencode.desktop"
 export const TAURI_APP_IDENTIFIER_DEV = "ai.opencode.desktop.dev"
+
+export function getOmoDefaultIsolatedDir(): string {
+  return join(homedir(), ".config", OMO_ISOLATED_DIR_NAME)
+}
+
+export function getOmoIsolatedConfigDir(options: OpenCodeConfigDirOptions): OpenCodeConfigPaths {
+  const isolatedDir = process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim() || getOmoDefaultIsolatedDir()
+  const configDir = resolve(isolatedDir)
+
+  return {
+    configDir,
+    configJson: join(configDir, "opencode.json"),
+    configJsonc: join(configDir, "opencode.jsonc"),
+    packageJson: join(configDir, "package.json"),
+    omoConfig: join(configDir, "oh-my-opencode.json"),
+  }
+}
 
 export function isDevBuild(version: string | null | undefined): boolean {
   if (!version) return false
@@ -47,6 +66,11 @@ function getTauriConfigDir(identifier: string): string {
 }
 
 function getCliConfigDir(): string {
+  const omoEnvConfigDir = process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim()
+  if (omoEnvConfigDir) {
+    return resolve(omoEnvConfigDir)
+  }
+
   const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
   if (envConfigDir) {
     return resolve(envConfigDir)
@@ -112,6 +136,11 @@ export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenC
 
 export function detectExistingConfigDir(binary: OpenCodeBinaryType, version?: string | null): string | null {
   const locations: string[] = []
+
+  const omoEnvConfigDir = process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim()
+  if (omoEnvConfigDir) {
+    locations.push(resolve(omoEnvConfigDir))
+  }
 
   const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
   if (envConfigDir) {
