@@ -13,7 +13,7 @@ import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-di
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
-const DEFAULT_SKIP_AGENTS = ["prometheus"]
+const DEFAULT_SKIP_AGENTS = ["prometheus", "compaction"]
 
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
@@ -373,6 +373,7 @@ export function createTodoContinuationEnforcer(
       }
 
       let resolvedInfo: ResolvedMessageInfo | undefined
+      let hasCompactionMessage = false
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
@@ -388,6 +389,10 @@ export function createTodoContinuationEnforcer(
         }>
         for (let i = messages.length - 1; i >= 0; i--) {
           const info = messages[i].info
+          if (info?.agent === "compaction") {
+            hasCompactionMessage = true
+            continue
+          }
           if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
             resolvedInfo = {
               agent: info.agent,
@@ -401,9 +406,13 @@ export function createTodoContinuationEnforcer(
         log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(err) })
       }
 
-      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents })
+      log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
       if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
         log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
+        return
+      }
+      if (hasCompactionMessage && !resolvedInfo?.agent) {
+        log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
         return
       }
 
