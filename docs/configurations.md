@@ -405,7 +405,7 @@ Each agent has a defined provider priority chain. The system tries providers in 
 | **oracle** | `gpt-5.2` | openai → anthropic → google → github-copilot → opencode |
 | **librarian** | `big-pickle` | opencode → github-copilot → anthropic |
 | **explore** | `gpt-5-nano` | opencode → anthropic → github-copilot |
-| **multimodal-looker** | `gemini-3-flash` | google → anthropic → zai → openai → github-copilot → opencode |
+| **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → anthropic → opencode |
 | **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **Metis (Plan Consultant)** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
 | **Momus (Plan Reviewer)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
