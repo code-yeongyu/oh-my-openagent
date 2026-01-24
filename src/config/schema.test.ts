@@ -345,6 +345,20 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  test("accepts reasoningEffort as optional string with xhigh", () => {
+    // #given
+    const config = { reasoningEffort: "xhigh" }
+
+    // #when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("xhigh")
+    }
+  })
+
   test("rejects non-string variant", () => {
     // #given
     const config = { model: "openai/gpt-5.2", variant: 123 }
