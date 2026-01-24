@@ -854,7 +854,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/big-pickle",
     },
     "multimodal-looker": {
-      "model": "zai-coding-plan/glm-4.6",
+      "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
       "model": "opencode/big-pickle",
@@ -912,7 +912,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/big-pickle",
     },
     "multimodal-looker": {
-      "model": "zai-coding-plan/glm-4.6",
+      "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
       "model": "opencode/big-pickle",
@@ -1099,7 +1099,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-opus-4-5",
     },
     "multimodal-looker": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-5",
