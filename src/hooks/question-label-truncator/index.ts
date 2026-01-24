@@ -1,5 +1,3 @@
-import type { Plugin } from "@opencode-ai/plugin";
-
 const MAX_LABEL_LENGTH = 30;
 
 interface QuestionOption {
@@ -42,20 +40,20 @@ function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs 
   };
 }
 
-export function createQuestionLabelTruncatorHook(): Pick<
-  Plugin,
-  "tool.execute.before"
-> {
+export function createQuestionLabelTruncatorHook() {
   return {
-    "tool.execute.before": async (input, output) => {
+    "tool.execute.before": async (
+      input: { tool: string },
+      output: { args: Record<string, unknown> }
+    ): Promise<void> => {
       const toolName = input.tool?.toLowerCase();
 
       if (toolName === "askuserquestion" || toolName === "ask_user_question") {
-        const args = output.args as AskUserQuestionArgs | undefined;
+        const args = output.args as unknown as AskUserQuestionArgs | undefined;
 
         if (args?.questions) {
           const truncatedArgs = truncateQuestionLabels(args);
-          Object.assign(output.args as object, truncatedArgs);
+          Object.assign(output.args, truncatedArgs);
         }
       }
     },
