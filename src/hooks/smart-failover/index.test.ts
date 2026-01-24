@@ -30,7 +30,7 @@ describe("smart-failover hook", () => {
     config = {
       model: "primary/model",
       agents: {
-        Sisyphus: {
+        sisyphus: {
           model: "primary/model | fallback/model"
         }
       }

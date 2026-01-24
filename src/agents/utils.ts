@@ -151,6 +151,17 @@ function mergeAgentConfig(
   return merged
 }
 
+function extractPrimaryModel(model?: string | string[]): string | undefined {
+  if (Array.isArray(model)) {
+    return model.map((m) => m.trim()).find((m) => m.length > 0)
+  }
+  if (typeof model === "string") {
+    if (model.includes("|")) return model.split("|")[0].trim() || undefined
+    return model.trim() || undefined
+  }
+  return undefined
+}
+
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
   if (scope === "project" || scope === "opencode-project") return "project"
@@ -216,7 +227,7 @@ export async function createBuiltinAgents(
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
 
     const { model, variant: resolvedVariant } = resolveModelWithFallback({
-      userModel: override?.model,
+      userModel: extractPrimaryModel(override?.model),
       fallbackChain: requirement?.fallbackChain,
       availableModels,
       systemDefaultModel,
@@ -256,7 +267,7 @@ export async function createBuiltinAgents(
     const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     const { model: sisyphusModel, variant: sisyphusResolvedVariant } = resolveModelWithFallback({
-      userModel: sisyphusOverride?.model,
+      userModel: extractPrimaryModel(sisyphusOverride?.model),
       fallbackChain: sisyphusRequirement?.fallbackChain,
       availableModels,
       systemDefaultModel,
@@ -293,7 +304,7 @@ export async function createBuiltinAgents(
     const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     const { model: atlasModel, variant: atlasResolvedVariant } = resolveModelWithFallback({
-      userModel: orchestratorOverride?.model,
+      userModel: extractPrimaryModel(orchestratorOverride?.model),
       fallbackChain: atlasRequirement?.fallbackChain,
       availableModels,
       systemDefaultModel,

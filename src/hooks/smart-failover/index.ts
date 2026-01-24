@@ -32,17 +32,14 @@ export function createSmartFailoverHook(
 
   const findFallback = (agentName: string, currentModelKey: string, sessionID: string) => {
     const getModelConfig = (agent: string) => {
-      const agents = config.agents
+      const agents = config.agents as unknown as
+        | Record<string, { model?: string | string[] } | undefined>
+        | undefined
       if (!agents) return undefined
-      const agentConfig = agents[agent as keyof typeof agents]
-      return agentConfig?.model
+      return agents[agent]?.model ?? agents[agent.toLowerCase()]?.model
     }
 
     let modelConfig = getModelConfig(agentName) ?? config.model
-    
-    if (!modelConfig && agentName !== "Sisyphus") {
-       modelConfig = getModelConfig("Sisyphus")
-    }
 
     const chain = resolveModelChain(modelConfig as string | string[])
     if (!chain) return undefined

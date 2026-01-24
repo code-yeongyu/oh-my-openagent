@@ -28,6 +28,17 @@ function parseModelString(model: string): { providerID: string; modelID: string 
   return undefined
 }
 
+function extractPrimaryModel(model?: string | string[]): string | undefined {
+  if (Array.isArray(model)) {
+    return model.map((m) => m.trim()).find((m) => m.length > 0)
+  }
+  if (typeof model === "string") {
+    if (model.includes("|")) return model.split("|")[0].trim() || undefined
+    return model.trim() || undefined
+  }
+  return undefined
+}
+
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
@@ -516,8 +527,9 @@ To resume this session: resume="${args.resume}"`
            actualModel = resolved.model
            modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
           } else {
+          const userModel = extractPrimaryModel(userCategories?.[args.category]?.model) ?? sisyphusJuniorModel
           const { model: resolvedModel, source, variant: resolvedVariant } = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              userModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
