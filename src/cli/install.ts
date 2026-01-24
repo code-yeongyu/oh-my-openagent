@@ -6,8 +6,6 @@ import {
   writeOmoConfig,
   isOpenCodeInstalled,
   getOpenCodeVersion,
-  addAuthPlugins,
-  addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
 import { shouldShowChatGPTOnlyWarning } from "./model-fallback"
@@ -290,7 +288,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printHeader(isUpdate)
 
-  const totalSteps = 6
+  const totalSteps = 4
   let step = 1
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
@@ -317,26 +315,6 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     return 1
   }
   printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
-
-  if (config.hasGemini) {
-    printStep(step++, totalSteps, "Adding auth plugins...")
-    const authResult = await addAuthPlugins(config)
-    if (!authResult.success) {
-      printError(`Failed: ${authResult.error}`)
-      return 1
-    }
-    printSuccess(`Auth plugins configured ${SYMBOLS.arrow} ${color.dim(authResult.configPath)}`)
-
-    printStep(step++, totalSteps, "Adding provider configurations...")
-    const providerResult = addProviderConfig(config)
-    if (!providerResult.success) {
-      printError(`Failed: ${providerResult.error}`)
-      return 1
-    }
-    printSuccess(`Providers configured ${SYMBOLS.arrow} ${color.dim(providerResult.configPath)}`)
-  } else {
-    step += 2
-  }
 
   printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
   const omoResult = writeOmoConfig(config)
@@ -387,7 +365,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
       (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
-      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ Install opencode-antigravity-auth first")}\n` : "") +
       (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
       "Authenticate Your Providers"
     )
@@ -436,26 +414,6 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini) {
-    s.start("Adding auth plugins (fetching latest versions)")
-    const authResult = await addAuthPlugins(config)
-    if (!authResult.success) {
-      s.stop(`Failed to add auth plugins: ${authResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    s.stop(`Auth plugins added to ${color.cyan(authResult.configPath)}`)
-
-    s.start("Adding provider configurations")
-    const providerResult = addProviderConfig(config)
-    if (!providerResult.success) {
-      s.stop(`Failed to add provider config: ${providerResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    s.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
-  }
-
   s.start("Writing oh-my-opencode configuration")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
@@ -503,7 +461,7 @@ export async function install(args: InstallArgs): Promise<number> {
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
-    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ Install opencode-antigravity-auth first")}`)
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
     console.log()

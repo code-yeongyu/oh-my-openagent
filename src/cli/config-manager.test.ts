@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
+import { getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -166,37 +166,6 @@ describe("fetchNpmDistTags", () => {
 
     // #then should return null
     expect(result).toBeNull()
-  })
-})
-
-describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
-  test("Gemini models include full spec (limit + modalities)", () => {
-    const google = (ANTIGRAVITY_PROVIDER_CONFIG as any).google
-    expect(google).toBeTruthy()
-
-    const models = google.models as Record<string, any>
-    expect(models).toBeTruthy()
-
-    const required = [
-      "antigravity-gemini-3-pro-high",
-      "antigravity-gemini-3-pro-low",
-      "antigravity-gemini-3-flash",
-    ]
-
-    for (const key of required) {
-      const model = models[key]
-      expect(model).toBeTruthy()
-      expect(typeof model.name).toBe("string")
-      expect(model.name.includes("(Antigravity)")).toBe(true)
-
-      expect(model.limit).toBeTruthy()
-      expect(typeof model.limit.context).toBe("number")
-      expect(typeof model.limit.output).toBe("number")
-
-      expect(model.modalities).toBeTruthy()
-      expect(Array.isArray(model.modalities.input)).toBe(true)
-      expect(Array.isArray(model.modalities.output)).toBe(true)
-    }
   })
 })
 
