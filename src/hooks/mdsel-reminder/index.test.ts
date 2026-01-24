@@ -10,7 +10,7 @@ describe("createMdselReminderHook", () => {
 
   beforeAll(() => {
     mkdirSync(testDir, { recursive: true })
-    hook = createMdselReminderHook({} as never)
+    hook = createMdselReminderHook({ directory: testDir } as never)
   })
 
   afterAll(() => {
@@ -23,15 +23,17 @@ describe("createMdselReminderHook", () => {
     const content = Array(250).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "file content", metadata: {}, args: { filePath } }
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_001" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "Read", output: "file content", metadata: {} }
 
-    // #when
-    await hook["tool.execute.after"](input, output)
+    // #when - call before then after
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).toContain("[mdsel Reminder]")
-    expect(output.output).toContain("250 words")
+    expect(afterOutput.output).toContain("[mdsel Reminder]")
+    expect(afterOutput.output).toContain("250 words")
   })
 
   test("does NOT trigger reminder for .md file under 200 words", async () => {
@@ -40,14 +42,16 @@ describe("createMdselReminderHook", () => {
     const content = Array(100).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "file content", metadata: {}, args: { filePath } }
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_002" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "Read", output: "file content", metadata: {} }
 
     // #when
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).not.toContain("[mdsel Reminder]")
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
   })
 
   test("does NOT trigger for non-.md files", async () => {
@@ -56,14 +60,16 @@ describe("createMdselReminderHook", () => {
     const content = Array(500).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "file content", metadata: {}, args: { filePath } }
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_003" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "Read", output: "file content", metadata: {} }
 
     // #when
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).not.toContain("[mdsel Reminder]")
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
   })
 
   test("does NOT trigger for non-Read tools", async () => {
@@ -72,14 +78,16 @@ describe("createMdselReminderHook", () => {
     const content = Array(500).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "Write", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Write", output: "success", metadata: {}, args: { filePath } }
+    const input = { tool: "Write", sessionID: "ses_123", callID: "call_004" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "Write", output: "success", metadata: {} }
 
     // #when
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).not.toContain("[mdsel Reminder]")
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
   })
 
   test("handles case-insensitive tool names", async () => {
@@ -88,14 +96,16 @@ describe("createMdselReminderHook", () => {
     const content = Array(250).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "read", output: "content", metadata: {}, args: { filePath } }
+    const input = { tool: "read", sessionID: "ses_123", callID: "call_005" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "read", output: "content", metadata: {} }
 
     // #when
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).toContain("[mdsel Reminder]")
+    expect(afterOutput.output).toContain("[mdsel Reminder]")
   })
 
   test("handles file_path arg format", async () => {
@@ -104,39 +114,57 @@ describe("createMdselReminderHook", () => {
     const content = Array(250).fill("word").join(" ")
     writeFileSync(filePath, content)
 
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "content", metadata: {}, args: { file_path: filePath } }
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_006" }
+    const beforeOutput = { args: { file_path: filePath } }
+    const afterOutput = { title: "Read", output: "content", metadata: {} }
 
     // #when
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).toContain("[mdsel Reminder]")
+    expect(afterOutput.output).toContain("[mdsel Reminder]")
   })
 
   test("gracefully handles non-existent files", async () => {
     // #given - a file that doesn't exist
     const filePath = join(testDir, "nonexistent.md")
 
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "error", metadata: {}, args: { filePath } }
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_007" }
+    const beforeOutput = { args: { filePath } }
+    const afterOutput = { title: "Read", output: "error", metadata: {} }
 
     // #when - should not throw
-    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).not.toContain("[mdsel Reminder]")
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
   })
 
-  test("gracefully handles missing args", async () => {
-    // #given - no args
-    const input = { tool: "Read", sessionID: "ses_123", callID: "call_456" }
-    const output = { title: "Read", output: "content", metadata: {} }
+  test("gracefully handles missing args in before", async () => {
+    // #given - no args in before output
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_008" }
+    const beforeOutput = { args: {} }
+    const afterOutput = { title: "Read", output: "content", metadata: {} }
 
     // #when - should not throw
-    await hook["tool.execute.after"](input, output as never)
+    await hook["tool.execute.before"](input, beforeOutput)
+    await hook["tool.execute.after"](input, afterOutput)
 
     // #then
-    expect(output.output).not.toContain("[mdsel Reminder]")
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
+  })
+
+  test("gracefully handles no before call (orphaned after)", async () => {
+    // #given - only after call without before
+    const input = { tool: "Read", sessionID: "ses_123", callID: "call_orphan" }
+    const afterOutput = { title: "Read", output: "content", metadata: {} }
+
+    // #when - should not throw (no pendingCall found)
+    await hook["tool.execute.after"](input, afterOutput)
+
+    // #then
+    expect(afterOutput.output).not.toContain("[mdsel Reminder]")
   })
 })

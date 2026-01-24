@@ -86,6 +86,27 @@ function hasExemptionComment(content: string | undefined): boolean {
   return EXEMPTION_PATTERNS.some((pattern) => pattern.test(content))
 }
 
+// Constants for pending call management
+const PENDING_CALL_TTL = 60_000
+
+interface PendingCall {
+  filePath: string
+  timestamp: number
+}
+
+// Store pending calls between before and after (module-level for cleanup interval)
+const pendingCalls = new Map<string, PendingCall>()
+let cleanupIntervalStarted = false
+
+function cleanupOldPendingCalls(): void {
+  const now = Date.now()
+  for (const [callID, call] of pendingCalls) {
+    if (now - call.timestamp > PENDING_CALL_TTL) {
+      pendingCalls.delete(callID)
+    }
+  }
+}
+
 /**
  * Create the TDD Guard Hook
  */
@@ -100,6 +121,12 @@ export function createTddGuardHook(
 
   // Track files that have been checked this session to avoid duplicate messages
   const checkedFiles = new Set<string>()
+
+  // Start cleanup interval once
+  if (!cleanupIntervalStarted) {
+    cleanupIntervalStarted = true
+    setInterval(cleanupOldPendingCalls, 10_000)
+  }
 
   // Initialize storage and handlers
   const storage = FileStorage.create(ctx.cwd)
@@ -172,6 +199,12 @@ export function createTddGuardHook(
         return
       }
 
+      // Store filePath for tool.execute.after to use
+      pendingCalls.set(input.callID, {
+        filePath,
+        timestamp: Date.now(),
+      })
+
       // Test files are always allowed
       if (isTestFile(filePath)) {
         return
@@ -233,9 +266,8 @@ ${TDD_SKILL_CONTENT}`,
     },
 
     "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
+      input: { tool: string; sessionID: string; callID: string },
       output: {
-        args?: Record<string, unknown>
         output?: string
       }
     ): Promise<void> => {
@@ -256,12 +288,16 @@ ${TDD_SKILL_CONTENT}`,
         return
       }
 
-      // Get file path from args (try output.args first, then input.args)
-      const args = output.args ?? input.args ?? {}
-      const filePath = (args.filePath ?? args.file_path ?? args.path) as string | undefined
-      if (!filePath) {
+      // Get file path from pendingCalls (stored in tool.execute.before)
+      const pendingCall = pendingCalls.get(input.callID)
+      if (!pendingCall) {
         return
       }
+
+      // Clean up
+      pendingCalls.delete(input.callID)
+
+      const { filePath } = pendingCall
 
       // Skip test files for lint reminders
       if (isTestFile(filePath)) {

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "fs"
 import { isAbsolute, resolve } from "path"
 
 const DEFAULT_WORD_THRESHOLD = 200
+const PENDING_CALL_TTL = 60_000
 
 interface ToolExecuteInput {
   tool: string
@@ -10,12 +11,23 @@ interface ToolExecuteInput {
   callID: string
 }
 
-interface ToolExecuteOutput {
+interface ToolExecuteBeforeOutput {
+  args: Record<string, unknown>
+}
+
+interface ToolExecuteAfterOutput {
   title: string
   output: string
   metadata: unknown
-  args?: Record<string, unknown>
 }
+
+interface PendingCall {
+  filePath: string
+  timestamp: number
+}
+
+// Store pending calls between before and after
+const pendingCalls = new Map<string, PendingCall>()
 
 function getFilePath(args: Record<string, unknown>): string | undefined {
   return (args.filePath ?? args.file_path ?? args.path) as string | undefined
@@ -24,6 +36,15 @@ function getFilePath(args: Record<string, unknown>): string | undefined {
 function countWords(content: string): number {
   // Normalize line endings and count words
   return content.replace(/\r\n/g, "\n").split(/\s+/).filter(Boolean).length
+}
+
+function cleanupOldPendingCalls(): void {
+  const now = Date.now()
+  for (const [callID, call] of pendingCalls) {
+    if (now - call.timestamp > PENDING_CALL_TTL) {
+      pendingCalls.delete(callID)
+    }
+  }
 }
 
 function createReminderMessage(filePath: string, wordCount: number, threshold: number): string {
@@ -41,17 +62,25 @@ Benefits: ~95% token savings for targeted section reading.
 `
 }
 
-export function createMdselReminderHook(_ctx: PluginInput) {
+let cleanupIntervalStarted = false
+
+export function createMdselReminderHook(ctx: PluginInput) {
   const threshold = parseInt(process.env.MDSEL_MIN_WORDS || String(DEFAULT_WORD_THRESHOLD), 10)
 
-  const toolExecuteAfter = async (
+  // Start cleanup interval once
+  if (!cleanupIntervalStarted) {
+    cleanupIntervalStarted = true
+    setInterval(cleanupOldPendingCalls, 10_000)
+  }
+
+  const toolExecuteBefore = async (
     input: ToolExecuteInput,
-    output: ToolExecuteOutput & { args?: Record<string, unknown> },
+    output: ToolExecuteBeforeOutput,
   ) => {
-    const { tool } = input
+    const { tool, callID } = input
     const toolLower = tool.toLowerCase()
 
-    // Only trigger on Read tool
+    // Only capture Read tool calls
     if (toolLower !== "read") {
       return
     }
@@ -64,13 +93,37 @@ export function createMdselReminderHook(_ctx: PluginInput) {
       return
     }
 
-    // Only process .md files
+    // Only track .md files
     if (!filePath.endsWith(".md")) {
       return
     }
 
+    // Store for later use in tool.execute.after
+    pendingCalls.set(callID, {
+      filePath,
+      timestamp: Date.now(),
+    })
+  }
+
+  const toolExecuteAfter = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteAfterOutput,
+  ) => {
+    const { callID } = input
+
+    // Look up the pending call
+    const pendingCall = pendingCalls.get(callID)
+    if (!pendingCall) {
+      return
+    }
+
+    // Clean up
+    pendingCalls.delete(callID)
+
+    const { filePath } = pendingCall
+
     // Resolve full path
-    const cwd = process.cwd()
+    const cwd = ctx.directory || process.cwd()
     const fullPath = isAbsolute(filePath) ? filePath : resolve(cwd, filePath)
 
     // Check if file exists
@@ -93,6 +146,7 @@ export function createMdselReminderHook(_ctx: PluginInput) {
   }
 
   return {
+    "tool.execute.before": toolExecuteBefore,
     "tool.execute.after": toolExecuteAfter,
   }
 }
