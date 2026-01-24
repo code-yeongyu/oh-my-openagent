@@ -32,6 +32,7 @@ import {
   createAtlasHook,
   createPrometheusMdOnlyHook,
   createSmartFailoverHook,
+  createQuestionLabelTruncatorHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -74,12 +75,13 @@ import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  log("[OhMyOpenCodePlugin] ENTRY - plugin loading", { directory: ctx.directory })
   // Start background tmux check immediately
   startTmuxCheck();
 
@@ -199,21 +201,23 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createStartWorkHook(ctx)
     : null;
 
+  const prometheusMdOnly = isHookEnabled("prometheus-md-only")
+    ? createPrometheusMdOnlyHook(ctx)
+    : null;
+
+  const questionLabelTruncator = createQuestionLabelTruncatorHook();
+
+  const taskResumeInfo = createTaskResumeInfoHook();
+
+  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task);
+
   const atlasHook = isHookEnabled("atlas")
-    ? createAtlasHook(ctx)
+    ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
     : null;
 
   const smartFailover = isHookEnabled("smart-failover")
     ? createSmartFailoverHook(ctx, pluginConfig, modelCacheState)
     : null;
-
-  const prometheusMdOnly = isHookEnabled("prometheus-md-only")
-    ? createPrometheusMdOnlyHook(ctx)
-    : null;
-
-  const taskResumeInfo = createTaskResumeInfoHook();
-
-  const backgroundManager = new BackgroundManager(ctx);
 
   initTaskToastManager(ctx.client);
 
@@ -234,13 +238,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
-  const lookAt = createLookAt(ctx);
+  const isMultimodalLookerEnabled = !includesCaseInsensitive(
+    pluginConfig.disabled_agents ?? [],
+    "multimodal-looker"
+  );
+  const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
+  const sisyphusJuniorModelConfig = pluginConfig.agents?.["sisyphus-junior"]?.model
+  const sisyphusJuniorModel = Array.isArray(sisyphusJuniorModelConfig)
+    ? sisyphusJuniorModelConfig.map((m) => m.trim()).find((m) => m.length > 0)
+    : typeof sisyphusJuniorModelConfig === "string"
+      ? sisyphusJuniorModelConfig.includes("|")
+        ? sisyphusJuniorModelConfig.split("|")[0].trim() || undefined
+        : sisyphusJuniorModelConfig.trim() || undefined
+      : undefined
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
+    sisyphusJuniorModel,
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
@@ -293,7 +310,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const configHandler = createConfigHandler({
-    ctx,
+    ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
   });
@@ -303,7 +320,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...builtinTools,
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
-      look_at: lookAt,
+      ...(lookAt ? { look_at: lookAt } : {}),
       delegate_task: delegateTask,
       skill: skillTool,
       skill_mcp: skillMcpTool,
@@ -313,7 +330,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.message": async (input, output) => {
       if (input.agent) {
-        updateSessionAgent(input.sessionID, input.agent);
+        setSessionAgent(input.sessionID, input.agent);
       }
 
       const message = (output as { message: { variant?: string } }).message
@@ -485,6 +502,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
@@ -492,12 +510,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
         const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = ["explore", "librarian"].includes(
-          subagentType
+        const isExploreOrLibrarian = includesCaseInsensitive(
+          ["explore", "librarian"],
+          subagentType ?? ""
         );
 
         args.tools = {

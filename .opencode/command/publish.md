@@ -35,6 +35,8 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "draft-release-notes", "content": "Draft enhanced release notes content", "status": "pending", "priority": "high" },
   { "id": "update-release-notes", "content": "Update GitHub release with enhanced notes", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
+  { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
+  { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }
 ]
 ```
@@ -219,12 +221,64 @@ Compare with expected version. If not matching after 2 minutes, warn user about 
 
 ---
 
+## STEP 8.5: WAIT FOR PLATFORM WORKFLOW COMPLETION
+
+The main publish workflow triggers a separate `publish-platform` workflow for platform-specific binaries.
+
+1. Find the publish-platform workflow run triggered by the main workflow:
+```bash
+gh run list --workflow=publish-platform --limit=1 --json databaseId,status,conclusion --jq '.[0]'
+```
+
+2. Poll workflow status every 30 seconds until completion:
+```bash
+gh run view {platform_run_id} --json status,conclusion --jq '{status: .status, conclusion: .conclusion}'
+```
+
+**IMPORTANT: Use polling loop, NOT sleep commands.**
+
+If conclusion is `failure`, show error logs:
+```bash
+gh run view {platform_run_id} --log-failed
+```
+
+---
+
+## STEP 8.6: VERIFY PLATFORM BINARY PACKAGES
+
+After publish-platform workflow completes, verify all 7 platform packages are published:
+
+```bash
+PLATFORMS="darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64"
+for PLATFORM in $PLATFORMS; do
+  npm view "oh-my-opencode-${PLATFORM}" version
+done
+```
+
+All 7 packages should show the same version as the main package (`${NEW_VERSION}`).
+
+**Expected packages:**
+| Package | Description |
+|---------|-------------|
+| `oh-my-opencode-darwin-arm64` | macOS Apple Silicon |
+| `oh-my-opencode-darwin-x64` | macOS Intel |
+| `oh-my-opencode-linux-x64` | Linux x64 (glibc) |
+| `oh-my-opencode-linux-arm64` | Linux ARM64 (glibc) |
+| `oh-my-opencode-linux-x64-musl` | Linux x64 (musl/Alpine) |
+| `oh-my-opencode-linux-arm64-musl` | Linux ARM64 (musl/Alpine) |
+| `oh-my-opencode-windows-x64` | Windows x64 |
+
+If any platform package version doesn't match, warn the user and suggest checking the publish-platform workflow logs.
+
+---
+
 ## STEP 9: FINAL CONFIRMATION
 
 Report success to user with:
 - New version number
 - GitHub release URL: https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v{version}
 - npm package URL: https://www.npmjs.com/package/oh-my-opencode
+- Platform packages status: List all 7 platform packages with their versions
 
 ---
 
@@ -234,6 +288,8 @@ Report success to user with:
 - **Release not found**: Wait and retry, may be propagation delay
 - **npm not updated**: npm can take 1-5 minutes to propagate, inform user
 - **Permission denied**: User may need to re-authenticate with `gh auth login`
+- **Platform workflow fails**: Show logs from publish-platform workflow, check which platform failed
+- **Platform package missing**: Some platforms may fail due to cross-compilation issues, suggest re-running publish-platform workflow manually
 
 ## LANGUAGE
 

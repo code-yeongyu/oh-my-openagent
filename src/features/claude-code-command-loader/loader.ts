@@ -1,10 +1,9 @@
 import { promises as fs, type Dirent } from "fs"
 import { join, basename } from "path"
-import { homedir } from "os"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir, getOpenCodeConfigDir } from "../../shared"
 import { log } from "../../shared/logger"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
 
@@ -122,7 +121,8 @@ export async function loadProjectCommands(): Promise<Record<string, CommandDefin
 }
 
 export async function loadOpencodeGlobalCommands(): Promise<Record<string, CommandDefinition>> {
-  const opencodeCommandsDir = join(homedir(), ".config", "opencode", "command")
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const opencodeCommandsDir = join(configDir, "command")
   const commands = await loadCommandsFromDir(opencodeCommandsDir, "opencode")
   return commandsToRecord(commands)
 }

@@ -1,11 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
-import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
+import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 export * from "./constants"
 
@@ -110,19 +111,30 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         return
       }
 
-      if (!isAllowedFile(filePath, ctx.directory)) {
-        log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .sisyphus/*.md`, {
+       if (!isAllowedFile(filePath, ctx.directory)) {
+         log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .sisyphus/*.md`, {
+           sessionID: input.sessionID,
+           tool: toolName,
+           filePath,
+           agent: agentName,
+         })
+         throw new Error(
+           `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} can only write/edit .md files inside .sisyphus/ directory. ` +
+           `Attempted to modify: ${filePath}. ` +
+           `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
+           `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
+         )
+       }
+
+      const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
+      if (normalizedPath.includes(".sisyphus/plans/") || normalizedPath.includes(".sisyphus\\plans\\")) {
+        log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
           sessionID: input.sessionID,
           tool: toolName,
           filePath,
           agent: agentName,
         })
-        throw new Error(
-          `[${HOOK_NAME}] Prometheus (Planner) can only write/edit .md files inside .sisyphus/ directory. ` +
-          `Attempted to modify: ${filePath}. ` +
-          `Prometheus is a READ-ONLY planner. Use /start-work to execute the plan. ` +
-          `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
-        )
+        output.message = (output.message || "") + PROMETHEUS_WORKFLOW_REMINDER
       }
 
       log(`[${HOOK_NAME}] Allowed: .sisyphus/*.md write permitted`, {

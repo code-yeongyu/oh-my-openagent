@@ -71,8 +71,8 @@ export function createBackgroundCompactionHook(manager: BackgroundManager) {
         sections.push("## Recently Completed Tasks")
         sections.push("")
         for (const t of completed) {
-          const statusEmoji = t.status === "completed" ? "✅" : t.status === "error" ? "❌" : "⏱️"
-          sections.push(`- ${statusEmoji} **\`${t.id}\`**: ${t.description}`)
+          const statusLabel = t.status === "completed" ? "[DONE]" : t.status === "error" ? "[ERROR]" : "[PENDING]"
+          sections.push(`- ${statusLabel} **\`${t.id}\`**: ${t.description}`)
         }
         sections.push("")
       }

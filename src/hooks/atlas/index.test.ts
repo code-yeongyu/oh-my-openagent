@@ -123,7 +123,7 @@ describe("atlas hook", () => {
      test("should append standalone verification when no boulder state but caller is Atlas", async () => {
        // #given - no boulder state, but caller is Atlas
        const sessionID = "session-no-boulder-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const hook = createAtlasHook(createMockPluginInput())
       const output = {
@@ -149,7 +149,7 @@ describe("atlas hook", () => {
      test("should transform output when caller is Atlas with boulder state", async () => {
        // #given - Atlas caller with boulder state
        const sessionID = "session-transform-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
@@ -188,7 +188,7 @@ describe("atlas hook", () => {
      test("should still transform when plan is complete (shows progress)", async () => {
        // #given - boulder state with complete plan, Atlas caller
        const sessionID = "session-complete-plan-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -225,7 +225,7 @@ describe("atlas hook", () => {
      test("should append session ID to boulder state if not present", async () => {
        // #given - boulder state without session-append-test, Atlas caller
        const sessionID = "session-append-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -261,7 +261,7 @@ describe("atlas hook", () => {
      test("should not duplicate existing session ID", async () => {
        // #given - boulder state already has session-dup-test, Atlas caller
        const sessionID = "session-dup-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
@@ -298,7 +298,7 @@ describe("atlas hook", () => {
      test("should include boulder.json path and notepad path in transformed output", async () => {
        // #given - boulder state, Atlas caller
        const sessionID = "session-path-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "my-feature.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2\n- [x] Task 3")
@@ -335,7 +335,7 @@ describe("atlas hook", () => {
      test("should include resume and checkbox instructions in reminder", async () => {
        // #given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
-       setupMessageStorage(sessionID, "Atlas")
+       setupMessageStorage(sessionID, "atlas")
       
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1")

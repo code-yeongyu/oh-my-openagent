@@ -4,19 +4,21 @@ import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
-import { DELEGATE_TASK_DESCRIPTION, DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase } from "../../shared"
+import { fetchAvailableModels } from "../../shared/model-availability"
+import { resolveModelWithFallback } from "../../shared/model-resolver"
+import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 type OpencodeClient = PluginInput["client"]
 
-const SISYPHUS_JUNIOR_AGENT = "Sisyphus-Junior"
-const CATEGORY_EXAMPLES = Object.keys(DEFAULT_CATEGORIES).map(k => `'${k}'`).join(", ")
+const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
 function parseModelString(model: string): { providerID: string; modelID: string } | undefined {
   const parts = model.split("/")
@@ -83,7 +85,7 @@ function formatDetailedError(error: unknown, ctx: ErrorContext): string {
     lines.push(`- category: ${ctx.args.category ?? "(none)"}`)
     lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
     lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
-    lines.push(`- skills: [${ctx.args.skills?.join(", ") ?? ""}]`)
+    lines.push(`- load_skills: [${ctx.args.load_skills?.join(", ") ?? ""}]`)
     if (ctx.args.resume) {
       lines.push(`- resume: ${ctx.args.resume}`)
     }
@@ -157,6 +159,7 @@ export interface DelegateTaskToolOptions {
   directory: string
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
+  sisyphusJuniorModel?: string
 }
 
 export interface BuildSystemContentInput {
@@ -179,35 +182,65 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig } = options
+  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel } = options
+
+  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const categoryNames = Object.keys(allCategories)
+  const categoryExamples = categoryNames.map(k => `'${k}'`).join(", ")
+
+  const categoryList = categoryNames.map(name => {
+    const userDesc = userCategories?.[name]?.description
+    const builtinDesc = CATEGORY_DESCRIPTIONS[name]
+    const desc = userDesc || builtinDesc
+    return desc ? `  - ${name}: ${desc}` : `  - ${name}`
+  }).join("\n")
+
+  const description = `Spawn agent task with category-based or direct agent selection.
+
+MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless resuming).
+
+- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+- category: Use predefined category → Spawns Sisyphus-Junior with category config
+  Available categories:
+${categoryList}
+- subagent_type: Use specific agent directly (e.g., "oracle", "explore")
+- run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
+- resume: Session ID to resume (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+
+**WHEN TO USE resume:**
+- Task failed/incomplete → resume with "fix: [specific issue]"
+- Need follow-up on previous result → resume with additional question
+- Multi-turn conversation with same agent → always resume instead of new task
+
+Prompts MUST be in English.`
 
   return tool({
-    description: DELEGATE_TASK_DESCRIPTION,
+    description,
     args: {
-      description: tool.schema.string().describe("Short task description"),
+      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-      category: tool.schema.string().optional().describe(`Category name (e.g., ${CATEGORY_EXAMPLES}). Mutually exclusive with subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("Agent name directly (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
-      run_in_background: tool.schema.boolean().describe("Run in background. MUST be explicitly set. Use false for task delegation, true only for parallel exploration."),
-      resume: tool.schema.string().optional().describe("Session ID to resume - continues previous agent session with full context"),
-      skills: tool.schema.array(tool.schema.string()).describe("Array of skill names to prepend to the prompt. Use [] (empty array) if no skills needed."),
+      run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
+      category: tool.schema.string().optional().describe(`Category (e.g., ${categoryExamples}). Mutually exclusive with subagent_type.`),
+      subagent_type: tool.schema.string().optional().describe("Agent name (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
+      resume: tool.schema.string().optional().describe("Session ID to resume"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       if (args.run_in_background === undefined) {
-        return `Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`
+        throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
-      if (args.skills === undefined) {
-        return `Invalid arguments: 'skills' parameter is REQUIRED. Use skills=[] if no skills are needed, or provide an array of skill names.`
+      if (args.load_skills === undefined) {
+        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
       }
-      if (args.skills === null) {
-        return `Invalid arguments: skills=null is not allowed. Use skills=[] (empty array) if no skills are needed.`
+      if (args.load_skills === null) {
+        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
       }
       const runInBackground = args.run_in_background === true
 
       let skillContent: string | undefined
-      if (args.skills.length > 0) {
-        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.skills, { gitMasterConfig })
+      if (args.load_skills.length > 0) {
+        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.load_skills, { gitMasterConfig })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
           const available = allSkills.map(s => s.name).join(", ")
@@ -221,7 +254,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
       const sessionAgent = getSessionAgent(ctx.sessionID)
       const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
-      
+
       log("[delegate_task] parentAgent resolution", {
         sessionID: ctx.sessionID,
         messageDir,
@@ -249,7 +282,14 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
             ctx.metadata?.({
               title: `Resume: ${task.description}`,
-              metadata: { sessionId: task.sessionID },
+              metadata: {
+                prompt: args.prompt,
+                agent: task.agent,
+                load_skills: args.load_skills,
+                description: args.description,
+                run_in_background: args.run_in_background,
+                sessionId: task.sessionID,
+              },
             })
 
             return `Background task resumed.
@@ -286,7 +326,14 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
         ctx.metadata?.({
           title: `Resume: ${args.description}`,
-          metadata: { sessionId: args.resume, sync: true },
+          metadata: {
+            prompt: args.prompt,
+            load_skills: args.load_skills,
+            description: args.description,
+            run_in_background: args.run_in_background,
+            sessionId: args.resume,
+            sync: true,
+          },
         })
 
         try {
@@ -347,7 +394,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
         while (Date.now() - pollStart < 60000) {
           await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
-          
+
           const elapsed = Date.now() - pollStart
           if (elapsed < MIN_STABILITY_TIME_MS) continue
 
@@ -405,7 +452,10 @@ Session ID: ${args.resume}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}
+
+---
+To resume this session: resume="${args.resume}"`
       }
 
       if (args.category && args.subagent_type) {
@@ -416,79 +466,113 @@ ${textContent || "(No text output)"}`
         return `Invalid arguments: Must provide either category or subagent_type.`
       }
 
-      // Fetch OpenCode config at boundary to get system default model
-      let systemDefaultModel: string | undefined
-      try {
-        const openCodeConfig = await client.config.get()
-        systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
-      } catch {
-        // Config fetch failed, proceed without system default
-        systemDefaultModel = undefined
-      }
+       // Fetch OpenCode config at boundary to get system default model
+       let systemDefaultModel: string | undefined
+       try {
+         const openCodeConfig = await client.config.get()
+         systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
+       } catch {
+         // Config fetch failed, proceed without system default
+         systemDefaultModel = undefined
+       }
 
-      let agentToUse: string
-      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
-      let categoryPromptAppend: string | undefined
+       let agentToUse: string
+       let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+       let categoryPromptAppend: string | undefined
 
-      const inheritedModel = parentModel
-        ? `${parentModel.providerID}/${parentModel.modelID}`
-        : undefined
+       const inheritedModel = parentModel
+         ? `${parentModel.providerID}/${parentModel.modelID}`
+         : undefined
 
-      let modelInfo: ModelFallbackInfo | undefined
+       let modelInfo: ModelFallbackInfo | undefined
 
-      if (args.category) {
-        // Guard: require system default model for category delegation
-        if (!systemDefaultModel) {
-          const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
-          return (
-            'oh-my-opencode requires a default model.\n\n' +
-            `Add this to ${paths.configJsonc}:\n\n` +
-            '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
-            '(Replace with your preferred provider/model)'
-          )
-        }
+       if (args.category) {
+         // Guard: require system default model for category delegation
+         if (!systemDefaultModel) {
+           const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+           return (
+             'oh-my-opencode requires a default model.\n\n' +
+             `Add this to ${paths.configJsonc}:\n\n` +
+             '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
+             '(Replace with your preferred provider/model)'
+           )
+         }
 
-        const resolved = resolveCategoryConfig(args.category, {
-          userCategories,
-          inheritedModel,
-          systemDefaultModel,
+         const availableModels = await fetchAvailableModels(client)
+
+         const resolved = resolveCategoryConfig(args.category, {
+           userCategories,
+           inheritedModel,
+           systemDefaultModel,
+         })
+         if (!resolved) {
+           return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
+         }
+
+         const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category]
+         let actualModel: string
+
+         if (!requirement) {
+           actualModel = resolved.model
+           modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
+          } else {
+          const { model: resolvedModel, source, variant: resolvedVariant } = resolveModelWithFallback({
+              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              fallbackChain: requirement.fallbackChain,
+              availableModels,
+              systemDefaultModel,
+            })
+
+           actualModel = resolvedModel
+
+           if (!parseModelString(actualModel)) {
+             return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+           }
+
+           let type: "user-defined" | "inherited" | "category-default" | "system-default"
+           switch (source) {
+              case "override":
+                type = "user-defined"
+                break
+              case "provider-fallback":
+                type = "category-default"
+                break
+              case "system-default":
+                type = "system-default"
+                break
+           }
+
+           modelInfo = { model: actualModel, type, source }
+           
+           const parsedModel = parseModelString(actualModel)
+           const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+           categoryModel = parsedModel
+             ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+             : undefined
+         }
+
+         agentToUse = SISYPHUS_JUNIOR_AGENT
+         if (!categoryModel) {
+           const parsedModel = parseModelString(actualModel)
+           categoryModel = parsedModel ?? undefined
+         }
+         categoryPromptAppend = resolved.promptAppend || undefined
+
+         const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
+        // Handle both boolean false and string "false" due to potential serialization
+        const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
+
+        log("[delegate_task] unstable agent detection", {
+          category: args.category,
+          actualModel,
+          isUnstableAgent,
+          run_in_background_value: args.run_in_background,
+          run_in_background_type: typeof args.run_in_background,
+          isRunInBackgroundExplicitlyFalse,
+          willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
         })
-        if (!resolved) {
-          return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
-        }
 
-        // Determine model source by comparing against the actual resolved model
-        const actualModel = resolved.model
-        const userDefinedModel = userCategories?.[args.category]?.model
-
-        if (!parseModelString(actualModel)) {
-          return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
-        }
-
-        switch (actualModel) {
-          case userDefinedModel:
-            modelInfo = { model: actualModel, type: "user-defined" }
-            break
-          case inheritedModel:
-            modelInfo = { model: actualModel, type: "inherited" }
-            break
-          case systemDefaultModel:
-            modelInfo = { model: actualModel, type: "system-default" }
-            break
-        }
-
-        agentToUse = SISYPHUS_JUNIOR_AGENT
-        const parsedModel = parseModelString(actualModel)
-        categoryModel = parsedModel
-          ? (resolved.config.variant
-            ? { ...parsedModel, variant: resolved.config.variant }
-            : parsedModel)
-          : undefined
-        categoryPromptAppend = resolved.promptAppend || undefined
-
-        // Unstable agent detection - launch as background for monitoring but wait for result
-        const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
-        if (isUnstableAgent && args.run_in_background === false) {
+        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
           const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
 
           try {
@@ -501,14 +585,26 @@ ${textContent || "(No text output)"}`
               parentModel,
               parentAgent,
               model: categoryModel,
-              skills: args.skills.length > 0 ? args.skills : undefined,
+              skills: args.load_skills.length > 0 ? args.load_skills : undefined,
               skillContent: systemContent,
             })
 
+            // Wait for sessionID to be set (task transitions from pending to running)
+            // launch() returns immediately with status="pending", sessionID is set async in startTask()
+            const WAIT_FOR_SESSION_INTERVAL_MS = 100
+            const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
+            const waitStart = Date.now()
+            while (!task.sessionID && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
+              if (ctx.abort?.aborted) {
+                return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+              }
+              await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
+            }
+
             const sessionID = task.sessionID
             if (!sessionID) {
-              return formatDetailedError(new Error("Background task launched but no sessionID returned"), {
-                operation: "Launch background task (unstable agent)",
+              return formatDetailedError(new Error(`Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`), {
+                operation: "Launch monitored background task",
                 args,
                 agent: agentToUse,
                 category: args.category,
@@ -517,7 +613,15 @@ ${textContent || "(No text output)"}`
 
             ctx.metadata?.({
               title: args.description,
-              metadata: { sessionId: sessionID, category: args.category },
+              metadata: {
+                prompt: args.prompt,
+                agent: agentToUse,
+                category: args.category,
+                load_skills: args.load_skills,
+                description: args.description,
+                run_in_background: args.run_in_background,
+                sessionId: sessionID,
+              },
             })
 
             const startTime = new Date()
@@ -533,7 +637,7 @@ ${textContent || "(No text output)"}`
 
             while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
               if (ctx.abort?.aborted) {
-                return `[UNSTABLE AGENT] Task aborted.\n\nSession ID: ${sessionID}`
+                return `Task aborted (was running in background mode).\n\nSession ID: ${sessionID}`
               }
 
               await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
@@ -575,25 +679,39 @@ ${textContent || "(No text output)"}`
             const lastMessage = assistantMessages[0]
 
             if (!lastMessage) {
-              return `[UNSTABLE AGENT] No assistant response found.\n\nSession ID: ${sessionID}`
+              return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
             }
 
             const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
             const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
             const duration = formatDuration(startTime)
 
-            return `[UNSTABLE AGENT] Task completed in ${duration}.
+            return `SUPERVISED TASK COMPLETED SUCCESSFULLY
 
-Model: ${actualModel} (unstable/experimental - launched via background for monitoring)
+IMPORTANT: This model (${actualModel}) is marked as unstable/experimental.
+Your run_in_background=false was automatically converted to background mode for reliability monitoring.
+
+Duration: ${duration}
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
 Session ID: ${sessionID}
 
+MONITORING INSTRUCTIONS:
+- The task was monitored and completed successfully
+- If you observe this agent behaving erratically in future calls, actively monitor its progress
+- Use background_cancel(task_id="...") to abort if the agent seems stuck or producing garbage output
+- Do NOT retry automatically if you see this message - the task already succeeded
+
 ---
 
-${textContent || "(No text output)"}`
+RESULT:
+
+${textContent || "(No text output)"}
+
+---
+To resume this session: resume="${sessionID}"`
           } catch (error) {
             return formatDetailedError(error, {
-              operation: "Launch background task (unstable agent)",
+              operation: "Launch monitored background task",
               args,
               agent: agentToUse,
               category: args.category,
@@ -605,28 +723,42 @@ ${textContent || "(No text output)"}`
           return `Agent name cannot be empty.`
         }
         const agentName = args.subagent_type.trim()
+
+        if (equalsIgnoreCase(agentName, SISYPHUS_JUNIOR_AGENT)) {
+          return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
+
+Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
+        }
+
         agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
+        // Uses case-insensitive matching to allow "Oracle", "oracle", "ORACLE" etc.
         try {
           const agentsResult = await client.app.agents()
           type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
           const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
 
           const callableAgents = agents.filter((a) => a.mode !== "primary")
-          const callableNames = callableAgents.map((a) => a.name)
 
-          if (!callableNames.includes(agentToUse)) {
-            const isPrimaryAgent = agents.some((a) => a.name === agentToUse && a.mode === "primary")
+          const matchedAgent = findByNameCaseInsensitive(callableAgents, agentToUse)
+          if (!matchedAgent) {
+            const isPrimaryAgent = findByNameCaseInsensitive(
+              agents.filter((a) => a.mode === "primary"),
+              agentToUse
+            )
             if (isPrimaryAgent) {
-              return `Cannot call primary agent "${agentToUse}" via delegate_task. Primary agents are top-level orchestrators.`
+              return `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`
             }
 
-            const availableAgents = callableNames
+            const availableAgents = callableAgents
+              .map((a) => a.name)
               .sort()
               .join(", ")
             return `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`
           }
+          // Use the canonical agent name from registration
+          agentToUse = matchedAgent.name
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }
@@ -645,13 +777,21 @@ ${textContent || "(No text output)"}`
             parentModel,
             parentAgent,
             model: categoryModel,
-            skills: args.skills.length > 0 ? args.skills : undefined,
+            skills: args.load_skills.length > 0 ? args.load_skills : undefined,
             skillContent: systemContent,
           })
 
           ctx.metadata?.({
             title: args.description,
-            metadata: { sessionId: task.sessionID, category: args.category },
+            metadata: {
+              prompt: args.prompt,
+              agent: task.agent,
+              category: args.category,
+              load_skills: args.load_skills,
+              description: args.description,
+              run_in_background: args.run_in_background,
+              sessionId: task.sessionID,
+            },
           })
 
           return `Background task launched.
@@ -662,7 +802,8 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+To resume this session: resume="${task.sessionID}"`
         } catch (error) {
           return formatDetailedError(error, {
             operation: "Launch background task",
@@ -709,14 +850,24 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
             description: args.description,
             agent: agentToUse,
             isBackground: false,
-            skills: args.skills.length > 0 ? args.skills : undefined,
+            category: args.category,
+            skills: args.load_skills,
             modelInfo,
           })
         }
 
         ctx.metadata?.({
           title: args.description,
-          metadata: { sessionId: sessionID, category: args.category, sync: true },
+          metadata: {
+            prompt: args.prompt,
+            agent: agentToUse,
+            category: args.category,
+            load_skills: args.load_skills,
+            description: args.description,
+            run_in_background: args.run_in_background,
+            sessionId: sessionID,
+            sync: true,
+          },
         })
 
         try {
@@ -843,11 +994,11 @@ System notifies on completion. Use \`background_output\` with task_id="${task.id
           .filter((m) => m.info?.role === "assistant")
           .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
         const lastMessage = assistantMessages[0]
-        
+
         if (!lastMessage) {
           return `No assistant response found.\n\nSession ID: ${sessionID}`
         }
-        
+
         // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
         const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
         const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
@@ -867,7 +1018,10 @@ Session ID: ${sessionID}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}
+
+---
+To resume this session: resume="${sessionID}"`
       } catch (error) {
         if (toastManager && taskId !== undefined) {
           toastManager.removeTask(taskId)

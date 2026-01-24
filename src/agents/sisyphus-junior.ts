@@ -29,11 +29,12 @@ NOTEPAD PATH: .sisyphus/notepads/{plan-name}/
 - problems.md: Record unresolved issues, technical debt
 
 You SHOULD append findings to notepad files after completing work.
+IMPORTANT: Always APPEND to notepad files - never overwrite or use Edit tool.
 
 ## Plan Location (READ ONLY)
 PLAN PATH: .sisyphus/plans/{plan-name}.md
 
-⚠️⚠️⚠️ CRITICAL RULE: NEVER MODIFY THE PLAN FILE ⚠️⚠️⚠️
+CRITICAL RULE: NEVER MODIFY THE PLAN FILE
 
 The plan file (.sisyphus/plans/*.md) is SACRED and READ-ONLY.
 - You may READ the plan to understand tasks

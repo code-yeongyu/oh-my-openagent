@@ -10,24 +10,25 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
+import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
 
 type AgentSource = AgentFactory | AgentConfig
 
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
-  Sisyphus: createSisyphusAgent,
+  sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
   "multimodal-looker": createMultimodalLookerAgent,
-  "Metis (Plan Consultant)": createMetisAgent,
-  "Momus (Plan Reviewer)": createMomusAgent,
+  metis: createMetisAgent,
+  momus: createMomusAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  Atlas: createAtlasAgent as unknown as AgentFactory,
+  atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
 /**
@@ -150,17 +151,28 @@ function mergeAgentConfig(
   return merged
 }
 
-export function createBuiltinAgents(
-  disabledAgents: BuiltinAgentName[] = [],
+function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
+  if (scope === "user" || scope === "opencode") return "user"
+  if (scope === "project" || scope === "opencode-project") return "project"
+  return "plugin"
+}
+
+export async function createBuiltinAgents(
+  disabledAgents: string[] = [],
   agentOverrides: AgentOverrides = {},
   directory?: string,
   systemDefaultModel?: string,
   categories?: CategoriesConfig,
-  gitMasterConfig?: GitMasterConfig
-): Record<string, AgentConfig> {
+  gitMasterConfig?: GitMasterConfig,
+  discoveredSkills: LoadedSkill[] = [],
+  client?: any
+): Promise<Record<string, AgentConfig>> {
   if (!systemDefaultModel) {
     throw new Error("createBuiltinAgents requires systemDefaultModel")
   }
+
+  // Fetch available models at plugin init
+  const availableModels = client ? await fetchAvailableModels(client) : new Set<string>()
 
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
@@ -171,28 +183,52 @@ export function createBuiltinAgents(
 
   const availableCategories: AvailableCategory[] = Object.entries(mergedCategories).map(([name]) => ({
     name,
-    description: CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
+    description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
   const builtinSkills = createBuiltinSkills()
-  const availableSkills: AvailableSkill[] = builtinSkills.map((skill) => ({
+  const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
+
+  const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({
     name: skill.name,
     description: skill.description,
     location: "plugin" as const,
   }))
 
+  const discoveredAvailable: AvailableSkill[] = discoveredSkills
+    .filter(s => !builtinSkillNames.has(s.name))
+    .map((skill) => ({
+      name: skill.name,
+      description: skill.definition.description ?? "",
+      location: mapScopeToLocation(skill.scope),
+    }))
+
+  const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
+
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
-    if (agentName === "Sisyphus") continue
-    if (agentName === "Atlas") continue
-    if (disabledAgents.includes(agentName)) continue
+    if (agentName === "sisyphus") continue
+    if (agentName === "atlas") continue
+    if (includesCaseInsensitive(disabledAgents, agentName)) continue
 
-    const override = agentOverrides[agentName]
-    const model = override?.model ?? systemDefaultModel
-    const primaryModel = Array.isArray(model) ? model[0] : model
+    const override = findCaseInsensitive(agentOverrides, agentName)
+    const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
 
-    let config = buildAgent(source, primaryModel, mergedCategories, gitMasterConfig)
+    const { model, variant: resolvedVariant } = resolveModelWithFallback({
+      userModel: override?.model,
+      fallbackChain: requirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig)
+
+    if (override?.variant) {
+      config = { ...config, variant: override.variant }
+    } else if (resolvedVariant) {
+      config = { ...config, variant: resolvedVariant }
+    }
 
     if (agentName === "librarian" && directory && config.prompt) {
       const envContext = createEnvContext()
@@ -215,18 +251,30 @@ export function createBuiltinAgents(
     }
   }
 
-  if (!disabledAgents.includes("Sisyphus")) {
-    const sisyphusOverride = agentOverrides["Sisyphus"]
-    const sisyphusModel = sisyphusOverride?.model ?? systemDefaultModel
-    const sisyphusPrimaryModel = Array.isArray(sisyphusModel) ? sisyphusModel[0] : sisyphusModel
+  if (!includesCaseInsensitive(disabledAgents, "sisyphus")) {
+    const sisyphusOverride = findCaseInsensitive(agentOverrides, "sisyphus")
+    const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
+
+    const { model: sisyphusModel, variant: sisyphusResolvedVariant } = resolveModelWithFallback({
+      userModel: sisyphusOverride?.model,
+      fallbackChain: sisyphusRequirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
 
     let sisyphusConfig = createSisyphusAgent(
-      sisyphusPrimaryModel,
+      sisyphusModel,
       availableAgents,
       undefined,
       availableSkills,
       availableCategories
     )
+
+    if (sisyphusOverride?.variant) {
+      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusOverride.variant }
+    } else if (sisyphusResolvedVariant) {
+      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
+    }
 
     if (directory && sisyphusConfig.prompt) {
       const envContext = createEnvContext()
@@ -237,26 +285,38 @@ export function createBuiltinAgents(
       sisyphusConfig = mergeAgentConfig(sisyphusConfig, sisyphusOverride)
     }
 
-    result["Sisyphus"] = sisyphusConfig
+    result["sisyphus"] = sisyphusConfig
   }
 
-  if (!disabledAgents.includes("Atlas")) {
-    const orchestratorOverride = agentOverrides["Atlas"]
-    const orchestratorModel = orchestratorOverride?.model ?? systemDefaultModel
-    const orchestratorPrimaryModel = Array.isArray(orchestratorModel) ? orchestratorModel[0] : orchestratorModel
+  if (!includesCaseInsensitive(disabledAgents, "atlas")) {
+    const orchestratorOverride = findCaseInsensitive(agentOverrides, "atlas")
+    const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
 
-     let orchestratorConfig = createAtlasAgent({
-       model: orchestratorPrimaryModel,
-       availableAgents,
-       availableSkills,
-       userCategories: categories,
-     })
+    const { model: atlasModel, variant: atlasResolvedVariant } = resolveModelWithFallback({
+      userModel: orchestratorOverride?.model,
+      fallbackChain: atlasRequirement?.fallbackChain,
+      availableModels,
+      systemDefaultModel,
+    })
+
+    let orchestratorConfig = createAtlasAgent({
+      model: atlasModel,
+      availableAgents,
+      availableSkills,
+      userCategories: categories,
+    })
+
+    if (orchestratorOverride?.variant) {
+      orchestratorConfig = { ...orchestratorConfig, variant: orchestratorOverride.variant }
+    } else if (atlasResolvedVariant) {
+      orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
+    }
 
     if (orchestratorOverride) {
       orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
     }
 
-    result["Atlas"] = orchestratorConfig
+    result["atlas"] = orchestratorConfig
   }
 
   return result

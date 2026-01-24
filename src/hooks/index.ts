@@ -31,3 +31,4 @@ export { createStartWorkHook } from "./start-work";
 export { createAtlasHook } from "./atlas";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createSmartFailoverHook } from "./smart-failover";
+export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
