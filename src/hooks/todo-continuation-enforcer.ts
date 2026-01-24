@@ -400,29 +400,49 @@ export function createTodoContinuationEnforcer(
 
       // Check 1.7: Plan progress check (File is Source of Truth)
       // Priority: boulder.phase === "completed" > tasks.md > OpenCode todos
+      // Note: tasks.md is used as fallback when OpenCode todos API returns empty
       const planProgress = readPlanProgress(ctx.directory)
-      if (planProgress) {
-        // tasks.md exists - use it as source of truth (ignore OpenCode todos)
-        const checkboxesComplete = planProgress.completed === planProgress.total || planProgress.total === 0
-        const phasesComplete = !planProgress.phases || planProgress.phases.length === 0 || 
-          planProgress.phases.every(p => p.status === "complete")
-        
-        if (checkboxesComplete && phasesComplete) {
-          log(`[${HOOK_NAME}] Skipped: plan complete (tasks.md is source of truth)`, { 
-            sessionID, 
+      const planSource = planProgress
+        ? {
+            incompleteCount: Math.max(planProgress.total - planProgress.completed, 0),
+            phasesComplete:
+              !planProgress.phases ||
+              planProgress.phases.length === 0 ||
+              planProgress.phases.every(p => p.status === "complete"),
             planPath: planProgress.planPath,
-            checkboxes: `${planProgress.completed}/${planProgress.total}`,
-            phases: planProgress.phases?.length ?? 0
+            total: planProgress.total,
+            completed: planProgress.completed,
+            phaseCount: planProgress.phases?.length ?? 0,
+          }
+        : null
+
+      if (planSource) {
+        // Fix: total===0 should NOT be treated as complete unless phases are also complete
+        // This prevents false "complete" when checkbox parsing fails
+        const checkboxesComplete =
+          planSource.total > 0
+            ? planSource.completed === planSource.total
+            : planSource.phasesComplete // Only treat as complete if phases also complete
+
+        // Note: Don't return here even if tasks.md is complete
+        // We need to also check OpenCode TODO API below (line ~563)
+        // Both sources must be complete before skipping continuation
+        if (checkboxesComplete && planSource.phasesComplete) {
+          log(`[${HOOK_NAME}] tasks.md complete, will verify OpenCode TODO status`, {
+            sessionID,
+            planPath: planSource.planPath,
+            checkboxes: `${planSource.completed}/${planSource.total}`,
+            phases: planSource.phaseCount,
           })
-          return
+          // Continue to OpenCode TODO check below instead of returning
         }
-        
+
         // Plan not complete - will inject continuation below
         log(`[${HOOK_NAME}] Plan incomplete (tasks.md)`, {
           sessionID,
-          checkboxes: `${planProgress.completed}/${planProgress.total}`,
-          phasesComplete,
-          incompleteTasks: planProgress.total - planProgress.completed
+          checkboxes: `${planSource.completed}/${planSource.total}`,
+          phasesComplete: planSource.phasesComplete,
+          incompleteTasks: planSource.incompleteCount,
         })
 
         // Check 1.8: Checkbox update enforcement (3-strike system)
@@ -435,8 +455,8 @@ export function createTodoContinuationEnforcer(
 
         try {
           // Get current tasks.md mtime
-          const currentTasksMtime = existsSync(planProgress.planPath) 
-            ? statSync(planProgress.planPath).mtimeMs 
+          const currentTasksMtime = existsSync(planSource.planPath) 
+            ? statSync(planSource.planPath).mtimeMs 
             : 0
 
           // Get git diff hash for code files (excluding .md files)
@@ -540,19 +560,36 @@ export function createTodoContinuationEnforcer(
         todos = (response.data ?? response) as Todo[]
       } catch (err) {
         log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(err) })
+        // Don't return here - we may have planSource as fallback
+      }
+
+      // Calculate incomplete counts from both sources
+      const apiIncompleteCount = todos ? getIncompleteCount(todos) : 0
+      const fileIncompleteCount = planSource?.incompleteCount ?? 0
+      const hasIncomplete = apiIncompleteCount > 0 || fileIncompleteCount > 0
+
+      // Check if all tasks are complete (both sources agree)
+      if (!hasIncomplete) {
+        log(`[${HOOK_NAME}] All todos complete`, {
+          sessionID,
+          total: todos?.length ?? 0,
+          planPath: planSource?.planPath,
+        })
         return
       }
 
-      if (!todos || todos.length === 0) {
-        log(`[${HOOK_NAME}] No todos`, { sessionID })
-        return
+      // If OpenCode todos is empty but tasks.md has incomplete items, use tasks.md as fallback
+      if ((!todos || todos.length === 0) && fileIncompleteCount > 0) {
+        log(`[${HOOK_NAME}] No OpenCode todos, falling back to tasks.md`, {
+          sessionID,
+          incompleteFromPlan: fileIncompleteCount,
+          planPath: planSource?.planPath,
+        })
       }
 
-      const incompleteCount = getIncompleteCount(todos)
-      if (incompleteCount === 0) {
-        log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
-        return
-      }
+      // Use whichever source has incomplete tasks (prefer API, fallback to file)
+      const resolvedIncomplete = apiIncompleteCount || fileIncompleteCount
+      const resolvedTotal = todos?.length || planSource?.total || resolvedIncomplete
 
       let resolvedInfo: ResolvedMessageInfo | undefined
       let hasCompactionMessage = false
@@ -598,7 +635,7 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      startCountdown(sessionID, incompleteCount, todos.length, resolvedInfo)
+      startCountdown(sessionID, resolvedIncomplete, resolvedTotal, resolvedInfo)
       return
     }
 
