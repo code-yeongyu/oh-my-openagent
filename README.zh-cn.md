@@ -16,8 +16,8 @@
 
 > [!TIP]
 >
-> [![Orchestrator 现已进入测试阶段。](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
-> > **Orchestrator 现已进入测试阶段。使用 `oh-my-opencode@3.0.0-beta.10` 安装。**
+> [![Oh My OpenCode 3.0 正式发布！](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
+> > **Oh My OpenCode 3.0 正式发布！使用 `oh-my-opencode@latest` 安装。**
 >
 > 加入我们！
 >
@@ -74,7 +74,9 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![许可证](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 
-[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 </div>
 
