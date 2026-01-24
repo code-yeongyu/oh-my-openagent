@@ -36,7 +36,7 @@ export interface GeneratedOmoConfig {
 
 const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
-const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
+const ULTIMATE_FALLBACK = "opencode/big-pickle"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
 
 function toProviderAvailability(config: InstallConfig): ProviderAvailability {
@@ -103,7 +103,7 @@ function getSisyphusFallbackChain(isMaxPlan: boolean): FallbackEntry[] {
   return [
     { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
     { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
-    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro-preview" },
+    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
   ]
 }
 
@@ -139,14 +139,14 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       continue
     }
 
-    // Special case: explore uses Claude haiku → OpenCode grok-code
+    // Special case: explore uses Claude haiku → OpenCode gpt-5-nano
     if (role === "explore") {
       if (avail.native.claude) {
         agents[role] = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
       } else {
-        agents[role] = { model: "opencode/grok-code" }
+        agents[role] = { model: "opencode/gpt-5-nano" }
       }
       continue
     }

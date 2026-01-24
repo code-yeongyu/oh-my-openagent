@@ -80,7 +80,7 @@ describe("fetchAvailableModels", () => {
       openai: { id: "openai", models: { "gpt-5.2-codex": { id: "gpt-5.2-codex" } } },
       anthropic: { id: "anthropic", models: { "claude-sonnet-4-5": { id: "claude-sonnet-4-5" } } },
       google: { id: "google", models: { "gemini-3-flash": { id: "gemini-3-flash" } } },
-      opencode: { id: "opencode", models: { "grok-code": { id: "grok-code" } } },
+      opencode: { id: "opencode", models: { "gpt-5-nano": { id: "gpt-5-nano" } } },
     })
 
     const result = await fetchAvailableModels()
@@ -89,7 +89,7 @@ describe("fetchAvailableModels", () => {
     expect(result.has("openai/gpt-5.2-codex")).toBe(true)
     expect(result.has("anthropic/claude-sonnet-4-5")).toBe(true)
     expect(result.has("google/gemini-3-flash")).toBe(true)
-    expect(result.has("opencode/grok-code")).toBe(true)
+    expect(result.has("opencode/gpt-5-nano")).toBe(true)
   })
 })
 

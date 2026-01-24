@@ -310,15 +310,15 @@ describe("generateModelConfig", () => {
   })
 
   describe("explore agent special cases", () => {
-    test("explore uses grok-code when only Gemini available (no Claude)", () => {
+    test("explore uses gpt-5-nano when only Gemini available (no Claude)", () => {
       // #given only Gemini is available (no Claude)
       const config = createConfig({ hasGemini: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use grok-code (Claude haiku not available)
-      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
+      // #then explore should use gpt-5-nano (Claude haiku not available)
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
 
     test("explore uses Claude haiku when Claude available", () => {
@@ -343,15 +343,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
     })
 
-    test("explore uses grok-code when only OpenAI available", () => {
+    test("explore uses gpt-5-nano when only OpenAI available", () => {
       // #given only OpenAI is available
       const config = createConfig({ hasOpenAI: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use grok-code (fallback)
-      expect(result.agents?.explore?.model).toBe("opencode/grok-code")
+      // #then explore should use gpt-5-nano (fallback)
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
   })
 

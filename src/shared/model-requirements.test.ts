@@ -69,19 +69,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("claude-haiku-4-5")
   })
 
-  test("multimodal-looker has valid fallbackChain with gemini-3-flash-preview as primary", () => {
+  test("multimodal-looker has valid fallbackChain with gemini-3-flash as primary", () => {
     // #given - multimodal-looker agent requirement
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // #when - accessing multimodal-looker requirement
-    // #then - fallbackChain exists with gemini-3-flash-preview as first entry
+    // #then - fallbackChain exists with gemini-3-flash as first entry
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
     expect(multimodalLooker.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = multimodalLooker.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-flash-preview")
+    expect(primary.model).toBe("gemini-3-flash")
   })
 
   test("prometheus has valid fallbackChain with claude-opus-4-5 as primary", () => {
@@ -199,19 +199,19 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("visual-engineering has valid fallbackChain with gemini-3-pro-preview as primary", () => {
+  test("visual-engineering has valid fallbackChain with gemini-3-pro as primary", () => {
     // #given - visual-engineering category requirement
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // #when - accessing visual-engineering requirement
-    // #then - fallbackChain exists with gemini-3-pro-preview as first entry
+    // #then - fallbackChain exists with gemini-3-pro as first entry
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
     expect(visualEngineering.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-pro-preview")
+    expect(primary.model).toBe("gemini-3-pro")
   })
 
   test("quick has valid fallbackChain with claude-haiku-4-5 as primary", () => {
@@ -260,34 +260,34 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("artistry has valid fallbackChain with gemini-3-pro-preview as primary", () => {
+  test("artistry has valid fallbackChain with gemini-3-pro as primary", () => {
     // #given - artistry category requirement
     const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
     // #when - accessing artistry requirement
-    // #then - fallbackChain exists with gemini-3-pro-preview as first entry
+    // #then - fallbackChain exists with gemini-3-pro as first entry
     expect(artistry).toBeDefined()
     expect(artistry.fallbackChain).toBeArray()
     expect(artistry.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = artistry.fallbackChain[0]
-    expect(primary.model).toBe("gemini-3-pro-preview")
+    expect(primary.model).toBe("gemini-3-pro")
     expect(primary.variant).toBe("max")
     expect(primary.providers[0]).toBe("google")
   })
 
-  test("writing has valid fallbackChain with gemini-3-flash-preview as primary", () => {
+  test("writing has valid fallbackChain with gemini-3-flash as primary", () => {
     // #given - writing category requirement
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // #when - accessing writing requirement
-    // #then - fallbackChain exists with gemini-3-flash-preview as first entry
+    // #then - fallbackChain exists with gemini-3-flash as first entry
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
     expect(writing.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = writing.fallbackChain[0]
-    expect(primary.model).toBe("gemini-3-flash-preview")
+    expect(primary.model).toBe("gemini-3-flash")
     expect(primary.providers[0]).toBe("google")
   })
 
@@ -344,7 +344,7 @@ describe("FallbackEntry type", () => {
     // #given - a FallbackEntry without variant
     const entry: FallbackEntry = {
       providers: ["opencode", "anthropic"],
-      model: "glm-4.7-free",
+      model: "big-pickle",
     }
 
     // #when - accessing variant
@@ -374,7 +374,7 @@ describe("ModelRequirement type", () => {
   test("ModelRequirement variant is optional", () => {
     // #given - a ModelRequirement without top-level variant
     const requirement: ModelRequirement = {
-      fallbackChain: [{ providers: ["opencode"], model: "glm-4.7-free" }],
+      fallbackChain: [{ providers: ["opencode"], model: "big-pickle" }],
     }
 
     // #when - accessing variant
