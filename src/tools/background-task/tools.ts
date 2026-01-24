@@ -406,27 +406,61 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
             return `No running or pending background tasks to cancel.`
           }
 
-          const results: string[] = []
+          const cancelledInfo: Array<{
+            id: string
+            description: string
+            status: string
+            sessionID?: string
+          }> = []
+
           for (const task of cancellableTasks) {
             if (task.status === "pending") {
-              // Pending task: use manager method (no session to abort)
               manager.cancelPendingTask(task.id)
-              results.push(`- ${task.id}: ${task.description} (pending)`)
+              cancelledInfo.push({
+                id: task.id,
+                description: task.description,
+                status: "pending",
+                sessionID: undefined,
+              })
             } else if (task.sessionID) {
-              // Running task: abort session
               client.session.abort({
                 path: { id: task.sessionID },
               }).catch(() => {})
 
               task.status = "cancelled"
               task.completedAt = new Date()
-              results.push(`- ${task.id}: ${task.description} (running)`)
+              cancelledInfo.push({
+                id: task.id,
+                description: task.description,
+                status: "running",
+                sessionID: task.sessionID,
+              })
             }
           }
 
+          const tableRows = cancelledInfo
+            .map(t => `| \`${t.id}\` | ${t.description} | ${t.status} | ${t.sessionID ? `\`${t.sessionID}\`` : "(not started)"} |`)
+            .join("\n")
+
+          const resumableTasks = cancelledInfo.filter(t => t.sessionID)
+          const resumeSection = resumableTasks.length > 0
+            ? `\n## Resume Instructions
+
+To resume a cancelled task, use:
+\`\`\`
+delegate_task(resume="<session_id>", prompt="Continue: <your follow-up>")
+\`\`\`
+
+Resumable sessions:
+${resumableTasks.map(t => `- \`${t.sessionID}\` (${t.description})`).join("\n")}`
+            : ""
+
           return `Cancelled ${cancellableTasks.length} background task(s):
 
-${results.join("\n")}`
+| Task ID | Description | Status | Session ID |
+|---------|-------------|--------|------------|
+${tableRows}
+${resumeSection}`
         }
 
         const task = manager.getTask(args.taskId!)
