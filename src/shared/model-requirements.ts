@@ -128,3 +128,4 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
 }
+
