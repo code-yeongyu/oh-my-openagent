@@ -37,7 +37,7 @@ describe("migrateAgentNames", () => {
     const agents = {
       oracle: { model: "openai/gpt-5.2" },
       librarian: { model: "google/gemini-3-flash" },
-      explore: { model: "opencode/grok-code" },
+      explore: { model: "opencode/gpt-5-nano" },
     }
 
     // #when: Migrate agent names
@@ -47,7 +47,7 @@ describe("migrateAgentNames", () => {
     expect(changed).toBe(false)
     expect(migrated["oracle"]).toEqual({ model: "openai/gpt-5.2" })
     expect(migrated["librarian"]).toEqual({ model: "google/gemini-3-flash" })
-    expect(migrated["explore"]).toEqual({ model: "opencode/grok-code" })
+    expect(migrated["explore"]).toEqual({ model: "opencode/gpt-5-nano" })
   })
 
   test("handles case-insensitive migration", () => {
@@ -418,7 +418,7 @@ describe("migrateAgentConfigToCategory", () => {
   test("migrates model to category when mapping exists", () => {
     // #given: Config with a model that has a category mapping
     const config = {
-      model: "google/gemini-3-pro-preview",
+      model: "google/gemini-3-pro",
       temperature: 0.5,
       top_p: 0.9,
     }
@@ -467,7 +467,7 @@ describe("migrateAgentConfigToCategory", () => {
   test("handles all mapped models correctly", () => {
     // #given: Configs for each mapped model
     const configs = [
-      { model: "google/gemini-3-pro-preview" },
+      { model: "google/gemini-3-pro" },
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
       { model: "anthropic/claude-opus-4-5" },
@@ -536,7 +536,7 @@ describe("shouldDeleteAgentConfig", () => {
     // #given: Config with fields matching category defaults
     const config = {
       category: "visual-engineering",
-      model: "google/gemini-3-pro-preview",
+      model: "google/gemini-3-pro",
     }
 
     // #when: Check if config should be deleted
@@ -664,7 +664,7 @@ describe("migrateConfigFile with backup", () => {
       agents: {
         "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
         oracle: { model: "openai/gpt-5.2" },
-        "my-custom-agent": { model: "google/gemini-3-pro-preview" },
+        "my-custom-agent": { model: "google/gemini-3-pro" },
       },
     }
 
@@ -680,7 +680,7 @@ describe("migrateConfigFile with backup", () => {
     const agents = rawConfig.agents as Record<string, Record<string, unknown>>
     expect(agents["multimodal-looker"].model).toBe("anthropic/claude-haiku-4-5")
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
-    expect(agents["my-custom-agent"].model).toBe("google/gemini-3-pro-preview")
+    expect(agents["my-custom-agent"].model).toBe("google/gemini-3-pro")
   })
 
   test("preserves category setting when explicitly set", () => {
