@@ -14,6 +14,8 @@ export function getMainSessionID(): string | undefined {
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  sessionAgentMap.clear()
+  sessionModelMap.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()
@@ -34,4 +36,29 @@ export function getSessionAgent(sessionID: string): string | undefined {
 
 export function clearSessionAgent(sessionID: string): void {
   sessionAgentMap.delete(sessionID)
+}
+
+export interface SessionModel {
+  providerID: string
+  modelID: string
+}
+
+const sessionModelMap = new Map<string, SessionModel>()
+
+export function setSessionModel(sessionID: string, model: SessionModel): void {
+  if (!sessionModelMap.has(sessionID)) {
+    sessionModelMap.set(sessionID, model)
+  }
+}
+
+export function updateSessionModel(sessionID: string, model: SessionModel): void {
+  sessionModelMap.set(sessionID, model)
+}
+
+export function getSessionModel(sessionID: string): SessionModel | undefined {
+  return sessionModelMap.get(sessionID)
+}
+
+export function clearSessionModel(sessionID: string): void {
+  sessionModelMap.delete(sessionID)
 }

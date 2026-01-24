@@ -7,6 +7,10 @@ import {
   setMainSession,
   getMainSessionID,
   _resetForTesting,
+  setSessionModel,
+  getSessionModel,
+  clearSessionModel,
+  updateSessionModel,
 } from "./state"
 
 describe("claude-code-session-state", () => {
@@ -16,6 +20,9 @@ describe("claude-code-session-state", () => {
     clearSessionAgent("test-session-1")
     clearSessionAgent("test-session-2")
     clearSessionAgent("test-prometheus-session")
+    clearSessionModel("test-session-1")
+    clearSessionModel("test-session-2")
+    clearSessionModel("test-model-session")
   })
 
   describe("setSessionAgent", () => {
@@ -157,6 +164,104 @@ describe("claude-code-session-state", () => {
 
       // #then - should be updated
       expect(getSessionAgent(sessionID)).toBe(newAgent)
+    })
+  })
+
+  describe("setSessionModel", () => {
+    test("should store model for session", () => {
+      // #given
+      const sessionID = "test-model-session"
+      const model = { providerID: "grok", modelID: "grok-2" }
+
+      // #when
+      setSessionModel(sessionID, model)
+
+      // #then
+      expect(getSessionModel(sessionID)).toEqual(model)
+    })
+
+    test("should NOT overwrite existing model (first-write wins)", () => {
+      // #given
+      const sessionID = "test-model-session"
+      const firstModel = { providerID: "grok", modelID: "grok-2" }
+      const secondModel = { providerID: "anthropic", modelID: "claude-sonnet-4-5" }
+      setSessionModel(sessionID, firstModel)
+
+      // #when - try to overwrite
+      setSessionModel(sessionID, secondModel)
+
+      // #then - first model preserved
+      expect(getSessionModel(sessionID)).toEqual(firstModel)
+    })
+
+    test("should return undefined for unknown session", () => {
+      // #given - no session set
+
+      // #when / #then
+      expect(getSessionModel("unknown-session")).toBeUndefined()
+    })
+  })
+
+  describe("updateSessionModel", () => {
+    test("should overwrite existing model", () => {
+      // #given
+      const sessionID = "test-model-session"
+      const firstModel = { providerID: "grok", modelID: "grok-2" }
+      const secondModel = { providerID: "anthropic", modelID: "claude-sonnet-4-5" }
+      setSessionModel(sessionID, firstModel)
+
+      // #when - force update
+      updateSessionModel(sessionID, secondModel)
+
+      // #then
+      expect(getSessionModel(sessionID)).toEqual(secondModel)
+    })
+  })
+
+  describe("clearSessionModel", () => {
+    test("should remove model from session", () => {
+      // #given
+      const sessionID = "test-model-session"
+      const model = { providerID: "grok", modelID: "grok-2" }
+      setSessionModel(sessionID, model)
+      expect(getSessionModel(sessionID)).toEqual(model)
+
+      // #when
+      clearSessionModel(sessionID)
+
+      // #then
+      expect(getSessionModel(sessionID)).toBeUndefined()
+    })
+  })
+
+  describe("issue #1024 integration scenario", () => {
+    test("should store UI-selected model on first message for delegate_task fallback", () => {
+      // #given - User selects grok model via UI before first message
+      const sessionID = "test-first-message-session"
+      const uiSelectedModel = { providerID: "grok", modelID: "grok-2" }
+
+      // #when - chat.message hook fires with input.model (simulating UI selection)
+      setSessionModel(sessionID, uiSelectedModel)
+
+      // #then - delegate_task can retrieve the model as fallback
+      const sessionModel = getSessionModel(sessionID)
+      expect(sessionModel).toEqual(uiSelectedModel)
+      expect(sessionModel?.providerID).toBe("grok")
+      expect(sessionModel?.modelID).toBe("grok-2")
+    })
+
+    test("should preserve first model selection (no overwrite on subsequent messages)", () => {
+      // #given - First message with grok model
+      const sessionID = "test-first-message-session"
+      const firstModel = { providerID: "grok", modelID: "grok-2" }
+      setSessionModel(sessionID, firstModel)
+
+      // #when - Second message with different model (shouldn't happen normally, but test the safety)
+      const secondModel = { providerID: "anthropic", modelID: "claude-opus-4" }
+      setSessionModel(sessionID, secondModel)
+
+      // #then - First model preserved
+      expect(getSessionModel(sessionID)).toEqual(firstModel)
     })
   })
 })

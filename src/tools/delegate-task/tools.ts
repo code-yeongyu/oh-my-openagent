@@ -10,7 +10,7 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
+import { subagentSessions, getSessionAgent, getSessionModel } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase } from "../../shared"
 import { fetchAvailableModels } from "../../shared/model-availability"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
@@ -264,9 +264,11 @@ Prompts MUST be in English.`
         prevMessageAgent: prevMessage?.agent,
         resolvedParentAgent: parentAgent,
       })
+      // Get stored session model as fallback (for first message before prevMessage exists)
+      const sessionModel = getSessionModel(ctx.sessionID)
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
         ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
-        : undefined
+        : sessionModel
 
       if (args.session_id) {
         if (runInBackground) {

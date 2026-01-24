@@ -55,6 +55,8 @@ import {
   setSessionAgent,
   updateSessionAgent,
   clearSessionAgent,
+  setSessionModel,
+  clearSessionModel,
 } from "./features/claude-code-session-state";
 import {
   builtinTools,
@@ -336,6 +338,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         setSessionAgent(input.sessionID, input.agent);
       }
 
+      // Store UI-selected model for first message (before prevMessage exists)
+      if (input.model?.providerID && input.model?.modelID) {
+        setSessionModel(input.sessionID, {
+          providerID: input.model.providerID,
+          modelID: input.model.modelID,
+        });
+      }
+
       const message = (output as { message: { variant?: string } }).message
       if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
         const variant = resolveAgentVariant(pluginConfig, input.agent)
@@ -465,6 +475,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
          }
          if (sessionInfo?.id) {
            clearSessionAgent(sessionInfo.id);
+           clearSessionModel(sessionInfo.id);
            resetMessageCursor(sessionInfo.id);
            firstMessageVariantGate.clear(sessionInfo.id);
            await skillMcpManager.disconnectSession(sessionInfo.id);

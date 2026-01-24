@@ -61,7 +61,7 @@ describe("createBuiltinSkills", () => {
 		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux and git-master skills", () => {
+	test("always includes frontend-ui-ux, git-master, and dev-browser skills", () => {
 		// #given - both provider options
 
 		// #when
@@ -72,18 +72,19 @@ describe("createBuiltinSkills", () => {
 		for (const skills of [defaultSkills, agentBrowserSkills]) {
 			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
+			expect(skills.find((s) => s.name === "dev-browser")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 3 skills regardless of provider", () => {
+	test("returns exactly 4 skills regardless of provider", () => {
 		// #given
 
 		// #when
 		const defaultSkills = createBuiltinSkills()
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
-		// #then
-		expect(defaultSkills).toHaveLength(3)
-		expect(agentBrowserSkills).toHaveLength(3)
+		// #then - browserSkill + frontend-ui-ux + git-master + dev-browser = 4
+		expect(defaultSkills).toHaveLength(4)
+		expect(agentBrowserSkills).toHaveLength(4)
 	})
 })
