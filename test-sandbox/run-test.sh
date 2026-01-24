@@ -13,11 +13,21 @@ echo "🧪 Running in sandbox:"
 echo "   Config dir: $SANDBOX_DIR"
 echo ""
 
-# Run the install
+# Run the install and propagate exit code
 bun run "$REPO_ROOT/src/cli/index.ts" install "$@"
+EXIT_CODE=$?
 
 echo ""
-echo "📋 Sandbox config created at:"
-echo "   $SANDBOX_DIR"
+
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "📋 Sandbox config created at:"
+  echo "   $SANDBOX_DIR"
+else
+  echo "❌ Installation failed with exit code $EXIT_CODE"
+fi
+
 echo ""
 echo "🧹 Clean up with: rm -rf test-sandbox"
+
+# Exit with the same code as the installer
+exit $EXIT_CODE
