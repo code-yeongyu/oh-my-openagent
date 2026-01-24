@@ -14,9 +14,12 @@ export function getMainSessionID(): string | undefined {
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  sessionAgentMap.clear()
+  previousAgentMap.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()
+const previousAgentMap = new Map<string, string>()
 
 export function setSessionAgent(sessionID: string, agent: string): void {
   if (!sessionAgentMap.has(sessionID)) {
@@ -25,6 +28,10 @@ export function setSessionAgent(sessionID: string, agent: string): void {
 }
 
 export function updateSessionAgent(sessionID: string, agent: string): void {
+  const currentAgent = sessionAgentMap.get(sessionID)
+  if (currentAgent !== undefined && currentAgent !== agent) {
+    previousAgentMap.set(sessionID, currentAgent)
+  }
   sessionAgentMap.set(sessionID, agent)
 }
 
@@ -32,6 +39,13 @@ export function getSessionAgent(sessionID: string): string | undefined {
   return sessionAgentMap.get(sessionID)
 }
 
+export function consumePreviousAgent(sessionID: string): string | undefined {
+  const previous = previousAgentMap.get(sessionID)
+  previousAgentMap.delete(sessionID)
+  return previous
+}
+
 export function clearSessionAgent(sessionID: string): void {
   sessionAgentMap.delete(sessionID)
+  previousAgentMap.delete(sessionID)
 }
