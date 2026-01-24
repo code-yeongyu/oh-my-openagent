@@ -6,6 +6,7 @@ import type { CommandFrontmatter } from "../../features/claude-code-command-load
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
+import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -63,7 +64,22 @@ export function discoverCommandsSync(): CommandInfo[] {
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
 
-  return [...opencodeProjectCommands, ...projectCommands, ...opencodeGlobalCommands, ...userCommands]
+  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
+    name: cmd.name,
+    metadata: {
+      name: cmd.name,
+      description: cmd.description || "",
+      argumentHint: cmd.argumentHint,
+      model: cmd.model,
+      agent: cmd.agent,
+      subtask: cmd.subtask
+    },
+    content: cmd.template,
+    scope: "builtin"
+  }))
+
+  return [...builtinCommands, ...opencodeProjectCommands, ...projectCommands, ...opencodeGlobalCommands, ...userCommands]
 }
 
 function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
@@ -234,7 +250,7 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       if (partialMatches.length > 0) {
         const matchList = partialMatches.map((cmd) => `/${cmd.name}`).join(", ")
         return (
-          `No exact match for "/${cmdName}". Did you mean: ${matchList}?\n\n` +
+          `No exact match for "/${cmdName}\". Did you mean: ${matchList}?\n\n` +
           formatCommandList(allItems)
         )
       }
