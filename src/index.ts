@@ -662,6 +662,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await tddGuard?.["tool.execute.before"]?.(input, output);
       await codebaseAssessment?.["tool.execute.before"]?.(input, output);
+      await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
