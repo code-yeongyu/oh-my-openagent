@@ -5,6 +5,37 @@ import { pathToFileURL } from "node:url"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
 
+/**
+ * Check if the current Bun version is affected by Windows LSP crash bug.
+ * Bun v1.3.5 and earlier have a known segmentation fault issue on Windows
+ * when spawning LSP servers. This was fixed in Bun v1.3.6.
+ * See: https://github.com/oven-sh/bun/issues/25798
+ */
+function checkWindowsBunVersion(): { isAffected: boolean; message: string } | null {
+  if (process.platform !== "win32") return null
+
+  const version = Bun.version
+  const [major, minor, patch] = version.split(".").map((v) => parseInt(v.split("-")[0], 10))
+
+  // Bun v1.3.5 and earlier are affected
+  if (major < 1 || (major === 1 && minor < 3) || (major === 1 && minor === 3 && patch < 6)) {
+    return {
+      isAffected: true,
+      message:
+        `⚠️  Windows + Bun v${version} detected: Known segmentation fault bug with LSP.\n` +
+        `   This causes crashes when using LSP tools (lsp_diagnostics, lsp_goto_definition, etc.).\n` +
+        `   \n` +
+        `   SOLUTION: Upgrade to Bun v1.3.6 or later:\n` +
+        `   powershell -c "irm bun.sh/install.ps1|iex"\n` +
+        `   \n` +
+        `   WORKAROUND: Use WSL instead of native Windows.\n` +
+        `   See: https://github.com/oven-sh/bun/issues/25798`,
+    }
+  }
+
+  return null
+}
+
 interface ManagedClient {
   client: LSPClient
   lastUsedAt: number
@@ -223,6 +254,13 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
+    const windowsCheck = checkWindowsBunVersion()
+    if (windowsCheck?.isAffected) {
+      throw new Error(
+        `LSP server cannot be started safely.\n\n${windowsCheck.message}`
+      )
+    }
+
     this.proc = spawn(this.server.command, {
       stdin: "pipe",
       stdout: "pipe",
