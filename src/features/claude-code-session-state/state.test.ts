@@ -7,6 +7,7 @@ import {
   setMainSession,
   getMainSessionID,
   _resetForTesting,
+  consumePreviousAgent,
 } from "./state"
 
 describe("claude-code-session-state", () => {
@@ -124,39 +125,116 @@ describe("claude-code-session-state", () => {
     })
   })
 
-  describe("issue #893: custom agent switch reset", () => {
-    test("should preserve custom agent when default agent is sent on subsequent messages", () => {
-      // #given - user switches to custom agent "MyCustomAgent"
-      const sessionID = "test-session-custom"
-      const customAgent = "MyCustomAgent"
-      const defaultAgent = "Sisyphus"
-
-      // User switches to custom agent (via UI)
-      setSessionAgent(sessionID, customAgent)
-      expect(getSessionAgent(sessionID)).toBe(customAgent)
-
-      // #when - first message after switch sends default agent
-      // This simulates the bug: input.agent = "Sisyphus" on first message
-      // Using setSessionAgent (first-write wins) should preserve custom agent
-      setSessionAgent(sessionID, defaultAgent)
-
-      // #then - custom agent should be preserved, NOT overwritten
-      expect(getSessionAgent(sessionID)).toBe(customAgent)
-    })
-
-    test("should allow explicit agent update via updateSessionAgent", () => {
-      // #given - custom agent is set
-      const sessionID = "test-session-explicit"
-      const customAgent = "MyCustomAgent"
-      const newAgent = "AnotherAgent"
-
-      setSessionAgent(sessionID, customAgent)
-
-      // #when - explicit update (user intentionally switches)
-      updateSessionAgent(sessionID, newAgent)
-
-      // #then - should be updated
-      expect(getSessionAgent(sessionID)).toBe(newAgent)
-    })
-  })
-})
+   describe("issue #893: custom agent switch reset", () => {
+     test("should preserve custom agent when default agent is sent on subsequent messages", () => {
+       // #given - user switches to custom agent "MyCustomAgent"
+       const sessionID = "test-session-custom"
+       const customAgent = "MyCustomAgent"
+       const defaultAgent = "Sisyphus"
+ 
+       // User switches to custom agent (via UI)
+       setSessionAgent(sessionID, customAgent)
+       expect(getSessionAgent(sessionID)).toBe(customAgent)
+ 
+       // #when - first message after switch sends default agent
+       // This simulates the bug: input.agent = "Sisyphus" on first message
+       // Using setSessionAgent (first-write wins) should preserve custom agent
+       setSessionAgent(sessionID, defaultAgent)
+ 
+       // #then - custom agent should be preserved, NOT overwritten
+       expect(getSessionAgent(sessionID)).toBe(customAgent)
+     })
+ 
+     test("should allow explicit agent update via updateSessionAgent", () => {
+       // #given - custom agent is set
+       const sessionID = "test-session-explicit"
+       const customAgent = "MyCustomAgent"
+       const newAgent = "AnotherAgent"
+ 
+       setSessionAgent(sessionID, customAgent)
+ 
+       // #when - explicit update (user intentionally switches)
+       updateSessionAgent(sessionID, newAgent)
+ 
+       // #then - should be updated
+       expect(getSessionAgent(sessionID)).toBe(newAgent)
+     })
+   })
+ 
+   describe("previousAgentMap for agent switch detection", () => {
+     test("updateSessionAgent() stores previous agent in previousAgentMap", () => {
+       // #given - session has agent "Sisyphus"
+       const sessionID = "test-session-1"
+       setSessionAgent(sessionID, "Sisyphus")
+       expect(getSessionAgent(sessionID)).toBe("Sisyphus")
+ 
+       // #when - update to "Oracle"
+       updateSessionAgent(sessionID, "Oracle")
+ 
+       // #then - consumePreviousAgent() returns "Sisyphus"
+       expect(consumePreviousAgent(sessionID)).toBe("Sisyphus")
+     })
+ 
+     test("consumePreviousAgent() returns previous agent and clears it", () => {
+       // #given - session has current and previous agent
+       const sessionID = "test-session-2"
+       setSessionAgent(sessionID, "Sisyphus")
+       updateSessionAgent(sessionID, "Oracle")
+       expect(consumePreviousAgent(sessionID)).toBe("Sisyphus")
+ 
+       // #when - call consumePreviousAgent() again
+       const secondCall = consumePreviousAgent(sessionID)
+ 
+       // #then - returns undefined (cleared after first call)
+       expect(secondCall).toBeUndefined()
+     })
+ 
+     test("same agent update does not store previous agent", () => {
+       // #given - session has agent "Sisyphus"
+       const sessionID = "test-session-1"
+       setSessionAgent(sessionID, "Sisyphus")
+       expect(getSessionAgent(sessionID)).toBe("Sisyphus")
+ 
+       // #when - update to "Sisyphus" again (same agent)
+       updateSessionAgent(sessionID, "Sisyphus")
+ 
+       // #then - consumePreviousAgent() returns undefined
+       expect(consumePreviousAgent(sessionID)).toBeUndefined()
+     })
+ 
+     test("clearSessionAgent() clears both current and previous agent", () => {
+       // #given - session has current and previous agent
+       const sessionID = "test-session-2"
+       setSessionAgent(sessionID, "Sisyphus")
+       updateSessionAgent(sessionID, "Oracle")
+       expect(getSessionAgent(sessionID)).toBe("Oracle")
+       expect(consumePreviousAgent(sessionID)).toBe("Sisyphus")
+ 
+       // #when - clearSessionAgent()
+       clearSessionAgent(sessionID)
+ 
+       // #then - both current and previous are undefined
+       expect(getSessionAgent(sessionID)).toBeUndefined()
+       expect(consumePreviousAgent(sessionID)).toBeUndefined()
+     })
+ 
+     test("_resetForTesting() clears previousAgentMap", () => {
+       // #given - multiple sessions with previous agents
+       const session1 = "test-session-1"
+       const session2 = "test-session-2"
+       setSessionAgent(session1, "Sisyphus")
+       updateSessionAgent(session1, "Oracle")
+       setSessionAgent(session2, "Prometheus")
+       updateSessionAgent(session2, "Librarian")
+       expect(consumePreviousAgent(session1)).toBe("Sisyphus")
+       expect(consumePreviousAgent(session2)).toBe("Prometheus")
+ 
+       // #when - _resetForTesting()
+       _resetForTesting()
+ 
+       // #then - all previous agents cleared
+       expect(consumePreviousAgent(session1)).toBeUndefined()
+       expect(consumePreviousAgent(session2)).toBeUndefined()
+     })
+   })
+ })
