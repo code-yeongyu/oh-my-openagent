@@ -94,6 +94,7 @@ describe("opencode-config-dir - OH_MY_OPENCODE_CONFIG_DIR (isolated mode)", () =
       // #given OH_MY_OPENCODE_CONFIG_DIR is set to empty string
       process.env.OH_MY_OPENCODE_CONFIG_DIR = ""
       delete process.env.XDG_CONFIG_HOME
+      delete process.env.OPENCODE_CONFIG_DIR
       Object.defineProperty(process, "platform", { value: "linux" })
 
       // #when getOpenCodeConfigDir is called with binary="opencode"
@@ -107,6 +108,7 @@ describe("opencode-config-dir - OH_MY_OPENCODE_CONFIG_DIR (isolated mode)", () =
       // #given OH_MY_OPENCODE_CONFIG_DIR is set to whitespace only
       process.env.OH_MY_OPENCODE_CONFIG_DIR = "   "
       delete process.env.XDG_CONFIG_HOME
+      delete process.env.OPENCODE_CONFIG_DIR
       Object.defineProperty(process, "platform", { value: "linux" })
 
       // #when getOpenCodeConfigDir is called with binary="opencode"

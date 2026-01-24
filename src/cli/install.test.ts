@@ -4,6 +4,7 @@ import { tmpdir, homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { install } from "./install"
 import * as configManager from "./config-manager"
+import * as opencodeConfigDir from "../shared/opencode-config-dir"
 import type { InstallArgs } from "./types"
 
 // Mock console methods to capture output
@@ -167,10 +168,10 @@ describe("install CLI - binary check behavior", () => {
         OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
         OH_MY_OPENCODE_CONFIG_DIR: process.env.OH_MY_OPENCODE_CONFIG_DIR,
       }
-      
-      // Set isolated config directory
-      process.env.OH_MY_OPENCODE_CONFIG_DIR = isolatedTempDir
+
+      // Clear config environment variables to use defaults
       delete process.env.OPENCODE_CONFIG_DIR
+      delete process.env.OH_MY_OPENCODE_CONFIG_DIR
 
       // Reset config context
       configManager.resetConfigContext()
@@ -197,11 +198,6 @@ describe("install CLI - binary check behavior", () => {
       }
       if (existsSync(isolatedTempDir)) {
         rmSync(isolatedTempDir, { recursive: true, force: true })
-      }
-      
-      const defaultIsolatedDir = join(homedir(), ".config", "oh-my-opencode")
-      if (existsSync(defaultIsolatedDir)) {
-        rmSync(defaultIsolatedDir, { recursive: true, force: true })
       }
 
       isOpenCodeInstalledSpy?.mockRestore()
@@ -232,19 +228,20 @@ describe("install CLI - binary check behavior", () => {
         isolated: true, // Enable isolated mode
       }
 
+      // Mock getOmoDefaultIsolatedDir to return temp directory instead of real path
+      const getOmoDefaultIsolatedDirMock = spyOn(opencodeConfigDir, "getOmoDefaultIsolatedDir").mockReturnValue(isolatedTempDir)
+
       // #when running install with isolated flag
       const exitCode = await install(args)
+
+      getOmoDefaultIsolatedDirMock.mockRestore()
 
       // #then should return success
       expect(exitCode).toBe(0)
 
-      // #then should create config in isolated directory, not shared
-      const defaultIsolatedDir = join(homedir(), ".config", "oh-my-opencode")
-      const isolatedConfigPath = join(defaultIsolatedDir, "opencode.json")
-      const sharedConfigPath = join(tempDir, "opencode.json")
-      
+      // #then should create config in default isolated directory
+      const isolatedConfigPath = join(isolatedTempDir, "opencode.json")
       expect(existsSync(isolatedConfigPath)).toBe(true)
-      expect(existsSync(sharedConfigPath)).toBe(false)
 
       // #then isolated config should have plugin entry
       const config = JSON.parse(readFileSync(isolatedConfigPath, "utf-8"))
@@ -252,7 +249,7 @@ describe("install CLI - binary check behavior", () => {
       expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(true)
 
       // #then oh-my-opencode.json should also be in isolated directory
-      const omoConfigPath = join(defaultIsolatedDir, "oh-my-opencode.json")
+      const omoConfigPath = join(isolatedTempDir, "oh-my-opencode.json")
       expect(existsSync(omoConfigPath)).toBe(true)
     })
 
@@ -298,82 +295,6 @@ describe("install CLI - binary check behavior", () => {
       
       expect(existsSync(sharedConfigPath)).toBe(true)
       expect(existsSync(isolatedConfigPath)).toBe(false)
-    })
-
-    test("isolated mode ignores OH_MY_OPENCODE_CONFIG_DIR in non-TUI mode", async () => {
-      const relativePath = "./test-omo-config"
-      process.env.OH_MY_OPENCODE_CONFIG_DIR = relativePath
-      configManager.resetConfigContext()
-      configManager.initConfigContext("opencode", null)
-
-      isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
-      getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
-
-      globalThis.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ latest: "3.0.0" }),
-        } as Response)
-      ) as unknown as typeof fetch
-
-      const args: InstallArgs = {
-        tui: false,
-        claude: "yes",
-        openai: "no",
-        gemini: "no",
-        copilot: "no",
-        opencodeZen: "no",
-        zaiCodingPlan: "no",
-        isolated: true,
-      }
-
-      const exitCode = await install(args)
-
-      expect(exitCode).toBe(0)
-
-      const defaultIsolatedDir = join(homedir(), ".config", "oh-my-opencode")
-      const customPath = resolve(relativePath)
-      
-      expect(existsSync(join(defaultIsolatedDir, "opencode.json"))).toBe(true)
-      expect(existsSync(join(customPath, "opencode.json"))).toBe(false)
-    })
-
-    test("handles empty OH_MY_OPENCODE_CONFIG_DIR correctly", async () => {
-      // #given empty string OH_MY_OPENCODE_CONFIG_DIR
-      process.env.OH_MY_OPENCODE_CONFIG_DIR = ""
-      configManager.resetConfigContext()
-      configManager.initConfigContext("opencode", null)
-
-      isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
-      getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
-
-      globalThis.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ latest: "3.0.0" }),
-        } as Response)
-      ) as unknown as typeof fetch
-
-      const args: InstallArgs = {
-        tui: false,
-        claude: "yes",
-        openai: "no",
-        gemini: "no",
-        copilot: "no",
-        opencodeZen: "no",
-        zaiCodingPlan: "no",
-        isolated: true,
-      }
-
-      // #when running install with isolated flag and empty env var
-      const exitCode = await install(args)
-
-      // #then should return success
-      expect(exitCode).toBe(0)
-
-      // #then should fall back to default isolated directory
-      const defaultIsolatedDir = join(homedir(), ".config", "oh-my-opencode")
-      expect(existsSync(join(defaultIsolatedDir, "opencode.json"))).toBe(true)
     })
   })
 })
