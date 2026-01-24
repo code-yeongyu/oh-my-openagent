@@ -109,6 +109,157 @@ type ToolContextWithMetadata = {
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
 }
 
+// Empty response retry configuration
+const EMPTY_RESPONSE_MAX_RETRIES = 2
+const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
+const EMPTY_RESPONSE_MIN_LENGTH = 10
+
+/**
+ * Check if the response content is empty or too short to be valid.
+ * Gemini models sometimes return empty responses that need retry.
+ */
+function isEmptyResponse(textContent: string | undefined): boolean {
+  if (!textContent) return true
+  const trimmed = textContent.trim()
+  return trimmed.length < EMPTY_RESPONSE_MIN_LENGTH
+}
+
+/**
+ * Extract text content from session messages.
+ * Returns both the text content and the last assistant message for inspection.
+ */
+function extractTextFromMessages(
+  messages: Array<{
+    info?: { role?: string; time?: { created?: number } }
+    parts?: Array<{ type?: string; text?: string }>
+  }>
+): { textContent: string; lastMessage: typeof messages[0] | undefined } {
+  const assistantMessages = messages
+    .filter((m) => m.info?.role === "assistant")
+    .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+  const lastMessage = assistantMessages[0]
+  
+  if (!lastMessage) {
+    return { textContent: "", lastMessage: undefined }
+  }
+  
+  // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
+  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+  
+  return { textContent, lastMessage }
+}
+
+interface EmptyResponseRetryContext {
+  sessionID: string
+  client: OpencodeClient
+  isGeminiModel?: boolean
+  agent?: string
+  model?: { providerID: string; modelID: string }
+  abortSignal?: AbortSignal
+}
+
+/**
+ * Retry logic for empty responses from Gemini models.
+ * Sends a "continue" prompt to nudge the model to produce output.
+ */
+async function retryOnEmptyResponse(
+  ctx: EmptyResponseRetryContext,
+  currentTextContent: string,
+  retryCount: number
+): Promise<{ textContent: string; retried: boolean; finalRetryCount: number }> {
+  // Only retry for Gemini models or if explicitly flagged
+  const modelString = ctx.model ? `${ctx.model.providerID}/${ctx.model.modelID}` : ""
+  const isGemini = ctx.isGeminiModel ?? modelString.toLowerCase().includes("gemini")
+  
+  if (!isGemini || !isEmptyResponse(currentTextContent)) {
+    return { textContent: currentTextContent, retried: false, finalRetryCount: retryCount }
+  }
+  
+  let textContent = currentTextContent
+  let currentRetry = retryCount
+  
+  while (currentRetry < EMPTY_RESPONSE_MAX_RETRIES && isEmptyResponse(textContent)) {
+    if (ctx.abortSignal?.aborted) {
+      break
+    }
+    
+    currentRetry++
+    log(`[delegate_task] Empty response detected, retry ${currentRetry}/${EMPTY_RESPONSE_MAX_RETRIES}`, {
+      sessionID: ctx.sessionID,
+      agent: ctx.agent,
+      model: modelString,
+      previousContentLength: textContent.length,
+    })
+    
+    await new Promise(resolve => setTimeout(resolve, EMPTY_RESPONSE_RETRY_DELAY_MS))
+    
+    try {
+      // Send a continue prompt to nudge the model
+      await ctx.client.session.prompt({
+        path: { id: ctx.sessionID },
+        body: {
+          parts: [{ type: "text", text: "continue" }],
+        },
+      })
+      
+      // Wait for response to stabilize
+      const RETRY_POLL_INTERVAL_MS = 500
+      const RETRY_STABILITY_TIME_MS = 3000
+      const RETRY_MAX_WAIT_MS = 30000
+      const retryStart = Date.now()
+      let stablePolls = 0
+      let lastMsgCount = 0
+      
+      while (Date.now() - retryStart < RETRY_MAX_WAIT_MS) {
+        if (ctx.abortSignal?.aborted) break
+        
+        await new Promise(resolve => setTimeout(resolve, RETRY_POLL_INTERVAL_MS))
+        
+        if (Date.now() - retryStart < RETRY_STABILITY_TIME_MS) continue
+        
+        const messagesCheck = await ctx.client.session.messages({ path: { id: ctx.sessionID } })
+        const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+        
+        if (msgs.length === lastMsgCount) {
+          stablePolls++
+          if (stablePolls >= 3) break
+        } else {
+          stablePolls = 0
+          lastMsgCount = msgs.length
+        }
+      }
+      
+      // Fetch updated messages
+      const messagesResult = await ctx.client.session.messages({ path: { id: ctx.sessionID } })
+      const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
+        info?: { role?: string; time?: { created?: number } }
+        parts?: Array<{ type?: string; text?: string }>
+      }>
+      
+      const extracted = extractTextFromMessages(messages)
+      textContent = extracted.textContent
+      
+      if (!isEmptyResponse(textContent)) {
+        log(`[delegate_task] Empty response retry succeeded`, {
+          sessionID: ctx.sessionID,
+          retryCount: currentRetry,
+          newContentLength: textContent.length,
+        })
+      }
+    } catch (retryError) {
+      log(`[delegate_task] Empty response retry failed`, {
+        sessionID: ctx.sessionID,
+        retryCount: currentRetry,
+        error: retryError instanceof Error ? retryError.message : String(retryError),
+      })
+      // Continue to next retry or exit
+    }
+  }
+  
+  return { textContent, retried: currentRetry > retryCount, finalRetryCount: currentRetry }
+}
+
 export function resolveCategoryConfig(
   categoryName: string,
   options: {
@@ -424,10 +575,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           parts?: Array<{ type?: string; text?: string }>
         }>
 
-        const assistantMessages = messages
-          .filter((m) => m.info?.role === "assistant")
-          .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-        const lastMessage = assistantMessages[0]
+        let { textContent, lastMessage } = extractTextFromMessages(messages)
 
         if (toastManager) {
           toastManager.removeTask(taskId)
@@ -437,9 +585,17 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           return `No assistant response found.\n\nSession ID: ${args.resume}`
         }
 
-        // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
-        const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-        const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+        // Retry on empty response for Gemini models
+        const retryResult = await retryOnEmptyResponse(
+          {
+            sessionID: args.resume,
+            client,
+            abortSignal: ctx.abort,
+          },
+          textContent,
+          0
+        )
+        textContent = retryResult.textContent
 
         const duration = formatDuration(startTime)
 
@@ -670,17 +826,26 @@ To resume this session: resume="${args.resume}"`
               parts?: Array<{ type?: string; text?: string }>
             }>
 
-            const assistantMessages = messages
-              .filter((m) => m.info?.role === "assistant")
-              .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-            const lastMessage = assistantMessages[0]
+            let { textContent, lastMessage } = extractTextFromMessages(messages)
 
             if (!lastMessage) {
               return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
             }
 
-            const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-            const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+            // Retry on empty response for Gemini models (this is the unstable agent path)
+            const retryResult = await retryOnEmptyResponse(
+              {
+                sessionID,
+                client,
+                isGeminiModel: true, // This path is specifically for unstable/Gemini models
+                agent: agentToUse,
+                model: categoryModel,
+                abortSignal: ctx.abort,
+              },
+              textContent,
+              0
+            )
+            textContent = retryResult.textContent
             const duration = formatDuration(startTime)
 
             return `SUPERVISED TASK COMPLETED SUCCESSFULLY
@@ -987,18 +1152,25 @@ To resume this session: resume="${task.sessionID}"`
           parts?: Array<{ type?: string; text?: string }>
         }>
 
-        const assistantMessages = messages
-          .filter((m) => m.info?.role === "assistant")
-          .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-        const lastMessage = assistantMessages[0]
+        let { textContent, lastMessage } = extractTextFromMessages(messages)
 
         if (!lastMessage) {
           return `No assistant response found.\n\nSession ID: ${sessionID}`
         }
 
-        // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
-        const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-        const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+        // Retry on empty response for Gemini models
+        const retryResult = await retryOnEmptyResponse(
+          {
+            sessionID,
+            client,
+            agent: agentToUse,
+            model: categoryModel,
+            abortSignal: ctx.abort,
+          },
+          textContent,
+          0
+        )
+        textContent = retryResult.textContent
 
         const duration = formatDuration(startTime)
 
