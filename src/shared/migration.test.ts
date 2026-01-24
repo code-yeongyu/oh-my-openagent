@@ -468,13 +468,14 @@ describe("migrateAgentConfigToCategory", () => {
     // #given: Configs for each mapped model
     const configs = [
       { model: "google/gemini-3-pro" },
+      { model: "google/gemini-3-flash" },
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
       { model: "anthropic/claude-opus-4-5" },
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
+    const expectedCategories = ["visual-engineering", "writing", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
 
     // #when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
