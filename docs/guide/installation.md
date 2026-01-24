@@ -91,16 +91,16 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --isolated --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui [--isolated] --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
 - User has all native subscriptions (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=max20 --openai=yes --gemini=yes --copilot=no`
-- User has only Claude (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --gemini=no --copilot=no`
+- User has only Claude (shared mode): `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
 - User has Claude + OpenAI (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --openai=yes --gemini=no --copilot=no`
-- User has only GitHub Copilot (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=yes`
+- User has only GitHub Copilot (shared mode): `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
 - User has Z.ai for Librarian (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
-- User has only OpenCode Zen (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has only OpenCode Zen (shared mode): `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
 - User has no subscriptions (isolated mode): `bunx oh-my-opencode install --no-tui --isolated --claude=no --gemini=no --copilot=no`
 
 The CLI will:
