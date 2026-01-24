@@ -83,6 +83,7 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
  */
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-pro": "visual-engineering",
+  "google/gemini-3-flash": "writing",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
   "anthropic/claude-opus-4-5": "unspecified-high",
