@@ -78,6 +78,8 @@ ohmyoc install  # Uses isolated mode automatically
 
 This convenience wrapper automatically sets `OH_MY_OPENCODE_CONFIG_DIR=~/.config/oh-my-opencode/` before executing.
 
+> **Note:** Isolated config mode only applies to the CLI (`opencode` command). The desktop app (`opencode-desktop`) uses its own config directory and does not respect `OH_MY_OPENCODE_CONFIG_DIR`.
+
 Schema autocomplete supported:
 
 ```json
