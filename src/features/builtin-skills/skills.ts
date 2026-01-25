@@ -1988,7 +1988,11 @@ Insert \`__debugLog\` / \`debug_log\` / \`DebugLog\` calls at strategic points:
 
 ### Step 5: Reproduce the Issue
 1. Ensure debug server is running
-2. Clear previous logs: \`> .opencode/debug/debug.log\`
+2. **Clear previous logs** (MANDATORY before each debug session):
+   \`\`\`bash
+   > .opencode/debug/debug.log
+   \`\`\`
+   This ensures you only see logs from the current reproduction attempt.
 3. Trigger the problematic behavior
 4. Collect logs
 
@@ -2026,8 +2030,14 @@ Look for:
 After debugging is complete:
 
 1. **Remove instrumentation code** from all modified files
-2. **Stop the debug server**: \`pkill -f "node .opencode/debug/server.js"\`
-3. **Delete debug artifacts**:
+2. **Revert any CSP changes** (if you modified CSP for frontend debugging):
+   \`\`\`bash
+   # Check for CSP modifications
+   git diff | grep -E "Content-Security-Policy|contentSecurityPolicy|helmet|connect-src"
+   # Revert if found (unless using environment-based CSP)
+   \`\`\`
+3. **Stop the debug server**: \`pkill -f "node .opencode/debug/server.js"\`
+4. **Delete debug artifacts**:
    \`\`\`bash
    rm -rf .opencode/debug/
    \`\`\`
@@ -2195,10 +2205,11 @@ If modifying source code is not feasible, use a browser extension like [Requestl
 |--------|---------|
 | Start server | \`node .opencode/debug/server.js &\` |
 | Check server | \`curl http://localhost:7777/health\` |
-| Clear logs | \`> .opencode/debug/debug.log\` |
+| **Clear logs (before each run)** | \`> .opencode/debug/debug.log\` |
 | View logs | \`cat .opencode/debug/debug.log \\| jq .\` |
 | Stop server | \`pkill -f "node .opencode/debug/server.js"\` |
-| Cleanup | \`rm -rf .opencode/debug/\` |
+| Check CSP changes | \`git diff \\| grep -E "Content-Security-Policy\\|connect-src"\` |
+| **Full cleanup** | \`pkill -f "node .opencode/debug/server.js"; rm -rf .opencode/debug/\` |
 `,
 }
 
