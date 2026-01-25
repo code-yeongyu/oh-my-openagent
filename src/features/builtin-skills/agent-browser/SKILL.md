@@ -97,7 +97,7 @@ agent-browser click @e1                   # Perform actions
 agent-browser record stop                 # Stop and save video
 agent-browser record restart ./take2.webm # Stop current + start new recording
 ```
-Recording creates a fresh context but preserves cookies/storage from your session. If no URL is provided, it automatically returns to your current page. For smooth demos, explore first, then start recording.
+Recording creates a fresh context but preserves cookies/storage from your session.
 
 ### Wait
 ```bash
@@ -146,6 +146,10 @@ agent-browser storage local               # Get all localStorage
 agent-browser storage local key           # Get specific key
 agent-browser storage local set k v       # Set value
 agent-browser storage local clear         # Clear all
+agent-browser storage session             # Get all sessionStorage
+agent-browser storage session key         # Get specific key
+agent-browser storage session set k v     # Set value
+agent-browser storage session clear       # Clear all
 ```
 
 ### Network
@@ -184,6 +188,24 @@ agent-browser dialog dismiss        # Dismiss dialog
 agent-browser eval "document.title"   # Run JavaScript
 ```
 
+## Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--session <name>` | Isolated browser session (`AGENT_BROWSER_SESSION` env) |
+| `--profile <path>` | Persistent browser profile (`AGENT_BROWSER_PROFILE` env) |
+| `--headers <json>` | HTTP headers scoped to URL's origin |
+| `--executable-path <path>` | Custom browser binary (`AGENT_BROWSER_EXECUTABLE_PATH` env) |
+| `--args <args>` | Browser launch args (`AGENT_BROWSER_ARGS` env) |
+| `--user-agent <ua>` | Custom User-Agent (`AGENT_BROWSER_USER_AGENT` env) |
+| `--proxy <url>` | Proxy server (`AGENT_BROWSER_PROXY` env) |
+| `--proxy-bypass <hosts>` | Hosts to bypass proxy (`AGENT_BROWSER_PROXY_BYPASS` env) |
+| `-p, --provider <name>` | Cloud browser provider (`AGENT_BROWSER_PROVIDER` env) |
+| `--json` | Machine-readable JSON output |
+| `--headed` | Show browser window (not headless) |
+| `--cdp <port\|wss://url>` | Connect via Chrome DevTools Protocol |
+| `--debug` | Debug output |
+
 ## Example: Form submission
 
 ```bash
@@ -215,13 +237,35 @@ agent-browser state load auth.json
 agent-browser open https://app.example.com/dashboard
 ```
 
-## Sessions (parallel browsers)
+### Header-based Auth (Skip login flows)
+```bash
+# Headers scoped to api.example.com only
+agent-browser open api.example.com --headers '{"Authorization": "Bearer <token>"}'
+# Navigate to another domain - headers NOT sent (safe)
+agent-browser open other-site.com
+# Global headers (all domains)
+agent-browser set headers '{"X-Custom-Header": "value"}'
+```
 
+## Sessions & Persistent Profiles
+
+### Sessions (parallel browsers)
 ```bash
 agent-browser --session test1 open site-a.com
 agent-browser --session test2 open site-b.com
 agent-browser session list
 ```
+
+### Persistent Profiles
+Persists cookies, localStorage, IndexedDB, service workers, cache, login sessions across browser restarts.
+```bash
+agent-browser --profile ~/.myapp-profile open myapp.com
+# Or via env var
+AGENT_BROWSER_PROFILE=~/.myapp-profile agent-browser open myapp.com
+```
+- Use different profile paths for different projects
+- Login once → restart browser → still logged in
+- Stores: cookies, localStorage, IndexedDB, service workers, browser cache
 
 ## JSON output (for parsing)
 
@@ -237,66 +281,16 @@ agent-browser get text @e1 --json
 agent-browser open example.com --headed              # Show browser window
 agent-browser console                                # View console messages
 agent-browser errors                                 # View page errors
-agent-browser record start ./debug.webm   # Record from current page
+agent-browser record start ./debug.webm              # Record from current page
 agent-browser record stop                            # Save recording
-agent-browser --cdp 9222 snapshot        # Connect via CDP
-agent-browser console --clear            # Clear console
-agent-browser errors --clear             # Clear errors
-agent-browser highlight @e1              # Highlight element
-agent-browser trace start                # Start recording trace
-agent-browser trace stop trace.zip       # Stop and save trace
+agent-browser connect 9222                           # Local CDP port
+agent-browser --cdp "wss://browser-service.com/cdp?token=..." snapshot  # Remote via WebSocket
+agent-browser console --clear                        # Clear console
+agent-browser errors --clear                         # Clear errors
+agent-browser highlight @e1                          # Highlight element
+agent-browser trace start                            # Start recording trace
+agent-browser trace stop trace.zip                   # Stop and save trace
 ```
 
-## References
-
-### Installation
-
-If `agent-browser` is not installed, install it before use:
-
-```bash
-npm install -g agent-browser
-agent-browser install  # Download Chromium
-```
-
-On Linux, install system dependencies:
-
-```bash
-agent-browser install --with-deps
-# or manually: npx playwright install-deps chromium
-```
-
-### Verify installation
-
-```bash
-agent-browser --version  # Should print version
-```
-
-### Windows
-
-Standard `npm install -g agent-browser` may fail on Windows due to daemon startup and path escaping issues. Use the workaround below:
-
-```powershell
-# 1. Install the package
-npm install -g agent-browser
-
-# 2. Alias directly to the native Windows binary (PowerShell)
-Set-Alias agent-browser "$env:APPDATA\npm\node_modules\agent-browser\bin\agent-browser-win32-x64.exe"
-
-# 3. Download Chromium
-agent-browser install
-```
-
-For CMD, call the binary path directly instead of the alias:
-```cmd
-"%APPDATA%\npm\node_modules\agent-browser\bin\agent-browser-win32-x64.exe" install
-```
-
-Known limitations on Windows:
-- npm wrapper scripts may invoke `/bin/sh` and fail in PowerShell/CMD
-- Git Bash may also encounter daemon startup errors
-- If the alias workaround fails, try running the `.exe` binary directly
-
-### Documentation
-
-- Repository: https://github.com/vercel-labs/agent-browser
-- Run `agent-browser --help` for all commands
+---
+Install: `npm install -g agent-browser && agent-browser install`. Run `agent-browser --help` for all commands. Repo: https://github.com/vercel-labs/agent-browser
