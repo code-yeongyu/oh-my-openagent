@@ -102,7 +102,7 @@ mcp:
 
 #### Option 2: Agent Browser CLI (Vercel)
 
-Alternative provider using [Vercel's agent-browser CLI](https://github.com/AltimateAI/vscode-dbt-power-user/tree/master/agent-browser):
+Alternative provider using [Vercel's agent-browser CLI](https://github.com/vercel-labs/agent-browser):
 
 ```json
 {
