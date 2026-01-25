@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-50 cross-cutting utilities: path resolution, token truncation, config parsing, model resolution.
+34 cross-cutting utilities: path resolution, token truncation, config parsing, model resolution, agent display names.
 
 ## STRUCTURE
 
@@ -19,12 +19,27 @@ shared/
 ├── migration.ts           # Legacy config migration
 ├── opencode-version.ts    # Version comparison
 ├── external-plugin-detector.ts # OAuth spoofing detection
-├── env-expander.ts        # ${VAR} expansion
 ├── model-requirements.ts  # Agent/Category requirements
 ├── model-availability.ts  # Models fetch + fuzzy match
 ├── model-resolver.ts      # 3-step resolution
+├── model-sanitizer.ts     # Model ID normalization
 ├── shell-env.ts           # Cross-platform shell
-├── prompt-parts-helper.ts # Prompt manipulation
+├── agent-display-names.ts # Agent display name mapping
+├── agent-tool-restrictions.ts # Tool restriction helpers
+├── agent-variant.ts       # Agent variant detection
+├── command-executor.ts    # Subprocess execution
+├── config-errors.ts       # Config error types
+├── deep-merge.ts          # Deep object merge
+├── file-reference-resolver.ts # File path resolution
+├── file-utils.ts          # File utilities
+├── hook-disabled.ts       # Hook enable/disable check
+├── pattern-matcher.ts     # Glob pattern matching
+├── session-cursor.ts      # Session cursor tracking
+├── snake-case.ts          # String case conversion
+├── system-directive.ts    # System prompt helpers
+├── tool-name.ts           # Tool name constants
+├── zip-extractor.ts       # ZIP file extraction
+├── index.ts               # Barrel export
 └── *.test.ts              # Colocated tests
 ```
 
@@ -40,6 +55,7 @@ shared/
 | Resolve paths | `getOpenCodeConfigDir()` |
 | Compare versions | `isOpenCodeVersionAtLeast("1.1.0")` |
 | Resolve model | `resolveModelWithFallback()` |
+| Agent display name | `getAgentDisplayName(agentName)` |
 
 ## PATTERNS
 
