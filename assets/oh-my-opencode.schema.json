@@ -38,6 +38,7 @@
         "type": "string",
         "enum": [
           "playwright",
+          "agent-browser",
           "frontend-ui-ux",
           "git-master"
         ]
@@ -76,6 +77,7 @@
           "edit-error-recovery",
           "delegate-task-retry",
           "prometheus-md-only",
+          "sisyphus-junior-notepad",
           "start-work",
           "atlas"
         ]
@@ -2169,6 +2171,45 @@
         "include_co_authored_by": {
           "default": true,
           "type": "boolean"
+        }
+      }
+    },
+    "browser_automation_engine": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "default": "playwright",
+          "type": "string",
+          "enum": [
+            "playwright",
+            "agent-browser"
+          ]
+        }
+      }
+    },
+    "tmux": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "layout": {
+          "default": "main-vertical",
+          "type": "string",
+          "enum": [
+            "main-horizontal",
+            "main-vertical",
+            "tiled",
+            "even-horizontal",
+            "even-vertical"
+          ]
+        },
+        "main_pane_size": {
+          "default": 60,
+          "type": "number",
+          "minimum": 20,
+          "maximum": 80
         }
       }
     }

@@ -326,13 +326,13 @@ Skills prepend specialized instructions to subagent prompts:
 // Category + Skill combination
 delegate_task(
   category="visual-engineering", 
-  skills=["frontend-ui-ux"],  // Adds UI/UX expertise
+  load_skills=["frontend-ui-ux"],  // Adds UI/UX expertise
   prompt="..."
 )
 
 delegate_task(
   category="general",
-  skills=["playwright"],  // Adds browser automation expertise
+  load_skills=["playwright"],  // Adds browser automation expertise
   prompt="..."
 )
 ```
@@ -341,8 +341,8 @@ delegate_task(
 
 | Before | After |
 |--------|-------|
-| Hardcoded: `frontend-ui-ux-engineer` (Gemini 3 Pro) | `category="visual-engineering" + skills=["frontend-ui-ux"]` |
-| One-size-fits-all | `category="visual-engineering" + skills=["unity-master"]` |
+| Hardcoded: `frontend-ui-ux-engineer` (Gemini 3 Pro) | `category="visual-engineering" + load_skills=["frontend-ui-ux"]` |
+| One-size-fits-all | `category="visual-engineering" + load_skills=["unity-master"]` |
 | Model bias | Category-based: model abstraction eliminates bias |
 
 ---
@@ -365,7 +365,7 @@ sequenceDiagram
         
         Note over Orchestrator: Prompt Structure:<br/>1. TASK (exact checkbox)<br/>2. EXPECTED OUTCOME<br/>3. REQUIRED SKILLS<br/>4. REQUIRED TOOLS<br/>5. MUST DO<br/>6. MUST NOT DO<br/>7. CONTEXT + Wisdom
         
-        Orchestrator->>Junior: delegate_task(category, skills, prompt)
+        Orchestrator->>Junior: delegate_task(category, load_skills, prompt)
         
         Junior->>Junior: Create todos, execute
         Junior->>Junior: Verify (lsp_diagnostics, tests)

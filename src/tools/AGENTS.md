@@ -25,7 +25,7 @@ tools/
 ├── skill-mcp/        # Skill MCP operations
 ├── slashcommand/     # Slash command dispatch
 ├── call-omo-agent/   # Direct agent invocation
-└── background-task/  # background_output, background_cancel
+└── background-task/  # background_output, background_cancel (513 lines)
 ```
 
 ## TOOL CATEGORIES
@@ -48,7 +48,7 @@ tools/
 
 ## LSP SPECIFICS
 
-- **Client**: `client.ts` manages stdio, JSON-RPC
+- **Client**: `client.ts` manages stdio, JSON-RPC (596 lines)
 - **Singleton**: `LSPServerManager` with ref counting
 - **Capabilities**: definition, references, symbols, diagnostics, rename
 

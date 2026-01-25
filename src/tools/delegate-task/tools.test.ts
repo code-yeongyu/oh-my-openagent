@@ -3,14 +3,15 @@ import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } fr
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import { __resetModelCache } from "../../shared/model-availability"
+import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 
 // Test constants - systemDefaultModel is required by resolveCategoryConfig
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
-  // Reset model cache before each test to prevent cross-test pollution
   beforeEach(() => {
     __resetModelCache()
+    clearSkillCache()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -594,16 +595,16 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
-  describe("resume with background parameter", () => {
-  test("resume with background=false should wait for result and return content", async () => {
+  describe("session_id with background parameter", () => {
+  test("session_id with background=false should wait for result and return content", async () => {
     // Note: This test needs extended timeout because the implementation has MIN_STABILITY_TIME_MS = 5000
     // #given
     const { createDelegateTask } = require("./tools")
     
     const mockTask = {
       id: "task-123",
-      sessionID: "ses_resume_test",
-      description: "Resumed task",
+      sessionID: "ses_continue_test",
+      description: "Continued task",
       agent: "explore",
       status: "running",
     }
@@ -620,7 +621,7 @@ describe("sisyphus-task", () => {
           data: [
             {
               info: { role: "assistant", time: { created: Date.now() } },
-              parts: [{ type: "text", text: "This is the resumed task result" }],
+              parts: [{ type: "text", text: "This is the continued task result" }],
             },
           ],
         }),
@@ -646,28 +647,28 @@ describe("sisyphus-task", () => {
     // #when
     const result = await tool.execute(
       {
-        description: "Resume test",
+        description: "Continue test",
         prompt: "Continue the task",
-        resume: "ses_resume_test",
+        session_id: "ses_continue_test",
         run_in_background: false,
         load_skills: ["git-master"],
       },
       toolContext
     )
     
-    // #then - should contain actual result, not just "Background task resumed"
-    expect(result).toContain("This is the resumed task result")
-    expect(result).not.toContain("Background task resumed")
+    // #then - should contain actual result, not just "Background task continued"
+    expect(result).toContain("This is the continued task result")
+    expect(result).not.toContain("Background task continued")
   }, { timeout: 10000 })
 
-  test("resume with background=true should return immediately without waiting", async () => {
+  test("session_id with background=true should return immediately without waiting", async () => {
     // #given
     const { createDelegateTask } = require("./tools")
     
     const mockTask = {
       id: "task-456",
-      sessionID: "ses_bg_resume",
-      description: "Background resumed task",
+      sessionID: "ses_bg_continue",
+      description: "Background continued task",
       agent: "explore",
       status: "running",
     }
@@ -701,9 +702,9 @@ describe("sisyphus-task", () => {
     // #when
     const result = await tool.execute(
       {
-        description: "Resume bg test",
+        description: "Continue bg test",
         prompt: "Continue in background",
-        resume: "ses_bg_resume",
+        session_id: "ses_bg_continue",
         run_in_background: true,
         load_skills: ["git-master"],
       },
@@ -711,7 +712,7 @@ describe("sisyphus-task", () => {
     )
     
     // #then - should return background message
-    expect(result).toContain("Background task resumed")
+    expect(result).toContain("Background task continued")
     expect(result).toContain("task-456")
   })
 })
@@ -1322,6 +1323,112 @@ describe("sisyphus-task", () => {
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Custom unstable result")
     }, { timeout: 20000 })
+  })
+
+  describe("browserProvider propagation", () => {
+    test("should resolve agent-browser skill when browserProvider is passed", async () => {
+      // #given - delegate_task configured with browserProvider: "agent-browser"
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_browser_provider" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      // Pass browserProvider to createDelegateTask
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        browserProvider: "agent-browser",
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - request agent-browser skill
+      await tool.execute(
+        {
+          description: "Test browserProvider propagation",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["agent-browser"],
+        },
+        toolContext
+      )
+
+      // #then - agent-browser skill should be resolved (not in notFound)
+      expect(promptBody).toBeDefined()
+      expect(promptBody.system).toBeDefined()
+      expect(promptBody.system).toContain("agent-browser")
+    }, { timeout: 20000 })
+
+    test("should NOT resolve agent-browser skill when browserProvider is not set", async () => {
+      // #given - delegate_task without browserProvider (defaults to playwright)
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_no_browser_provider" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      // No browserProvider passed
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - request agent-browser skill without browserProvider
+      const result = await tool.execute(
+        {
+          description: "Test missing browserProvider",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["agent-browser"],
+        },
+        toolContext
+      )
+
+      // #then - should return skill not found error
+      expect(result).toContain("Skills not found")
+      expect(result).toContain("agent-browser")
+    })
   })
 
   describe("buildSystemContent", () => {

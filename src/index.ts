@@ -31,6 +31,7 @@ import {
   createStartWorkHook,
   createAtlasHook,
   createPrometheusMdOnlyHook,
+  createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
 } from "./hooks";
 import {
@@ -73,6 +74,7 @@ import {
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
+import { TmuxSessionManager } from "./features/tmux-subagent";
 import { type HookName } from "./config";
 import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
@@ -87,6 +89,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const firstMessageVariantGate = createFirstMessageVariantGate();
+
+  const tmuxConfig = {
+    enabled: pluginConfig.tmux?.enabled ?? false,
+    layout: pluginConfig.tmux?.layout ?? 'main-vertical',
+    main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
+  } as const;
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
   const modelCacheState = createModelCacheState();
@@ -204,11 +212,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createPrometheusMdOnlyHook(ctx)
     : null;
 
+  const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
+    ? createSisyphusJuniorNotepadHook(ctx)
+    : null;
+
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task);
+
+  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
@@ -238,6 +252,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "multimodal-looker"
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
+  const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -245,10 +260,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    browserProvider,
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills().filter((skill) => {
+  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill) => {
     if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {
@@ -425,29 +441,39 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
 
-      if (event.type === "session.created") {
-        const sessionInfo = props?.info as
-          | { id?: string; title?: string; parentID?: string }
-          | undefined;
-        if (!sessionInfo?.parentID) {
-          setMainSession(sessionInfo?.id);
-        }
-        firstMessageVariantGate.markSessionCreated(sessionInfo);
-      }
+       if (event.type === "session.created") {
+         const sessionInfo = props?.info as
+           | { id?: string; title?: string; parentID?: string }
+           | undefined;
+         if (!sessionInfo?.parentID) {
+           setMainSession(sessionInfo?.id);
+         }
+         firstMessageVariantGate.markSessionCreated(sessionInfo);
+         if (sessionInfo?.id && sessionInfo?.title) {
+           await tmuxSessionManager.onSessionCreated({
+             sessionID: sessionInfo.id,
+             parentID: sessionInfo.parentID,
+             title: sessionInfo.title,
+           });
+         }
+       }
 
-      if (event.type === "session.deleted") {
-        const sessionInfo = props?.info as { id?: string } | undefined;
-        if (sessionInfo?.id === getMainSessionID()) {
-          setMainSession(undefined);
-        }
-        if (sessionInfo?.id) {
-          clearSessionAgent(sessionInfo.id);
-          resetMessageCursor(sessionInfo.id);
-          firstMessageVariantGate.clear(sessionInfo.id);
-          await skillMcpManager.disconnectSession(sessionInfo.id);
-          await lspManager.cleanupTempDirectoryClients();
-        }
-      }
+       if (event.type === "session.deleted") {
+         const sessionInfo = props?.info as { id?: string } | undefined;
+         if (sessionInfo?.id === getMainSessionID()) {
+           setMainSession(undefined);
+         }
+         if (sessionInfo?.id) {
+           clearSessionAgent(sessionInfo.id);
+           resetMessageCursor(sessionInfo.id);
+           firstMessageVariantGate.clear(sessionInfo.id);
+           await skillMcpManager.disconnectSession(sessionInfo.id);
+           await lspManager.cleanupTempDirectoryClients();
+           await tmuxSessionManager.onSessionDeleted({
+             sessionID: sessionInfo.id,
+           });
+         }
+       }
 
       if (event.type === "message.updated") {
         const info = props?.info as Record<string, unknown> | undefined;
@@ -495,6 +521,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {

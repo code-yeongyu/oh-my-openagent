@@ -442,18 +442,18 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Openc
             .map(t => `| \`${t.id}\` | ${t.description} | ${t.status} | ${t.sessionID ? `\`${t.sessionID}\`` : "(not started)"} |`)
             .join("\n")
 
-          const resumableTasks = cancelledInfo.filter(t => t.sessionID)
-          const resumeSection = resumableTasks.length > 0
-            ? `\n## Resume Instructions
+           const resumableTasks = cancelledInfo.filter(t => t.sessionID)
+           const resumeSection = resumableTasks.length > 0
+             ? `\n## Continue Instructions
 
-To resume a cancelled task, use:
+To continue a cancelled task, use:
 \`\`\`
-delegate_task(resume="<session_id>", prompt="Continue: <your follow-up>")
+delegate_task(session_id="<session_id>", prompt="Continue: <your follow-up>")
 \`\`\`
 
-Resumable sessions:
+Continuable sessions:
 ${resumableTasks.map(t => `- \`${t.sessionID}\` (${t.description})`).join("\n")}`
-            : ""
+             : ""
 
           return `Cancelled ${cancellableTasks.length} background task(s):
 

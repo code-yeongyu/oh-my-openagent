@@ -100,7 +100,18 @@ export function createRalphLoopHook(
 
       const content = readFileSync(transcriptPath, "utf-8")
       const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
-      return pattern.test(content)
+      const lines = content.split("\n").filter(l => l.trim())
+
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line)
+          if (entry.type === "user") continue
+          if (pattern.test(line)) return true
+        } catch {
+          continue
+        }
+      }
+      return false
     } catch {
       return false
     }

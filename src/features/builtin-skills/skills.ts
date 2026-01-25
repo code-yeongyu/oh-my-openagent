@@ -1,4 +1,5 @@
 import type { BuiltinSkill } from "./types"
+import type { BrowserAutomationProvider } from "../../config/schema"
 
 const playwrightSkill: BuiltinSkill = {
   name: "playwright",
@@ -12,6 +13,303 @@ This skill provides browser automation capabilities via the Playwright MCP serve
       args: ["@playwright/mcp@latest"],
     },
   },
+}
+
+const agentBrowserSkill: BuiltinSkill = {
+  name: "agent-browser",
+  description: "MUST USE for any browser-related tasks. Browser automation via agent-browser CLI - verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.",
+  template: `# Browser Automation with agent-browser
+
+## Quick start
+
+\`\`\`bash
+agent-browser open <url>        # Navigate to page
+agent-browser snapshot -i       # Get interactive elements with refs
+agent-browser click @e1         # Click element by ref
+agent-browser fill @e2 "text"   # Fill input by ref
+agent-browser close             # Close browser
+\`\`\`
+
+## Core workflow
+
+1. Navigate: \`agent-browser open <url>\`
+2. Snapshot: \`agent-browser snapshot -i\` (returns elements with refs like \`@e1\`, \`@e2\`)
+3. Interact using refs from the snapshot
+4. Re-snapshot after navigation or significant DOM changes
+
+## Commands
+
+### Navigation
+\`\`\`bash
+agent-browser open <url>      # Navigate to URL
+agent-browser back            # Go back
+agent-browser forward         # Go forward
+agent-browser reload          # Reload page
+agent-browser close           # Close browser
+\`\`\`
+
+### Snapshot (page analysis)
+\`\`\`bash
+agent-browser snapshot            # Full accessibility tree
+agent-browser snapshot -i         # Interactive elements only (recommended)
+agent-browser snapshot -c         # Compact output
+agent-browser snapshot -d 3       # Limit depth to 3
+agent-browser snapshot -s "#main" # Scope to CSS selector
+\`\`\`
+
+### Interactions (use @refs from snapshot)
+\`\`\`bash
+agent-browser click @e1           # Click
+agent-browser dblclick @e1        # Double-click
+agent-browser focus @e1           # Focus element
+agent-browser fill @e2 "text"     # Clear and type
+agent-browser type @e2 "text"     # Type without clearing
+agent-browser press Enter         # Press key
+agent-browser press Control+a     # Key combination
+agent-browser keydown Shift       # Hold key down
+agent-browser keyup Shift         # Release key
+agent-browser hover @e1           # Hover
+agent-browser check @e1           # Check checkbox
+agent-browser uncheck @e1         # Uncheck checkbox
+agent-browser select @e1 "value"  # Select dropdown
+agent-browser scroll down 500     # Scroll page
+agent-browser scrollintoview @e1  # Scroll element into view
+agent-browser drag @e1 @e2        # Drag and drop
+agent-browser upload @e1 file.pdf # Upload files
+\`\`\`
+
+### Get information
+\`\`\`bash
+agent-browser get text @e1        # Get element text
+agent-browser get html @e1        # Get innerHTML
+agent-browser get value @e1       # Get input value
+agent-browser get attr @e1 href   # Get attribute
+agent-browser get title           # Get page title
+agent-browser get url             # Get current URL
+agent-browser get count ".item"   # Count matching elements
+agent-browser get box @e1         # Get bounding box
+\`\`\`
+
+### Check state
+\`\`\`bash
+agent-browser is visible @e1      # Check if visible
+agent-browser is enabled @e1      # Check if enabled
+agent-browser is checked @e1      # Check if checked
+\`\`\`
+
+### Screenshots & PDF
+\`\`\`bash
+agent-browser screenshot          # Screenshot to stdout
+agent-browser screenshot path.png # Save to file
+agent-browser screenshot --full   # Full page
+agent-browser pdf output.pdf      # Save as PDF
+\`\`\`
+
+### Video recording
+\`\`\`bash
+agent-browser record start ./demo.webm    # Start recording (uses current URL + state)
+agent-browser click @e1                   # Perform actions
+agent-browser record stop                 # Stop and save video
+agent-browser record restart ./take2.webm # Stop current + start new recording
+\`\`\`
+Recording creates a fresh context but preserves cookies/storage from your session.
+
+### Wait
+\`\`\`bash
+agent-browser wait @e1                     # Wait for element
+agent-browser wait 2000                    # Wait milliseconds
+agent-browser wait --text "Success"        # Wait for text
+agent-browser wait --url "**/dashboard"    # Wait for URL pattern
+agent-browser wait --load networkidle      # Wait for network idle
+agent-browser wait --fn "window.ready"     # Wait for JS condition
+\`\`\`
+
+### Mouse control
+\`\`\`bash
+agent-browser mouse move 100 200      # Move mouse
+agent-browser mouse down left         # Press button
+agent-browser mouse up left           # Release button
+agent-browser mouse wheel 100         # Scroll wheel
+\`\`\`
+
+### Semantic locators (alternative to refs)
+\`\`\`bash
+agent-browser find role button click --name "Submit"
+agent-browser find text "Sign In" click
+agent-browser find label "Email" fill "user@test.com"
+agent-browser find first ".item" click
+agent-browser find nth 2 "a" text
+\`\`\`
+
+### Browser settings
+\`\`\`bash
+agent-browser set viewport 1920 1080      # Set viewport size
+agent-browser set device "iPhone 14"      # Emulate device
+agent-browser set geo 37.7749 -122.4194   # Set geolocation
+agent-browser set offline on              # Toggle offline mode
+agent-browser set headers '{"X-Key":"v"}' # Extra HTTP headers
+agent-browser set credentials user pass   # HTTP basic auth
+agent-browser set media dark              # Emulate color scheme
+\`\`\`
+
+### Cookies & Storage
+\`\`\`bash
+agent-browser cookies                     # Get all cookies
+agent-browser cookies set name value      # Set cookie
+agent-browser cookies clear               # Clear cookies
+agent-browser storage local               # Get all localStorage
+agent-browser storage local key           # Get specific key
+agent-browser storage local set k v       # Set value
+agent-browser storage local clear         # Clear all
+agent-browser storage session             # Get all sessionStorage
+agent-browser storage session key         # Get specific key
+agent-browser storage session set k v     # Set value
+agent-browser storage session clear       # Clear all
+\`\`\`
+
+### Network
+\`\`\`bash
+agent-browser network route <url>              # Intercept requests
+agent-browser network route <url> --abort      # Block requests
+agent-browser network route <url> --body '{}'  # Mock response
+agent-browser network unroute [url]            # Remove routes
+agent-browser network requests                 # View tracked requests
+agent-browser network requests --filter api    # Filter requests
+\`\`\`
+
+### Tabs & Windows
+\`\`\`bash
+agent-browser tab                 # List tabs
+agent-browser tab new [url]       # New tab
+agent-browser tab 2               # Switch to tab
+agent-browser tab close           # Close tab
+agent-browser window new          # New window
+\`\`\`
+
+### Frames
+\`\`\`bash
+agent-browser frame "#iframe"     # Switch to iframe
+agent-browser frame main          # Back to main frame
+\`\`\`
+
+### Dialogs
+\`\`\`bash
+agent-browser dialog accept [text]  # Accept dialog
+agent-browser dialog dismiss        # Dismiss dialog
+\`\`\`
+
+### JavaScript
+\`\`\`bash
+agent-browser eval "document.title"   # Run JavaScript
+\`\`\`
+
+## Global Options
+
+| Option | Description |
+|--------|-------------|
+| \`--session <name>\` | Isolated browser session (\`AGENT_BROWSER_SESSION\` env) |
+| \`--profile <path>\` | Persistent browser profile (\`AGENT_BROWSER_PROFILE\` env) |
+| \`--headers <json>\` | HTTP headers scoped to URL's origin |
+| \`--executable-path <path>\` | Custom browser binary (\`AGENT_BROWSER_EXECUTABLE_PATH\` env) |
+| \`--args <args>\` | Browser launch args (\`AGENT_BROWSER_ARGS\` env) |
+| \`--user-agent <ua>\` | Custom User-Agent (\`AGENT_BROWSER_USER_AGENT\` env) |
+| \`--proxy <url>\` | Proxy server (\`AGENT_BROWSER_PROXY\` env) |
+| \`--proxy-bypass <hosts>\` | Hosts to bypass proxy (\`AGENT_BROWSER_PROXY_BYPASS\` env) |
+| \`-p, --provider <name>\` | Cloud browser provider (\`AGENT_BROWSER_PROVIDER\` env) |
+| \`--json\` | Machine-readable JSON output |
+| \`--headed\` | Show browser window (not headless) |
+| \`--cdp <port\\|wss://url>\` | Connect via Chrome DevTools Protocol |
+| \`--debug\` | Debug output |
+
+## Example: Form submission
+
+\`\`\`bash
+agent-browser open https://example.com/form
+agent-browser snapshot -i
+# Output shows: textbox "Email" [ref=e1], textbox "Password" [ref=e2], button "Submit" [ref=e3]
+
+agent-browser fill @e1 "user@example.com"
+agent-browser fill @e2 "password123"
+agent-browser click @e3
+agent-browser wait --load networkidle
+agent-browser snapshot -i  # Check result
+\`\`\`
+
+## Example: Authentication with saved state
+
+\`\`\`bash
+# Login once
+agent-browser open https://app.example.com/login
+agent-browser snapshot -i
+agent-browser fill @e1 "username"
+agent-browser fill @e2 "password"
+agent-browser click @e3
+agent-browser wait --url "**/dashboard"
+agent-browser state save auth.json
+
+# Later sessions: load saved state
+agent-browser state load auth.json
+agent-browser open https://app.example.com/dashboard
+\`\`\`
+
+### Header-based Auth (Skip login flows)
+\`\`\`bash
+# Headers scoped to api.example.com only
+agent-browser open api.example.com --headers '{"Authorization": "Bearer <token>"}'
+# Navigate to another domain - headers NOT sent (safe)
+agent-browser open other-site.com
+# Global headers (all domains)
+agent-browser set headers '{"X-Custom-Header": "value"}'
+\`\`\`
+
+## Sessions & Persistent Profiles
+
+### Sessions (parallel browsers)
+\`\`\`bash
+agent-browser --session test1 open site-a.com
+agent-browser --session test2 open site-b.com
+agent-browser session list
+\`\`\`
+
+### Persistent Profiles
+Persists cookies, localStorage, IndexedDB, service workers, cache, login sessions across browser restarts.
+\`\`\`bash
+agent-browser --profile ~/.myapp-profile open myapp.com
+# Or via env var
+AGENT_BROWSER_PROFILE=~/.myapp-profile agent-browser open myapp.com
+\`\`\`
+- Use different profile paths for different projects
+- Login once → restart browser → still logged in
+- Stores: cookies, localStorage, IndexedDB, service workers, browser cache
+
+## JSON output (for parsing)
+
+Add \`--json\` for machine-readable output:
+\`\`\`bash
+agent-browser snapshot -i --json
+agent-browser get text @e1 --json
+\`\`\`
+
+## Debugging
+
+\`\`\`bash
+agent-browser open example.com --headed              # Show browser window
+agent-browser console                                # View console messages
+agent-browser errors                                 # View page errors
+agent-browser record start ./debug.webm              # Record from current page
+agent-browser record stop                            # Save recording
+agent-browser connect 9222                           # Local CDP port
+agent-browser --cdp "wss://browser-service.com/cdp?token=..." snapshot  # Remote via WebSocket
+agent-browser console --clear                        # Clear console
+agent-browser errors --clear                         # Clear errors
+agent-browser highlight @e1                          # Highlight element
+agent-browser trace start                            # Start recording trace
+agent-browser trace stop trace.zip                   # Stop and save trace
+\`\`\`
+
+---
+Install: \`bun add -g agent-browser && agent-browser install\`. Run \`agent-browser --help\` for all commands. Repo: https://github.com/vercel-labs/agent-browser`,
+  allowedTools: ["Bash(agent-browser:*)"],
 }
 
 const frontendUiUxSkill: BuiltinSkill = {
@@ -95,7 +393,7 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 const gitMasterSkill: BuiltinSkill = {
   name: "git-master",
   description:
-    "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with delegate_task(category='quick', skills=['git-master'], ...) to save context. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'.",
+    "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with delegate_task(category='quick', load_skills=['git-master'], ...) to save context. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'.",
   template: `# Git Master Agent
 
 You are a Git expert combining three specializations:
@@ -1198,6 +1496,234 @@ POTENTIAL ACTIONS:
 - Bisect without proper good/bad boundaries -> Wasted time`,
 }
 
-export function createBuiltinSkills(): BuiltinSkill[] {
-  return [playwrightSkill, frontendUiUxSkill, gitMasterSkill]
+const devBrowserSkill: BuiltinSkill = {
+  name: "dev-browser",
+  description:
+    "Browser automation with persistent page state. Use when users ask to navigate websites, fill forms, take screenshots, extract web data, test web apps, or automate browser workflows. Trigger phrases include 'go to [url]', 'click on', 'fill out the form', 'take a screenshot', 'scrape', 'automate', 'test the website', 'log into', or any browser interaction request.",
+  template: `# Dev Browser Skill
+
+Browser automation that maintains page state across script executions. Write small, focused scripts to accomplish tasks incrementally. Once you've proven out part of a workflow and there is repeated work to be done, you can write a script to do the repeated work in a single execution.
+
+## Choosing Your Approach
+
+- **Local/source-available sites**: Read the source code first to write selectors directly
+- **Unknown page layouts**: Use \`getAISnapshot()\` to discover elements and \`selectSnapshotRef()\` to interact with them
+- **Visual feedback**: Take screenshots to see what the user sees
+
+## Setup
+
+**IMPORTANT**: Before using this skill, ensure the server is running. See [references/installation.md](references/installation.md) for platform-specific setup instructions (macOS, Linux, Windows).
+
+Two modes available. Ask the user if unclear which to use.
+
+### Standalone Mode (Default)
+
+Launches a new Chromium browser for fresh automation sessions.
+
+**macOS/Linux:**
+\`\`\`bash
+./skills/dev-browser/server.sh &
+\`\`\`
+
+**Windows (PowerShell):**
+\`\`\`powershell
+Start-Process -NoNewWindow -FilePath "node" -ArgumentList "skills/dev-browser/server.js"
+\`\`\`
+
+Add \`--headless\` flag if user requests it. **Wait for the \`Ready\` message before running scripts.**
+
+### Extension Mode
+
+Connects to user's existing Chrome browser. Use this when:
+
+- The user is already logged into sites and wants you to do things behind an authed experience that isn't local dev.
+- The user asks you to use the extension
+
+**Important**: The core flow is still the same. You create named pages inside of their browser.
+
+**Start the relay server:**
+
+**macOS/Linux:**
+\`\`\`bash
+cd skills/dev-browser && npm i && npm run start-extension &
+\`\`\`
+
+**Windows (PowerShell):**
+\`\`\`powershell
+cd skills/dev-browser; npm i; Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "run", "start-extension"
+\`\`\`
+
+Wait for \`Waiting for extension to connect...\` followed by \`Extension connected\` in the console.
+
+If the extension hasn't connected yet, tell the user to launch and activate it. Download link: https://github.com/SawyerHood/dev-browser/releases
+
+## Writing Scripts
+
+> **Run all scripts from \`skills/dev-browser/\` directory.** The \`@/\` import alias requires this directory's config.
+
+Execute scripts inline using heredocs:
+
+**macOS/Linux:**
+\`\`\`bash
+cd skills/dev-browser && npx tsx <<'EOF'
+import { connect, waitForPageLoad } from "@/client.js";
+
+const client = await connect();
+const page = await client.page("example", { viewport: { width: 1920, height: 1080 } });
+
+await page.goto("https://example.com");
+await waitForPageLoad(page);
+
+console.log({ title: await page.title(), url: page.url() });
+await client.disconnect();
+EOF
+\`\`\`
+
+**Windows (PowerShell):**
+\`\`\`powershell
+cd skills/dev-browser
+@"
+import { connect, waitForPageLoad } from "@/client.js";
+
+const client = await connect();
+const page = await client.page("example", { viewport: { width: 1920, height: 1080 } });
+
+await page.goto("https://example.com");
+await waitForPageLoad(page);
+
+console.log({ title: await page.title(), url: page.url() });
+await client.disconnect();
+"@ | npx tsx --input-type=module
+\`\`\`
+
+### Key Principles
+
+1. **Small scripts**: Each script does ONE thing (navigate, click, fill, check)
+2. **Evaluate state**: Log/return state at the end to decide next steps
+3. **Descriptive page names**: Use \`"checkout"\`, \`"login"\`, not \`"main"\`
+4. **Disconnect to exit**: \`await client.disconnect()\` - pages persist on server
+5. **Plain JS in evaluate**: \`page.evaluate()\` runs in browser - no TypeScript syntax
+
+## Workflow Loop
+
+1. **Write a script** to perform one action
+2. **Run it** and observe the output
+3. **Evaluate** - did it work? What's the current state?
+4. **Decide** - is the task complete or do we need another script?
+5. **Repeat** until task is done
+
+### No TypeScript in Browser Context
+
+Code passed to \`page.evaluate()\` runs in the browser, which doesn't understand TypeScript:
+
+\`\`\`typescript
+// Correct: plain JavaScript
+const text = await page.evaluate(() => {
+  return document.body.innerText;
+});
+
+// Wrong: TypeScript syntax will fail at runtime
+const text = await page.evaluate(() => {
+  const el: HTMLElement = document.body; // Type annotation breaks in browser!
+  return el.innerText;
+});
+\`\`\`
+
+## Scraping Data
+
+For scraping large datasets, intercept and replay network requests rather than scrolling the DOM. See [references/scraping.md](references/scraping.md) for the complete guide.
+
+## Client API
+
+\`\`\`typescript
+const client = await connect();
+
+// Get or create named page
+const page = await client.page("name");
+const pageWithSize = await client.page("name", { viewport: { width: 1920, height: 1080 } });
+
+const pages = await client.list(); // List all page names
+await client.close("name"); // Close a page
+await client.disconnect(); // Disconnect (pages persist)
+
+// ARIA Snapshot methods
+const snapshot = await client.getAISnapshot("name"); // Get accessibility tree
+const element = await client.selectSnapshotRef("name", "e5"); // Get element by ref
+\`\`\`
+
+## Waiting
+
+\`\`\`typescript
+import { waitForPageLoad } from "@/client.js";
+
+await waitForPageLoad(page); // After navigation
+await page.waitForSelector(".results"); // For specific elements
+await page.waitForURL("**/success"); // For specific URL
+\`\`\`
+
+## Screenshots
+
+\`\`\`typescript
+await page.screenshot({ path: "tmp/screenshot.png" });
+await page.screenshot({ path: "tmp/full.png", fullPage: true });
+\`\`\`
+
+## ARIA Snapshot (Element Discovery)
+
+Use \`getAISnapshot()\` to discover page elements. Returns YAML-formatted accessibility tree:
+
+\`\`\`yaml
+- banner:
+  - link "Hacker News" [ref=e1]
+  - navigation:
+    - link "new" [ref=e2]
+- main:
+  - list:
+    - listitem:
+      - link "Article Title" [ref=e8]
+\`\`\`
+
+**Interacting with refs:**
+
+\`\`\`typescript
+const snapshot = await client.getAISnapshot("hackernews");
+console.log(snapshot); // Find the ref you need
+
+const element = await client.selectSnapshotRef("hackernews", "e2");
+await element.click();
+\`\`\`
+
+## Error Recovery
+
+Page state persists after failures. Debug with:
+
+\`\`\`bash
+cd skills/dev-browser && npx tsx <<'EOF'
+import { connect } from "@/client.js";
+
+const client = await connect();
+const page = await client.page("hackernews");
+
+await page.screenshot({ path: "tmp/debug.png" });
+console.log({
+  url: page.url(),
+  title: await page.title(),
+  bodyText: await page.textContent("body").then((t) => t?.slice(0, 200)),
+});
+
+await client.disconnect();
+EOF
+\`\`\``,
+}
+
+export interface CreateBuiltinSkillsOptions {
+  browserProvider?: BrowserAutomationProvider
+}
+
+export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
+  const { browserProvider = "playwright" } = options
+
+  const browserSkill = browserProvider === "agent-browser" ? agentBrowserSkill : playwrightSkill
+
+  return [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill]
 }

@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
-import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
+import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
@@ -86,8 +86,8 @@ function formatDetailedError(error: unknown, ctx: ErrorContext): string {
     lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
     lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
     lines.push(`- load_skills: [${ctx.args.load_skills?.join(", ") ?? ""}]`)
-    if (ctx.args.resume) {
-      lines.push(`- resume: ${ctx.args.resume}`)
+    if (ctx.args.session_id) {
+      lines.push(`- session_id: ${ctx.args.session_id}`)
     }
   }
 
@@ -157,6 +157,7 @@ export interface DelegateTaskToolOptions {
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
+  browserProvider?: BrowserAutomationProvider
 }
 
 export interface BuildSystemContentInput {
@@ -179,7 +180,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel } = options
+  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel, browserProvider } = options
 
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const categoryNames = Object.keys(allCategories)
@@ -194,7 +195,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
   const description = `Spawn agent task with category-based or direct agent selection.
 
-MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless resuming).
+MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
 
 - load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
 - category: Use predefined category → Spawns Sisyphus-Junior with category config
@@ -202,12 +203,13 @@ MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless r
 ${categoryList}
 - subagent_type: Use specific agent directly (e.g., "oracle", "explore")
 - run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
-- resume: Session ID to resume (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+- session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+- command: The command that triggered this task (optional, for slash command tracking).
 
-**WHEN TO USE resume:**
-- Task failed/incomplete → resume with "fix: [specific issue]"
-- Need follow-up on previous result → resume with additional question
-- Multi-turn conversation with same agent → always resume instead of new task
+**WHEN TO USE session_id:**
+- Task failed/incomplete → session_id with "fix: [specific issue]"
+- Need follow-up on previous result → session_id with additional question
+- Multi-turn conversation with same agent → always session_id instead of new task
 
 Prompts MUST be in English.`
 
@@ -220,7 +222,8 @@ Prompts MUST be in English.`
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
       category: tool.schema.string().optional().describe(`Category (e.g., ${categoryExamples}). Mutually exclusive with subagent_type.`),
       subagent_type: tool.schema.string().optional().describe("Agent name (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
-      resume: tool.schema.string().optional().describe("Session ID to resume"),
+      session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
+      command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
@@ -237,7 +240,7 @@ Prompts MUST be in English.`
 
       let skillContent: string | undefined
       if (args.load_skills.length > 0) {
-        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.load_skills, { gitMasterConfig })
+        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.load_skills, { gitMasterConfig, browserProvider })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
           const available = allSkills.map(s => s.name).join(", ")
@@ -265,11 +268,11 @@ Prompts MUST be in English.`
         ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
         : undefined
 
-      if (args.resume) {
+      if (args.session_id) {
         if (runInBackground) {
           try {
             const task = await manager.resume({
-              sessionId: args.resume,
+              sessionId: args.session_id,
               prompt: args.prompt,
               parentSessionID: ctx.sessionID,
               parentMessageID: ctx.messageID,
@@ -278,7 +281,7 @@ Prompts MUST be in English.`
             })
 
             ctx.metadata?.({
-              title: `Resume: ${task.description}`,
+              title: `Continue: ${task.description}`,
               metadata: {
                 prompt: args.prompt,
                 agent: task.agent,
@@ -286,10 +289,11 @@ Prompts MUST be in English.`
                 description: args.description,
                 run_in_background: args.run_in_background,
                 sessionId: task.sessionID,
+                command: args.command,
               },
             })
 
-            return `Background task resumed.
+            return `Background task continued.
 
 Task ID: ${task.id}
 Session ID: ${task.sessionID}
@@ -301,35 +305,36 @@ Agent continues with full previous context preserved.
 Use \`background_output\` with task_id="${task.id}" to check progress.`
           } catch (error) {
             return formatDetailedError(error, {
-              operation: "Resume background task",
+              operation: "Continue background task",
               args,
-              sessionID: args.resume,
+              sessionID: args.session_id,
             })
           }
         }
 
         const toastManager = getTaskToastManager()
-        const taskId = `resume_sync_${args.resume.slice(0, 8)}`
+        const taskId = `resume_sync_${args.session_id.slice(0, 8)}`
         const startTime = new Date()
 
         if (toastManager) {
           toastManager.addTask({
             id: taskId,
             description: args.description,
-            agent: "resume",
+            agent: "continue",
             isBackground: false,
           })
         }
 
         ctx.metadata?.({
-          title: `Resume: ${args.description}`,
+          title: `Continue: ${args.description}`,
           metadata: {
             prompt: args.prompt,
             load_skills: args.load_skills,
             description: args.description,
             run_in_background: args.run_in_background,
-            sessionId: args.resume,
+            sessionId: args.session_id,
             sync: true,
+            command: args.command,
           },
         })
 
@@ -338,7 +343,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           let resumeModel: { providerID: string; modelID: string } | undefined
 
           try {
-            const messagesResp = await client.session.messages({ path: { id: args.resume } })
+            const messagesResp = await client.session.messages({ path: { id: args.session_id } })
             const messages = (messagesResp.data ?? []) as Array<{
               info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
             }>
@@ -351,7 +356,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
               }
             }
           } catch {
-            const resumeMessageDir = getMessageDir(args.resume)
+            const resumeMessageDir = getMessageDir(args.session_id)
             const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
             resumeAgent = resumeMessage?.agent
             resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
@@ -360,7 +365,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           }
 
           await client.session.prompt({
-            path: { id: args.resume },
+            path: { id: args.session_id },
             body: {
               ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
               ...(resumeModel !== undefined ? { model: resumeModel } : {}),
@@ -378,7 +383,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             toastManager.removeTask(taskId)
           }
           const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-          return `Failed to send resume prompt: ${errorMessage}\n\nSession ID: ${args.resume}`
+          return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
         }
 
         // Wait for message stability after prompt completes
@@ -395,7 +400,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
           const elapsed = Date.now() - pollStart
           if (elapsed < MIN_STABILITY_TIME_MS) continue
 
-          const messagesCheck = await client.session.messages({ path: { id: args.resume } })
+          const messagesCheck = await client.session.messages({ path: { id: args.session_id } })
           const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
           const currentMsgCount = msgs.length
 
@@ -409,14 +414,14 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         const messagesResult = await client.session.messages({
-          path: { id: args.resume },
+          path: { id: args.session_id },
         })
 
         if (messagesResult.error) {
           if (toastManager) {
             toastManager.removeTask(taskId)
           }
-          return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.resume}`
+          return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.session_id}`
         }
 
         const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as Array<{
@@ -434,7 +439,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         if (!lastMessage) {
-          return `No assistant response found.\n\nSession ID: ${args.resume}`
+          return `No assistant response found.\n\nSession ID: ${args.session_id}`
         }
 
         // Extract text from both "text" and "reasoning" parts (thinking models use "reasoning")
@@ -443,16 +448,16 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
 
         const duration = formatDuration(startTime)
 
-        return `Task resumed and completed in ${duration}.
+        return `Task continued and completed in ${duration}.
 
-Session ID: ${args.resume}
+Session ID: ${args.session_id}
 
 ---
 
 ${textContent || "(No text output)"}
 
 ---
-To resume this session: resume="${args.resume}"`
+To continue this session: session_id="${args.session_id}"`
       }
 
       if (args.category && args.subagent_type) {
@@ -618,6 +623,7 @@ To resume this session: resume="${args.resume}"`
                 description: args.description,
                 run_in_background: args.run_in_background,
                 sessionId: sessionID,
+                command: args.command,
               },
             })
 
@@ -705,7 +711,7 @@ RESULT:
 ${textContent || "(No text output)"}
 
 ---
-To resume this session: resume="${sessionID}"`
+To continue this session: session_id="${sessionID}"`
           } catch (error) {
             return formatDetailedError(error, {
               operation: "Launch monitored background task",
@@ -788,6 +794,7 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
               description: args.description,
               run_in_background: args.run_in_background,
               sessionId: task.sessionID,
+              command: args.command,
             },
           })
 
@@ -800,7 +807,7 @@ Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
 System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-To resume this session: resume="${task.sessionID}"`
+To continue this session: session_id="${task.sessionID}"`
         } catch (error) {
           return formatDetailedError(error, {
             operation: "Launch background task",
@@ -864,6 +871,7 @@ To resume this session: resume="${task.sessionID}"`
             run_in_background: args.run_in_background,
             sessionId: sessionID,
             sync: true,
+            command: args.command,
           },
         })
 
@@ -1018,7 +1026,7 @@ Session ID: ${sessionID}
 ${textContent || "(No text output)"}
 
 ---
-To resume this session: resume="${sessionID}"`
+To continue this session: session_id="${sessionID}"`
       } catch (error) {
         if (toastManager && taskId !== undefined) {
           toastManager.removeTask(taskId)

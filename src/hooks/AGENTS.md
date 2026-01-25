@@ -10,7 +10,7 @@
 hooks/
 ├── atlas/                      # Main orchestration (773 lines)
 ├── anthropic-context-window-limit-recovery/  # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion
+├── todo-continuation-enforcer.ts # Force TODO completion (489 lines)
 ├── ralph-loop/                 # Self-referential dev loop
 ├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
 ├── comment-checker/            # Prevents AI slop
@@ -28,7 +28,15 @@ hooks/
 ├── prometheus-md-only/         # Planner read-only mode
 ├── agent-usage-reminder/       # Specialized agent hints
 ├── auto-update-checker/        # Plugin update check
-└── tool-output-truncator.ts    # Prevents context bloat
+├── tool-output-truncator.ts    # Prevents context bloat
+├── compaction-context-injector/ # Injects context on compaction
+├── delegate-task-retry/        # Retries failed delegations
+├── interactive-bash-session/   # Tmux session management
+├── non-interactive-env/        # Non-TTY environment handling
+├── start-work/                 # Sisyphus work session starter
+├── task-resume-info/           # Resume info for cancelled tasks
+├── question-label-truncator/   # Auto-truncates question labels >30 chars
+└── index.ts                    # Hook aggregation + registration
 ```
 
 ## HOOK EVENTS

@@ -8,17 +8,17 @@
 
 ```
 agents/
-├── atlas.ts                    # Master Orchestrator (543 lines)
-├── sisyphus.ts                 # Main prompt (615 lines)
-├── sisyphus-junior.ts          # Delegated task executor
-├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
+├── atlas.ts                    # Master Orchestrator (572 lines)
+├── sisyphus.ts                 # Main prompt (450 lines)
+├── sisyphus-junior.ts          # Delegated task executor (135 lines)
+├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (359 lines)
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
-├── librarian.ts                # Multi-repo research (GLM-4.7-free)
+├── librarian.ts                # Multi-repo research (326 lines)
 ├── explore.ts                  # Fast grep (Grok Code)
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
 ├── prometheus-prompt.ts        # Planning (1196 lines)
-├── metis.ts                    # Plan consultant
-├── momus.ts                    # Plan reviewer
+├── metis.ts                    # Plan consultant (315 lines)
+├── momus.ts                    # Plan reviewer (444 lines)
 ├── types.ts                    # AgentModelConfig, AgentPromptMetadata
 ├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback()
 └── index.ts                    # builtinAgents export

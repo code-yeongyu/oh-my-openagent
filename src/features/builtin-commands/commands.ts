@@ -81,7 +81,7 @@ export function loadBuiltinCommands(
   for (const [name, definition] of Object.entries(BUILTIN_COMMAND_DEFINITIONS)) {
     if (!disabled.has(name as BuiltinCommandName)) {
       const { argumentHint: _argumentHint, ...openCodeCompatible } = definition
-      commands[name] = openCodeCompatible as CommandDefinition
+      commands[name] = { ...openCodeCompatible, name } as CommandDefinition
     }
   }
 

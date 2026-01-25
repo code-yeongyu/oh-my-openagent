@@ -17,7 +17,7 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 
 ## Exit Conditions
 
-1. **Completion**: Output \`<promise>DONE</promise>\` (or custom promise text) when fully complete
+1. **Completion**: Output your completion promise tag when fully complete
 2. **Max Iterations**: Loop stops automatically at limit
 3. **Cancel**: User runs \`/cancel-ralph\` command
 
