@@ -1676,6 +1676,417 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   })
 })
 
+describe("BackgroundManager.deadlockDetection", () => {
+  function createMockClientWithTracking() {
+    const abortCalls: string[] = []
+    const statusResponses: Record<string, { type: string }> = {}
+    const messagesResponses: Record<string, Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>> = {}
+
+    return {
+      abortCalls,
+      statusResponses,
+      messagesResponses,
+      client: {
+        session: {
+          prompt: async () => ({}),
+          abort: async (args: { path: { id: string } }) => {
+            abortCalls.push(args.path.id)
+            return {}
+          },
+          status: async () => ({ data: statusResponses }),
+          messages: async (args: { path: { id: string } }) => ({
+            data: messagesResponses[args.path.id] ?? [
+              { info: { role: "assistant" }, parts: [{ type: "text", text: "response" }] }
+            ]
+          }),
+          todo: async () => ({ data: [] }),
+        },
+      },
+    }
+  }
+
+  test("should force-cancel task after maxStabilityResets when session stuck in non-idle", async () => {
+    // #given
+    const { client, abortCalls, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 3 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-deadlock",
+      sessionID: "session-deadlock",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Deadlock test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000), // Started 60s ago
+      lastMsgCount: 5,
+      stablePolls: 2, // Already at 2 stable polls
+      stabilityResets: 2, // Already reset twice
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    // Session stuck in "busy" state
+    statusResponses["session-deadlock"] = { type: "busy" }
+    messagesResponses["session-deadlock"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "response" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "response2" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "response3" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "response4" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "response5" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when - simulate polling cycle that will trigger 3rd stable poll → 3rd reset → deadlock
+    await manager["pollRunningTasks"]()
+
+    // #then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Deadlock detected")
+    expect(task.error).toContain("stability resets")
+    expect(task.completedAt).toBeDefined()
+    expect(abortCalls).toContain("session-deadlock")
+
+    manager.shutdown()
+  })
+
+  test("should set status to cancelled (not completed) on deadlock", async () => {
+    // #given
+    const { client, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 1 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-cancelled-status",
+      sessionID: "session-cancelled",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Cancelled status test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 3,
+      stablePolls: 2, // Will trigger stability on next poll
+      stabilityResets: 0,
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    statusResponses["session-cancelled"] = { type: "processing" }
+    messagesResponses["session-cancelled"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "a" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "b" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "c" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - specifically verify status is "cancelled" not "completed"
+    expect(task.status).toBe("cancelled")
+    expect(task.status).not.toBe("completed")
+
+    manager.shutdown()
+  })
+
+  test("should call session.abort() on deadlock", async () => {
+    // #given
+    const { client, abortCalls, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 1 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-abort-test",
+      sessionID: "session-abort",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Abort test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 2,
+      stablePolls: 2,
+      stabilityResets: 0,
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    statusResponses["session-abort"] = { type: "busy" }
+    messagesResponses["session-abort"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "x" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "y" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - verify abort was called with correct session ID
+    expect(abortCalls).toContain("session-abort")
+    expect(abortCalls.length).toBe(1)
+
+    manager.shutdown()
+  })
+
+  test("should release concurrency slot on deadlock", async () => {
+    // #given
+    const { client, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 1 })
+    stubNotifyParentSession(manager)
+
+    const concurrencyKey = "test-agent"
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire(concurrencyKey)
+
+    const task: BackgroundTask = {
+      id: "task-concurrency",
+      sessionID: "session-concurrency",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Concurrency test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 1,
+      stablePolls: 2,
+      stabilityResets: 0,
+      concurrencyKey,
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    statusResponses["session-concurrency"] = { type: "busy" }
+    messagesResponses["session-concurrency"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "z" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then
+    expect(task.concurrencyKey).toBeUndefined()
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("should reset stabilityResets counter when session becomes idle via stability detection", async () => {
+    // #given - need to simulate: first status check returns busy, recheck returns idle
+    let statusCallCount = 0
+    const abortCalls: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async (args: { path: { id: string } }) => {
+          abortCalls.push(args.path.id)
+          return {}
+        },
+        status: async () => {
+          statusCallCount++
+          // First call (line 1144): return busy so we go through stability detection
+          // Second call (line 1231 recheck): return idle so stabilityResets gets reset
+          if (statusCallCount === 1) {
+            return { data: { "session-reset-idle": { type: "busy" } } }
+          }
+          return { data: { "session-reset-idle": { type: "idle" } } }
+        },
+        messages: async () => ({
+          data: [
+            { info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] },
+            { info: { role: "assistant" }, parts: [{ type: "text", text: "finished" }] },
+          ]
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 10 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-reset-idle",
+      sessionID: "session-reset-idle",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Reset on idle test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 2,
+      stablePolls: 2, // Will trigger stability check (hits 3 on this poll)
+      stabilityResets: 5, // Has 5 resets already
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - task should complete normally and stabilityResets should be reset
+    expect(task.status).toBe("completed")
+    expect(task.stabilityResets).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("should reset stabilityResets counter when message count changes", async () => {
+    // #given
+    const { client, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 10 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-reset-activity",
+      sessionID: "session-reset-activity",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Reset on activity test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 2, // Previous count was 2
+      stablePolls: 1,
+      stabilityResets: 5, // Has 5 resets already
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    statusResponses["session-reset-activity"] = { type: "busy" }
+    // Now has 3 messages (count changed from 2)
+    messagesResponses["session-reset-activity"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "a" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "b" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "c" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - stabilityResets should be reset due to message count change
+    expect(task.status).toBe("running")
+    expect(task.stabilityResets).toBe(0)
+    expect(task.stablePolls).toBe(0) // Also reset
+    expect(task.lastMsgCount).toBe(3) // Updated to new count
+
+    manager.shutdown()
+  })
+
+  test("should increment stabilityResets when stability reached but session not idle", async () => {
+    // #given
+    const { client, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { maxStabilityResets: 10 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-increment",
+      sessionID: "session-increment",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Increment test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 2,
+      stablePolls: 2, // Will hit 3 on this poll
+      stabilityResets: 3, // Has 3 resets already
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    // Session stuck in busy
+    statusResponses["session-increment"] = { type: "busy" }
+    messagesResponses["session-increment"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "a" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "b" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - should increment stabilityResets and reset stablePolls
+    expect(task.status).toBe("running")
+    expect(task.stabilityResets).toBe(4) // Incremented from 3 to 4
+    expect(task.stablePolls).toBe(0) // Reset
+
+    manager.shutdown()
+  })
+
+  test("should use default maxStabilityResets of 10 when not configured", async () => {
+    // #given
+    const { client, statusResponses, messagesResponses } = createMockClientWithTracking()
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput) // No config
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-default",
+      sessionID: "session-default",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Default max test",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 1,
+      stablePolls: 2,
+      stabilityResets: 9, // At 9, will hit 10 and trigger deadlock
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(),
+      },
+    }
+
+    statusResponses["session-default"] = { type: "busy" }
+    messagesResponses["session-default"] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "x" }] },
+    ]
+
+    getTaskMap(manager).set(task.id, task)
+
+    // #when
+    await manager["pollRunningTasks"]()
+
+    // #then - should trigger deadlock at 10 resets (default)
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("Deadlock detected")
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
   test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
     const client = {

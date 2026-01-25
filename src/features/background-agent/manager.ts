@@ -1237,13 +1237,36 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
                   const maxResets = this.config?.maxStabilityResets ?? 10
 
                   if (task.stabilityResets >= maxResets) {
-                    log("[background-agent] DEADLOCK - Force completing after max stability resets:", {
+                    log("[background-agent] DEADLOCK - Force cancelling after max stability resets:", {
                       taskId: task.id,
                       stabilityResets: task.stabilityResets,
                       sessionStatus: currentStatus?.type ?? "not_in_status"
                     })
-                    task.error = `Force-completed after ${task.stabilityResets} stability resets (deadlock detected)`
-                    await this.tryCompleteTask(task, "deadlock detection")
+
+                    // Guard: Check if task is still running (could have been completed by another path)
+                    if (task.status !== "running") continue
+
+                    // Use "cancelled" status for abnormal termination (matching stale timeout pattern)
+                    task.status = "cancelled"
+                    task.error = `Deadlock detected: force-terminated after ${task.stabilityResets} stability resets (session stuck in "${currentStatus?.type ?? "unknown"}")`
+                    task.completedAt = new Date()
+
+                    // Release concurrency BEFORE any async operations to prevent slot leaks
+                    if (task.concurrencyKey) {
+                      this.concurrencyManager.release(task.concurrencyKey)
+                      task.concurrencyKey = undefined
+                    }
+
+                    // Abort the server-side session to stop resource consumption
+                    this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+
+                    this.markForNotification(task)
+
+                    try {
+                      await this.notifyParentSession(task)
+                    } catch (err) {
+                      log("[background-agent] Error notifying parent for deadlocked task:", { taskId: task.id, error: err })
+                    }
                     continue
                   }
 
