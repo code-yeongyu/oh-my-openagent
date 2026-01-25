@@ -310,6 +310,19 @@ export const BrowserAutomationConfigSchema = z.object({
   provider: BrowserAutomationProviderSchema.default("playwright"),
 })
 
+export const TmuxLayoutSchema = z.enum([
+  'main-horizontal',  // main pane top, agent panes bottom stack
+  'main-vertical',    // main pane left, agent panes right stack (default)
+  'tiled',            // all panes same size grid
+  'even-horizontal',  // all panes horizontal row
+  'even-vertical',    // all panes vertical stack
+])
+
+export const TmuxConfigSchema = z.object({
+  enabled: z.boolean().default(false),           // default: false (disabled)
+  layout: TmuxLayoutSchema.default('main-vertical'),  // default: main-vertical
+  main_pane_size: z.number().min(20).max(80).default(60),  // percentage, default: 60%
+})
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -330,6 +343,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   notification: NotificationConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
+  tmux: TmuxConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -354,5 +368,7 @@ export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
 export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
 export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>
+export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
+export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
