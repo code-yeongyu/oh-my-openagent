@@ -2048,6 +2048,147 @@ git status | grep -E "debug|__debugLog|debug_log"
 
 If you see any debug-related changes, remove them before committing.
 
+## CSP Handling for Frontend Debugging
+
+### The Problem
+
+When debugging frontend code, Content Security Policy (CSP) may block connections to the debug server at \`localhost:7777\`. CSP violations appear in the browser console as:
+
+\`\`\`
+Refused to connect to 'http://localhost:7777/ingest' because it violates 
+the following Content Security Policy directive: "connect-src 'self'"
+\`\`\`
+
+### Step 1: Detect CSP Configuration
+
+Search the project for CSP settings:
+
+\`\`\`bash
+# HTML meta tags
+grep -r "Content-Security-Policy" . --include="*.html" --include="*.htm"
+
+# Next.js config
+grep -r "contentSecurityPolicy\\|headers()" . --include="next.config.*"
+
+# Express/Node (helmet middleware)
+grep -r "helmet\\|contentSecurityPolicy" . --include="*.ts" --include="*.js"
+
+# Nginx
+grep -r "add_header.*Content-Security-Policy" . --include="nginx.conf" --include="*.conf"
+
+# Apache
+grep -r "Header set Content-Security-Policy" . --include=".htaccess"
+
+# Vite/Webpack plugins
+grep -r "csp\\|ContentSecurityPolicy" . --include="vite.config.*" --include="webpack.config.*"
+\`\`\`
+
+### Step 2: Modify CSP for Debugging
+
+**Option A: HTML Meta Tag**
+\`\`\`html
+<!-- Find and modify connect-src to include localhost -->
+<meta http-equiv="Content-Security-Policy" 
+      content="default-src 'self'; connect-src 'self' localhost:* http://localhost:* ws://localhost:*">
+\`\`\`
+
+**Option B: Next.js (next.config.js)**
+\`\`\`javascript
+// Add to headers() function
+async headers() {
+  const isDev = process.env.NODE_ENV === 'development';
+  return [{
+    source: '/:path*',
+    headers: [{
+      key: isDev ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy',
+      value: isDev 
+        ? "default-src 'self'; connect-src 'self' localhost:* http://localhost:* ws://localhost:*; script-src 'self' 'unsafe-eval'"
+        : "default-src 'self'; connect-src 'self' api.example.com"
+    }]
+  }];
+}
+\`\`\`
+
+**Option C: Express/Helmet**
+\`\`\`javascript
+const helmet = require('helmet');
+const isDev = process.env.NODE_ENV === 'development';
+
+app.use(helmet.contentSecurityPolicy({
+  reportOnly: isDev, // Report violations but don't block in dev
+  directives: {
+    defaultSrc: ["'self'"],
+    connectSrc: isDev 
+      ? ["'self'", "localhost:*", "http://localhost:*", "ws://localhost:*"]
+      : ["'self'", "api.example.com"],
+    scriptSrc: isDev 
+      ? ["'self'", "'unsafe-eval'"] // unsafe-eval needed for DevTools console
+      : ["'self'"]
+  }
+}));
+\`\`\`
+
+**Option D: Nginx**
+\`\`\`nginx
+# In development server block
+add_header Content-Security-Policy-Report-Only 
+    "default-src 'self'; connect-src 'self' localhost:* http://localhost:* ws://localhost:*";
+\`\`\`
+
+### Step 3: Verify CSP Changes
+
+After modifying CSP:
+
+1. **Check browser console** for CSP violation messages (should disappear)
+2. **Test debug server connection**:
+   \`\`\`javascript
+   // Run in browser console
+   fetch('http://localhost:7777/health')
+     .then(r => r.json())
+     .then(console.log)
+     .catch(e => console.error('CSP still blocking:', e));
+   \`\`\`
+3. **Monitor violations programmatically** (optional):
+   \`\`\`javascript
+   document.addEventListener('securitypolicyviolation', (e) => {
+     console.warn('CSP Violation:', {
+       blockedURI: e.blockedURI,
+       violatedDirective: e.violatedDirective
+     });
+   });
+   \`\`\`
+
+### Step 4: Restore CSP After Debugging
+
+**CRITICAL**: Revert CSP changes before committing!
+
+\`\`\`bash
+# Check for CSP modifications in staged files
+git diff --cached | grep -E "Content-Security-Policy|contentSecurityPolicy|helmet|connect-src"
+\`\`\`
+
+If you used environment-based CSP (Options B, C above), changes are safe to commit as they only affect development mode.
+
+### Browser Extension Alternative (Last Resort)
+
+If modifying source code is not feasible, use a browser extension like [Requestly](https://requestly.io/) to override CSP headers locally:
+
+1. Install Requestly browser extension
+2. Create "Modify Headers" rule:
+   - **URL Pattern**: Your app's URL
+   - **Header**: Content-Security-Policy
+   - **Action**: Remove or modify to allow localhost
+
+**WARNING**: Only use for local debugging. Never rely on extensions in production testing.
+
+### CSP Directives Reference
+
+| Directive | Controls | Debug Value |
+|-----------|----------|-------------|
+| \`connect-src\` | fetch, XHR, WebSocket | \`'self' localhost:* http://localhost:* ws://localhost:*\` |
+| \`script-src\` | Script execution | \`'self' 'unsafe-eval'\` (for DevTools console) |
+| \`default-src\` | Fallback for all | \`'self' localhost:*\` |
+
 ## Quick Reference
 
 | Action | Command |

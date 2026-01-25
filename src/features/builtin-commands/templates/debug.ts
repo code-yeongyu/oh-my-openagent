@@ -36,5 +36,8 @@ For complete details (server code, NDJSON schema, instrumentation patterns for J
 - Artifacts go in .opencode/debug/ (automatically added to .gitignore)
 - Cleanup: remove instrumentation calls, stop server, delete .opencode/debug/
 
+## Frontend CSP Note
+If debugging browser code, Content Security Policy (CSP) may block connections to localhost:7777. Check browser console for "Refused to connect" errors. The runtime-debugging skill includes detailed CSP detection and handling instructions.
+
 Start by updating .gitignore (if needed), then ask: "What bug are you experiencing? Please describe what happens and what you expected to happen."
 `
