@@ -394,46 +394,6 @@ export async function getOpenCodeVersion(): Promise<string | null> {
   return result?.version ?? null
 }
 
-export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMergeResult> {
-  try {
-    ensureConfigDir()
-  } catch (err) {
-    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
-  }
-
-  const { format, path } = detectConfigFormat()
-
-  try {
-    let existingConfig: OpenCodeConfig | null = null
-    if (format !== "none") {
-      const parseResult = parseConfigWithError(path)
-      if (parseResult.error && !parseResult.config) {
-        existingConfig = {}
-      } else {
-        existingConfig = parseResult.config
-      }
-    }
-
-    const plugins: string[] = existingConfig?.plugin ?? []
-
-    if (config.hasGemini) {
-      const version = await fetchLatestVersion("opencode-antigravity-auth")
-      const pluginEntry = version ? `opencode-antigravity-auth@${version}` : "opencode-antigravity-auth"
-      if (!plugins.some((p) => p.startsWith("opencode-antigravity-auth"))) {
-        plugins.push(pluginEntry)
-      }
-    }
-
-
-
-    const newConfig = { ...(existingConfig ?? {}), plugin: plugins }
-    writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
-    return { success: true, configPath: path }
-  } catch (err) {
-    return { success: false, configPath: path, error: formatErrorWithSuggestion(err, "add auth plugins to config") }
-  }
-}
-
 export interface BunInstallResult {
   success: boolean
   timedOut?: boolean
@@ -489,89 +449,6 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
       success: false,
       error: `bun install failed: ${message}. Is bun installed? Try: curl -fsSL https://bun.sh/install | bash`,
     }
-  }
-}
-
-/**
- * Antigravity Provider Configuration
- *
- * IMPORTANT: Model names MUST use `antigravity-` prefix for stability.
- *
- * The opencode-antigravity-auth plugin supports two naming conventions:
- * - `antigravity-gemini-3-pro-high` (RECOMMENDED, explicit Antigravity quota routing)
- * - `gemini-3-pro-high` (LEGACY, backward compatible but may break in future)
- *
- * Legacy names rely on Gemini CLI using `-preview` suffix for disambiguation.
- * If Google removes `-preview`, legacy names may route to wrong quota.
- *
- * @see https://github.com/NoeFabris/opencode-antigravity-auth#migration-guide-v127
- */
-export const ANTIGRAVITY_PROVIDER_CONFIG = {
-  google: {
-    name: "Google",
-    models: {
-      "antigravity-gemini-3-pro-high": {
-        name: "Gemini 3 Pro High (Antigravity)",
-        thinking: true,
-        attachment: true,
-        limit: { context: 1048576, output: 65535 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-      "antigravity-gemini-3-pro-low": {
-        name: "Gemini 3 Pro Low (Antigravity)",
-        thinking: true,
-        attachment: true,
-        limit: { context: 1048576, output: 65535 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-      "antigravity-gemini-3-flash": {
-        name: "Gemini 3 Flash (Antigravity)",
-        attachment: true,
-        limit: { context: 1048576, output: 65536 },
-        modalities: { input: ["text", "image", "pdf"], output: ["text"] },
-      },
-    },
-  },
-}
-
-
-
-export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
-  try {
-    ensureConfigDir()
-  } catch (err) {
-    return { success: false, configPath: getConfigDir(), error: formatErrorWithSuggestion(err, "create config directory") }
-  }
-
-  const { format, path } = detectConfigFormat()
-
-  try {
-    let existingConfig: OpenCodeConfig | null = null
-    if (format !== "none") {
-      const parseResult = parseConfigWithError(path)
-      if (parseResult.error && !parseResult.config) {
-        existingConfig = {}
-      } else {
-        existingConfig = parseResult.config
-      }
-    }
-
-    const newConfig = { ...(existingConfig ?? {}) }
-
-    const providers = (newConfig.provider ?? {}) as Record<string, unknown>
-
-    if (config.hasGemini) {
-      providers.google = ANTIGRAVITY_PROVIDER_CONFIG.google
-    }
-
-    if (Object.keys(providers).length > 0) {
-      newConfig.provider = providers
-    }
-
-    writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
-    return { success: true, configPath: path }
-  } catch (err) {
-    return { success: false, configPath: path, error: formatErrorWithSuggestion(err, "add provider config") }
   }
 }
 
