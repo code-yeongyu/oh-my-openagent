@@ -50,7 +50,7 @@ export function loadConfigFromPath(
 
 export function loadConfigFromContent(
   content: string,
-  source: string
+  source: string,
 ): OhMyOpenCodeConfig | null {
   try {
     const rawConfig = parseJsonc<Record<string, unknown>>(content);
@@ -123,7 +123,7 @@ function getProjectConfigPaths(directory: string): string[] {
 
 export function mergeConfigs(
   base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
+  override: OhMyOpenCodeConfig,
 ): OhMyOpenCodeConfig {
   return {
     ...base,
@@ -166,7 +166,7 @@ export function mergeConfigs(
 
 export function loadPluginConfig(
   directory: string,
-  _ctx: unknown
+  _ctx: unknown,
 ): OhMyOpenCodeConfig {
   const configDir = getOhMyOpenCodeConfigDir();
   const userBasePath = path.join(configDir, "oh-my-opencode");
@@ -195,7 +195,7 @@ export function loadPluginConfig(
   if (inlineConfigContent) {
     const inlineConfig = loadConfigFromContent(
       inlineConfigContent,
-      "OH_MY_OPENCODE_CONFIG_CONTENT"
+      "OH_MY_OPENCODE_CONFIG_CONTENT",
     );
     if (inlineConfig) {
       config = mergeConfigs(config, inlineConfig);
