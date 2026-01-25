@@ -3,14 +3,15 @@ import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } fr
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import { __resetModelCache } from "../../shared/model-availability"
+import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 
 // Test constants - systemDefaultModel is required by resolveCategoryConfig
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
-  // Reset model cache before each test to prevent cross-test pollution
   beforeEach(() => {
     __resetModelCache()
+    clearSkillCache()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -1322,6 +1323,112 @@ describe("sisyphus-task", () => {
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Custom unstable result")
     }, { timeout: 20000 })
+  })
+
+  describe("browserProvider propagation", () => {
+    test("should resolve agent-browser skill when browserProvider is passed", async () => {
+      // #given - delegate_task configured with browserProvider: "agent-browser"
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_browser_provider" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      // Pass browserProvider to createDelegateTask
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        browserProvider: "agent-browser",
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - request agent-browser skill
+      await tool.execute(
+        {
+          description: "Test browserProvider propagation",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["agent-browser"],
+        },
+        toolContext
+      )
+
+      // #then - agent-browser skill should be resolved (not in notFound)
+      expect(promptBody).toBeDefined()
+      expect(promptBody.system).toBeDefined()
+      expect(promptBody.system).toContain("agent-browser")
+    }, { timeout: 20000 })
+
+    test("should NOT resolve agent-browser skill when browserProvider is not set", async () => {
+      // #given - delegate_task without browserProvider (defaults to playwright)
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_no_browser_provider" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      // No browserProvider passed
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - request agent-browser skill without browserProvider
+      const result = await tool.execute(
+        {
+          description: "Test missing browserProvider",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["agent-browser"],
+        },
+        toolContext
+      )
+
+      // #then - should return skill not found error
+      expect(result).toContain("Skills not found")
+      expect(result).toContain("agent-browser")
+    })
   })
 
   describe("buildSystemContent", () => {

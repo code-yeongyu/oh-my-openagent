@@ -238,6 +238,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "multimodal-looker"
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
+  const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -245,10 +246,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    browserProvider,
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill) => {
     if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
