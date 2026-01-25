@@ -1,22 +1,28 @@
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata } from "./types"
 import { getSessionInfo, readSessionMessages } from "./storage"
 
-export async function formatSessionList(sessionIDs: string[]): Promise<string> {
-  if (sessionIDs.length === 0) {
+export async function formatSessionList(sessions: SessionMetadata[]): Promise<string> {
+  if (sessions.length === 0) {
     return "No sessions found."
   }
 
-  const infos = (await Promise.all(sessionIDs.map((id) => getSessionInfo(id)))).filter(
-    (info): info is SessionInfo => info !== null
-  )
+  const infos: SessionInfo[] = []
+  for (const meta of sessions) {
+    const info = await getSessionInfo(meta.id)
+    if (info) {
+      info.title = meta.title
+      infos.push(info)
+    }
+  }
 
   if (infos.length === 0) {
     return "No valid sessions found."
   }
 
-  const headers = ["Session ID", "Messages", "First", "Last", "Agents"]
+  const headers = ["Session ID", "Title", "Messages", "First", "Last", "Agents"]
   const rows = infos.map((info) => [
     info.id,
+    info.title ?? "(untitled)",
     info.message_count.toString(),
     info.first_message?.toISOString().split("T")[0] ?? "N/A",
     info.last_message?.toISOString().split("T")[0] ?? "N/A",

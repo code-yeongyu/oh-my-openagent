@@ -23,6 +23,7 @@ export interface MessagePart {
 
 export interface SessionInfo {
   id: string
+  title?: string
   message_count: number
   first_message?: Date
   last_message?: Date

@@ -38,17 +38,18 @@ export const session_list: ToolDefinition = tool({
     try {
       const directory = args.project_path ?? process.cwd()
       let sessions = await getMainSessions({ directory })
-      let sessionIDs = sessions.map((s) => s.id)
 
       if (args.from_date || args.to_date) {
-        sessionIDs = await filterSessionsByDate(sessionIDs, args.from_date, args.to_date)
+        const filteredIDs = await filterSessionsByDate(sessions.map((s) => s.id), args.from_date, args.to_date)
+        const filteredSet = new Set(filteredIDs)
+        sessions = sessions.filter((s) => filteredSet.has(s.id))
       }
 
       if (args.limit && args.limit > 0) {
-        sessionIDs = sessionIDs.slice(0, args.limit)
+        sessions = sessions.slice(0, args.limit)
       }
 
-      return await formatSessionList(sessionIDs)
+      return await formatSessionList(sessions)
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }

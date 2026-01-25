@@ -7,12 +7,12 @@ import {
   filterSessionsByDate,
   searchInSession,
 } from "./utils"
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata } from "./types"
 
 describe("session-manager utils", () => {
   test("formatSessionList handles empty array", async () => {
     // #given
-    const sessions: string[] = []
+    const sessions: SessionMetadata[] = []
 
     // #when
     const result = await formatSessionList(sessions)
