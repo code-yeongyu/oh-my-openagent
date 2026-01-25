@@ -15,6 +15,7 @@ import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-tas
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
 import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
+import type { BrowserAutomationProvider } from "../config/schema"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -146,7 +147,8 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  client?: any
+  client?: any,
+  browserProvider?: BrowserAutomationProvider
 ): Promise<Record<string, AgentConfig>> {
   if (!systemDefaultModel) {
     throw new Error("createBuiltinAgents requires systemDefaultModel")
@@ -167,7 +169,7 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const builtinSkills = createBuiltinSkills()
+  const builtinSkills = createBuiltinSkills({ browserProvider })
   const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({

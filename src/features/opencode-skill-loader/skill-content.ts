@@ -3,10 +3,11 @@ import { discoverSkills } from "./loader"
 import type { LoadedSkill } from "./types"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { readFileSync } from "node:fs"
-import type { GitMasterConfig } from "../../config/schema"
+import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 
 export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
+	browserProvider?: BrowserAutomationProvider
 }
 
 let cachedSkills: LoadedSkill[] | null = null
@@ -15,12 +16,12 @@ function clearSkillCache(): void {
 	cachedSkills = null
 }
 
-async function getAllSkills(): Promise<LoadedSkill[]> {
+async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
 	if (cachedSkills) return cachedSkills
 
 	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
 		discoverSkills({ includeClaudeCodePaths: true }),
-		Promise.resolve(createBuiltinSkills()),
+		Promise.resolve(createBuiltinSkills({ browserProvider: options?.browserProvider })),
 	])
 
 	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => ({
@@ -118,7 +119,7 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 }
 
 export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
-	const skills = createBuiltinSkills()
+	const skills = createBuiltinSkills({ browserProvider: options?.browserProvider })
 	const skill = skills.find((s) => s.name === skillName)
 	if (!skill) return null
 
@@ -133,7 +134,7 @@ export function resolveMultipleSkills(skillNames: string[], options?: SkillResol
 	resolved: Map<string, string>
 	notFound: string[]
 } {
-	const skills = createBuiltinSkills()
+	const skills = createBuiltinSkills({ browserProvider: options?.browserProvider })
 	const skillMap = new Map(skills.map((s) => [s.name, s.template]))
 
 	const resolved = new Map<string, string>()
@@ -159,7 +160,7 @@ export async function resolveSkillContentAsync(
 	skillName: string,
 	options?: SkillResolutionOptions
 ): Promise<string | null> {
-	const allSkills = await getAllSkills()
+	const allSkills = await getAllSkills(options)
 	const skill = allSkills.find((s) => s.name === skillName)
 	if (!skill) return null
 
@@ -179,7 +180,7 @@ export async function resolveMultipleSkillsAsync(
 	resolved: Map<string, string>
 	notFound: string[]
 }> {
-	const allSkills = await getAllSkills()
+	const allSkills = await getAllSkills(options)
 	const skillMap = new Map<string, LoadedSkill>()
 	for (const skill of allSkills) {
 		skillMap.set(skill.name, skill)
