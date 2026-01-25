@@ -246,3 +246,32 @@ agent-browser highlight @e1              # Highlight element
 agent-browser trace start                # Start recording trace
 agent-browser trace stop trace.zip       # Stop and save trace
 ```
+
+## References
+
+### Installation
+
+If `agent-browser` is not installed, install it before use:
+
+```bash
+npm install -g agent-browser
+agent-browser install  # Download Chromium
+```
+
+On Linux, install system dependencies:
+
+```bash
+agent-browser install --with-deps
+# or manually: npx playwright install-deps chromium
+```
+
+### Verify installation
+
+```bash
+agent-browser --version  # Should print version
+```
+
+### Documentation
+
+- Repository: https://github.com/vercel-labs/agent-browser
+- Run `agent-browser --help` for all commands
