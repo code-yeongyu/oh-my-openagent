@@ -594,16 +594,16 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
-  describe("resume with background parameter", () => {
-  test("resume with background=false should wait for result and return content", async () => {
+  describe("session_id with background parameter", () => {
+  test("session_id with background=false should wait for result and return content", async () => {
     // Note: This test needs extended timeout because the implementation has MIN_STABILITY_TIME_MS = 5000
     // #given
     const { createDelegateTask } = require("./tools")
     
     const mockTask = {
       id: "task-123",
-      sessionID: "ses_resume_test",
-      description: "Resumed task",
+      sessionID: "ses_continue_test",
+      description: "Continued task",
       agent: "explore",
       status: "running",
     }
@@ -620,7 +620,7 @@ describe("sisyphus-task", () => {
           data: [
             {
               info: { role: "assistant", time: { created: Date.now() } },
-              parts: [{ type: "text", text: "This is the resumed task result" }],
+              parts: [{ type: "text", text: "This is the continued task result" }],
             },
           ],
         }),
@@ -646,28 +646,28 @@ describe("sisyphus-task", () => {
     // #when
     const result = await tool.execute(
       {
-        description: "Resume test",
+        description: "Continue test",
         prompt: "Continue the task",
-        resume: "ses_resume_test",
+        session_id: "ses_continue_test",
         run_in_background: false,
         load_skills: ["git-master"],
       },
       toolContext
     )
     
-    // #then - should contain actual result, not just "Background task resumed"
-    expect(result).toContain("This is the resumed task result")
-    expect(result).not.toContain("Background task resumed")
+    // #then - should contain actual result, not just "Background task continued"
+    expect(result).toContain("This is the continued task result")
+    expect(result).not.toContain("Background task continued")
   }, { timeout: 10000 })
 
-  test("resume with background=true should return immediately without waiting", async () => {
+  test("session_id with background=true should return immediately without waiting", async () => {
     // #given
     const { createDelegateTask } = require("./tools")
     
     const mockTask = {
       id: "task-456",
-      sessionID: "ses_bg_resume",
-      description: "Background resumed task",
+      sessionID: "ses_bg_continue",
+      description: "Background continued task",
       agent: "explore",
       status: "running",
     }
@@ -701,9 +701,9 @@ describe("sisyphus-task", () => {
     // #when
     const result = await tool.execute(
       {
-        description: "Resume bg test",
+        description: "Continue bg test",
         prompt: "Continue in background",
-        resume: "ses_bg_resume",
+        session_id: "ses_bg_continue",
         run_in_background: true,
         load_skills: ["git-master"],
       },
@@ -711,7 +711,7 @@ describe("sisyphus-task", () => {
     )
     
     // #then - should return background message
-    expect(result).toContain("Background task resumed")
+    expect(result).toContain("Background task continued")
     expect(result).toContain("task-456")
   })
 })

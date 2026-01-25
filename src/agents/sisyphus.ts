@@ -209,15 +209,15 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 Every \`delegate_task()\` output includes a session_id. **USE IT.**
 
-**ALWAYS resume when:**
+**ALWAYS continue when:**
 | Scenario | Action |
 |----------|--------|
-| Task failed/incomplete | \`resume="{session_id}", prompt="Fix: {specific error}"\` |
-| Follow-up question on result | \`resume="{session_id}", prompt="Also: {question}"\` |
-| Multi-turn with same agent | \`resume="{session_id}"\` - NEVER start fresh |
-| Verification failed | \`resume="{session_id}", prompt="Failed verification: {error}. Fix."\` |
+| Task failed/incomplete | \`session_id="{session_id}", prompt="Fix: {specific error}"\` |
+| Follow-up question on result | \`session_id="{session_id}", prompt="Also: {question}"\` |
+| Multi-turn with same agent | \`session_id="{session_id}"\` - NEVER start fresh |
+| Verification failed | \`session_id="{session_id}", prompt="Failed verification: {error}. Fix."\` |
 
-**Why resume is CRITICAL:**
+**Why session_id is CRITICAL:**
 - Subagent has FULL conversation context preserved
 - No repeated file reads, exploration, or setup
 - Saves 70%+ tokens on follow-ups
@@ -228,10 +228,10 @@ Every \`delegate_task()\` output includes a session_id. **USE IT.**
 delegate_task(category="quick", prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
-delegate_task(resume="ses_abc123", prompt="Fix: Type error on line 42")
+delegate_task(session_id="ses_abc123", prompt="Fix: Type error on line 42")
 \`\`\`
 
-**After EVERY delegation, STORE the session_id for potential resume.**
+**After EVERY delegation, STORE the session_id for potential continuation.**
 
 ### Code Changes:
 - Match existing patterns (if codebase is disciplined)
