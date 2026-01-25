@@ -144,11 +144,11 @@ ${librarianSection}
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find auth implementations in our codebase...")
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find JWT best practices in official docs...")
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
