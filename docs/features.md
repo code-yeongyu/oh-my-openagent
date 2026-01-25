@@ -82,7 +82,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 
 **Trigger**: Any browser-related request
 
-Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation.provider`:
+Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation_engine.provider`:
 
 #### Option 1: Playwright MCP (Default)
 
@@ -106,7 +106,7 @@ Alternative provider using [Vercel's agent-browser CLI](https://github.com/verce
 
 ```json
 {
-  "browser_automation": {
+  "browser_automation_engine": {
     "provider": "agent-browser"
   }
 }
