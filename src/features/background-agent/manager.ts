@@ -7,7 +7,8 @@ import type {
 } from "./types"
 import { log, getAgentToolRestrictions } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
-import type { BackgroundTaskConfig } from "../../config/schema"
+import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import { isInsideTmux } from "../../shared/tmux"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -68,12 +69,16 @@ export class BackgroundManager {
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
-
+  private tmuxEnabled: boolean
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
 
-  constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
+  constructor(
+    ctx: PluginInput,
+    config?: BackgroundTaskConfig,
+    tmuxConfig?: TmuxConfig
+  ) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.pendingByParent = new Map()
@@ -81,6 +86,7 @@ export class BackgroundManager {
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
     this.config = config
+    this.tmuxEnabled = tmuxConfig?.enabled ?? false
     this.registerProcessCleanup()
   }
 
@@ -221,6 +227,11 @@ export class BackgroundManager {
 
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
+
+    // Wait for TmuxSessionManager to spawn pane via event hook
+    if (this.tmuxEnabled && isInsideTmux()) {
+      await new Promise(r => setTimeout(r, 500))
+    }
 
     // Update task to running state
     task.status = "running"
