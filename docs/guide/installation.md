@@ -132,7 +132,7 @@ First, add the opencode-antigravity-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.2.8"
+    "opencode-antigravity-auth@latest"
   ]
 }
 ```
@@ -140,7 +140,7 @@ First, add the opencode-antigravity-auth plugin:
 ##### Model Configuration
 
 You'll also need full model settings in `opencode.json`.
-Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy provider/models config from the README, and merge carefully to avoid breaking the user's existing setup.
+Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy the full model configuration from the README, and merge carefully to avoid breaking the user's existing setup. The plugin now uses a **variant system** — models like `antigravity-gemini-3-pro` support `low`/`high` variants instead of separate `-low`/`-high` model entries.
 
 ##### oh-my-opencode Agent Model Override
 
@@ -154,7 +154,17 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 }
 ```
 
-**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro`, `google/gemini-3-flash`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
+**Available models (Antigravity quota)**:
+- `google/antigravity-gemini-3-pro` — variants: `low`, `high`
+- `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
+- `google/antigravity-claude-sonnet-4-5` — no variants
+- `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
+
+**Available models (Gemini CLI quota)**:
+- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
+
+> **Note**: Legacy tier-suffixed names like `google/antigravity-gemini-3-pro-high` still work but variants are recommended. Use `--variant=high` with the base model name instead.
 
 Then authenticate:
 
