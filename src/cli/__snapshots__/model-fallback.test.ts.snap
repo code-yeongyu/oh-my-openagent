@@ -712,7 +712,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "explore": {
-      "model": "opencode/gpt-5-nano",
+      "model": "github-copilot/gpt-5-mini",
     },
     "librarian": {
       "model": "github-copilot/claude-sonnet-4.5",
@@ -776,7 +776,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "explore": {
-      "model": "opencode/gpt-5-nano",
+      "model": "github-copilot/gpt-5-mini",
     },
     "librarian": {
       "model": "github-copilot/claude-sonnet-4.5",
@@ -1022,7 +1022,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "explore": {
-      "model": "opencode/gpt-5-nano",
+      "model": "github-copilot/gpt-5-mini",
     },
     "librarian": {
       "model": "github-copilot/claude-sonnet-4.5",

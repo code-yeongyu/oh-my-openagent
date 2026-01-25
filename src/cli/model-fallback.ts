@@ -139,12 +139,14 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       continue
     }
 
-    // Special case: explore uses Claude haiku → OpenCode gpt-5-nano
+    // Special case: explore uses Claude haiku → GitHub Copilot gpt-5-mini → OpenCode gpt-5-nano
     if (role === "explore") {
       if (avail.native.claude) {
         agents[role] = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
+      } else if (avail.copilot) {
+        agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else {
         agents[role] = { model: "opencode/gpt-5-nano" }
       }

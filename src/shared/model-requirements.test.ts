@@ -59,14 +59,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // #when - accessing explore requirement
-    // #then - fallbackChain exists with claude-haiku-4-5 as first entry
+    // #then - fallbackChain exists with claude-haiku-4-5 as first entry, gpt-5-mini as second, gpt-5-nano as third
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain.length).toBeGreaterThan(0)
+    expect(explore.fallbackChain).toHaveLength(3)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("anthropic")
+    expect(primary.providers).toContain("opencode")
     expect(primary.model).toBe("claude-haiku-4-5")
+
+    const secondary = explore.fallbackChain[1]
+    expect(secondary.providers).toContain("github-copilot")
+    expect(secondary.model).toBe("gpt-5-mini")
+
+    const tertiary = explore.fallbackChain[2]
+    expect(tertiary.providers).toContain("opencode")
+    expect(tertiary.model).toBe("gpt-5-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gemini-3-flash as primary", () => {
