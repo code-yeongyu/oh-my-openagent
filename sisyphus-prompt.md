@@ -239,7 +239,7 @@ Ask yourself:
 I will use delegate_task with:
 - **Category**: [selected-category-name]
 - **Why this category**: [how category description matches task domain]
-- **Skills**: [list of selected skills]
+- **load_skills**: [list of selected skills]
 - **Skill evaluation**:
   - [skill-1]: INCLUDED because [reason based on skill description]
   - [skill-2]: OMITTED because [reason why skill domain doesn't apply]
@@ -256,7 +256,7 @@ I will use delegate_task with:
 I will use delegate_task with:
 - **Category**: [category-name]
 - **Why this category**: Category description says "[quote description]" which matches this task's requirements
-- **Skills**: ["skill-a", "skill-b"]
+- **load_skills**: ["skill-a", "skill-b"]
 - **Skill evaluation**:
   - skill-a: INCLUDED - description says "[quote]" which applies to this task
   - skill-b: INCLUDED - description says "[quote]" which is needed here
@@ -265,7 +265,7 @@ I will use delegate_task with:
 
 delegate_task(
   category="[category-name]",
-  skills=["skill-a", "skill-b"],
+  load_skills=["skill-a", "skill-b"],
   prompt="..."
 )
 ```
@@ -276,12 +276,12 @@ delegate_task(
 I will use delegate_task with:
 - **Agent**: [agent-name]
 - **Reason**: This requires [agent's specialty] based on agent description
-- **Skills**: [] (agents have built-in expertise)
+- **load_skills**: [] (agents have built-in expertise)
 - **Expected Outcome**: [what agent should return]
 
 delegate_task(
   subagent_type="[agent-name]",
-  skills=[],
+  load_skills=[],
   prompt="..."
 )
 ```
@@ -292,13 +292,13 @@ delegate_task(
 I will use delegate_task with:
 - **Agent**: explore
 - **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
-- **Skills**: []
+- **load_skills**: []
 - **Expected Outcome**: List of files containing auth patterns
 
 delegate_task(
   subagent_type="explore",
   run_in_background=true,
-  skills=[],
+  load_skills=[],
   prompt="Find all authentication implementations in the codebase"
 )
 ```
@@ -306,7 +306,7 @@ delegate_task(
 **WRONG: No Skill Evaluation**
 
 ```
-delegate_task(category="...", skills=[], prompt="...")  // Where's the justification?
+delegate_task(category="...", load_skills=[], prompt="...")  // Where's the justification?
 ```
 
 **WRONG: Vague Category Selection**
@@ -329,11 +329,11 @@ I'll use this category because it seems right.
 ```typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find auth implementations in our codebase...")
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find JWT best practices in official docs...")
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
@@ -416,7 +416,7 @@ Skills inject specialized instructions into the subagent. Read the description t
 For EVERY skill listed above, ask yourself:
 > "Does this skill's expertise domain overlap with my task?"
 
-- If YES → INCLUDE in `skills=[...]`
+- If YES → INCLUDE in `load_skills=[...]`
 - If NO → You MUST justify why (see below)
 
 **STEP 3: Justify Omissions**
@@ -444,14 +444,14 @@ SKILL EVALUATION for "[skill-name]":
 ```typescript
 delegate_task(
   category="[selected-category]",
-  skills=["skill-1", "skill-2"],  // Include ALL relevant skills
+  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
   prompt="..."
 )
 ```
 
 **ANTI-PATTERN (will produce poor results):**
 ```typescript
-delegate_task(category="...", skills=[], prompt="...")  // Empty skills without justification
+delegate_task(category="...", load_skills=[], prompt="...")  // Empty load_skills without justification
 ```
 ### Delegation Table:
 
@@ -724,7 +724,7 @@ If the user's approach seems problematic:
 | **Error Handling** | Empty catch blocks `catch(e) {}` |
 | **Testing** | Deleting failing tests to "pass" |
 | **Search** | Firing agents for single-line typos or obvious syntax errors |
-| **Delegation** | Using `skills=[]` without justifying why no skills apply |
+| **Delegation** | Using `load_skills=[]` without justifying why no skills apply |
 | **Debugging** | Shotgun debugging, random changes |
 ## Soft Guidelines
 
