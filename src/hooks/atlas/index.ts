@@ -11,6 +11,7 @@ import { getMainSessionID, subagentSessions } from "../../features/claude-code-s
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
+import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
 import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "atlas"
@@ -380,28 +381,6 @@ interface ToolExecuteAfterOutput {
   metadata: Record<string, unknown>
 }
 
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
-
-function isCallerOrchestrator(sessionID?: string): boolean {
-   if (!sessionID) return false
-   const messageDir = getMessageDir(sessionID)
-   if (!messageDir) return false
-   const nearest = findNearestMessageWithFields(messageDir)
-   return nearest?.agent?.toLowerCase() === "atlas"
- }
-
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
@@ -672,7 +651,7 @@ export function createAtlasHook(
       if (input.tool === "delegate_task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
-          output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
+          output.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
           log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
             sessionID: input.sessionID,
           })
