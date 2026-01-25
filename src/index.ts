@@ -54,6 +54,8 @@ import {
   setMainSession,
   getMainSessionID,
   setSessionAgent,
+  setSessionModel,
+  getSessionModel,
   updateSessionAgent,
   clearSessionAgent,
 } from "./features/claude-code-session-state";
@@ -380,7 +382,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         setSessionAgent(input.sessionID, input.agent);
       }
 
-      const message = (output as { message: { variant?: string } }).message
+      const message = (output as { message: { variant?: string; model?: { providerID?: string; modelID?: string } } }).message
+      if (message.model?.providerID && message.model?.modelID) {
+        setSessionModel(input.sessionID, {
+          providerID: message.model.providerID,
+          modelID: message.model.modelID,
+        });
+      }
       if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
         const variant = resolveAgentVariant(pluginConfig, input.agent)
         if (variant !== undefined) {

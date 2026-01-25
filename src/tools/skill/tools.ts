@@ -5,6 +5,7 @@ import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
+import { getSessionModel } from "../../features/claude-code-session-state"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 
@@ -163,7 +164,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     args: {
       name: tool.schema.string().describe("The skill identifier from available_skills (e.g., 'code-review')"),
     },
-    async execute(args: SkillArgs, ctx?: { agent?: string }) {
+    async execute(args: SkillArgs, ctx?: { agent?: string; sessionID?: string }) {
       const skills = await getSkills()
       const skill = skills.find(s => s.name === args.name)
 
@@ -183,11 +184,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       }
 
       const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
+      const currentModel = ctx?.sessionID ? getSessionModel(ctx.sessionID) : undefined
 
       const output = [
         `## Skill: ${skill.name}`,
         "",
         `**Base directory**: ${dir}`,
+        ...(currentModel ? [`**Current Model**: ${currentModel.providerID}/${currentModel.modelID}`] : []),
         "",
         body,
       ]

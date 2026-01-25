@@ -7,6 +7,7 @@ import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
+import { getSessionModel } from "../../features/claude-code-session-state"
 import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -100,7 +101,12 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
   }
 }
 
-async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
+interface CurrentModelInfo {
+  providerID: string
+  modelID: string
+}
+
+async function formatLoadedCommand(cmd: CommandInfo, currentModel?: CurrentModelInfo): Promise<string> {
   const sections: string[] = []
 
   sections.push(`# /${cmd.name} Command\n`)
@@ -126,6 +132,11 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<string> {
   }
 
   sections.push(`**Scope**: ${cmd.scope}\n`)
+  
+  if (currentModel) {
+    sections.push(`**Current Model**: ${currentModel.providerID}/${currentModel.modelID}\n`)
+  }
+  
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
@@ -230,7 +241,7 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
         ),
     },
 
-    async execute(args) {
+    async execute(args, ctx) {
       const allItems = await getAllItems()
 
       if (!args.command) {
@@ -244,7 +255,8 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       )
 
       if (exactMatch) {
-        return await formatLoadedCommand(exactMatch)
+        const currentModel = ctx?.sessionID ? getSessionModel(ctx.sessionID) : undefined
+        return await formatLoadedCommand(exactMatch, currentModel)
       }
 
       const partialMatches = allItems.filter((cmd) =>

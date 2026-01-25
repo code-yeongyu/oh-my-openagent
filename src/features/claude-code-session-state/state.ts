@@ -14,14 +14,29 @@ export function getMainSessionID(): string | undefined {
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  sessionAgentMap.clear()
+  sessionModelMap.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()
+const sessionModelMap = new Map<string, { providerID: string; modelID: string }>()
 
 export function setSessionAgent(sessionID: string, agent: string): void {
   if (!sessionAgentMap.has(sessionID)) {
     sessionAgentMap.set(sessionID, agent)
   }
+}
+
+export function setSessionModel(sessionID: string, model: { providerID: string; modelID: string }): void {
+  sessionModelMap.set(sessionID, model)
+}
+
+export function getSessionModel(sessionID: string): { providerID: string; modelID: string } | undefined {
+  return sessionModelMap.get(sessionID)
+}
+
+export function clearSessionModel(sessionID: string): void {
+  sessionModelMap.delete(sessionID)
 }
 
 export function updateSessionAgent(sessionID: string, agent: string): void {
