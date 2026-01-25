@@ -87,15 +87,16 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
 // Synced with OpenCode's server.ts
 // https://github.com/sst/opencode/blob/dev/packages/opencode/src/lsp/server.ts
 export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
-   tsgo: {
-     command: ["tsgo", "lsp", "--stdio"],
-     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
-     priority: -50,
-   },
-   typescript: {
-     command: ["typescript-language-server", "--stdio"],
-     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
-   },
+  typescript: {
+    command: ["typescript-language-server", "--stdio"],
+    extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+    priority: -50,
+  },
+  tsgo: {
+    command: ["tsgo", "lsp", "--stdio"],
+    extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+    priority: -100, // Preview: deprioritized until rename/find-references are fully supported
+  },
   deno: {
     command: ["deno", "lsp"],
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs"],

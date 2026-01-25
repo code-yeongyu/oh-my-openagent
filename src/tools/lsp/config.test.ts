@@ -214,11 +214,10 @@ describe("findServerForExtension with tsgo", () => {
     // #when findServerForExtension is called for .ts
     const result = findServerForExtension(".ts")
 
-    // #then tsgo should be selected (higher priority: -50 vs -100)
+    // #then tsgo should be selected (PREFER_WHEN_INSTALLED: users who install preview tools want them)
     expect(result.status).toBe("found")
     if (result.status === "found") {
       expect(result.server.id).toBe("tsgo")
-      expect(result.server.priority).toBe(-50)
     }
   })
 
@@ -246,11 +245,11 @@ describe("findServerForExtension with tsgo", () => {
     // #when findServerForExtension is called for .ts
     const result = findServerForExtension(".ts")
 
-    // #then status should be not_installed with highest-priority server's details
+    // #then status should be not_installed with highest-priority server's details (typescript)
     expect(result.status).toBe("not_installed")
     if (result.status === "not_installed") {
-      expect(result.server.id).toBe("tsgo")
-      expect(result.installHint).toContain("native-preview")
+      expect(result.server.id).toBe("typescript")
+      expect(result.installHint).toContain("typescript-language-server")
     }
   })
 })

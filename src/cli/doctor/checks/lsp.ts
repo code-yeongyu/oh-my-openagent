@@ -6,8 +6,8 @@ const DEFAULT_LSP_SERVERS: Array<{
   binary: string
   extensions: string[]
 }> = [
-  { id: "tsgo", binary: "tsgo", extensions: [".ts", ".tsx", ".js", ".jsx"] },
   { id: "typescript-language-server", binary: "typescript-language-server", extensions: [".ts", ".tsx", ".js", ".jsx"] },
+  { id: "tsgo", binary: "tsgo", extensions: [".ts", ".tsx", ".js", ".jsx"] },
   { id: "pyright", binary: "pyright-langserver", extensions: [".py"] },
   { id: "rust-analyzer", binary: "rust-analyzer", extensions: [".rs"] },
   { id: "gopls", binary: "gopls", extensions: [".go"] },

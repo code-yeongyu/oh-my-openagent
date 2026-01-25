@@ -113,8 +113,27 @@ function getMergedServers(): ServerWithSource[] {
   })
 }
 
+const PREFER_WHEN_INSTALLED = ["tsgo"]
+
 export function findServerForExtension(ext: string): ServerLookupResult {
   const servers = getMergedServers()
+
+  for (const id of PREFER_WHEN_INSTALLED) {
+    const server = servers.find((s) => s.id === id && s.extensions.includes(ext))
+    if (server && isServerInstalled(server.command)) {
+      return {
+        status: "found",
+        server: {
+          id: server.id,
+          command: server.command,
+          extensions: server.extensions,
+          priority: server.priority,
+          env: server.env,
+          initialization: server.initialization,
+        },
+      }
+    }
+  }
 
   for (const server of servers) {
     if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
