@@ -3,6 +3,7 @@ export interface LSPServerConfig {
   command: string[]
   extensions: string[]
   disabled?: boolean
+  priority?: number
   env?: Record<string, string>
   initialization?: Record<string, unknown>
 }

@@ -99,7 +99,7 @@ function getMergedServers(): ServerWithSource[] {
       id,
       command: config.command,
       extensions: config.extensions,
-      priority: -100,
+      priority: config.priority ?? -100,
       source: "opencode",
     })
   }
