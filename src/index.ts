@@ -31,6 +31,7 @@ import {
   createStartWorkHook,
   createAtlasHook,
   createPrometheusMdOnlyHook,
+  createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
 } from "./hooks";
 import {
@@ -202,6 +203,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
     ? createPrometheusMdOnlyHook(ctx)
+    : null;
+
+  const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
+    ? createSisyphusJuniorNotepadHook(ctx)
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
@@ -495,6 +500,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
