@@ -131,4 +131,17 @@ describe("lsp check", () => {
       expect(def.critical).toBe(false)
     })
   })
+
+  describe("getLspServersInfo with tsgo", () => {
+    it("includes tsgo in server list", async () => {
+      // #given
+      // #when getting servers info
+      const servers = await lsp.getLspServersInfo()
+
+      // #then should include tsgo server
+      const tsgoServer = servers.find((s) => s.id === "tsgo")
+      expect(tsgoServer).toBeDefined()
+      expect(tsgoServer?.extensions).toContain(".ts")
+    })
+  })
 })
