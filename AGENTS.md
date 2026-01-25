@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-23T15:59:00+09:00
-**Commit:** 599fad0e
+**Generated:** 2026-01-25T13:10:00+09:00
+**Commit:** 043b1a33
 **Branch:** dev
 
 ## OVERVIEW
@@ -21,7 +21,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (593 lines)
+│   └── index.ts       # Main plugin entry (601 lines)
 ├── script/            # build-schema.ts, build-binaries.ts
 ├── packages/          # 7 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
@@ -36,6 +36,7 @@ oh-my-opencode/
 | Add tool | `src/tools/` | Dir with index/types/constants/tools.ts |
 | Add MCP | `src/mcp/` | Create config, add to index.ts |
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
+| Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
 | Background agents | `src/features/background-agent/` | manager.ts (1335 lines) |
 | Orchestrator | `src/hooks/atlas/` | Main orchestration hook (773 lines) |
@@ -60,7 +61,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern via index.ts
 - **Naming**: kebab-case dirs, `createXXXHook`/`createXXXTool` factories
-- **Testing**: BDD comments, 90 test files
+- **Testing**: BDD comments, 95 test files
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS
@@ -99,7 +100,7 @@ oh-my-opencode/
 bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
-bun test               # 90 test files
+bun test               # 95 test files
 ```
 
 ## DEPLOYMENT
@@ -118,7 +119,11 @@ bun test               # 90 test files
 | `src/agents/prometheus-prompt.ts` | 1196 | Planning agent |
 | `src/tools/delegate-task/tools.ts` | 1039 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 773 | Orchestrator hook |
-| `src/cli/config-manager.ts` | 641 | JSONC config parsing |
+| `src/cli/config-manager.ts` | 664 | JSONC config parsing |
+| `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
+| `src/index.ts` | 601 | Main plugin entry |
+| `src/tools/lsp/client.ts` | 596 | LSP JSON-RPC client |
+| `src/agents/atlas.ts` | 572 | Atlas orchestrator agent |
 
 ## MCP ARCHITECTURE
 

@@ -12,12 +12,14 @@ features/
 │   ├── manager.ts              # Launch → poll → complete
 │   ├── concurrency.ts          # Per-provider limits
 │   └── types.ts                # BackgroundTask, LaunchInput
-├── skill-mcp-manager/          # MCP client lifecycle
+├── skill-mcp-manager/          # MCP client lifecycle (520 lines)
 │   ├── manager.ts              # Lazy loading, cleanup
 │   └── types.ts                # SkillMcpConfig
 ├── builtin-skills/             # Playwright, git-master, frontend-ui-ux
 │   └── skills.ts               # 1203 lines
-├── builtin-commands/           # ralph-loop, refactor, init-deep
+├── builtin-commands/           # ralph-loop, refactor, init-deep, start-work, remove-deadcode
+│   ├── commands.ts             # Command registry
+│   └── templates/              # Command templates (4 files)
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # .mcp.json
@@ -26,7 +28,8 @@ features/
 ├── opencode-skill-loader/      # Skills from 6 directories
 ├── context-injector/           # AGENTS.md/README.md injection
 ├── boulder-state/              # Todo state persistence
-└── hook-message-injector/      # Message injection
+├── hook-message-injector/      # Message injection
+└── task-toast-manager/         # Background task notifications
 ```
 
 ## LOADER PRIORITY
