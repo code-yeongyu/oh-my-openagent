@@ -323,7 +323,7 @@ delegate_task(
 **If verification fails**: Resume the SAME session with the ACTUAL error output:
 \`\`\`typescript
 delegate_task(
-  resume="ses_xyz789",  // ALWAYS use the session from the failed task
+  session_id="ses_xyz789",  // ALWAYS use the session from the failed task
   load_skills=[...],
   prompt="Verification failed: {actual error}. Fix."
 )
@@ -331,24 +331,24 @@ delegate_task(
 
 ### 3.5 Handle Failures (USE RESUME)
 
-**CRITICAL: When re-delegating, ALWAYS use \`resume\` parameter.**
+**CRITICAL: When re-delegating, ALWAYS use \`session_id\` parameter.**
 
 Every \`delegate_task()\` output includes a session_id. STORE IT.
 
 If task fails:
 1. Identify what went wrong
 2. **Resume the SAME session** - subagent has full context already:
-   \`\`\`typescript
-   delegate_task(
-     resume="ses_xyz789",  // Session from failed task
-     load_skills=[...],
-     prompt="FAILED: {error}. Fix by: {specific instruction}"
-   )
-   \`\`\`
+    \`\`\`typescript
+    delegate_task(
+      session_id="ses_xyz789",  // Session from failed task
+      load_skills=[...],
+      prompt="FAILED: {error}. Fix by: {specific instruction}"
+    )
+    \`\`\`
 3. Maximum 3 retry attempts with the SAME session
 4. If blocked after 3 attempts: Document and continue to independent tasks
 
-**Why resume is MANDATORY for failures:**
+**Why session_id is MANDATORY for failures:**
 - Subagent already read all files, knows the context
 - No repeated exploration = 70%+ token savings
 - Subagent knows what approaches already failed
@@ -493,7 +493,7 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Parallelize independent tasks
 - Verify with your own tools
 - **Store session_id from every delegation output**
-- **Use \`resume="{session_id}"\` for retries, fixes, and follow-ups**
+- **Use \`session_id="{session_id}"\` for retries, fixes, and follow-ups**
 </critical_overrides>
 `
 
