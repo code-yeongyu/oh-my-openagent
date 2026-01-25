@@ -75,7 +75,7 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 4 skills regardless of provider", () => {
+	test("returns exactly 5 skills regardless of provider", () => {
 		// #given
 
 		// #when
@@ -83,7 +83,22 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// #then
-		expect(defaultSkills).toHaveLength(4)
-		expect(agentBrowserSkills).toHaveLength(4)
+		expect(defaultSkills).toHaveLength(5)
+		expect(agentBrowserSkills).toHaveLength(5)
+	})
+
+	test("includes runtime-debugging skill", () => {
+		// #given
+
+		// #when
+		const skills = createBuiltinSkills()
+
+		// #then
+		const runtimeDebuggingSkill = skills.find((s) => s.name === "runtime-debugging")
+		expect(runtimeDebuggingSkill).toBeDefined()
+		expect(runtimeDebuggingSkill!.description).toContain("runtime")
+		expect(runtimeDebuggingSkill!.template).toContain("Debug Server")
+		expect(runtimeDebuggingSkill!.template).toContain("NDJSON")
+		expect(runtimeDebuggingSkill!.template).toContain("hypothesisId")
 	})
 })

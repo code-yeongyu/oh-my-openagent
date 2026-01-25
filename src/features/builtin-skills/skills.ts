@@ -1716,6 +1716,351 @@ EOF
 \`\`\``,
 }
 
+const runtimeDebuggingSkill: BuiltinSkill = {
+  name: "runtime-debugging",
+  description:
+    "Debug runtime issues with hypothesis-driven instrumentation. Use for async issues, state problems, race conditions.",
+  template: `# Runtime Debugging Skill
+
+Debug runtime issues systematically using hypothesis-driven instrumentation and a lightweight debug server.
+
+## Overview
+
+This skill helps you debug runtime issues (async problems, state corruption, race conditions) by:
+1. Forming hypotheses about what's wrong
+2. Adding targeted instrumentation to verify/refute hypotheses
+3. Analyzing logs to find root cause
+4. Fixing and verifying the fix
+
+## Debug Server Contract
+
+Create \`.opencode/debug/server.js\` with this content:
+
+\`\`\`javascript
+// Debug Server - Port 7777 (or pass custom port as CLI arg)
+// Usage: node .opencode/debug/server.js [port]
+// Requires: Node.js (or Bun)
+
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const PORT = parseInt(process.argv[2]) || 7777;
+const LOG_DIR = path.join(process.cwd(), ".opencode", "debug");
+const LOG_FILE = path.join(LOG_DIR, "debug.log");
+
+// Ensure log directory exists
+if (!fs.existsSync(LOG_DIR)) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+}
+
+const server = http.createServer((req, res) => {
+  // CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", port: PORT }));
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/ingest") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      try {
+        const entry = JSON.parse(body);
+        // Add server timestamp if not present
+        if (!entry.timestamp) {
+          entry.timestamp = Date.now();
+        }
+        // Append as NDJSON
+        fs.appendFileSync(LOG_FILE, JSON.stringify(entry) + "\\n");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+      }
+    });
+    return;
+  }
+
+  res.writeHead(404);
+  res.end("Not Found");
+});
+
+server.listen(PORT, () => {
+  console.log(\\\`Debug server listening on http://localhost:\\\${PORT}\\\`);
+  console.log(\\\`Log file: \\\${LOG_FILE}\\\`);
+  console.log("Endpoints:");
+  console.log("  POST /ingest - Send debug log entries");
+  console.log("  GET /health  - Health check");
+});
+\`\`\`
+
+**Start the server:**
+\`\`\`bash
+mkdir -p .opencode/debug && node .opencode/debug/server.js &
+\`\`\`
+
+## NDJSON Log Entry Schema
+
+Each log entry is a JSON object on its own line:
+
+\`\`\`json
+{
+  "hypothesisId": "A",
+  "label": "fn-entry",
+  "location": "src/api.ts:42",
+  "message": "Function called",
+  "data": { "arg1": 123, "arg2": "test" },
+  "level": "info",
+  "timestamp": 1704067925123
+}
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| hypothesisId | string | Yes | Links log to hypothesis (A, B, C...) |
+| label | string | Yes | Semantic label (fn-entry, fn-exit, state-change, error, checkpoint) |
+| location | string | Yes | Source location (file:line) |
+| message | string | Yes | Human-readable description |
+| data | object | No | Arbitrary payload (args, state, etc.) |
+| level | string | No | Log level: debug, info, warn, error (default: info) |
+| timestamp | number | No | Unix ms timestamp (server adds if missing) |
+
+## Instrumentation Functions
+
+### JavaScript/TypeScript
+
+\`\`\`typescript
+// Add to instrumented file or a shared utils file
+async function __debugLog(
+  hypothesisId: string,
+  label: string,
+  location: string,
+  message: string,
+  data?: Record<string, unknown>,
+  level: string = "info"
+): Promise<void> {
+  try {
+    await fetch("http://localhost:7777/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hypothesisId,
+        label,
+        location,
+        message,
+        data,
+        level,
+        timestamp: Date.now(),
+      }),
+    });
+  } catch {
+    // Silent fail - don't break app if debug server is down
+  }
+}
+
+// Usage examples:
+await __debugLog("A", "fn-entry", "src/api.ts:42", "processOrder called", { orderId: 123 });
+await __debugLog("A", "state-change", "src/api.ts:55", "Order status updated", { from: "pending", to: "processing" });
+await __debugLog("A", "fn-exit", "src/api.ts:78", "processOrder completed", { result: "success" });
+\`\`\`
+
+### Python
+
+\`\`\`python
+import requests
+import time
+from typing import Any, Optional
+
+def debug_log(
+    hypothesis_id: str,
+    label: str,
+    location: str,
+    message: str,
+    data: Optional[dict[str, Any]] = None,
+    level: str = "info"
+) -> None:
+    """Send debug log entry to debug server."""
+    try:
+        requests.post(
+            "http://localhost:7777/ingest",
+            json={
+                "hypothesisId": hypothesis_id,
+                "label": label,
+                "location": location,
+                "message": message,
+                "data": data,
+                "level": level,
+                "timestamp": int(time.time() * 1000),
+            },
+            timeout=1,
+        )
+    except Exception:
+        pass  # Silent fail
+
+# Usage:
+debug_log("A", "fn-entry", "api.py:42", "process_order called", {"order_id": 123})
+\`\`\`
+
+### Go
+
+\`\`\`go
+package debug
+
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+    "time"
+)
+
+type LogEntry struct {
+    HypothesisID string                 \\\`json:"hypothesisId"\\\`
+    Label        string                 \\\`json:"label"\\\`
+    Location     string                 \\\`json:"location"\\\`
+    Message      string                 \\\`json:"message"\\\`
+    Data         map[string]interface{} \\\`json:"data,omitempty"\\\`
+    Level        string                 \\\`json:"level"\\\`
+    Timestamp    int64                  \\\`json:"timestamp"\\\`
+}
+
+func DebugLog(hypothesisID, label, location, message string, data map[string]interface{}) {
+    entry := LogEntry{
+        HypothesisID: hypothesisID,
+        Label:        label,
+        Location:     location,
+        Message:      message,
+        Data:         data,
+        Level:        "info",
+        Timestamp:    time.Now().UnixMilli(),
+    }
+    body, _ := json.Marshal(entry)
+    client := &http.Client{Timeout: time.Second}
+    client.Post("http://localhost:7777/ingest", "application/json", bytes.NewReader(body))
+}
+
+// Usage:
+// debug.DebugLog("A", "fn-entry", "api.go:42", "ProcessOrder called", map[string]interface{}{"orderID": 123})
+\`\`\`
+
+## 7-Step Debugging Workflow
+
+### Step 1: Describe the Problem
+Clearly articulate:
+- What behavior is expected?
+- What behavior is observed?
+- When does it happen? (Always? Sometimes? Under specific conditions?)
+- Any error messages or symptoms?
+
+### Step 2: Form Hypotheses
+List 2-4 possible causes, labeled A, B, C, etc.:
+- **Hypothesis A**: "The async callback fires before state is initialized"
+- **Hypothesis B**: "Race condition between two concurrent requests"
+- **Hypothesis C**: "Stale closure captures old state value"
+
+### Step 3: Design Instrumentation
+For each hypothesis, identify:
+- What code paths to instrument
+- What data to capture
+- What sequence of events would confirm/refute the hypothesis
+
+### Step 4: Add Instrumentation
+Insert \`__debugLog\` / \`debug_log\` / \`DebugLog\` calls at strategic points:
+- Function entry/exit
+- State changes
+- Async boundaries (before/after await, callback entry)
+- Error handlers
+- Branch points
+
+**Keep instrumentation minimal and targeted.** Don't log everything.
+
+### Step 5: Reproduce the Issue
+1. Ensure debug server is running
+2. Clear previous logs: \`> .opencode/debug/debug.log\`
+3. Trigger the problematic behavior
+4. Collect logs
+
+### Step 6: Analyze Logs
+\`\`\`bash
+# View all logs
+cat .opencode/debug/debug.log | jq .
+
+# Filter by hypothesis
+cat .opencode/debug/debug.log | jq 'select(.hypothesisId == "A")'
+
+# View timeline
+cat .opencode/debug/debug.log | jq -r '[.timestamp, .hypothesisId, .label, .message] | @tsv' | sort -n
+
+# Find errors
+cat .opencode/debug/debug.log | jq 'select(.level == "error")'
+\`\`\`
+
+Look for:
+- Unexpected ordering of events
+- Missing expected log entries
+- Unexpected data values
+- Timing gaps
+
+### Step 7: Fix and Verify
+1. Implement the fix based on findings
+2. Keep instrumentation in place
+3. Reproduce the scenario
+4. Verify logs show correct behavior
+5. Remove instrumentation
+6. Run full test suite
+
+## Cleanup Instructions
+
+After debugging is complete:
+
+1. **Remove instrumentation code** from all modified files
+2. **Stop the debug server**: \`pkill -f "node .opencode/debug/server.js"\`
+3. **Delete debug artifacts**:
+   \`\`\`bash
+   rm -rf .opencode/debug/
+   \`\`\`
+
+## Git Safety
+
+**IMPORTANT**: Never commit debug artifacts!
+
+Add to \`.gitignore\`:
+\`\`\`
+.opencode/debug/
+\`\`\`
+
+Before committing, verify:
+\`\`\`bash
+git status | grep -E "debug|__debugLog|debug_log"
+\`\`\`
+
+If you see any debug-related changes, remove them before committing.
+
+## Quick Reference
+
+| Action | Command |
+|--------|---------|
+| Start server | \`node .opencode/debug/server.js &\` |
+| Check server | \`curl http://localhost:7777/health\` |
+| Clear logs | \`> .opencode/debug/debug.log\` |
+| View logs | \`cat .opencode/debug/debug.log \\| jq .\` |
+| Stop server | \`pkill -f "node .opencode/debug/server.js"\` |
+| Cleanup | \`rm -rf .opencode/debug/\` |
+`,
+}
+
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
 }
@@ -1725,5 +2070,5 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 
   const browserSkill = browserProvider === "agent-browser" ? agentBrowserSkill : playwrightSkill
 
-  return [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill]
+  return [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, runtimeDebuggingSkill]
 }
