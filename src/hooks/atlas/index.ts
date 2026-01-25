@@ -179,13 +179,13 @@ If you were NOT given **exactly ONE atomic task**, you MUST:
 `
 
 function buildVerificationReminder(sessionId: string): string {
-  return `${VERIFICATION_REMINDER}
+   return `${VERIFICATION_REMINDER}
 
 ---
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-delegate_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
+delegate_task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -711,8 +711,8 @@ export function createAtlasHook(
         return
       }
 
-      const outputStr = output.output && typeof output.output === "string" ? output.output : ""
-      const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task resumed")
+       const outputStr = output.output && typeof output.output === "string" ? output.output : ""
+       const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
       
       if (isBackgroundLaunch) {
         return
