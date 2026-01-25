@@ -1838,12 +1838,41 @@ Each log entry is a JSON object on its own line:
 | level | string | No | Log level: debug, info, warn, error (default: info) |
 | timestamp | number | No | Unix ms timestamp (server adds if missing) |
 
+## Region Markers for Instrumentation
+
+**CRITICAL**: ALL debug instrumentation MUST be wrapped with region markers for systematic removal.
+
+### Region Marker Format
+
+| Language | Start Marker | End Marker |
+|----------|--------------|------------|
+| JavaScript/TypeScript | \`// @DEBUG:START\` | \`// @DEBUG:END\` |
+| Python | \`# @DEBUG:START\` | \`# @DEBUG:END\` |
+| Go | \`// @DEBUG:START\` | \`// @DEBUG:END\` |
+| Rust | \`// @DEBUG:START\` | \`// @DEBUG:END\` |
+| Ruby | \`# @DEBUG:START\` | \`# @DEBUG:END\` |
+| Java/Kotlin | \`// @DEBUG:START\` | \`// @DEBUG:END\` |
+| C/C++ | \`// @DEBUG:START\` | \`// @DEBUG:END\` |
+| Shell/Bash | \`# @DEBUG:START\` | \`# @DEBUG:END\` |
+| HTML | \`<!-- @DEBUG:START -->\` | \`<!-- @DEBUG:END -->\` |
+| CSS | \`/* @DEBUG:START */\` | \`/* @DEBUG:END */\` |
+
+### Find All Debug Regions
+
+\`\`\`bash
+# Find all files with debug instrumentation
+grep -rn "@DEBUG:START" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go"
+
+# Count debug regions
+grep -c "@DEBUG:START" . -r --include="*.ts" --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | grep -v ":0$"
+\`\`\`
+
 ## Instrumentation Functions
 
 ### JavaScript/TypeScript
 
 \`\`\`typescript
-// Add to instrumented file or a shared utils file
+// @DEBUG:START - Debug logging utility
 async function __debugLog(
   hypothesisId: string,
   label: string,
@@ -1870,16 +1899,23 @@ async function __debugLog(
     // Silent fail - don't break app if debug server is down
   }
 }
+// @DEBUG:END
 
-// Usage examples:
+// Usage examples (wrap each instrumentation block):
+// @DEBUG:START - Hypothesis A: async timing
 await __debugLog("A", "fn-entry", "src/api.ts:42", "processOrder called", { orderId: 123 });
+// @DEBUG:END
+
+// @DEBUG:START - Hypothesis A: state tracking
 await __debugLog("A", "state-change", "src/api.ts:55", "Order status updated", { from: "pending", to: "processing" });
 await __debugLog("A", "fn-exit", "src/api.ts:78", "processOrder completed", { result: "success" });
+// @DEBUG:END
 \`\`\`
 
 ### Python
 
 \`\`\`python
+# @DEBUG:START - Debug logging utility
 import requests
 import time
 from typing import Any, Optional
@@ -1909,14 +1945,18 @@ def debug_log(
         )
     except Exception:
         pass  # Silent fail
+# @DEBUG:END
 
-# Usage:
+# Usage (wrap each instrumentation block):
+# @DEBUG:START - Hypothesis A
 debug_log("A", "fn-entry", "api.py:42", "process_order called", {"order_id": 123})
+# @DEBUG:END
 \`\`\`
 
 ### Go
 
 \`\`\`go
+// @DEBUG:START - Debug logging utility
 package debug
 
 import (
@@ -1950,9 +1990,12 @@ func DebugLog(hypothesisID, label, location, message string, data map[string]int
     client := &http.Client{Timeout: time.Second}
     client.Post("http://localhost:7777/ingest", "application/json", bytes.NewReader(body))
 }
+// @DEBUG:END
 
-// Usage:
+// Usage (wrap each instrumentation block):
+// @DEBUG:START - Hypothesis A
 // debug.DebugLog("A", "fn-entry", "api.go:42", "ProcessOrder called", map[string]interface{}{"orderID": 123})
+// @DEBUG:END
 \`\`\`
 
 ## 7-Step Debugging Workflow
@@ -1977,6 +2020,15 @@ For each hypothesis, identify:
 - What sequence of events would confirm/refute the hypothesis
 
 ### Step 4: Add Instrumentation
+
+**CRITICAL: Always wrap instrumentation with region markers!**
+
+\`\`\`typescript
+// @DEBUG:START - Hypothesis A: [description]
+await __debugLog("A", "fn-entry", "src/api.ts:42", "processOrder called", { orderId });
+// @DEBUG:END
+\`\`\`
+
 Insert \`__debugLog\` / \`debug_log\` / \`DebugLog\` calls at strategic points:
 - Function entry/exit
 - State changes
@@ -1985,6 +2037,7 @@ Insert \`__debugLog\` / \`debug_log\` / \`DebugLog\` calls at strategic points:
 - Branch points
 
 **Keep instrumentation minimal and targeted.** Don't log everything.
+**Every debug block MUST have \`@DEBUG:START\` and \`@DEBUG:END\` markers.**
 
 ### Step 5: Reproduce the Issue
 1. Ensure debug server is running
@@ -2029,7 +2082,20 @@ Look for:
 
 After debugging is complete:
 
-1. **Remove instrumentation code** from all modified files
+1. **Remove instrumentation code systematically using region markers**:
+   \`\`\`bash
+   # Step 1: Find all files with debug instrumentation
+   grep -rn "@DEBUG:START" . --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" --include="*.py" --include="*.go" --include="*.rs" --include="*.rb" --include="*.java" --include="*.kt"
+   
+   # Step 2: For each file, remove all content between @DEBUG:START and @DEBUG:END (inclusive)
+   # The agent should open each file and delete the marked regions
+   \`\`\`
+   
+   **Systematic removal process:**
+   - Search for \`@DEBUG:START\` in all source files
+   - For each match, delete from \`@DEBUG:START\` line through \`@DEBUG:END\` line (inclusive)
+   - Verify no \`@DEBUG\` markers remain: \`grep -r "@DEBUG:" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go"\`
+
 2. **Revert any CSP changes** (if you modified CSP for frontend debugging):
    \`\`\`bash
    # Check for CSP modifications
@@ -2040,6 +2106,11 @@ After debugging is complete:
 4. **Delete debug artifacts**:
    \`\`\`bash
    rm -rf .opencode/debug/
+   \`\`\`
+5. **Final verification**:
+   \`\`\`bash
+   # Ensure no debug markers remain
+   grep -r "@DEBUG:" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go" && echo "WARNING: Debug markers still present!" || echo "✓ All debug instrumentation removed"
    \`\`\`
 
 ## Git Safety
@@ -2053,6 +2124,8 @@ Add to \`.gitignore\`:
 
 Before committing, verify:
 \`\`\`bash
+# Check for any remaining debug code
+grep -r "@DEBUG:" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go"
 git status | grep -E "debug|__debugLog|debug_log"
 \`\`\`
 
@@ -2207,6 +2280,8 @@ If modifying source code is not feasible, use a browser extension like [Requestl
 | Check server | \`curl http://localhost:7777/health\` |
 | **Clear logs (before each run)** | \`> .opencode/debug/debug.log\` |
 | View logs | \`cat .opencode/debug/debug.log \\| jq .\` |
+| **Find debug regions** | \`grep -rn "@DEBUG:START" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go"\` |
+| **Verify cleanup** | \`grep -r "@DEBUG:" . --include="*.ts" --include="*.js" --include="*.py" --include="*.go"\` |
 | Stop server | \`pkill -f "node .opencode/debug/server.js"\` |
 | Check CSP changes | \`git diff \\| grep -E "Content-Security-Policy\\|connect-src"\` |
 | **Full cleanup** | \`pkill -f "node .opencode/debug/server.js"; rm -rf .opencode/debug/\` |
