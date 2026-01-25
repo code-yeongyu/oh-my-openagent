@@ -1,4 +1,5 @@
 import { extname, basename } from "node:path"
+import { existsSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
@@ -80,6 +81,12 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       }
 
       log(`[look_at] Analyzing file: ${args.file_path}, goal: ${args.goal}`)
+
+      if (!existsSync(args.file_path)) {
+        const errorMsg = `Error: File not found: ${args.file_path}`
+        log(`[look_at] ${errorMsg}`)
+        return errorMsg
+      }
 
       const mimeType = inferMimeType(args.file_path)
       const filename = basename(args.file_path)
