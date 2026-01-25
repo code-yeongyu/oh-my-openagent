@@ -200,7 +200,9 @@ export function createSessionNotification(
 
   function markSessionActivity(sessionID: string) {
     cancelPendingNotification(sessionID)
-    notifiedSessions.delete(sessionID)
+    if (!executingNotifications.has(sessionID)) {
+      notifiedSessions.delete(sessionID)
+    }
   }
 
   async function executeNotification(sessionID: string, version: number) {
@@ -254,6 +256,11 @@ export function createSessionNotification(
     } finally {
       executingNotifications.delete(sessionID)
       pendingTimers.delete(sessionID)
+      // Clear notified state if there was activity during notification
+      if (sessionActivitySinceIdle.has(sessionID)) {
+        notifiedSessions.delete(sessionID)
+        sessionActivitySinceIdle.delete(sessionID)
+      }
     }
   }
 
@@ -262,7 +269,7 @@ export function createSessionNotification(
 
     const props = event.properties as Record<string, unknown> | undefined
 
-    if (event.type === "session.updated" || event.type === "session.created") {
+    if (event.type === "session.created") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.id as string | undefined
       if (sessionID) {
@@ -299,7 +306,7 @@ export function createSessionNotification(
       return
     }
 
-    if (event.type === "message.updated" || event.type === "message.created") {
+    if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       if (sessionID) {
