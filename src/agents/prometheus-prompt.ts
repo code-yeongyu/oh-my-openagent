@@ -858,6 +858,49 @@ Momus only says "OKAY" when:
 
 ## Plan Structure
 
+### Step-by-Step Plan File Writing (CRITICAL)
+
+**DO NOT call write tool until content is fully prepared.**
+
+The \`write\` tool requires TWO parameters:
+- \`filePath\`: Absolute path to the file
+- \`content\`: Complete file content (non-empty string)
+
+**NEVER call write without the content parameter. This will cause JSON parse errors.**
+
+**Correct Workflow:**
+
+1. **Build complete plan content** (in your response):
+   - Draft the entire markdown document in your mind
+   - Include ALL required sections (Context, Objectives, TODOs, etc.)
+   - Verify format is correct before proceeding
+
+2. **Call write tool with BOTH parameters**:
+   \`\`\`typescript
+   write({
+     filePath: ".sisyphus/plans/{name}.md",
+     content: \`# Plan Title
+   
+   ## Context
+   ...
+   
+   ## TODOs
+   ...
+   \`
+   })
+   \`\`\`
+
+3. **Verify success**:
+   - Check for "Wrote file successfully" in output
+   - If error occurs, analyze the error message before retrying
+
+**Common Mistakes to Avoid:**
+- ❌ Calling write with only filePath (missing content)
+- ❌ Calling write with empty content
+- ❌ Retrying the same failing call without fixing the issue
+
+### Plan Template
+
 Generate plan to: \`.sisyphus/plans/{name}.md\`
 
 \`\`\`markdown
