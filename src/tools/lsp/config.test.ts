@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { isServerInstalled } from "./config"
+import { isServerInstalled, findServerForExtension } from "./config"
 import { mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
@@ -116,15 +116,141 @@ describe("isServerInstalled", () => {
  
         expect(isServerInstalled([binName])).toBe(true)
      })
-  } else {
-      test("Non-Windows: does not use windows extensions", () => {
-          const binName = "test-lsp-server-win"
-          const binPath = join(tempDir, binName + ".cmd")
-          writeFileSync(binPath, "echo hello")
-          
-          process.env.PATH = tempDir
-          
-          expect(isServerInstalled([binName])).toBe(false)
-      })
+   } else {
+       test("Non-Windows: does not use windows extensions", () => {
+           const binName = "test-lsp-server-win"
+           const binPath = join(tempDir, binName + ".cmd")
+           writeFileSync(binPath, "echo hello")
+           
+           process.env.PATH = tempDir
+           
+           expect(isServerInstalled([binName])).toBe(false)
+       })
+   }
+})
+
+describe("findServerForExtension with tsgo", () => {
+  let tempDir: string
+  let tempConfigDir: string
+  let tempDataDir: string
+  let savedEnv: { 
+    PATH?: string
+    Path?: string
+    OPENCODE_CONFIG_DIR?: string
+    XDG_DATA_HOME?: string
   }
+  let savedCwd: string
+
+  beforeEach(() => {
+    // #given isolated temp environment
+    tempDir = mkdtempSync(join(tmpdir(), "lsp-tsgo-test-"))
+    tempConfigDir = mkdtempSync(join(tmpdir(), "lsp-tsgo-config-"))
+    tempDataDir = mkdtempSync(join(tmpdir(), "lsp-tsgo-data-"))
+    
+    savedEnv = { 
+      PATH: process.env.PATH,
+      Path: process.env.Path,
+      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+      XDG_DATA_HOME: process.env.XDG_DATA_HOME
+    }
+    savedCwd = process.cwd()
+    
+    // Isolate from real configs and data dirs
+    process.env.OPENCODE_CONFIG_DIR = tempConfigDir
+    process.env.XDG_DATA_HOME = tempDataDir
+    process.chdir(tempDir)
+  })
+
+  afterEach(() => {
+    // Restore original environment
+    process.chdir(savedCwd)
+    
+    process.env.PATH = savedEnv.PATH
+    if (process.platform === "win32") {
+      process.env.Path = savedEnv.Path
+    }
+    
+    // Restore or delete env vars
+    for (const key of ["OPENCODE_CONFIG_DIR", "XDG_DATA_HOME"] as const) {
+      if (savedEnv[key] !== undefined) {
+        process.env[key] = savedEnv[key]
+      } else {
+        delete process.env[key]
+      }
+    }
+    
+    try {
+      rmSync(tempDir, { recursive: true, force: true })
+      rmSync(tempConfigDir, { recursive: true, force: true })
+      rmSync(tempDataDir, { recursive: true, force: true })
+    } catch (e) {
+      console.error(`Cleanup failed: ${e}`)
+    }
+  })
+
+  // Helper to create fake binary with platform-specific extension
+  function createFakeBinary(name: string): void {
+    const ext = process.platform === "win32" ? ".cmd" : ""
+    const binPath = join(tempDir, name + ext)
+    writeFileSync(binPath, process.platform === "win32" ? "@echo off" : "#!/bin/sh\nexit 0")
+  }
+
+  // Helper to set PATH on both Windows and Unix deterministically
+  function setPath(pathValue: string): void {
+    process.env.PATH = pathValue
+    if (process.platform === "win32") {
+      process.env.Path = pathValue
+    }
+  }
+
+  test("selects tsgo over typescript when both are installed", () => {
+    // #given BOTH tsgo and typescript-language-server binaries exist in PATH
+    createFakeBinary("tsgo")
+    createFakeBinary("typescript-language-server")
+    
+    const pathSep = process.platform === "win32" ? ";" : ":"
+    setPath(tempDir + pathSep + (savedEnv.PATH || ""))
+
+    // #when findServerForExtension is called for .ts
+    const result = findServerForExtension(".ts")
+
+    // #then tsgo should be selected (higher priority: -50 vs -100)
+    expect(result.status).toBe("found")
+    if (result.status === "found") {
+      expect(result.server.id).toBe("tsgo")
+      expect(result.server.priority).toBe(-50)
+    }
+  })
+
+  test("falls back to typescript when only typescript-language-server is installed", () => {
+    // #given ONLY typescript-language-server exists in PATH (no tsgo)
+    createFakeBinary("typescript-language-server")
+    
+    const pathSep = process.platform === "win32" ? ";" : ":"
+    setPath(tempDir + pathSep + (savedEnv.PATH || ""))
+
+    // #when findServerForExtension is called for .ts
+    const result = findServerForExtension(".ts")
+
+    // #then typescript should be selected as fallback
+    expect(result.status).toBe("found")
+    if (result.status === "found") {
+      expect(result.server.id).toBe("typescript")
+    }
+  })
+
+  test("returns not_installed when neither tsgo nor typescript-language-server is installed", () => {
+    // #given NO TypeScript-related LSP servers in PATH
+    setPath(tempDir)
+
+    // #when findServerForExtension is called for .ts
+    const result = findServerForExtension(".ts")
+
+    // #then status should be not_installed with highest-priority server's details
+    expect(result.status).toBe("not_installed")
+    if (result.status === "not_installed") {
+      expect(result.server.id).toBe("tsgo")
+      expect(result.installHint).toContain("native-preview")
+    }
+  })
 })
