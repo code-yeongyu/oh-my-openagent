@@ -271,6 +271,31 @@ agent-browser install --with-deps
 agent-browser --version  # Should print version
 ```
 
+### Windows
+
+Standard `npm install -g agent-browser` may fail on Windows due to daemon startup and path escaping issues. Use the workaround below:
+
+```powershell
+# 1. Install the package
+npm install -g agent-browser
+
+# 2. Alias directly to the native Windows binary (PowerShell)
+Set-Alias agent-browser "$env:APPDATA\npm\node_modules\agent-browser\bin\agent-browser-win32-x64.exe"
+
+# 3. Download Chromium
+agent-browser install
+```
+
+For CMD, call the binary path directly instead of the alias:
+```cmd
+"%APPDATA%\npm\node_modules\agent-browser\bin\agent-browser-win32-x64.exe" install
+```
+
+Known limitations on Windows:
+- npm wrapper scripts may invoke `/bin/sh` and fail in PowerShell/CMD
+- Git Bash may also encounter daemon startup errors
+- If the alias workaround fails, try running the `.exe` binary directly
+
 ### Documentation
 
 - Repository: https://github.com/vercel-labs/agent-browser
