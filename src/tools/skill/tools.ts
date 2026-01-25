@@ -147,7 +147,14 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return cachedDescription
   }
 
-  getDescription()
+  if (options.skills) {
+    const skillInfos = options.skills.map(loadedSkillToInfo)
+    cachedDescription = skillInfos.length === 0
+      ? TOOL_DESCRIPTION_NO_SKILLS
+      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+  } else {
+    getDescription()
+  }
 
   return tool({
     get description() {
