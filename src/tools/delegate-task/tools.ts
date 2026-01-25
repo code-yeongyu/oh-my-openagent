@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
-import type { CategoryConfig, CategoriesConfig, GitMasterConfig } from "../../config/schema"
+import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
@@ -157,6 +157,7 @@ export interface DelegateTaskToolOptions {
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
+  browserProvider?: BrowserAutomationProvider
 }
 
 export interface BuildSystemContentInput {
@@ -179,7 +180,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel } = options
+  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel, browserProvider } = options
 
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const categoryNames = Object.keys(allCategories)
@@ -239,7 +240,7 @@ Prompts MUST be in English.`
 
       let skillContent: string | undefined
       if (args.load_skills.length > 0) {
-        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.load_skills, { gitMasterConfig })
+        const { resolved, notFound } = await resolveMultipleSkillsAsync(args.load_skills, { gitMasterConfig, browserProvider })
         if (notFound.length > 0) {
           const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
           const available = allSkills.map(s => s.name).join(", ")

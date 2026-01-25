@@ -78,11 +78,15 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 | **frontend-ui-ux** | UI/UX tasks, styling | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes. |
 | **git-master** | commit, rebase, squash, blame | MUST USE for ANY git operations. Atomic commits with automatic splitting, rebase/squash workflows, history search (blame, bisect, log -S). |
 
-### Skill: playwright
+### Skill: Browser Automation (playwright / agent-browser)
 
 **Trigger**: Any browser-related request
 
-Provides browser automation via Playwright MCP server:
+Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation_engine.provider`:
+
+#### Option 1: Playwright MCP (Default)
+
+The default provider uses Playwright MCP server:
 
 ```yaml
 mcp:
@@ -91,17 +95,40 @@ mcp:
     args: ["@playwright/mcp@latest"]
 ```
 
-**Capabilities**:
+**Usage**:
+```
+/playwright Navigate to example.com and take a screenshot
+```
+
+#### Option 2: Agent Browser CLI (Vercel)
+
+Alternative provider using [Vercel's agent-browser CLI](https://github.com/vercel-labs/agent-browser):
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  }
+}
+```
+
+**Requires installation**:
+```bash
+bun add -g agent-browser
+```
+
+**Usage**:
+```
+Use agent-browser to navigate to example.com and extract the main heading
+```
+
+#### Capabilities (Both Providers)
+
 - Navigate and interact with web pages
 - Take screenshots and PDFs
 - Fill forms and click elements
 - Wait for network requests
 - Scrape content
-
-**Usage**:
-```
-/playwright Navigate to example.com and take a screenshot
-```
 
 ### Skill: frontend-ui-ux
 

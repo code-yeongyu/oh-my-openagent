@@ -159,7 +159,7 @@ Available agents: `oracle`, `librarian`, `explore`, `multimodal-looker`
 
 Oh My OpenCode includes built-in skills that provide additional capabilities:
 
-- **playwright**: Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions.
+- **playwright** (default) / **agent-browser**: Browser automation for web scraping, testing, screenshots, and browser interactions. See [Browser Automation](#browser-automation) for switching between providers.
 - **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `delegate_task(category='quick', load_skills=['git-master'], ...)` to save context.
 
 Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
@@ -170,7 +170,54 @@ Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-openc
 }
 ```
 
-Available built-in skills: `playwright`, `git-master`
+Available built-in skills: `playwright`, `agent-browser`, `git-master`
+
+## Browser Automation
+
+Choose between two browser automation providers:
+
+| Provider | Interface | Features | Installation |
+|----------|-----------|----------|--------------|
+| **playwright** (default) | MCP tools | Playwright MCP server with structured tool calls | Auto-installed via npx |
+| **agent-browser** | Bash CLI | Vercel's CLI with session management, parallel browsers | Requires `bun add -g agent-browser` |
+
+**Switch providers** via `browser_automation_engine` in `oh-my-opencode.json`:
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  }
+}
+```
+
+### Playwright (Default)
+
+Uses the official Playwright MCP server (`@playwright/mcp`). Browser automation happens through structured MCP tool calls.
+
+### agent-browser
+
+Uses [Vercel's agent-browser CLI](https://github.com/vercel-labs/agent-browser). Key advantages:
+- **Session management**: Run multiple isolated browser instances with `--session` flag
+- **Persistent profiles**: Keep browser state across restarts with `--profile`
+- **Snapshot-based workflow**: Get element refs via `snapshot -i`, interact with `@e1`, `@e2`, etc.
+- **CLI-first**: All commands via Bash - great for scripting
+
+**Installation required**:
+```bash
+bun add -g agent-browser
+agent-browser install  # Download Chromium
+```
+
+**Example workflow**:
+```bash
+agent-browser open https://example.com
+agent-browser snapshot -i  # Get interactive elements with refs
+agent-browser fill @e1 "user@example.com"
+agent-browser click @e2
+agent-browser screenshot result.png
+agent-browser close
+```
 
 ## Git Master
 
