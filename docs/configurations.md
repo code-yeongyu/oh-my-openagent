@@ -181,11 +181,11 @@ Choose between two browser automation providers:
 | **playwright** (default) | MCP tools | Playwright MCP server with structured tool calls | Auto-installed via npx |
 | **agent-browser** | Bash CLI | Vercel's CLI with session management, parallel browsers | Requires `npm install -g agent-browser` |
 
-**Switch providers** via `browser_automation` in `oh-my-opencode.json`:
+**Switch providers** via `browser_automation_engine` in `oh-my-opencode.json`:
 
 ```json
 {
-  "browser_automation": {
+  "browser_automation_engine": {
     "provider": "agent-browser"
   }
 }
