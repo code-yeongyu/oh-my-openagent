@@ -183,7 +183,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
-| **Explore**   | `github-copilot/gpt-5-nano-fast-1`|
+| **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.

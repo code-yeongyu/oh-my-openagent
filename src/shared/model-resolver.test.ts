@@ -236,9 +236,9 @@ describe("resolveModelWithFallback", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["anthropic", "opencode", "github-copilot"], model: "gpt-5-nano" },
+          { providers: ["anthropic", "opencode"], model: "gpt-5-nano" },
         ],
-        availableModels: new Set(["opencode/gpt-5-nano", "github-copilot/gpt-5-nano-preview"]),
+        availableModels: new Set(["opencode/gpt-5-nano"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
