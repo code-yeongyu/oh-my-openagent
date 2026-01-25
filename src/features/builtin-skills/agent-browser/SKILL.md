@@ -293,4 +293,44 @@ agent-browser trace stop trace.zip                   # Stop and save trace
 ```
 
 ---
-Install: `bun add -g agent-browser && agent-browser install`. Run `agent-browser --help` for all commands. Repo: https://github.com/vercel-labs/agent-browser
+
+## Installation
+
+### Step 1: Install agent-browser CLI
+
+```bash
+bun add -g agent-browser
+```
+
+### Step 2: Install Playwright browsers
+
+**IMPORTANT**: `agent-browser install` may fail on some platforms (e.g., darwin-arm64) with "No binary found" error. In that case, install Playwright browsers directly:
+
+```bash
+# Create a temp project and install playwright
+cd /tmp && bun init -y && bun add playwright
+
+# Install Chromium browser
+bun playwright install chromium
+```
+
+This downloads Chrome for Testing to `~/Library/Caches/ms-playwright/`.
+
+### Verify installation
+
+```bash
+agent-browser open https://example.com --headed
+```
+
+If the browser opens successfully, installation is complete.
+
+### Troubleshooting
+
+| Error | Solution |
+|-------|----------|
+| `No binary found for darwin-arm64` | Run `bun playwright install chromium` in a project with playwright dependency |
+| `Executable doesn't exist at .../chromium-XXXX` | Re-run `bun playwright install chromium` |
+| Browser doesn't open | Ensure `--headed` flag is used for visible browser |
+
+---
+Run `agent-browser --help` for all commands. Repo: https://github.com/vercel-labs/agent-browser
