@@ -39,6 +39,11 @@
 
 > 这是开挂级别的编程——`oh-my-opencode` 实战效果。运行后台智能体，调用专业智能体如 oracle、librarian 和前端工程师。使用精心设计的 LSP/AST 工具、精选的 MCP，以及完整的 Claude Code 兼容层。
 
+> [!TIP]
+> **正在寻找更轻量的版本？**
+>
+> 查看 [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) - 一个精简的分支，包含核心功能，适合喜欢最小化配置的用户。
+
 # Claude OAuth 访问通知
 
 ## TL;DR
