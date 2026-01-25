@@ -41,7 +41,8 @@ export const DEFAULT_MAX_SYMBOLS = 200
 export const DEFAULT_MAX_DIAGNOSTICS = 200
 
 export const LSP_INSTALL_HINTS: Record<string, string> = {
-  typescript: "npm install -g typescript-language-server typescript",
+   tsgo: "npm install -g @typescript/native-preview (Preview: rename/find-references not yet supported)",
+   typescript: "npm install -g typescript-language-server typescript",
   deno: "Install Deno from https://deno.land",
   vue: "npm install -g @vue/language-server",
   eslint: "npm install -g vscode-langservers-extracted",
@@ -86,10 +87,15 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
 // Synced with OpenCode's server.ts
 // https://github.com/sst/opencode/blob/dev/packages/opencode/src/lsp/server.ts
 export const BUILTIN_SERVERS: Record<string, Omit<LSPServerConfig, "id">> = {
-  typescript: {
-    command: ["typescript-language-server", "--stdio"],
-    extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
-  },
+   tsgo: {
+     command: ["tsgo", "lsp", "--stdio"],
+     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+     priority: -50,
+   },
+   typescript: {
+     command: ["typescript-language-server", "--stdio"],
+     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+   },
   deno: {
     command: ["deno", "lsp"],
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs"],
