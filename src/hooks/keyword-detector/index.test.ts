@@ -539,3 +539,128 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).toContain("plan this")
   })
 })
+
+describe("keyword-detector debug keyword detection", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+  })
+
+  function createMockPluginInput() {
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+      },
+    } as any
+  }
+
+  test("should prepend debug message to text part", async () => {
+    // #given - a fresh ContextCollector and keyword-detector hook
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-debug"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "debug this issue" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - debug message should be prepended to text part
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+    expect(textPart!.text).toContain("---")
+    expect(textPart!.text).toContain("this issue")
+  })
+
+  test("should detect 'debugging' keyword", async () => {
+    // #given - text with 'debugging' keyword
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-debugging"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "I'm debugging the application" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - debug message should be prepended
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+  })
+
+  test("should detect 'breakpoint' keyword", async () => {
+    // #given - text with 'breakpoint' keyword
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-breakpoint"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "set a breakpoint here" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - debug message should be prepended
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+  })
+
+  test("should detect Korean debug keyword '디버그'", async () => {
+    // #given - text with Korean debug keyword
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-korean-debug"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "디버그 해줘" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - debug message should be prepended
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+  })
+
+  test("should NOT trigger analyze-mode for 'debug' keyword", async () => {
+    // #given - text with only 'debug' keyword
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session-debug-only"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "debug this code" }],
+    }
+
+    // #when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - only debug-mode should be triggered, not analyze-mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[debug-mode]")
+    expect(textPart!.text).not.toContain("[analyze-mode]")
+  })
+})

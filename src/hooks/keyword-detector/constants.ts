@@ -298,7 +298,7 @@ NEVER stop at first result - be exhaustive.`,
   // ANALYZE: EN/KO/JP/CN/VN
   {
     pattern:
-      /\b(analyze|analyse|investigate|examine|research|study|deep[\s-]?dive|inspect|audit|evaluate|assess|review|diagnose|scrutinize|dissect|debug|comprehend|interpret|breakdown|understand)\b|why\s+is|how\s+does|how\s+to|분석|조사|파악|연구|검토|진단|이해|설명|원인|이유|뜯어봐|따져봐|평가|해석|디버깅|디버그|어떻게|왜|살펴|分析|調査|解析|検討|研究|診断|理解|説明|検証|精査|究明|デバッグ|なぜ|どう|仕組み|调查|检查|剖析|深入|诊断|解释|调试|为什么|原理|搞清楚|弄明白|phân tích|điều tra|nghiên cứu|kiểm tra|xem xét|chẩn đoán|giải thích|tìm hiểu|gỡ lỗi|tại sao/i,
+      /\b(analyze|analyse|investigate|examine|research|study|deep[\s-]?dive|inspect|audit|evaluate|assess|review|diagnose|scrutinize|dissect|comprehend|interpret|breakdown|understand)\b|why\s+is|how\s+does|how\s+to|분석|조사|파악|연구|검토|진단|이해|설명|원인|이유|뜯어봐|따져봐|평가|해석|어떻게|왜|살펴|分析|調査|解析|検討|研究|診断|理解|説明|検証|精査|究明|なぜ|どう|仕組み|调查|检查|剖析|深入|诊断|解释|为什么|原理|搞清楚|弄明白|phân tích|điều tra|nghiên cứu|kiểm tra|xem xét|chẩn đoán|giải thích|tìm hiểu|tại sao/i,
     message: `[analyze-mode]
 ANALYSIS MODE. Gather context before diving deep:
 
@@ -311,5 +311,18 @@ IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
 - Consult oracle for strategic guidance
 
 SYNTHESIZE findings before proceeding.`,
+  },
+  // DEBUG (index 3)
+  {
+    pattern: /\b(debug|debugging|debugger|breakpoint)\b|디버그|デバッグ|调试|gỡ lỗi/i,
+    message: `[debug-mode]
+DEBUG MODE. Use /debug command or follow runtime-debugging skill:
+1. Describe the bug
+2. Generate hypotheses
+3. Instrument code
+4. Reproduce issue
+5. Analyze logs
+6. Fix based on evidence
+7. Verify and cleanup`,
   },
 ]
