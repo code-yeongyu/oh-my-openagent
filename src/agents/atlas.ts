@@ -58,7 +58,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-delegate_task(category="[category-name]", skills=[...], prompt="...")
+delegate_task(category="[category-name]", load_skills=[...], prompt="...")
 \`\`\``
 }
 
@@ -84,12 +84,12 @@ ${skillRows.join("\n")}
 **MANDATORY: Evaluate ALL skills for relevance to your task.**
 
 Read each skill's description and ask: "Does this skill's domain overlap with my task?"
-- If YES: INCLUDE in skills=[...]
+- If YES: INCLUDE in load_skills=[...]
 - If NO: You MUST justify why in your pre-delegation declaration
 
 **Usage:**
 \`\`\`typescript
-delegate_task(category="[category]", skills=["skill-1", "skill-2"], prompt="...")
+delegate_task(category="[category]", load_skills=["skill-1", "skill-2"], prompt="...")
 \`\`\`
 
 **IMPORTANT:**
@@ -102,7 +102,7 @@ function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<s
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
 
   const categoryRows = Object.entries(allCategories).map(([name]) =>
-    `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", skills=[...]\` |`
+    `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", load_skills=[...]\` |`
   )
 
   const agentRows = agents.map((a) => {

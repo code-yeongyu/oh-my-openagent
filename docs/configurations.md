@@ -160,7 +160,7 @@ Available agents: `oracle`, `librarian`, `explore`, `multimodal-looker`
 Oh My OpenCode includes built-in skills that provide additional capabilities:
 
 - **playwright**: Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions.
-- **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `delegate_task(category='quick', skills=['git-master'], ...)` to save context.
+- **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `delegate_task(category='quick', load_skills=['git-master'], ...)` to save context.
 
 Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
