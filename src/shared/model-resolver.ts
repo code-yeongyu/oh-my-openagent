@@ -1,6 +1,7 @@
 import { log } from "./logger"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
+import { readConnectedProvidersCache } from "./connected-providers-cache"
 
 export type ModelResolutionInput = {
 	userModel?: string
@@ -53,12 +54,28 @@ export function resolveModelWithFallback(
 
 	// Step 2: Provider fallback chain (with availability check)
 	if (fallbackChain && fallbackChain.length > 0) {
-		// If availableModels is empty (no cache), use first fallback entry directly without availability check
 		if (availableModels.size === 0) {
+			const connectedProviders = readConnectedProvidersCache()
+			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+
+			for (const entry of fallbackChain) {
+				for (const provider of entry.providers) {
+					if (connectedSet === null || connectedSet.has(provider)) {
+						const model = `${provider}/${entry.model}`
+						log("Model resolved via fallback chain (no model cache, using connected provider)", { 
+							provider, 
+							model: entry.model, 
+							variant: entry.variant,
+							hasConnectedCache: connectedSet !== null
+						})
+						return { model, source: "provider-fallback", variant: entry.variant }
+					}
+				}
+			}
 			const firstEntry = fallbackChain[0]
 			const firstProvider = firstEntry.providers[0]
 			const model = `${firstProvider}/${firstEntry.model}`
-			log("Model resolved via fallback chain (no cache, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
+			log("Model resolved via fallback chain (no cache at all, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
 			return { model, source: "provider-fallback", variant: firstEntry.variant }
 		}
 
@@ -72,7 +89,6 @@ export function resolveModelWithFallback(
 				}
 			}
 		}
-		// No match found in fallback chain - fall through to system default
 		log("No available model found in fallback chain, falling through to system default")
 	}
 
