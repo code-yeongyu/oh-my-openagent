@@ -157,6 +157,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // config.model represents the currently active model in OpenCode (including UI selection)
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
+    const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -167,7 +168,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       allDiscoveredSkills,
       ctx.client,
       browserProvider,
-      currentModel // uiSelectedModel - takes highest priority
+      currentModel, // uiSelectedModel - takes highest priority
+      disabledSkills
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -358,7 +360,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = shouldDemotePlan
-        ? { mode: "subagent" as const }
+           ? { mode: "subagent" as const
+          }
         : undefined;
 
       config.agent = {
