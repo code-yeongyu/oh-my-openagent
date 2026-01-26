@@ -78,11 +78,11 @@ describe("sisyphus-task", () => {
   })
 
   describe("category delegation config validation", () => {
-    test("returns error when systemDefaultModel is not configured", async () => {
+    test("proceeds without error when systemDefaultModel is undefined", async () => {
       // #given a mock client with no model in config
       const { createDelegateTask } = require("./tools")
       
-      const mockManager = { launch: async () => ({}) }
+      const mockManager = { launch: async () => ({ id: "task-123" }) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) }, // No model configured
@@ -111,14 +111,14 @@ describe("sisyphus-task", () => {
           description: "Test task",
           prompt: "Do something",
           category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["git-master"],
+          run_in_background: true,
+          load_skills: [],
         },
         toolContext
       )
       
-      // #then returns descriptive error message
-      expect(result).toContain("oh-my-opencode requires a default model")
+      // #then proceeds without error - uses fallback chain
+      expect(result).not.toContain("oh-my-opencode requires a default model")
     })
   })
 

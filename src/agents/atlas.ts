@@ -523,9 +523,6 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
-  if (!ctx.model) {
-    throw new Error("createAtlasAgent requires a model in context")
-  }
   const restrictions = createAgentToolRestrictions([
     "task",
     "call_omo_agent",
@@ -534,7 +531,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     description:
       "Orchestrates work via delegate_task() to complete ALL tasks in a todo list until fully done",
     mode: "primary" as const,
-    model: ctx.model,
+    ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },
