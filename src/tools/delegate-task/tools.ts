@@ -151,6 +151,12 @@ export function resolveCategoryConfig(
   return { config, promptAppend, model }
 }
 
+export interface SyncSessionCreatedEvent {
+  sessionID: string
+  parentID: string
+  title: string
+}
+
 export interface DelegateTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
@@ -159,6 +165,7 @@ export interface DelegateTaskToolOptions {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
 }
 
 export interface BuildSystemContentInput {
@@ -181,7 +188,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
-  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel, browserProvider } = options
+  const { manager, client, directory, userCategories, gitMasterConfig, sisyphusJuniorModel, browserProvider, onSyncSessionCreated } = options
 
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const categoryNames = Object.keys(allCategories)
@@ -849,6 +856,18 @@ To continue this session: session_id="${task.sessionID}"`
         const sessionID = createResult.data.id
         syncSessionID = sessionID
         subagentSessions.add(sessionID)
+
+        if (onSyncSessionCreated) {
+          log("[delegate_task] Invoking onSyncSessionCreated callback", { sessionID, parentID: ctx.sessionID })
+          await onSyncSessionCreated({
+            sessionID,
+            parentID: ctx.sessionID,
+            title: args.description,
+          }).catch((err) => {
+            log("[delegate_task] onSyncSessionCreated callback failed", { error: String(err) })
+          })
+          await new Promise(r => setTimeout(r, 200))
+        }
 
         taskId = `sync_${sessionID.slice(0, 8)}`
         const startTime = new Date()

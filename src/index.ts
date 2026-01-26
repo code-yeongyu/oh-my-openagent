@@ -95,6 +95,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     enabled: pluginConfig.tmux?.enabled ?? false,
     layout: pluginConfig.tmux?.layout ?? 'main-vertical',
     main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
+    main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
+    agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
   } as const;
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
@@ -225,9 +227,29 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task);
-
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
+
+  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task, {
+    tmuxConfig,
+    onSubagentSessionCreated: async (event) => {
+      log("[index] onSubagentSessionCreated callback received", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+      log("[index] onSubagentSessionCreated callback completed");
+    },
+  });
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
@@ -266,6 +288,23 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
     browserProvider,
+    onSyncSessionCreated: async (event) => {
+      log("[index] onSyncSessionCreated callback", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+    },
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
@@ -451,17 +490,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
          const sessionInfo = props?.info as
            | { id?: string; title?: string; parentID?: string }
            | undefined;
+         log("[event] session.created", { sessionInfo, props });
          if (!sessionInfo?.parentID) {
            setMainSession(sessionInfo?.id);
          }
          firstMessageVariantGate.markSessionCreated(sessionInfo);
-         if (sessionInfo?.id && sessionInfo?.title) {
-           await tmuxSessionManager.onSessionCreated({
-             sessionID: sessionInfo.id,
-             parentID: sessionInfo.parentID,
-             title: sessionInfo.title,
-           });
-         }
+         await tmuxSessionManager.onSessionCreated(
+           event as { type: string; properties?: { info?: { id?: string; parentID?: string; title?: string } } }
+         );
        }
 
        if (event.type === "session.deleted") {

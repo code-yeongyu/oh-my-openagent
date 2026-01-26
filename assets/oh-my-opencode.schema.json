@@ -71,6 +71,7 @@
           "interactive-bash-session",
           "thinking-block-validator",
           "ralph-loop",
+          "category-skill-reminder",
           "compaction-context-injector",
           "claude-code-hooks",
           "auto-slash-command",
@@ -2210,6 +2211,16 @@
           "type": "number",
           "minimum": 20,
           "maximum": 80
+        },
+        "main_pane_min_width": {
+          "default": 120,
+          "type": "number",
+          "minimum": 40
+        },
+        "agent_pane_min_width": {
+          "default": 40,
+          "type": "number",
+          "minimum": 20
         }
       }
     }
