@@ -65,13 +65,32 @@ export function createThinkModeHook() {
       }
 
       if (thinkingConfig) {
-        Object.assign(output.message, thinkingConfig)
-        state.thinkingConfigInjected = true
-        log("Think mode: thinking config injected", {
-          sessionID,
-          provider: currentModel.providerID,
-          config: thinkingConfig,
-        })
+        const messageData = output.message as Record<string, unknown>
+        const agentThinking = messageData.thinking as { type?: string } | undefined
+        const agentProviderOptions = messageData.providerOptions
+
+        const agentDisabledThinking = agentThinking?.type === "disabled"
+        const agentHasCustomProviderOptions = Boolean(agentProviderOptions)
+
+        if (agentDisabledThinking) {
+          log("Think mode: skipping - agent has thinking disabled", {
+            sessionID,
+            provider: currentModel.providerID,
+          })
+        } else if (agentHasCustomProviderOptions) {
+          log("Think mode: skipping - agent has custom providerOptions", {
+            sessionID,
+            provider: currentModel.providerID,
+          })
+        } else {
+          Object.assign(output.message, thinkingConfig)
+          state.thinkingConfigInjected = true
+          log("Think mode: thinking config injected", {
+            sessionID,
+            provider: currentModel.providerID,
+            config: thinkingConfig,
+          })
+        }
       }
 
       thinkModeState.set(sessionID, state)

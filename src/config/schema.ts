@@ -116,6 +116,19 @@ export const AgentOverrideConfigSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
   permission: AgentPermissionSchema.optional(),
+  /** Maximum tokens for response. Passed directly to OpenCode SDK. */
+  maxTokens: z.number().optional(),
+  /** Extended thinking configuration (Anthropic). Overrides category and default settings. */
+  thinking: z.object({
+    type: z.enum(["enabled", "disabled"]),
+    budgetTokens: z.number().optional(),
+  }).optional(),
+  /** Reasoning effort level (OpenAI). Overrides category and default settings. */
+  reasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
+  /** Text verbosity level. */
+  textVerbosity: z.enum(["low", "medium", "high"]).optional(),
+  /** Provider-specific options. Passed directly to OpenCode SDK. */
+  providerOptions: z.record(z.string(), z.unknown()).optional(),
 })
 
 export const AgentOverridesSchema = z.object({
