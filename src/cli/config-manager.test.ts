@@ -1,7 +1,7 @@
 import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
 import { parseJsonc } from "../shared"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig, detectProvidersFromConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -627,5 +627,47 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     expect(hasAnyOpencodeZen).toBe(true)
+  })
+
+  test("detectProvidersFromConfig: categories-only config detects providers", () => {
+    const categoriesOnlyConfig = {
+      categories: {
+        "visual-engineering": { model: "openai/gpt-5.2", temperature: 0.7 },
+        "quick": { model: "github-copilot/starcoder", temperature: 0.1 },
+        "ultrabrain": { model: "anthropic/claude-opus-4-5", temperature: 0.1 },
+        "artistry": { model: "opencode/claude-sonnet-4-5", temperature: 0.8 },
+        "writing": { model: "zai-coding-plan/glm-4.7", temperature: 0.3 },
+      },
+    }
+
+    const detected = detectProvidersFromConfig(categoriesOnlyConfig)
+
+    expect(detected.hasOpenAI).toBe(true)
+    expect(detected.hasCopilot).toBe(true)
+    expect(detected.hasClaude).toBe(true)
+    expect(detected.isMax20).toBe(true)
+    expect(detected.hasOpencodeZen).toBe(true)
+    expect(detected.hasZaiCodingPlan).toBe(true)
+  })
+
+  test("detectProvidersFromConfig: mixed agents and categories detects all", () => {
+    const mixedConfig = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2" },
+        oracle: { model: "anthropic/claude-opus-4-5" },
+      },
+      categories: {
+        "quick": { model: "github-copilot/starcoder" },
+        "visual-engineering": { model: "opencode/claude-sonnet-4-5" },
+      },
+    }
+
+    const detected = detectProvidersFromConfig(mixedConfig)
+
+    expect(detected.hasOpenAI).toBe(true)
+    expect(detected.hasCopilot).toBe(true)
+    expect(detected.hasClaude).toBe(true)
+    expect(detected.isMax20).toBe(true)
+    expect(detected.hasOpencodeZen).toBe(true)
   })
 })

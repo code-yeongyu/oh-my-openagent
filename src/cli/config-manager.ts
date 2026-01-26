@@ -51,7 +51,7 @@ function getPackageJson(): string {
   return getConfigContext().paths.packageJson
 }
 
-function getOmoConfig(): string {
+export function getOmoConfig(): string {
   return getConfigContext().paths.omoConfig
 }
 
@@ -305,6 +305,43 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
   }
 
   return result
+}
+
+export function detectProvidersFromConfig(config: Record<string, unknown>): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasCopilot: boolean; isMax20: boolean; hasClaude: boolean } {
+  try {
+    const agents = config.agents as Record<string, { model: string }> | undefined
+    const categories = config.categories as Record<string, { model: string }> | undefined
+
+    const findProviderInObjects = (providerPrefix: string, objects: Record<string, { model: string }> | undefined): boolean => {
+      if (!objects) return false
+      for (const config of Object.values(objects)) {
+        if (config?.model?.startsWith(providerPrefix)) {
+          return true
+        }
+      }
+      return false
+    }
+
+    const findProviderAnywhere = (providerPrefix: string): boolean => {
+      return findProviderInObjects(providerPrefix, agents) || findProviderInObjects(providerPrefix, categories)
+    }
+
+    const hasOpenAI = findProviderAnywhere("openai/")
+    const hasOpencodeZen = findProviderAnywhere("opencode/")
+    const hasZaiCodingPlan = findProviderAnywhere("zai-coding-plan/")
+    const hasCopilot = findProviderAnywhere("github-copilot/")
+
+    const hasAnyOpus = findProviderAnywhere("anthropic/claude-opus-4-5")
+    const hasAnySonnet = findProviderAnywhere("anthropic/claude-sonnet-4-5")
+    const hasAnyOtherClaude = findProviderAnywhere("claude") && !hasAnyOpus && !hasAnySonnet
+
+    const isMax20 = hasAnyOpus
+    const hasClaude = hasAnyOpus || hasAnySonnet || hasAnyOtherClaude || findProviderAnywhere("anthropic/")
+
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasCopilot, isMax20, hasClaude }
+  } catch {
+    return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
+  }
 }
 
 export function generateOmoConfig(installConfig: InstallConfig): Record<string, unknown> {
@@ -598,7 +635,7 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
-function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasCopilot: boolean; isMax20: boolean; hasClaude: boolean } {
+export function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasCopilot: boolean; isMax20: boolean; hasClaude: boolean } {
   const omoConfigPath = getOmoConfig()
   if (!existsSync(omoConfigPath)) {
     return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
@@ -611,35 +648,7 @@ function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: b
       return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
     }
 
-    const agents = omoConfig.agents as Record<string, { model: string }> | undefined
-    if (!agents) {
-      return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
-    }
-
-    const findProviderInAgents = (providerPrefix: string): boolean => {
-      for (const agentConfig of Object.values(agents)) {
-        if (agentConfig?.model?.startsWith(providerPrefix)) {
-          return true
-        }
-      }
-      return false
-    }
-
-    const hasOpenAI = findProviderInAgents("openai/")
-    const hasOpencodeZen = findProviderInAgents("opencode/")
-    const hasZaiCodingPlan = findProviderInAgents("zai-coding-plan/")
-    const hasCopilot = findProviderInAgents("github-copilot/")
-
-    const sisyphusModel = agents.sisyphus?.model || ""
-    
-    const usesOpus = sisyphusModel.includes("claude-opus-4-5")
-    const usesSonnet = sisyphusModel.includes("claude-sonnet-4-5")
-    const usesOtherClaude = !usesOpus && !usesSonnet && sisyphusModel.includes("claude")
-    
-    const isMax20 = usesOpus
-    const hasClaude = usesOpus || usesSonnet || usesOtherClaude || findProviderInAgents("anthropic/")
-
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasCopilot, isMax20, hasClaude }
+    return detectProvidersFromConfig(omoConfig)
   } catch {
     return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
   }
