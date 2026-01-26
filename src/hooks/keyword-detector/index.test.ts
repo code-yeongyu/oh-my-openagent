@@ -338,6 +338,197 @@ describe("keyword-detector word boundary", () => {
   })
 })
 
+describe("keyword-detector system-reminder filtering", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    setMainSession(undefined)
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    setMainSession(undefined)
+  })
+
+  function createMockPluginInput() {
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+      },
+    } as any
+  }
+
+  test("should NOT trigger search mode from keywords inside <system-reminder> tags", async () => {
+    // #given - message contains search keywords only inside system-reminder tags
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<system-reminder>
+The system will search for the file and find all occurrences.
+Please locate and scan the directory.
+</system-reminder>`
+      }],
+    }
+
+    // #when - keyword detection runs on system-reminder content
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should NOT trigger search mode (text should remain unchanged)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart!.text).toContain("<system-reminder>")
+  })
+
+  test("should NOT trigger analyze mode from keywords inside <system-reminder> tags", async () => {
+    // #given - message contains analyze keywords only inside system-reminder tags
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<system-reminder>
+You should investigate and examine the code carefully.
+Research the implementation details.
+</system-reminder>`
+      }],
+    }
+
+    // #when - keyword detection runs on system-reminder content
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should NOT trigger analyze mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[analyze-mode]")
+    expect(textPart!.text).toContain("<system-reminder>")
+  })
+
+  test("should detect keywords in user text even when system-reminder is present", async () => {
+    // #given - message contains both system-reminder and user search keyword
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<system-reminder>
+System will find and locate files.
+</system-reminder>
+
+Please search for the bug in the code.`
+      }],
+    }
+
+    // #when - keyword detection runs on mixed content
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should trigger search mode from user text only
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[search-mode]")
+    expect(textPart!.text).toContain("Please search for the bug in the code.")
+  })
+
+  test("should handle multiple system-reminder tags in message", async () => {
+    // #given - message contains multiple system-reminder blocks with keywords
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<system-reminder>
+First reminder with search and find keywords.
+</system-reminder>
+
+User message without keywords.
+
+<system-reminder>
+Second reminder with investigate and examine keywords.
+</system-reminder>`
+      }],
+    }
+
+    // #when - keyword detection runs on message with multiple system-reminders
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should NOT trigger any mode (only user text exists, no keywords)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart!.text).not.toContain("[analyze-mode]")
+  })
+
+  test("should handle case-insensitive system-reminder tags", async () => {
+    // #given - message contains system-reminder with different casing
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<SYSTEM-REMINDER>
+System will search and find files.
+</SYSTEM-REMINDER>`
+      }],
+    }
+
+    // #when - keyword detection runs on uppercase system-reminder
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should NOT trigger search mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[search-mode]")
+  })
+
+  test("should handle multiline system-reminder content with search keywords", async () => {
+    // #given - system-reminder with multiline content containing various search keywords
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        text: `<system-reminder>
+Commands executed:
+- find: searched for pattern
+- grep: located file
+- scan: completed
+
+Please explore the codebase and discover patterns.
+</system-reminder>`
+      }],
+    }
+
+    // #when - keyword detection runs on multiline system-reminder
+    await hook["chat.message"]({ sessionID }, output)
+
+    // #then - should NOT trigger search mode
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("[search-mode]")
+  })
+})
+
 describe("keyword-detector agent-specific ultrawork messages", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
   let logSpy: ReturnType<typeof spyOn>
