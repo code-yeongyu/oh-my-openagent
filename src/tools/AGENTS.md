@@ -15,9 +15,9 @@ tools/
 │   └── constants.ts  # Fixed values
 ├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename (client.ts 596 lines)
 ├── ast-grep/         # 2 tools: search, replace (25 languages)
-├── delegate-task/    # Category-based routing (1070 lines, 302 nesting levels)
+├── delegate-task/    # Category-based routing (1070 lines)
 ├── session-manager/  # 4 tools: list, read, search, info
-├── grep/             # Custom grep with timeout
+├── grep/             # Custom grep with timeout (60s, 10MB)
 ├── glob/             # 60s timeout, 100 file limit
 ├── interactive-bash/ # Tmux session management
 ├── look-at/          # Multimodal PDF/image
@@ -25,7 +25,7 @@ tools/
 ├── skill-mcp/        # Skill MCP operations
 ├── slashcommand/     # Slash command dispatch
 ├── call-omo-agent/   # Direct agent invocation
-└── background-task/  # background_output, background_cancel (513 lines)
+└── background-task/  # background_output, background_cancel
 ```
 
 ## TOOL CATEGORIES

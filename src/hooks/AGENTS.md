@@ -8,7 +8,7 @@
 hooks/
 ├── atlas/                      # Main orchestration (752 lines)
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion
+├── todo-continuation-enforcer.ts # Force TODO completion (16k lines)
 ├── ralph-loop/                 # Self-referential dev loop
 ├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
 ├── comment-checker/            # Prevents AI slop
@@ -53,15 +53,6 @@ hooks/
 - **UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
 - **PreToolUse**: questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → atlasHook
 - **PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo
-
-## CRITICAL DEPENDENCIES
-
-| Hook | Depends On | State Sharing |
-|------|------------|---------------|
-| todo-continuation-enforcer | session-recovery callbacks | `isRecovering` flag |
-| atlas | backgroundManager | Running task checks |
-| start-work | boulder state file | `.sisyphus/boulder.json` |
-| directory-*-injector | per-session caches | `sessionCaches` Map |
 
 ## HOW TO ADD
 1. Create `src/hooks/name/` with `index.ts` exporting `createMyHook(ctx)`

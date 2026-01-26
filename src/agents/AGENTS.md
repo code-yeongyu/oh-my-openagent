@@ -16,6 +16,7 @@ agents/
 ├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1196 lines)
 ├── metis.ts                    # Pre-planning analysis (Gap detection)
 ├── momus.ts                    # Plan reviewer (Ruthless fault-finding)
+├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
 ├── types.ts                    # AgentModelConfig, AgentPromptMetadata
 ├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback()
 └── index.ts                    # builtinAgents export
