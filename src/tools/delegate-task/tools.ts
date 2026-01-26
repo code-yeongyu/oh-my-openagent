@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -171,20 +171,33 @@ export interface DelegateTaskToolOptions {
 export interface BuildSystemContentInput {
   skillContent?: string
   categoryPromptAppend?: string
+  agentName?: string
 }
 
 export function buildSystemContent(input: BuildSystemContentInput): string | undefined {
-  const { skillContent, categoryPromptAppend } = input
+  const { skillContent, categoryPromptAppend, agentName } = input
 
-  if (!skillContent && !categoryPromptAppend) {
+  const planAgentPrepend = isPlanAgent(agentName) ? PLAN_AGENT_SYSTEM_PREPEND : ""
+
+  if (!skillContent && !categoryPromptAppend && !planAgentPrepend) {
     return undefined
   }
 
-  if (skillContent && categoryPromptAppend) {
-    return `${skillContent}\n\n${categoryPromptAppend}`
+  const parts: string[] = []
+
+  if (planAgentPrepend) {
+    parts.push(planAgentPrepend)
   }
 
-  return skillContent || categoryPromptAppend
+  if (skillContent) {
+    parts.push(skillContent)
+  }
+
+  if (categoryPromptAppend) {
+    parts.push(categoryPromptAppend)
+  }
+
+  return parts.join("\n\n") || undefined
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
@@ -382,6 +395,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
                 task: false,
                 delegate_task: false,
                 call_omo_agent: true,
+                question: false,
               },
               parts: [{ type: "text", text: args.prompt }],
             },
@@ -580,7 +594,7 @@ To continue this session: session_id="${args.session_id}"`
         })
 
         if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
-          const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+          const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
 
           try {
             const task = await manager.launch({
@@ -772,7 +786,7 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
         }
       }
 
-      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend })
+      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
 
       if (runInBackground) {
         try {
@@ -903,6 +917,7 @@ To continue this session: session_id="${task.sessionID}"`
                 task: false,
                 delegate_task: false,
                 call_omo_agent: true,
+                question: false,
               },
               parts: [{ type: "text", text: args.prompt }],
               ...(categoryModel ? { model: categoryModel } : {}),

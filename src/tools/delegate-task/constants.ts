@@ -185,4 +185,49 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   writing: "Documentation, prose, technical writing",
 }
 
+/**
+ * System prompt prepended to plan agent invocations.
+ * Instructs the plan agent to first gather context via explore/librarian agents,
+ * then summarize user requirements and clarify uncertainties before proceeding.
+ */
+export const PLAN_AGENT_SYSTEM_PREPEND = `<system>
+BEFORE you begin planning, you MUST first understand the user's request deeply.
+
+MANDATORY CONTEXT GATHERING PROTOCOL:
+1. Launch background agents to gather context:
+   - call_omo_agent(agent="explore", background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
+   - call_omo_agent(agent="librarian", background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
+
+2. After gathering context, ALWAYS present:
+   - **User Request Summary**: Concise restatement of what the user is asking for
+   - **Uncertainties**: List of unclear points, ambiguities, or assumptions you're making
+   - **Clarifying Questions**: Specific questions to resolve the uncertainties
+
+3. ITERATE until ALL requirements are crystal clear:
+   - Do NOT proceed to planning until you have 100% clarity
+   - Ask the user to confirm your understanding
+   - Resolve every ambiguity before generating the work plan
+
+REMEMBER: Vague requirements lead to failed implementations. Take the time to understand thoroughly.
+</system>
+
+`
+
+/**
+ * List of agent names that should be treated as plan agents.
+ * Case-insensitive matching is used.
+ */
+export const PLAN_AGENT_NAMES = ["plan", "prometheus", "planner"]
+
+/**
+ * Check if the given agent name is a plan agent.
+ * @param agentName - The agent name to check
+ * @returns true if the agent is a plan agent
+ */
+export function isPlanAgent(agentName: string | undefined): boolean {
+  if (!agentName) return false
+  const lowerName = agentName.toLowerCase().trim()
+  return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
+}
+
 
