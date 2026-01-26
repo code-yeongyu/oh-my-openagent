@@ -688,4 +688,34 @@ describe("generateOmoConfig - model fallback system", () => {
     expect(detected.isMax20).toBe(false)
     expect(detected.hasOpencodeZen).toBe(true)
   })
+
+  test("detectProvidersFromConfig: Copilot Opus model does not set isMax20", () => {
+    const copilotOpusConfig = {
+      agents: {
+        sisyphus: { model: "github-copilot/claude-opus-4.5" },
+      },
+    }
+
+    const detected = detectProvidersFromConfig(copilotOpusConfig)
+
+    expect(detected.hasCopilot).toBe(true)
+    expect(detected.isMax20).toBe(false)
+    expect(detected.hasOpenAI).toBe(false)
+    expect(detected.hasOpencodeZen).toBe(false)
+  })
+
+  test("detectProvidersFromConfig: OpenCode Zen Opus model does not set isMax20", () => {
+    const opencodeZenOpusConfig = {
+      categories: {
+        "ultrabrain": { model: "opencode/claude-opus-4-5", temperature: 0.1 },
+      },
+    }
+
+    const detected = detectProvidersFromConfig(opencodeZenOpusConfig)
+
+    expect(detected.hasOpencodeZen).toBe(true)
+    expect(detected.isMax20).toBe(false)
+    expect(detected.hasOpenAI).toBe(false)
+    expect(detected.hasCopilot).toBe(false)
+  })
 })
