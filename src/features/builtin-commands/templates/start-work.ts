@@ -25,7 +25,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
    }
    \`\`\`
 
-5. **Read the plan file** and start executing tasks according to Orchestrator Sisyphus workflow
+5. **Read the plan file** and start executing tasks according to atlas workflow
 
 ## OUTPUT FORMAT
 
@@ -69,4 +69,4 @@ Reading plan and beginning execution...
 - The session_id is injected by the hook - use it directly
 - Always update boulder.json BEFORE starting work
 - Read the FULL plan file before delegating any tasks
-- Follow Orchestrator Sisyphus delegation protocols (7-section format)`
+- Follow atlas delegation protocols (7-section format)`

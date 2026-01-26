@@ -373,7 +373,7 @@ describe("atlas hook", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
        beforeEach(() => {
-         setupMessageStorage(ORCHESTRATOR_SESSION, "Atlas")
+         setupMessageStorage(ORCHESTRATOR_SESSION, "atlas")
        })
 
       afterEach(() => {
@@ -444,7 +444,7 @@ describe("atlas hook", () => {
       test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
         // #given
         const nonOrchestratorSession = "non-orchestrator-session"
-        setupMessageStorage(nonOrchestratorSession, "Sisyphus-Junior")
+        setupMessageStorage(nonOrchestratorSession, "sisyphus-junior")
         
         const hook = createAtlasHook(createMockPluginInput())
         const originalOutput = "File written successfully"
@@ -601,7 +601,7 @@ describe("atlas hook", () => {
          getMainSessionID: () => MAIN_SESSION_ID,
          subagentSessions: new Set<string>(),
        }))
-       setupMessageStorage(MAIN_SESSION_ID, "Atlas")
+       setupMessageStorage(MAIN_SESSION_ID, "atlas")
      })
 
     afterEach(() => {
@@ -845,7 +845,7 @@ describe("atlas hook", () => {
 
        // #given - last agent is NOT Atlas
        cleanupMessageStorage(MAIN_SESSION_ID)
-       setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
+       setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
 
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput)
