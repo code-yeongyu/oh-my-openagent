@@ -31,6 +31,7 @@ export type SplitDirection = "-h" | "-v"
 export type PaneAction =
   | { type: "close"; paneId: string; sessionId: string }
   | { type: "spawn"; sessionId: string; description: string; targetPaneId: string; splitDirection: SplitDirection }
+  | { type: "replace"; paneId: string; oldSessionId: string; newSessionId: string; description: string }
 
 export interface SpawnDecision {
   canSpawn: boolean

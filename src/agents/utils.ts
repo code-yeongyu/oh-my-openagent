@@ -10,7 +10,7 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive, readConnectedProvidersCache } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -155,8 +155,10 @@ export async function createBuiltinAgents(
     throw new Error("createBuiltinAgents requires systemDefaultModel")
   }
 
-  // Fetch available models at plugin init
-  const availableModels = client ? await fetchAvailableModels(client) : new Set<string>()
+  const connectedProviders = readConnectedProvidersCache()
+  const availableModels = client 
+    ? await fetchAvailableModels(client, { connectedProviders: connectedProviders ?? undefined }) 
+    : new Set<string>()
 
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []

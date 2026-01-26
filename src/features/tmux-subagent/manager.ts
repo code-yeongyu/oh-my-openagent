@@ -166,11 +166,11 @@ export class TmuxSessionManager {
         canSpawn: decision.canSpawn,
         reason: decision.reason,
         actionCount: decision.actions.length,
-        actions: decision.actions.map((a) =>
-          a.type === "close"
-            ? { type: "close", paneId: a.paneId }
-            : { type: "spawn", sessionId: a.sessionId }
-        ),
+        actions: decision.actions.map((a) => {
+          if (a.type === "close") return { type: "close", paneId: a.paneId }
+          if (a.type === "replace") return { type: "replace", paneId: a.paneId, newSessionId: a.newSessionId }
+          return { type: "spawn", sessionId: a.sessionId }
+        }),
       })
 
       if (!decision.canSpawn) {
@@ -188,6 +188,13 @@ export class TmuxSessionManager {
           this.sessions.delete(action.sessionId)
           log("[tmux-session-manager] removed closed session from cache", {
             sessionId: action.sessionId,
+          })
+        }
+        if (action.type === "replace" && actionResult.success) {
+          this.sessions.delete(action.oldSessionId)
+          log("[tmux-session-manager] removed replaced session from cache", {
+            oldSessionId: action.oldSessionId,
+            newSessionId: action.newSessionId,
           })
         }
       }

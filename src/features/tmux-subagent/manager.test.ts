@@ -100,9 +100,9 @@ function createSessionCreatedEvent(
 
 function createWindowState(overrides?: Partial<WindowState>): WindowState {
   return {
-    windowWidth: 200,
+    windowWidth: 220,
     windowHeight: 44,
-    mainPane: { paneId: '%0', width: 120, height: 44, left: 0, top: 0, title: 'main', isActive: true },
+    mainPane: { paneId: '%0', width: 110, height: 44, left: 0, top: 0, title: 'main', isActive: true },
     agentPanes: [],
     ...overrides,
   }
@@ -368,8 +368,8 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
     })
 
-    test('closes oldest agent when at max capacity', async () => {
-      //#given
+    test('replaces oldest agent when unsplittable (small window)', async () => {
+      //#given - small window where split is not possible
       mockIsInsideTmux.mockReturnValue(true)
       mockQueryWindowState.mockImplementation(async () =>
         createWindowState({
@@ -405,18 +405,13 @@ describe('TmuxSessionManager', () => {
         createSessionCreatedEvent('ses_new', 'ses_parent', 'New Task')
       )
 
-      //#then
+      //#then - with small window, replace action is used instead of close+spawn
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
       const actionsArg = call![0]
-      expect(actionsArg.length).toBeGreaterThanOrEqual(1)
-
-      const closeActions = actionsArg.filter((a) => a.type === 'close')
-      const spawnActions = actionsArg.filter((a) => a.type === 'spawn')
-
-      expect(closeActions).toHaveLength(1)
-      expect(spawnActions).toHaveLength(1)
+      expect(actionsArg).toHaveLength(1)
+      expect(actionsArg[0].type).toBe('replace')
     })
   })
 
@@ -614,8 +609,8 @@ describe('DecisionEngine', () => {
       }
     })
 
-    test('returns close + spawn when at capacity', async () => {
-      //#given
+    test('returns replace when split not possible', async () => {
+      //#given - small window where split is never possible
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
         windowWidth: 160,
@@ -654,15 +649,10 @@ describe('DecisionEngine', () => {
         sessionMappings
       )
 
-      //#then
+      //#then - agent area (80) < MIN_SPLIT_WIDTH (105), so replace is used
       expect(decision.canSpawn).toBe(true)
-      expect(decision.actions).toHaveLength(2)
-      expect(decision.actions[0]).toEqual({
-        type: 'close',
-        paneId: '%1',
-        sessionId: 'ses_old',
-      })
-      expect(decision.actions[1].type).toBe('spawn')
+      expect(decision.actions).toHaveLength(1)
+      expect(decision.actions[0].type).toBe('replace')
     })
 
     test('returns canSpawn=false when window too small', async () => {
