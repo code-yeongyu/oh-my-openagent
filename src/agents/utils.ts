@@ -149,7 +149,8 @@ export async function createBuiltinAgents(
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
   client?: any,
-  browserProvider?: BrowserAutomationProvider
+  browserProvider?: BrowserAutomationProvider,
+  disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
   if (!systemDefaultModel) {
     throw new Error("createBuiltinAgents requires systemDefaultModel")
@@ -170,7 +171,7 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const builtinSkills = createBuiltinSkills({ browserProvider })
+  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills })
   const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({

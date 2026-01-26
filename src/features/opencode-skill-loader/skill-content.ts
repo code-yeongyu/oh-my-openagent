@@ -8,6 +8,7 @@ import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/sc
 export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
 	browserProvider?: BrowserAutomationProvider
+	disabledSkills?: Set<string>
 }
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
@@ -23,7 +24,12 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 
 	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
 		discoverSkills({ includeClaudeCodePaths: true }),
-		Promise.resolve(createBuiltinSkills({ browserProvider: options?.browserProvider })),
+		Promise.resolve(
+			createBuiltinSkills({
+				browserProvider: options?.browserProvider,
+				disabledSkills: options?.disabledSkills,
+			})
+		),
 	])
 
 	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => ({
@@ -122,7 +128,10 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 }
 
 export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
-	const skills = createBuiltinSkills({ browserProvider: options?.browserProvider })
+	const skills = createBuiltinSkills({
+		browserProvider: options?.browserProvider,
+		disabledSkills: options?.disabledSkills,
+	})
 	const skill = skills.find((s) => s.name === skillName)
 	if (!skill) return null
 
@@ -137,7 +146,10 @@ export function resolveMultipleSkills(skillNames: string[], options?: SkillResol
 	resolved: Map<string, string>
 	notFound: string[]
 } {
-	const skills = createBuiltinSkills({ browserProvider: options?.browserProvider })
+	const skills = createBuiltinSkills({
+		browserProvider: options?.browserProvider,
+		disabledSkills: options?.disabledSkills,
+	})
 	const skillMap = new Map(skills.map((s) => [s.name, s.template]))
 
 	const resolved = new Map<string, string>()

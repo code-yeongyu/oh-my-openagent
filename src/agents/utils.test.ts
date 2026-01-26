@@ -10,7 +10,7 @@ describe("createBuiltinAgents with model overrides", () => {
     // #given - no overrides, using systemDefaultModel
 
     // #when
-    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then
     expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
@@ -25,7 +25,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then
     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
@@ -38,7 +38,7 @@ describe("createBuiltinAgents with model overrides", () => {
     const systemDefaultModel = "anthropic/claude-opus-4-5"
 
     // #when
-    const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel)
+    const agents = await createBuiltinAgents([], {}, undefined, systemDefaultModel, undefined, undefined, [], undefined, undefined)
 
     // #then - falls back to system default when no availability match
     expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
@@ -50,7 +50,7 @@ describe("createBuiltinAgents with model overrides", () => {
     // #given - no available models simulates CI without model cache
 
     // #when
-    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then - uses first fallback entry (openai/gpt-5.2) instead of system default
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
@@ -66,7 +66,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
@@ -82,7 +82,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
 
     // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
     // #then
     expect(agents.oracle.model).toBe("anthropic/claude-sonnet-4")
@@ -98,12 +98,25 @@ describe("createBuiltinAgents with model overrides", () => {
      }
 
      // #when
-     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
 
      // #then
      expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
      expect(agents.sisyphus.temperature).toBe(0.5)
    })
+
+  test("createBuiltinAgents excludes disabled skills from availableSkills", async () => {
+    // #given
+    const disabledSkills = new Set(["playwright"])
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, disabledSkills)
+
+    // #then
+    expect(agents.sisyphus.prompt).not.toContain("playwright")
+    expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
+    expect(agents.sisyphus.prompt).toContain("git-master")
+  })
 })
 
 describe("buildAgent with category and skills", () => {

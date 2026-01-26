@@ -166,6 +166,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     ];
 
     const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
+    const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -175,7 +176,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.git_master,
       allDiscoveredSkills,
       ctx.client,
-      browserProvider
+      browserProvider,
+      disabledSkills
     );
 
     // Claude Code agents: Do NOT apply permission migration
