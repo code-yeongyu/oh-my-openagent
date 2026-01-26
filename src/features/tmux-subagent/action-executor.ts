@@ -1,6 +1,6 @@
 import type { TmuxConfig } from "../../config/schema"
-import type { PaneAction } from "./types"
-import { spawnTmuxPane, closeTmuxPane } from "../../shared/tmux"
+import type { PaneAction, WindowState } from "./types"
+import { spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth } from "../../shared/tmux"
 import { log } from "../../shared"
 
 export interface ActionResult {
@@ -15,23 +15,41 @@ export interface ExecuteActionsResult {
   results: Array<{ action: PaneAction; result: ActionResult }>
 }
 
+export interface ExecuteContext {
+  config: TmuxConfig
+  serverUrl: string
+  windowState: WindowState
+}
+
+async function enforceMainPane(windowState: WindowState): Promise<void> {
+  if (!windowState.mainPane) return
+  await enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth)
+}
+
 export async function executeAction(
   action: PaneAction,
-  config: TmuxConfig,
-  serverUrl: string
+  ctx: ExecuteContext
 ): Promise<ActionResult> {
   if (action.type === "close") {
     const success = await closeTmuxPane(action.paneId)
+    if (success) {
+      await enforceMainPane(ctx.windowState)
+    }
     return { success }
   }
 
   const result = await spawnTmuxPane(
     action.sessionId,
     action.description,
-    config,
-    serverUrl,
-    action.targetPaneId
+    ctx.config,
+    ctx.serverUrl,
+    action.targetPaneId,
+    action.splitDirection
   )
+
+  if (result.success) {
+    await enforceMainPane(ctx.windowState)
+  }
 
   return {
     success: result.success,
@@ -41,15 +59,14 @@ export async function executeAction(
 
 export async function executeActions(
   actions: PaneAction[],
-  config: TmuxConfig,
-  serverUrl: string
+  ctx: ExecuteContext
 ): Promise<ExecuteActionsResult> {
   const results: Array<{ action: PaneAction; result: ActionResult }> = []
   let spawnedPaneId: string | undefined
 
   for (const action of actions) {
     log("[action-executor] executing", { type: action.type })
-    const result = await executeAction(action, config, serverUrl)
+    const result = await executeAction(action, ctx)
     results.push({ action, result })
 
     if (!result.success) {
