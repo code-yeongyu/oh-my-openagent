@@ -68,7 +68,16 @@ RULES:
 - Mark each checkbox [x] in the plan file when done
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
-- If blocked, document the blocker and move to the next task`
+- If blocked, document the blocker and move to the next task
+
+SYNC REQUIREMENT (tasks.md is source of truth):
+After reading this message, you MUST sync your todo list with tasks.md:
+1. Read tasks.md to get the authoritative task list
+2. Use todowrite to update your todo list:
+   - Add any tasks from tasks.md that are missing in todo
+   - Keep any extra todo items not in tasks.md (merge-preserve)
+   - Match task names exactly as they appear in tasks.md
+3. Work from tasks.md checkboxes, not from memory or old todo state`
 
 const EXECUTION_MODE_AUTO_DECISION = `
 ---

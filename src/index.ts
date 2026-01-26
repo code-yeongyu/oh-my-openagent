@@ -577,7 +577,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await ralphLoop?.event(input);
       await tddGuard?.event?.(input);
       await planReorganizer?.handler(input);
-      await planAttentionRefresher?.handler(input);
       await atlasHook?.handler(input);
 
       const { event } = input;

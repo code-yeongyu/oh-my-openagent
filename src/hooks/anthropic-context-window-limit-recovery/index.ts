@@ -4,6 +4,7 @@ import type { ExperimentalConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { log } from "../../shared/logger"
+import { isCompactionInProgress, markCompactionInProgress, clearCompactionInProgress } from "../compaction-state"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
@@ -51,9 +52,18 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState.pendingCompact.add(sessionID)
         autoCompactState.errorDataBySession.set(sessionID, parsed)
 
+        // Check shared compaction guard (bidirectional prevention with onSummarize)
+        if (isCompactionInProgress(sessionID)) {
+          log("[auto-compact] skipped: shared compaction already in progress", { sessionID })
+          return
+        }
+
         if (autoCompactState.compactionInProgress.has(sessionID)) {
           return
         }
+
+        // Mark shared compaction in progress before starting
+        markCompactionInProgress(sessionID)
 
         const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
         const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)
@@ -78,7 +88,10 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
             ctx.client,
             ctx.directory,
             experimental
-          )
+          ).finally(() => {
+            // Clear shared compaction flag when done
+            clearCompactionInProgress(sessionID)
+          })
         }, 300)
       }
       return
@@ -108,6 +121,13 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
 
       if (!autoCompactState.pendingCompact.has(sessionID)) return
 
+      // Check shared compaction guard (bidirectional prevention with onSummarize)
+      if (isCompactionInProgress(sessionID)) {
+        log("[auto-compact] session.idle skipped: shared compaction already in progress", { sessionID })
+        autoCompactState.pendingCompact.delete(sessionID)
+        return
+      }
+
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
       const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
 
@@ -115,6 +135,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         autoCompactState.pendingCompact.delete(sessionID)
         return
       }
+
+      // Mark shared compaction in progress before starting
+      markCompactionInProgress(sessionID)
 
       const providerID = errorData?.providerID ?? (lastAssistant?.providerID as string | undefined)
       const modelID = errorData?.modelID ?? (lastAssistant?.modelID as string | undefined)
@@ -130,14 +153,19 @@ export function createAnthropicContextWindowLimitRecoveryHook(ctx: PluginInput, 
         })
         .catch(() => {})
 
-      await executeCompact(
-        sessionID,
-        { providerID, modelID },
-        autoCompactState,
-        ctx.client,
-        ctx.directory,
-        experimental
-      )
+      try {
+        await executeCompact(
+          sessionID,
+          { providerID, modelID },
+          autoCompactState,
+          ctx.client,
+          ctx.directory,
+          experimental
+        )
+      } finally {
+        // Clear shared compaction flag when done
+        clearCompactionInProgress(sessionID)
+      }
     }
   }
 

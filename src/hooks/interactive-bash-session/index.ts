@@ -147,6 +147,14 @@ function findSubcommand(tokens: string[]): string {
 }
 
 export function createInteractiveBashSessionHook(_ctx: PluginInput) {
+  // Skip on Windows - tmux is not available
+  if (process.platform === "win32") {
+    return {
+      "tool.execute.after": async () => {},
+      event: async () => {},
+    }
+  }
+
   const sessionStates = new Map<string, InteractiveBashSessionState>();
 
   function getOrCreateState(sessionID: string): InteractiveBashSessionState {

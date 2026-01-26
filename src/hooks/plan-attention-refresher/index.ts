@@ -70,29 +70,18 @@ function shouldRefresh(sessionId: string): boolean {
 
 export function createPlanAttentionRefresherHook(ctx: PluginInput) {
   return {
-    name: HOOK_NAME,
-    
-    async handler({ event, sessionID }: { event: { type: string; properties?: unknown }; sessionID?: string }): Promise<void> {
-      if (event.type !== "tool.execute.before") {
-        return
-      }
-      
-      const sessionId = sessionID ?? "unknown"
+    "tool.execute.before": async (
+      input: { tool: string; sessionID: string; callID: string },
+      output: { args: Record<string, unknown>; message?: string }
+    ): Promise<void> => {
+      const sessionId = input.sessionID ?? "unknown"
       
       // Skip subagent sessions - they don't need plan context refresh
       if (subagentSessions.has(sessionId)) {
         return
       }
       
-      const props = event.properties as {
-        tool?: string
-        input?: Record<string, unknown>
-        output?: { output?: string }
-      } | undefined
-      
-      if (!props) return
-      
-      const toolName = props.tool?.toLowerCase()
+      const toolName = input.tool?.toLowerCase()
       
       // Only trigger on specific tools
       if (!toolName || !TRIGGER_TOOLS.has(toolName)) {
@@ -120,22 +109,15 @@ export function createPlanAttentionRefresherHook(ctx: PluginInput) {
         return
       }
       
-      // Prepend to output as context refresh
+      // Prepend to message as context refresh
       const refreshHeader = `\n[PLAN CONTEXT - ${boulderState.plan_name}]\n`
       const refreshContent = `\`\`\`markdown\n${preview}\n\`\`\`\n`
       const refreshFooter = `[/PLAN CONTEXT]\n\n`
       
       const fullRefresh = refreshHeader + refreshContent + refreshFooter
       
-      // Modify the output object
-      const output = props.output as { output?: string } | undefined
-      if (output) {
-        if (output.output) {
-          output.output = fullRefresh + output.output
-        } else {
-          output.output = fullRefresh
-        }
-      }
+      // Inject as message (PreToolUse uses message, not output)
+      output.message = (output.message || "") + fullRefresh
       
       log(`[${HOOK_NAME}] Refreshed plan context`, { 
         plan: boulderState.plan_name,

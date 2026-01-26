@@ -56,11 +56,21 @@ interface SessionState {
 
 const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
 
-Incomplete tasks remain in your todo list. Continue working on the next pending task.
+Incomplete tasks remain. Continue working on the next pending task.
 
+RULES:
 - Proceed without asking for permission
 - Mark each task complete when finished
-- Do not stop until all tasks are done`
+- Do not stop until all tasks are done
+
+SYNC REQUIREMENT (tasks.md is source of truth):
+- If .sisyphus/boulder.json exists and has active_plan:
+  1. Read tasks.md to get the authoritative task list
+  2. Use todowrite to sync your todo list with tasks.md:
+     - Add any tasks from tasks.md that are missing in todo
+     - Keep any extra todo items not in tasks.md (merge-preserve)
+     - Match task names exactly as they appear in tasks.md
+  3. Work from tasks.md, not from memory`
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
@@ -95,6 +105,88 @@ function containsGitPublishKeywords(content: string): boolean {
   if (!content) return false
   const lowerContent = content.toLowerCase()
   return GIT_PUBLISH_KEYWORDS.some(keyword => lowerContent.includes(keyword.toLowerCase()))
+}
+
+/**
+ * Semantic markers for distinguishing awaiting types.
+ * - "decision": Critical choices requiring user judgment (git strategy, architecture)
+ * - "continue": Simple continuation prompts that can be auto-answered
+ */
+type AwaitingType = "decision" | "continue" | null
+
+/**
+ * Regex patterns that indicate AI is asking user to continue.
+ * Used as fallback when explicit semantic markers are not present.
+ */
+const CONTINUE_PATTERNS: RegExp[] = [
+  // English question patterns
+  /\b(shall|should|would you like|want me to|ready to)\s+(i\s+)?(continue|proceed|go on|move forward)\b/i,
+  /\b(continue|proceed)\s*\?/i,
+  /\bcontinue\s+(with\s+)?(the\s+)?(next|remaining|rest|other)/i,
+  /\bshall\s+i\s+(go\s+ahead|move\s+on)/i,
+  /\bwould\s+you\s+like\s+me\s+to\s+(continue|proceed|go\s+ahead)/i,
+  // Chinese patterns
+  /继续(吗|么|执行|测试|进行|下去)?[？?]/,
+  /继续.{0,10}(吗|么)[？?]?/,  // 继续测试剩余的吗？
+  /(要|是否|需要|可以)(继续|接着|往下)/,
+  /接下来(要|继续|测试)?/,
+  // Japanese patterns
+  /続(け|行)(ます|しま)か/,
+  /続行しますか/,  // Explicit match for 続行しますか
+  /進(め|み)ますか/,
+]
+
+/**
+ * Check for explicit semantic markers in content.
+ * These markers take priority over regex pattern matching.
+ * 
+ * Usage in agent output:
+ * - <awaiting_decision>Which git strategy?</awaiting_decision> → blocks continuation
+ * - <awaiting_continue>Should I continue?</awaiting_continue> → allows continuation
+ */
+export function getAwaitingType(content: string): AwaitingType {
+  if (!content) return null
+  if (/<awaiting_decision>/i.test(content)) return "decision"
+  if (/<awaiting_continue>/i.test(content)) return "continue"
+  return null
+}
+
+/**
+ * Check if content matches continue prompt patterns using regex.
+ */
+export function matchesContinuePattern(content: string): boolean {
+  if (!content) return false
+  return CONTINUE_PATTERNS.some(pattern => pattern.test(content))
+}
+
+/**
+ * Determine if auto-continuation should be allowed despite awaiting_user state.
+ * 
+ * Two-layer detection:
+ * 1. Explicit markers (highest priority): <awaiting_decision> blocks, <awaiting_continue> allows
+ * 2. Regex pattern matching (fallback): detects "continue?", "继续吗？", etc.
+ * 
+ * @param lastAssistantContent - The text content of the last assistant message
+ * @returns true if continuation should be allowed, false if blocked
+ */
+export function shouldOverrideAwaitingUser(lastAssistantContent: string): boolean {
+  // Layer 1: Check explicit markers (highest priority)
+  const awaitingType = getAwaitingType(lastAssistantContent)
+  if (awaitingType === "decision") return false  // Strict block
+  if (awaitingType === "continue") return true   // Allow override
+  
+  // Layer 2: Regex pattern matching (fallback)
+  // Only allow if it looks like a simple "continue?" prompt
+  // AND does not contain git/publish decision keywords
+  if (matchesContinuePattern(lastAssistantContent)) {
+    // Double-check: don't override if git/publish keywords are present
+    if (containsGitPublishKeywords(lastAssistantContent)) {
+      return false
+    }
+    return true
+  }
+  
+  return false
 }
 
 function getMessageDir(sessionID: string): string | null {
@@ -225,18 +317,49 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    let todos: Todo[] = []
-    try {
-      const response = await ctx.client.session.todo({ path: { id: sessionID } })
-      todos = (response.data ?? response) as Todo[]
-    } catch (err) {
-      log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(err) })
-      return
+    // Check if boulder is active - if so, tasks.md is source of truth
+    const boulderState = readBoulderState(ctx.directory)
+    const planProgress = boulderState?.active_plan ? readPlanProgress(ctx.directory) : null
+    
+    let effectiveIncompleteCount = incompleteCount
+    let effectiveTotal = total
+    let usedTasksMd = false
+
+    // If boulder is active and tasks.md has data, use tasks.md counts (source of truth)
+    if (planProgress && planProgress.total > 0) {
+      effectiveIncompleteCount = planProgress.total - planProgress.completed
+      effectiveTotal = planProgress.total
+      usedTasksMd = true
+      log(`[${HOOK_NAME}] Using tasks.md as source of truth`, { 
+        sessionID, 
+        planPath: planProgress.planPath,
+        tasksIncomplete: effectiveIncompleteCount,
+        tasksTotal: effectiveTotal
+      })
     }
 
-    const freshIncompleteCount = getIncompleteCount(todos)
-    if (freshIncompleteCount === 0) {
-      log(`[${HOOK_NAME}] Skipped injection: no incomplete todos`, { sessionID })
+    // If tasks.md shows complete but we still have incomplete count from caller, check todos as fallback
+    if (effectiveIncompleteCount === 0 && !usedTasksMd) {
+      let todos: Todo[] = []
+      try {
+        const response = await ctx.client.session.todo({ path: { id: sessionID } })
+        todos = (response.data ?? response) as Todo[]
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(err) })
+        return
+      }
+
+      const freshIncompleteCount = getIncompleteCount(todos)
+      if (freshIncompleteCount === 0) {
+        log(`[${HOOK_NAME}] Skipped injection: no incomplete todos`, { sessionID })
+        return
+      }
+      effectiveIncompleteCount = freshIncompleteCount
+      effectiveTotal = todos.length
+    }
+
+    if (effectiveIncompleteCount === 0) {
+      log(`[${HOOK_NAME}] Skipped injection: all tasks complete`, { sessionID })
       return
     }
 
@@ -269,10 +392,12 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
+    const completed = effectiveTotal - effectiveIncompleteCount
+    const sourceNote = usedTasksMd ? " (from tasks.md)" : ""
+    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining${sourceNote}]`
 
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: effectiveIncompleteCount, usedTasksMd })
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
@@ -390,12 +515,55 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      // Check 1.6: Boulder state - don't auto-continue when awaiting user input or completed
-      // This prevents todo-continuation from interfering with Phase 3 git strategy selection
+      // Check 1.6: Boulder state - don't auto-continue when completed
+      // This prevents todo-continuation from interfering with completed workflows
       const boulderState = readBoulderState(ctx.directory)
-      if (boulderState?.phase === "awaiting_user" || boulderState?.phase === "completed") {
-        log(`[${HOOK_NAME}] Skipped: boulder in terminal state (${boulderState.phase})`, { sessionID, plan: boulderState.plan_name })
+      if (boulderState?.phase === "completed") {
+        log(`[${HOOK_NAME}] Skipped: boulder completed`, { sessionID, plan: boulderState.plan_name })
         return
+      }
+
+      // Check 1.6.1: Smart override for awaiting_user state
+      // When AI is asking "continue?" (not git strategy), allow auto-continuation
+      if (boulderState?.phase === "awaiting_user") {
+        // Get last assistant message to check for continue patterns
+        let lastAssistantContent = ""
+        try {
+          const messagesResp = await ctx.client.session.messages({
+            path: { id: sessionID },
+            query: { directory: ctx.directory },
+          })
+          const messages = (messagesResp as { data?: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }> }).data ?? []
+          
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i]
+            if (msg.info?.role === "assistant" && msg.parts) {
+              lastAssistantContent = msg.parts
+                .filter(p => p.type === "text" && p.text)
+                .map(p => p.text)
+                .join(" ")
+              break
+            }
+          }
+        } catch (err) {
+          log(`[${HOOK_NAME}] Failed to fetch messages for continue check`, { sessionID, error: String(err) })
+        }
+        
+        if (!shouldOverrideAwaitingUser(lastAssistantContent)) {
+          log(`[${HOOK_NAME}] Skipped: awaiting_user (not a continue prompt)`, { 
+            sessionID, 
+            plan: boulderState.plan_name,
+            preview: lastAssistantContent.slice(0, 100)
+          })
+          return
+        }
+        
+        log(`[${HOOK_NAME}] Override: awaiting_user but AI is asking to continue`, { 
+          sessionID,
+          plan: boulderState.plan_name,
+          preview: lastAssistantContent.slice(0, 100)
+        })
+        // Continue to normal flow - allow auto-continuation
       }
 
       // Check 1.7: Plan progress check (File is Source of Truth)
