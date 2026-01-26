@@ -31,10 +31,37 @@ export interface SpawnTarget {
 }
 
 const MAIN_PANE_RATIO = 0.5
+const MAX_COLS = 2
+const MAX_ROWS = 3
 const MAX_GRID_SIZE = 4
 const DIVIDER_SIZE = 1
 const MIN_SPLIT_WIDTH = 2 * MIN_PANE_WIDTH + DIVIDER_SIZE
 const MIN_SPLIT_HEIGHT = 2 * MIN_PANE_HEIGHT + DIVIDER_SIZE
+
+export function getColumnCount(paneCount: number): number {
+  if (paneCount <= 0) return 1
+  return Math.min(MAX_COLS, Math.max(1, Math.ceil(paneCount / MAX_ROWS)))
+}
+
+export function getColumnWidth(agentAreaWidth: number, paneCount: number): number {
+  const cols = getColumnCount(paneCount)
+  const dividersWidth = (cols - 1) * DIVIDER_SIZE
+  return Math.floor((agentAreaWidth - dividersWidth) / cols)
+}
+
+export function isSplittableAtCount(agentAreaWidth: number, paneCount: number): boolean {
+  const columnWidth = getColumnWidth(agentAreaWidth, paneCount)
+  return columnWidth >= MIN_SPLIT_WIDTH
+}
+
+export function findMinimalEvictions(agentAreaWidth: number, currentCount: number): number | null {
+  for (let k = 1; k <= currentCount; k++) {
+    if (isSplittableAtCount(agentAreaWidth, currentCount - k)) {
+      return k
+    }
+  }
+  return null
+}
 
 export function canSplitPane(pane: TmuxPaneInfo, direction: SplitDirection): boolean {
   if (direction === "-h") {
@@ -251,9 +278,10 @@ export function decideSpawnActions(
     return { canSpawn: false, actions: [], reason: "no main pane found" }
   }
 
-  const capacity = calculateCapacity(state.windowWidth, state.windowHeight)
-  
-  if (capacity.total === 0) {
+  const agentAreaWidth = Math.floor(state.windowWidth * (1 - MAIN_PANE_RATIO))
+  const currentCount = state.agentPanes.length
+
+  if (agentAreaWidth < MIN_PANE_WIDTH) {
     return {
       canSpawn: false,
       actions: [],
@@ -261,52 +289,85 @@ export function decideSpawnActions(
     }
   }
 
-  let currentState = state
-  const closeActions: PaneAction[] = []
-  const maxIterations = state.agentPanes.length + 1
+  const oldestPane = findOldestAgentPane(state.agentPanes, sessionMappings)
+  const oldestMapping = oldestPane 
+    ? sessionMappings.find(m => m.paneId === oldestPane.paneId)
+    : null
 
-  for (let i = 0; i < maxIterations; i++) {
-    const spawnTarget = findSplittableTarget(currentState)
-    
+  if (currentCount === 0) {
+    const virtualMainPane: TmuxPaneInfo = { ...state.mainPane, width: state.windowWidth }
+    if (canSplitPane(virtualMainPane, "-h")) {
+      return {
+        canSpawn: true,
+        actions: [{
+          type: "spawn",
+          sessionId,
+          description,
+          targetPaneId: state.mainPane.paneId,
+          splitDirection: "-h"
+        }]
+      }
+    }
+    return { canSpawn: false, actions: [], reason: "mainPane too small to split" }
+  }
+
+  if (isSplittableAtCount(agentAreaWidth, currentCount)) {
+    const spawnTarget = findSplittableTarget(state)
     if (spawnTarget) {
       return {
         canSpawn: true,
-        actions: [
-          ...closeActions,
-          { 
-            type: "spawn", 
-            sessionId, 
-            description, 
-            targetPaneId: spawnTarget.targetPaneId,
-            splitDirection: spawnTarget.splitDirection
-          }
-        ],
-        reason: closeActions.length > 0 ? `closed ${closeActions.length} pane(s) to make room` : undefined,
+        actions: [{
+          type: "spawn",
+          sessionId,
+          description,
+          targetPaneId: spawnTarget.targetPaneId,
+          splitDirection: spawnTarget.splitDirection
+        }]
       }
     }
+  }
 
-    const oldestPane = findOldestAgentPane(currentState.agentPanes, sessionMappings)
-    if (!oldestPane) {
-      break
+  const minEvictions = findMinimalEvictions(agentAreaWidth, currentCount)
+
+  if (minEvictions === 1 && oldestPane) {
+    return {
+      canSpawn: true,
+      actions: [
+        {
+          type: "close",
+          paneId: oldestPane.paneId,
+          sessionId: oldestMapping?.sessionId || ""
+        },
+        {
+          type: "spawn",
+          sessionId,
+          description,
+          targetPaneId: state.mainPane.paneId,
+          splitDirection: "-h"
+        }
+      ],
+      reason: "closed 1 pane to make room for split"
     }
+  }
 
-    const mappingForPane = sessionMappings.find(m => m.paneId === oldestPane.paneId)
-    closeActions.push({
-      type: "close",
-      paneId: oldestPane.paneId,
-      sessionId: mappingForPane?.sessionId || ""
-    })
-
-    currentState = {
-      ...currentState,
-      agentPanes: currentState.agentPanes.filter(p => p.paneId !== oldestPane.paneId)
+  if (oldestPane) {
+    return {
+      canSpawn: true,
+      actions: [{
+        type: "replace",
+        paneId: oldestPane.paneId,
+        oldSessionId: oldestMapping?.sessionId || "",
+        newSessionId: sessionId,
+        description
+      }],
+      reason: "replaced oldest pane (no split possible)"
     }
   }
 
   return {
     canSpawn: false,
     actions: [],
-    reason: "no splittable pane found even after closing all agent panes",
+    reason: "no pane available to replace"
   }
 }
 
