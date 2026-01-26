@@ -219,6 +219,66 @@ agent-browser screenshot result.png
 agent-browser close
 ```
 
+## Tmux Integration
+
+Run background subagents in separate tmux panes for **visual multi-agent execution**. See your agents working in parallel, each in their own terminal pane.
+
+**Enable tmux integration** via `tmux` in `oh-my-opencode.json`:
+
+```json
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical",
+    "main_pane_size": 60,
+    "main_pane_min_width": 120,
+    "agent_pane_min_width": 40
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enable tmux subagent pane spawning. Only works when running inside an existing tmux session. |
+| `layout` | `main-vertical` | Tmux layout for agent panes. See [Layout Options](#layout-options) below. |
+| `main_pane_size` | `60` | Main pane size as percentage (20-80). |
+| `main_pane_min_width` | `120` | Minimum width for main pane in columns. |
+| `agent_pane_min_width` | `40` | Minimum width for each agent pane in columns. |
+
+### Layout Options
+
+| Layout | Description |
+|--------|-------------|
+| `main-vertical` | Main pane left, agent panes stacked on right (default) |
+| `main-horizontal` | Main pane top, agent panes stacked bottom |
+| `tiled` | All panes in equal-sized grid |
+| `even-horizontal` | All panes in horizontal row |
+| `even-vertical` | All panes in vertical stack |
+
+### Requirements
+
+1. **Must run inside tmux**: The feature only activates when OpenCode is already running inside a tmux session
+2. **Tmux installed**: Requires tmux to be available in PATH
+
+### How It Works
+
+When `tmux.enabled` is `true` and you're inside a tmux session:
+- Background agents (via `delegate_task(run_in_background=true)`) spawn in new tmux panes
+- Each pane shows the subagent's real-time output
+- Panes are automatically closed when the subagent completes
+- Layout is automatically adjusted based on your configuration
+
+**Example workflow**:
+```bash
+# Start tmux session
+tmux new -s dev
+
+# Run OpenCode inside tmux
+opencode
+
+# Now background agents will appear in separate panes
+```
+
 ## Git Master
 
 Configure git-master skill behavior:
