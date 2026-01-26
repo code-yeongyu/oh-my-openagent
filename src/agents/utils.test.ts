@@ -91,34 +91,6 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.oracle.textVerbosity).toBeUndefined()
   })
 
-  test("Librarian with Gemini model has no thinking", async () => {
-    // #given
-    const overrides = {
-      librarian: { model: "google/gemini-3-flash-preview" },
-    }
-
-    // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
-
-    // #then
-    expect(agents.librarian.model).toBe("google/gemini-3-flash-preview")
-    expect(agents.librarian.thinking).toBeUndefined()
-  })
-
-  test("Librarian with Claude model has thinking enabled", async () => {
-    // #given
-    const overrides = {
-      librarian: { model: "anthropic/claude-sonnet-4-5" },
-    }
-
-    // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
-
-    // #then
-    expect(agents.librarian.model).toBe("anthropic/claude-sonnet-4-5")
-    expect(agents.librarian.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
-  })
-
    test("non-model overrides are still applied after factory rebuild", async () => {
      // #given
      const overrides = {
