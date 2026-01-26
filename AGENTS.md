@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-25T18:08:00+09:00
-**Commit:** 1d68757f
+**Generated:** 2026-01-26T14:50:00+09:00
+**Commit:** 9d66b807
 **Branch:** dev
 
 ---
@@ -33,7 +33,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (669 lines)
+│   └── index.ts       # Main plugin entry (672 lines)
 ├── script/            # build-schema.ts, build-binaries.ts
 ├── packages/          # 7 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
@@ -132,7 +132,7 @@ bun test               # 100 test files
 | `src/tools/delegate-task/tools.ts` | 1070 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 752 | Orchestrator hook |
 | `src/cli/config-manager.ts` | 664 | JSONC config parsing |
-| `src/index.ts` | 669 | Main plugin entry |
+| `src/index.ts` | 672 | Main plugin entry |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
 
 ## MCP ARCHITECTURE
