@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-3 remote MCP servers: web search, documentation, code search. HTTP/SSE transport.
+3 remote MCP servers: web search, documentation, code search. HTTP/SSE transport. Part of three-tier MCP system.
 
 ## STRUCTURE
 
@@ -20,9 +20,15 @@ mcp/
 
 | Name | URL | Purpose | Auth |
 |------|-----|---------|------|
-| websearch | mcp.exa.ai | Real-time web search | EXA_API_KEY |
-| context7 | mcp.context7.com | Library docs | None |
+| websearch | mcp.exa.ai/mcp?tools=web_search_exa | Real-time web search | EXA_API_KEY |
+| context7 | mcp.context7.com/mcp | Library docs | None |
 | grep_app | mcp.grep.app | GitHub code search | None |
+
+## THREE-TIER MCP SYSTEM
+
+1. **Built-in** (this directory): websearch, context7, grep_app
+2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
+3. **Skill-embedded**: YAML frontmatter in skills (handled by skill-mcp-manager)
 
 ## CONFIG PATTERN
 
@@ -54,5 +60,5 @@ const mcps = createBuiltinMcps(["websearch"])  // Disable specific
 ## NOTES
 
 - **Remote only**: HTTP/SSE, no stdio
-- **Disable**: User can set `disabled_mcps: ["name"]`
+- **Disable**: User can set `disabled_mcps: ["name"]` in config
 - **Exa**: Requires `EXA_API_KEY` env var

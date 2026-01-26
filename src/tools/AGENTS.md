@@ -10,12 +10,12 @@
 tools/
 ├── [tool-name]/
 │   ├── index.ts      # Barrel export
-│   ├── tools.ts      # ToolDefinition
+│   ├── tools.ts      # ToolDefinition or factory
 │   ├── types.ts      # Zod schemas
 │   └── constants.ts  # Fixed values
-├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename
+├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename (client.ts 596 lines)
 ├── ast-grep/         # 2 tools: search, replace (25 languages)
-├── delegate-task/    # Category-based routing (1039 lines)
+├── delegate-task/    # Category-based routing (1070 lines, 302 nesting levels)
 ├── session-manager/  # 4 tools: list, read, search, info
 ├── grep/             # Custom grep with timeout
 ├── glob/             # 60s timeout, 100 file limit
@@ -30,32 +30,46 @@ tools/
 
 ## TOOL CATEGORIES
 
-| Category | Tools | Purpose |
+| Category | Tools | Pattern |
 |----------|-------|---------|
-| LSP | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_prepare_rename, lsp_rename | Semantic code intelligence |
-| Search | ast_grep_search, ast_grep_replace, grep, glob | Pattern discovery |
-| Session | session_list, session_read, session_search, session_info | History navigation |
-| Agent | delegate_task, call_omo_agent, background_output, background_cancel | Task orchestration |
-| System | interactive_bash, look_at | CLI, multimodal |
-| Skill | skill, skill_mcp, slashcommand | Skill execution |
+| LSP | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_prepare_rename, lsp_rename | Direct |
+| Search | ast_grep_search, ast_grep_replace, grep, glob | Direct |
+| Session | session_list, session_read, session_search, session_info | Direct |
+| Agent | delegate_task, call_omo_agent | Factory |
+| Background | background_output, background_cancel | Factory |
+| System | interactive_bash, look_at | Mixed |
+| Skill | skill, skill_mcp, slashcommand | Factory |
 
 ## HOW TO ADD
 
 1. Create `src/tools/[name]/` with standard files
 2. Use `tool()` from `@opencode-ai/plugin/tool`
 3. Export from `src/tools/index.ts`
-4. Add to `builtinTools` object
+4. Static tools → `builtinTools`, Factory → separate export
 
-## LSP SPECIFICS
+## TOOL PATTERNS
 
-- **Client**: `client.ts` manages stdio, JSON-RPC (596 lines)
-- **Singleton**: `LSPServerManager` with ref counting
-- **Capabilities**: definition, references, symbols, diagnostics, rename
+**Direct ToolDefinition**:
+```typescript
+export const grep: ToolDefinition = tool({
+  description: "...",
+  args: { pattern: tool.schema.string() },
+  execute: async (args) => result,
+})
+```
 
-## AST-GREP SPECIFICS
+**Factory Function** (context-dependent):
+```typescript
+export function createDelegateTask(ctx, manager): ToolDefinition {
+  return tool({ execute: async (args) => { /* uses ctx */ } })
+}
+```
 
-- **Engine**: `@ast-grep/napi` for 25+ languages
-- **Patterns**: `$VAR` (single), `$$$` (multiple)
+## NAMING
+
+- **Tool names**: snake_case (`lsp_goto_definition`)
+- **Functions**: camelCase (`createDelegateTask`)
+- **Directories**: kebab-case (`delegate-task/`)
 
 ## ANTI-PATTERNS
 
