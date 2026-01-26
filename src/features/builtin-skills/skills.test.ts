@@ -86,4 +86,58 @@ describe("createBuiltinSkills", () => {
 		expect(defaultSkills).toHaveLength(4)
 		expect(agentBrowserSkills).toHaveLength(4)
 	})
+
+	test("should exclude playwright when it is in disabledSkills", () => {
+		// #given
+		const options = { disabledSkills: new Set(["playwright"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.map((s) => s.name)).not.toContain("playwright")
+		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("git-master")
+		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.length).toBe(3)
+	})
+
+	test("should exclude multiple skills when they are in disabledSkills", () => {
+		// #given
+		const options = { disabledSkills: new Set(["playwright", "git-master"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.map((s) => s.name)).not.toContain("playwright")
+		expect(skills.map((s) => s.name)).not.toContain("git-master")
+		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.length).toBe(2)
+	})
+
+	test("should return an empty array when all skills are disabled", () => {
+		// #given
+		const options = {
+			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser"]),
+		}
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.length).toBe(0)
+	})
+
+	test("should return all skills when disabledSkills set is empty", () => {
+		// #given
+		const options = { disabledSkills: new Set<string>() }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.length).toBe(4)
+	})
 })
