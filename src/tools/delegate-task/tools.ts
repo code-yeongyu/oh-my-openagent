@@ -13,6 +13,7 @@ import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase } from "../../shared"
 import { fetchAvailableModels } from "../../shared/model-availability"
+import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
@@ -500,7 +501,10 @@ To continue this session: session_id="${args.session_id}"`
            )
          }
 
-         const availableModels = await fetchAvailableModels(client)
+          const connectedProviders = readConnectedProvidersCache()
+          const availableModels = await fetchAvailableModels(client, {
+            connectedProviders: connectedProviders ?? undefined
+          })
 
          const resolved = resolveCategoryConfig(args.category, {
            userCategories,
@@ -845,6 +849,7 @@ To continue this session: session_id="${task.sessionID}"`
         const sessionID = createResult.data.id
         syncSessionID = sessionID
         subagentSessions.add(sessionID)
+
         taskId = `sync_${sessionID.slice(0, 8)}`
         const startTime = new Date()
 
