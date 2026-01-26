@@ -58,7 +58,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-delegate_task(category="[category-name]", skills=[...], prompt="...")
+delegate_task(category="[category-name]", load_skills=[...], prompt="...")
 \`\`\``
 }
 
@@ -84,12 +84,12 @@ ${skillRows.join("\n")}
 **MANDATORY: Evaluate ALL skills for relevance to your task.**
 
 Read each skill's description and ask: "Does this skill's domain overlap with my task?"
-- If YES: INCLUDE in skills=[...]
+- If YES: INCLUDE in load_skills=[...]
 - If NO: You MUST justify why in your pre-delegation declaration
 
 **Usage:**
 \`\`\`typescript
-delegate_task(category="[category]", skills=["skill-1", "skill-2"], prompt="...")
+delegate_task(category="[category]", load_skills=["skill-1", "skill-2"], prompt="...")
 \`\`\`
 
 **IMPORTANT:**
@@ -102,7 +102,7 @@ function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<s
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
 
   const categoryRows = Object.entries(allCategories).map(([name]) =>
-    `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", skills=[...]\` |`
+    `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", load_skills=[...]\` |`
   )
 
   const agentRows = agents.map((a) => {
@@ -323,7 +323,7 @@ delegate_task(
 **If verification fails**: Resume the SAME session with the ACTUAL error output:
 \`\`\`typescript
 delegate_task(
-  resume="ses_xyz789",  // ALWAYS use the session from the failed task
+  session_id="ses_xyz789",  // ALWAYS use the session from the failed task
   load_skills=[...],
   prompt="Verification failed: {actual error}. Fix."
 )
@@ -331,24 +331,24 @@ delegate_task(
 
 ### 3.5 Handle Failures (USE RESUME)
 
-**CRITICAL: When re-delegating, ALWAYS use \`resume\` parameter.**
+**CRITICAL: When re-delegating, ALWAYS use \`session_id\` parameter.**
 
 Every \`delegate_task()\` output includes a session_id. STORE IT.
 
 If task fails:
 1. Identify what went wrong
 2. **Resume the SAME session** - subagent has full context already:
-   \`\`\`typescript
-   delegate_task(
-     resume="ses_xyz789",  // Session from failed task
-     load_skills=[...],
-     prompt="FAILED: {error}. Fix by: {specific instruction}"
-   )
-   \`\`\`
+    \`\`\`typescript
+    delegate_task(
+      session_id="ses_xyz789",  // Session from failed task
+      load_skills=[...],
+      prompt="FAILED: {error}. Fix by: {specific instruction}"
+    )
+    \`\`\`
 3. Maximum 3 retry attempts with the SAME session
 4. If blocked after 3 attempts: Document and continue to independent tasks
 
-**Why resume is MANDATORY for failures:**
+**Why session_id is MANDATORY for failures:**
 - Subagent already read all files, knows the context
 - No repeated exploration = 70%+ token savings
 - Subagent knows what approaches already failed
@@ -493,7 +493,7 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Parallelize independent tasks
 - Verify with your own tools
 - **Store session_id from every delegation output**
-- **Use \`resume="{session_id}"\` for retries, fixes, and follow-ups**
+- **Use \`session_id="{session_id}"\` for retries, fixes, and follow-ups**
 </critical_overrides>
 `
 
@@ -523,9 +523,6 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
-  if (!ctx.model) {
-    throw new Error("createAtlasAgent requires a model in context")
-  }
   const restrictions = createAgentToolRestrictions([
     "task",
     "call_omo_agent",
@@ -534,7 +531,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     description:
       "Orchestrates work via delegate_task() to complete ALL tasks in a todo list until fully done",
     mode: "primary" as const,
-    model: ctx.model,
+    ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     thinking: { type: "enabled", budgetTokens: 32000 },

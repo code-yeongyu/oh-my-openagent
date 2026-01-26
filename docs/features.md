@@ -62,6 +62,27 @@ delegate_task(agent="explore", background=true, prompt="Find auth implementation
 background_output(task_id="bg_abc123")
 ```
 
+#### Visual Multi-Agent with Tmux
+
+Enable `tmux.enabled` to see background agents in separate tmux panes:
+
+```json
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical"
+  }
+}
+```
+
+When running inside tmux:
+- Background agents spawn in new panes
+- Watch multiple agents work in real-time
+- Each pane shows agent output live
+- Auto-cleanup when agents complete
+
+See [Tmux Integration](configurations.md#tmux-integration) for full configuration options.
+
 Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](configurations.md#agents).
 
 ---
@@ -78,11 +99,15 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 | **frontend-ui-ux** | UI/UX tasks, styling | Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes. |
 | **git-master** | commit, rebase, squash, blame | MUST USE for ANY git operations. Atomic commits with automatic splitting, rebase/squash workflows, history search (blame, bisect, log -S). |
 
-### Skill: playwright
+### Skill: Browser Automation (playwright / agent-browser)
 
 **Trigger**: Any browser-related request
 
-Provides browser automation via Playwright MCP server:
+Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation_engine.provider`:
+
+#### Option 1: Playwright MCP (Default)
+
+The default provider uses Playwright MCP server:
 
 ```yaml
 mcp:
@@ -91,17 +116,40 @@ mcp:
     args: ["@playwright/mcp@latest"]
 ```
 
-**Capabilities**:
+**Usage**:
+```
+/playwright Navigate to example.com and take a screenshot
+```
+
+#### Option 2: Agent Browser CLI (Vercel)
+
+Alternative provider using [Vercel's agent-browser CLI](https://github.com/vercel-labs/agent-browser):
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  }
+}
+```
+
+**Requires installation**:
+```bash
+bun add -g agent-browser
+```
+
+**Usage**:
+```
+Use agent-browser to navigate to example.com and extract the main heading
+```
+
+#### Capabilities (Both Providers)
+
 - Navigate and interact with web pages
 - Take screenshots and PDFs
 - Fill forms and click elements
 - Wait for network requests
 - Scrape content
-
-**Usage**:
-```
-/playwright Navigate to example.com and take a screenshot
-```
 
 ### Skill: frontend-ui-ux
 
@@ -417,6 +465,29 @@ Disable specific hooks in config:
 | **session_read** | Read messages and history from a session |
 | **session_search** | Full-text search across session messages |
 | **session_info** | Get session metadata and statistics |
+
+### Interactive Terminal Tools
+
+| Tool | Description |
+|------|-------------|
+| **interactive_bash** | Tmux-based terminal for TUI apps (vim, htop, pudb). Pass tmux subcommands directly without prefix. |
+
+**Usage Examples**:
+```bash
+# Create a new session
+interactive_bash(tmux_command="new-session -d -s dev-app")
+
+# Send keystrokes to a session
+interactive_bash(tmux_command="send-keys -t dev-app 'vim main.py' Enter")
+
+# Capture pane output
+interactive_bash(tmux_command="capture-pane -p -t dev-app")
+```
+
+**Key Points**:
+- Commands are tmux subcommands (no `tmux` prefix)
+- Use for interactive apps that need persistent sessions
+- One-shot commands should use regular `Bash` tool with `&`
 
 ---
 

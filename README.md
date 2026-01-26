@@ -16,8 +16,8 @@
 
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
-> > **The Orchestrator is now available in beta. Use `oh-my-opencode@3.0.0-beta.10` to install it.**
+> [![Oh My OpenCode 3.0 is now stable!](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
+> > **Oh My OpenCode 3.0 is now stable! Use `oh-my-opencode@latest` to install it.**
 >
 > Be with us!
 >

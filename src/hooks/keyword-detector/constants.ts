@@ -169,10 +169,10 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 ## AGENTS / **CATEGORY + SKILLS** UTILIZATION PRINCIPLES (by capability, not by name)
 - **Codebase Exploration**: Spawn exploration agents using BACKGROUND TASKS for file patterns, internal implementations, project structure
 - **Documentation & References**: Use librarian-type agents via BACKGROUND TASKS for API references, examples, external library docs
-- **Planning & Strategy**: NEVER plan yourself - ALWAYS spawn a dedicated planning agent for work breakdown
-  - MUST USE PLAN AGENT. MUST USE PLAN AGENT. MUST USE PLAN AGENT.
-  - ALWAYS ASK PLAN AGENT TO WHAT CATEGORY + SKILLS / AGENTS TO LEVERAGE.
-  - IF IMPLEMENT TASK, MUST ADD TODO NOW: "CONSULT WITH PLAN AGENT WITH CATEGORY + SKILLS"
+- **Planning & Strategy**: NEVER plan yourself - ALWAYS spawn the Plan agent for work breakdown
+  - MUST invoke: \`delegate_task(subagent_type="plan", prompt="<gathered context + user request>")\`
+  - In your prompt to the Plan agent, ASK it to recommend which CATEGORY + SKILLS / AGENTS to leverage for implementation.
+  - IF IMPLEMENT TASK, MUST ADD TODO NOW: "Consult Plan agent via delegate_task(subagent_type='plan') for work breakdown with category + skills recommendations"
 - **High-IQ Reasoning**: Leverage specialized agents for architecture decisions, code review, strategic planning
 - **SPECIAL TASKS COVERED WITH CATEGORY + LOAD_SKILLS**: Delegate to specialized agents with category+skills for design and implementation, as following guide:
   - CATEGORY + SKILL GUIDE
@@ -192,7 +192,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
 2. Spawn exploration/librarian agents via delegate_task(background=true) in PARALLEL (10+ if needed)
-3. Always Use Plan agent with gathered context to create detailed work breakdown
+3. Spawn Plan agent: \`delegate_task(subagent_type="plan", prompt="<context + request>")\` to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
 ## VERIFICATION GUARANTEE (NON-NEGOTIABLE)
@@ -266,9 +266,9 @@ Write these criteria explicitly. Share with user if scope is non-trivial.
 
 THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
 
-1. EXPLORES + LIBRARIANS
-2. GATHER -> PLAN AGENT SPAWN
-3. WORK BY DELEGATING TO ANOTHER AGENTS
+1. EXPLORES + LIBRARIANS (background)
+2. GATHER -> delegate_task(subagent_type="plan", prompt="<context + request>")
+3. WORK BY DELEGATING TO CATEGORY + SKILLS AGENTS
 
 NOW.
 

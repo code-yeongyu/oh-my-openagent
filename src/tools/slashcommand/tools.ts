@@ -210,8 +210,12 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
     return cachedDescription
   }
 
-  // Pre-warm the cache immediately
-  buildDescription()
+  if (options.commands !== undefined && options.skills !== undefined) {
+    const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
+    cachedDescription = buildDescriptionFromItems(allItems)
+  } else {
+    buildDescription()
+  }
 
   return tool({
     get description() {

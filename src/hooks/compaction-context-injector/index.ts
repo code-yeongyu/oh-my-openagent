@@ -33,7 +33,13 @@ When summarizing this session, you MUST include the following sections in your s
 - Pending items from the original request
 - Follow-up tasks identified during the work
 
-## 5. MUST NOT Do (Critical Constraints)
+## 5. Active Working Context (For Seamless Continuation)
+- **Files**: Paths of files currently being edited or frequently referenced
+- **Code in Progress**: Key code snippets, function signatures, or data structures under active development
+- **External References**: Documentation URLs, library APIs, or external resources being consulted
+- **State & Variables**: Important variable names, configuration values, or runtime state relevant to ongoing work
+
+## 6. MUST NOT Do (Critical Constraints)
 - Things that were explicitly forbidden
 - Approaches that failed and should not be retried
 - User's explicit restrictions or preferences

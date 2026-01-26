@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
 import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
@@ -105,9 +106,37 @@ describe("createBuiltinAgents with model overrides", () => {
    })
 })
 
+describe("createBuiltinAgents without systemDefaultModel", () => {
+  test("creates agents successfully without systemDefaultModel", async () => {
+    // #given - no systemDefaultModel provided
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+    // #then - agents should still be created using fallback chain
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+  })
+
+  test("sisyphus uses fallback chain when systemDefaultModel undefined", async () => {
+    // #given - no systemDefaultModel
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+    // #then - sisyphus should use its fallback chain
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+  })
+})
+
 describe("buildAgent with category and skills", () => {
   const { buildAgent } = require("./utils")
   const TEST_MODEL = "anthropic/claude-opus-4-5"
+
+  beforeEach(() => {
+    clearSkillCache()
+  })
 
   test("agent with category inherits category settings", () => {
     // #given - agent factory that sets category but no model
@@ -307,5 +336,43 @@ describe("buildAgent with category and skills", () => {
 
     // #then
     expect(agent.prompt).toBe("Base prompt")
+  })
+
+  test("agent with agent-browser skill resolves when browserProvider is set", () => {
+    // #given
+    const source = {
+      "test-agent": () =>
+        ({
+          description: "Test agent",
+          skills: ["agent-browser"],
+          prompt: "Base prompt",
+        }) as AgentConfig,
+    }
+
+    // #when - browserProvider is "agent-browser"
+    const agent = buildAgent(source["test-agent"], TEST_MODEL, undefined, undefined, "agent-browser")
+
+    // #then - agent-browser skill content should be in prompt
+    expect(agent.prompt).toContain("agent-browser")
+    expect(agent.prompt).toContain("Base prompt")
+  })
+
+  test("agent with agent-browser skill NOT resolved when browserProvider not set", () => {
+    // #given
+    const source = {
+      "test-agent": () =>
+        ({
+          description: "Test agent",
+          skills: ["agent-browser"],
+          prompt: "Base prompt",
+        }) as AgentConfig,
+    }
+
+    // #when - no browserProvider (defaults to playwright)
+    const agent = buildAgent(source["test-agent"], TEST_MODEL)
+
+    // #then - agent-browser skill not found, only base prompt remains
+    expect(agent.prompt).toBe("Base prompt")
+    expect(agent.prompt).not.toContain("agent-browser open")
   })
 })

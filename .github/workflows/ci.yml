@@ -4,13 +4,32 @@ on:
   push:
     branches: [master, dev]
   pull_request:
-    branches: [dev]
+    branches: [master, dev]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Block PRs targeting master branch
+  block-master-pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check PR target branch
+        run: |
+          if [ "${{ github.base_ref }}" = "master" ]; then
+            echo "::error::PRs to master branch are not allowed. Please target the 'dev' branch instead."
+            echo ""
+            echo "PULL REQUESTS TO MASTER ARE BLOCKED"
+            echo ""
+            echo "All PRs must target the 'dev' branch."
+            echo "Please close this PR and create a new one targeting 'dev'."
+            exit 1
+          else
+            echo "PR targets '${{ github.base_ref }}' branch - OK"
+          fi
+
   test:
     runs-on: ubuntu-latest
     steps:

@@ -7,7 +7,8 @@ import type {
 } from "./types"
 import { log, getAgentToolRestrictions } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
-import type { BackgroundTaskConfig } from "../../config/schema"
+import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import { isInsideTmux } from "../../shared/tmux"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -54,6 +55,14 @@ interface QueueItem {
   input: LaunchInput
 }
 
+export interface SubagentSessionCreatedEvent {
+  sessionID: string
+  parentID: string
+  title: string
+}
+
+export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
+
 export class BackgroundManager {
   private static cleanupManagers = new Set<BackgroundManager>()
   private static cleanupRegistered = false
@@ -68,12 +77,20 @@ export class BackgroundManager {
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
-
+  private tmuxEnabled: boolean
+  private onSubagentSessionCreated?: OnSubagentSessionCreated
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
 
-  constructor(ctx: PluginInput, config?: BackgroundTaskConfig) {
+  constructor(
+    ctx: PluginInput,
+    config?: BackgroundTaskConfig,
+    options?: {
+      tmuxConfig?: TmuxConfig
+      onSubagentSessionCreated?: OnSubagentSessionCreated
+    }
+  ) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.pendingByParent = new Map()
@@ -81,6 +98,8 @@ export class BackgroundManager {
     this.directory = ctx.directory
     this.concurrencyManager = new ConcurrencyManager(config)
     this.config = config
+    this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
+    this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.registerProcessCleanup()
   }
 
@@ -222,6 +241,29 @@ export class BackgroundManager {
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
+    log("[background-agent] tmux callback check", {
+      hasCallback: !!this.onSubagentSessionCreated,
+      tmuxEnabled: this.tmuxEnabled,
+      isInsideTmux: isInsideTmux(),
+      sessionID,
+      parentID: input.parentSessionID,
+    })
+
+    if (this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
+      log("[background-agent] Invoking tmux callback NOW", { sessionID })
+      await this.onSubagentSessionCreated({
+        sessionID,
+        parentID: input.parentSessionID,
+        title: input.description,
+      }).catch((err) => {
+        log("[background-agent] Failed to spawn tmux pane:", err)
+      })
+      log("[background-agent] tmux callback completed, waiting 200ms")
+      await new Promise(r => setTimeout(r, 200))
+    } else {
+      log("[background-agent] SKIP tmux callback - conditions not met")
+    }
+
     // Update task to running state
     task.status = "running"
     task.startedAt = new Date()
@@ -263,6 +305,7 @@ export class BackgroundManager {
           task: false,
           delegate_task: false,
           call_omo_agent: true,
+          question: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
@@ -509,6 +552,7 @@ export class BackgroundManager {
           task: false,
           delegate_task: false,
           call_omo_agent: true,
+          question: false,
         },
         parts: [{ type: "text", text: input.prompt }],
       },

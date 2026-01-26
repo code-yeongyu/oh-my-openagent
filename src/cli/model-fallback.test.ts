@@ -353,6 +353,17 @@ describe("generateModelConfig", () => {
       // #then explore should use gpt-5-nano (fallback)
       expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
+
+    test("explore uses gpt-5-mini when only Copilot available", () => {
+      // #given only Copilot is available
+      const config = createConfig({ hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should use gpt-5-mini (Copilot fallback)
+      expect(result.agents?.explore?.model).toBe("github-copilot/gpt-5-mini")
+    })
   })
 
   describe("Sisyphus agent special cases", () => {

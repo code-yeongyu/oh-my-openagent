@@ -199,9 +199,11 @@ function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModels
   details.push("═══ Available Models (from cache) ═══")
   details.push("")
   if (available.cacheExists) {
-    details.push(`  Providers: ${available.providers.length} (${available.providers.slice(0, 8).join(", ")}${available.providers.length > 8 ? "..." : ""})`)
+    details.push(`  Providers in cache: ${available.providers.length}`)
+    details.push(`  Sample: ${available.providers.slice(0, 6).join(", ")}${available.providers.length > 6 ? "..." : ""}`)
     details.push(`  Total models: ${available.modelCount}`)
     details.push(`  Cache: ~/.cache/opencode/models.json`)
+    details.push(`  ℹ Runtime: only connected providers used`)
     details.push(`  Refresh: opencode models --refresh`)
   } else {
     details.push("  ⚠ Cache not found. Run 'opencode' to populate.")
