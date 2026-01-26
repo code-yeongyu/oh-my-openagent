@@ -51,28 +51,82 @@ export function resetServerCheck(): void {
   serverCheckUrl = null
 }
 
+export type SplitDirection = "-h" | "-v"
+
+export function getCurrentPaneId(): string | undefined {
+  return process.env.TMUX_PANE
+}
+
+export interface PaneDimensions {
+  paneWidth: number
+  windowWidth: number
+}
+
+export async function getPaneDimensions(paneId: string): Promise<PaneDimensions | null> {
+  const tmux = await getTmuxPath()
+  if (!tmux) return null
+
+  const proc = spawn([tmux, "display", "-p", "-t", paneId, "#{pane_width},#{window_width}"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const exitCode = await proc.exited
+  const stdout = await new Response(proc.stdout).text()
+
+  if (exitCode !== 0) return null
+
+  const [paneWidth, windowWidth] = stdout.trim().split(",").map(Number)
+  if (isNaN(paneWidth) || isNaN(windowWidth)) return null
+
+  return { paneWidth, windowWidth }
+}
+
 export async function spawnTmuxPane(
   sessionId: string,
   description: string,
   config: TmuxConfig,
-  serverUrl: string
+  serverUrl: string,
+  targetPaneId?: string,
+  splitDirection: SplitDirection = "-h"
 ): Promise<SpawnPaneResult> {
-  if (!config.enabled) return { success: false }
-  if (!isInsideTmux()) return { success: false }
-  if (!(await isServerRunning(serverUrl))) return { success: false }
+  const { log } = await import("../logger")
+  
+  log("[spawnTmuxPane] called", { sessionId, description, serverUrl, configEnabled: config.enabled, targetPaneId, splitDirection })
+  
+  if (!config.enabled) {
+    log("[spawnTmuxPane] SKIP: config.enabled is false")
+    return { success: false }
+  }
+  if (!isInsideTmux()) {
+    log("[spawnTmuxPane] SKIP: not inside tmux", { TMUX: process.env.TMUX })
+    return { success: false }
+  }
+  
+  const serverRunning = await isServerRunning(serverUrl)
+  if (!serverRunning) {
+    log("[spawnTmuxPane] SKIP: server not running", { serverUrl })
+    return { success: false }
+  }
 
   const tmux = await getTmuxPath()
-  if (!tmux) return { success: false }
+  if (!tmux) {
+    log("[spawnTmuxPane] SKIP: tmux not found")
+    return { success: false }
+  }
+  
+  log("[spawnTmuxPane] all checks passed, spawning...")
 
   const opencodeCmd = `opencode attach ${serverUrl} --session ${sessionId}`
 
   const args = [
     "split-window",
-    "-h",
+    splitDirection,
     "-d",
     "-P",
     "-F",
     "#{pane_id}",
+    "-l", String(config.agent_pane_min_width),
+    ...(targetPaneId ? ["-t", targetPaneId] : []),
     opencodeCmd,
   ]
 
@@ -91,22 +145,37 @@ export async function spawnTmuxPane(
     stderr: "ignore",
   })
 
-  await applyLayout(tmux, config.layout, config.main_pane_size)
-
   return { success: true, paneId }
 }
 
 export async function closeTmuxPane(paneId: string): Promise<boolean> {
-  if (!isInsideTmux()) return false
+  const { log } = await import("../logger")
+  
+  if (!isInsideTmux()) {
+    log("[closeTmuxPane] SKIP: not inside tmux")
+    return false
+  }
 
   const tmux = await getTmuxPath()
-  if (!tmux) return false
+  if (!tmux) {
+    log("[closeTmuxPane] SKIP: tmux not found")
+    return false
+  }
 
+  log("[closeTmuxPane] killing pane", { paneId })
+  
   const proc = spawn([tmux, "kill-pane", "-t", paneId], {
-    stdout: "ignore",
-    stderr: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
   })
   const exitCode = await proc.exited
+  const stderr = await new Response(proc.stderr).text()
+
+  if (exitCode !== 0) {
+    log("[closeTmuxPane] FAILED", { paneId, exitCode, stderr: stderr.trim() })
+  } else {
+    log("[closeTmuxPane] SUCCESS", { paneId })
+  }
 
   return exitCode === 0
 }

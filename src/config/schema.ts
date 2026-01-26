@@ -320,9 +320,11 @@ export const TmuxLayoutSchema = z.enum([
 ])
 
 export const TmuxConfigSchema = z.object({
-  enabled: z.boolean().default(false),           // default: false (disabled)
-  layout: TmuxLayoutSchema.default('main-vertical'),  // default: main-vertical
-  main_pane_size: z.number().min(20).max(80).default(60),  // percentage, default: 60%
+  enabled: z.boolean().default(false),
+  layout: TmuxLayoutSchema.default('main-vertical'),
+  main_pane_size: z.number().min(20).max(80).default(60),
+  main_pane_min_width: z.number().min(40).default(120),
+  agent_pane_min_width: z.number().min(20).default(40),
 })
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
