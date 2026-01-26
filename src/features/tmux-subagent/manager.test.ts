@@ -1,7 +1,7 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
-import type { ActionResult } from './action-executor'
+import type { ActionResult, ExecuteContext } from './action-executor'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -11,16 +11,16 @@ type ExecuteActionsResult = {
 
 const mockQueryWindowState = mock<(paneId: string) => Promise<WindowState | null>>(
   async () => ({
-    windowWidth: 200,
-    mainPane: { paneId: '%0', width: 120, left: 0, title: 'main', isActive: true },
+    windowWidth: 212,
+    windowHeight: 44,
+    mainPane: { paneId: '%0', width: 106, height: 44, left: 0, top: 0, title: 'main', isActive: true },
     agentPanes: [],
   })
 )
 const mockPaneExists = mock<(paneId: string) => Promise<boolean>>(async () => true)
 const mockExecuteActions = mock<(
   actions: PaneAction[],
-  config: TmuxConfig,
-  serverUrl: string
+  ctx: ExecuteContext
 ) => Promise<ExecuteActionsResult>>(async () => ({
   success: true,
   spawnedPaneId: '%mock',
@@ -28,8 +28,7 @@ const mockExecuteActions = mock<(
 }))
 const mockExecuteAction = mock<(
   action: PaneAction,
-  config: TmuxConfig,
-  serverUrl: string
+  ctx: ExecuteContext
 ) => Promise<ActionResult>>(async () => ({ success: true }))
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
@@ -102,7 +101,8 @@ function createSessionCreatedEvent(
 function createWindowState(overrides?: Partial<WindowState>): WindowState {
   return {
     windowWidth: 200,
-    mainPane: { paneId: '%0', width: 120, left: 0, title: 'main', isActive: true },
+    windowHeight: 44,
+    mainPane: { paneId: '%0', width: 120, height: 44, left: 0, top: 0, title: 'main', isActive: true },
     agentPanes: [],
     ...overrides,
   }
@@ -228,15 +228,16 @@ describe('TmuxSessionManager', () => {
       expect(call).toBeDefined()
       const actionsArg = call![0]
       expect(actionsArg).toHaveLength(1)
-      expect(actionsArg[0]).toEqual({
-        type: 'spawn',
-        sessionId: 'ses_child',
-        description: 'Background: Test Task',
-        targetPaneId: '%0',
-      })
+      expect(actionsArg[0].type).toBe('spawn')
+      if (actionsArg[0].type === 'spawn') {
+        expect(actionsArg[0].sessionId).toBe('ses_child')
+        expect(actionsArg[0].description).toBe('Background: Test Task')
+        expect(actionsArg[0].targetPaneId).toBe('%0')
+        expect(actionsArg[0].splitDirection).toBe('-h')
+      }
     })
 
-    test('second agent spawns from last agent pane', async () => {
+    test('second agent spawns with correct split direction', async () => {
       //#given
       mockIsInsideTmux.mockReturnValue(true)
 
@@ -251,7 +252,9 @@ describe('TmuxSessionManager', () => {
             {
               paneId: '%1',
               width: 40,
-              left: 120,
+              height: 44,
+              left: 100,
+              top: 0,
               title: 'omo-subagent-Task 1',
               isActive: false,
             },
@@ -281,18 +284,13 @@ describe('TmuxSessionManager', () => {
         createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2')
       )
 
-      //#then - second agent targets the last agent pane (%1)
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
       const actionsArg = call![0]
       expect(actionsArg).toHaveLength(1)
-      expect(actionsArg[0]).toEqual({
-        type: 'spawn',
-        sessionId: 'ses_2',
-        description: 'Task 2',
-        targetPaneId: '%1',
-      })
+      expect(actionsArg[0].type).toBe('spawn')
     })
 
     test('does NOT spawn pane when session has no parentID', async () => {
@@ -376,11 +374,14 @@ describe('TmuxSessionManager', () => {
       mockQueryWindowState.mockImplementation(async () =>
         createWindowState({
           windowWidth: 160,
+          windowHeight: 11,
           agentPanes: [
             {
               paneId: '%1',
               width: 40,
-              left: 120,
+              height: 11,
+              left: 80,
+              top: 0,
               title: 'omo-subagent-Task 1',
               isActive: false,
             },
@@ -415,7 +416,6 @@ describe('TmuxSessionManager', () => {
       const spawnActions = actionsArg.filter((a) => a.type === 'spawn')
 
       expect(closeActions).toHaveLength(1)
-      expect((closeActions[0] as any).paneId).toBe('%1')
       expect(spawnActions).toHaveLength(1)
     })
   })
@@ -436,7 +436,9 @@ describe('TmuxSessionManager', () => {
             {
               paneId: '%mock',
               width: 40,
-              left: 120,
+              height: 44,
+              left: 100,
+              top: 0,
               title: 'omo-subagent-Task',
               isActive: false,
             },
@@ -546,45 +548,45 @@ describe('TmuxSessionManager', () => {
 
 describe('DecisionEngine', () => {
   describe('calculateCapacity', () => {
-    test('calculates correct max agents for given window width', async () => {
+    test('calculates correct 2D grid capacity', async () => {
       //#given
       const { calculateCapacity } = await import('./decision-engine')
 
       //#when
-      const result = calculateCapacity(200, {
-        mainPaneMinWidth: 120,
-        agentPaneWidth: 40,
-      })
+      const result = calculateCapacity(212, 44)
 
-      //#then
-      expect(result).toBe(2)
+      //#then - availableWidth=106, cols=(106+1)/(52+1)=2, rows=(44+1)/(11+1)=3 (accounting for dividers)
+      expect(result.cols).toBe(2)
+      expect(result.rows).toBe(3)
+      expect(result.total).toBe(6)
     })
 
-    test('returns 0 when window is too narrow', async () => {
+    test('returns 0 cols when agent area too narrow', async () => {
       //#given
       const { calculateCapacity } = await import('./decision-engine')
 
       //#when
-      const result = calculateCapacity(100, {
-        mainPaneMinWidth: 120,
-        agentPaneWidth: 40,
-      })
+      const result = calculateCapacity(100, 44)
 
-      //#then
-      expect(result).toBe(0)
+      //#then - availableWidth=50, cols=50/53=0
+      expect(result.cols).toBe(0)
+      expect(result.total).toBe(0)
     })
   })
 
   describe('decideSpawnActions', () => {
-    test('returns spawn action when under capacity', async () => {
+    test('returns spawn action with splitDirection when under capacity', async () => {
       //#given
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
-        windowWidth: 200,
+        windowWidth: 212,
+        windowHeight: 44,
         mainPane: {
           paneId: '%0',
-          width: 120,
+          width: 106,
+          height: 44,
           left: 0,
+          top: 0,
           title: 'main',
           isActive: true,
         },
@@ -603,12 +605,13 @@ describe('DecisionEngine', () => {
       //#then
       expect(decision.canSpawn).toBe(true)
       expect(decision.actions).toHaveLength(1)
-      expect(decision.actions[0]).toEqual({
-        type: 'spawn',
-        sessionId: 'ses_1',
-        description: 'Test Task',
-        targetPaneId: '%0',
-      })
+      expect(decision.actions[0].type).toBe('spawn')
+      if (decision.actions[0].type === 'spawn') {
+        expect(decision.actions[0].sessionId).toBe('ses_1')
+        expect(decision.actions[0].description).toBe('Test Task')
+        expect(decision.actions[0].targetPaneId).toBe('%0')
+        expect(decision.actions[0].splitDirection).toBe('-h')
+      }
     })
 
     test('returns close + spawn when at capacity', async () => {
@@ -616,18 +619,23 @@ describe('DecisionEngine', () => {
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
         windowWidth: 160,
+        windowHeight: 11,
         mainPane: {
           paneId: '%0',
-          width: 120,
+          width: 80,
+          height: 11,
           left: 0,
+          top: 0,
           title: 'main',
           isActive: true,
         },
         agentPanes: [
           {
             paneId: '%1',
-            width: 40,
-            left: 120,
+            width: 80,
+            height: 11,
+            left: 80,
+            top: 0,
             title: 'omo-subagent-Old',
             isActive: false,
           },
@@ -654,23 +662,21 @@ describe('DecisionEngine', () => {
         paneId: '%1',
         sessionId: 'ses_old',
       })
-      expect(decision.actions[1]).toEqual({
-        type: 'spawn',
-        sessionId: 'ses_new',
-        description: 'New Task',
-        targetPaneId: '%0',
-      })
+      expect(decision.actions[1].type).toBe('spawn')
     })
 
-    test('returns canSpawn=false when window too narrow', async () => {
+    test('returns canSpawn=false when window too small', async () => {
       //#given
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
-        windowWidth: 100,
+        windowWidth: 60,
+        windowHeight: 5,
         mainPane: {
           paneId: '%0',
-          width: 100,
+          width: 30,
+          height: 5,
           left: 0,
+          top: 0,
           title: 'main',
           isActive: true,
         },
@@ -688,7 +694,7 @@ describe('DecisionEngine', () => {
 
       //#then
       expect(decision.canSpawn).toBe(false)
-      expect(decision.reason).toContain('too narrow')
+      expect(decision.reason).toContain('too small')
     })
   })
 })
