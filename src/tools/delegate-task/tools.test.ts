@@ -101,7 +101,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -316,7 +316,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
 
@@ -378,7 +378,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
 
@@ -436,7 +436,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
 
@@ -485,7 +485,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -525,7 +525,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -574,7 +574,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -640,7 +640,7 @@ describe("sisyphus-task", () => {
     const toolContext = {
       sessionID: "parent-session",
       messageID: "parent-message",
-      agent: "Sisyphus",
+      agent: "sisyphus",
       abort: new AbortController().signal,
     }
     
@@ -695,7 +695,7 @@ describe("sisyphus-task", () => {
     const toolContext = {
       sessionID: "parent-session",
       messageID: "parent-message",
-      agent: "Sisyphus",
+      agent: "sisyphus",
       abort: new AbortController().signal,
     }
     
@@ -750,7 +750,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -810,7 +810,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -863,7 +863,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -918,7 +918,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent",
         messageID: "msg",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal
       }
 
@@ -983,7 +983,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1041,7 +1041,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1102,7 +1102,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1167,7 +1167,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1232,7 +1232,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1302,7 +1302,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
       
@@ -1359,7 +1359,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
 
@@ -1409,7 +1409,7 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "Sisyphus",
+        agent: "sisyphus",
         abort: new AbortController().signal,
       }
 
