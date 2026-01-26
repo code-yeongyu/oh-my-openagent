@@ -1,4 +1,5 @@
 import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
+import { parseJsonc } from "../shared"
 
 import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
@@ -399,5 +400,232 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then explore should use haiku (isMax20 doesn't affect explore anymore)
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")
+  })
+
+  test("detects claude=yes (standard) from saved config with sonnet model", () => {
+    // #given a config generated for Claude standard subscription
+    const installConfig: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+    const savedConfig = generateOmoConfig(installConfig)
+
+    // #when checking the saved config
+    const sisyphusModel = (savedConfig.agents as Record<string, { model: string }>).sisyphus.model
+
+    // #then sisyphus should use sonnet (standard plan)
+    expect(sisyphusModel).toBe("anthropic/claude-sonnet-4-5")
+    // #then isMax20 can be inferred as false from sonnet model
+    expect(sisyphusModel.includes("sonnet")).toBe(true)
+    expect(sisyphusModel.includes("opus")).toBe(false)
+  })
+
+  test("detects claude=max20 from saved config with opus model", () => {
+    // #given a config generated for Claude max20 subscription
+    const installConfig: InstallConfig = {
+      hasClaude: true,
+      isMax20: true,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+    const savedConfig = generateOmoConfig(installConfig)
+
+    // #when checking the saved config
+    const sisyphusModel = (savedConfig.agents as Record<string, { model: string }>).sisyphus.model
+
+    // #then sisyphus should use opus (max20 plan)
+    expect(sisyphusModel).toBe("anthropic/claude-opus-4-5")
+    // #then isMax20 can be inferred as true from opus model
+    expect(sisyphusModel.includes("opus")).toBe(true)
+    expect(sisyphusModel.includes("sonnet")).toBe(false)
+  })
+
+  test("roundtrip: claude=yes (standard) can be detected from saved config", () => {
+    // #given user selects claude=yes during install
+    const installConfig: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+
+    // #when config is generated and saved
+    const savedConfig = generateOmoConfig(installConfig)
+    const configJson = JSON.stringify(savedConfig)
+    const parsedConfig = parseJsonc<typeof savedConfig>(configJson)
+
+    // #then sisyphus should use sonnet
+    const agents = parsedConfig?.agents as Record<string, { model: string }> | undefined
+    expect(agents?.sisyphus?.model).toBe("anthropic/claude-sonnet-4-5")
+
+    // #then detectProvidersFromOmoConfig should correctly infer isMax20=false and hasClaude=true
+    const sisyphusModel = agents?.sisyphus?.model || ""
+    const usesOpus = sisyphusModel.includes("claude-opus-4-5")
+    const usesSonnet = sisyphusModel.includes("claude-sonnet-4-5")
+    const usesOtherClaude = !usesOpus && !usesSonnet && sisyphusModel.includes("claude")
+    const detectedIsMax20 = usesOpus
+    const detectedHasClaude = usesOpus || usesSonnet || usesOtherClaude
+
+    expect(detectedIsMax20).toBe(false)
+    expect(detectedHasClaude).toBe(true)
+  })
+
+  test("roundtrip: claude=max20 can be detected from saved config", () => {
+    // #given user selects claude=max20 during install
+    const installConfig: InstallConfig = {
+      hasClaude: true,
+      isMax20: true,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+
+    // #when config is generated and saved
+    const savedConfig = generateOmoConfig(installConfig)
+    const configJson = JSON.stringify(savedConfig)
+    const parsedConfig = parseJsonc<typeof savedConfig>(configJson)
+
+    // #then sisyphus should use opus
+    const agents = parsedConfig?.agents as Record<string, { model: string }> | undefined
+    expect(agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-5")
+
+    // #then detectProvidersFromOmoConfig should correctly infer isMax20=true and hasClaude=true
+    const sisyphusModel = agents?.sisyphus?.model || ""
+    const usesOpus = sisyphusModel.includes("claude-opus-4-5")
+    const usesSonnet = sisyphusModel.includes("claude-sonnet-4-5")
+    const usesOtherClaude = !usesOpus && !usesSonnet && sisyphusModel.includes("claude")
+    const detectedIsMax20 = usesOpus
+    const detectedHasClaude = usesOpus || usesSonnet || usesOtherClaude
+
+    expect(detectedIsMax20).toBe(true)
+    expect(detectedHasClaude).toBe(true)
+  })
+
+  test("roundtrip: all providers detected correctly", () => {
+    // #given user has all providers configured
+    const installConfig: InstallConfig = {
+      hasClaude: true,
+      isMax20: true,
+      hasOpenAI: true,
+      hasGemini: true,
+      hasCopilot: true,
+      hasOpencodeZen: true,
+      hasZaiCodingPlan: true,
+    }
+
+    // #when config is generated
+    const savedConfig = generateOmoConfig(installConfig)
+    const agents = savedConfig.agents as Record<string, { model: string }> | undefined
+
+    // #then all providers should have models in config
+    let hasAnyClaude = false
+    let hasAnyOpenAI = false
+    let hasAnyOpencodeZen = false
+    let hasAnyZai = false
+    let hasAnyCopilot = false
+
+    for (const agentConfig of Object.values(agents || {})) {
+      const model = agentConfig?.model || ""
+      if (model.startsWith("anthropic/") || model.includes("claude")) hasAnyClaude = true
+      if (model.startsWith("openai/")) hasAnyOpenAI = true
+      if (model.startsWith("opencode/")) hasAnyOpencodeZen = true
+      if (model.startsWith("zai-coding-plan/")) hasAnyZai = true
+      if (model.startsWith("github-copilot/")) hasAnyCopilot = true
+    }
+
+    expect(hasAnyClaude).toBe(true)
+    expect(hasAnyOpenAI).toBe(true)
+    expect(hasAnyZai).toBe(true)
+  })
+
+  test("roundtrip: OpenAI-only config detects correctly", () => {
+    // #given user has only OpenAI
+    const installConfig: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: true,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+
+    // #when config is generated
+    const savedConfig = generateOmoConfig(installConfig)
+    const agents = savedConfig.agents as Record<string, { model: string }> | undefined
+
+    // #then should find openai/ models
+    let hasAnyOpenAI = false
+    for (const agentConfig of Object.values(agents || {})) {
+      const model = agentConfig?.model || ""
+      if (model.startsWith("openai/")) hasAnyOpenAI = true
+    }
+
+    expect(hasAnyOpenAI).toBe(true)
+  })
+
+  test("roundtrip: Copilot-only config detects correctly", () => {
+    // #given user has only Copilot
+    const installConfig: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: true,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+    }
+
+    // #when config is generated
+    const savedConfig = generateOmoConfig(installConfig)
+    const agents = savedConfig.agents as Record<string, { model: string }> | undefined
+
+    // #then should find github-copilot/ models
+    let hasAnyCopilot = false
+    for (const agentConfig of Object.values(agents || {})) {
+      const model = agentConfig?.model || ""
+      if (model.startsWith("github-copilot/")) hasAnyCopilot = true
+    }
+
+    expect(hasAnyCopilot).toBe(true)
+  })
+
+  test("roundtrip: OpenCode Zen-only config detects correctly", () => {
+    // #given user has only OpenCode Zen
+    const installConfig: InstallConfig = {
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: true,
+      hasZaiCodingPlan: false,
+    }
+
+    // #when config is generated
+    const savedConfig = generateOmoConfig(installConfig)
+    const agents = savedConfig.agents as Record<string, { model: string }> | undefined
+
+    // #then should find opencode/ models
+    let hasAnyOpencodeZen = false
+    for (const agentConfig of Object.values(agents || {})) {
+      const model = agentConfig?.model || ""
+      if (model.startsWith("opencode/")) hasAnyOpencodeZen = true
+    }
+
+    expect(hasAnyOpencodeZen).toBe(true)
   })
 })

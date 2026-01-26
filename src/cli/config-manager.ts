@@ -598,39 +598,62 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
-function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean } {
+function detectProvidersFromOmoConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasCopilot: boolean; isMax20: boolean; hasClaude: boolean } {
   const omoConfigPath = getOmoConfig()
   if (!existsSync(omoConfigPath)) {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+    return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
   }
 
   try {
     const content = readFileSync(omoConfigPath, "utf-8")
     const omoConfig = parseJsonc<Record<string, unknown>>(content)
     if (!omoConfig || typeof omoConfig !== "object") {
-      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+      return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
     }
 
-    const configStr = JSON.stringify(omoConfig)
-    const hasOpenAI = configStr.includes('"openai/')
-    const hasOpencodeZen = configStr.includes('"opencode/')
-    const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
+    const agents = omoConfig.agents as Record<string, { model: string }> | undefined
+    if (!agents) {
+      return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
+    }
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan }
+    const findProviderInAgents = (providerPrefix: string): boolean => {
+      for (const agentConfig of Object.values(agents)) {
+        if (agentConfig?.model?.startsWith(providerPrefix)) {
+          return true
+        }
+      }
+      return false
+    }
+
+    const hasOpenAI = findProviderInAgents("openai/")
+    const hasOpencodeZen = findProviderInAgents("opencode/")
+    const hasZaiCodingPlan = findProviderInAgents("zai-coding-plan/")
+    const hasCopilot = findProviderInAgents("github-copilot/")
+
+    const sisyphusModel = agents.sisyphus?.model || ""
+    
+    const usesOpus = sisyphusModel.includes("claude-opus-4-5")
+    const usesSonnet = sisyphusModel.includes("claude-sonnet-4-5")
+    const usesOtherClaude = !usesOpus && !usesSonnet && sisyphusModel.includes("claude")
+    
+    const isMax20 = usesOpus
+    const hasClaude = usesOpus || usesSonnet || usesOtherClaude || findProviderInAgents("anthropic/")
+
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasCopilot, isMax20, hasClaude }
   } catch {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false }
+    return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasCopilot: false, isMax20: false, hasClaude: false }
   }
 }
 
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
-    hasClaude: true,
-    isMax20: true,
-    hasOpenAI: true,
+    hasClaude: false,
+    isMax20: false,
+    hasOpenAI: false,
     hasGemini: false,
     hasCopilot: false,
-    hasOpencodeZen: true,
+    hasOpencodeZen: false,
     hasZaiCodingPlan: false,
   }
 
@@ -652,13 +675,15 @@ export function detectCurrentConfig(): DetectedConfig {
     return result
   }
 
-  // Gemini auth plugin detection still works via plugin presence
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasCopilot, isMax20, hasClaude } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
+  result.hasCopilot = hasCopilot
+  result.isMax20 = isMax20
+  result.hasClaude = hasClaude
 
   return result
 }

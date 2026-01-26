@@ -383,12 +383,15 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasOpenAI || config.hasGemini || config.hasCopilot || config.hasOpencodeZen || config.hasZaiCodingPlan) && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
       (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasOpenAI ? `  ${SYMBOLS.bullet} OpenAI ${color.gray("→ ChatGPT Plus")}\n` : "") +
       (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
-      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}\n` : "") +
+      (config.hasOpencodeZen ? `  ${SYMBOLS.bullet} OpenCode Zen ${color.gray("→ opencode/ models")}\n` : "") +
+      (config.hasZaiCodingPlan ? `  ${SYMBOLS.bullet} Z.ai ${color.gray("→ Coding Plan")}` : ""),
       "Authenticate Your Providers"
     )
   }
@@ -500,11 +503,14 @@ export async function install(args: InstallArgs): Promise<number> {
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((config.hasClaude || config.hasOpenAI || config.hasGemini || config.hasCopilot || config.hasOpencodeZen || config.hasZaiCodingPlan) && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (config.hasOpenAI) providers.push(`OpenAI ${color.gray("→ ChatGPT Plus")}`)
     if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+    if (config.hasOpencodeZen) providers.push(`OpenCode Zen ${color.gray("→ opencode/ models")}`)
+    if (config.hasZaiCodingPlan) providers.push(`Z.ai ${color.gray("→ Coding Plan")}`)
 
     console.log()
     console.log(color.bold("Authenticate Your Providers"))

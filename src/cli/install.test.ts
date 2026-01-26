@@ -148,4 +148,113 @@ describe("install CLI - binary check behavior", () => {
     expect(allCalls).toContain("[OK]")
     expect(allCalls).toContain("OpenCode 1.0.200")
   })
+
+  test("non-TUI mode: should prompt OpenAI authentication when openai=yes", async () => {
+    // #given OpenCode binary IS installed
+    isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
+    getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
+
+    // #given mock npm fetch
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "no",
+      openai: "yes",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // #when running install
+    const exitCode = await install(args)
+
+    // #then should return success
+    expect(exitCode).toBe(0)
+
+    // #then should prompt for OpenAI authentication
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("Authenticate Your Providers")
+    expect(allCalls).toContain("OpenAI")
+    expect(allCalls).toContain("ChatGPT Plus")
+  })
+
+  test("non-TUI mode: should prompt all providers when multiple selected", async () => {
+    // #given OpenCode binary IS installed
+    isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
+    getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
+
+    // #given mock npm fetch
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "yes",
+      gemini: "no",
+      copilot: "yes",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // #when running install
+    const exitCode = await install(args)
+
+    // #then should return success
+    expect(exitCode).toBe(0)
+
+    // #then should prompt for all selected providers
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("Authenticate Your Providers")
+    expect(allCalls).toContain("Anthropic")
+    expect(allCalls).toContain("OpenAI")
+    expect(allCalls).toContain("GitHub")
+  })
+
+  test("non-TUI mode: should prompt all providers including OpenCode Zen and Z.ai", async () => {
+    // #given OpenCode binary IS installed
+    isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
+    getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
+
+    // #given mock npm fetch
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "no",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "yes",
+      zaiCodingPlan: "yes",
+    }
+
+    // #when running install
+    const exitCode = await install(args)
+
+    // #then should return success
+    expect(exitCode).toBe(0)
+
+    // #then should prompt for OpenCode Zen and Z.ai
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("Authenticate Your Providers")
+    expect(allCalls).toContain("OpenCode Zen")
+    expect(allCalls).toContain("Z.ai")
+  })
 })
