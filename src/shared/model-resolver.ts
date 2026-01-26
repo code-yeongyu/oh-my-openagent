@@ -6,7 +6,7 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
 export type ModelResolutionInput = {
 	userModel?: string
 	inheritedModel?: string
-	systemDefault: string
+	systemDefault?: string
 }
 
 export type ModelSource =
@@ -24,7 +24,7 @@ export type ExtendedModelResolutionInput = {
 	userModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
-	systemDefaultModel: string
+	systemDefaultModel?: string
 }
 
 function normalizeModel(model?: string): string | undefined {
@@ -32,7 +32,7 @@ function normalizeModel(model?: string): string | undefined {
 	return trimmed || undefined
 }
 
-export function resolveModel(input: ModelResolutionInput): string {
+export function resolveModel(input: ModelResolutionInput): string | undefined {
 	return (
 		normalizeModel(input.userModel) ??
 		normalizeModel(input.inheritedModel) ??
@@ -42,7 +42,7 @@ export function resolveModel(input: ModelResolutionInput): string {
 
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
-): ModelResolutionResult {
+): ModelResolutionResult | undefined {
 	const { userModel, fallbackChain, availableModels, systemDefaultModel } = input
 
 	// Step 1: Override
@@ -92,7 +92,12 @@ export function resolveModelWithFallback(
 		log("No available model found in fallback chain, falling through to system default")
 	}
 
-	// Step 4: System default
+	// Step 3: System default (if provided)
+	if (systemDefaultModel === undefined) {
+		log("No model resolved - systemDefaultModel not configured")
+		return undefined
+	}
+
 	log("Model resolved via system default", { model: systemDefaultModel })
 	return { model: systemDefaultModel, source: "system-default" }
 }
