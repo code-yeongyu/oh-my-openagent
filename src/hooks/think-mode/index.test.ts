@@ -350,4 +350,63 @@ describe("createThinkModeHook integration", () => {
       expect(input.message.model?.modelID).toBe("claude-opus-4-5")
     })
   })
+
+  describe("Agent-level thinking configuration respect", () => {
+    it("should NOT inject thinking config when agent has thinking disabled", async () => {
+      // #given agent with thinking explicitly disabled
+      const hook = createThinkModeHook()
+      const input: ThinkModeInput = {
+        parts: [{ type: "text", text: "ultrathink deeply" }],
+        message: {
+          model: { providerID: "google", modelID: "gemini-3-pro" },
+          thinking: { type: "disabled" },
+        } as ThinkModeInput["message"],
+      }
+
+      // #when the chat.params hook is called
+      await hook["chat.params"](input, sessionID)
+
+      // #then should NOT override agent's thinking disabled setting
+      const message = input.message as MessageWithInjectedProps
+      expect((message.thinking as { type: string }).type).toBe("disabled")
+      expect(message.providerOptions).toBeUndefined()
+    })
+
+    it("should NOT inject thinking config when agent has custom providerOptions", async () => {
+      // #given agent with custom providerOptions
+      const hook = createThinkModeHook()
+      const input: ThinkModeInput = {
+        parts: [{ type: "text", text: "ultrathink" }],
+        message: {
+          model: { providerID: "google", modelID: "gemini-3-flash" },
+          providerOptions: {
+            google: { thinkingConfig: { thinkingBudget: 0 } },
+          },
+        } as ThinkModeInput["message"],
+      }
+
+      // #when the chat.params hook is called
+      await hook["chat.params"](input, sessionID)
+
+      // #then should NOT override agent's providerOptions
+      const message = input.message as MessageWithInjectedProps
+      const providerOpts = message.providerOptions as Record<string, unknown>
+      expect((providerOpts.google as Record<string, unknown>).thinkingConfig).toEqual({
+        thinkingBudget: 0,
+      })
+    })
+
+    it("should still inject thinking config when agent has no thinking override", async () => {
+      // #given agent without thinking override
+      const hook = createThinkModeHook()
+      const input = createMockInput("google", "gemini-3-pro", "ultrathink")
+
+      // #when the chat.params hook is called
+      await hook["chat.params"](input, sessionID)
+
+      // #then should inject thinking config as normal
+      const message = input.message as MessageWithInjectedProps
+      expect(message.providerOptions).toBeDefined()
+    })
+  })
 })
