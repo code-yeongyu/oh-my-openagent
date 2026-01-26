@@ -23,6 +23,7 @@ import {
   createInteractiveBashSessionHook,
 
   createThinkingBlockValidatorHook,
+  createCategorySkillReminderHook,
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
@@ -187,6 +188,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
     ? createThinkingBlockValidatorHook()
+    : null;
+
+  const categorySkillReminder = isHookEnabled("category-skill-reminder")
+    ? createCategorySkillReminderHook(ctx)
     : null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
@@ -434,6 +439,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await thinkMode?.event(input);
       await anthropicContextWindowLimitRecovery?.event(input);
       await agentUsageReminder?.event(input);
+      await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
       await atlasHook?.handler(input);
@@ -601,6 +607,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.["tool.execute.after"](input, output);
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
+      await categorySkillReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
 await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);
