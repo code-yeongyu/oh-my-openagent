@@ -325,6 +325,56 @@ export function createSessionNotification(
         notificationVersions.delete(sessionInfo.id)
         executingNotifications.delete(sessionInfo.id)
       }
+      return
+    }
+
+    if (event.type === "question.asked") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
+
+      if (subagentSessions.has(sessionID)) return
+
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return
+
+      await sendNotification(
+        ctx,
+        currentPlatform,
+        "OpenCode - Question",
+        "Agent is waiting for your answer"
+      )
+
+      if (mergedConfig.playSound && mergedConfig.soundPath) {
+        await playSound(ctx, currentPlatform, mergedConfig.soundPath)
+      }
+      return
+    }
+
+    if (event.type === "session.error") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
+
+      if (subagentSessions.has(sessionID)) return
+
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return
+
+      const error = props?.error as { message?: string } | undefined
+      const errorMessage = error?.message
+        ? `Error: ${error.message.slice(0, 100)}`
+        : "Session encountered an error"
+
+      await sendNotification(
+        ctx,
+        currentPlatform,
+        "OpenCode - Error",
+        errorMessage
+      )
+
+      if (mergedConfig.playSound && mergedConfig.soundPath) {
+        await playSound(ctx, currentPlatform, mergedConfig.soundPath)
+      }
+      return
     }
   }
 }

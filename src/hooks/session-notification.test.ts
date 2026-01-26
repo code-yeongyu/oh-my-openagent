@@ -358,4 +358,157 @@ describe("session-notification", () => {
     // #then - only one notification should be sent
     expect(notificationCalls).toHaveLength(1)
   })
+
+  test("should trigger notification immediately on question.asked event for main session", async () => {
+    // #given - main session is set
+    const mainSessionID = "main-question"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - question.asked event fires
+    await hook({
+      event: {
+        type: "question.asked",
+        properties: {
+          sessionID: mainSessionID,
+          questions: [{ header: "Test", question: "Test question?" }],
+        },
+      },
+    })
+
+    // #then - notification should be sent immediately
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+    expect(notificationCalls[0]).toContain("Question")
+  })
+
+  test("should not trigger question.asked notification for subagent session", async () => {
+    // #given - a subagent session exists
+    const subagentSessionID = "subagent-question"
+    subagentSessions.add(subagentSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - question.asked event fires for subagent
+    await hook({
+      event: {
+        type: "question.asked",
+        properties: { sessionID: subagentSessionID },
+      },
+    })
+
+    // #then - notification should NOT be sent
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should not trigger question.asked notification for non-main session", async () => {
+    // #given - main session is set, but different session asks question
+    const mainSessionID = "main-q"
+    const otherSessionID = "other-q"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - question.asked event fires for non-main session
+    await hook({
+      event: {
+        type: "question.asked",
+        properties: { sessionID: otherSessionID },
+      },
+    })
+
+    // #then - notification should NOT be sent
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should trigger notification on session.error event for main session", async () => {
+    // #given - main session is set
+    const mainSessionID = "main-error"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - session.error event fires
+    await hook({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID: mainSessionID,
+          error: { message: "The final block in an assistant message cannot be thinking" },
+        },
+      },
+    })
+
+    // #then - notification should be sent immediately with error message
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+    expect(notificationCalls[0]).toContain("Error")
+  })
+
+  test("should not trigger session.error notification for subagent session", async () => {
+    // #given - a subagent session exists
+    const subagentSessionID = "subagent-error"
+    subagentSessions.add(subagentSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - session.error event fires for subagent
+    await hook({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID: subagentSessionID,
+          error: { message: "Some error" },
+        },
+      },
+    })
+
+    // #then - notification should NOT be sent
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should not trigger session.error notification for non-main session", async () => {
+    // #given - main session is set, but different session has error
+    const mainSessionID = "main-e"
+    const otherSessionID = "other-e"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - session.error event fires for non-main session
+    await hook({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID: otherSessionID,
+          error: { message: "Some error" },
+        },
+      },
+    })
+
+    // #then - notification should NOT be sent
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should handle session.error with no error message", async () => {
+    // #given - main session is set
+    const mainSessionID = "main-error-no-msg"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {})
+
+    // #when - session.error event fires without error message
+    await hook({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID: mainSessionID,
+          error: {},
+        },
+      },
+    })
+
+    // #then - notification should be sent with default message
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+    expect(notificationCalls[0]).toContain("Error")
+  })
 })
