@@ -670,4 +670,22 @@ describe("generateOmoConfig - model fallback system", () => {
     expect(detected.isMax20).toBe(true)
     expect(detected.hasOpencodeZen).toBe(true)
   })
+
+  test("detectProvidersFromConfig: OpenCode Zen models don't trigger Claude detection", () => {
+    const opencodeZenOnlyConfig = {
+      categories: {
+        "quick": { model: "opencode/claude-opus-4-5", temperature: 0.1 },
+        "visual-engineering": { model: "opencode/claude-sonnet-4-5", temperature: 0.7 },
+        "ultrabrain": { model: "opencode/claude-haiku-3-5", temperature: 0.1 },
+      },
+    }
+
+    const detected = detectProvidersFromConfig(opencodeZenOnlyConfig)
+
+    expect(detected.hasOpenAI).toBe(false)
+    expect(detected.hasCopilot).toBe(false)
+    expect(detected.hasClaude).toBe(false)
+    expect(detected.isMax20).toBe(false)
+    expect(detected.hasOpencodeZen).toBe(true)
+  })
 })

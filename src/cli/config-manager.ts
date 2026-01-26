@@ -333,7 +333,8 @@ export function detectProvidersFromConfig(config: Record<string, unknown>): { ha
 
     const hasAnyOpus = findProviderAnywhere("anthropic/claude-opus-4-5")
     const hasAnySonnet = findProviderAnywhere("anthropic/claude-sonnet-4-5")
-    const hasAnyOtherClaude = findProviderAnywhere("claude") && !hasAnyOpus && !hasAnySonnet
+
+    const hasAnyOtherClaude = findProviderAnywhere("anthropic/claude") && !hasAnyOpus && !hasAnySonnet
 
     const isMax20 = hasAnyOpus
     const hasClaude = hasAnyOpus || hasAnySonnet || hasAnyOtherClaude || findProviderAnywhere("anthropic/")
