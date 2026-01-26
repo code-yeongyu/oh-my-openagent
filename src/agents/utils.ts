@@ -151,10 +151,6 @@ export async function createBuiltinAgents(
   client?: any,
   browserProvider?: BrowserAutomationProvider
 ): Promise<Record<string, AgentConfig>> {
-  if (!systemDefaultModel) {
-    throw new Error("createBuiltinAgents requires systemDefaultModel")
-  }
-
   const connectedProviders = readConnectedProvidersCache()
   const availableModels = client 
     ? await fetchAvailableModels(client, { connectedProviders: connectedProviders ?? undefined }) 
@@ -201,13 +197,14 @@ export async function createBuiltinAgents(
     const override = findCaseInsensitive(agentOverrides, agentName)
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
     
-    // Use resolver to determine model
-    const { model, variant: resolvedVariant } = resolveModelWithFallback({
+    const resolution = resolveModelWithFallback({
       userModel: override?.model,
       fallbackChain: requirement?.fallbackChain,
       availableModels,
       systemDefaultModel,
     })
+    if (!resolution) continue
+    const { model, variant: resolvedVariant } = resolution
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
     
@@ -243,72 +240,76 @@ export async function createBuiltinAgents(
      const sisyphusOverride = agentOverrides["sisyphus"]
      const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
     
-    // Use resolver to determine model
-    const { model: sisyphusModel, variant: sisyphusResolvedVariant } = resolveModelWithFallback({
+    const sisyphusResolution = resolveModelWithFallback({
       userModel: sisyphusOverride?.model,
       fallbackChain: sisyphusRequirement?.fallbackChain,
       availableModels,
       systemDefaultModel,
     })
 
-    let sisyphusConfig = createSisyphusAgent(
-      sisyphusModel,
-      availableAgents,
-      undefined,
-      availableSkills,
-      availableCategories
-    )
-    
-    // Apply variant from override or resolved fallback chain
-    if (sisyphusOverride?.variant) {
-      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusOverride.variant }
-    } else if (sisyphusResolvedVariant) {
-      sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
-    }
+    if (sisyphusResolution) {
+      const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
-    if (directory && sisyphusConfig.prompt) {
-      const envContext = createEnvContext()
-      sisyphusConfig = { ...sisyphusConfig, prompt: sisyphusConfig.prompt + envContext }
-    }
+      let sisyphusConfig = createSisyphusAgent(
+        sisyphusModel,
+        availableAgents,
+        undefined,
+        availableSkills,
+        availableCategories
+      )
+      
+      if (sisyphusOverride?.variant) {
+        sisyphusConfig = { ...sisyphusConfig, variant: sisyphusOverride.variant }
+      } else if (sisyphusResolvedVariant) {
+        sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
+      }
 
-    if (sisyphusOverride) {
-      sisyphusConfig = mergeAgentConfig(sisyphusConfig, sisyphusOverride)
-    }
+      if (directory && sisyphusConfig.prompt) {
+        const envContext = createEnvContext()
+        sisyphusConfig = { ...sisyphusConfig, prompt: sisyphusConfig.prompt + envContext }
+      }
 
-     result["sisyphus"] = sisyphusConfig
+      if (sisyphusOverride) {
+        sisyphusConfig = mergeAgentConfig(sisyphusConfig, sisyphusOverride)
+      }
+
+      result["sisyphus"] = sisyphusConfig
+    }
    }
 
    if (!disabledAgents.includes("atlas")) {
      const orchestratorOverride = agentOverrides["atlas"]
      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
     
-    // Use resolver to determine model
-    const { model: atlasModel, variant: atlasResolvedVariant } = resolveModelWithFallback({
+    const atlasResolution = resolveModelWithFallback({
       userModel: orchestratorOverride?.model,
       fallbackChain: atlasRequirement?.fallbackChain,
       availableModels,
       systemDefaultModel,
     })
     
-    let orchestratorConfig = createAtlasAgent({
-      model: atlasModel,
-      availableAgents,
-      availableSkills,
-      userCategories: categories,
-    })
-    
-    // Apply variant from override or resolved fallback chain
-    if (orchestratorOverride?.variant) {
-      orchestratorConfig = { ...orchestratorConfig, variant: orchestratorOverride.variant }
-    } else if (atlasResolvedVariant) {
-      orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
-    }
+    if (atlasResolution) {
+      const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
 
-    if (orchestratorOverride) {
-      orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
-    }
+      let orchestratorConfig = createAtlasAgent({
+        model: atlasModel,
+        availableAgents,
+        availableSkills,
+        userCategories: categories,
+      })
+      
+      if (orchestratorOverride?.variant) {
+        orchestratorConfig = { ...orchestratorConfig, variant: orchestratorOverride.variant }
+      } else if (atlasResolvedVariant) {
+        orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
+      }
 
-     result["atlas"] = orchestratorConfig
+      if (orchestratorOverride) {
+        orchestratorConfig = mergeAgentConfig(orchestratorConfig, orchestratorOverride)
+      }
+
+      result["atlas"] = orchestratorConfig
+    }
    }
 
    return result

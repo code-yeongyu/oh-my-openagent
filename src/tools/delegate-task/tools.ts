@@ -115,9 +115,9 @@ export function resolveCategoryConfig(
   options: {
     userCategories?: CategoriesConfig
     inheritedModel?: string
-    systemDefaultModel: string
+    systemDefaultModel?: string
   }
-): { config: CategoryConfig; promptAppend: string; model: string } | null {
+): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
   const { userCategories, inheritedModel, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -497,17 +497,6 @@ To continue this session: session_id="${args.session_id}"`
        let modelInfo: ModelFallbackInfo | undefined
 
        if (args.category) {
-         // Guard: require system default model for category delegation
-         if (!systemDefaultModel) {
-           const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
-           return (
-             'oh-my-opencode requires a default model.\n\n' +
-             `Add this to ${paths.configJsonc}:\n\n` +
-             '  "model": "anthropic/claude-sonnet-4-5"\n\n' +
-             '(Replace with your preferred provider/model)'
-           )
-         }
-
           const connectedProviders = readConnectedProvidersCache()
           const availableModels = await fetchAvailableModels(client, {
             connectedProviders: connectedProviders ?? undefined
@@ -523,55 +512,60 @@ To continue this session: session_id="${args.session_id}"`
          }
 
          const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category]
-         let actualModel: string
+         let actualModel: string | undefined
 
          if (!requirement) {
            actualModel = resolved.model
-           modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
+           if (actualModel) {
+             modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
+           }
           } else {
-          const { model: resolvedModel, source, variant: resolvedVariant } = resolveModelWithFallback({
+          const resolution = resolveModelWithFallback({
               userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
             })
 
-           actualModel = resolvedModel
+           if (resolution) {
+             const { model: resolvedModel, source, variant: resolvedVariant } = resolution
+             actualModel = resolvedModel
 
-           if (!parseModelString(actualModel)) {
-             return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+             if (!parseModelString(actualModel)) {
+               return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
+             }
+
+             let type: "user-defined" | "inherited" | "category-default" | "system-default"
+             switch (source) {
+                case "override":
+                  type = "user-defined"
+                  break
+                case "provider-fallback":
+                  type = "category-default"
+                  break
+                case "system-default":
+                  type = "system-default"
+                  break
+             }
+
+             modelInfo = { model: actualModel, type, source }
+             
+             const parsedModel = parseModelString(actualModel)
+             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+             categoryModel = parsedModel
+               ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+               : undefined
            }
-
-           let type: "user-defined" | "inherited" | "category-default" | "system-default"
-           switch (source) {
-              case "override":
-                type = "user-defined"
-                break
-              case "provider-fallback":
-                type = "category-default"
-                break
-              case "system-default":
-                type = "system-default"
-                break
-           }
-
-           modelInfo = { model: actualModel, type, source }
-           
-           const parsedModel = parseModelString(actualModel)
-           const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
-           categoryModel = parsedModel
-             ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
-             : undefined
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT
-         if (!categoryModel) {
+         if (!categoryModel && actualModel) {
            const parsedModel = parseModelString(actualModel)
            categoryModel = parsedModel ?? undefined
          }
          categoryPromptAppend = resolved.promptAppend || undefined
 
-         const isUnstableAgent = resolved.config.is_unstable_agent === true || actualModel.toLowerCase().includes("gemini")
+         const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
         // Handle both boolean false and string "false" due to potential serialization
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 

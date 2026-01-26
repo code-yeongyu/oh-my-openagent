@@ -106,6 +106,30 @@ describe("createBuiltinAgents with model overrides", () => {
    })
 })
 
+describe("createBuiltinAgents without systemDefaultModel", () => {
+  test("creates agents successfully without systemDefaultModel", async () => {
+    // #given - no systemDefaultModel provided
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+    // #then - agents should still be created using fallback chain
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+  })
+
+  test("sisyphus uses fallback chain when systemDefaultModel undefined", async () => {
+    // #given - no systemDefaultModel
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+    // #then - sisyphus should use its fallback chain
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+  })
+})
+
 describe("buildAgent with category and skills", () => {
   const { buildAgent } = require("./utils")
   const TEST_MODEL = "anthropic/claude-opus-4-5"
