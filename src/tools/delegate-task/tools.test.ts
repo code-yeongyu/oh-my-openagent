@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import { __resetModelCache } from "../../shared/model-availability"
@@ -74,6 +74,87 @@ describe("sisyphus-task", () => {
       // #then
       expect(description).toBeDefined()
       expect(description).toContain("high effort")
+    })
+  })
+
+  describe("isPlanAgent", () => {
+    test("returns true for 'plan'", () => {
+      // #given / #when
+      const result = isPlanAgent("plan")
+
+      // #then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for 'prometheus'", () => {
+      // #given / #when
+      const result = isPlanAgent("prometheus")
+
+      // #then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for 'planner'", () => {
+      // #given / #when
+      const result = isPlanAgent("planner")
+
+      // #then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for case-insensitive match 'PLAN'", () => {
+      // #given / #when
+      const result = isPlanAgent("PLAN")
+
+      // #then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for case-insensitive match 'Prometheus'", () => {
+      // #given / #when
+      const result = isPlanAgent("Prometheus")
+
+      // #then
+      expect(result).toBe(true)
+    })
+
+    test("returns false for 'oracle'", () => {
+      // #given / #when
+      const result = isPlanAgent("oracle")
+
+      // #then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for 'explore'", () => {
+      // #given / #when
+      const result = isPlanAgent("explore")
+
+      // #then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for undefined", () => {
+      // #given / #when
+      const result = isPlanAgent(undefined)
+
+      // #then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for empty string", () => {
+      // #given / #when
+      const result = isPlanAgent("")
+
+      // #then
+      expect(result).toBe(false)
+    })
+
+    test("PLAN_AGENT_NAMES contains expected values", () => {
+      // #given / #when / #then
+      expect(PLAN_AGENT_NAMES).toContain("plan")
+      expect(PLAN_AGENT_NAMES).toContain("prometheus")
+      expect(PLAN_AGENT_NAMES).toContain("planner")
     })
   })
 
@@ -1480,6 +1561,87 @@ describe("sisyphus-task", () => {
       expect(result).toContain(skillContent)
       expect(result).toContain(categoryPromptAppend)
       expect(result).toContain("\n\n")
+    })
+
+    test("prepends plan agent system prompt when agentName is 'plan'", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+
+      // #when
+      const result = buildSystemContent({ agentName: "plan" })
+
+      // #then
+      expect(result).toContain("<system>")
+      expect(result).toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
+      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+    })
+
+    test("prepends plan agent system prompt when agentName is 'prometheus'", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+
+      // #when
+      const result = buildSystemContent({ agentName: "prometheus" })
+
+      // #then
+      expect(result).toContain("<system>")
+      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+    })
+
+    test("prepends plan agent system prompt when agentName is 'Prometheus' (case insensitive)", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+
+      // #when
+      const result = buildSystemContent({ agentName: "Prometheus" })
+
+      // #then
+      expect(result).toContain("<system>")
+      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+    })
+
+    test("combines plan agent prepend with skill content", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+      const skillContent = "You are a planning expert"
+
+      // #when
+      const result = buildSystemContent({ skillContent, agentName: "plan" })
+
+      // #then
+      expect(result).toContain(PLAN_AGENT_SYSTEM_PREPEND)
+      expect(result).toContain(skillContent)
+      expect(result!.indexOf(PLAN_AGENT_SYSTEM_PREPEND)).toBeLessThan(result!.indexOf(skillContent))
+    })
+
+    test("does not prepend plan agent prompt for non-plan agents", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const skillContent = "You are an expert"
+
+      // #when
+      const result = buildSystemContent({ skillContent, agentName: "oracle" })
+
+      // #then
+      expect(result).toBe(skillContent)
+      expect(result).not.toContain("<system>")
+    })
+
+    test("does not prepend plan agent prompt when agentName is undefined", () => {
+      // #given
+      const { buildSystemContent } = require("./tools")
+      const skillContent = "You are an expert"
+
+      // #when
+      const result = buildSystemContent({ skillContent, agentName: undefined })
+
+      // #then
+      expect(result).toBe(skillContent)
+      expect(result).not.toContain("<system>")
     })
   })
 
