@@ -31,7 +31,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       }
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
-      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), currentAgent)
+      let detectedKeywords = detectKeywordsWithType(promptText, currentAgent)
 
       if (detectedKeywords.length === 0) {
         return
