@@ -1,12 +1,8 @@
-/**
- * Fuzzy matching utility for model names
- * Supports substring matching with provider filtering and priority-based selection
- */
-
 import { existsSync, readFileSync } from "fs"
-import { homedir } from "os"
 import { join } from "path"
 import { log } from "./logger"
+import { getOpenCodeCacheDir } from "./data-path"
+import { readProviderModelsCache, hasProviderModelsCache } from "./connected-providers-cache"
 
 /**
  * Fuzzy match a target model name against available models
@@ -91,29 +87,69 @@ export function fuzzyMatchModel(
 	return result
 }
 
-let cachedModels: Set<string> | null = null
-
-function getOpenCodeCacheDir(): string {
-	const xdgCache = process.env.XDG_CACHE_HOME
-	if (xdgCache) return join(xdgCache, "opencode")
-	return join(homedir(), ".cache", "opencode")
-}
-
-export async function fetchAvailableModels(_client?: any): Promise<Set<string>> {
-	log("[fetchAvailableModels] CALLED")
-	
-	if (cachedModels !== null) {
-		log("[fetchAvailableModels] returning cached models", { count: cachedModels.size, models: Array.from(cachedModels).slice(0, 20) })
-		return cachedModels
+export async function getConnectedProviders(client: any): Promise<string[]> {
+	if (!client?.provider?.list) {
+		log("[getConnectedProviders] client.provider.list not available")
+		return []
 	}
 
+	try {
+		const result = await client.provider.list()
+		const connected = result.data?.connected ?? []
+		log("[getConnectedProviders] connected providers", { count: connected.length, providers: connected })
+		return connected
+	} catch (err) {
+		log("[getConnectedProviders] SDK error", { error: String(err) })
+		return []
+	}
+}
+
+export async function fetchAvailableModels(
+	_client?: any,
+	options?: { connectedProviders?: string[] | null }
+): Promise<Set<string>> {
+	const connectedProvidersUnknown = options?.connectedProviders === null || options?.connectedProviders === undefined
+
+	log("[fetchAvailableModels] CALLED", { 
+		connectedProvidersUnknown,
+		connectedProviders: options?.connectedProviders 
+	})
+
+	if (connectedProvidersUnknown) {
+		log("[fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution")
+		return new Set<string>()
+	}
+
+	const connectedProviders = options!.connectedProviders!
+	const connectedSet = new Set(connectedProviders)
 	const modelSet = new Set<string>()
+
+	const providerModelsCache = readProviderModelsCache()
+	if (providerModelsCache) {
+		log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
+		
+		for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
+			if (!connectedSet.has(providerId)) {
+				continue
+			}
+			for (const modelId of modelIds) {
+				modelSet.add(`${providerId}/${modelId}`)
+			}
+		}
+
+		log("[fetchAvailableModels] parsed from provider-models cache", {
+			count: modelSet.size,
+			connectedProviders: connectedProviders.slice(0, 5)
+		})
+
+		return modelSet
+	}
+
+	log("[fetchAvailableModels] provider-models cache not found, falling back to models.json")
 	const cacheFile = join(getOpenCodeCacheDir(), "models.json")
 
-	log("[fetchAvailableModels] reading cache file", { cacheFile })
-
 	if (!existsSync(cacheFile)) {
-		log("[fetchAvailableModels] cache file not found, returning empty set")
+		log("[fetchAvailableModels] models.json cache file not found, returning empty set")
 		return modelSet
 	}
 
@@ -122,9 +158,13 @@ export async function fetchAvailableModels(_client?: any): Promise<Set<string>> 
 		const data = JSON.parse(content) as Record<string, { id?: string; models?: Record<string, { id?: string }> }>
 
 		const providerIds = Object.keys(data)
-		log("[fetchAvailableModels] providers found", { count: providerIds.length, providers: providerIds.slice(0, 10) })
+		log("[fetchAvailableModels] providers found in models.json", { count: providerIds.length, providers: providerIds.slice(0, 10) })
 
 		for (const providerId of providerIds) {
+			if (!connectedSet.has(providerId)) {
+				continue
+			}
+
 			const provider = data[providerId]
 			const models = provider?.models
 			if (!models || typeof models !== "object") continue
@@ -134,9 +174,11 @@ export async function fetchAvailableModels(_client?: any): Promise<Set<string>> 
 			}
 		}
 
-		log("[fetchAvailableModels] parsed models", { count: modelSet.size, models: Array.from(modelSet).slice(0, 20) })
+		log("[fetchAvailableModels] parsed models from models.json (NO whitelist filtering)", {
+			count: modelSet.size,
+			connectedProviders: connectedProviders.slice(0, 5)
+		})
 
-		cachedModels = modelSet
 		return modelSet
 	} catch (err) {
 		log("[fetchAvailableModels] error", { error: String(err) })
@@ -144,11 +186,12 @@ export async function fetchAvailableModels(_client?: any): Promise<Set<string>> 
 	}
 }
 
-export function __resetModelCache(): void {
-	cachedModels = null
-}
+export function __resetModelCache(): void {}
 
 export function isModelCacheAvailable(): boolean {
+	if (hasProviderModelsCache()) {
+		return true
+	}
 	const cacheFile = join(getOpenCodeCacheDir(), "models.json")
 	return existsSync(cacheFile)
 }
