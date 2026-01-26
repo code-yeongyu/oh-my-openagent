@@ -16,13 +16,23 @@ echo -e "${BLUE}oh-my-opencode Hook QA Testing Guide${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Verify hooks are registered
+# Verify hooks are registered (check each hook individually)
 echo -e "${YELLOW}[1/5] Verifying hooks are registered...${NC}"
-HOOK_COUNT=$(grep -c "notification-on-idle\|fixed-comment-rule\|tmux-long-running\|git-push-reviewer" dist/index.js || echo "0")
-if [ "$HOOK_COUNT" -gt 0 ]; then
-  echo -e "${GREEN}✓ Found $HOOK_COUNT hook references in dist/index.js${NC}"
+HOOKS=("notification-on-idle" "fixed-comment-rule" "tmux-long-running" "git-push-reviewer")
+MISSING_HOOKS=()
+for hook in "${HOOKS[@]}"; do
+  if grep -q "$hook" dist/index.js 2>/dev/null; then
+    echo -e "${GREEN}  ✓ $hook${NC}"
+  else
+    echo -e "${YELLOW}  ✗ $hook (missing)${NC}"
+    MISSING_HOOKS+=("$hook")
+  fi
+done
+
+if [ ${#MISSING_HOOKS[@]} -eq 0 ]; then
+  echo -e "${GREEN}✓ All 4 hooks registered in dist/index.js${NC}"
 else
-  echo -e "${YELLOW}⚠ Warning: Could not verify hooks in dist/index.js${NC}"
+  echo -e "${YELLOW}⚠ Warning: ${#MISSING_HOOKS[@]} hook(s) not found: ${MISSING_HOOKS[*]}${NC}"
 fi
 echo ""
 
