@@ -32,6 +32,10 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
 
           if (options.directory && meta.directory !== options.directory) continue
 
+          if (!meta.preview) {
+            meta.preview = await getFirstUserMessagePreview(meta.id)
+          }
+
           sessions.push(meta)
         } catch {
           continue
@@ -43,6 +47,21 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   }
 
   return sessions.sort((a, b) => b.time.updated - a.time.updated)
+}
+
+async function getFirstUserMessagePreview(sessionID: string, maxLength = 50): Promise<string | undefined> {
+  const messages = await readSessionMessages(sessionID)
+  const firstUserMessage = messages.find((m) => m.role === "user")
+  if (!firstUserMessage) return undefined
+
+  for (const part of firstUserMessage.parts) {
+    if (part.type === "text" && part.text) {
+      const text = part.text.trim().replace(/\s+/g, " ")
+      if (text.length <= maxLength) return text
+      return text.substring(0, maxLength) + "..."
+    }
+  }
+  return undefined
 }
 
 export async function getAllSessions(): Promise<string[]> {

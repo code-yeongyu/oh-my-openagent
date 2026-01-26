@@ -66,6 +66,8 @@ export interface SessionMetadata {
     deletions: number
     files: number
   }
+  /** First user message preview (auto-generated for display) */
+  preview?: string
 }
 
 export interface SessionListArgs {

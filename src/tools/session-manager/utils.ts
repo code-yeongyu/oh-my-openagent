@@ -6,12 +6,26 @@ export async function formatSessionList(sessions: SessionMetadata[]): Promise<st
     return "No sessions found."
   }
 
-  const infos: SessionInfo[] = []
+  interface EnrichedInfo extends SessionInfo {
+    preview?: string
+    files?: number
+    additions?: number
+    deletions?: number
+  }
+
+  const infos: EnrichedInfo[] = []
   for (const meta of sessions) {
     const info = await getSessionInfo(meta.id)
     if (info) {
-      info.title = meta.title
-      infos.push(info)
+      const enriched: EnrichedInfo = {
+        ...info,
+        title: meta.title,
+        preview: meta.preview,
+        files: meta.summary?.files,
+        additions: meta.summary?.additions,
+        deletions: meta.summary?.deletions,
+      }
+      infos.push(enriched)
     }
   }
 
@@ -19,14 +33,41 @@ export async function formatSessionList(sessions: SessionMetadata[]): Promise<st
     return "No valid sessions found."
   }
 
-  const headers = ["Session ID", "Title", "Messages", "First", "Last", "Agents"]
+  const formatDateTime = (date: Date | undefined): string => {
+    if (!date) return "N/A"
+    const d = date.toISOString().split("T")
+    const time = d[1].substring(0, 5)
+    return `${d[0]} ${time}`
+  }
+
+  const formatChanges = (info: EnrichedInfo): string => {
+    if (info.files === undefined) return "-"
+    const parts: string[] = []
+    if (info.files > 0) parts.push(`${info.files}F`)
+    if (info.additions && info.additions > 0) parts.push(`+${info.additions}`)
+    if (info.deletions && info.deletions > 0) parts.push(`-${info.deletions}`)
+    return parts.length > 0 ? parts.join("/") : "-"
+  }
+
+  const getDisplayTitle = (info: EnrichedInfo): string => {
+    if (info.title && info.title.trim()) return truncate(info.title, 30)
+    if (info.preview) return truncate(info.preview, 30)
+    return "(untitled)"
+  }
+
+  const truncate = (str: string, maxLen: number): string => {
+    if (str.length <= maxLen) return str
+    return str.substring(0, maxLen - 3) + "..."
+  }
+
+  const headers = ["Session ID", "Title/Preview", "Msgs", "Updated", "Changes", "Agents"]
   const rows = infos.map((info) => [
     info.id,
-    info.title ?? "(untitled)",
+    getDisplayTitle(info),
     info.message_count.toString(),
-    info.first_message?.toISOString().split("T")[0] ?? "N/A",
-    info.last_message?.toISOString().split("T")[0] ?? "N/A",
-    info.agents_used.join(", ") || "none",
+    formatDateTime(info.last_message),
+    formatChanges(info),
+    truncate(info.agents_used.join(", ") || "none", 20),
   ])
 
   const colWidths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)))
