@@ -1,6 +1,6 @@
 import type { TmuxConfig } from "../../config/schema"
 import type { PaneAction, WindowState } from "./types"
-import { spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth } from "../../shared/tmux"
+import { spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane } from "../../shared/tmux"
 import { log } from "../../shared"
 
 export interface ActionResult {
@@ -36,6 +36,20 @@ export async function executeAction(
       await enforceMainPane(ctx.windowState)
     }
     return { success }
+  }
+
+  if (action.type === "replace") {
+    const result = await replaceTmuxPane(
+      action.paneId,
+      action.newSessionId,
+      action.description,
+      ctx.config,
+      ctx.serverUrl
+    )
+    return {
+      success: result.success,
+      paneId: result.paneId,
+    }
   }
 
   const result = await spawnTmuxPane(
@@ -74,7 +88,7 @@ export async function executeActions(
       return { success: false, results }
     }
 
-    if (action.type === "spawn" && result.paneId) {
+    if ((action.type === "spawn" || action.type === "replace") && result.paneId) {
       spawnedPaneId = result.paneId
     }
   }

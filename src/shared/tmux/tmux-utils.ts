@@ -179,6 +179,53 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
   return exitCode === 0
 }
 
+export async function replaceTmuxPane(
+  paneId: string,
+  sessionId: string,
+  description: string,
+  config: TmuxConfig,
+  serverUrl: string
+): Promise<SpawnPaneResult> {
+  const { log } = await import("../logger")
+  
+  log("[replaceTmuxPane] called", { paneId, sessionId, description })
+  
+  if (!config.enabled) {
+    return { success: false }
+  }
+  if (!isInsideTmux()) {
+    return { success: false }
+  }
+
+  const tmux = await getTmuxPath()
+  if (!tmux) {
+    return { success: false }
+  }
+
+  const opencodeCmd = `opencode attach ${serverUrl} --session ${sessionId}`
+
+  const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const exitCode = await proc.exited
+
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text()
+    log("[replaceTmuxPane] FAILED", { paneId, exitCode, stderr: stderr.trim() })
+    return { success: false }
+  }
+
+  const title = `omo-subagent-${description.slice(0, 20)}`
+  spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
+    stdout: "ignore",
+    stderr: "ignore",
+  })
+
+  log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
+  return { success: true, paneId }
+}
+
 export async function applyLayout(
   tmux: string,
   layout: TmuxLayout,
