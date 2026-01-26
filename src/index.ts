@@ -34,6 +34,10 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
+  createNotificationOnIdleHook,
+  createFixedCommentRuleHook,
+  createTmuxLongRunningHook,
+  createGitPushReviewerHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -226,6 +230,19 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
 
   const taskResumeInfo = createTaskResumeInfoHook();
+
+  const notificationOnIdle = isHookEnabled("notification-on-idle")
+    ? createNotificationOnIdleHook(ctx)
+    : null;
+  const fixedCommentRule = isHookEnabled("fixed-comment-rule")
+    ? createFixedCommentRuleHook()
+    : null;
+  const tmuxLongRunning = isHookEnabled("tmux-long-running")
+    ? createTmuxLongRunningHook()
+    : null;
+  const gitPushReviewer = isHookEnabled("git-push-reviewer")
+    ? createGitPushReviewerHook(ctx)
+    : null;
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
 
@@ -460,7 +477,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         "experimental.chat.messages.transform"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ]?.(input, output as any);
-
+      await fixedCommentRule?.["experimental.chat.messages.transform"]?.(input, output as any);
+      await tmuxLongRunning?.["experimental.chat.messages.transform"]?.(input, output as any);
     },
 
     config: configHandler,
@@ -482,6 +500,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
       await atlasHook?.handler(input);
+      await notificationOnIdle?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -565,6 +584,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
+      await gitPushReviewer?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;

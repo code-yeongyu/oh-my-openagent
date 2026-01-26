@@ -80,7 +80,11 @@
           "prometheus-md-only",
           "sisyphus-junior-notepad",
           "start-work",
-          "atlas"
+          "atlas",
+          "notification-on-idle",
+          "fixed-comment-rule",
+          "tmux-long-running",
+          "git-push-reviewer"
         ]
       }
     },
