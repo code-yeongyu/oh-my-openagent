@@ -25,10 +25,12 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log } from "../shared";
+import { log, fetchAvailableModels, readConnectedProvidersCache } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
+import { resolveModelWithFallback } from "../shared/model-resolver";
+import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
@@ -221,13 +223,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
-            | (Record<string, unknown> & { category?: string; model?: string })
+            | (Record<string, unknown> & { category?: string; model?: string; variant?: string })
             | undefined;
         const defaultModel = config.model as string | undefined;
 
-        // Resolve full category config (model, temperature, top_p, tools, etc.)
-        // Apply all category properties when category is specified, but explicit
-        // overrides (model, temperature, etc.) will take precedence during merge
         const categoryConfig = prometheusOverride?.category
           ? resolveCategoryConfig(
               prometheusOverride.category,
@@ -235,19 +234,31 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             )
           : undefined;
 
-        // Model resolution: explicit override → category config → OpenCode default
-        // No hardcoded fallback - OpenCode config.model is the terminal fallback
-        const resolvedModel = prometheusOverride?.model ?? categoryConfig?.model ?? defaultModel;
+        const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
+        const connectedProviders = readConnectedProvidersCache();
+        const availableModels = ctx.client
+          ? await fetchAvailableModels(ctx.client, { connectedProviders: connectedProviders ?? undefined })
+          : new Set<string>();
 
+        const modelResolution = resolveModelWithFallback({
+          userModel: prometheusOverride?.model ?? categoryConfig?.model,
+          fallbackChain: prometheusRequirement?.fallbackChain,
+          availableModels,
+          systemDefaultModel: defaultModel ?? "",
+        });
+        const resolvedModel = modelResolution?.model;
+        const resolvedVariant = modelResolution?.variant;
+
+        const variantToUse = prometheusOverride?.variant ?? resolvedVariant;
         const prometheusBase = {
-          // Only include model if one was resolved - let OpenCode apply its own default if none
+          name: "prometheus",
           ...(resolvedModel ? { model: resolvedModel } : {}),
+          ...(variantToUse ? { variant: variantToUse } : {}),
           mode: "primary" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
           color: (configAgent?.plan?.color as string) ?? "#FF6347",
-          // Apply category properties (temperature, top_p, tools, etc.)
           ...(categoryConfig?.temperature !== undefined
             ? { temperature: categoryConfig.temperature }
             : {}),
@@ -295,8 +306,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = replacePlan
-        ? { mode: "subagent" as const }
+      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
+        ? { ...agentConfig["prometheus"], name: "plan", mode: "subagent" as const }
         : undefined;
 
       config.agent = {
