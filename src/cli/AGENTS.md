@@ -8,7 +8,7 @@ CLI entry: `bunx oh-my-opencode`. Interactive installer, doctor diagnostics. Com
 
 ```
 cli/
-├── index.ts              # Commander.js entry
+├── index.ts              # Commander.js entry (4 commands)
 ├── install.ts            # Interactive TUI (520 lines)
 ├── config-manager.ts     # JSONC parsing (664 lines)
 ├── types.ts              # InstallArgs, InstallConfig
@@ -18,7 +18,7 @@ cli/
 │   ├── runner.ts         # Check orchestration
 │   ├── formatter.ts      # Colored output
 │   ├── constants.ts      # Check IDs, symbols
-│   ├── types.ts          # CheckResult, CheckDefinition
+│   ├── types.ts          # CheckResult, CheckDefinition (114 lines)
 │   └── checks/           # 14 checks, 21 files
 │       ├── version.ts    # OpenCode + plugin version
 │       ├── config.ts     # JSONC validity, Zod
@@ -38,36 +38,37 @@ cli/
 
 | Command | Purpose |
 |---------|---------|
-| `install` | Interactive setup |
-| `doctor` | 14 health checks |
-| `run` | Launch session |
-| `get-local-version` | Version check |
+| `install` | Interactive setup with provider selection |
+| `doctor` | 14 health checks for diagnostics |
+| `run` | Launch session with todo enforcement |
+| `get-local-version` | Version detection and update check |
 
-## DOCTOR CATEGORIES
+## DOCTOR CATEGORIES (14 Checks)
 
 | Category | Checks |
 |----------|--------|
 | installation | opencode, plugin |
-| configuration | config validity, Zod |
+| configuration | config validity, Zod, model-resolution |
 | authentication | anthropic, openai, google |
-| dependencies | ast-grep, comment-checker |
+| dependencies | ast-grep, comment-checker, gh-cli |
 | tools | LSP, MCP |
 | updates | version comparison |
 
 ## HOW TO ADD CHECK
 
 1. Create `src/cli/doctor/checks/my-check.ts`
-2. Export from `checks/index.ts`
-3. Add to `getAllCheckDefinitions()`
+2. Export `getXXXCheckDefinition()` factory returning `CheckDefinition`
+3. Add to `getAllCheckDefinitions()` in `checks/index.ts`
 
 ## TUI FRAMEWORK
 
-- **@clack/prompts**: `select()`, `spinner()`, `intro()`
-- **picocolors**: Terminal colors
-- **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn)
+- **@clack/prompts**: `select()`, `spinner()`, `intro()`, `outro()`
+- **picocolors**: Terminal colors for status and headers
+- **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn), ℹ (info)
 
 ## ANTI-PATTERNS
 
-- **Blocking in non-TTY**: Check `process.stdout.isTTY`
-- **Direct JSON.parse**: Use `parseJsonc()`
-- **Silent failures**: Return warn/fail in doctor
+- **Blocking in non-TTY**: Always check `process.stdout.isTTY`
+- **Direct JSON.parse**: Use `parseJsonc()` from shared utils
+- **Silent failures**: Return `warn` or `fail` in doctor instead of throwing
+- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from `config-manager.ts`

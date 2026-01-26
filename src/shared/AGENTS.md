@@ -1,81 +1,78 @@
 # SHARED UTILITIES KNOWLEDGE BASE
 
 ## OVERVIEW
-
-34 cross-cutting utilities: path resolution, token truncation, config parsing, model resolution, agent display names.
+55 cross-cutting utilities: path resolution, token truncation, config parsing, model resolution.
 
 ## STRUCTURE
-
 ```
 shared/
-├── logger.ts              # File-based logging
-├── permission-compat.ts   # Agent tool restrictions
-├── dynamic-truncator.ts   # Token-aware truncation
-├── frontmatter.ts         # YAML frontmatter
-├── jsonc-parser.ts        # JSON with Comments
-├── data-path.ts           # XDG-compliant storage
-├── opencode-config-dir.ts # ~/.config/opencode
-├── claude-config-dir.ts   # ~/.claude
-├── migration.ts           # Legacy config migration
-├── opencode-version.ts    # Version comparison
-├── external-plugin-detector.ts # OAuth spoofing detection
-├── model-requirements.ts  # Agent/Category requirements
-├── model-availability.ts  # Models fetch + fuzzy match
-├── model-resolver.ts      # 3-step resolution
-├── model-sanitizer.ts     # Model ID normalization
-├── shell-env.ts           # Cross-platform shell
-├── agent-display-names.ts # Agent display name mapping
-├── agent-tool-restrictions.ts # Tool restriction helpers
-├── agent-variant.ts       # Agent variant detection
-├── command-executor.ts    # Subprocess execution
-├── config-errors.ts       # Config error types
-├── deep-merge.ts          # Deep object merge
-├── file-reference-resolver.ts # File path resolution
-├── file-utils.ts          # File utilities
-├── hook-disabled.ts       # Hook enable/disable check
-├── pattern-matcher.ts     # Glob pattern matching
-├── session-cursor.ts      # Session cursor tracking
-├── snake-case.ts          # String case conversion
-├── system-directive.ts    # System prompt helpers
-├── tool-name.ts           # Tool name constants
-├── zip-extractor.ts       # ZIP file extraction
-├── index.ts               # Barrel export
-└── *.test.ts              # Colocated tests
+├── tmux/                  # Tmux TUI integration (types, utils, constants)
+├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log)
+├── dynamic-truncator.ts   # Token-aware context window management (194 lines)
+├── model-resolver.ts      # 3-step resolution (Override → Fallback → Default)
+├── model-requirements.ts  # Agent/category model fallback chains (132 lines)
+├── model-availability.ts  # Provider model fetching & fuzzy matching (154 lines)
+├── jsonc-parser.ts        # JSONC parsing with comment support
+├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only)
+├── data-path.ts           # XDG-compliant storage resolution
+├── opencode-config-dir.ts # ~/.config/opencode resolution (143 lines)
+├── claude-config-dir.ts   # ~/.claude resolution
+├── migration.ts           # Legacy config migration logic (231 lines)
+├── opencode-version.ts    # Semantic version comparison
+├── permission-compat.ts   # Agent tool restriction enforcement
+├── system-directive.ts    # Unified system message prefix & types
+├── session-utils.ts       # Session cursor, orchestrator detection
+├── shell-env.ts           # Cross-platform shell environment
+├── agent-variant.ts       # Agent variant from config
+├── zip-extractor.ts       # Binary/Resource ZIP extraction
+├── deep-merge.ts          # Recursive object merging (proto-pollution safe, MAX_DEPTH=50)
+├── case-insensitive.ts    # Case-insensitive object lookups
+├── session-cursor.ts      # Session message cursor tracking
+├── command-executor.ts    # Shell command execution (225 lines)
+└── index.ts               # Barrel export for all utilities
 ```
 
-## WHEN TO USE
+## MOST IMPORTED
+| Utility | Users | Purpose |
+|---------|-------|---------|
+| logger.ts | 16+ | Background task visibility |
+| system-directive.ts | 8+ | Message filtering |
+| opencode-config-dir.ts | 8+ | Path resolution |
+| permission-compat.ts | 6+ | Tool restrictions |
 
+## WHEN TO USE
 | Task | Utility |
 |------|---------|
-| Debug logging | `log(message, data)` |
-| Limit context | `dynamicTruncate(ctx, sessionId, output)` |
-| Parse frontmatter | `parseFrontmatter(content)` |
-| Load JSONC | `parseJsonc(text)` or `readJsoncFile(path)` |
-| Restrict tools | `createAgentToolAllowlist(tools)` |
-| Resolve paths | `getOpenCodeConfigDir()` |
-| Compare versions | `isOpenCodeVersionAtLeast("1.1.0")` |
-| Resolve model | `resolveModelWithFallback()` |
-| Agent display name | `getAgentDisplayName(agentName)` |
+| Path Resolution | `getOpenCodeConfigDir()`, `getDataPath()` |
+| Token Truncation | `dynamicTruncate(ctx, sessionId, output)` |
+| Config Parsing | `readJsoncFile<T>(path)`, `parseJsonc(text)` |
+| Model Resolution | `resolveModelWithFallback(client, reqs, override)` |
+| Version Gating | `isOpenCodeVersionAtLeast(version)` |
+| YAML Metadata | `parseFrontmatter(content)` |
+| Tool Security | `createAgentToolAllowlist(tools)` |
+| System Messages | `createSystemDirective(type)`, `isSystemDirective(msg)` |
+| Deep Merge | `deepMerge(target, source)` |
 
-## PATTERNS
+## KEY PATTERNS
 
+**3-Step Resolution** (Override → Fallback → Default):
 ```typescript
-// Token-aware truncation
-const { result } = await dynamicTruncate(ctx, sessionID, buffer)
+const model = resolveModelWithFallback({
+  userModel: config.agents.sisyphus.model,
+  fallbackChain: AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain,
+  availableModels: fetchedModels,
+})
+```
 
-// JSONC config
-const settings = readJsoncFile<Settings>(configPath)
-
-// Version-gated
-if (isOpenCodeVersionAtLeast("1.1.0")) { /* ... */ }
-
-// Model resolution
-const model = await resolveModelWithFallback(client, requirements, override)
+**System Directive Filtering**:
+```typescript
+if (isSystemDirective(message)) return  // Skip system-generated
+const directive = createSystemDirective("TODO CONTINUATION")
 ```
 
 ## ANTI-PATTERNS
-
-- **Raw JSON.parse**: Use `jsonc-parser.ts`
-- **Hardcoded paths**: Use `*-config-dir.ts`
-- **console.log**: Use `logger.ts` for background
-- **Unbounded output**: Use `dynamic-truncator.ts`
+- **Raw JSON.parse**: Use `jsonc-parser.ts` for comment support
+- **Hardcoded Paths**: Use `*-config-dir.ts` or `data-path.ts`
+- **console.log**: Use `logger.ts` for background task visibility
+- **Unbounded Output**: Use `dynamic-truncator.ts` to prevent overflow
+- **Manual Version Check**: Use `opencode-version.ts` for semver safety
