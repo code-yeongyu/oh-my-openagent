@@ -62,6 +62,27 @@ delegate_task(agent="explore", background=true, prompt="Find auth implementation
 background_output(task_id="bg_abc123")
 ```
 
+#### Visual Multi-Agent with Tmux
+
+Enable `tmux.enabled` to see background agents in separate tmux panes:
+
+```json
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical"
+  }
+}
+```
+
+When running inside tmux:
+- Background agents spawn in new panes
+- Watch multiple agents work in real-time
+- Each pane shows agent output live
+- Auto-cleanup when agents complete
+
+See [Tmux Integration](configurations.md#tmux-integration) for full configuration options.
+
 Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](configurations.md#agents).
 
 ---
@@ -444,6 +465,29 @@ Disable specific hooks in config:
 | **session_read** | Read messages and history from a session |
 | **session_search** | Full-text search across session messages |
 | **session_info** | Get session metadata and statistics |
+
+### Interactive Terminal Tools
+
+| Tool | Description |
+|------|-------------|
+| **interactive_bash** | Tmux-based terminal for TUI apps (vim, htop, pudb). Pass tmux subcommands directly without prefix. |
+
+**Usage Examples**:
+```bash
+# Create a new session
+interactive_bash(tmux_command="new-session -d -s dev-app")
+
+# Send keystrokes to a session
+interactive_bash(tmux_command="send-keys -t dev-app 'vim main.py' Enter")
+
+# Capture pane output
+interactive_bash(tmux_command="capture-pane -p -t dev-app")
+```
+
+**Key Points**:
+- Commands are tmux subcommands (no `tmux` prefix)
+- Use for interactive apps that need persistent sessions
+- One-shot commands should use regular `Bash` tool with `&`
 
 ---
 
