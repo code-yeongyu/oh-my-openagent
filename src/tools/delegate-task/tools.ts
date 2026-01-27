@@ -573,13 +573,26 @@ To continue this session: session_id="${args.session_id}"`
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT
-         if (!categoryModel && actualModel) {
-           const parsedModel = parseModelString(actualModel)
-           categoryModel = parsedModel ?? undefined
-         }
-         categoryPromptAppend = resolved.promptAppend || undefined
+          if (!categoryModel && actualModel) {
+            const parsedModel = parseModelString(actualModel)
+            categoryModel = parsedModel ?? undefined
+          }
+          categoryPromptAppend = resolved.promptAppend || undefined
 
-         const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
+          if (!categoryModel && !actualModel) {
+            const categoryNames = Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories })
+            return `Model not configured for category "${args.category}".
+
+Configure in one of:
+1. OpenCode: Set "model" in opencode.json
+2. Oh-My-OpenCode: Set category model in oh-my-opencode.json
+3. Provider: Connect a provider with available models
+
+Current category: ${args.category}
+Available categories: ${categoryNames.join(", ")}`
+          }
+
+          const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
         // Handle both boolean false and string "false" due to potential serialization
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
