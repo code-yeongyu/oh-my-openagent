@@ -94,7 +94,7 @@ function openBrowser(url: string): void {
   if (platform === "darwin") {
     spawn("open", [url], { stdio: "ignore", detached: true }).unref()
   } else if (platform === "win32") {
-    spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true }).unref()
+    spawn("explorer", [url], { stdio: "ignore", detached: true }).unref()
   } else {
     spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref()
   }
