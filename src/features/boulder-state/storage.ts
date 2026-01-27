@@ -74,35 +74,17 @@ export function clearBoulderState(directory: string): boolean {
 
 /**
  * Find Prometheus plan files for this project.
- * Searches two locations (priority order):
- * 1. {project}/.sisyphus/plans/{name}.md (preferred)
- * 2. {project}/changes/{name}/tasks.md (legacy format)
+ * Searches in changes/ directory (primary location):
+ * 1. {project}/changes/{name}/tasks.md (standard format)
+ * 2. {project}/.sisyphus/plans/{name}.md (deprecated, for backward compat only)
  * 
- * Plans from .sisyphus/plans/ take priority when same name exists in both.
+ * Plans from changes/ take priority.
  */
 export function findPrometheusPlans(directory: string): string[] {
   const plans: string[] = []
   const seenNames = new Set<string>()
 
-  // 1. Search .sisyphus/plans/*.md (priority)
-  const sisyphusPlansDir = join(directory, PROMETHEUS_PLANS_DIR)
-  if (existsSync(sisyphusPlansDir)) {
-    try {
-      const files = readdirSync(sisyphusPlansDir)
-      for (const f of files) {
-        if (f.endsWith(".md")) {
-          const planPath = join(sisyphusPlansDir, f)
-          const planName = basename(f, ".md").toLowerCase()
-          plans.push(planPath)
-          seenNames.add(planName)
-        }
-      }
-    } catch {
-      // Ignore errors reading directory
-    }
-  }
-
-  // 2. Search changes/*/tasks.md (legacy, lower priority)
+  // 1. Search changes/*/tasks.md (PRIMARY - this is the correct location)
   const changesDir = join(directory, LEGACY_CHANGES_DIR)
   if (existsSync(changesDir)) {
     try {
@@ -112,11 +94,29 @@ export function findPrometheusPlans(directory: string): string[] {
           const tasksPath = join(changesDir, dirent.name, "tasks.md")
           if (existsSync(tasksPath)) {
             const planName = dirent.name.toLowerCase()
-            // Only add if not already found in .sisyphus/plans/
-            if (!seenNames.has(planName)) {
-              plans.push(tasksPath)
-              seenNames.add(planName)
-            }
+            plans.push(tasksPath)
+            seenNames.add(planName)
+          }
+        }
+      }
+    } catch {
+      // Ignore errors reading directory
+    }
+  }
+
+  // 2. Search .sisyphus/plans/*.md (DEPRECATED - backward compat only)
+  const sisyphusPlansDir = join(directory, PROMETHEUS_PLANS_DIR)
+  if (existsSync(sisyphusPlansDir)) {
+    try {
+      const files = readdirSync(sisyphusPlansDir)
+      for (const f of files) {
+        if (f.endsWith(".md")) {
+          const planPath = join(sisyphusPlansDir, f)
+          const planName = basename(f, ".md").toLowerCase()
+          // Only add if not already found in changes/
+          if (!seenNames.has(planName)) {
+            plans.push(planPath)
+            seenNames.add(planName)
           }
         }
       }

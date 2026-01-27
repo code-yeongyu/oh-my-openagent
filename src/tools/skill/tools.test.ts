@@ -55,6 +55,8 @@ const mockContext = {
   messageID: "msg-1",
   agent: "test-agent",
   abort: new AbortController().signal,
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("skill tool - synchronous description", () => {

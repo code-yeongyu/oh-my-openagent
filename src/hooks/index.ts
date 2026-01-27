@@ -62,8 +62,8 @@ export { createPlanAttentionRefresherHook } from "./plan-attention-refresher";
 // Subagent Verification Hook - reminds orchestrator to verify delegated work
 export { createSubagentVerificationHook } from "./subagent-verification";
 
-// Background Compaction Hook - preserves background task state during context compaction
-export { createBackgroundCompactionHook } from "./background-compaction";
+// Background Compaction Hook - not yet implemented
+// export { createBackgroundCompactionHook } from "./background-compaction";
 
 // Codebase Assessment Hook - evaluates project state at session start
 export { createCodebaseAssessmentHook } from "./codebase-assessment";

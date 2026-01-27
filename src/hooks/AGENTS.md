@@ -37,7 +37,6 @@ hooks/
 ├── category-skill-reminder/    # Reminds of category skills
 ├── empty-task-response-detector.ts # Detects empty responses
 ├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
-├── skill-suggestion/           # Suggests relevant skills based on context
 ├── planning-flow-guide/        # Guides planning workflow phases
 ├── tdd-guard/                  # Enforces test-driven development (opt-in)
 ├── subagent-verification/      # Verifies subagent task completion

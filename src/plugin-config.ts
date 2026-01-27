@@ -123,7 +123,7 @@ export function loadPluginConfig(
       : projectBasePath + ".json";
 
   // DEBUG: Log config paths
-  console.error("[OhMyOpenCode DEBUG] getUserConfigDir():", getUserConfigDir());
+  console.error("[OhMyOpenCode DEBUG] getOpenCodeConfigDir():", configDir);
   console.error("[OhMyOpenCode DEBUG] userConfigPath:", userConfigPath);
   console.error("[OhMyOpenCode DEBUG] projectConfigPath:", projectConfigPath);
 

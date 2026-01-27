@@ -7,6 +7,8 @@ const mockContext: ToolContext = {
   messageID: "test-message",
   agent: "test-agent",
   abort: new AbortController().signal,
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("session-manager tools", () => {

@@ -7,9 +7,8 @@ import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 import { createImplementerAgent, IMPLEMENTER_PROMPT_METADATA } from "./implementer"
 import { createArchiverAgent, ARCHIVER_PROMPT_METADATA } from "./archiver"
-import { createFrontendUiUxEngineerAgent, FRONTEND_PROMPT_METADATA } from "./frontend-ui-ux-engineer"
-
-import { createDocumentWriterAgent, DOCUMENT_WRITER_PROMPT_METADATA } from "./document-writer"
+// Note: frontend-ui-ux-engineer and document-writer agents are not yet implemented
+// These will be added in a future update
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
@@ -25,16 +24,14 @@ import type { BrowserAutomationProvider } from "../config/schema"
 
 type AgentSource = AgentFactory | AgentConfig
 
-const agentSources: Record<BuiltinAgentName, AgentSource> = {
+const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   sisyphus: createSisyphusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
   implementer: createImplementerAgent,
   archiver: createArchiverAgent,
-  "frontend-ui-ux-engineer": createFrontendUiUxEngineerAgent,
-
-  "document-writer": createDocumentWriterAgent,
+  // Note: frontend-ui-ux-engineer and document-writer are not yet implemented
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
@@ -54,9 +51,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   explore: EXPLORE_PROMPT_METADATA,
   implementer: IMPLEMENTER_PROMPT_METADATA,
   archiver: ARCHIVER_PROMPT_METADATA,
-  "frontend-ui-ux-engineer": FRONTEND_PROMPT_METADATA,
-
-  "document-writer": DOCUMENT_WRITER_PROMPT_METADATA,
+  // Note: frontend-ui-ux-engineer and document-writer metadata not available
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
   prometheus: PROMETHEUS_PROMPT_METADATA,
 }

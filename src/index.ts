@@ -43,7 +43,7 @@ import {
   createPlanAttentionRefresherHook,
   // Phase 2: High-priority hooks
   createSubagentVerificationHook,
-  createBackgroundCompactionHook,
+  // Note: createBackgroundCompactionHook not yet implemented
   // Phase 3: Optional hooks
   createCodebaseAssessmentHook,
   createLspDiagnosticsEnforcerHook,
@@ -354,10 +354,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
   
-  // Background Compaction hook - preserves task state during context compaction
-  const backgroundCompaction = isHookEnabled("background-compaction")
-    ? createBackgroundCompactionHook(backgroundManager)
-    : null;
+  // Background Compaction hook - not yet implemented
+  const backgroundCompaction = null;
 
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
