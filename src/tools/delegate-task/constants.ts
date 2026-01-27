@@ -341,8 +341,8 @@ For EACH task, include a recommendation block:
 - Skills: [\`skill-1\`, \`skill-2\`] - [reason each skill is needed]
 
 **Skills Evaluation:**
-- ✅ \`skill-name\`: Included because [reason]
-- ❌ \`other-skill\`: Omitted because [reason domain doesn't overlap]
+- INCLUDED \`skill-name\`: [reason]
+- OMITTED \`other-skill\`: [reason domain doesn't overlap]
 \`\`\`
 
 WHY THIS MATTERS:

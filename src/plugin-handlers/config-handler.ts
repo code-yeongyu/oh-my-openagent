@@ -254,7 +254,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           name: "prometheus",
           ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(variantToUse ? { variant: variantToUse } : {}),
-          mode: "primary" as const,
+          mode: "all" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
@@ -307,7 +307,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { ...agentConfig["prometheus"], name: "plan", mode: "subagent" as const }
+        ? { 
+            ...agentConfig["prometheus"],
+            name: "plan", 
+            mode: "subagent" as const 
+          }
         : undefined;
 
       config.agent = {
@@ -381,8 +385,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       : { servers: {} };
 
     config.mcp = {
-      ...(config.mcp as Record<string, unknown>),
       ...createBuiltinMcps(pluginConfig.disabled_mcps),
+      ...(config.mcp as Record<string, unknown>),
       ...mcpResult.servers,
       ...pluginComponents.mcpServers,
     };
