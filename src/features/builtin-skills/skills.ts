@@ -610,6 +610,13 @@ const mdselSkill: BuiltinSkill = {
   template: readBuiltinSkillTemplate("mdsel"),
 }
 
+const progressiveDisclosureMdSkill: BuiltinSkill = {
+  name: "progressive-disclosure-md",
+  description:
+    "ENFORCED progressive disclosure for large Markdown files. Blocks reading .md files over 200 words - must use mdsel selectors. Use for document synthesis workflows.",
+  template: readBuiltinSkillTemplate("progressive-disclosure-md"),
+}
+
 const gitMasterSkill: BuiltinSkill = {
   name: "git-master",
   description:
@@ -1967,6 +1974,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     waveParallelExecutionSkill,
     executingPlansSkill,
     mdselSkill,
+    progressiveDisclosureMdSkill,
     devBrowserSkill,
   ]
 }

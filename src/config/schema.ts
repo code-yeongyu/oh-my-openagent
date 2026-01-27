@@ -114,6 +114,7 @@ export const HookNameSchema = z.enum([
   "plan-update-reminder",
   "plan-attention-refresher",
   "mdsel-reminder",
+  "mdsel-enforcer",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

@@ -75,4 +75,6 @@ Reading plan and beginning execution...
 - Always update boulder.json BEFORE starting work
 - Read the FULL plan file before delegating any tasks
 - Follow atlas delegation protocols (7-section format)
-- **ONLY search in \`changes/\` directory** - do NOT search \`.sisyphus/plans/\``
+- **ONLY search in \`changes/\` directory**
+
+`

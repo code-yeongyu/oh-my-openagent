@@ -76,3 +76,6 @@ export { createPhaseFlowEnforcerHook } from "./phase-flow-enforcer";
 
 // mdsel Reminder Hook - reminds to use mdsel for large markdown files
 export { createMdselReminderHook } from "./mdsel-reminder";
+
+// mdsel Enforcer Hook - blocks reading large .md files, enforces mdsel usage
+export { createMdselEnforcerHook } from "./mdsel-enforcer";
