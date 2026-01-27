@@ -864,7 +864,10 @@ To continue this session: session_id="${task.sessionID}"`
           body: {
             parentID: ctx.sessionID,
             title: `Task: ${args.description}`,
-          },
+            permission: [
+              { permission: "question", action: "deny" as const, pattern: "*" },
+            ],
+          } as any,
           query: {
             directory: parentDirectory,
           },
