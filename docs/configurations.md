@@ -525,27 +525,96 @@ Configure concurrency limits for background agent tasks. This controls how many 
 
 Categories enable domain-specific task delegation via the `delegate_task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
 
-**Default Categories:**
+### Built-in Categories
 
-| Category         | Model                         | Description                                                                  |
-| ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `visual`         | `google/gemini-3-pro` | Frontend, UI/UX, design-focused tasks. High creativity (temp 0.7).           |
-| `business-logic` | `openai/gpt-5.2`              | Backend logic, architecture, strategic reasoning. Low creativity (temp 0.1). |
+All 7 categories come with optimal model defaults, but **you must configure them to use those defaults**:
 
-**Usage:**
+| Category             | Built-in Default Model             | Description                                                          |
+| -------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `visual-engineering` | `google/gemini-3-pro-preview`      | Frontend, UI/UX, design, styling, animation                          |
+| `ultrabrain`         | `openai/gpt-5.2-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
+| `artistry`           | `google/gemini-3-pro-preview` (max)| Highly creative/artistic tasks, novel ideas                          |
+| `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
+| `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
+| `unspecified-high`   | `anthropic/claude-opus-4-5` (max)  | Tasks that don't fit other categories, high effort required          |
+| `writing`            | `google/gemini-3-flash-preview`    | Documentation, prose, technical writing                              |
+
+### ⚠️ Critical: Model Resolution Priority
+
+**Categories DO NOT use their built-in defaults unless configured.** Model resolution follows this priority:
 
 ```
-// Via delegate_task tool
-delegate_task(category="visual", prompt="Create a responsive dashboard component")
-delegate_task(category="business-logic", prompt="Design the payment processing flow")
+1. User-configured model (in oh-my-opencode.json)
+2. Category's built-in default (if you add category to config)
+3. System default model (from opencode.json)
+```
 
-// Or target a specific agent directly
+**Example Problem:**
+
+```json
+// opencode.json
+{ "model": "anthropic/claude-sonnet-4-5" }
+
+// oh-my-opencode.json (empty categories section)
+{}
+
+// Result: ALL categories use claude-sonnet-4-5 (wasteful!)
+// - quick tasks use Sonnet instead of Haiku (expensive)
+// - ultrabrain uses Sonnet instead of GPT-5.2 (inferior reasoning)
+// - visual tasks use Sonnet instead of Gemini (suboptimal for UI)
+```
+
+### Recommended Configuration
+
+**To use optimal models for each category, add them to your config:**
+
+```json
+{
+  "categories": {
+    "visual-engineering": { 
+      "model": "google/gemini-3-pro-preview"
+    },
+    "ultrabrain": { 
+      "model": "openai/gpt-5.2-codex",
+      "variant": "xhigh"
+    },
+    "artistry": { 
+      "model": "google/gemini-3-pro-preview",
+      "variant": "max"
+    },
+    "quick": { 
+      "model": "anthropic/claude-haiku-4-5"  // Fast + cheap for trivial tasks
+    },
+    "unspecified-low": { 
+      "model": "anthropic/claude-sonnet-4-5"
+    },
+    "unspecified-high": { 
+      "model": "anthropic/claude-opus-4-5",
+      "variant": "max"
+    },
+    "writing": { 
+      "model": "google/gemini-3-flash-preview"
+    }
+  }
+}
+```
+
+**Only configure categories you have access to.** Unconfigured categories fall back to your system default model.
+
+### Usage
+
+```javascript
+// Via delegate_task tool
+delegate_task(category="visual-engineering", prompt="Create a responsive dashboard component")
+delegate_task(category="ultrabrain", prompt="Design the payment processing flow")
+
+// Or target a specific agent directly (bypasses categories)
 delegate_task(agent="oracle", prompt="Review this architecture")
 ```
 
-**Custom Categories:**
+### Custom Categories
 
-Add custom categories in `oh-my-opencode.json`:
+Add your own categories or override built-in ones:
 
 ```json
 {
@@ -555,15 +624,15 @@ Add custom categories in `oh-my-opencode.json`:
       "temperature": 0.2,
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
-    "visual": {
-      "model": "google/gemini-3-pro",
+    "visual-engineering": {
+      "model": "google/gemini-3-pro-preview",
       "prompt_append": "Use shadcn/ui components and Tailwind CSS."
     }
   }
 }
 ```
 
-Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`.
+Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`.
 
 ## Model Resolution System
 

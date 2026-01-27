@@ -118,6 +118,161 @@ describe("external-plugin-detector", () => {
     })
   })
 
+  describe("false positive prevention", () => {
+    test("should NOT match my-opencode-notifier-fork (suffix variation)", () => {
+      // #given - plugin with similar name but different suffix
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["my-opencode-notifier-fork"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+
+    test("should NOT match some-other-plugin/opencode-notifier-like (path with similar name)", () => {
+      // #given - plugin path containing similar substring
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["some-other-plugin/opencode-notifier-like"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+
+    test("should NOT match opencode-notifier-extended (prefix match but different package)", () => {
+      // #given - plugin with prefix match but extended name
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["opencode-notifier-extended"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+
+    test("should match opencode-notifier exactly", () => {
+      // #given - exact match
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["opencode-notifier"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match opencode-notifier@1.2.3 (version suffix)", () => {
+      // #given - version suffix
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["opencode-notifier@1.2.3"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match @mohak34/opencode-notifier (scoped package)", () => {
+      // #given - scoped package
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["@mohak34/opencode-notifier"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toContain("opencode-notifier")
+    })
+
+    test("should match npm:opencode-notifier (npm prefix)", () => {
+      // #given - npm prefix
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["npm:opencode-notifier"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match npm:opencode-notifier@2.0.0 (npm prefix with version)", () => {
+      // #given - npm prefix with version
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["npm:opencode-notifier@2.0.0"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match file:///path/to/opencode-notifier (file path)", () => {
+      // #given - file path
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["file:///home/user/plugins/opencode-notifier"] })
+      )
+
+      // #when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // #then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+  })
+
   describe("getNotificationConflictWarning", () => {
     test("should generate warning message with plugin name", () => {
       // #when

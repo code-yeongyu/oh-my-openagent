@@ -863,6 +863,20 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 \`\`\`markdown
 # {Plan Title}
 
+## TL;DR
+
+> **Quick Summary**: [1-2 sentences capturing the core objective and approach]
+> 
+> **Deliverables**: [Bullet list of concrete outputs]
+> - [Output 1]
+> - [Output 2]
+> 
+> **Estimated Effort**: [Quick | Short | Medium | Large | XL]
+> **Parallel Execution**: [YES - N waves | NO - sequential]
+> **Critical Path**: [Task X → Task Y → Task Z]
+
+---
+
 ## Context
 
 ### Original Request
@@ -963,29 +977,55 @@ Each TODO includes detailed verification procedures:
 
 ---
 
-## Task Flow
+## Execution Strategy
+
+### Parallel Execution Waves
+
+> Maximize throughput by grouping independent tasks into parallel waves.
+> Each wave completes before the next begins.
 
 \`\`\`
-Task 1 → Task 2 → Task 3
-              ↘ Task 4 (parallel)
+Wave 1 (Start Immediately):
+├── Task 1: [no dependencies]
+└── Task 5: [no dependencies]
+
+Wave 2 (After Wave 1):
+├── Task 2: [depends: 1]
+├── Task 3: [depends: 1]
+└── Task 6: [depends: 5]
+
+Wave 3 (After Wave 2):
+└── Task 4: [depends: 2, 3]
+
+Critical Path: Task 1 → Task 2 → Task 4
+Parallel Speedup: ~40% faster than sequential
 \`\`\`
 
-## Parallelization
+### Dependency Matrix
 
-| Group | Tasks | Reason |
-|-------|-------|--------|
-| A | 2, 3 | Independent files |
+| Task | Depends On | Blocks | Can Parallelize With |
+|------|------------|--------|---------------------|
+| 1 | None | 2, 3 | 5 |
+| 2 | 1 | 4 | 3, 6 |
+| 3 | 1 | 4 | 2, 6 |
+| 4 | 2, 3 | None | None (final) |
+| 5 | None | 6 | 1 |
+| 6 | 5 | None | 2, 3 |
 
-| Task | Depends On | Reason |
-|------|------------|--------|
-| 4 | 1 | Requires output from 1 |
+### Agent Dispatch Summary
+
+| Wave | Tasks | Recommended Agents |
+|------|-------|-------------------|
+| 1 | 1, 5 | delegate_task(category="...", load_skills=[...], run_in_background=true) |
+| 2 | 2, 3, 6 | dispatch parallel after Wave 1 completes |
+| 3 | 4 | final integration task |
 
 ---
 
 ## TODOs
 
 > Implementation + Test = ONE Task. Never separate.
-> Specify parallelizability for EVERY task.
+> EVERY task MUST have: Recommended Agent Profile + Parallelization info.
 
 - [ ] 1. [Task Title]
 
@@ -996,7 +1036,21 @@ Task 1 → Task 2 → Task 3
   **Must NOT do**:
   - [Specific exclusions from guardrails]
 
-  **Parallelizable**: YES (with 3, 4) | NO (depends on 0)
+  **Recommended Agent Profile**:
+  > Select category + skills based on task domain. Justify each choice.
+  - **Category**: \`[visual-engineering | ultrabrain | artistry | quick | unspecified-low | unspecified-high | writing]\`
+    - Reason: [Why this category fits the task domain]
+  - **Skills**: [\`skill-1\`, \`skill-2\`]
+    - \`skill-1\`: [Why needed - domain overlap explanation]
+    - \`skill-2\`: [Why needed - domain overlap explanation]
+  - **Skills Evaluated but Omitted**:
+    - \`omitted-skill\`: [Why domain doesn't overlap]
+
+  **Parallelization**:
+  - **Can Run In Parallel**: YES | NO
+  - **Parallel Group**: Wave N (with Tasks X, Y) | Sequential
+  - **Blocks**: [Tasks that depend on this task completing]
+  - **Blocked By**: [Tasks this depends on] | None (can start immediately)
 
   **References** (CRITICAL - Be Exhaustive):
 

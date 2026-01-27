@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
+import { isPlannerAgent } from "./constants"
 import { log } from "../../shared"
 import { isSystemDirective } from "../../shared/system-directive"
 import { getMainSessionID, getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
@@ -32,6 +33,10 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
       let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), currentAgent)
+
+      if (isPlannerAgent(currentAgent)) {
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+      }
 
       if (detectedKeywords.length === 0) {
         return

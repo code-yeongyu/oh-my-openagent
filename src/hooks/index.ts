@@ -33,9 +33,9 @@ export { createStartWorkHook } from "./start-work";
 export { createAtlasHook } from "./atlas";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
-// export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
-
-
 // Mnemosyne Memory System
 export { createMemoryInjectorHook } from "./memory-injector";
 export { createMemoryConsolidatorHook } from "./memory-consolidator";
+
+// export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
+
