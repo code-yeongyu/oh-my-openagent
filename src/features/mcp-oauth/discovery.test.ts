@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { discoverOAuthServerMetadata, resetDiscoveryCache } from "./discovery.ts"
+import { discoverOAuthServerMetadata, resetDiscoveryCache } from "./discovery"
 
 describe("discoverOAuthServerMetadata", () => {
   const originalFetch = globalThis.fetch

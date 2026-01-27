@@ -38,7 +38,8 @@ async function fetchMetadata(url: string): Promise<{ ok: true; json: Record<stri
 
 async function fetchAuthorizationServerMetadata(issuer: string, resource: string): Promise<OAuthServerMetadata> {
   const issuerUrl = parseHttpsUrl(issuer, "Authorization server URL")
-  const metadataUrl = new URL("/.well-known/oauth-authorization-server", issuerUrl).toString()
+  const issuerPath = issuerUrl.pathname.replace(/\/+$/, "")
+  const metadataUrl = new URL(`/.well-known/oauth-authorization-server${issuerPath}`, issuerUrl).toString()
   const metadata = await fetchMetadata(metadataUrl)
 
   if (!metadata.ok) {

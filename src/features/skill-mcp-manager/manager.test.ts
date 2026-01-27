@@ -650,7 +650,7 @@ describe("SkillMcpManager", () => {
       expect(headers?.Authorization).toBe("Bearer stored-access-token")
     })
 
-    it("does not inject Authorization header when no stored tokens exist", async () => {
+    it("does not inject Authorization header when no stored tokens exist and login fails", async () => {
       // #given
       const info: SkillMcpClientInfo = {
         serverName: "oauth-no-token",
@@ -664,6 +664,7 @@ describe("SkillMcpManager", () => {
         },
       }
       mockTokens.mockReturnValue(null)
+      mockLogin.mockRejectedValue(new Error("Login failed"))
 
       // #when
       try {

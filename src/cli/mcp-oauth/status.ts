@@ -1,26 +1,29 @@
-import { listAllTokens, listTokensByHost, loadToken } from "../../features/mcp-oauth/storage"
+import { listAllTokens, listTokensByHost } from "../../features/mcp-oauth/storage"
 
 export async function status(serverName: string | undefined): Promise<number> {
   try {
     if (serverName) {
-      const token = loadToken(serverName, serverName)
+      const tokens = listTokensByHost(serverName)
 
-      if (!token) {
+      if (Object.keys(tokens).length === 0) {
         console.log(`No tokens found for ${serverName}`)
         return 0
       }
 
       console.log(`OAuth Status for ${serverName}:`)
-      console.log(`  Access Token: ${token.accessToken.slice(0, 20)}...`)
-      if (token.refreshToken) {
-        console.log(`  Refresh Token: ${token.refreshToken.slice(0, 20)}...`)
-      }
-      if (token.expiresAt) {
-        const expiryDate = new Date(token.expiresAt * 1000)
-        const now = Date.now() / 1000
-        const isExpired = token.expiresAt < now
-        const tokenStatus = isExpired ? "EXPIRED" : "VALID"
-        console.log(`  Expiry: ${expiryDate.toISOString()} (${tokenStatus})`)
+      for (const [key, token] of Object.entries(tokens)) {
+        console.log(`  ${key}:`)
+        console.log(`    Access Token: ${token.accessToken.slice(0, 20)}...`)
+        if (token.refreshToken) {
+          console.log(`    Refresh Token: ${token.refreshToken.slice(0, 20)}...`)
+        }
+        if (token.expiresAt) {
+          const expiryDate = new Date(token.expiresAt * 1000)
+          const now = Date.now() / 1000
+          const isExpired = token.expiresAt < now
+          const tokenStatus = isExpired ? "EXPIRED" : "VALID"
+          console.log(`    Expiry: ${expiryDate.toISOString()} (${tokenStatus})`)
+        }
       }
       return 0
     }

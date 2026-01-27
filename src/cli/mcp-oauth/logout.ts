@@ -6,7 +6,13 @@ export interface LogoutOptions {
 
 export async function logout(serverName: string, options?: LogoutOptions): Promise<number> {
   try {
-    const serverUrl = options?.serverUrl ?? serverName
+    const serverUrl = options?.serverUrl
+    if (!serverUrl) {
+      console.error(`Error: --server-url is required for logout. Token storage uses server URLs, not names.`)
+      console.error(`  Usage: mcp oauth logout ${serverName} --server-url https://your-server.example.com`)
+      return 1
+    }
+
     const success = deleteToken(serverUrl, serverUrl)
 
     if (success) {

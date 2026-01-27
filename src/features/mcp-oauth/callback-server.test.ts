@@ -79,19 +79,34 @@ describe("startCallbackServer", () => {
     expect(response.status).toBe(404)
   })
 
-  it("returns 400 when code or state is missing", async () => {
+  it("returns 400 and rejects when code is missing", async () => {
     //#given
     server = await startCallbackServer()
+    const callbackRejection = server.waitForCallback().catch((e: Error) => e)
 
     //#when
-    const noCode = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?state=s`)
-    const noState = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?code=c`)
-    const neither = await fetch(`http://127.0.0.1:${server.port}/oauth/callback`)
+    const response = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?state=s`)
 
     //#then
-    expect(noCode.status).toBe(400)
-    expect(noState.status).toBe(400)
-    expect(neither.status).toBe(400)
+    expect(response.status).toBe(400)
+    const error = await callbackRejection
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain("missing code or state")
+  })
+
+  it("returns 400 and rejects when state is missing", async () => {
+    //#given
+    server = await startCallbackServer()
+    const callbackRejection = server.waitForCallback().catch((e: Error) => e)
+
+    //#when
+    const response = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?code=c`)
+
+    //#then
+    expect(response.status).toBe(400)
+    const error = await callbackRejection
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain("missing code or state")
   })
 
   it("close stops the server immediately", async () => {

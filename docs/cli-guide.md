@@ -187,7 +187,7 @@ bunx oh-my-opencode auth status
 
 ---
 
-## 7. Configuration Files
+## 8. Configuration Files
 
 The CLI searches for configuration files in the following locations (in priority order):
 
@@ -217,7 +217,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### "OpenCode version too old" Error
 
@@ -247,7 +247,7 @@ bunx oh-my-opencode doctor --category authentication
 
 ---
 
-## 9. Non-Interactive Mode
+## 10. Non-Interactive Mode
 
 Use the `--no-tui` option for CI/CD environments.
 
@@ -261,7 +261,7 @@ bunx oh-my-opencode doctor --json > doctor-report.json
 
 ---
 
-## 10. Developer Information
+## 11. Developer Information
 
 ### CLI Structure
 

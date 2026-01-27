@@ -235,7 +235,17 @@ export class SkillMcpManager {
     let authProvider: McpOAuthProvider | undefined
     if (config.oauth) {
       authProvider = this.getOrCreateAuthProvider(config.url, config.oauth)
-      const tokenData = authProvider.tokens()
+      let tokenData = authProvider.tokens()
+
+      const isExpired = tokenData?.expiresAt != null && tokenData.expiresAt < Math.floor(Date.now() / 1000)
+      if (!tokenData || isExpired) {
+        try {
+          tokenData = await authProvider.login()
+        } catch {
+          // Login failed — proceed without auth header
+        }
+      }
+
       if (tokenData) {
         const existingHeaders = (requestInit.headers ?? {}) as Record<string, string>
         requestInit.headers = {

@@ -83,10 +83,22 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
         return new Response("Not Found", { status: 404 })
       }
 
+      const oauthError = url.searchParams.get("error")
+      if (oauthError) {
+        const description = url.searchParams.get("error_description") ?? oauthError
+        clearTimeout(timeoutId)
+        rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
+        setTimeout(() => server.stop(true), 100)
+        return new Response(`Authorization failed: ${description}`, { status: 400 })
+      }
+
       const code = url.searchParams.get("code")
       const state = url.searchParams.get("state")
 
       if (!code || !state) {
+        clearTimeout(timeoutId)
+        rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
+        setTimeout(() => server.stop(true), 100)
         return new Response("Missing code or state parameter", { status: 400 })
       }
 

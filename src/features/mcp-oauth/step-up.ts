@@ -6,11 +6,13 @@ export interface StepUpInfo {
 
 export function parseWwwAuthenticate(header: string): StepUpInfo | null {
   const trimmed = header.trim()
-  if (!trimmed.toLowerCase().startsWith("bearer")) {
+  const lowerHeader = trimmed.toLowerCase()
+  const bearerIndex = lowerHeader.indexOf("bearer")
+  if (bearerIndex === -1) {
     return null
   }
 
-  const params = trimmed.slice("bearer".length).trim()
+  const params = trimmed.slice(bearerIndex + "bearer".length).trim()
   if (params.length === 0) {
     return null
   }

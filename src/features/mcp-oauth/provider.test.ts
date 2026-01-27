@@ -133,7 +133,7 @@ describe("McpOAuthProvider", () => {
       const provider = new McpOAuthProvider(options)
 
       //#then
-      expect(provider.redirectUrl()).toBe("http://127.0.0.1:8912/callback")
+      expect(provider.redirectUrl()).toBe("http://127.0.0.1:19877/callback")
     })
   })
 
@@ -217,7 +217,7 @@ describe("McpOAuthProvider", () => {
       const url = provider.redirectUrl()
 
       //#then
-      expect(url).toBe("http://127.0.0.1:8912/callback")
+      expect(url).toBe("http://127.0.0.1:19877/callback")
     })
   })
 })

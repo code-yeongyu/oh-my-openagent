@@ -41,7 +41,7 @@ export async function checkMcpOAuthTokens(): Promise<CheckResult> {
     }
   }
 
-  const now = Date.now()
+  const now = Math.floor(Date.now() / 1000)
   const tokens = Object.entries(store)
   const expiredTokens = tokens.filter(
     ([, token]) => token.expiresAt && token.expiresAt < now

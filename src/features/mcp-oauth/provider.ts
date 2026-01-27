@@ -7,6 +7,7 @@ import { discoverOAuthServerMetadata } from "./discovery"
 import type { OAuthServerMetadata } from "./discovery"
 import { getOrRegisterClient } from "./dcr"
 import type { ClientCredentials, ClientRegistrationStorage } from "./dcr"
+import { findAvailablePort } from "./callback-server"
 
 export type McpOAuthProviderOptions = {
   serverUrl: string
@@ -54,19 +55,26 @@ function buildAuthorizationUrl(
   return url.toString()
 }
 
+const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
+
 function startCallbackServer(port: number): Promise<CallbackResult> {
   return new Promise((resolve, reject) => {
+    let timeoutId: ReturnType<typeof setTimeout>
+
     const server = createServer((request, response) => {
+      clearTimeout(timeoutId)
+
       const requestUrl = new URL(request.url ?? "/", `http://localhost:${port}`)
       const code = requestUrl.searchParams.get("code")
       const state = requestUrl.searchParams.get("state")
       const error = requestUrl.searchParams.get("error")
 
       if (error) {
+        const errorDescription = requestUrl.searchParams.get("error_description") ?? error
         response.writeHead(400, { "content-type": "text/html" })
         response.end("<html><body><h1>Authorization failed</h1></body></html>")
         server.close()
-        reject(new Error(`OAuth authorization error: ${error}`))
+        reject(new Error(`OAuth authorization error: ${errorDescription}`))
         return
       }
 
@@ -84,19 +92,41 @@ function startCallbackServer(port: number): Promise<CallbackResult> {
       resolve({ code, state })
     })
 
+    timeoutId = setTimeout(() => {
+      server.close()
+      reject(new Error("OAuth callback timed out after 5 minutes"))
+    }, CALLBACK_TIMEOUT_MS)
+
     server.listen(port, "127.0.0.1")
-    server.on("error", reject)
+    server.on("error", (err) => {
+      clearTimeout(timeoutId)
+      reject(err)
+    })
   })
 }
 
 function openBrowser(url: string): void {
   const platform = process.platform
+  let cmd: string
+  let args: string[]
+
   if (platform === "darwin") {
-    spawn("open", [url], { stdio: "ignore", detached: true }).unref()
+    cmd = "open"
+    args = [url]
   } else if (platform === "win32") {
-    spawn("explorer", [url], { stdio: "ignore", detached: true }).unref()
+    cmd = "explorer"
+    args = [url]
   } else {
-    spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref()
+    cmd = "xdg-open"
+    args = [url]
+  }
+
+  try {
+    const child = spawn(cmd, args, { stdio: "ignore", detached: true })
+    child.on("error", () => {})
+    child.unref()
+  } catch {
+    // Browser open failed — user must navigate manually
   }
 }
 
@@ -106,7 +136,7 @@ export class McpOAuthProvider {
   private readonly scopes: string[]
   private storedCodeVerifier: string | null = null
   private storedClientInfo: ClientCredentials | null = null
-  private callbackPort = 8912
+  private callbackPort: number | null = null
 
   constructor(options: McpOAuthProviderOptions) {
     this.serverUrl = options.serverUrl
@@ -123,11 +153,17 @@ export class McpOAuthProvider {
   }
 
   clientInformation(): ClientCredentials | null {
-    return this.storedClientInfo
+    if (this.storedClientInfo) return this.storedClientInfo
+    const tokenData = this.tokens()
+    if (tokenData?.clientInfo) {
+      this.storedClientInfo = tokenData.clientInfo
+      return this.storedClientInfo
+    }
+    return null
   }
 
   redirectUrl(): string {
-    return `http://127.0.0.1:${this.callbackPort}/callback`
+    return `http://127.0.0.1:${this.callbackPort ?? 19877}/callback`
   }
 
   saveCodeVerifier(verifier: string): void {
@@ -147,6 +183,10 @@ export class McpOAuthProvider {
     const clientInfo = this.clientInformation()
     if (!clientInfo) {
       throw new Error("No client information available. Run login() or register a client first.")
+    }
+
+    if (this.callbackPort === null) {
+      this.callbackPort = await findAvailablePort()
     }
 
     const authUrl = buildAuthorizationUrl(metadata.authorizationEndpoint, {
