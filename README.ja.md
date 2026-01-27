@@ -39,6 +39,11 @@
 
 > `oh-my-opencode` をインストールして、ドーピングしたかのようにコーディングしましょう。バックグラウンドでエージェントを走らせ、oracle、librarian、frontend engineer のような専門エージェントを呼び出してください。丹精込めて作られた LSP/AST ツール、厳選された MCP、そして完全な Claude Code 互換レイヤーを、たった一行で手に入れましょう。
 
+> [!TIP]
+> **より軽量なバージョンをお探しですか？**
+>
+> [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) をチェックしてください - 最小限の設定を好む方のための、必須機能のみを備えたストリームライン化されたフォークです。
+
 # Claude OAuth アクセスに関するお知らせ
 
 ## TL;DR
