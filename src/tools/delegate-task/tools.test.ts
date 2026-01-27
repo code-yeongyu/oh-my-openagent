@@ -201,6 +201,56 @@ describe("sisyphus-task", () => {
       // #then proceeds without error - uses fallback chain
       expect(result).not.toContain("oh-my-opencode requires a default model")
     })
+
+    test("returns clear error when no model can be resolved", async () => {
+      // #given - custom category with no model, no systemDefaultModel, no available models
+      const { createDelegateTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({ id: "task-123" }) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) }, // No model configured
+        model: { list: async () => [] }, // No available models
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+      
+      // Custom category with no model defined
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "custom-no-model": { temperature: 0.5 }, // No model field
+        },
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when delegating with a custom category that has no model
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "custom-no-model",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then returns clear error message with configuration guidance
+      expect(result).toContain("Model not configured")
+      expect(result).toContain("custom-no-model")
+      expect(result).toContain("Configure in one of")
+    })
   })
 
   describe("resolveCategoryConfig", () => {
