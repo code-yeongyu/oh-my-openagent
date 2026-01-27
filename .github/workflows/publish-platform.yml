@@ -111,3 +111,27 @@ jobs:
           npm publish --access public $TAG_ARG
         env:
           NPM_CONFIG_PROVENANCE: false
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publish
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
+          VERSION="${{ inputs.version }}"
+
+          echo "Verifying ${PKG_NAME}@${VERSION} is available on npm..."
+
+          # Wait for npm registry to propagate (up to 60 seconds)
+          for i in {1..12}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ ${PKG_NAME}@${VERSION} successfully published and verified"
+              exit 0
+            fi
+            echo "  Attempt $i/12: waiting for npm registry propagation..."
+            sleep 5
+          done
+
+          echo "✗ ERROR: ${PKG_NAME}@${VERSION} not found on npm after publishing"
+          echo "  This may indicate a publish failure. Please check npm logs."
+          exit 1
