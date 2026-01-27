@@ -21,7 +21,7 @@ mcp/
 | Name | URL | Purpose | Auth |
 |------|-----|---------|------|
 | websearch | mcp.exa.ai/mcp?tools=web_search_exa | Real-time web search | EXA_API_KEY |
-| context7 | mcp.context7.com/mcp | Library docs | None |
+| context7 | mcp.context7.com/mcp | Library docs | CONTEXT7_API_KEY |
 | grep_app | mcp.grep.app | GitHub code search | None |
 
 ## THREE-TIER MCP SYSTEM
@@ -61,4 +61,5 @@ const mcps = createBuiltinMcps(["websearch"])  // Disable specific
 
 - **Remote only**: HTTP/SSE, no stdio
 - **Disable**: User can set `disabled_mcps: ["name"]` in config
-- **Exa**: Requires `EXA_API_KEY` env var
+- **Context7**: Optional auth using `CONTEXT7_API_KEY` env var
+- **Exa**: Optional auth using `EXA_API_KEY` env var
