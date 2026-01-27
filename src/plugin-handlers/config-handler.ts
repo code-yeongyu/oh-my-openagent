@@ -306,8 +306,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { ...agentConfig["prometheus"], name: "plan", mode: "subagent" as const }
+      const prometheusModel = (agentConfig["prometheus"] as { model?: string })?.model;
+      const planConfigModel = (configAgent?.plan as { model?: string })?.model;
+      const planDemoteConfig = replacePlan && (planConfigModel || prometheusModel)
+        ? { 
+            ...configAgent?.plan,
+            model: planConfigModel || prometheusModel,
+            name: "plan", 
+            mode: "subagent" as const 
+          }
         : undefined;
 
       config.agent = {
