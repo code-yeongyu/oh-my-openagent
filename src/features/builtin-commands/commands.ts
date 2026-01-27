@@ -4,6 +4,7 @@ import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { MEMORY_DASHBOARD_TEMPLATE } from "./templates/memory-dashboard"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -69,6 +70,12 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[plan-name]",
+  },
+  "memory-dashboard": {
+    description: "(builtin) Generate visual dashboard for Mnemosyne memory system",
+    template: `<command-instruction>
+${MEMORY_DASHBOARD_TEMPLATE}
+</command-instruction>`,
   },
 }
 
