@@ -55,6 +55,8 @@ const mockContext = {
   messageID: "msg-1",
   agent: "test-agent",
   abort: new AbortController().signal,
+  metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
+  ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
 }
 
 describe("skill tool - synchronous description", () => {
