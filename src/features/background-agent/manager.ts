@@ -297,11 +297,19 @@ export class BackgroundManager {
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
     // Include model if caller provided one (e.g., from Sisyphus category configs)
+    // IMPORTANT: variant must be a top-level field in the body, NOT nested inside model
+    // OpenCode's PromptInput schema expects: { model: { providerID, modelID }, variant: "max" }
+    const launchModel = input.model
+      ? { providerID: input.model.providerID, modelID: input.model.modelID }
+      : undefined
+    const launchVariant = input.model?.variant
+
     this.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: input.agent,
-        ...(input.model ? { model: input.model } : {}),
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
         tools: {
           ...getAgentToolRestrictions(input.agent),
@@ -545,11 +553,18 @@ export class BackgroundManager {
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop
     // Include model if task has one (preserved from original launch with category config)
+    // variant must be top-level in body, not nested inside model (OpenCode PromptInput schema)
+    const resumeModel = existingTask.model
+      ? { providerID: existingTask.model.providerID, modelID: existingTask.model.modelID }
+      : undefined
+    const resumeVariant = existingTask.model?.variant
+
     this.client.session.prompt({
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
-        ...(existingTask.model ? { model: existingTask.model } : {}),
+        ...(resumeModel ? { model: resumeModel } : {}),
+        ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: {
           ...getAgentToolRestrictions(existingTask.agent),
           task: false,
