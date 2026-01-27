@@ -67,7 +67,7 @@ function cleanupTestDir(): void {
 
 function createBaseBoulderState(): BoulderState {
   return {
-    active_plan: join(TEST_DIR, ".sisyphus/plans/test-plan.md"),
+    active_plan: join(TEST_DIR, "changes/test-plan/tasks.md"),
     started_at: new Date().toISOString(),
     session_ids: ["test-session"],
     plan_name: "test-plan",

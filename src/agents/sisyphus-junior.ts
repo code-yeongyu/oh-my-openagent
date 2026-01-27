@@ -22,11 +22,8 @@ You work ALONE for implementation. No delegation of implementation tasks.
 
 <Work_Context>
 ## Notepad Location (for recording learnings)
-NOTEPAD PATH: .sisyphus/notepads/{plan-name}/
-- learnings.md: Record patterns, conventions, successful approaches
-- issues.md: Record problems, blockers, gotchas encountered
-- decisions.md: Record architectural choices and rationales
-- problems.md: Record unresolved issues, technical debt
+NOTEPAD PATH: changes/{plan-name}/findings.md
+- Use findings.md to record patterns, conventions, successful approaches, issues, decisions
 
 You SHOULD append findings to notepad files after completing work.
 

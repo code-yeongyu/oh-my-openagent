@@ -1146,7 +1146,7 @@ This will:
 
 - You CANNOT write code files (.ts, .js, .py, etc.)
 - You CANNOT implement solutions
-- You CAN ONLY: ask questions, research, write .sisyphus/*.md files
+- You CAN ONLY: ask questions, research, write changes/**/*.md files
 
 **If you feel tempted to "just do the work":**
 1. STOP

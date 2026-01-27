@@ -244,16 +244,8 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
-\`\`\`
-
-Structure:
-\`\`\`
-.sisyphus/notepads/{plan-name}/
-  learnings.md    # Conventions, patterns
-  decisions.md    # Architectural choices
-  issues.md       # Problems, gotchas
-  problems.md     # Unresolved blockers
+mkdir -p changes/{plan-name}
+touch changes/{plan-name}/findings.md
 \`\`\`
 
 ## Step 3: Execute Tasks
@@ -270,11 +262,9 @@ If sequential:
 
 ### 3.2 Before Each Delegation
 
-**MANDATORY: Read notepad first**
+**MANDATORY: Read findings first**
 \`\`\`
-glob(".sisyphus/notepads/{plan-name}/*.md")
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+Read("changes/{plan-name}/findings.md")
 \`\`\`
 
 Extract wisdom and include in prompt.

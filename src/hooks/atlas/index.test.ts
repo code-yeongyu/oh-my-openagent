@@ -427,7 +427,7 @@ describe("atlas hook", () => {
         const output = {
           title: "Write",
           output: originalOutput,
-          metadata: { filePath: "/project/.sisyphus/plans/work-plan.md" },
+          metadata: { filePath: "/project/.sisyphus/boulder.json" },
         }
 
         // #when

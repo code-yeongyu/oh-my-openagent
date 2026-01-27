@@ -352,7 +352,7 @@ Some notes here
   describe("getPlanName", () => {
     test("should extract plan name from path", () => {
       // #given
-      const path = "/home/user/.sisyphus/plans/project/my-feature.md"
+      const path = "/home/user/changes/project/my-feature.md"
       // #when
       const name = getPlanName(path)
       // #then

@@ -100,7 +100,8 @@
           "plan-reorganizer",
           "plan-update-reminder",
           "plan-attention-refresher",
-          "mdsel-reminder"
+          "mdsel-reminder",
+          "mdsel-enforcer"
         ]
       }
     },
