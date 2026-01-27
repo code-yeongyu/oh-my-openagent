@@ -254,7 +254,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           name: "prometheus",
           ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(variantToUse ? { variant: variantToUse } : {}),
-          mode: "primary" as const,
+          mode: "all" as const,
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
@@ -306,12 +306,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const prometheusModel = (agentConfig["prometheus"] as { model?: string })?.model;
-      const planConfigModel = (configAgent?.plan as { model?: string })?.model;
-      const planDemoteConfig = replacePlan && (planConfigModel || prometheusModel)
+      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
         ? { 
-            ...configAgent?.plan,
-            model: planConfigModel || prometheusModel,
+            ...agentConfig["prometheus"],
             name: "plan", 
             mode: "subagent" as const 
           }
