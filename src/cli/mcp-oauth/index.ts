@@ -22,8 +22,9 @@ export function createMcpOAuthCommand(): Command {
   oauth
     .command("logout <server-name>")
     .description("Remove stored OAuth tokens for an MCP server")
-    .action(async (serverName: string) => {
-      const exitCode = await logout(serverName)
+    .option("--server-url <url>", "OAuth server URL (use if server name differs from URL)")
+    .action(async (serverName: string, options) => {
+      const exitCode = await logout(serverName, options)
       process.exit(exitCode)
     })
 

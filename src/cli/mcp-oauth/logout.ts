@@ -1,8 +1,13 @@
 import { deleteToken } from "../../features/mcp-oauth/storage"
 
-export async function logout(serverName: string): Promise<number> {
+export interface LogoutOptions {
+  serverUrl?: string
+}
+
+export async function logout(serverName: string, options?: LogoutOptions): Promise<number> {
   try {
-    const success = deleteToken(serverName, serverName)
+    const serverUrl = options?.serverUrl ?? serverName
+    const success = deleteToken(serverUrl, serverUrl)
 
     if (success) {
       console.log(`✓ Successfully removed tokens for ${serverName}`)

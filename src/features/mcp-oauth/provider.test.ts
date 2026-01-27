@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
 import { McpOAuthProvider, generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl } from "./provider"

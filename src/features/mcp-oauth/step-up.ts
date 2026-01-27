@@ -44,9 +44,15 @@ export function parseWwwAuthenticate(header: string): StepUpInfo | null {
 }
 
 function extractParam(params: string, name: string): string | null {
-  const pattern = new RegExp(`${name}="([^"]*)"`)
-  const match = pattern.exec(params)
-  return match?.[1] ?? null
+  const quotedPattern = new RegExp(`${name}="([^"]*)"`)
+  const quotedMatch = quotedPattern.exec(params)
+  if (quotedMatch) {
+    return quotedMatch[1]
+  }
+
+  const unquotedPattern = new RegExp(`${name}=([^\\s,]+)`)
+  const unquotedMatch = unquotedPattern.exec(params)
+  return unquotedMatch?.[1] ?? null
 }
 
 export function mergeScopes(existing: string[], required: string[]): string[] {

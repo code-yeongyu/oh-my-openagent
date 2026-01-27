@@ -1,8 +1,6 @@
-// @ts-nocheck
-
 import { createHash, randomBytes } from "node:crypto"
 import { createServer } from "node:http"
-import { exec } from "node:child_process"
+import { spawn } from "node:child_process"
 import type { OAuthTokenData } from "./storage"
 import { loadToken, saveToken } from "./storage"
 import { discoverOAuthServerMetadata } from "./discovery"
@@ -75,6 +73,8 @@ function startCallbackServer(port: number): Promise<CallbackResult> {
       if (!code || !state) {
         response.writeHead(400, { "content-type": "text/html" })
         response.end("<html><body><h1>Missing code or state</h1></body></html>")
+        server.close()
+        reject(new Error("OAuth callback missing code or state parameter"))
         return
       }
 
@@ -90,7 +90,14 @@ function startCallbackServer(port: number): Promise<CallbackResult> {
 }
 
 function openBrowser(url: string): void {
-  exec(`open "${url}"`)
+  const platform = process.platform
+  if (platform === "darwin") {
+    spawn("open", [url], { stdio: "ignore", detached: true }).unref()
+  } else if (platform === "win32") {
+    spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true }).unref()
+  } else {
+    spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref()
+  }
 }
 
 export class McpOAuthProvider {

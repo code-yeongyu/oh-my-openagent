@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { getOpenCodeConfigDir } from "../../shared"
@@ -148,4 +146,8 @@ export function listTokensByHost(serverHost: string): TokenStore {
   }
 
   return result
+}
+
+export function listAllTokens(): TokenStore {
+  return readStore() ?? {}
 }

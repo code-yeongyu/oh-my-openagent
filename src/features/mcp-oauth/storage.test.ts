@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -7,6 +5,7 @@ import { tmpdir } from "node:os"
 import {
   deleteToken,
   getMcpOauthStoragePath,
+  listAllTokens,
   listTokensByHost,
   loadToken,
   saveToken,
@@ -15,8 +14,10 @@ import type { OAuthTokenData } from "./storage"
 
 describe("mcp-oauth storage", () => {
   const TEST_CONFIG_DIR = join(tmpdir(), "mcp-oauth-test-" + Date.now())
+  let originalConfigDir: string | undefined
 
   beforeEach(() => {
+    originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
     if (!existsSync(TEST_CONFIG_DIR)) {
       mkdirSync(TEST_CONFIG_DIR, { recursive: true })
@@ -24,7 +25,11 @@ describe("mcp-oauth storage", () => {
   })
 
   afterEach(() => {
-    delete process.env.OPENCODE_CONFIG_DIR
+    if (originalConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+    }
     if (existsSync(TEST_CONFIG_DIR)) {
       rmSync(TEST_CONFIG_DIR, { recursive: true, force: true })
     }

@@ -545,11 +545,12 @@ export class SkillMcpManager {
       return false
     }
 
-    const provider = this.getOrCreateAuthProvider(config.url, config.oauth)
-
     const currentScopes = config.oauth.scopes ?? []
     const merged = mergeScopes(currentScopes, stepUp.requiredScopes)
     config.oauth.scopes = merged
+
+    this.authProviders.delete(config.url)
+    const provider = this.getOrCreateAuthProvider(config.url, config.oauth)
 
     try {
       await provider.login()

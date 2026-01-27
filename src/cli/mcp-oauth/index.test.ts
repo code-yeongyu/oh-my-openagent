@@ -1,17 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, it, expect } from "bun:test"
 import { Command } from "commander"
 import { createMcpOAuthCommand } from "./index"
 
 describe("mcp oauth command", () => {
-  let program: Command
-
-  beforeEach(() => {
-    program = new Command()
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
 
   describe("command structure", () => {
     it("creates mcp command group with oauth subcommand", () => {
@@ -63,7 +54,7 @@ describe("mcp oauth command", () => {
 
       // when
       const options = loginCommand?.options ?? []
-      const serverUrlOption = options.find((opt: any) => opt.long === "--server-url")
+      const serverUrlOption = options.find((opt: { long?: string }) => opt.long === "--server-url")
 
       // then
       expect(serverUrlOption).toBeDefined()
@@ -77,7 +68,7 @@ describe("mcp oauth command", () => {
 
       // when
       const options = loginCommand?.options ?? []
-      const clientIdOption = options.find((opt: any) => opt.long === "--client-id")
+      const clientIdOption = options.find((opt: { long?: string }) => opt.long === "--client-id")
 
       // then
       expect(clientIdOption).toBeDefined()
@@ -91,7 +82,7 @@ describe("mcp oauth command", () => {
 
       // when
       const options = loginCommand?.options ?? []
-      const scopesOption = options.find((opt: any) => opt.long === "--scopes")
+      const scopesOption = options.find((opt: { long?: string }) => opt.long === "--scopes")
 
       // then
       expect(scopesOption).toBeDefined()
