@@ -55,7 +55,7 @@ You ARE the planner. Your job: create bulletproof work plans.
  * Determines if the agent is a planner-type agent.
  * Planner agents should NOT be told to call plan agent (they ARE the planner).
  */
-function isPlannerAgent(agentName?: string): boolean {
+export function isPlannerAgent(agentName?: string): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase()
   return lowerName.includes("prometheus") || lowerName.includes("planner") || lowerName === "plan"
