@@ -34,6 +34,7 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
+  createSubagentQuestionBlockerHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -224,6 +225,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
+  const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
@@ -555,6 +557,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
       await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
