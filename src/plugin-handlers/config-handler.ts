@@ -133,16 +133,20 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     ];
 
     const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
+    // config.model represents the currently active model in OpenCode (including UI selection)
+    // Pass it as uiSelectedModel so it takes highest priority in model resolution
+    const currentModel = config.model as string | undefined;
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
       ctx.directory,
-      config.model as string | undefined,
+      undefined, // systemDefaultModel - let fallback chain handle this
       pluginConfig.categories,
       pluginConfig.git_master,
       allDiscoveredSkills,
       ctx.client,
-      browserProvider
+      browserProvider,
+      currentModel // uiSelectedModel - takes highest priority
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -225,7 +229,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & { category?: string; model?: string; variant?: string })
             | undefined;
-        const defaultModel = config.model as string | undefined;
 
         const categoryConfig = prometheusOverride?.category
           ? resolveCategoryConfig(
@@ -241,10 +244,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           : new Set<string>();
 
         const modelResolution = resolveModelWithFallback({
+          uiSelectedModel: currentModel,
           userModel: prometheusOverride?.model ?? categoryConfig?.model,
           fallbackChain: prometheusRequirement?.fallbackChain,
           availableModels,
-          systemDefaultModel: defaultModel ?? "",
+          systemDefaultModel: undefined, // let fallback chain handle this
         });
         const resolvedModel = modelResolution?.model;
         const resolvedVariant = modelResolution?.variant;
