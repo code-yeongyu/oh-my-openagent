@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress, PhaseStatus, TaskPhaseInfo, TaskPhaseStatus } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR, LEGACY_CHANGES_DIR } from "./constants"
+import { BOULDER_DIR, BOULDER_FILE, CHANGES_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -74,18 +74,14 @@ export function clearBoulderState(directory: string): boolean {
 
 /**
  * Find Prometheus plan files for this project.
- * Searches in changes/ directory (primary location):
- * 1. {project}/changes/{name}/tasks.md (standard format)
- * 2. {project}/.sisyphus/plans/{name}.md (deprecated, for backward compat only)
- * 
- * Plans from changes/ take priority.
+ * Searches in changes/ directory:
+ * - {project}/changes/{name}/tasks.md (standard format)
  */
 export function findPrometheusPlans(directory: string): string[] {
   const plans: string[] = []
-  const seenNames = new Set<string>()
 
-  // 1. Search changes/*/tasks.md (PRIMARY - this is the correct location)
-  const changesDir = join(directory, LEGACY_CHANGES_DIR)
+  // Search changes/*/tasks.md
+  const changesDir = join(directory, CHANGES_DIR)
   if (existsSync(changesDir)) {
     try {
       const subdirs = readdirSync(changesDir, { withFileTypes: true })
@@ -93,30 +89,7 @@ export function findPrometheusPlans(directory: string): string[] {
         if (dirent.isDirectory()) {
           const tasksPath = join(changesDir, dirent.name, "tasks.md")
           if (existsSync(tasksPath)) {
-            const planName = dirent.name.toLowerCase()
             plans.push(tasksPath)
-            seenNames.add(planName)
-          }
-        }
-      }
-    } catch {
-      // Ignore errors reading directory
-    }
-  }
-
-  // 2. Search .sisyphus/plans/*.md (DEPRECATED - backward compat only)
-  const sisyphusPlansDir = join(directory, PROMETHEUS_PLANS_DIR)
-  if (existsSync(sisyphusPlansDir)) {
-    try {
-      const files = readdirSync(sisyphusPlansDir)
-      for (const f of files) {
-        if (f.endsWith(".md")) {
-          const planPath = join(sisyphusPlansDir, f)
-          const planName = basename(f, ".md").toLowerCase()
-          // Only add if not already found in changes/
-          if (!seenNames.has(planName)) {
-            plans.push(planPath)
-            seenNames.add(planName)
           }
         }
       }

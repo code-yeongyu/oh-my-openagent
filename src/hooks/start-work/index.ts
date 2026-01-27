@@ -238,7 +238,7 @@ Looking for new plans...`
 
 ## No Plans Found
 
-No Prometheus plan files found at .sisyphus/plans/
+No plan files found in changes/ directory.
 Use Prometheus to create a work plan first: /plan "your task"`
         } else if (incompletePlans.length === 0) {
           contextInfo += `

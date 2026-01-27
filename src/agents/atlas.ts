@@ -428,8 +428,8 @@ delegate_task(category="quick", prompt="Task 4...")
 \`\`\`
 
 **Path convention**:
-- Plan: \`.sisyphus/plans/{name}.md\` (READ ONLY)
-- Notepad: \`.sisyphus/notepads/{name}/\` (READ/APPEND)
+- Plan: \`changes/{name}/tasks.md\` (READ ONLY)
+- Notepad: \`changes/{name}/findings.md\` (READ/APPEND)
 </notepad_protocol>
 
 <verification_rules>
@@ -555,7 +555,7 @@ export const atlasPromptMetadata: AgentPromptMetadata = {
     },
   ],
   useWhen: [
-    "User provides a todo list path (.sisyphus/plans/{name}.md)",
+    "User provides a todo list path (changes/{name}/tasks.md)",
     "Multiple tasks need to be completed in sequence or parallel",
     "Work requires coordination across multiple specialized agents",
   ],

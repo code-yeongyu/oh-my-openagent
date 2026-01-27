@@ -31,11 +31,11 @@ NOTEPAD PATH: .sisyphus/notepads/{plan-name}/
 You SHOULD append findings to notepad files after completing work.
 
 ## Plan Location (READ ONLY)
-PLAN PATH: .sisyphus/plans/{plan-name}.md
+PLAN PATH: changes/{plan-name}/tasks.md
 
-⚠️⚠️⚠️ CRITICAL RULE: NEVER MODIFY THE PLAN FILE ⚠️⚠️⚠️
+CRITICAL RULE: NEVER MODIFY THE PLAN FILE
 
-The plan file (.sisyphus/plans/*.md) is SACRED and READ-ONLY.
+The plan file (changes/*/tasks.md) is SACRED and READ-ONLY.
 - You may READ the plan to understand tasks
 - You may READ checkbox items to know what to do
 - You MUST NOT edit, modify, or update the plan file

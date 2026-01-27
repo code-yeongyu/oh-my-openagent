@@ -569,7 +569,8 @@ export function createTodoContinuationEnforcer(
       // Check 1.7: Plan progress check (File is Source of Truth)
       // Priority: boulder.phase === "completed" > tasks.md > OpenCode todos
       // Note: tasks.md is used as fallback when OpenCode todos API returns empty
-      const planProgress = readPlanProgress(ctx.directory)
+      // IMPORTANT: Only read plan progress if boulder has an active plan
+      const planProgress = boulderState?.active_plan ? readPlanProgress(ctx.directory) : null
       const planSource = planProgress
         ? {
             incompleteCount: Math.max(planProgress.total - planProgress.completed, 0),
@@ -734,7 +735,9 @@ export function createTodoContinuationEnforcer(
       // Calculate incomplete counts from both sources
       const apiIncompleteCount = todos ? getIncompleteCount(todos) : 0
       const fileIncompleteCount = planSource?.incompleteCount ?? 0
-      const hasIncomplete = apiIncompleteCount > 0 || fileIncompleteCount > 0
+      // IMPORTANT: Only use fileIncompleteCount if boulder has an active plan
+      // This prevents triggering continuation when no work session is active
+      const hasIncomplete = apiIncompleteCount > 0 || (boulderState?.active_plan && fileIncompleteCount > 0)
 
       // Check if all tasks are complete (both sources agree)
       if (!hasIncomplete) {
