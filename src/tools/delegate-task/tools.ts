@@ -936,7 +936,8 @@ To continue this session: session_id="${task.sessionID}"`
                 question: false,
               },
               parts: [{ type: "text", text: args.prompt }],
-              ...(categoryModel ? { model: categoryModel } : {}),
+              ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+              ...(categoryModel?.variant ? { variant: categoryModel.variant } : {}),
             },
           })
         } catch (promptError) {
