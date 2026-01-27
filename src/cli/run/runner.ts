@@ -31,8 +31,18 @@ export async function run(options: RunOptions): Promise<number> {
   }
 
   try {
+    // Support custom OpenCode server port via environment variable
+    // This allows Open Agent and other orchestrators to run multiple
+    // concurrent missions without port conflicts
+    const serverPort = process.env.OPENCODE_SERVER_PORT
+      ? parseInt(process.env.OPENCODE_SERVER_PORT, 10)
+      : undefined
+    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || undefined
+
     const { client, server } = await createOpencode({
       signal: abortController.signal,
+      ...(serverPort && !isNaN(serverPort) ? { port: serverPort } : {}),
+      ...(serverHostname ? { hostname: serverHostname } : {}),
     })
 
     const cleanup = () => {
