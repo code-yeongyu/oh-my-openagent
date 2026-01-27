@@ -224,7 +224,10 @@ export class BackgroundManager {
       body: {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
-      },
+        permission: [
+          { permission: "question", action: "deny" as const, pattern: "*" },
+        ],
+      } as any,
       query: {
         directory: parentDirectory,
       },
