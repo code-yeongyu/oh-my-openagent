@@ -47,11 +47,14 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run tests that use mock.module() separately to avoid pollution
+          # Run tests that use mock.module() in isolated processes first
           bun test src/plugin-handlers/config-handler.test.ts
           bun test src/hooks/compaction-context-injector/index.test.ts
-          # Run all other tests (excluding already-run mock-heavy files)
-          bun test --ignore '**/config-handler.test.ts' --ignore '**/compaction-context-injector/index.test.ts'
+          # Run remaining tests (find all test files, exclude mock-heavy ones, run in single batch)
+          find src -name '*.test.ts' \
+            ! -path '**/config-handler.test.ts' \
+            ! -path '**/compaction-context-injector/index.test.ts' \
+            | xargs bun test
 
   typecheck:
     runs-on: ubuntu-latest
