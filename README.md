@@ -39,6 +39,11 @@
 
 > This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like oracle, librarian, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
+> [!TIP]
+> **Looking for a lighter version?**
+>
+> Check out [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) - a streamlined fork with essential features for those who prefer a minimal setup.
+
 # Claude OAuth Access Notice
 
 ## TL;DR

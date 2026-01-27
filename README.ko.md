@@ -39,6 +39,11 @@
 
 > 이것은 코딩을 스테로이드로 만드는 것 — 실제로 작동하는 `oh-my-opencode`입니다. 백그라운드 에이전트 실행, 오라클, 라이브러리언, 프론트엔드 엔지니어와 같은 전문 에이전트 호출. 정교하게 제작된 LSP/AST 도구, 큐레이팅된 MCP, 완전한 Claude Code 호환 계층 사용.
 
+> [!TIP]
+> **더 가벼운 버전을 찾고 계신가요?**
+>
+> [oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim)을 확인해보세요 - 최소 설정을 선호하는 분들을 위한 필수 기능만 갖춘 간소화된 포크입니다.
+
 # Claude OAuth 액세스 공지
 
 ## TL;DR
