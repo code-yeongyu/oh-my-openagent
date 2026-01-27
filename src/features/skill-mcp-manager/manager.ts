@@ -19,6 +19,17 @@ interface ManagedClientBase {
   skillName: string
   lastUsedAt: number
   connectionType: ConnectionType
+  errorRateTracker?: ErrorRateTracker
+}
+
+/**
+ * Tracks error rate to detect runaway MCP processes that flood stdout with garbage.
+ * If error rate exceeds threshold, the client should be killed.
+ */
+interface ErrorRateTracker {
+  count: number
+  windowStart: number
+  killed: boolean
 }
 
 interface ManagedStdioClient extends ManagedClientBase {
@@ -304,12 +315,41 @@ export class SkillMcpManager {
       )
     }
 
+    const errorRateTracker: ErrorRateTracker = {
+      count: 0,
+      windowStart: Date.now(),
+      killed: false,
+    }
+
+    const originalOnerror = transport.onerror
+    transport.onerror = (error: Error) => {
+      if (errorRateTracker.killed) return
+
+      const now = Date.now()
+      if (now - errorRateTracker.windowStart > 1000) {
+        errorRateTracker.count = 0
+        errorRateTracker.windowStart = now
+      }
+      errorRateTracker.count++
+
+      if (errorRateTracker.count > 50) {
+        errorRateTracker.killed = true
+        this.clients.delete(key)
+        transport.close().catch(() => {})
+        client.close().catch(() => {})
+        return
+      }
+
+      originalOnerror?.(error)
+    }
+
     const managedClient: ManagedStdioClient = {
       client,
       transport,
       skillName: info.skillName,
       lastUsedAt: Date.now(),
       connectionType: "stdio",
+      errorRateTracker,
     }
     this.clients.set(key, managedClient)
     this.startCleanupTimer()
@@ -453,6 +493,20 @@ export class SkillMcpManager {
     let lastError: Error | null = null
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const key = this.getClientKey(info)
+      const existingBeforeOp = this.clients.get(key)
+      if (existingBeforeOp?.errorRateTracker?.killed) {
+        throw new Error(
+          `MCP server "${info.serverName}" was terminated due to excessive errors.\n\n` +
+          `The server was outputting invalid data to stdout (not valid JSON-RPC).\n` +
+          `This usually means:\n` +
+          `  - npm/npx is outputting download progress or warnings\n` +
+          `  - The MCP server is logging debug output to stdout instead of stderr\n` +
+          `  - The server process crashed and is outputting error messages\n\n` +
+          `Try reloading the skill or check the MCP server configuration.`
+        )
+      }
+
       try {
         const client = await this.getOrCreateClientWithRetry(info, config)
         return await operation(client)
@@ -470,7 +524,6 @@ export class SkillMcpManager {
           )
         }
 
-        const key = this.getClientKey(info)
         const existing = this.clients.get(key)
         if (existing) {
           this.clients.delete(key)
