@@ -92,7 +92,24 @@ mock.module("../shared/model-resolver", () => ({
 
 mock.module("../shared/model-requirements", () => ({
   AGENT_MODEL_REQUIREMENTS: {
-    prometheus: { fallbackChain: [{ providers: ["anthropic"], model: "claude-opus-4-5" }] },
+    sisyphus: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
+    oracle: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" }] },
+    librarian: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
+    explore: { fallbackChain: [{ providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" }] },
+    "multimodal-looker": { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" }] },
+    prometheus: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
+    metis: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
+    momus: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" }] },
+    atlas: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
+  },
+  CATEGORY_MODEL_REQUIREMENTS: {
+    "visual-engineering": { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" }] },
+    ultrabrain: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex" }] },
+    artistry: { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" }] },
+    quick: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" }] },
+    "unspecified-low": { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
+    "unspecified-high": { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
+    writing: { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" }] },
   },
 }))
 
