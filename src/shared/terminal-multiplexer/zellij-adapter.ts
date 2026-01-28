@@ -60,7 +60,7 @@ export class ZellijAdapter implements Multiplexer {
 
     // Wrap command to capture pane ID
     const idFile = `/tmp/opencode-pane-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const wrappedCmd = `echo $ZELLIJ_PANE_ID > ${idFile}; exec ${cmd}`
+    const wrappedCmd = `echo \\$ZELLIJ_PANE_ID > ${idFile}; exec ${cmd}`
     const cmdArgs = ["bash", "-c", wrappedCmd]
 
     const zellijCmd = isFirstPane
@@ -83,10 +83,27 @@ export class ZellijAdapter implements Multiplexer {
 
     await proc.exited
 
-    // Read pane ID from temp file
-    const idProc = spawn(["cat", idFile], { stdout: "pipe" })
-    await idProc.exited
-    const paneId = (await new Response(idProc.stdout).text()).trim()
+    // Wait for pane to start and write its ID (with timeout)
+    let paneId = ""
+    const maxAttempts = 10  // 1 second total (100ms per attempt)
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const idProc = spawn(["cat", idFile], { stdout: "pipe", stderr: "pipe" })
+        await idProc.exited
+        const content = (await new Response(idProc.stdout).text()).trim()
+        if (content) {
+          paneId = content
+          break
+        }
+      } catch {
+        // File doesn't exist yet
+      }
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    if (!paneId) {
+      log("[ZellijAdapter.spawnPane] WARNING: Could not read pane ID", { idFile })
+    }
 
     // Clean up temp file
     spawn(["rm", idFile], { stdout: "pipe" })
