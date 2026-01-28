@@ -8,6 +8,8 @@
  * @see https://github.com/ollama/ollama/blob/main/docs/api.md
  */
 
+import { log } from "./logger"
+
 /**
  * Ollama message structure
  */
@@ -135,8 +137,7 @@ export function parseOllamaStreamResponse(response: string): OllamaMergedRespons
         }
       }
     } catch (error) {
-      // Skip malformed lines with warning
-      console.warn(`[ollama-ndjson-parser] Skipping malformed NDJSON line: ${line}`, error)
+      log(`[ollama-ndjson-parser] Skipping malformed NDJSON line: ${line}`, { error })
       continue
     }
   }

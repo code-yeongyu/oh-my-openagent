@@ -76,7 +76,7 @@ Until the SDK is fixed, here's how to implement NDJSON parsing (for SDK maintain
 async function parseOllamaStreamResponse(response: string): Promise<object> {
   const lines = response.split('\n').filter(line => line.trim());
   const mergedMessage = { tool_calls: [] };
-  
+
   for (const line of lines) {
     try {
       const json = JSON.parse(line);
@@ -91,7 +91,7 @@ async function parseOllamaStreamResponse(response: string): Promise<object> {
       console.warn('Skipping malformed NDJSON line:', line);
     }
   }
-  
+
   return mergedMessage;
 }
 ```
