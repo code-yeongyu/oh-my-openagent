@@ -140,13 +140,16 @@ function extractTaskContextFromPrompt(prompt: string): Partial<TaskContext> {
   const hasGoal = prompt.length > 10
   const hasFiles = /\.(ts|js|tsx|jsx|md|json)/.test(prompt)
   const hasTestCriteria = /(test|expect|should|must|verify)/i.test(prompt)
-  const hasAmbiguity = /(maybe|perhaps|possibly|or|unclear)/i.test(prompt)
+  const hasAmbiguity = /\b(maybe|perhaps|possibly|unclear)\b/i.test(prompt) ||
+    /\bor\b/.test(prompt.replace(/\b(and\/or|either|error|for|or\s+not)\b/gi, ""))
+  const hasDependencyMention = /(depends?\s+on|after|requires?|blocks?|prerequisite|first\s+need)/i.test(prompt)
+  const dependenciesMapped = !hasDependencyMention || /(already|done|complete|identified)/i.test(prompt)
 
   return {
     goal: hasGoal ? prompt.slice(0, 100) : "",
     filesIdentified: hasFiles ? ["detected"] : [],
     testCriteria: hasTestCriteria ? "detected" : "",
-    dependenciesMapped: true,
+    dependenciesMapped,
     hasAmbiguity,
   }
 }
