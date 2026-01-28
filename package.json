@@ -57,7 +57,7 @@
   "dependencies": {
     "@ast-grep/cli": "^0.40.5",
     "@ast-grep/napi": "^0.40.5",
-    "@clack/prompts": "^0.11.0",
+    "@clack/prompts": "^1.0.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@opencode-ai/plugin": "^1.1.39",
