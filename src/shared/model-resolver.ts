@@ -58,25 +58,26 @@ export function resolveModelWithFallback(
 			const connectedProviders = readConnectedProvidersCache()
 			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
-			for (const entry of fallbackChain) {
-				for (const provider of entry.providers) {
-					if (connectedSet === null || connectedSet.has(provider)) {
-						const model = `${provider}/${entry.model}`
-						log("Model resolved via fallback chain (no model cache, using connected provider)", { 
-							provider, 
-							model: entry.model, 
-							variant: entry.variant,
-							hasConnectedCache: connectedSet !== null
-						})
-						return { model, source: "provider-fallback", variant: entry.variant }
+			// When no cache exists at all, skip fallback chain and fall through to system default
+			// This allows OpenCode to use Provider.defaultModel() as the final fallback
+			if (connectedSet === null) {
+				log("No cache available, skipping fallback chain to use system default")
+			} else {
+				for (const entry of fallbackChain) {
+					for (const provider of entry.providers) {
+						if (connectedSet.has(provider)) {
+							const model = `${provider}/${entry.model}`
+							log("Model resolved via fallback chain (no model cache, using connected provider)", { 
+								provider, 
+								model: entry.model, 
+								variant: entry.variant,
+							})
+							return { model, source: "provider-fallback", variant: entry.variant }
+						}
 					}
 				}
+				log("No matching provider in connected cache, falling through to system default")
 			}
-			const firstEntry = fallbackChain[0]
-			const firstProvider = firstEntry.providers[0]
-			const model = `${firstProvider}/${firstEntry.model}`
-			log("Model resolved via fallback chain (no cache at all, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
-			return { model, source: "provider-fallback", variant: firstEntry.variant }
 		}
 
 		for (const entry of fallbackChain) {
