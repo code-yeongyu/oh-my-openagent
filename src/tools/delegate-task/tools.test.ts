@@ -1,17 +1,35 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
+import { __setTimingConfig, __resetTimingConfig } from "./timing"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
-// Test constants - systemDefaultModel is required by resolveCategoryConfig
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
+  let cacheSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
     __resetModelCache()
     clearSkillCache()
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 10,
+      MIN_STABILITY_TIME_MS: 50,
+      STABILITY_POLLS_REQUIRED: 1,
+      WAIT_FOR_SESSION_INTERVAL_MS: 10,
+      WAIT_FOR_SESSION_TIMEOUT_MS: 1000,
+      MAX_POLL_TIME_MS: 2000,
+      SESSION_CONTINUATION_STABILITY_MS: 50,
+    })
+    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
+  })
+
+  afterEach(() => {
+    __resetTimingConfig()
+    cacheSpy?.mockRestore()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -533,7 +551,7 @@ describe("sisyphus-task", () => {
       })
     })
 
-    test.skip("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
+    test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
       // #given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -583,12 +601,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // #then - variant MUST be "max" from DEFAULT_CATEGORIES
+      // #then - variant MUST be "max" from DEFAULT_CATEGORIES (passed as separate field)
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
         modelID: "claude-opus-4-5",
-        variant: "max",
       })
+      expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
   })
 
