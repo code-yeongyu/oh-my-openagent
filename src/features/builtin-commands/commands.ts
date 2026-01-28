@@ -6,6 +6,12 @@ import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { STATUS_TEMPLATE } from "./templates/status"
 import { REVERT_TEMPLATE } from "./templates/revert"
+import { EVOLVE_TEMPLATE } from "./templates/evolve"
+import { INSTINCT_IMPORT_TEMPLATE } from "./templates/instinct-import"
+import { INSTINCT_EXPORT_TEMPLATE } from "./templates/instinct-export"
+import { INSTINCT_STATUS_TEMPLATE } from "./templates/instinct-status"
+import { BUILD_FIX_TEMPLATE } from "./templates/build-fix"
+import { LEARN_TEMPLATE } from "./templates/learn"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -88,6 +94,64 @@ ${REVERT_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[task <id>] [phase <n>] [change]",
+  },
+  "instinct-import": {
+    description: "(builtin) Import instincts from external sources",
+    template: `<command-instruction>
+${INSTINCT_IMPORT_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "<source> [--filter <pattern>]",
+  },
+  "instinct-export": {
+    description: "(builtin) Export instincts for sharing or backup",
+    template: `<command-instruction>
+${INSTINCT_EXPORT_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[--filter <pattern>] [--output <path>]",
+  },
+  evolve: {
+    description: "(builtin) Analyze and cluster related instincts into evolved structures",
+    template: `<command-instruction>
+${EVOLVE_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[--execute] [--dry-run] [--domain <name>] [--threshold <n>] [--type <command|skill|agent>]",
+  },
+  "instinct-status": {
+    description: "(builtin) Display status report of all instincts",
+    template: `<command-instruction>
+${INSTINCT_STATUS_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[--sort usage|confidence] [--domain <name>]",
+  },
+  "build-fix": {
+    description: "(builtin) Incrementally fix TypeScript build errors",
+    template: `<command-instruction>
+${BUILD_FIX_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[--max-iterations N] [--file <path>]",
+  },
+  learn: {
+    description: "(builtin) Extract patterns from current session and create reusable skills",
+    template: `<command-instruction>
+${LEARN_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: '[--pattern "TDD"] [--threshold 0.8]',
   },
 }
 

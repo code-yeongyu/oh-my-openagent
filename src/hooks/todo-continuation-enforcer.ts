@@ -58,6 +58,8 @@ const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_C
 
 Incomplete tasks remain. Continue working on the next pending task.
 
+**PLAN FILE LOCATION**: \`{TASKS_PATH}\`
+
 RULES:
 - Proceed without asking for permission
 - Mark each task complete when finished
@@ -65,12 +67,13 @@ RULES:
 
 SYNC REQUIREMENT (tasks.md is source of truth):
 - If .sisyphus/boulder.json exists and has active_plan:
-  1. Read tasks.md to get the authoritative task list
+  1. **Read the plan file at \`{TASKS_PATH}\`** to get the authoritative task list
   2. Use todowrite to sync your todo list with tasks.md:
-     - Add any tasks from tasks.md that are missing in todo
-     - Keep any extra todo items not in tasks.md (merge-preserve)
-     - Match task names exactly as they appear in tasks.md
-  3. Work from tasks.md, not from memory`
+      - Add any tasks from tasks.md that are missing in todo
+      - Keep any extra todo items not in tasks.md (merge-preserve)
+      - Match task names exactly as they appear in tasks.md
+  3. **Work from \`{TASKS_PATH}\`, not from memory**
+  4. **When completing tasks, edit \`{TASKS_PATH}\` directly** to check off: \`- [x]\``
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
@@ -394,7 +397,8 @@ export function createTodoContinuationEnforcer(
 
     const completed = effectiveTotal - effectiveIncompleteCount
     const sourceNote = usedTasksMd ? " (from tasks.md)" : ""
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining${sourceNote}]`
+    const tasksPath = planProgress?.planPath ?? boulderState?.active_plan ?? "tasks.md"
+    const prompt = `${CONTINUATION_PROMPT.replace(/{TASKS_PATH}/g, tasksPath)}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining${sourceNote}]`
 
     try {
       log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: effectiveIncompleteCount, usedTasksMd })

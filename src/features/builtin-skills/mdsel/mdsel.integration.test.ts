@@ -51,15 +51,18 @@ describe("mdsel skill integration", () => {
       writeFileSync(filePath, content)
 
       const hook = createMdselReminderHook({} as never)
-      const input = { tool: "Read", sessionID: "ses_test", callID: "call_test" }
-      const output = { title: "Read", output: "content", metadata: {}, args: { filePath } }
+      const callID = "call_test_" + Date.now()
+      const input = { tool: "Read", sessionID: "ses_test", callID }
+      const beforeOutput = { args: { filePath } }
+      const afterOutput = { title: "Read", output: "content", metadata: {}, args: { filePath } }
 
-      // #when
-      await hook["tool.execute.after"](input, output)
+      // #when - must call before first to register the pending call
+      await hook["tool.execute.before"](input, beforeOutput)
+      await hook["tool.execute.after"](input, afterOutput)
 
       // #then
-      expect(output.output).toContain("[mdsel Reminder]")
-      expect(output.output).toContain("300 words")
+      expect(afterOutput.output).toContain("[mdsel Reminder]")
+      expect(afterOutput.output).toContain("300 words")
     })
 
     test("hook does not trigger for small .md files", async () => {

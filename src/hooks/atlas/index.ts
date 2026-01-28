@@ -63,6 +63,8 @@ const BOULDER_CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveType
 
 You have an active work plan with incomplete tasks. Continue working.
 
+**PLAN FILE LOCATION**: \`{TASKS_PATH}\`
+
 RULES:
 - Proceed without asking for permission
 - Mark each checkbox [x] in the plan file when done
@@ -71,13 +73,14 @@ RULES:
 - If blocked, document the blocker and move to the next task
 
 SYNC REQUIREMENT (tasks.md is source of truth):
-After reading this message, you MUST sync your todo list with tasks.md:
-1. Read tasks.md to get the authoritative task list
+After reading this message, you MUST:
+1. **Read the plan file at \`{TASKS_PATH}\`** to get the authoritative task list
 2. Use todowrite to update your todo list:
    - Add any tasks from tasks.md that are missing in todo
    - Keep any extra todo items not in tasks.md (merge-preserve)
    - Match task names exactly as they appear in tasks.md
-3. Work from tasks.md checkboxes, not from memory or old todo state`
+3. Work from \`{TASKS_PATH}\` checkboxes, not from memory or old todo state
+4. **When completing tasks, edit \`{TASKS_PATH}\` directly** to check off: \`- [x]\``
 
 const EXECUTION_MODE_AUTO_DECISION = `
 ---
@@ -558,7 +561,7 @@ export function createAtlasHook(
     return state
   }
 
-  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number): Promise<void> {
+  async function injectContinuation(sessionID: string, planName: string, tasksPath: string, remaining: number, total: number): Promise<void> {
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -569,7 +572,8 @@ export function createAtlasHook(
     }
 
     const prompt = BOULDER_CONTINUATION_PROMPT
-      .replace(/{PLAN_NAME}/g, planName) +
+      .replace(/{PLAN_NAME}/g, planName)
+      .replace(/{TASKS_PATH}/g, tasksPath) +
       `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
 
     try {
@@ -742,7 +746,7 @@ export function createAtlasHook(
 
         state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
-        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total)
+        injectContinuation(sessionID, boulderState.plan_name, boulderState.active_plan, remaining, progress.total)
         return
       }
 

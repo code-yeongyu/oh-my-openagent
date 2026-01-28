@@ -30,6 +30,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "metis",
   "momus",
   "atlas",
+  "observer",
 ])
 
 
@@ -58,6 +59,7 @@ export const OverridableAgentNameSchema = z.enum([
   "document-writer",
   "multimodal-looker",
   "atlas",
+  "observer",
 ])
 
 
@@ -115,6 +117,11 @@ export const HookNameSchema = z.enum([
   "plan-attention-refresher",
   "mdsel-reminder",
   "mdsel-enforcer",
+  "observation-recorder",
+  "observer-detector",
+  "instinct-trigger",
+  "instinct-learner",
+  "pattern-extraction",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

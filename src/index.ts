@@ -50,6 +50,11 @@ import {
   createPhaseFlowEnforcerHook,
   // mdsel reminder hook
   createMdselReminderHook,
+  createObservationRecorderHook,
+  createObserverDetectorHook,
+  createInstinctTriggerHook,
+  createInstinctLearnerHook,
+  createPatternExtractionHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -300,6 +305,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createMdselReminderHook(ctx)
     : null;
 
+  const observationRecorder = isHookEnabled("observation-recorder")
+    ? createObservationRecorderHook()
+    : null;
+
+  const instinctTrigger = isHookEnabled("instinct-trigger")
+    ? createInstinctTriggerHook({ claudeConfigDir: (ctx as any).claudeConfigDir })
+    : null;
+
+  const instinctLearner = isHookEnabled("instinct-learner")
+    ? createInstinctLearnerHook()
+    : null;
+
+  const patternExtraction = isHookEnabled("pattern-extraction")
+    ? createPatternExtractionHook()
+    : null;
+
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
@@ -366,6 +387,21 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
   const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
+
+  const observerDetector = isHookEnabled("observer-detector")
+    ? createObserverDetectorHook({
+        delegateTask: async (args) => {
+          return ctx.client.session.prompt({
+            path: { id: getMainSessionID() || "" },
+            body: {
+              parts: [{ type: "text", text: args.prompt }],
+            },
+            query: { directory: ctx.directory },
+          });
+        },
+      })
+    : null;
+
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -394,7 +430,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill) => {
+  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill: any) => {
     if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {
@@ -576,6 +612,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await tddGuard?.event?.(input);
       await planReorganizer?.handler(input);
       await atlasHook?.handler(input);
+      await observerDetector?.event(input as any);
+      await instinctLearner?.event(input as any);
+      await patternExtraction?.event(input as any);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -661,6 +700,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await codebaseAssessment?.["tool.execute.before"]?.(input, output);
       await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
+      await instinctTrigger?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
@@ -753,6 +793,9 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
       await lspDiagnosticsEnforcer?.["tool.execute.after"]?.(input, output);
       await phaseFlowEnforcer?.["tool.execute.after"]?.(input, output);
       await mdselReminder?.["tool.execute.after"]?.(input, output);
+      await observationRecorder?.["tool.execute.after"]?.(input, output);
+      await observerDetector?.["tool.execute.after"]?.(input, output);
+      await instinctLearner?.["tool.execute.after"]?.(input, output);
     },
   };
 };

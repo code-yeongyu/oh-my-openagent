@@ -79,3 +79,9 @@ export { createMdselReminderHook } from "./mdsel-reminder";
 
 // mdsel Enforcer Hook - blocks reading large .md files, enforces mdsel usage
 export { createMdselEnforcerHook } from "./mdsel-enforcer";
+
+export { createObservationRecorderHook } from "./observation-recorder";
+export { createObserverDetectorHook } from "./observer-detector";
+export { createInstinctTriggerHook } from "./instinct-trigger";
+export { createInstinctLearnerHook } from "./instinct-learner";
+export { createPatternExtractionHook } from "./pattern-extraction";

@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
+import { execSync } from "child_process"
 import type { InstallArgs, InstallConfig, ClaudeSubscription, BooleanArg, DetectedConfig } from "./types"
 import {
   addPluginToOpenCodeConfig,
@@ -271,6 +272,33 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
   }
 }
 
+function installDefaultMcps(): { success: boolean; installed: string[]; failed: string[] } {
+  const mcps = [
+    {
+      name: "memory",
+      command: "claude mcp add memory -s user -- npx -y @modelcontextprotocol/server-memory",
+    },
+    {
+      name: "thinking",
+      command: "claude mcp add thinking -s user -- npx -y @modelcontextprotocol/server-sequential-thinking",
+    },
+  ]
+
+  const installed: string[] = []
+  const failed: string[] = []
+
+  for (const mcp of mcps) {
+    try {
+      execSync(mcp.command, { stdio: "ignore", timeout: 60000 })
+      installed.push(mcp.name)
+    } catch {
+      failed.push(mcp.name)
+    }
+  }
+
+  return { success: failed.length === 0, installed, failed }
+}
+
 async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
@@ -290,7 +318,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   printHeader(isUpdate)
 
-  const totalSteps = 6
+  const totalSteps = 7
   let step = 1
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
@@ -345,6 +373,18 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+
+  printStep(step++, totalSteps, "Installing default MCPs...")
+  const mcpResult = installDefaultMcps()
+  if (mcpResult.success) {
+    printSuccess(`Default MCPs installed (${mcpResult.installed.join(", ")})`)
+  } else {
+    if (mcpResult.installed.length > 0) {
+      printSuccess(`Installed: ${mcpResult.installed.join(", ")}`)
+    }
+    printWarning(`Failed to install: ${mcpResult.failed.join(", ")}`)
+    printInfo("You can manually install them later using 'claude mcp add'")
+  }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
@@ -464,6 +504,21 @@ export async function install(args: InstallArgs): Promise<number> {
     return 1
   }
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
+
+  s.start("Installing default MCPs (memory, thinking)")
+  const mcpResult = installDefaultMcps()
+  if (mcpResult.success) {
+    s.stop(`Default MCPs installed (${mcpResult.installed.join(", ")})`)
+  } else {
+    s.stop(`MCP installation partial or failed ${color.yellow("[!]")}`)
+    if (mcpResult.installed.length > 0) {
+      p.log.success(`Installed: ${mcpResult.installed.join(", ")}`)
+    }
+    if (mcpResult.failed.length > 0) {
+      p.log.warn(`Failed to install: ${mcpResult.failed.join(", ")}`)
+      p.note("You can manually install them later using 'claude mcp add'", "MCP Manual Install")
+    }
+  }
 
   if (!config.hasClaude) {
     console.log()

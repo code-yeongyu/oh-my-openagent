@@ -154,16 +154,18 @@ describe("start-work hook", () => {
     })
 
     test("should auto-select when only one incomplete plan among multiple plans", async () => {
-      // #given - multiple plans but only one incomplete
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - multiple plans but only one incomplete (using changes/*/tasks.md format)
+      const plan1Dir = join(TEST_DIR, "changes", "plan-complete")
+      const plan2Dir = join(TEST_DIR, "changes", "plan-incomplete")
+      mkdirSync(plan1Dir, { recursive: true })
+      mkdirSync(plan2Dir, { recursive: true })
 
       // Plan 1: complete (all checked)
-      const plan1Path = join(plansDir, "plan-complete.md")
+      const plan1Path = join(plan1Dir, "tasks.md")
       writeFileSync(plan1Path, "# Plan Complete\n- [x] Task 1\n- [x] Task 2")
 
       // Plan 2: incomplete (has unchecked)
-      const plan2Path = join(plansDir, "plan-incomplete.md")
+      const plan2Path = join(plan2Dir, "tasks.md")
       writeFileSync(plan2Path, "# Plan Incomplete\n- [ ] Task 1\n- [x] Task 2")
 
       const hook = createStartWorkHook(createMockPluginInput())
@@ -184,14 +186,16 @@ describe("start-work hook", () => {
     })
 
     test("should wrap multiple plans message in system-reminder tag", async () => {
-      // #given - multiple incomplete plans
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - multiple incomplete plans (using changes/*/tasks.md format)
+      const plan1Dir = join(TEST_DIR, "changes", "plan-a")
+      const plan2Dir = join(TEST_DIR, "changes", "plan-b")
+      mkdirSync(plan1Dir, { recursive: true })
+      mkdirSync(plan2Dir, { recursive: true })
 
-      const plan1Path = join(plansDir, "plan-a.md")
+      const plan1Path = join(plan1Dir, "tasks.md")
       writeFileSync(plan1Path, "# Plan A\n- [ ] Task 1")
 
-      const plan2Path = join(plansDir, "plan-b.md")
+      const plan2Path = join(plan2Dir, "tasks.md")
       writeFileSync(plan2Path, "# Plan B\n- [ ] Task 2")
 
       const hook = createStartWorkHook(createMockPluginInput())
@@ -212,14 +216,16 @@ describe("start-work hook", () => {
     })
 
     test("should use 'ask user' prompt style for multiple plans", async () => {
-      // #given - multiple incomplete plans
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - multiple incomplete plans (using changes/*/tasks.md format)
+      const plan1Dir = join(TEST_DIR, "changes", "plan-x")
+      const plan2Dir = join(TEST_DIR, "changes", "plan-y")
+      mkdirSync(plan1Dir, { recursive: true })
+      mkdirSync(plan2Dir, { recursive: true })
 
-      const plan1Path = join(plansDir, "plan-x.md")
+      const plan1Path = join(plan1Dir, "tasks.md")
       writeFileSync(plan1Path, "# Plan X\n- [ ] Task 1")
 
-      const plan2Path = join(plansDir, "plan-y.md")
+      const plan2Path = join(plan2Dir, "tasks.md")
       writeFileSync(plan2Path, "# Plan Y\n- [ ] Task 2")
 
       const hook = createStartWorkHook(createMockPluginInput())
@@ -239,16 +245,18 @@ describe("start-work hook", () => {
     })
 
     test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
-      // #given - existing boulder state pointing to old plan
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - existing boulder state pointing to old plan (using changes/*/tasks.md format)
+      const oldPlanDir = join(TEST_DIR, "changes", "old-plan")
+      const newPlanDir = join(TEST_DIR, "changes", "new-plan")
+      mkdirSync(oldPlanDir, { recursive: true })
+      mkdirSync(newPlanDir, { recursive: true })
 
       // Old plan (in boulder state)
-      const oldPlanPath = join(plansDir, "old-plan.md")
+      const oldPlanPath = join(oldPlanDir, "tasks.md")
       writeFileSync(oldPlanPath, "# Old Plan\n- [ ] Old Task 1")
 
       // New plan (user wants this one)
-      const newPlanPath = join(plansDir, "new-plan.md")
+      const newPlanPath = join(newPlanDir, "tasks.md")
       writeFileSync(newPlanPath, "# New Plan\n- [ ] New Task 1")
 
       // Set up stale boulder state pointing to old plan
@@ -285,11 +293,11 @@ describe("start-work hook", () => {
     })
 
     test("should strip ultrawork/ulw keywords from plan name argument", async () => {
-      // #given - plan with ultrawork keyword in user-request
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - plan with ultrawork keyword in user-request (using changes/*/tasks.md format)
+      const planDir = join(TEST_DIR, "changes", "my-feature-plan")
+      mkdirSync(planDir, { recursive: true })
 
-      const planPath = join(plansDir, "my-feature-plan.md")
+      const planPath = join(planDir, "tasks.md")
       writeFileSync(planPath, "# My Feature Plan\n- [ ] Task 1")
 
       const hook = createStartWorkHook(createMockPluginInput())
@@ -316,11 +324,11 @@ describe("start-work hook", () => {
     })
 
     test("should strip ulw keyword from plan name argument", async () => {
-      // #given - plan with ulw keyword in user-request
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - plan with ulw keyword in user-request (using changes/*/tasks.md format)
+      const planDir = join(TEST_DIR, "changes", "api-refactor")
+      mkdirSync(planDir, { recursive: true })
 
-      const planPath = join(plansDir, "api-refactor.md")
+      const planPath = join(planDir, "tasks.md")
       writeFileSync(planPath, "# API Refactor\n- [ ] Task 1")
 
       const hook = createStartWorkHook(createMockPluginInput())
@@ -347,11 +355,11 @@ describe("start-work hook", () => {
     })
 
     test("should match plan by partial name", async () => {
-      // #given - user specifies partial plan name
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
-      mkdirSync(plansDir, { recursive: true })
+      // #given - user specifies partial plan name (using changes/*/tasks.md format)
+      const planDir = join(TEST_DIR, "changes", "2026-01-15-feature-implementation")
+      mkdirSync(planDir, { recursive: true })
 
-      const planPath = join(plansDir, "2026-01-15-feature-implementation.md")
+      const planPath = join(planDir, "tasks.md")
       writeFileSync(planPath, "# Feature Implementation\n- [ ] Task 1")
 
       const hook = createStartWorkHook(createMockPluginInput())

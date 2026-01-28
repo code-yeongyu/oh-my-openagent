@@ -9,6 +9,12 @@ export type BuiltinCommandName =
   | "start-work"
   | "status"
   | "revert"
+  | "evolve"
+  | "instinct-import"
+  | "instinct-export"
+  | "instinct-status"
+  | "build-fix"
+  | "learn"
 
 export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]

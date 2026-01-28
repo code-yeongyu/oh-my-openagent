@@ -590,6 +590,36 @@ Match implementation complexity to aesthetic vision:
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
 }
 
+const securityAuditSkill: BuiltinSkill = {
+  name: "security-audit",
+  description: "Security audit and vulnerability assessment skill",
+  template: readBuiltinSkillTemplate("security-audit"),
+}
+
+const databaseOptimizationSkill: BuiltinSkill = {
+  name: "database-optimization",
+  description: "Database performance optimization and query analysis",
+  template: readBuiltinSkillTemplate("database-optimization"),
+}
+
+const backendPatternGoSkill: BuiltinSkill = {
+  name: "backend-pattern-go",
+  description: "Go backend development patterns and best practices",
+  template: readBuiltinSkillTemplate("backend-pattern-go"),
+}
+
+const backendPatternJavaSkill: BuiltinSkill = {
+  name: "backend-pattern-java",
+  description: "Java/Spring backend patterns",
+  template: readBuiltinSkillTemplate("backend-pattern-java"),
+}
+
+const backendPatternPythonSkill: BuiltinSkill = {
+  name: "backend-pattern-python",
+  description: "Python backend patterns (FastAPI, Django)",
+  template: readBuiltinSkillTemplate("backend-pattern-python"),
+}
+
 const waveParallelExecutionSkill: BuiltinSkill = {
   name: "wave-parallel-execution",
   description: "Use when executing plans with multiple independent waves in parallel",
@@ -1940,7 +1970,15 @@ console.log({
 
 await client.disconnect();
 EOF
-\`\`\``,
+\`\`\`
+`,
+}
+
+const continuousLearningSkill: BuiltinSkill = {
+  name: "continuous-learning",
+  description:
+    "Continuous learning and instinct system - automatically learns from successful patterns and creates reusable instincts",
+  template: readBuiltinSkillTemplate("continuous-learning"),
 }
 
 export interface CreateBuiltinSkillsOptions {
@@ -1976,5 +2014,11 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     mdselSkill,
     progressiveDisclosureMdSkill,
     devBrowserSkill,
+    continuousLearningSkill,
+    securityAuditSkill,
+    databaseOptimizationSkill,
+    backendPatternGoSkill,
+    backendPatternJavaSkill,
+    backendPatternPythonSkill,
   ]
 }

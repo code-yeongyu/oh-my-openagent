@@ -213,7 +213,15 @@ export function getPlanProgress(planPath: string): PlanProgress {
  * Extract plan name from file path.
  */
 export function getPlanName(planPath: string): string {
-  return basename(planPath, ".md")
+  // For changes/*/tasks.md format, return the parent directory name
+  // For legacy .sisyphus/plans/*.md format, return the file name without .md
+  const fileName = basename(planPath, ".md")
+  if (fileName === "tasks") {
+    // New format: changes/{name}/tasks.md - return parent directory name
+    return basename(dirname(planPath))
+  }
+  // Legacy format: .sisyphus/plans/{name}.md - return file name
+  return fileName
 }
 
 /**

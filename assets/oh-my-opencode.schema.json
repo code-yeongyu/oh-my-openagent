@@ -32,7 +32,8 @@
           "multimodal-looker",
           "metis",
           "momus",
-          "atlas"
+          "atlas",
+          "observer"
         ]
       }
     },
@@ -101,7 +102,12 @@
           "plan-update-reminder",
           "plan-attention-refresher",
           "mdsel-reminder",
-          "mdsel-enforcer"
+          "mdsel-enforcer",
+          "observation-recorder",
+          "observer-detector",
+          "instinct-trigger",
+          "instinct-learner",
+          "pattern-extraction"
         ]
       }
     },
