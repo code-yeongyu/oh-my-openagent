@@ -1,6 +1,6 @@
 # Understanding the Orchestration System
 
-Oh My OpenCode's orchestration system transforms a simple AI agent into a coordinated development team. This document explains how the Prometheus → Orchestrator → Junior workflow creates high-quality, reliable code output.
+Oh My OpenCode's orchestration system transforms a simple AI agent into a coordinated development team. This document explains how the Prometheus → Atlas → Junior workflow creates high-quality, reliable code output.
 
 ---
 
@@ -29,7 +29,7 @@ flowchart TB
     end
     
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator["⚡ Orchestrator-Sisyphus<br/>(Conductor)<br/>Claude Opus 4.5"]
+        Orchestrator["⚡ Atlas<br/>(Conductor)<br/>Claude Opus 4.5"]
     end
     
     subgraph Workers["Worker Layer (Specialized Agents)"]
@@ -152,7 +152,7 @@ If REJECTED, Prometheus fixes issues and resubmits. **No maximum retry limit.**
 
 ---
 
-## Layer 2: Execution (Orchestrator-Sisyphus)
+## Layer 2: Execution (Atlas)
 
 ### The Conductor Mindset
 
@@ -160,7 +160,7 @@ The Orchestrator is like an orchestra conductor: **it doesn't play instruments, 
 
 ```mermaid
 flowchart LR
-    subgraph Orchestrator["Orchestrator-Sisyphus"]
+    subgraph Orchestrator["Atlas"]
         Read["1. Read Plan"]
         Analyze["2. Analyze Tasks"]
         Wisdom["3. Accumulate Wisdom"]
@@ -291,15 +291,15 @@ delegate_task(category="quick", prompt="...")          // "Just get it done fast
 
 ### Built-in Categories
 
-| Category | Model | Temp | When to Use |
-|----------|-------|------|-------------|
-| `visual-engineering` | Gemini 3 Pro | 0.7 | Frontend, UI/UX, design, animations |
-| `ultrabrain` | GPT-5.2 | 0.1 | Complex architecture, business logic |
-| `artistry` | Gemini 3 Pro | 0.9 | Creative tasks, novel ideas |
-| `quick` | Claude Haiku 4.5 | 0.3 | Small tasks, budget-friendly |
-| `most-capable` | Claude Opus 4.5 | 0.1 | Maximum reasoning power |
-| `writing` | Gemini 3 Flash | 0.5 | Documentation, prose |
-| `general` | Claude Sonnet 4.5 | 0.3 | Default, general purpose |
+| Category | Model | When to Use |
+|----------|-------|-------------|
+| `visual-engineering` | Gemini 3 Pro | Frontend, UI/UX, design, styling, animation |
+| `ultrabrain` | GPT-5.2 Codex (xhigh) | Deep logical reasoning, complex architecture decisions |
+| `artistry` | Gemini 3 Pro (max) | Highly creative/artistic tasks, novel ideas |
+| `quick` | Claude Haiku 4.5 | Trivial tasks - single file changes, typo fixes |
+| `unspecified-low` | Claude Sonnet 4.5 | Tasks that don't fit other categories, low effort |
+| `unspecified-high` | Claude Opus 4.5 (max) | Tasks that don't fit other categories, high effort |
+| `writing` | Gemini 3 Flash | Documentation, prose, technical writing |
 
 ### Custom Categories
 
@@ -326,13 +326,13 @@ Skills prepend specialized instructions to subagent prompts:
 // Category + Skill combination
 delegate_task(
   category="visual-engineering", 
-  skills=["frontend-ui-ux"],  // Adds UI/UX expertise
+  load_skills=["frontend-ui-ux"],  // Adds UI/UX expertise
   prompt="..."
 )
 
 delegate_task(
   category="general",
-  skills=["playwright"],  // Adds browser automation expertise
+  load_skills=["playwright"],  // Adds browser automation expertise
   prompt="..."
 )
 ```
@@ -341,8 +341,8 @@ delegate_task(
 
 | Before | After |
 |--------|-------|
-| Hardcoded: `frontend-ui-ux-engineer` (Gemini 3 Pro) | `category="visual-engineering" + skills=["frontend-ui-ux"]` |
-| One-size-fits-all | `category="visual-engineering" + skills=["unity-master"]` |
+| Hardcoded: `frontend-ui-ux-engineer` (Gemini 3 Pro) | `category="visual-engineering" + load_skills=["frontend-ui-ux"]` |
+| One-size-fits-all | `category="visual-engineering" + load_skills=["unity-master"]` |
 | Model bias | Category-based: model abstraction eliminates bias |
 
 ---
@@ -352,7 +352,7 @@ delegate_task(
 ```mermaid
 sequenceDiagram
     participant User
-    participant Orchestrator as Orchestrator-Sisyphus
+    participant Orchestrator as Atlas
     participant Junior as Sisyphus-Junior
     participant Notepad as .sisyphus/notepads/
     
@@ -365,7 +365,7 @@ sequenceDiagram
         
         Note over Orchestrator: Prompt Structure:<br/>1. TASK (exact checkbox)<br/>2. EXPECTED OUTCOME<br/>3. REQUIRED SKILLS<br/>4. REQUIRED TOOLS<br/>5. MUST DO<br/>6. MUST NOT DO<br/>7. CONTEXT + Wisdom
         
-        Orchestrator->>Junior: delegate_task(category, skills, prompt)
+        Orchestrator->>Junior: delegate_task(category, load_skills, prompt)
         
         Junior->>Junior: Create todos, execute
         Junior->>Junior: Verify (lsp_diagnostics, tests)
@@ -392,7 +392,7 @@ sequenceDiagram
 ### 1. Separation of Concerns
 
 - **Planning** (Prometheus): High reasoning, interview, strategic thinking
-- **Orchestration** (Sisyphus): Coordination, verification, wisdom accumulation
+- **Orchestration** (Atlas): Coordination, verification, wisdom accumulation
 - **Execution** (Junior): Focused implementation, no distractions
 
 ### 2. Explicit Over Implicit

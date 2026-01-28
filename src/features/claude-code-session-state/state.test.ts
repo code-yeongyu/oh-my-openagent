@@ -37,7 +37,7 @@ describe("claude-code-session-state", () => {
       setSessionAgent(sessionID, "Prometheus (Planner)")
 
       // #when - try to overwrite
-      setSessionAgent(sessionID, "Sisyphus")
+      setSessionAgent(sessionID, "sisyphus")
 
       // #then - first agent preserved
       expect(getSessionAgent(sessionID)).toBe("Prometheus (Planner)")
@@ -58,10 +58,10 @@ describe("claude-code-session-state", () => {
       setSessionAgent(sessionID, "Prometheus (Planner)")
 
       // #when - force update
-      updateSessionAgent(sessionID, "Sisyphus")
+      updateSessionAgent(sessionID, "sisyphus")
 
       // #then
-      expect(getSessionAgent(sessionID)).toBe("Sisyphus")
+      expect(getSessionAgent(sessionID)).toBe("sisyphus")
     })
   })
 
@@ -121,6 +121,42 @@ describe("claude-code-session-state", () => {
 
       // #when / #then - this is the bug: agent is undefined
       expect(getSessionAgent(sessionID)).toBeUndefined()
+    })
+  })
+
+  describe("issue #893: custom agent switch reset", () => {
+    test("should preserve custom agent when default agent is sent on subsequent messages", () => {
+      // #given - user switches to custom agent "MyCustomAgent"
+      const sessionID = "test-session-custom"
+      const customAgent = "MyCustomAgent"
+      const defaultAgent = "sisyphus"
+
+      // User switches to custom agent (via UI)
+      setSessionAgent(sessionID, customAgent)
+      expect(getSessionAgent(sessionID)).toBe(customAgent)
+
+      // #when - first message after switch sends default agent
+      // This simulates the bug: input.agent = "Sisyphus" on first message
+      // Using setSessionAgent (first-write wins) should preserve custom agent
+      setSessionAgent(sessionID, defaultAgent)
+
+      // #then - custom agent should be preserved, NOT overwritten
+      expect(getSessionAgent(sessionID)).toBe(customAgent)
+    })
+
+    test("should allow explicit agent update via updateSessionAgent", () => {
+      // #given - custom agent is set
+      const sessionID = "test-session-explicit"
+      const customAgent = "MyCustomAgent"
+      const newAgent = "AnotherAgent"
+
+      setSessionAgent(sessionID, customAgent)
+
+      // #when - explicit update (user intentionally switches)
+      updateSessionAgent(sessionID, newAgent)
+
+      // #then - should be updated
+      expect(getSessionAgent(sessionID)).toBe(newAgent)
     })
   })
 })

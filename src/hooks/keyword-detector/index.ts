@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
+import { isPlannerAgent } from "./constants"
 import { log } from "../../shared"
 import { isSystemDirective } from "../../shared/system-directive"
 import { getMainSessionID, getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
@@ -32,6 +33,10 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
       let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(promptText), currentAgent)
+
+      if (isPlannerAgent(currentAgent)) {
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+      }
 
       if (detectedKeywords.length === 0) {
         return
@@ -80,16 +85,16 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
           )
       }
 
-      if (collector) {
-        for (const keyword of detectedKeywords) {
-          collector.register(input.sessionID, {
-            id: `keyword-${keyword.type}`,
-            source: "keyword-detector",
-            content: keyword.message,
-            priority: keyword.type === "ultrawork" ? "critical" : "high",
-          })
-        }
+      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+      if (textPartIndex === -1) {
+        log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
+        return
       }
+
+      const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
+      const originalText = output.parts[textPartIndex].text ?? ""
+
+      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,

@@ -55,7 +55,7 @@ ${REFACTOR_TEMPLATE}
   },
   "start-work": {
     description: "(builtin) Start Sisyphus work session from Prometheus plan",
-    agent: "orchestrator-sisyphus",
+    agent: "atlas",
     template: `<command-instruction>
 ${START_WORK_TEMPLATE}
 </command-instruction>
@@ -81,7 +81,7 @@ export function loadBuiltinCommands(
   for (const [name, definition] of Object.entries(BUILTIN_COMMAND_DEFINITIONS)) {
     if (!disabled.has(name as BuiltinCommandName)) {
       const { argumentHint: _argumentHint, ...openCodeCompatible } = definition
-      commands[name] = openCodeCompatible as CommandDefinition
+      commands[name] = { ...openCodeCompatible, name } as CommandDefinition
     }
   }
 

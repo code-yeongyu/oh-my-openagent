@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config"
+import { findCaseInsensitive } from "./case-insensitive"
 
 export function resolveAgentVariant(
   config: OhMyOpenCodeConfig,
@@ -11,7 +12,7 @@ export function resolveAgentVariant(
   const agentOverrides = config.agents as
     | Record<string, { variant?: string; category?: string }>
     | undefined
-  const agentOverride = agentOverrides?.[agentName]
+  const agentOverride = agentOverrides ? findCaseInsensitive(agentOverrides, agentName) : undefined
   if (!agentOverride) {
     return undefined
   }

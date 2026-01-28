@@ -27,13 +27,13 @@
         "typescript": "^5.7.3",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "3.0.0-beta.11",
-        "oh-my-opencode-darwin-x64": "3.0.0-beta.11",
-        "oh-my-opencode-linux-arm64": "3.0.0-beta.11",
-        "oh-my-opencode-linux-arm64-musl": "3.0.0-beta.11",
-        "oh-my-opencode-linux-x64": "3.0.0-beta.11",
-        "oh-my-opencode-linux-x64-musl": "3.0.0-beta.11",
-        "oh-my-opencode-windows-x64": "3.0.0-beta.11",
+        "oh-my-opencode-darwin-arm64": "3.1.3",
+        "oh-my-opencode-darwin-x64": "3.1.3",
+        "oh-my-opencode-linux-arm64": "3.1.3",
+        "oh-my-opencode-linux-arm64-musl": "3.1.3",
+        "oh-my-opencode-linux-x64": "3.1.3",
+        "oh-my-opencode-linux-x64-musl": "3.1.3",
+        "oh-my-opencode-windows-x64": "3.1.3",
       },
     },
   },
@@ -225,9 +225,9 @@
 
     "object-inspect": ["object-inspect@1.13.4", "", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
 
-    "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@3.0.0-beta.11", "https://registry.npmmirror.com/oh-my-opencode-darwin-arm64/-/oh-my-opencode-darwin-arm64-3.0.0-beta.11.tgz", { "os": "darwin", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-7cFv2bbz9HTY7sshgVTu+IhvYf7CT0czDYqHEB+dYfEqFU6TaoSMimq6uHqcWegUUR1T7PNmc0dyjYVw69FeVA=="],
+    "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@3.1.3", "https://registry.npmmirror.com/oh-my-opencode-darwin-arm64/-/oh-my-opencode-darwin-arm64-3.1.3.tgz", { "os": "darwin", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-ll7pnSgHtBfsv3C6aXO4i2THxicpsmrt9gQYyOUEOh/HbMlDJHCDNv/uAdF1cDjiIBeN0enFxUCbMzFA06Y6Og=="],
 
-    "oh-my-opencode-darwin-x64": ["oh-my-opencode-darwin-x64@3.0.0-beta.11", "https://registry.npmmirror.com/oh-my-opencode-darwin-x64/-/oh-my-opencode-darwin-x64-3.0.0-beta.11.tgz", { "os": "darwin", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-rGAbDdUySWITIdm2yiuNFB9lFYaSXT8LMtg97LTlOO5vZbI3M+obIS3QlIkBtAhgOTIPB7Ni+T0W44OmJpHoYA=="],
+    "oh-my-opencode-darwin-x64": ["oh-my-opencode-darwin-x64@3.1.3", "https://registry.npmmirror.com/oh-my-opencode-darwin-x64/-/oh-my-opencode-darwin-x64-3.1.3.tgz", { "os": "darwin", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-8BvtGiQS4/thmrkzyLS+wFGa6sodTQFelFRrZX8jAnjNLa5NB5qtDZcgB1pIoLhhw2oSyDtfdTwZB9x8pWHeQg=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 

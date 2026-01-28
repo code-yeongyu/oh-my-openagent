@@ -1,11 +1,12 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
-import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
+import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
+import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -52,10 +53,10 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 }
 
 export function discoverCommandsSync(): CommandInfo[] {
-  const { homedir } = require("os")
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
-  const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
+  const opencodeGlobalDir = join(configDir, "command")
   const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
@@ -63,7 +64,22 @@ export function discoverCommandsSync(): CommandInfo[] {
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
 
-  return [...opencodeProjectCommands, ...projectCommands, ...opencodeGlobalCommands, ...userCommands]
+  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
+    name: cmd.name,
+    metadata: {
+      name: cmd.name,
+      description: cmd.description || "",
+      argumentHint: cmd.argumentHint,
+      model: cmd.model,
+      agent: cmd.agent,
+      subtask: cmd.subtask
+    },
+    content: cmd.template,
+    scope: "builtin"
+  }))
+
+  return [...builtinCommands, ...opencodeProjectCommands, ...projectCommands, ...opencodeGlobalCommands, ...userCommands]
 }
 
 function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
@@ -194,8 +210,12 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
     return cachedDescription
   }
 
-  // Pre-warm the cache immediately
-  buildDescription()
+  if (options.commands !== undefined && options.skills !== undefined) {
+    const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
+    cachedDescription = buildDescriptionFromItems(allItems)
+  } else {
+    buildDescription()
+  }
 
   return tool({
     get description() {
@@ -234,7 +254,7 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       if (partialMatches.length > 0) {
         const matchList = partialMatches.map((cmd) => `/${cmd.name}`).join(", ")
         return (
-          `No exact match for "/${cmdName}". Did you mean: ${matchList}?\n\n` +
+          `No exact match for "/${cmdName}\". Did you mean: ${matchList}?\n\n` +
           formatCommandList(allItems)
         )
       }

@@ -27,7 +27,7 @@ describe("mergeConfigs", () => {
             temperature: 0.3,
           },
           visual: {
-            model: "google/gemini-3-pro-preview",
+            model: "google/gemini-3-pro",
           },
         },
       } as unknown as OhMyOpenCodeConfig;
@@ -41,7 +41,7 @@ describe("mergeConfigs", () => {
       // #then quick should be preserved from base
       expect(result.categories?.quick?.model).toBe("anthropic/claude-haiku-4-5");
       // #then visual should be added from override
-      expect(result.categories?.visual?.model).toBe("google/gemini-3-pro-preview");
+      expect(result.categories?.visual?.model).toBe("google/gemini-3-pro");
     });
 
     it("should preserve base categories when override has no categories", () => {

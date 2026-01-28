@@ -459,7 +459,7 @@ describe("ralph-loop", () => {
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      writeFileSync(transcriptPath, JSON.stringify({ content: "Task done <promise>COMPLETE</promise>" }))
+      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done <promise>COMPLETE</promise>" } }) + "\n")
 
       // #when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
@@ -703,10 +703,105 @@ describe("ralph-loop", () => {
       expect(promptCalls[0].text).toContain("2/50")
     })
 
+    test("should NOT detect completion from user message in transcript (issue #622)", async () => {
+      // #given - transcript contains user message with template text that includes completion promise
+      // This reproduces the bug where the RALPH_LOOP_TEMPLATE instructional text
+      // containing `<promise>DONE</promise>` is recorded as a user message and
+      // falsely triggers completion detection
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const templateText = `You are starting a Ralph Loop...
+Output <promise>DONE</promise> when fully complete`
+      const userEntry = JSON.stringify({
+        type: "user",
+        timestamp: new Date().toISOString(),
+        content: templateText,
+      })
+      writeFileSync(transcriptPath, userEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // #then - loop should CONTINUE (user message completion promise is instructional, not actual)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should NOT detect completion from continuation prompt in transcript (issue #622)", async () => {
+      // #given - transcript contains continuation prompt (also a user message) with completion promise
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const continuationText = `RALPH LOOP 2/100
+When FULLY complete, output: <promise>DONE</promise>
+Original task: Build something`
+      const userEntry = JSON.stringify({
+        type: "user",
+        timestamp: new Date().toISOString(),
+        content: continuationText,
+      })
+      writeFileSync(transcriptPath, userEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // #then - loop should CONTINUE (continuation prompt text is not actual completion)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should detect completion from tool_result entry in transcript", async () => {
+      // #given - transcript contains a tool_result with completion promise
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const toolResultEntry = JSON.stringify({
+        type: "tool_result",
+        timestamp: new Date().toISOString(),
+        tool_name: "write",
+        tool_input: {},
+        tool_output: { output: "Task complete! <promise>DONE</promise>" },
+      })
+      writeFileSync(transcriptPath, toolResultEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // #then - loop should complete (tool_result contains actual completion output)
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+    })
+
     test("should check transcript BEFORE API to optimize performance", async () => {
       // #given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
       mockSessionMessages = [
         { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
       ]
@@ -736,7 +831,7 @@ describe("ralph-loop", () => {
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
       hook.startLoop("test-id", "Build API", { ultrawork: true })
 
       // #when - idle event triggered
@@ -754,7 +849,7 @@ describe("ralph-loop", () => {
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
-      writeFileSync(transcriptPath, JSON.stringify({ content: "<promise>DONE</promise>" }))
+      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "<promise>DONE</promise>" } }) + "\n")
       hook.startLoop("test-id", "Build API")
 
       // #when - idle event triggered

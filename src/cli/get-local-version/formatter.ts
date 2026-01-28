@@ -2,13 +2,13 @@ import color from "picocolors"
 import type { VersionInfo } from "./types"
 
 const SYMBOLS = {
-  check: color.green("✓"),
-  cross: color.red("✗"),
-  arrow: color.cyan("→"),
-  info: color.blue("ℹ"),
-  warn: color.yellow("⚠"),
-  pin: color.magenta("📌"),
-  dev: color.cyan("🔧"),
+  check: color.green("[OK]"),
+  cross: color.red("[X]"),
+  arrow: color.cyan("->"),
+  info: color.blue("[i]"),
+  warn: color.yellow("[!]"),
+  pin: color.magenta("[PINNED]"),
+  dev: color.cyan("[DEV]"),
 }
 
 export function formatVersionOutput(info: VersionInfo): string {

@@ -20,16 +20,15 @@
       "items": {
         "type": "string",
         "enum": [
-          "Sisyphus",
+          "sisyphus",
+          "prometheus",
           "oracle",
           "librarian",
           "explore",
-          "frontend-ui-ux-engineer",
-          "document-writer",
           "multimodal-looker",
-          "Metis (Plan Consultant)",
-          "Momus (Plan Reviewer)",
-          "orchestrator-sisyphus"
+          "metis",
+          "momus",
+          "atlas"
         ]
       }
     },
@@ -39,6 +38,7 @@
         "type": "string",
         "enum": [
           "playwright",
+          "agent-browser",
           "frontend-ui-ux",
           "git-master"
         ]
@@ -71,14 +71,16 @@
           "interactive-bash-session",
           "thinking-block-validator",
           "ralph-loop",
+          "category-skill-reminder",
           "compaction-context-injector",
           "claude-code-hooks",
           "auto-slash-command",
           "edit-error-recovery",
           "delegate-task-retry",
           "prometheus-md-only",
+          "sisyphus-junior-notepad",
           "start-work",
-          "sisyphus-orchestrator"
+          "atlas"
         ]
       }
     },
@@ -218,6 +220,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
@@ -344,10 +391,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "Sisyphus": {
+        "sisyphus": {
           "type": "object",
           "properties": {
             "model": {
@@ -470,10 +562,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           "type": "object",
           "properties": {
             "model": {
@@ -596,6 +733,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
@@ -722,10 +904,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "Prometheus (Planner)": {
+        "prometheus": {
           "type": "object",
           "properties": {
             "model": {
@@ -848,10 +1075,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "Metis (Plan Consultant)": {
+        "metis": {
           "type": "object",
           "properties": {
             "model": {
@@ -974,10 +1246,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "Momus (Plan Reviewer)": {
+        "momus": {
           "type": "object",
           "properties": {
             "model": {
@@ -1100,6 +1417,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
@@ -1226,6 +1588,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
@@ -1352,6 +1759,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
@@ -1478,258 +1930,51 @@
                   ]
                 }
               }
-            }
-          }
-        },
-        "frontend-ui-ux-engineer": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string"
             },
-            "variant": {
-              "type": "string"
+            "maxTokens": {
+              "type": "number"
             },
-            "category": {
-              "type": "string"
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
             },
-            "skills": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
             },
-            "top_p": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "prompt": {
-              "type": "string"
-            },
-            "prompt_append": {
-              "type": "string"
-            },
-            "tools": {
+            "providerOptions": {
               "type": "object",
               "propertyNames": {
                 "type": "string"
               },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
-            "disable": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "subagent",
-                "primary",
-                "all"
-              ]
-            },
-            "color": {
-              "type": "string",
-              "pattern": "^#[0-9A-Fa-f]{6}$"
-            },
-            "permission": {
-              "type": "object",
-              "properties": {
-                "edit": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "bash": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "ask",
-                        "allow",
-                        "deny"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "enum": [
-                          "ask",
-                          "allow",
-                          "deny"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                "webfetch": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "doom_loop": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "external_directory": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "document-writer": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string"
-            },
-            "variant": {
-              "type": "string"
-            },
-            "category": {
-              "type": "string"
-            },
-            "skills": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "prompt": {
-              "type": "string"
-            },
-            "prompt_append": {
-              "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
-            "disable": {
-              "type": "boolean"
-            },
-            "description": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "subagent",
-                "primary",
-                "all"
-              ]
-            },
-            "color": {
-              "type": "string",
-              "pattern": "^#[0-9A-Fa-f]{6}$"
-            },
-            "permission": {
-              "type": "object",
-              "properties": {
-                "edit": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "bash": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "ask",
-                        "allow",
-                        "deny"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "enum": [
-                          "ask",
-                          "allow",
-                          "deny"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                "webfetch": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "doom_loop": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                },
-                "external_directory": {
-                  "type": "string",
-                  "enum": [
-                    "ask",
-                    "allow",
-                    "deny"
-                  ]
-                }
-              }
+              "additionalProperties": {}
             }
           }
         },
@@ -1856,10 +2101,55 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         },
-        "orchestrator-sisyphus": {
+        "atlas": {
           "type": "object",
           "properties": {
             "model": {
@@ -1982,6 +2272,51 @@
                   ]
                 }
               }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           }
         }
@@ -1995,6 +2330,9 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "description": {
+            "type": "string"
+          },
           "model": {
             "type": "string"
           },
@@ -2037,7 +2375,8 @@
             "enum": [
               "low",
               "medium",
-              "high"
+              "high",
+              "xhigh"
             ]
           },
           "textVerbosity": {
@@ -2059,11 +2398,11 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "is_unstable_agent": {
+            "type": "boolean"
           }
-        },
-        "required": [
-          "model"
-        ]
+        }
       }
     },
     "claude_code": {
@@ -2381,7 +2720,7 @@
           },
           "additionalProperties": {
             "type": "number",
-            "minimum": 1
+            "minimum": 0
           }
         },
         "modelConcurrency": {
@@ -2391,7 +2730,7 @@
           },
           "additionalProperties": {
             "type": "number",
-            "minimum": 1
+            "minimum": 0
           }
         },
         "staleTimeoutMs": {
@@ -2418,6 +2757,99 @@
         "include_co_authored_by": {
           "default": true,
           "type": "boolean"
+        }
+      }
+    },
+    "browser_automation_engine": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "default": "playwright",
+          "type": "string",
+          "enum": [
+            "playwright",
+            "agent-browser"
+          ]
+        }
+      }
+    },
+    "tmux": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "layout": {
+          "default": "main-vertical",
+          "type": "string",
+          "enum": [
+            "main-horizontal",
+            "main-vertical",
+            "tiled",
+            "even-horizontal",
+            "even-vertical"
+          ]
+        },
+        "main_pane_size": {
+          "default": 60,
+          "type": "number",
+          "minimum": 20,
+          "maximum": 80
+        },
+        "main_pane_min_width": {
+          "default": 120,
+          "type": "number",
+          "minimum": 40
+        },
+        "agent_pane_min_width": {
+          "default": 40,
+          "type": "number",
+          "minimum": 20
+        }
+      }
+    },
+    "sisyphus": {
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "storage_path": {
+              "default": ".sisyphus/tasks",
+              "type": "string"
+            },
+            "claude_code_compat": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        },
+        "swarm": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "storage_path": {
+              "default": ".sisyphus/teams",
+              "type": "string"
+            },
+            "ui_mode": {
+              "default": "toast",
+              "type": "string",
+              "enum": [
+                "toast",
+                "tmux",
+                "both"
+              ]
+            }
+          }
         }
       }
     }

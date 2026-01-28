@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { AgentOverrideConfigSchema, BuiltinCategoryNameSchema, CategoryConfigSchema, OhMyOpenCodeConfigSchema } from "./schema"
+import {
+  AgentOverrideConfigSchema,
+  BrowserAutomationConfigSchema,
+  BrowserAutomationProviderSchema,
+  BuiltinCategoryNameSchema,
+  CategoryConfigSchema,
+  OhMyOpenCodeConfigSchema,
+} from "./schema"
 
 describe("disabled_mcps schema", () => {
   test("should accept built-in MCP names", () => {
@@ -345,6 +352,20 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  test("accepts reasoningEffort as optional string with xhigh", () => {
+    // #given
+    const config = { reasoningEffort: "xhigh" }
+
+    // #when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("xhigh")
+    }
+  })
+
   test("rejects non-string variant", () => {
     // #given
     const config = { model: "openai/gpt-5.2", variant: 123 }
@@ -360,7 +381,7 @@ describe("CategoryConfigSchema", () => {
 describe("BuiltinCategoryNameSchema", () => {
   test("accepts all builtin category names", () => {
     // #given
-    const categories = ["visual-engineering", "ultrabrain", "artistry", "quick", "most-capable", "writing", "general"]
+    const categories = ["visual-engineering", "ultrabrain", "artistry", "quick", "unspecified-low", "unspecified-high", "writing"]
 
     // #when / #then
     for (const cat of categories) {
@@ -375,7 +396,7 @@ describe("Sisyphus-Junior agent override", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           model: "openai/gpt-5.2",
           temperature: 0.2,
         },
@@ -388,18 +409,18 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]).toBeDefined()
-      expect(result.data.agents?.["Sisyphus-Junior"]?.model).toBe("openai/gpt-5.2")
-      expect(result.data.agents?.["Sisyphus-Junior"]?.temperature).toBe(0.2)
+      expect(result.data.agents?.["sisyphus-junior"]).toBeDefined()
+      expect(result.data.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.2")
+      expect(result.data.agents?.["sisyphus-junior"]?.temperature).toBe(0.2)
     }
   })
 
-  test("schema accepts Sisyphus-Junior with prompt_append", () => {
+  test("schema accepts sisyphus-junior with prompt_append", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
-          prompt_append: "Additional instructions for Sisyphus-Junior",
+        "sisyphus-junior": {
+          prompt_append: "Additional instructions for sisyphus-junior",
         },
       },
     }
@@ -410,17 +431,17 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.prompt_append).toBe(
-        "Additional instructions for Sisyphus-Junior"
+      expect(result.data.agents?.["sisyphus-junior"]?.prompt_append).toBe(
+        "Additional instructions for sisyphus-junior"
       )
     }
   })
 
-  test("schema accepts Sisyphus-Junior with tools override", () => {
+  test("schema accepts sisyphus-junior with tools override", () => {
     // #given
     const config = {
       agents: {
-        "Sisyphus-Junior": {
+        "sisyphus-junior": {
           tools: {
             read: true,
             write: false,
@@ -435,10 +456,153 @@ describe("Sisyphus-Junior agent override", () => {
     // #then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.["Sisyphus-Junior"]?.tools).toEqual({
+      expect(result.data.agents?.["sisyphus-junior"]?.tools).toEqual({
         read: true,
         write: false,
       })
     }
+  })
+
+  test("schema accepts lowercase agent names (sisyphus, atlas, prometheus)", () => {
+    // #given
+    const config = {
+      agents: {
+        sisyphus: {
+          temperature: 0.1,
+        },
+        atlas: {
+          temperature: 0.2,
+        },
+        prometheus: {
+          temperature: 0.3,
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.sisyphus?.temperature).toBe(0.1)
+      expect(result.data.agents?.atlas?.temperature).toBe(0.2)
+      expect(result.data.agents?.prometheus?.temperature).toBe(0.3)
+    }
+  })
+
+  test("schema accepts lowercase metis and momus agent names", () => {
+    // #given
+    const config = {
+      agents: {
+        metis: {
+          category: "ultrabrain",
+        },
+        momus: {
+          category: "quick",
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.metis?.category).toBe("ultrabrain")
+      expect(result.data.agents?.momus?.category).toBe("quick")
+    }
+  })
+})
+
+describe("BrowserAutomationProviderSchema", () => {
+  test("accepts 'playwright' as valid provider", () => {
+    // #given
+    const input = "playwright"
+
+    // #when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright")
+  })
+
+  test("accepts 'agent-browser' as valid provider", () => {
+    // #given
+    const input = "agent-browser"
+
+    // #when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("agent-browser")
+  })
+
+  test("rejects invalid provider", () => {
+    // #given
+    const input = "invalid-provider"
+
+    // #when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("BrowserAutomationConfigSchema", () => {
+  test("defaults provider to 'playwright' when not specified", () => {
+    // #given
+    const input = {}
+
+    // #when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // #then
+    expect(result.provider).toBe("playwright")
+  })
+
+  test("accepts agent-browser provider", () => {
+    // #given
+    const input = { provider: "agent-browser" }
+
+    // #when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // #then
+    expect(result.provider).toBe("agent-browser")
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
+  test("accepts browser_automation_engine config", () => {
+    // #given
+    const input = {
+      browser_automation_engine: {
+        provider: "agent-browser",
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("agent-browser")
+  })
+
+  test("accepts config without browser_automation_engine", () => {
+    // #given
+    const input = {}
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine).toBeUndefined()
   })
 })

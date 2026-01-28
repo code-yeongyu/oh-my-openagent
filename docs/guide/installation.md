@@ -33,7 +33,7 @@ follow these steps:
 
 ### Step 0: Ask user about subscriptions
 
-Ask the user these 3 questions to determine CLI options:
+Ask the user these questions to determine CLI options:
 
 1. **Do you have a Claude Pro/Max Subscription?**
    - If **yes**: **Are you on max20 (20x mode)?**
@@ -41,9 +41,9 @@ Ask the user these 3 questions to determine CLI options:
      - **not max20** → `--claude=yes`
    - If **no** → `--claude=no`
 
-2. **Do you have a ChatGPT Subscription?**
-   - If **yes** → `--chatgpt=yes`
-   - If **no** → `--chatgpt=no`
+2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
+   - If **yes** → `--openai=yes` (GPT-5.2 for Oracle agent)
+   - If **no** → `--openai=no` (default)
 
 3. **Will you integrate Gemini models?**
    - If **yes** → `--gemini=yes`
@@ -53,7 +53,17 @@ Ask the user these 3 questions to determine CLI options:
    - If **yes** → `--copilot=yes`
    - If **no** → `--copilot=no`
 
-MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALY.
+5. **Do you have access to OpenCode Zen (opencode/ models)?**
+   - If **yes** → `--opencode-zen=yes`
+   - If **no** → `--opencode-zen=no` (default)
+
+6. **Do you have a Z.ai Coding Plan subscription?**
+   - If **yes** → `--zai-coding-plan=yes`
+   - If **no** → `--zai-coding-plan=no` (default)
+
+**Provider Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
+
+MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
 
 ### Step 1: Install OpenCode (if not installed)
 
@@ -74,14 +84,17 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --chatgpt=<yes|no> --gemini=<yes|no> --copilot=<yes|no>
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 **Examples:**
-- User has all subscriptions with max20: `bunx oh-my-opencode install --no-tui --claude=max20 --chatgpt=yes --gemini=yes --copilot=no`
-- User has only Claude (no max20): `bunx oh-my-opencode install --no-tui --claude=yes --chatgpt=no --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes`
-- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no`
+- User has all native subscriptions: `bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
+- User has only Claude: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI: `bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian: `bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has no subscriptions: `bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 - Register the plugin in `opencode.json`
@@ -119,7 +132,7 @@ First, add the opencode-antigravity-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.2.8"
+    "opencode-antigravity-auth@latest"
   ]
 }
 ```
@@ -127,7 +140,7 @@ First, add the opencode-antigravity-auth plugin:
 ##### Model Configuration
 
 You'll also need full model settings in `opencode.json`.
-Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy provider/models config from the README, and merge carefully to avoid breaking the user's existing setup.
+Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy the full model configuration from the README, and merge carefully to avoid breaking the user's existing setup. The plugin now uses a **variant system** — models like `antigravity-gemini-3-pro` support `low`/`high` variants instead of separate `-low`/`-high` model entries.
 
 ##### oh-my-opencode Agent Model Override
 
@@ -136,14 +149,22 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 ```json
 {
   "agents": {
-    "frontend-ui-ux-engineer": { "model": "google/antigravity-gemini-3-pro-high" },
-    "document-writer": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   }
 }
 ```
 
-**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro-preview`, `google/gemini-3-flash-preview`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
+**Available models (Antigravity quota)**:
+- `google/antigravity-gemini-3-pro` — variants: `low`, `high`
+- `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
+- `google/antigravity-claude-sonnet-4-5` — no variants
+- `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
+
+**Available models (Gemini CLI quota)**:
+- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
+
+> **Note**: Legacy tier-suffixed names like `google/antigravity-gemini-3-pro-high` still work but variants are recommended. Use `--variant=high` with the base model name instead.
 
 Then authenticate:
 
@@ -160,22 +181,48 @@ opencode auth login
 
 #### GitHub Copilot (Fallback Provider)
 
-GitHub Copilot is supported as a **fallback provider** when native providers (Claude, ChatGPT, Gemini) are unavailable. The installer configures Copilot with lower priority than native providers.
+GitHub Copilot is supported as a **fallback provider** when native providers are unavailable.
 
-**Priority**: Native providers (Claude/ChatGPT/Gemini) > GitHub Copilot > Free models
+**Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
 
 ##### Model Mappings
 
-When GitHub Copilot is enabled, oh-my-opencode uses these model assignments:
+When GitHub Copilot is the best available provider, oh-my-opencode uses these model assignments:
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
-| **Explore**   | `grok code` (default)            |
-| **Librarian** | `glm 4.7 free` (default)         |
+| **Explore**   | `opencode/gpt-5-nano`              |
+| **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
+
+#### Z.ai Coding Plan
+
+Z.ai Coding Plan provides access to GLM-4.7 models. When enabled, the **Librarian agent always uses `zai-coding-plan/glm-4.7`** regardless of other available providers.
+
+If Z.ai is the only provider available, all agents will use GLM models:
+
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `zai-coding-plan/glm-4.7`        |
+| **Oracle**    | `zai-coding-plan/glm-4.7`        |
+| **Explore**   | `zai-coding-plan/glm-4.7-flash`  |
+| **Librarian** | `zai-coding-plan/glm-4.7`        |
+
+#### OpenCode Zen
+
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/big-pickle`.
+
+When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
+
+| Agent         | Model                            |
+| ------------- | -------------------------------- |
+| **Sisyphus**  | `opencode/claude-opus-4-5`       |
+| **Oracle**    | `opencode/gpt-5.2`               |
+| **Explore**   | `opencode/gpt-5-nano`             |
+| **Librarian** | `opencode/big-pickle`          |
 
 ##### Setup
 
@@ -190,7 +237,7 @@ bunx oh-my-opencode install
 Or use non-interactive mode:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=no --chatgpt=no --gemini=no --copilot=yes
+bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copilot=yes
 ```
 
 Then authenticate with GitHub:

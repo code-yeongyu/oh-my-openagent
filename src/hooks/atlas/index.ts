@@ -11,9 +11,10 @@ import { getMainSessionID, subagentSessions } from "../../features/claude-code-s
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
+import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
 import type { BackgroundManager } from "../../features/background-agent"
 
-export const HOOK_NAME = "sisyphus-orchestrator"
+export const HOOK_NAME = "atlas"
 
 /**
  * Cross-platform check if a path is inside .sisyphus/ directory.
@@ -68,7 +69,7 @@ const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ CRITICAL: Subagents FREQUENTLY LIE about completion.
+CRITICAL: Subagents FREQUENTLY LIE about completion.
 Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -107,17 +108,17 @@ const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ---
 
-⚠️⚠️⚠️ ${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)} ⚠️⚠️⚠️
+${createSystemDirective(SystemDirectiveTypes.DELEGATION_REQUIRED)}
 
 **STOP. YOU ARE VIOLATING ORCHESTRATOR PROTOCOL.**
 
-You (orchestrator-sisyphus) are attempting to directly modify a file outside \`.sisyphus/\`.
+You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 
 **Path attempted:** $FILE_PATH
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🚫 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
+**THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
 1. **DELEGATE** all implementation work via \`delegate_task\`
@@ -148,7 +149,7 @@ delegate_task(
 )
 \`\`\`
 
-⚠️⚠️⚠️ DELEGATE. DON'T IMPLEMENT. ⚠️⚠️⚠️
+DELEGATE. DON'T IMPLEMENT.
 
 ---
 `
@@ -179,13 +180,13 @@ If you were NOT given **exactly ONE atomic task**, you MUST:
 `
 
 function buildVerificationReminder(sessionId: string): string {
-  return `${VERIFICATION_REMINDER}
+   return `${VERIFICATION_REMINDER}
 
 ---
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-delegate_task(resume="${sessionId}", prompt="fix: [describe the specific failure]")
+delegate_task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -274,6 +275,7 @@ function getGitDiffStats(directory: string): GitFileStat[] {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
     if (!output) return []
@@ -282,6 +284,7 @@ function getGitDiffStats(directory: string): GitFileStat[] {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
     const statusMap = new Map<string, "modified" | "added" | "deleted">()
@@ -378,28 +381,6 @@ interface ToolExecuteAfterOutput {
   metadata: Record<string, unknown>
 }
 
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
-
-function isCallerOrchestrator(sessionID?: string): boolean {
-  if (!sessionID) return false
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir) return false
-  const nearest = findNearestMessageWithFields(messageDir)
-  return nearest?.agent === "orchestrator-sisyphus"
-}
-
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
@@ -407,7 +388,7 @@ interface SessionState {
 
 const CONTINUATION_COOLDOWN_MS = 5000
 
-export interface SisyphusOrchestratorHookOptions {
+export interface AtlasHookOptions {
   directory: string
   backgroundManager?: BackgroundManager
 }
@@ -433,9 +414,9 @@ function isAbortError(error: unknown): boolean {
   return false
 }
 
-export function createSisyphusOrchestratorHook(
+export function createAtlasHook(
   ctx: PluginInput,
-  options?: SisyphusOrchestratorHookOptions
+  options?: AtlasHookOptions
 ) {
   const backgroundManager = options?.backgroundManager
   const sessions = new Map<string, SessionState>()
@@ -493,15 +474,15 @@ export function createSisyphusOrchestratorHook(
           : undefined
       }
 
-      await ctx.client.session.prompt({
-        path: { id: sessionID },
-        body: {
-          agent: "orchestrator-sisyphus",
-          ...(model !== undefined ? { model } : {}),
-          parts: [{ type: "text", text: prompt }],
-        },
-        query: { directory: ctx.directory },
-      })
+       await ctx.client.session.prompt({
+         path: { id: sessionID },
+         body: {
+            agent: "atlas",
+           ...(model !== undefined ? { model } : {}),
+           parts: [{ type: "text", text: prompt }],
+         },
+         query: { directory: ctx.directory },
+       })
 
       log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
     } catch (err) {
@@ -569,7 +550,7 @@ export function createSisyphusOrchestratorHook(
         }
 
         if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not orchestrator-sisyphus`, { sessionID })
+          log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
           return
         }
 
@@ -670,7 +651,7 @@ export function createSisyphusOrchestratorHook(
       if (input.tool === "delegate_task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
-          output.args.prompt = prompt + `\n<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>`
+          output.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
           log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
             sessionID: input.sessionID,
           })
@@ -709,8 +690,8 @@ export function createSisyphusOrchestratorHook(
         return
       }
 
-      const outputStr = output.output && typeof output.output === "string" ? output.output : ""
-      const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task resumed")
+       const outputStr = output.output && typeof output.output === "string" ? output.output : ""
+       const isBackgroundLaunch = outputStr.includes("Background task launched") || outputStr.includes("Background task continued")
       
       if (isBackgroundLaunch) {
         return

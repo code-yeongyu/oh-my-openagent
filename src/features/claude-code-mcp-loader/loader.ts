@@ -77,7 +77,13 @@ export async function loadMcpConfigs(): Promise<McpLoadResult> {
 
     for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
       if (serverConfig.disabled) {
-        log(`Skipping disabled MCP server "${name}"`, { path })
+        log(`Disabling MCP server "${name}"`, { path })
+        delete servers[name]
+        const existingIndex = loadedServers.findIndex((s) => s.name === name)
+        if (existingIndex !== -1) {
+          loadedServers.splice(existingIndex, 1)
+          log(`Removed previously loaded MCP server "${name}"`, { path })
+        }
         continue
       }
 

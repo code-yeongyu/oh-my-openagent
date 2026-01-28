@@ -24,7 +24,13 @@
 
         node_modules = pkgs.stdenvNoCC.mkDerivation {
           name = "oh-my-opencode-node_modules-${version}";
-          src = self;
+          src = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              ./package.json
+              ./bun.lock
+            ];
+          };
 
           nativeBuildInputs = with pkgs; [
             bun
@@ -64,6 +70,11 @@
 
           buildInputs = with pkgs; [
             pkgs.stdenv.cc.cc.lib
+          ];
+
+          autoPatchelfIgnoreMissingDeps = [
+            "libc.musl-x86_64.so.1"
+            "libc.musl-aarch64.so.1"
           ];
 
           buildPhase = ''

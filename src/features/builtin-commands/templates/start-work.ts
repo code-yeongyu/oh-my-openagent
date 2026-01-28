@@ -25,13 +25,13 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
    }
    \`\`\`
 
-5. **Read the plan file** and start executing tasks according to Orchestrator Sisyphus workflow
+5. **Read the plan file** and start executing tasks according to atlas workflow
 
 ## OUTPUT FORMAT
 
 When listing plans for selection:
 \`\`\`
-📋 Available Work Plans
+Available Work Plans
 
 Current Time: {ISO timestamp}
 Session ID: {current session id}
@@ -44,7 +44,7 @@ Which plan would you like to work on? (Enter number or plan name)
 
 When resuming existing work:
 \`\`\`
-🔄 Resuming Work Session
+Resuming Work Session
 
 Active Plan: {plan-name}
 Progress: {completed}/{total} tasks
@@ -55,7 +55,7 @@ Reading plan and continuing from last incomplete task...
 
 When auto-selecting single plan:
 \`\`\`
-🚀 Starting Work Session
+Starting Work Session
 
 Plan: {plan-name}
 Session ID: {session_id}
@@ -69,4 +69,4 @@ Reading plan and beginning execution...
 - The session_id is injected by the hook - use it directly
 - Always update boulder.json BEFORE starting work
 - Read the FULL plan file before delegating any tasks
-- Follow Orchestrator Sisyphus delegation protocols (7-section format)`
+- Follow atlas delegation protocols (7-section format)`

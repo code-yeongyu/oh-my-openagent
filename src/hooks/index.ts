@@ -22,11 +22,15 @@ export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
+export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
 export { createStartWorkHook } from "./start-work";
-export { createSisyphusOrchestratorHook } from "./sisyphus-orchestrator";
+export { createAtlasHook } from "./atlas";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
+export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
+export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
