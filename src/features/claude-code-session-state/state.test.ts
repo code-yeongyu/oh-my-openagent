@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
   setSessionAgent,
   getSessionAgent,
@@ -13,9 +13,11 @@ describe("claude-code-session-state", () => {
   beforeEach(() => {
     // #given - clean state before each test
     _resetForTesting()
-    clearSessionAgent("test-session-1")
-    clearSessionAgent("test-session-2")
-    clearSessionAgent("test-prometheus-session")
+  })
+
+  afterEach(() => {
+    // #then - cleanup after each test to prevent pollution
+    _resetForTesting()
   })
 
   describe("setSessionAgent", () => {
