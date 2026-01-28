@@ -95,7 +95,8 @@ describe("claude-code-session-state", () => {
     })
 
     test("should return undefined when not set", () => {
-      // #given - state reset by beforeEach
+      // #given - explicit reset to ensure clean state (parallel test isolation)
+      _resetForTesting()
       // #then
       expect(getMainSessionID()).toBeUndefined()
     })
