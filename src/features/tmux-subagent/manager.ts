@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
+import type { Multiplexer, PaneHandle } from "../../shared/terminal-multiplexer/types"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -52,16 +53,19 @@ const STABLE_POLLS_REQUIRED = 3          // 3 consecutive idle polls (~6s with 2
  */
 export class TmuxSessionManager {
   private client: OpencodeClient
+  private adapter: Multiplexer
   private tmuxConfig: TmuxConfig
   private serverUrl: string
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
+  private sessionHandles = new Map<string, PaneHandle>()
   private pendingSessions = new Set<string>()
   private pollInterval?: ReturnType<typeof setInterval>
   private deps: TmuxUtilDeps
 
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
+  constructor(ctx: PluginInput, adapter: Multiplexer, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
+    this.adapter = adapter
     this.tmuxConfig = tmuxConfig
     this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
@@ -70,7 +74,8 @@ export class TmuxSessionManager {
 
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
-      tmuxConfig: this.tmuxConfig,
+      multiplexerType: this.adapter.type,
+      capabilities: this.adapter.capabilities,
       serverUrl: this.serverUrl,
       sourcePaneId: this.sourcePaneId,
     })
@@ -158,101 +163,154 @@ export class TmuxSessionManager {
     this.pendingSessions.add(sessionId)
 
     try {
-      const state = await queryWindowState(this.sourcePaneId)
-      if (!state) {
-        log("[tmux-session-manager] failed to query window state")
-        return
-      }
-
-      log("[tmux-session-manager] window state queried", {
-        windowWidth: state.windowWidth,
-        mainPane: state.mainPane?.paneId,
-        agentPaneCount: state.agentPanes.length,
-        agentPanes: state.agentPanes.map((p) => p.paneId),
-      })
-
-      const decision = decideSpawnActions(
-        state,
-        sessionId,
-        title,
-        this.getCapacityConfig(),
-        this.getSessionMappings()
-      )
-
-      log("[tmux-session-manager] spawn decision", {
-        canSpawn: decision.canSpawn,
-        reason: decision.reason,
-        actionCount: decision.actions.length,
-        actions: decision.actions.map((a) => {
-          if (a.type === "close") return { type: "close", paneId: a.paneId }
-          if (a.type === "replace") return { type: "replace", paneId: a.paneId, newSessionId: a.newSessionId }
-          return { type: "spawn", sessionId: a.sessionId }
-        }),
-      })
-
-      if (!decision.canSpawn) {
-        log("[tmux-session-manager] cannot spawn", { reason: decision.reason })
-        return
-      }
-
-      const result = await executeActions(
-        decision.actions,
-        { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
-      )
-
-      for (const { action, result: actionResult } of result.results) {
-        if (action.type === "close" && actionResult.success) {
-          this.sessions.delete(action.sessionId)
-          log("[tmux-session-manager] removed closed session from cache", {
-            sessionId: action.sessionId,
-          })
-        }
-        if (action.type === "replace" && actionResult.success) {
-          this.sessions.delete(action.oldSessionId)
-          log("[tmux-session-manager] removed replaced session from cache", {
-            oldSessionId: action.oldSessionId,
-            newSessionId: action.newSessionId,
-          })
-        }
-      }
-
-      if (result.success && result.spawnedPaneId) {
-        const sessionReady = await this.waitForSessionReady(sessionId)
-        
-        if (!sessionReady) {
-          log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
-            sessionId,
-            paneId: result.spawnedPaneId,
-          })
-        }
-        
-        const now = Date.now()
-        this.sessions.set(sessionId, {
-          sessionId,
-          paneId: result.spawnedPaneId,
-          description: title,
-          createdAt: new Date(now),
-          lastSeenAt: new Date(now),
-        })
-        log("[tmux-session-manager] pane spawned and tracked", {
-          sessionId,
-          paneId: result.spawnedPaneId,
-          sessionReady,
-        })
-        this.startPolling()
+      if (this.adapter.capabilities.manualLayout) {
+        await this.spawnWithDecisionEngine(sessionId, title)
       } else {
-        log("[tmux-session-manager] spawn failed", {
-          success: result.success,
-          results: result.results.map((r) => ({
-            type: r.action.type,
-            success: r.result.success,
-            error: r.result.error,
-          })),
-        })
+        await this.spawnSimple(sessionId, title)
       }
     } finally {
       this.pendingSessions.delete(sessionId)
     }
+  }
+
+  private async spawnWithDecisionEngine(sessionId: string, title: string): Promise<void> {
+    const state = await queryWindowState(this.sourcePaneId!)
+    if (!state) {
+      log("[tmux-session-manager] failed to query window state")
+      return
+    }
+
+    log("[tmux-session-manager] window state queried", {
+      windowWidth: state.windowWidth,
+      mainPane: state.mainPane?.paneId,
+      agentPaneCount: state.agentPanes.length,
+      agentPanes: state.agentPanes.map((p) => p.paneId),
+    })
+
+    const decision = decideSpawnActions(
+      state,
+      sessionId,
+      title,
+      this.getCapacityConfig(),
+      this.getSessionMappings()
+    )
+
+    log("[tmux-session-manager] spawn decision", {
+      canSpawn: decision.canSpawn,
+      reason: decision.reason,
+      actionCount: decision.actions.length,
+      actions: decision.actions.map((a) => {
+        if (a.type === "close") return { type: "close", paneId: a.paneId }
+        if (a.type === "replace") return { type: "replace", paneId: a.paneId, newSessionId: a.newSessionId }
+        return { type: "spawn", sessionId: a.sessionId }
+      }),
+    })
+
+    if (!decision.canSpawn) {
+      log("[tmux-session-manager] cannot spawn", { reason: decision.reason })
+      return
+    }
+
+    const result = await executeActions(
+      decision.actions,
+      { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+    )
+
+    for (const { action, result: actionResult } of result.results) {
+      if (action.type === "close" && actionResult.success) {
+        this.sessions.delete(action.sessionId)
+        this.sessionHandles.delete(action.sessionId)
+        log("[tmux-session-manager] removed closed session from cache", {
+          sessionId: action.sessionId,
+        })
+      }
+      if (action.type === "replace" && actionResult.success) {
+        this.sessions.delete(action.oldSessionId)
+        this.sessionHandles.delete(action.oldSessionId)
+        log("[tmux-session-manager] removed replaced session from cache", {
+          oldSessionId: action.oldSessionId,
+          newSessionId: action.newSessionId,
+        })
+      }
+    }
+
+    if (result.success && result.spawnedPaneId) {
+      const sessionReady = await this.waitForSessionReady(sessionId)
+      
+      if (!sessionReady) {
+        log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+          sessionId,
+          paneId: result.spawnedPaneId,
+        })
+      }
+      
+      const now = Date.now()
+      this.sessions.set(sessionId, {
+        sessionId,
+        paneId: result.spawnedPaneId,
+        description: title,
+        createdAt: new Date(now),
+        lastSeenAt: new Date(now),
+      })
+      this.sessionHandles.set(sessionId, { label: sessionId, nativeId: result.spawnedPaneId })
+      log("[tmux-session-manager] pane spawned and tracked", {
+        sessionId,
+        paneId: result.spawnedPaneId,
+        sessionReady,
+      })
+      this.startPolling()
+    } else {
+      log("[tmux-session-manager] spawn failed", {
+        success: result.success,
+        results: result.results.map((r) => ({
+          type: r.action.type,
+          success: r.result.success,
+          error: r.result.error,
+        })),
+      })
+    }
+  }
+
+  private async spawnSimple(sessionId: string, title: string): Promise<void> {
+    const label = `omo-subagent-${sessionId}`
+    const cmd = this.buildSpawnCommand(sessionId, title)
+
+    log("[tmux-session-manager] simple spawn (no manual layout)", {
+      sessionId,
+      label,
+      multiplexerType: this.adapter.type,
+    })
+
+    const handle = await this.adapter.spawnPane(cmd, { label })
+
+    const sessionReady = await this.waitForSessionReady(sessionId)
+    if (!sessionReady) {
+      log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+        sessionId,
+        label: handle.label,
+      })
+    }
+
+    const now = Date.now()
+    this.sessions.set(sessionId, {
+      sessionId,
+      paneId: handle.nativeId ?? handle.label,
+      description: title,
+      createdAt: new Date(now),
+      lastSeenAt: new Date(now),
+    })
+    this.sessionHandles.set(sessionId, handle)
+
+    log("[tmux-session-manager] pane spawned via adapter", {
+      sessionId,
+      handle,
+      sessionReady,
+    })
+    this.startPolling()
+  }
+
+  private buildSpawnCommand(sessionId: string, _title: string): string {
+    return `opencode --session ${sessionId} --server ${this.serverUrl}`
   }
 
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
@@ -264,18 +322,27 @@ export class TmuxSessionManager {
 
     log("[tmux-session-manager] onSessionDeleted", { sessionId: event.sessionID })
 
-    const state = await queryWindowState(this.sourcePaneId)
-    if (!state) {
-      this.sessions.delete(event.sessionID)
-      return
-    }
+    if (this.adapter.capabilities.manualLayout) {
+      const state = await queryWindowState(this.sourcePaneId)
+      if (!state) {
+        this.sessions.delete(event.sessionID)
+        this.sessionHandles.delete(event.sessionID)
+        return
+      }
 
-    const closeAction = decideCloseAction(state, event.sessionID, this.getSessionMappings())
-    if (closeAction) {
-      await executeAction(closeAction, { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state })
+      const closeAction = decideCloseAction(state, event.sessionID, this.getSessionMappings())
+      if (closeAction) {
+        await executeAction(closeAction, { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state })
+      }
+    } else {
+      const handle = this.sessionHandles.get(event.sessionID)
+      if (handle) {
+        await this.adapter.closePane(handle)
+      }
     }
 
     this.sessions.delete(event.sessionID)
+    this.sessionHandles.delete(event.sessionID)
 
     if (this.sessions.size === 0) {
       this.stopPolling()
@@ -422,15 +489,23 @@ export class TmuxSessionManager {
       paneId: tracked.paneId,
     })
 
-    const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
-    if (state) {
-      await executeAction(
-        { type: "close", paneId: tracked.paneId, sessionId },
-        { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
-      )
+    if (this.adapter.capabilities.manualLayout) {
+      const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
+      if (state) {
+        await executeAction(
+          { type: "close", paneId: tracked.paneId, sessionId },
+          { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+        )
+      }
+    } else {
+      const handle = this.sessionHandles.get(sessionId)
+      if (handle) {
+        await this.adapter.closePane(handle)
+      }
     }
 
     this.sessions.delete(sessionId)
+    this.sessionHandles.delete(sessionId)
 
     if (this.sessions.size === 0) {
       this.stopPolling()
@@ -448,23 +523,39 @@ export class TmuxSessionManager {
 
     if (this.sessions.size > 0) {
       log("[tmux-session-manager] closing all panes", { count: this.sessions.size })
-      const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
-      
-      if (state) {
-        const closePromises = Array.from(this.sessions.values()).map((s) =>
-          executeAction(
-            { type: "close", paneId: s.paneId, sessionId: s.sessionId },
-            { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
-          ).catch((err) =>
+
+      if (this.adapter.capabilities.manualLayout) {
+        const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
+        
+        if (state) {
+          const closePromises = Array.from(this.sessions.values()).map((s) =>
+            executeAction(
+              { type: "close", paneId: s.paneId, sessionId: s.sessionId },
+              { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+            ).catch((err) =>
+              log("[tmux-session-manager] cleanup error for pane", {
+                paneId: s.paneId,
+                error: String(err),
+              }),
+            ),
+          )
+          await Promise.all(closePromises)
+        }
+      } else {
+        const closePromises = Array.from(this.sessionHandles.entries()).map(([sessionId, handle]) =>
+          this.adapter.closePane(handle).catch((err) =>
             log("[tmux-session-manager] cleanup error for pane", {
-              paneId: s.paneId,
+              sessionId,
+              label: handle.label,
               error: String(err),
             }),
           ),
         )
         await Promise.all(closePromises)
       }
+
       this.sessions.clear()
+      this.sessionHandles.clear()
     }
 
     log("[tmux-session-manager] cleanup complete")

@@ -7,6 +7,7 @@ import {
 import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
 import { subagentSessions } from "../../features/claude-code-session-state";
+import { detectMultiplexer, createMultiplexer } from "../../shared/terminal-multiplexer/detection";
 
 interface ToolExecuteInput {
   tool: string;
@@ -156,6 +157,7 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
       const state: InteractiveBashSessionState = persisted ?? {
         sessionID,
         tmuxSessions: new Set<string>(),
+        multiplexerType: null,
         updatedAt: Date.now(),
       };
       sessionStates.set(sessionID, state);
@@ -170,13 +172,15 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
   async function killAllTrackedSessions(
     state: InteractiveBashSessionState,
   ): Promise<void> {
+    const multiplexerType = state.multiplexerType ?? (await detectMultiplexer());
+    if (!multiplexerType) {
+      return;
+    }
+
+    const adapter = createMultiplexer(multiplexerType);
     for (const sessionName of state.tmuxSessions) {
       try {
-        const proc = Bun.spawn(["tmux", "kill-session", "-t", sessionName], {
-          stdout: "ignore",
-          stderr: "ignore",
-        });
-        await proc.exited;
+        await adapter.killSession(sessionName);
       } catch {}
     }
 
@@ -205,6 +209,11 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     const subCommand = findSubcommand(tokens);
     const state = getOrCreateState(sessionID);
     let stateChanged = false;
+
+    if (!state.multiplexerType) {
+      state.multiplexerType = await detectMultiplexer();
+      stateChanged = true;
+    }
 
     const toolOutput = output?.output ?? ""
     if (toolOutput.startsWith("Error:")) {

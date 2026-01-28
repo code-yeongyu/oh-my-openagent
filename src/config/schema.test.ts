@@ -606,3 +606,179 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     expect(result.data?.browser_automation_engine).toBeUndefined()
   })
 })
+
+describe("TerminalConfigSchema", () => {
+  test("accepts provider field with 'auto' value", () => {
+    // #given
+    const input = { provider: "auto" }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.terminal?.provider).toBe("auto")
+    }
+  })
+
+  test("accepts provider field with 'tmux' value", () => {
+    // #given
+    const input = { provider: "tmux" }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.terminal?.provider).toBe("tmux")
+    }
+  })
+
+  test("accepts provider field with 'zellij' value", () => {
+    // #given
+    const input = { provider: "zellij" }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.terminal?.provider).toBe("zellij")
+    }
+  })
+
+  test("defaults provider to 'auto' when not specified", () => {
+    // #given
+    const input = {}
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.parse({ terminal: input })
+
+    // #then
+    expect(result.terminal?.provider).toBe("auto")
+  })
+
+  test("accepts tmux config nested in terminal", () => {
+    // #given
+    const input = {
+      provider: "tmux",
+      tmux: {
+        enabled: true,
+        layout: "main-horizontal",
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.terminal?.tmux?.enabled).toBe(true)
+      expect(result.data.terminal?.tmux?.layout).toBe("main-horizontal")
+    }
+  })
+
+  test("accepts zellij config nested in terminal", () => {
+    // #given
+    const input = {
+      provider: "zellij",
+      zellij: {
+        enabled: true,
+        session_prefix: "my-session",
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.terminal?.zellij?.enabled).toBe(true)
+      expect(result.data.terminal?.zellij?.session_prefix).toBe("my-session")
+    }
+  })
+
+  test("rejects invalid provider value", () => {
+    // #given
+    const input = { provider: "invalid" }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse({ terminal: input })
+
+    // #then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - backward compatibility with tmux key", () => {
+  test("still accepts top-level tmux config key (backward compat)", () => {
+    // #given
+    const input = {
+      tmux: {
+        enabled: true,
+        layout: "main-vertical",
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.tmux?.enabled).toBe(true)
+      expect(result.data.tmux?.layout).toBe("main-vertical")
+    }
+  })
+
+  test("accepts both tmux and terminal keys together", () => {
+    // #given
+    const input = {
+      tmux: {
+        enabled: true,
+      },
+      terminal: {
+        provider: "zellij",
+        zellij: {
+          enabled: true,
+        },
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.tmux?.enabled).toBe(true)
+      expect(result.data.terminal?.provider).toBe("zellij")
+      expect(result.data.terminal?.zellij?.enabled).toBe(true)
+    }
+  })
+
+  test("accepts config with only tmux key (no terminal key)", () => {
+    // #given
+    const input = {
+      tmux: {
+        enabled: true,
+        session_prefix: "my-prefix",
+      },
+    }
+
+    // #when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // #then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.tmux?.enabled).toBe(true)
+      expect(result.data.terminal).toBeUndefined()
+    }
+  })
+})

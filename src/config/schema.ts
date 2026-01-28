@@ -367,6 +367,17 @@ export const TmuxConfigSchema = z.object({
   agent_pane_min_width: z.number().min(20).default(40),
 })
 
+export const ZellijConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  session_prefix: z.string().optional(),
+})
+
+export const TerminalConfigSchema = z.object({
+  provider: z.enum(["auto", "tmux", "zellij"]).default("auto"),
+  tmux: TmuxConfigSchema.optional(),
+  zellij: ZellijConfigSchema.optional(),
+})
+
 export const SisyphusTasksConfigSchema = z.object({
   /** Absolute or relative storage path override. When set, bypasses global config dir. */
   storage_path: z.string().optional(),
@@ -408,6 +419,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  terminal: TerminalConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
 })
 
@@ -438,6 +450,8 @@ export type WebsearchProvider = z.infer<typeof WebsearchProviderSchema>
 export type WebsearchConfig = z.infer<typeof WebsearchConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
+export type ZellijConfig = z.infer<typeof ZellijConfigSchema>
+export type TerminalConfig = z.infer<typeof TerminalConfigSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
 

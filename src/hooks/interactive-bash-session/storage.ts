@@ -22,17 +22,18 @@ export function loadInteractiveBashSessionState(
   const filePath = getStoragePath(sessionID);
   if (!existsSync(filePath)) return null;
 
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    const serialized = JSON.parse(content) as SerializedInteractiveBashSessionState;
-    return {
-      sessionID: serialized.sessionID,
-      tmuxSessions: new Set(serialized.tmuxSessions),
-      updatedAt: serialized.updatedAt,
-    };
-  } catch {
-    return null;
-  }
+   try {
+     const content = readFileSync(filePath, "utf-8");
+     const serialized = JSON.parse(content) as SerializedInteractiveBashSessionState;
+     return {
+       sessionID: serialized.sessionID,
+       tmuxSessions: new Set(serialized.tmuxSessions),
+       multiplexerType: serialized.multiplexerType ?? null,
+       updatedAt: serialized.updatedAt,
+     };
+   } catch {
+     return null;
+   }
 }
 
 export function saveInteractiveBashSessionState(
@@ -42,13 +43,14 @@ export function saveInteractiveBashSessionState(
     mkdirSync(INTERACTIVE_BASH_SESSION_STORAGE, { recursive: true });
   }
 
-  const filePath = getStoragePath(state.sessionID);
-  const serialized: SerializedInteractiveBashSessionState = {
-    sessionID: state.sessionID,
-    tmuxSessions: Array.from(state.tmuxSessions),
-    updatedAt: state.updatedAt,
-  };
-  writeFileSync(filePath, JSON.stringify(serialized, null, 2));
+   const filePath = getStoragePath(state.sessionID);
+   const serialized: SerializedInteractiveBashSessionState = {
+     sessionID: state.sessionID,
+     tmuxSessions: Array.from(state.tmuxSessions),
+     multiplexerType: state.multiplexerType,
+     updatedAt: state.updatedAt,
+   };
+   writeFileSync(filePath, JSON.stringify(serialized, null, 2));
 }
 
 export function clearInteractiveBashSessionState(sessionID: string): void {

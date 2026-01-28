@@ -3,6 +3,7 @@ import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
+import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from '../../shared/terminal-multiplexer/types'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -72,6 +73,30 @@ mock.module('../../shared/tmux', () => {
 })
 
 const trackedSessions = new Set<string>()
+
+function createMockMultiplexer(overrides?: {
+  capabilities?: Partial<MultiplexerCapabilities>
+  spawnPaneResult?: PaneHandle
+}): Multiplexer {
+  const capabilities: MultiplexerCapabilities = {
+    manualLayout: true,
+    persistentLabels: false,
+    ...overrides?.capabilities,
+  }
+
+  return {
+    type: 'tmux',
+    capabilities,
+    ensureSession: mock(async () => {}),
+    killSession: mock(async () => {}),
+    spawnPane: mock(async (_cmd: string, options: SpawnOptions): Promise<PaneHandle> => {
+      trackedSessions.add(options.label)
+      return overrides?.spawnPaneResult ?? { label: options.label, nativeId: '%mock' }
+    }),
+    closePane: mock(async () => {}),
+    getPanes: mock(async () => []),
+  }
+}
 
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
@@ -151,11 +176,12 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('constructor', () => {
-    test('enabled when config.enabled=true and isInsideTmux=true', async () => {
-      // given
+    test('accepts Multiplexer instance', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -164,18 +190,19 @@ describe('TmuxSessionManager', () => {
         agent_pane_min_width: 40,
       }
 
-      // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      //#when
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
-      // then
+      //#then
       expect(manager).toBeDefined()
     })
 
-    test('disabled when config.enabled=true but isInsideTmux=false', async () => {
-      // given
+    test('disabled when isInsideTmux=false', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(false)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -184,18 +211,19 @@ describe('TmuxSessionManager', () => {
         agent_pane_min_width: 40,
       }
 
-      // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      //#when
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
-      // then
+      //#then
       expect(manager).toBeDefined()
     })
 
     test('disabled when config.enabled=false', async () => {
-      // given
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: false,
         layout: 'main-vertical',
@@ -204,22 +232,12 @@ describe('TmuxSessionManager', () => {
         agent_pane_min_width: 40,
       }
 
-      // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-
-      // then
-      expect(manager).toBeDefined()
-    })
-  })
-
-  describe('onSessionCreated', () => {
-    test('first agent spawns from source pane via decision engine', async () => {
-      // given
-      mockIsInsideTmux.mockReturnValue(true)
-      mockQueryWindowState.mockImplementation(async () => createWindowState())
-
+      //#when
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
+      mockIsInsideTmux.mockReturnValue(false)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -227,17 +245,60 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      //#when
+
+      //#then
+      expect(manager).toBeDefined()
+    })
+
+    test('disabled when config.enabled=false', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
+      const config: TmuxConfig = {
+        enabled: false,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      //#when
+
+      //#then
+      expect(manager).toBeDefined()
+    })
+  })
+
+  describe('onSessionCreated', () => {
+    test('uses decision engine when adapter.capabilities.manualLayout=true', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
       const event = createSessionCreatedEvent(
         'ses_child',
         'ses_parent',
         'Background: Test Task'
       )
 
-      // when
+      //#when
       await manager.onSessionCreated(event)
 
-      // then
+      //#then - decision engine is used (queryWindowState called)
       expect(mockQueryWindowState).toHaveBeenCalledTimes(1)
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
 
@@ -254,8 +315,38 @@ describe('TmuxSessionManager', () => {
       }
     })
 
-    test('second agent spawns with correct split direction', async () => {
-      // given
+    test('skips decision engine and uses simple spawn when adapter.capabilities.manualLayout=false', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const event = createSessionCreatedEvent(
+        'ses_child',
+        'ses_parent',
+        'Background: Test Task'
+      )
+
+      //#when
+      await manager.onSessionCreated(event)
+
+      //#then - decision engine NOT used (queryWindowState NOT called), adapter.spawnPane called directly
+      expect(mockQueryWindowState).toHaveBeenCalledTimes(0)
+      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(multiplexer.spawnPane).toHaveBeenCalledTimes(1)
+    })
+
+    test('second agent spawns with correct split direction (manualLayout=true)', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
 
       let callCount = 0
@@ -281,6 +372,7 @@ describe('TmuxSessionManager', () => {
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -288,20 +380,17 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
-      // when - first agent
+      //#when
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
       )
       mockExecuteActions.mockClear()
-
-      // when - second agent
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2')
       )
 
-      // then
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
@@ -311,10 +400,11 @@ describe('TmuxSessionManager', () => {
     })
 
     test('does NOT spawn pane when session has no parentID', async () => {
-      // given
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -322,21 +412,22 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = createSessionCreatedEvent('ses_root', undefined, 'Root Session')
 
-      // when
+      //#when
       await manager.onSessionCreated(event)
 
-      // then
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
     })
 
     test('does NOT spawn pane when disabled', async () => {
-      // given
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: false,
         layout: 'main-vertical',
@@ -344,25 +435,26 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = createSessionCreatedEvent(
         'ses_child',
         'ses_parent',
         'Background: Test Task'
       )
 
-      // when
+      //#when
       await manager.onSessionCreated(event)
 
-      // then
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
     })
 
     test('does NOT spawn pane for non session.created event type', async () => {
-      // given
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -370,7 +462,6 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = {
         type: 'session.deleted',
         properties: {
@@ -378,15 +469,16 @@ describe('TmuxSessionManager', () => {
         },
       }
 
-      // when
+      //#when
       await manager.onSessionCreated(event)
 
-      // then
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
     })
 
-    test('replaces oldest agent when unsplittable (small window)', async () => {
-      // given - small window where split is not possible
+    test('replaces oldest agent when unsplittable (small window, manualLayout=true)', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
       mockQueryWindowState.mockImplementation(async () =>
         createWindowState({
@@ -408,6 +500,7 @@ describe('TmuxSessionManager', () => {
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -415,14 +508,13 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
-      // when
+      //#when
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_new', 'ses_parent', 'New Task')
       )
 
-      // then - with small window, replace action is used instead of close+spawn
+      //#then
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       const call = mockExecuteActions.mock.calls[0]
       expect(call).toBeDefined()
@@ -433,8 +525,8 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('onSessionDeleted', () => {
-    test('closes pane when tracked session is deleted', async () => {
-      // given
+    test('uses adapter.closePane when manualLayout=true', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
 
       let stateCallCount = 0
@@ -460,6 +552,7 @@ describe('TmuxSessionManager', () => {
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -467,7 +560,6 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent(
@@ -478,10 +570,10 @@ describe('TmuxSessionManager', () => {
       )
       mockExecuteAction.mockClear()
 
-      // when
+      //#when
       await manager.onSessionDeleted({ sessionID: 'ses_child' })
 
-      // then
+      //#then
       expect(mockExecuteAction).toHaveBeenCalledTimes(1)
       const call = mockExecuteAction.mock.calls[0]
       expect(call).toBeDefined()
@@ -492,11 +584,13 @@ describe('TmuxSessionManager', () => {
       })
     })
 
-    test('does nothing when untracked session is deleted', async () => {
-      // given
+    test('uses adapter.closePane directly when manualLayout=false', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
+
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -504,19 +598,19 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
-      // when
+      //#when
       await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
 
-      // then
+      //#then
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(multiplexer.closePane).toHaveBeenCalledTimes(0)
     })
   })
 
   describe('cleanup', () => {
-    test('closes all tracked panes', async () => {
-      // given
+    test('closes all tracked panes (manualLayout=true)', async () => {
+      //#given
       mockIsInsideTmux.mockReturnValue(true)
 
       let callCount = 0
@@ -531,6 +625,7 @@ describe('TmuxSessionManager', () => {
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -538,7 +633,6 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
@@ -549,11 +643,43 @@ describe('TmuxSessionManager', () => {
 
       mockExecuteAction.mockClear()
 
-      // when
+      //#when
       await manager.cleanup()
 
-      // then
+      //#then
       expect(mockExecuteAction).toHaveBeenCalledTimes(2)
+    })
+
+    test('closes all tracked panes via adapter (manualLayout=false)', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
+      )
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2')
+      )
+
+      ;(multiplexer.closePane as ReturnType<typeof mock>).mockClear()
+
+      //#when
+      await manager.cleanup()
+
+      //#then
+      expect(multiplexer.closePane).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -588,7 +714,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       // Spawn a session first
       await manager.onSessionCreated(
@@ -641,7 +767,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
@@ -699,7 +825,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
@@ -751,7 +877,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
@@ -777,26 +903,26 @@ describe('TmuxSessionManager', () => {
 describe('DecisionEngine', () => {
   describe('calculateCapacity', () => {
     test('calculates correct 2D grid capacity', async () => {
-      // given
+      //#given
       const { calculateCapacity } = await import('./decision-engine')
 
-      // when
+      //#when
       const result = calculateCapacity(212, 44)
 
-      // then - availableWidth=106, cols=(106+1)/(52+1)=2, rows=(44+1)/(11+1)=3 (accounting for dividers)
+      //#then - availableWidth=106, cols=(106+1)/(52+1)=2, rows=(44+1)/(11+1)=3 (accounting for dividers)
       expect(result.cols).toBe(2)
       expect(result.rows).toBe(3)
       expect(result.total).toBe(6)
     })
 
     test('returns 0 cols when agent area too narrow', async () => {
-      // given
+      //#given
       const { calculateCapacity } = await import('./decision-engine')
 
-      // when
+      //#when
       const result = calculateCapacity(100, 44)
 
-      // then - availableWidth=50, cols=50/53=0
+      //#then - availableWidth=50, cols=50/53=0
       expect(result.cols).toBe(0)
       expect(result.total).toBe(0)
     })
@@ -804,7 +930,7 @@ describe('DecisionEngine', () => {
 
   describe('decideSpawnActions', () => {
     test('returns spawn action with splitDirection when under capacity', async () => {
-      // given
+      //#given
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
         windowWidth: 212,
@@ -821,7 +947,7 @@ describe('DecisionEngine', () => {
         agentPanes: [],
       }
 
-      // when
+      //#when
       const decision = decideSpawnActions(
         state,
         'ses_1',
@@ -830,7 +956,7 @@ describe('DecisionEngine', () => {
         []
       )
 
-      // then
+      //#then
       expect(decision.canSpawn).toBe(true)
       expect(decision.actions).toHaveLength(1)
       expect(decision.actions[0].type).toBe('spawn')
@@ -843,7 +969,7 @@ describe('DecisionEngine', () => {
     })
 
     test('returns replace when split not possible', async () => {
-      // given - small window where split is never possible
+      //#given - small window where split is never possible
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
         windowWidth: 160,
@@ -873,7 +999,7 @@ describe('DecisionEngine', () => {
         { sessionId: 'ses_old', paneId: '%1', createdAt: new Date('2024-01-01') },
       ]
 
-      // when
+      //#when
       const decision = decideSpawnActions(
         state,
         'ses_new',
@@ -882,14 +1008,14 @@ describe('DecisionEngine', () => {
         sessionMappings
       )
 
-      // then - agent area (80) < MIN_SPLIT_WIDTH (105), so replace is used
+      //#then - agent area (80) < MIN_SPLIT_WIDTH (105), so replace is used
       expect(decision.canSpawn).toBe(true)
       expect(decision.actions).toHaveLength(1)
       expect(decision.actions[0].type).toBe('replace')
     })
 
     test('returns canSpawn=false when window too small', async () => {
-      // given
+      //#given
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
         windowWidth: 60,
@@ -906,7 +1032,7 @@ describe('DecisionEngine', () => {
         agentPanes: [],
       }
 
-      // when
+      //#when
       const decision = decideSpawnActions(
         state,
         'ses_1',
@@ -915,7 +1041,7 @@ describe('DecisionEngine', () => {
         []
       )
 
-      // then
+      //#then
       expect(decision.canSpawn).toBe(false)
       expect(decision.reason).toContain('too small')
     })

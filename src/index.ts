@@ -64,6 +64,7 @@ import {
   updateSessionAgent,
   clearSessionAgent,
 } from "./features/claude-code-session-state";
+import { TmuxAdapter } from "./shared/terminal-multiplexer";
 import {
   builtinTools,
   createCallOmoAgent,
@@ -283,7 +284,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
+  const multiplexer = new TmuxAdapter({ enabled: tmuxConfig.enabled });
+  const tmuxSessionManager = new TmuxSessionManager(ctx, multiplexer, tmuxConfig);
 
   const backgroundManager = new BackgroundManager(
     ctx,
