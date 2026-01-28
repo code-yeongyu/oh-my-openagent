@@ -356,10 +356,8 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
-    test("skips fallback chain when availableModels empty even if connected providers cache exists", () => {
+    test("uses connected provider from fallback when availableModels empty but cache exists", () => {
       // #given - model cache missing but connected-providers cache exists
-      // This scenario caused bugs: provider is connected but may not have the model available
-      // Fix: When we can't verify model availability, skip fallback chain entirely
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "google"])
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -372,32 +370,49 @@ describe("resolveModelWithFallback", () => {
       // #when
       const result = resolveModelWithFallback(input)
 
-      // #then - should fall through to system default (NOT use connected provider blindly)
-      expect(result!.model).toBe("google/gemini-3-pro")
-      expect(result!.source).toBe("system-default")
+      // #then - should use connected provider (openai) from fallback chain
+      expect(result!.model).toBe("openai/claude-opus-4-5")
+      expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
-    test("prevents selecting model from provider that may not have it (bug reproduction)", () => {
-      // #given - user removed anthropic oauth, has quotio, but explore agent fallback has opencode
-      // opencode may be "connected" but doesn't have claude-haiku-4-5
-      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["quotio", "opencode"])
+    test("uses github-copilot when google not connected (visual-engineering scenario)", () => {
+      // #given - user has github-copilot but not google connected
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["github-copilot"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use github-copilot (second provider) since google not connected
+      expect(result!.model).toBe("github-copilot/gemini-3-pro")
+      expect(result!.source).toBe("provider-fallback")
+      cacheSpy.mockRestore()
+    })
+
+    test("falls through to system default when no provider in fallback is connected", () => {
+      // #given - user only has quotio connected, but fallback chain has anthropic/opencode
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["quotio"])
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
         ],
-        availableModels: new Set(), // no model cache available
+        availableModels: new Set(),
         systemDefaultModel: "quotio/claude-opus-4-5-20251101",
       }
 
       // #when
       const result = resolveModelWithFallback(input)
 
-      // #then - should NOT return opencode/claude-haiku-4-5 (model may not exist)
-      // should fall through to system default which user has configured
+      // #then - no provider in fallback is connected, fall through to system default
       expect(result!.model).toBe("quotio/claude-opus-4-5-20251101")
       expect(result!.source).toBe("system-default")
-      expect(result!.model).not.toBe("opencode/claude-haiku-4-5")
       cacheSpy.mockRestore()
     })
 
