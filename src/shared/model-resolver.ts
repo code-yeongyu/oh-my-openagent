@@ -55,29 +55,10 @@ export function resolveModelWithFallback(
 	// Step 2: Provider fallback chain (with availability check)
 	if (fallbackChain && fallbackChain.length > 0) {
 		if (availableModels.size === 0) {
-			const connectedProviders = readConnectedProvidersCache()
-			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
-
-			// When no cache exists at all, skip fallback chain and fall through to system default
-			// This allows OpenCode to use Provider.defaultModel() as the final fallback
-			if (connectedSet === null) {
-				log("No cache available, skipping fallback chain to use system default")
-			} else {
-				for (const entry of fallbackChain) {
-					for (const provider of entry.providers) {
-						if (connectedSet.has(provider)) {
-							const model = `${provider}/${entry.model}`
-							log("Model resolved via fallback chain (no model cache, using connected provider)", { 
-								provider, 
-								model: entry.model, 
-								variant: entry.variant,
-							})
-							return { model, source: "provider-fallback", variant: entry.variant }
-						}
-					}
-				}
-				log("No matching provider in connected cache, falling through to system default")
-			}
+			// When model cache is empty, we cannot verify if a provider actually has the model.
+			// Skip fallback chain entirely and fall through to system default.
+			// This prevents selecting provider/model combinations that may not exist.
+			log("No model cache available, skipping fallback chain to use system default")
 		}
 
 		for (const entry of fallbackChain) {
