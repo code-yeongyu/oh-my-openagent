@@ -6,6 +6,15 @@ import { execSync } from "child_process"
  */
 export const MINIMUM_OPENCODE_VERSION = "1.1.1"
 
+/**
+ * OpenCode version that introduced native AGENTS.md injection.
+ * PR #10678 merged on Jan 26, 2026 - OpenCode now dynamically resolves
+ * AGENTS.md files from subdirectories as the agent explores them.
+ * When this version is detected, the directory-agents-injector hook
+ * is auto-disabled to prevent duplicate AGENTS.md loading.
+ */
+export const OPENCODE_NATIVE_AGENTS_INJECTION_VERSION = "1.1.37"
+
 const NOT_CACHED = Symbol("NOT_CACHED")
 let cachedVersion: string | null | typeof NOT_CACHED = NOT_CACHED
 
