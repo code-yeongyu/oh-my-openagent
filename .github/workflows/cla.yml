@@ -25,7 +25,7 @@ jobs:
           path-to-signatures: 'signatures/cla.json'
           path-to-document: 'https://github.com/code-yeongyu/oh-my-opencode/blob/master/CLA.md'
           branch: 'dev'
-          allowlist: bot*,dependabot*,github-actions*,*[bot],sisyphus-dev-ai
+          allowlist: code-yeongyu,bot*,dependabot*,github-actions*,*[bot],sisyphus-dev-ai
           custom-notsigned-prcomment: |
             Thank you for your contribution! Before we can merge this PR, we need you to sign our [Contributor License Agreement (CLA)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/CLA.md).
             
