@@ -3,6 +3,8 @@ import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import type { CategoriesConfig } from "../config/schema"
+import * as shared from "../shared"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
@@ -32,6 +34,49 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.2")
     expect(agents.sisyphus.reasoningEffort).toBe("medium")
     expect(agents.sisyphus.thinking).toBeUndefined()
+  })
+
+  test("Sisyphus uses fallback_models when override model provider is not connected", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const modelsSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["openai/gpt-5.2"]))
+    const overrides = {
+      sisyphus: {
+        model: "anthropic/claude-opus-4-5",
+        fallback_models: "openai/gpt-5.2",
+      },
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then
+    expect(agents.sisyphus.model).toBe("openai/gpt-5.2")
+    modelsSpy.mockRestore()
+    cacheSpy.mockRestore()
+  })
+
+  test("Agent inherits category model and fallback_models", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const categories: CategoriesConfig = {
+      ultrabrain: {
+        model: "anthropic/claude-opus-4-5",
+        fallback_models: "openai/gpt-5.2",
+      },
+    }
+    const overrides = {
+      oracle: {
+        category: "ultrabrain",
+      },
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, categories)
+
+    // #then
+    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    cacheSpy.mockRestore()
   })
 
   test("Sisyphus uses system default when no availableModels provided", async () => {

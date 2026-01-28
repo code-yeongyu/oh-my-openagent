@@ -22,6 +22,7 @@ export type ModelResolutionResult = {
 
 export type ExtendedModelResolutionInput = {
 	userModel?: string
+	fallbackModels?: Array<string> | string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
 	systemDefaultModel?: string
@@ -30,6 +31,40 @@ export type ExtendedModelResolutionInput = {
 function normalizeModel(model?: string): string | undefined {
 	const trimmed = model?.trim()
 	return trimmed || undefined
+}
+
+function normalizeFallbackModels(models?: Array<string> | string): string[] {
+	if (!models) return []
+	const list = Array.isArray(models) ? models : [models]
+	const out: string[] = []
+	const seen = new Set<string>()
+	for (const m of list) {
+		const normalized = normalizeModel(m)
+		if (!normalized) continue
+		if (seen.has(normalized)) continue
+		seen.add(normalized)
+		out.push(normalized)
+	}
+	return out
+}
+
+function getProviderFromFullModel(fullModel: string): string | undefined {
+	const idx = fullModel.indexOf("/")
+	if (idx <= 0) return undefined
+	return fullModel.slice(0, idx)
+}
+
+function isModelAvailableViaCache(fullModel: string, connectedProviders: string[] | null): boolean {
+	if (!connectedProviders) return false
+	const provider = getProviderFromFullModel(fullModel)
+	if (!provider) return false
+	return new Set(connectedProviders).has(provider)
+}
+
+function isModelAvailableViaList(fullModel: string, availableModels: Set<string>): string | null {
+	if (availableModels.size === 0) return null
+	const provider = getProviderFromFullModel(fullModel)
+	return fuzzyMatchModel(fullModel, availableModels, provider ? [provider] : undefined) ?? null
 }
 
 export function resolveModel(input: ModelResolutionInput): string | undefined {
@@ -43,13 +78,57 @@ export function resolveModel(input: ModelResolutionInput): string | undefined {
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
 ): ModelResolutionResult | undefined {
-	const { userModel, fallbackChain, availableModels, systemDefaultModel } = input
+	const { userModel, fallbackModels, fallbackChain, availableModels, systemDefaultModel } = input
+	const normalizedFallbackModels = normalizeFallbackModels(fallbackModels)
 
 	// Step 1: Override
 	const normalizedUserModel = normalizeModel(userModel)
 	if (normalizedUserModel) {
-		log("Model resolved via override", { model: normalizedUserModel })
-		return { model: normalizedUserModel, source: "override" }
+		if (normalizedFallbackModels.length === 0) {
+			log("Model resolved via override", { model: normalizedUserModel })
+			return { model: normalizedUserModel, source: "override" }
+		}
+
+		const match = isModelAvailableViaList(normalizedUserModel, availableModels)
+		if (match) {
+			log("Model resolved via override (availability confirmed)", { model: normalizedUserModel, match })
+			return { model: match, source: "override" }
+		}
+
+		const connectedProviders = readConnectedProvidersCache()
+		if (availableModels.size === 0 && connectedProviders === null) {
+			// No cache available at all, keep override semantics to avoid surprising behavior.
+			log("No cache available, keeping override model", { model: normalizedUserModel })
+			return { model: normalizedUserModel, source: "override" }
+		}
+		if (availableModels.size === 0 && isModelAvailableViaCache(normalizedUserModel, connectedProviders)) {
+			log("Model resolved via override (connected provider)", { model: normalizedUserModel })
+			return { model: normalizedUserModel, source: "override" }
+		}
+		log("Override model not available, trying fallback_models", { model: normalizedUserModel })
+	}
+
+	// Step 1.5: User-configured fallback_models
+	if (normalizedFallbackModels.length > 0) {
+		if (availableModels.size === 0) {
+			const connectedProviders = readConnectedProvidersCache()
+			if (connectedProviders !== null) {
+				for (const candidate of normalizedFallbackModels) {
+					if (isModelAvailableViaCache(candidate, connectedProviders)) {
+						log("Model resolved via fallback_models (connected provider)", { model: candidate })
+						return { model: candidate, source: "provider-fallback" }
+					}
+				}
+			}
+		} else {
+			for (const candidate of normalizedFallbackModels) {
+				const match = isModelAvailableViaList(candidate, availableModels)
+				if (match) {
+					log("Model resolved via fallback_models (availability confirmed)", { model: candidate, match })
+					return { model: match, source: "provider-fallback" }
+				}
+			}
+		}
 	}
 
 	// Step 2: Provider fallback chain (with availability check)

@@ -536,12 +536,13 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
            }
           } else {
-          const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
-              fallbackChain: requirement.fallbackChain,
-              availableModels,
-              systemDefaultModel,
-            })
+			const resolution = resolveModelWithFallback({
+				userModel: resolved.model,
+				fallbackModels: resolved.config.fallback_models,
+				fallbackChain: requirement.fallbackChain,
+				availableModels,
+				systemDefaultModel,
+			})
 
            if (resolution) {
              const { model: resolvedModel, source, variant: resolvedVariant } = resolution
@@ -567,11 +568,11 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type, source }
              
              const parsedModel = parseModelString(actualModel)
-             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
-             categoryModel = parsedModel
-               ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
-               : undefined
-           }
+				const variantToUse = resolved.config.variant ?? resolvedVariant
+				categoryModel = parsedModel
+					? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+					: undefined
+			}
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT

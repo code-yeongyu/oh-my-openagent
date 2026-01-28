@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentOverrideConfig as SchemaAgentOverrideConfig, AgentOverrides as SchemaAgentOverrides } from "../config/schema"
 
 export type AgentFactory = (model: string) => AgentConfig
 
@@ -72,9 +73,6 @@ export type OverridableAgentName =
 
 export type AgentName = BuiltinAgentName
 
-export type AgentOverrideConfig = Partial<AgentConfig> & {
-  prompt_append?: string
-  variant?: string
-}
+export type AgentOverrideConfig = SchemaAgentOverrideConfig
 
-export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>
+export type AgentOverrides = SchemaAgentOverrides

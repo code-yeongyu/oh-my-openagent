@@ -105,6 +105,23 @@ Override built-in agent settings:
 
 Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
 
+You can also configure fallback models for an agent:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+    },
+    "explore": {
+      "model": "google/gemini-3-flash",
+      "fallback_models": "opencode/gpt-5-nano"
+    }
+  }
+}
+```
+
 Use `prompt_append` to add extra instructions without replacing the default system prompt:
 
 ```json
@@ -633,6 +650,37 @@ Add your own categories or override built-in ones:
 ```
 
 Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`.
+
+Categories also support `fallback_models` (string or string array). Fallback models are evaluated at **agent initialization time** - if the primary model is unavailable when the agent is created, the system tries fallback models in order.
+
+```jsonc
+{
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
+    }
+  }
+}
+```
+
+## Runtime Fallback (Planned)
+
+> **Note**: Runtime fallback is planned but not yet implemented. Currently, model switching only happens at initialization time via `fallback_models`.
+
+The `runtime_fallback` configuration will enable automatic model switching on transient provider errors (e.g. rate limits or overload):
+
+```jsonc
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "notify_on_fallback": true
+  }
+}
+```
 
 ## Model Resolution System
 

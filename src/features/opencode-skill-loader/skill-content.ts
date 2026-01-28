@@ -23,7 +23,7 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 
 	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
 		discoverSkills({ includeClaudeCodePaths: true }),
-		Promise.resolve(createBuiltinSkills({ browserProvider: options?.browserProvider })),
+		Promise.resolve(createBuiltinSkills({ browserProvider: options?.browserProvider ?? "playwright" })),
 	])
 
 	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => ({

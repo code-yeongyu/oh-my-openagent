@@ -223,7 +223,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
-            | (Record<string, unknown> & { category?: string; model?: string; variant?: string })
+            | (Record<string, unknown> & { category?: string; model?: string; variant?: string; fallback_models?: string | string[] })
             | undefined;
         const defaultModel = config.model as string | undefined;
 
@@ -242,6 +242,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
         const modelResolution = resolveModelWithFallback({
           userModel: prometheusOverride?.model ?? categoryConfig?.model,
+          fallbackModels: prometheusOverride?.fallback_models ?? categoryConfig?.fallback_models,
           fallbackChain: prometheusRequirement?.fallbackChain,
           availableModels,
           systemDefaultModel: defaultModel ?? "",
@@ -278,9 +279,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             : {}),
         };
 
-        agentConfig["prometheus"] = prometheusOverride
-          ? { ...prometheusBase, ...prometheusOverride }
-          : prometheusBase;
+        if (prometheusOverride) {
+          // Preserve resolvedModel when override.model was unavailable and fallback was used
+          const overrideToMerge =
+            prometheusOverride.model && resolvedModel !== prometheusOverride.model
+              ? { ...prometheusOverride, model: resolvedModel }
+              : prometheusOverride;
+          agentConfig["prometheus"] = { ...prometheusBase, ...overrideToMerge };
+        } else {
+          agentConfig["prometheus"] = prometheusBase;
+        }
       }
 
     const filteredConfigAgents = configAgent

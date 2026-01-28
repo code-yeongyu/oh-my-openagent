@@ -412,6 +412,41 @@ describe("resolveModelWithFallback", () => {
     })
   })
 
+  describe("fallback_models", () => {
+    test("uses fallback_models when override model is unavailable", () => {
+      // #given
+      const availableModels = new Set(["openai/gpt-5.2", "google/gemini-3-pro"])
+
+      // #when
+      const result = resolveModelWithFallback({
+        userModel: "anthropic/claude-opus-4-5",
+        fallbackModels: ["openai/gpt-5.2"],
+        availableModels,
+        systemDefaultModel: "system/default",
+      })
+
+      // #then
+      expect(result!.model).toBe("openai/gpt-5.2")
+    })
+
+    test("keeps override semantics when no cache is available", () => {
+      // #given
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+
+      // #when
+      const result = resolveModelWithFallback({
+        userModel: "anthropic/claude-opus-4-5",
+        fallbackModels: ["openai/gpt-5.2"],
+        availableModels: new Set(),
+        systemDefaultModel: "system/default",
+      })
+
+      // #then
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      cacheSpy.mockRestore()
+    })
+  })
+
   describe("Multi-entry fallbackChain", () => {
     test("resolves to claude-opus when OpenAI unavailable but Anthropic available (oracle scenario)", () => {
       // #given
