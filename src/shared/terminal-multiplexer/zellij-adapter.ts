@@ -64,8 +64,8 @@ export class ZellijAdapter implements Multiplexer {
     const cmdArgs = ["bash", "-c", wrappedCmd]
 
     const zellijCmd = isFirstPane
-      ? ["zellij", "action", "new-pane", "-d", direction, "-n", label, "--", ...cmdArgs]
-      : ["zellij", "action", "new-pane", "-n", label, "--", ...cmdArgs]
+      ? ["zellij", "action", "new-pane", "-d", direction, "-n", label, "--close-on-exit", "--", ...cmdArgs]
+      : ["zellij", "action", "new-pane", "-n", label, "--close-on-exit", "--", ...cmdArgs]
 
     const proc = spawn(zellijCmd, {
       stdout: "pipe",
@@ -112,9 +112,39 @@ export class ZellijAdapter implements Multiplexer {
     }
   }
 
-  async closePane(handle: PaneHandle): Promise<void> {
-    this.labelToSpawned.delete(handle.label)
-  }
+   async closePane(handle: PaneHandle): Promise<void> {
+      log("[ZellijAdapter.closePane] called", { label: handle.label })
+      
+      // Extract session ID from label (format: "omo-subagent-ses_XXXXX")
+      const match = handle.label.match(/ses_[a-zA-Z0-9]+/)
+      if (match) {
+        const sessionId = match[0]
+        log("[ZellijAdapter.closePane] extracted sessionId", { sessionId, label: handle.label })
+        
+        // Kill the opencode attach process for this session
+         // This will trigger --close-on-exit to close the pane
+         // Using -9 (SIGKILL) for immediate termination since process may ignore SIGTERM
+         const proc = spawn(["pkill", "-9", "-f", `opencode attach.*${sessionId}`], {
+           stdout: "pipe",
+           stderr: "pipe",
+         })
+        const exitCode = await proc.exited
+        const stdout = await new Response(proc.stdout).text()
+        const stderr = await new Response(proc.stderr).text()
+        
+        log("[ZellijAdapter.closePane] pkill result", { 
+          exitCode, 
+          stdout: stdout.trim(), 
+          stderr: stderr.trim(),
+          sessionId 
+        })
+      } else {
+        log("[ZellijAdapter.closePane] no session ID found in label", { label: handle.label })
+      }
+      
+      this.labelToSpawned.delete(handle.label)
+      log("[ZellijAdapter.closePane] completed", { label: handle.label })
+    }
 
   async getPanes(): Promise<PaneHandle[]> {
     const proc = spawn(["zellij", "list-sessions", "-n"], {
