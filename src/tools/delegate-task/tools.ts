@@ -537,7 +537,7 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model ?? resolved.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -567,7 +567,7 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type, source }
              
              const parsedModel = parseModelString(actualModel)
-             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
              categoryModel = parsedModel
                ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
                : undefined
