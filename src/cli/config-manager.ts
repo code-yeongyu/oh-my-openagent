@@ -532,14 +532,11 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
       },
       "antigravity-claude-sonnet-4-5": {
         name: "Claude Sonnet 4.5 (Antigravity)",
-        attachment: true,
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
       "antigravity-claude-sonnet-4-5-thinking": {
         name: "Claude Sonnet 4.5 Thinking (Antigravity)",
-        thinking: true,
-        attachment: true,
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {
@@ -549,8 +546,6 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
       },
       "antigravity-claude-opus-4-5-thinking": {
         name: "Claude Opus 4.5 Thinking (Antigravity)",
-        thinking: true,
-        attachment: true,
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {
