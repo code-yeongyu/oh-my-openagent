@@ -356,8 +356,10 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
-    test("uses connected provider when availableModels empty but connected providers cache exists", () => {
+    test("skips fallback chain when availableModels empty even if connected providers cache exists", () => {
       // #given - model cache missing but connected-providers cache exists
+      // This scenario caused bugs: provider is connected but may not have the model available
+      // Fix: When we can't verify model availability, skip fallback chain entirely
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "google"])
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
@@ -370,9 +372,32 @@ describe("resolveModelWithFallback", () => {
       // #when
       const result = resolveModelWithFallback(input)
 
-      // #then - should use openai (second provider) since anthropic not in connected cache
-      expect(result!.model).toBe("openai/claude-opus-4-5")
-      expect(result!.source).toBe("provider-fallback")
+      // #then - should fall through to system default (NOT use connected provider blindly)
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("system-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("prevents selecting model from provider that may not have it (bug reproduction)", () => {
+      // #given - user removed anthropic oauth, has quotio, but explore agent fallback has opencode
+      // opencode may be "connected" but doesn't have claude-haiku-4-5
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["quotio", "opencode"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+        ],
+        availableModels: new Set(), // no model cache available
+        systemDefaultModel: "quotio/claude-opus-4-5-20251101",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should NOT return opencode/claude-haiku-4-5 (model may not exist)
+      // should fall through to system default which user has configured
+      expect(result!.model).toBe("quotio/claude-opus-4-5-20251101")
+      expect(result!.source).toBe("system-default")
+      expect(result!.model).not.toBe("opencode/claude-haiku-4-5")
       cacheSpy.mockRestore()
     })
 
