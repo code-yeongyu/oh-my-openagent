@@ -37,6 +37,8 @@ import {
   createUnstableAgentBabysitterHook,
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
+  createLoopDetectorHook,
+  createDefinitionGatesHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -316,6 +318,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
+    : null;
+
+  const loopDetectorHook = isHookEnabled("loop-detector")
+    ? createLoopDetectorHook(ctx)
+    : null;
+
+  const definitionGatesHook = isHookEnabled("definition-gates")
+    ? createDefinitionGatesHook(ctx)
     : null;
 
   initTaskToastManager(ctx.client);
@@ -634,6 +644,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await ralphLoop?.event(input);
       await stopContinuationGuard?.event(input);
       await atlasHook?.handler(input);
+      await loopDetectorHook?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -729,6 +740,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
+      await loopDetectorHook?.["tool.execute.before"]?.(input, output);
+      await definitionGatesHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
