@@ -32,10 +32,10 @@
 - 完整测试覆盖
 
 ### Definition of Done
-- [ ] `bun test` 全部通过
-- [ ] 无 boulder 时不触发 tasks.md 扫描
-- [ ] 读取 >200 words 的 .md 时被阻止
-- [ ] 写入 .md 时强制 outline 工作流
+- [x] `bun test` 全部通过
+- [x] 无 boulder 时不触发 tasks.md 扫描
+- [x] 读取 >200 words 的 .md 时被阻止
+- [x] 写入 .md 时强制 outline 工作流
 
 ### Must Have
 - Bug 修复：boulder 检查逻辑
@@ -99,9 +99,9 @@ Phase 3: Verification
 
 ## TODOs
 
-### Phase 0: 统一路径规范修复 (前置修复) `pending`
+### Phase 0: 统一路径规范修复 (前置修复) `completed`
 
-- [ ] 0.1 统一所有 `.sisyphus/` 路径引用到 `changes/`
+- [x] 0.1 统一所有 `.sisyphus/` 路径引用到 `changes/`
 
   **What to do**:
   系统中存在两套路径约定的不一致，需要统一到 `changes/` 目录：
@@ -145,11 +145,11 @@ Phase 3: Verification
   - `src/features/boulder-state/storage.ts` - 搜索逻辑修改点
 
   **Acceptance Criteria**:
-  - [ ] 所有 `.sisyphus/drafts/` 引用已移除或更新
-  - [ ] 所有 `.sisyphus/plans/` 引用已改为 `changes/*/tasks.md`
-  - [ ] `bun run typecheck` → PASS
-  - [ ] `bun test` → PASS
-  - [ ] Prometheus 工作流文档与实际行为一致
+  - [x] 所有 `.sisyphus/drafts/` 引用已移除或更新
+  - [x] 所有 `.sisyphus/plans/` 引用已改为 `changes/*/tasks.md`
+  - [x] `bun run typecheck` → PASS
+  - [x] `bun test` → PASS
+  - [x] Prometheus 工作流文档与实际行为一致
 
   **Commit**: YES
   - Message: `fix(agents): unify plan paths to changes/ directory (remove .sisyphus/ references)`
@@ -158,9 +158,9 @@ Phase 3: Verification
 
 ---
 
-### Phase 1: TODO CONTINUATION Bug Fix `pending`
+### Phase 1: TODO CONTINUATION Bug Fix `completed`
 
-- [ ] 1.1 编写 todo-continuation-enforcer 测试用例
+- [x] 1.1 编写 todo-continuation-enforcer 测试用例
 
   **What to do**:
   - 创建测试文件或在现有测试中添加用例
@@ -180,14 +180,14 @@ Phase 3: Verification
   - `src/hooks/todo-continuation-enforcer.test.ts` - 现有测试文件
 
   **Acceptance Criteria**:
-  - [ ] 测试文件创建/更新
-  - [ ] `bun test todo-continuation` → FAIL (测试存在但实现未修复)
+  - [x] 测试文件创建/更新
+  - [x] `bun test todo-continuation` → FAIL (测试存在但实现未修复)
 
   **Commit**: NO (groups with 1.2)
 
 ---
 
-- [ ] 1.2 修复 planProgress 调用条件
+- [x] 1.2 修复 planProgress 调用条件
 
   **What to do**:
   - 在 L572 处添加 `boulderState?.active_plan` 检查
@@ -205,8 +205,8 @@ Phase 3: Verification
   - `src/features/plan-progress-reader/reader.ts:L141-L146` - readPlanProgress 实现
 
   **Acceptance Criteria**:
-  - [ ] 代码修改完成
-  - [ ] `bun test todo-continuation` → PASS
+  - [x] 代码修改完成
+  - [x] `bun test todo-continuation` → PASS
 
   **Commit**: YES
   - Message: `fix(hooks): gate planProgress behind active boulder check`
@@ -215,7 +215,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 1.3 修复 hasIncomplete 判断逻辑
+- [x] 1.3 修复 hasIncomplete 判断逻辑
 
   **What to do**:
   - 在 L737 处修改判断逻辑
@@ -231,8 +231,8 @@ Phase 3: Verification
   - `src/hooks/todo-continuation-enforcer.ts:L725-L732` - apiIncompleteCount 计算
 
   **Acceptance Criteria**:
-  - [ ] 代码修改完成
-  - [ ] `bun test todo-continuation` → PASS
+  - [x] 代码修改完成
+  - [x] `bun test todo-continuation` → PASS
 
   **Commit**: YES
   - Message: `fix(hooks): only use fileIncompleteCount when boulder is active`
@@ -241,7 +241,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 1.4 验证 Bug 修复完整性
+- [x] 1.4 验证 Bug 修复完整性
 
   **What to do**:
   - 运行完整测试套件
@@ -257,16 +257,16 @@ Phase 3: Verification
   - `src/features/boulder-state/storage.ts` - boulder 状态读取
 
   **Acceptance Criteria**:
-  - [ ] `bun test` → 全部 PASS
-  - [ ] 手动验证通过
+  - [x] `bun test` → 全部 PASS
+  - [x] 手动验证通过
 
   **Commit**: NO (verification only)
 
 ---
 
-### Phase 2: Progressive-Disclosure-MD Integration `pending`
+### Phase 2: Progressive-Disclosure-MD Integration `completed`
 
-- [ ] 2.1 创建 builtin skill 目录结构
+- [x] 2.1 创建 builtin skill 目录结构
 
   **What to do**:
   - 创建 `src/features/builtin-skills/progressive-disclosure-md/` 目录
@@ -282,14 +282,14 @@ Phase 3: Verification
   - `src/features/builtin-skills/index.ts` - 导出注册点
 
   **Acceptance Criteria**:
-  - [ ] 目录创建
-  - [ ] index.ts 存在
+  - [x] 目录创建
+  - [x] index.ts 存在
 
   **Commit**: NO (groups with 2.2)
 
 ---
 
-- [ ] 2.2 复制并适配 SKILL.md
+- [x] 2.2 复制并适配 SKILL.md
 
   **What to do**:
   - 从 `~/.claude/skills/progressive-disclosure-md/SKILL.md` 复制内容
@@ -307,8 +307,8 @@ Phase 3: Verification
   - `src/features/builtin-skills/mdsel/SKILL.md` - 格式参考
 
   **Acceptance Criteria**:
-  - [ ] SKILL.md 创建
-  - [ ] 路径已适配
+  - [x] SKILL.md 创建
+  - [x] 路径已适配
 
   **Commit**: YES
   - Message: `feat(skills): add progressive-disclosure-md builtin skill`
@@ -317,7 +317,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 2.3 创建 mdsel-enforcer hook 骨架
+- [x] 2.3 创建 mdsel-enforcer hook 骨架
 
   **What to do**:
   - 创建 `src/hooks/mdsel-enforcer/` 目录
@@ -334,15 +334,15 @@ Phase 3: Verification
   - `src/hooks/prometheus-md-only/` - PreToolUse block 模式参考
 
   **Acceptance Criteria**:
-  - [ ] 目录结构创建
-  - [ ] 常量定义完成
-  - [ ] `bun run typecheck` → PASS
+  - [x] 目录结构创建
+  - [x] 常量定义完成
+  - [x] `bun run typecheck` → PASS
 
   **Commit**: NO (groups with 2.4)
 
 ---
 
-- [ ] 2.4 实现 mdsel-enforcer PreToolUse 逻辑
+- [x] 2.4 实现 mdsel-enforcer PreToolUse 逻辑
 
   **What to do**:
   - 实现 Read 工具的 PreToolUse 检查
@@ -360,8 +360,8 @@ Phase 3: Verification
   - `src/hooks/comment-checker/index.ts` - 文件内容检查模式
 
   **Acceptance Criteria**:
-  - [ ] PreToolUse 逻辑实现
-  - [ ] `bun test mdsel-enforcer` → PASS
+  - [x] PreToolUse 逻辑实现
+  - [x] `bun test mdsel-enforcer` → PASS
 
   **Commit**: YES
   - Message: `feat(hooks): implement mdsel-enforcer PreToolUse blocking`
@@ -370,7 +370,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 2.5 注册 skill 到 skills.ts
+- [x] 2.5 注册 skill 到 skills.ts
 
   **What to do**:
   - 在 `src/features/builtin-skills/skills.ts` 中添加 progressive-disclosure-md
@@ -386,8 +386,8 @@ Phase 3: Verification
   - `src/features/builtin-skills/types.ts` - 类型定义
 
   **Acceptance Criteria**:
-  - [ ] Skill 注册完成
-  - [ ] `bun run typecheck` → PASS
+  - [x] Skill 注册完成
+  - [x] `bun run typecheck` → PASS
 
   **Commit**: YES
   - Message: `feat(skills): register progressive-disclosure-md in skills.ts`
@@ -396,7 +396,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 2.6 添加配置项到 schema.ts
+- [x] 2.6 添加配置项到 schema.ts
 
   **What to do**:
   - 在 `src/config/schema.ts` 添加 progressive-disclosure 配置
@@ -413,9 +413,9 @@ Phase 3: Verification
   - `src/config/types.ts` - 类型导出
 
   **Acceptance Criteria**:
-  - [ ] 配置项添加
-  - [ ] `bun run build:schema` → PASS
-  - [ ] `bun run typecheck` → PASS
+  - [x] 配置项添加
+  - [x] `bun run build:schema` → PASS
+  - [x] `bun run typecheck` → PASS
 
   **Commit**: YES
   - Message: `feat(config): add progressive-disclosure skill configuration`
@@ -424,7 +424,7 @@ Phase 3: Verification
 
 ---
 
-- [ ] 2.7 注册 hook 到 index.ts
+- [x] 2.7 注册 hook 到 index.ts
 
   **What to do**:
   - 在 `src/hooks/index.ts` 注册 mdsel-enforcer hook
@@ -440,9 +440,9 @@ Phase 3: Verification
   - `src/index.ts` - 插件入口
 
   **Acceptance Criteria**:
-  - [ ] Hook 注册完成
-  - [ ] `bun run typecheck` → PASS
-  - [ ] `bun test` → PASS
+  - [x] Hook 注册完成
+  - [x] `bun run typecheck` → PASS
+  - [x] `bun test` → PASS
 
   **Commit**: YES
   - Message: `feat(hooks): register mdsel-enforcer in hook chain`
@@ -451,9 +451,9 @@ Phase 3: Verification
 
 ---
 
-### Phase 3: Final Verification `pending`
+### Phase 3: Final Verification `completed`
 
-- [ ] 3.1 运行完整测试套件
+- [x] 3.1 运行完整测试套件
 
   **What to do**:
   - `bun test` 运行所有测试
@@ -470,15 +470,15 @@ Phase 3: Verification
   - `package.json` - 测试和构建脚本
 
   **Acceptance Criteria**:
-  - [ ] `bun test` → 全部 PASS
-  - [ ] `bun run typecheck` → 0 errors
-  - [ ] `bun run build` → 成功
+  - [x] `bun test` → 全部 PASS
+  - [x] `bun run typecheck` → 0 errors
+  - [x] `bun run build` → 成功
 
   **Commit**: NO (verification only)
 
 ---
 
-- [ ] 3.2 更新 HookNameSchema
+- [x] 3.2 更新 HookNameSchema
 
   **What to do**:
   - 在 `src/config/schema.ts` 的 HookNameSchema 中添加 "mdsel-enforcer"
@@ -493,8 +493,8 @@ Phase 3: Verification
   - `src/config/schema.ts:HookNameSchema` - hook 名称枚举
 
   **Acceptance Criteria**:
-  - [ ] Hook 名称添加
-  - [ ] `bun run build:schema` → PASS
+  - [x] Hook 名称添加
+  - [x] `bun run build:schema` → PASS
 
   **Commit**: YES
   - Message: `feat(config): add mdsel-enforcer to HookNameSchema`
@@ -529,11 +529,11 @@ bun run build:schema        # Expected: success
 ```
 
 ### Final Checklist
-- [ ] TODO CONTINUATION bug 已修复
-- [ ] 无 boulder 时不扫描 tasks.md
-- [ ] progressive-disclosure-md skill 已注册
-- [ ] mdsel-enforcer hook 已实现
-- [ ] >200 words 的 .md 被阻止直接读取
-- [ ] 写入 .md 强制 outline 工作流
-- [ ] 配置项可禁用功能
-- [ ] 所有测试通过
+- [x] TODO CONTINUATION bug 已修复
+- [x] 无 boulder 时不扫描 tasks.md
+- [x] progressive-disclosure-md skill 已注册
+- [x] mdsel-enforcer hook 已实现
+- [x] >200 words 的 .md 被阻止直接读取
+- [x] 写入 .md 强制 outline 工作流
+- [x] 配置项可禁用功能
+- [x] 所有测试通过
