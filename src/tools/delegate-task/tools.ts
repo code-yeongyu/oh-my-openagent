@@ -800,6 +800,13 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }
+
+        // When using subagent_type directly, inherit parent model so agents don't default
+        // to their hardcoded models (like grok-code) which may not be available
+        if (parentModel) {
+          categoryModel = parentModel
+          modelInfo = { model: `${parentModel.providerID}/${parentModel.modelID}`, type: "inherited" }
+        }
       }
 
       const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
