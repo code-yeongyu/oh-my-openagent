@@ -1892,4 +1892,250 @@ describe("sisyphus-task", () => {
       expect(resolved!.model).toBe(systemDefaultModel)
     })
   })
+
+  describe("prometheus self-delegation block", () => {
+    test("prometheus cannot delegate to prometheus - returns error with guidance", async () => {
+      // #given - current agent is prometheus
+      const { createDelegateTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "prometheus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - prometheus tries to delegate to prometheus
+      const result = await tool.execute(
+        {
+          description: "Test self-delegation block",
+          prompt: "Create a plan",
+          subagent_type: "prometheus",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should return error telling prometheus to create plan directly
+      expect(result).toContain("prometheus")
+      expect(result).toContain("directly")
+    })
+
+    test("non-prometheus agent CAN delegate to prometheus - proceeds normally", async () => {
+      // #given - current agent is sisyphus
+      const { createDelegateTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_prometheus_allowed" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created successfully" }] }]
+          }),
+          status: async () => ({ data: { "ses_prometheus_allowed": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - sisyphus delegates to prometheus
+      const result = await tool.execute(
+        {
+          description: "Test prometheus delegation from non-prometheus agent",
+          prompt: "Create a plan",
+          subagent_type: "prometheus",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should proceed normally
+      expect(result).not.toContain("Cannot delegate")
+      expect(result).toContain("Plan created successfully")
+    }, { timeout: 20000 })
+
+    test("case-insensitive: Prometheus (capitalized) cannot delegate to prometheus", async () => {
+      // #given - current agent is Prometheus (capitalized)
+      const { createDelegateTask } = require("./tools")
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Prometheus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - Prometheus tries to delegate to prometheus
+      const result = await tool.execute(
+        {
+          description: "Test case-insensitive block",
+          prompt: "Create a plan",
+          subagent_type: "prometheus",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - should still return error
+      expect(result).toContain("prometheus")
+      expect(result).toContain("directly")
+    })
+  })
+
+  describe("prometheus subagent delegate_task permission", () => {
+    test("prometheus subagent should have delegate_task permission enabled", async () => {
+      // #given - sisyphus delegates to prometheus
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_prometheus_delegate" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
+          }),
+          status: async () => ({ data: { "ses_prometheus_delegate": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - sisyphus delegates to prometheus
+      await tool.execute(
+        {
+          description: "Test prometheus delegate_task permission",
+          prompt: "Create a plan",
+          subagent_type: "prometheus",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - prometheus should have delegate_task permission
+      expect(promptBody.tools.delegate_task).toBe(true)
+    }, { timeout: 20000 })
+
+    test("non-prometheus subagent should NOT have delegate_task permission", async () => {
+      // #given - sisyphus delegates to oracle (non-prometheus)
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+      
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "oracle", mode: "subagent" }] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_oracle_no_delegate" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Consultation done" }] }]
+          }),
+          status: async () => ({ data: { "ses_oracle_no_delegate": { type: "idle" } } }),
+        },
+      }
+      
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      // #when - sisyphus delegates to oracle
+      await tool.execute(
+        {
+          description: "Test oracle no delegate_task permission",
+          prompt: "Consult on architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      // #then - oracle should NOT have delegate_task permission
+      expect(promptBody.tools.delegate_task).toBe(false)
+    }, { timeout: 20000 })
+  })
 })
