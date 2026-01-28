@@ -7,7 +7,7 @@ let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
 
 export function isInsideTmux(): boolean {
-  return !!process.env.TMUX
+  return !!(process.env.TMUX || process.env.ZELLIJ || process.env.ZELLIJ_SESSION_NAME)
 }
 
 export async function isServerRunning(serverUrl: string): Promise<boolean> {
@@ -53,8 +53,12 @@ export function resetServerCheck(): void {
 
 export type SplitDirection = "-h" | "-v"
 
+/**
+ * Returns the current pane ID from tmux ($TMUX_PANE) or zellij ($ZELLIJ_PANE_ID).
+ * Prioritizes tmux for backward compatibility. Returns undefined if not in a multiplexer.
+ */
 export function getCurrentPaneId(): string | undefined {
-  return process.env.TMUX_PANE
+  return process.env.TMUX_PANE || process.env.ZELLIJ_PANE_ID || undefined
 }
 
 export interface PaneDimensions {

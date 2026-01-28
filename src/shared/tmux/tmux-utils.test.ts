@@ -6,52 +6,90 @@ import {
   spawnTmuxPane,
   closeTmuxPane,
   applyLayout,
+  getCurrentPaneId,
 } from "./tmux-utils"
 
 describe("isInsideTmux", () => {
-  test("returns true when TMUX env is set", () => {
-    // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = "/tmp/tmux-1000/default"
+  let savedTmux: string | undefined
+  let savedZellij: string | undefined
+  let savedZellijSession: string | undefined
 
-    // when
-    const result = isInsideTmux()
-
-    // then
-    expect(result).toBe(true)
-
-    // cleanup
-    process.env.TMUX = originalTmux
+  beforeEach(() => {
+    savedTmux = process.env.TMUX
+    savedZellij = process.env.ZELLIJ
+    savedZellijSession = process.env.ZELLIJ_SESSION_NAME
+    process.env.TMUX = ""
+    process.env.ZELLIJ = ""
+    process.env.ZELLIJ_SESSION_NAME = ""
   })
 
-  test("returns false when TMUX env is not set", () => {
-    // given
-    const originalTmux = process.env.TMUX
-    delete process.env.TMUX
+  afterEach(() => {
+    process.env.TMUX = savedTmux
+    process.env.ZELLIJ = savedZellij
+    process.env.ZELLIJ_SESSION_NAME = savedZellijSession
+  })
 
-    // when
+  test("returns true when TMUX env is set", () => {
+    //#given TMUX is set
+    process.env.TMUX = "/tmp/tmux-1000/default"
+
+    //#when isInsideTmux is called
     const result = isInsideTmux()
 
-    // then
-    expect(result).toBe(false)
+    //#then it should return true
+    expect(result).toBe(true)
+  })
 
-    // cleanup
-    process.env.TMUX = originalTmux
+  test("returns false when no multiplexer env vars are set", () => {
+    //#given no multiplexer env vars are set (cleared in beforeEach)
+    //#when isInsideTmux is called
+    const result = isInsideTmux()
+
+    //#then it should return false
+    expect(result).toBe(false)
   })
 
   test("returns false when TMUX env is empty string", () => {
-    // given
-    const originalTmux = process.env.TMUX
-    process.env.TMUX = ""
-
-    // when
+    //#given all env vars are empty strings (set in beforeEach)
+    //#when isInsideTmux is called
     const result = isInsideTmux()
 
-    // then
+    //#then it should return false
     expect(result).toBe(false)
+  })
 
-    // cleanup
-    process.env.TMUX = originalTmux
+  test("returns true when ZELLIJ env is set", () => {
+    //#given process.env.ZELLIJ is set
+    process.env.ZELLIJ = "0.42.0"
+
+    //#when isInsideTmux is called
+    const result = isInsideTmux()
+
+    //#then it should return true
+    expect(result).toBe(true)
+  })
+
+  test("returns true when ZELLIJ_SESSION_NAME env is set", () => {
+    //#given process.env.ZELLIJ_SESSION_NAME is set
+    process.env.ZELLIJ_SESSION_NAME = "erudite-brachiosaur"
+
+    //#when isInsideTmux is called
+    const result = isInsideTmux()
+
+    //#then it should return true
+    expect(result).toBe(true)
+  })
+
+  test("returns true when both ZELLIJ and ZELLIJ_SESSION_NAME are set", () => {
+    //#given both zellij env vars are set
+    process.env.ZELLIJ = "0.42.0"
+    process.env.ZELLIJ_SESSION_NAME = "erudite-brachiosaur"
+
+    //#when isInsideTmux is called
+    const result = isInsideTmux()
+
+    //#then it should return true
+    expect(result).toBe(true)
   })
 })
 
@@ -165,6 +203,108 @@ describe("resetServerCheck", () => {
 
     // cleanup
     globalThis.fetch = originalFetch
+  })
+})
+
+describe("getCurrentPaneId", () => {
+  let savedTmuxPane: string | undefined
+  let savedZellijPaneId: string | undefined
+
+  beforeEach(() => {
+    savedTmuxPane = process.env.TMUX_PANE
+    savedZellijPaneId = process.env.ZELLIJ_PANE_ID
+    delete process.env.TMUX_PANE
+    delete process.env.ZELLIJ_PANE_ID
+  })
+
+  afterEach(() => {
+    if (savedTmuxPane !== undefined) {
+      process.env.TMUX_PANE = savedTmuxPane
+    } else {
+      delete process.env.TMUX_PANE
+    }
+    if (savedZellijPaneId !== undefined) {
+      process.env.ZELLIJ_PANE_ID = savedZellijPaneId
+    } else {
+      delete process.env.ZELLIJ_PANE_ID
+    }
+  })
+
+  test("returns pane id when TMUX_PANE is set", () => {
+    //#given process.env.TMUX_PANE is set
+    process.env.TMUX_PANE = "%123"
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return the tmux pane id
+    expect(result).toBe("%123")
+  })
+
+  test("returns pane id when ZELLIJ_PANE_ID is set", () => {
+    //#given process.env.ZELLIJ_PANE_ID is set
+    process.env.ZELLIJ_PANE_ID = "0"
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return the zellij pane id
+    expect(result).toBe("0")
+  })
+
+  test("prioritizes TMUX_PANE over ZELLIJ_PANE_ID when both are set", () => {
+    //#given both TMUX_PANE and ZELLIJ_PANE_ID are set
+    process.env.TMUX_PANE = "%123"
+    process.env.ZELLIJ_PANE_ID = "0"
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return the tmux pane id (priority)
+    expect(result).toBe("%123")
+  })
+
+  test("returns undefined when neither is set", () => {
+    //#given neither TMUX_PANE nor ZELLIJ_PANE_ID is set (cleared in beforeEach)
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return undefined
+    expect(result).toBeUndefined()
+  })
+
+  test("returns undefined when TMUX_PANE is empty string", () => {
+    //#given TMUX_PANE is empty string
+    process.env.TMUX_PANE = ""
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return undefined (empty string is falsy)
+    expect(result).toBeUndefined()
+  })
+
+  test("returns undefined when ZELLIJ_PANE_ID is empty string", () => {
+    //#given ZELLIJ_PANE_ID is empty string
+    process.env.ZELLIJ_PANE_ID = ""
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return undefined (empty string is falsy)
+    expect(result).toBeUndefined()
+  })
+
+  test("returns undefined when both are empty strings", () => {
+    //#given both TMUX_PANE and ZELLIJ_PANE_ID are empty strings
+    process.env.TMUX_PANE = ""
+    process.env.ZELLIJ_PANE_ID = ""
+
+    //#when getCurrentPaneId is called
+    const result = getCurrentPaneId()
+
+    //#then it should return undefined
+    expect(result).toBeUndefined()
   })
 })
 

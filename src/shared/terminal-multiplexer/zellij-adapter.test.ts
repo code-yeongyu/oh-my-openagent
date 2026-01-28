@@ -1,20 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import { ZellijAdapter } from "./zellij-adapter"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 
 const mockConfig = {
   enabled: true,
   sessionPrefix: "omo-test",
 }
 
+let ZellijAdapter: any
+
 describe("ZellijAdapter", () => {
   let originalSpawn: typeof Bun.spawn
-  let mockSpawn: ReturnType<typeof mock>
 
-  beforeEach(() => {
-    //#given - mock Bun.spawn to avoid real subprocess calls
+  beforeEach(async () => {
+    //#given - mock Bun.spawn before importing the adapter
     originalSpawn = Bun.spawn
-    mockSpawn = mock(() => ({
-      exited: 0,
+    ;(Bun as any).spawn = () => ({
+      exited: Promise.resolve(0),
       stdout: new ReadableStream({
         start(controller) {
           controller.close()
@@ -25,8 +25,11 @@ describe("ZellijAdapter", () => {
           controller.close()
         },
       }),
-    }))
-    ;(Bun as any).spawn = mockSpawn
+    })
+    
+    //#when - dynamically import after mocking
+    const module = await import("./zellij-adapter")
+    ZellijAdapter = module.ZellijAdapter
   })
 
   afterEach(() => {
@@ -102,7 +105,7 @@ describe("ZellijAdapter", () => {
 
       //#then - label should be removed from cache
       const panes = await adapter.getPanes()
-      expect(panes.some((p) => p.label === "omo-close-test")).toBe(false)
+      expect(panes.some((p: any) => p.label === "omo-close-test")).toBe(false)
     })
 
     it("handles closing non-existent pane gracefully", async () => {

@@ -284,33 +284,52 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const configuredProvider = pluginConfig.terminal?.provider ?? "auto";
-  const detectedType = configuredProvider === "auto"
-    ? await detectMultiplexer()
-    : configuredProvider;
-  log("[index] Terminal multiplexer detection", { configuredProvider, detectedType });
+   const configuredProvider = pluginConfig.terminal?.provider ?? "auto";
+   const detectedType = configuredProvider === "auto"
+     ? await detectMultiplexer()
+     : configuredProvider;
+   log("[index] Terminal multiplexer detection", { configuredProvider, detectedType });
+   
+   const terminalEnabledFlag = detectedType === 'zellij'
+     ? pluginConfig.terminal?.zellij?.enabled ?? pluginConfig.tmux?.enabled ?? false
+     : detectedType === 'tmux'
+     ? pluginConfig.terminal?.tmux?.enabled ?? pluginConfig.tmux?.enabled ?? false
+     : pluginConfig.tmux?.enabled ?? false;
+   
+   const multiplexer = detectedType
+     ? createMultiplexer(detectedType, {
+         tmux: { enabled: terminalEnabledFlag },
+         zellij: { enabled: terminalEnabledFlag },
+       })
+     : null;
   
-  const multiplexer = detectedType
-    ? createMultiplexer(detectedType, {
-        tmux: { enabled: tmuxConfig.enabled },
-        zellij: { enabled: pluginConfig.terminal?.zellij?.enabled ?? tmuxConfig.enabled },
-      })
-    : null;
-  
-  const tmuxSessionManager = multiplexer
-    ? new TmuxSessionManager(ctx, multiplexer, tmuxConfig)
-    : null;
+   const updatedTmuxConfig = {
+     ...tmuxConfig,
+     enabled: terminalEnabledFlag,
+   } as const;
 
-  const backgroundManager = new BackgroundManager(
-    ctx,
-    pluginConfig.background_task,
-    {
-      tmuxConfig,
-      onSubagentSessionCreated: async (event) => {
-        log("[index] onSubagentSessionCreated callback received", {
-          sessionID: event.sessionID,
-          parentID: event.parentID,
-          title: event.title,
+   const tmuxSessionManager = multiplexer
+     ? new TmuxSessionManager(ctx, multiplexer, updatedTmuxConfig)
+     : null;
+
+   const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task, {
+     tmuxConfig: updatedTmuxConfig,
+    onSubagentSessionCreated: async (event) => {
+      log("[index] onSubagentSessionCreated callback received", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      if (tmuxSessionManager) {
+        await tmuxSessionManager.onSessionCreated({
+          type: "session.created",
+          properties: {
+            info: {
+              id: event.sessionID,
+              parentID: event.parentID,
+              title: event.title,
+            },
+          },
         });
         if (tmuxSessionManager) {
           await tmuxSessionManager.onSessionCreated({

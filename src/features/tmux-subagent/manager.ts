@@ -310,7 +310,7 @@ export class TmuxSessionManager {
   }
 
   private buildSpawnCommand(sessionId: string, _title: string): string {
-    return `opencode --session ${sessionId} --server ${this.serverUrl}`
+    return `opencode attach ${this.serverUrl} --session ${sessionId}`
   }
 
   async onSessionDeleted(event: { sessionID: string }): Promise<void> {
