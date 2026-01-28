@@ -64,7 +64,7 @@ import {
   updateSessionAgent,
   clearSessionAgent,
 } from "./features/claude-code-session-state";
-import { TmuxAdapter } from "./shared/terminal-multiplexer";
+import { detectMultiplexer, createMultiplexer } from "./shared/terminal-multiplexer";
 import {
   builtinTools,
   createCallOmoAgent,
@@ -284,8 +284,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const multiplexer = new TmuxAdapter({ enabled: tmuxConfig.enabled });
-  const tmuxSessionManager = new TmuxSessionManager(ctx, multiplexer, tmuxConfig);
+  const configuredProvider = pluginConfig.terminal?.provider ?? "auto";
+  const detectedType = configuredProvider === "auto"
+    ? await detectMultiplexer()
+    : configuredProvider;
+  log("[index] Terminal multiplexer detection", { configuredProvider, detectedType });
+  
+  const multiplexer = detectedType
+    ? createMultiplexer(detectedType, {
+        tmux: { enabled: tmuxConfig.enabled },
+        zellij: { enabled: pluginConfig.terminal?.zellij?.enabled ?? tmuxConfig.enabled },
+      })
+    : null;
+  
+  const tmuxSessionManager = multiplexer
+    ? new TmuxSessionManager(ctx, multiplexer, tmuxConfig)
+    : null;
 
   const backgroundManager = new BackgroundManager(
     ctx,
@@ -298,22 +312,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           parentID: event.parentID,
           title: event.title,
         });
-        await tmuxSessionManager.onSessionCreated({
-          type: "session.created",
-          properties: {
-            info: {
-              id: event.sessionID,
-              parentID: event.parentID,
-              title: event.title,
+        if (tmuxSessionManager) {
+          await tmuxSessionManager.onSessionCreated({
+            type: "session.created",
+            properties: {
+              info: {
+                id: event.sessionID,
+                parentID: event.parentID,
+                title: event.title,
+              },
             },
-          },
-        });
+          });
+        }
         log("[index] onSubagentSessionCreated callback completed");
       },
       onShutdown: () => {
-        tmuxSessionManager.cleanup().catch((error) => {
-          log("[index] tmux cleanup error during shutdown:", error);
-        });
+        if (tmuxSessionManager) {
+          tmuxSessionManager.cleanup().catch((error) => {
+            log("[index] tmux cleanup error during shutdown:", error);
+          });
+        }
       },
     },
   );
@@ -406,16 +424,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         parentID: event.parentID,
         title: event.title,
       });
-      await tmuxSessionManager.onSessionCreated({
-        type: "session.created",
-        properties: {
-          info: {
-            id: event.sessionID,
-            parentID: event.parentID,
-            title: event.title,
+      if (tmuxSessionManager) {
+        await tmuxSessionManager.onSessionCreated({
+          type: "session.created",
+          properties: {
+            info: {
+              id: event.sessionID,
+              parentID: event.parentID,
+              title: event.title,
+            },
           },
-        },
-      });
+        });
+      }
     },
   });
   const systemMcpNames = getSystemMcpServerNames();
@@ -651,14 +671,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           setMainSession(sessionInfo?.id);
         }
         firstMessageVariantGate.markSessionCreated(sessionInfo);
-        await tmuxSessionManager.onSessionCreated(
-          event as {
-            type: string;
-            properties?: {
-              info?: { id?: string; parentID?: string; title?: string };
-            };
-          },
-        );
+        if (tmuxSessionManager) {
+          await tmuxSessionManager.onSessionCreated(
+            event as {
+              type: string;
+              properties?: {
+                info?: { id?: string; parentID?: string; title?: string };
+              };
+            },
+          );
+        }
       }
 
       if (event.type === "session.deleted") {
@@ -672,9 +694,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           firstMessageVariantGate.clear(sessionInfo.id);
           await skillMcpManager.disconnectSession(sessionInfo.id);
           await lspManager.cleanupTempDirectoryClients();
-          await tmuxSessionManager.onSessionDeleted({
-            sessionID: sessionInfo.id,
-          });
+          if (tmuxSessionManager) {
+            await tmuxSessionManager.onSessionDeleted({
+              sessionID: sessionInfo.id,
+            });
+          }
         }
       }
 

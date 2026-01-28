@@ -27,7 +27,7 @@ features/
 ├── hook-message-injector/      # Message injection
 ├── task-toast-manager/         # Background task notifications
 ├── skill-mcp-manager/          # MCP client lifecycle (617 lines)
-├── tmux-subagent/              # Tmux session management
+├── tmux-subagent/              # Terminal multiplexer session management (tmux/zellij)
 ├── mcp-oauth/                  # MCP OAuth handling
 ├── sisyphus-swarm/             # Swarm coordination
 ├── sisyphus-tasks/             # Task tracking
@@ -56,9 +56,45 @@ features/
 - **Transports**: stdio, http (SSE/Streamable)
 - **Lifecycle**: 5m idle cleanup
 
+## TMUX SESSION MANAGER
+
+**Purpose**: Manages background agent sessions in terminal multiplexer panes.
+
+### Architecture
+
+- **Multiplexer Abstraction**: Uses `Multiplexer` interface (supports tmux and zellij)
+- **Capability-Based Behavior**: Checks `adapter.capabilities.manualLayout` for layout strategy
+- **Dual State Tracking**: Maintains both `TrackedSession` and `PaneHandle` maps
+
+### Layout Strategies
+
+| Capability | Strategy | Multiplexer |
+|------------|----------|-------------|
+| `manualLayout: true` | Decision engine with grid algorithm | tmux |
+| `manualLayout: false` | Simple spawn, auto-layout | zellij |
+
+### Usage
+
+```typescript
+// Create with detected multiplexer
+const adapter = createMultiplexer(detectedType, config)
+const manager = new TmuxSessionManager(ctx, adapter, tmuxConfig)
+
+// Manager handles capability branching internally
+manager.onSessionCreated(session)  // Uses appropriate strategy
+```
+
+### Key Features
+
+- **Auto-detection**: Detects tmux or zellij via environment variables
+- **Graceful degradation**: Plugin works without multiplexer
+- **Backward compatible**: Existing tmux functionality unchanged
+- **Clean separation**: Capability-based branching is explicit
+
 ## ANTI-PATTERNS
 
 - **Sequential delegation**: Use `delegate_task` parallel
 - **Trust self-reports**: ALWAYS verify
 - **Main thread blocks**: No heavy I/O in loader init
 - **Direct state mutation**: Use managers for boulder/session state
+- **Hardcoded multiplexer**: Use `terminal-multiplexer` abstraction
