@@ -1,14 +1,17 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
+  let cacheSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
     __resetModelCache()
     clearSkillCache()
@@ -21,10 +24,12 @@ describe("sisyphus-task", () => {
       MAX_POLL_TIME_MS: 2000,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
+    cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
   })
 
   afterEach(() => {
     __resetTimingConfig()
+    cacheSpy?.mockRestore()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
