@@ -768,6 +768,12 @@ To continue this session: session_id="${sessionID}"`
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
         }
 
+        if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
+          return `You are prometheus. You cannot delegate to prometheus via delegate_task.
+
+Create the work plan directly - that's your job as the planning agent.`
+        }
+
         agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
@@ -927,6 +933,7 @@ To continue this session: session_id="${task.sessionID}"`
         })
 
         try {
+          const allowDelegateTask = isPlanAgent(agentToUse)
           await client.session.prompt({
             path: { id: sessionID },
             body: {
@@ -934,7 +941,7 @@ To continue this session: session_id="${task.sessionID}"`
               system: systemContent,
               tools: {
                 task: false,
-                delegate_task: false,
+                delegate_task: allowDelegateTask,
                 call_omo_agent: true,
                 question: false,
               },
