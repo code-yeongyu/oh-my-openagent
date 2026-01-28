@@ -4,8 +4,15 @@ import { TmuxAdapter } from "./tmux-adapter"
 import { ZellijAdapter } from "./zellij-adapter"
 
 describe("detectMultiplexer", () => {
+  let savedTmux: string | undefined
+  let savedZellij: string | undefined
+  let savedZellijSession: string | undefined
+
   beforeEach(() => {
     resetDetectionCache()
+    savedTmux = process.env.TMUX
+    savedZellij = process.env.ZELLIJ
+    savedZellijSession = process.env.ZELLIJ_SESSION_NAME
     delete process.env.TMUX
     delete process.env.ZELLIJ
     delete process.env.ZELLIJ_SESSION_NAME
@@ -13,6 +20,22 @@ describe("detectMultiplexer", () => {
 
   afterEach(() => {
     resetDetectionCache()
+    // Restore or delete based on original state
+    if (savedTmux !== undefined) {
+      process.env.TMUX = savedTmux
+    } else {
+      delete process.env.TMUX
+    }
+    if (savedZellij !== undefined) {
+      process.env.ZELLIJ = savedZellij
+    } else {
+      delete process.env.ZELLIJ
+    }
+    if (savedZellijSession !== undefined) {
+      process.env.ZELLIJ_SESSION_NAME = savedZellijSession
+    } else {
+      delete process.env.ZELLIJ_SESSION_NAME
+    }
   })
 
   it("returns 'tmux' when $TMUX env var is set", async () => {

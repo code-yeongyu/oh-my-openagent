@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import { TmuxAdapter } from "./tmux-adapter"
 
 const mockConfig = {
@@ -148,9 +148,27 @@ describe("TmuxAdapter", () => {
   })
 
   describe("ensureSession", () => {
+    const createdSessions: string[] = []
+
+    beforeEach(() => {
+      createdSessions.length = 0
+    })
+
+    afterEach(async () => {
+      for (const sessionName of createdSessions) {
+        try {
+          await adapter.killSession(sessionName)
+        } catch {
+          // Ignore errors if session doesn't exist
+        }
+      }
+      createdSessions.length = 0
+    })
+
     it("accepts session name and creates session", async () => {
       //#given
       const sessionName = "omo-test-session"
+      createdSessions.push(sessionName)
 
       //#when
       const ensurePromise = adapter.ensureSession(sessionName)
@@ -162,6 +180,7 @@ describe("TmuxAdapter", () => {
     it("succeeds when session already exists", async () => {
       //#given
       const sessionName = "omo-existing-session"
+      createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
       //#when
@@ -173,9 +192,27 @@ describe("TmuxAdapter", () => {
   })
 
   describe("killSession", () => {
+    const createdSessions: string[] = []
+
+    beforeEach(() => {
+      createdSessions.length = 0
+    })
+
+    afterEach(async () => {
+      for (const sessionName of createdSessions) {
+        try {
+          await adapter.killSession(sessionName)
+        } catch {
+          // Ignore errors if session doesn't exist
+        }
+      }
+      createdSessions.length = 0
+    })
+
     it("accepts session name and kills session", async () => {
       //#given
       const sessionName = "omo-kill-test"
+      createdSessions.push(sessionName)
       await adapter.ensureSession(sessionName)
 
       //#when

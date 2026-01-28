@@ -24,9 +24,21 @@ describe("isInsideTmux", () => {
   })
 
   afterEach(() => {
-    process.env.TMUX = savedTmux
-    process.env.ZELLIJ = savedZellij
-    process.env.ZELLIJ_SESSION_NAME = savedZellijSession
+    if (savedTmux !== undefined) {
+      process.env.TMUX = savedTmux
+    } else {
+      delete process.env.TMUX
+    }
+    if (savedZellij !== undefined) {
+      process.env.ZELLIJ = savedZellij
+    } else {
+      delete process.env.ZELLIJ
+    }
+    if (savedZellijSession !== undefined) {
+      process.env.ZELLIJ_SESSION_NAME = savedZellijSession
+    } else {
+      delete process.env.ZELLIJ_SESSION_NAME
+    }
   })
 
   test("returns true when TMUX env is set", () => {
