@@ -72,8 +72,8 @@
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.55.2",
-    "@rsdoctor/core": "^1.5.0",
-    "@rsdoctor/rspack-plugin": "^1.5.0",
+    "@rsdoctor/core": "^1.5.1",
+    "@rsdoctor/rspack-plugin": "^1.5.1",
     "@rslib/core": "^0.19.3",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.2",
@@ -81,13 +81,13 @@
     "typescript": "^5.9.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.1.3",
-    "oh-my-opencode-darwin-x64": "3.1.3",
-    "oh-my-opencode-linux-arm64": "3.1.3",
-    "oh-my-opencode-linux-arm64-musl": "3.1.3",
+    "oh-my-opencode-darwin-arm64": "3.1.4",
+    "oh-my-opencode-darwin-x64": "3.1.4",
+    "oh-my-opencode-linux-arm64": "3.1.4",
+    "oh-my-opencode-linux-arm64-musl": "3.1.4",
     "oh-my-opencode-linux-x64": "3.1.4",
     "oh-my-opencode-linux-x64-musl": "3.1.4",
-    "oh-my-opencode-windows-x64": "3.1.3"
+    "oh-my-opencode-windows-x64": "3.1.4"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
