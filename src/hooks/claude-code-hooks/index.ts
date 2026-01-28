@@ -237,6 +237,11 @@ export function createClaudeCodeHooksHook(
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: unknown }
     ): Promise<void> => {
+      // Guard against undefined output (e.g., from /review command - see issue #1035)
+      if (!output) {
+        return
+      }
+
       const claudeConfig = await loadClaudeHooksConfig()
       const extendedConfig = await loadPluginExtendedConfig()
 
