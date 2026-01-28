@@ -144,10 +144,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION);
 
     if (hasNativeSupport) {
-      console.warn(
-        `[oh-my-opencode] directory-agents-injector hook auto-disabled: ` +
-        `OpenCode ${currentVersion} has native AGENTS.md support (>= ${OPENCODE_NATIVE_AGENTS_INJECTION_VERSION})`
-      );
       log("directory-agents-injector auto-disabled due to native OpenCode support", {
         currentVersion,
         nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
