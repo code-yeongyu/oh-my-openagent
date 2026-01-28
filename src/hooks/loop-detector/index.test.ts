@@ -92,22 +92,26 @@ describe("loop-detector", () => {
 
     test("only considers recent history window", () => {
       //#given
-      const oldHistory: ToolCallRecord[] = Array.from({ length: 20 }, (_, i) => ({
-        tool: "read",
-        args: { path: `/old-${i}.ts` },
-        timestamp: i,
-      }))
-      const recentHistory: ToolCallRecord[] = [
-        { tool: "read", args: { path: "/new.ts" }, timestamp: 21 },
-        { tool: "edit", args: { path: "/new.ts" }, timestamp: 22 },
+      // Create a loop pattern in old history (3 identical calls = would trigger detection)
+      const loopInOldHistory: ToolCallRecord[] = [
+        { tool: "read", args: { path: "/looped.ts" }, timestamp: 1 },
+        { tool: "read", args: { path: "/looped.ts" }, timestamp: 2 },
+        { tool: "read", args: { path: "/looped.ts" }, timestamp: 3 },
       ]
-      const history = [...oldHistory, ...recentHistory]
+      // Add enough unique calls (varied tools) to push the loop outside the history window
+      const tools = ["glob", "grep", "bash", "write", "lsp_diagnostics"]
+      const fillerHistory: ToolCallRecord[] = Array.from({ length: 12 }, (_, i) => ({
+        tool: tools[i % tools.length],
+        args: { path: `/filler-${i}.ts` },
+        timestamp: 10 + i,
+      }))
+      const history = [...loopInOldHistory, ...fillerHistory]
 
       //#when
       const result = detectLoop(history)
 
       //#then
-      // Should not detect loop from old repeated reads
+      // Loop in old history (outside window) should be ignored
       expect(result).toBeNull()
     })
   })
