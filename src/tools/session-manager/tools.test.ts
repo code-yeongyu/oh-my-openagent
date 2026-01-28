@@ -7,6 +7,8 @@ const mockContext: ToolContext = {
   messageID: "test-message",
   agent: "test-agent",
   abort: new AbortController().signal,
+  directory: "/test/project",
+  worktree: "/test/project",
   metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
   ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
 }
