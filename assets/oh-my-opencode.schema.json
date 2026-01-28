@@ -2768,7 +2768,8 @@
           "type": "string",
           "enum": [
             "playwright",
-            "agent-browser"
+            "agent-browser",
+            "dev-browser"
           ]
         }
       }

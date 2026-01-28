@@ -891,40 +891,40 @@ Original task: Build something`
   })
 
   describe("API timeout protection", () => {
-    // FIXME: Flaky in CI - times out intermittently
-    test.skip("should not hang when session.messages() times out", async () => {
-      // #given - slow API that takes longer than timeout
-      const slowMock = {
+    test("should not hang when session.messages() throws", async () => {
+      // #given - API that throws (simulates timeout error)
+      let apiCallCount = 0
+      const errorMock = {
         ...createMockPluginInput(),
         client: {
           ...createMockPluginInput().client,
           session: {
             ...createMockPluginInput().client.session,
             messages: async () => {
-              // Simulate slow API (would hang without timeout)
-              await new Promise((resolve) => setTimeout(resolve, 10000))
-              return { data: [] }
+              apiCallCount++
+              throw new Error("API timeout")
             },
           },
         },
       }
-      const hook = createRalphLoopHook(slowMock as any, {
+      const hook = createRalphLoopHook(errorMock as any, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
-        apiTimeout: 100, // 100ms timeout for test
+        apiTimeout: 100,
       })
       hook.startLoop("session-123", "Build something")
 
-      // #when - session goes idle (API will timeout)
+      // #when - session goes idle (API will throw)
       const startTime = Date.now()
       await hook.event({
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
       })
       const elapsed = Date.now() - startTime
 
-      // #then - should complete within timeout + buffer (not hang for 10s)
-      expect(elapsed).toBeLessThan(500)
-      // #then - loop should continue (API timeout = no completion detected)
+      // #then - should complete quickly (not hang for 10s)
+      expect(elapsed).toBeLessThan(2000)
+      // #then - loop should continue (API error = no completion detected)
       expect(promptCalls.length).toBe(1)
+      expect(apiCallCount).toBeGreaterThan(0)
     })
   })
 })

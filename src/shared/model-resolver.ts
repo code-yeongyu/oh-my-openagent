@@ -55,28 +55,10 @@ export function resolveModelWithFallback(
 	// Step 2: Provider fallback chain (with availability check)
 	if (fallbackChain && fallbackChain.length > 0) {
 		if (availableModels.size === 0) {
-			const connectedProviders = readConnectedProvidersCache()
-			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
-
-			for (const entry of fallbackChain) {
-				for (const provider of entry.providers) {
-					if (connectedSet === null || connectedSet.has(provider)) {
-						const model = `${provider}/${entry.model}`
-						log("Model resolved via fallback chain (no model cache, using connected provider)", { 
-							provider, 
-							model: entry.model, 
-							variant: entry.variant,
-							hasConnectedCache: connectedSet !== null
-						})
-						return { model, source: "provider-fallback", variant: entry.variant }
-					}
-				}
-			}
-			const firstEntry = fallbackChain[0]
-			const firstProvider = firstEntry.providers[0]
-			const model = `${firstProvider}/${firstEntry.model}`
-			log("Model resolved via fallback chain (no cache at all, using first entry)", { provider: firstProvider, model: firstEntry.model, variant: firstEntry.variant })
-			return { model, source: "provider-fallback", variant: firstEntry.variant }
+			// When model cache is empty, we cannot verify if a provider actually has the model.
+			// Skip fallback chain entirely and fall through to system default.
+			// This prevents selecting provider/model combinations that may not exist.
+			log("No model cache available, skipping fallback chain to use system default")
 		}
 
 		for (const entry of fallbackChain) {

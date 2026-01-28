@@ -163,7 +163,10 @@ async function executeSync(
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
-      },
+        permission: [
+          { permission: "question", action: "deny" as const, pattern: "*" },
+        ],
+      } as any,
       query: {
         directory: parentDirectory,
       },
@@ -171,6 +174,17 @@ async function executeSync(
 
     if (createResult.error) {
       log(`[call_omo_agent] Session create error:`, createResult.error)
+      const errorStr = String(createResult.error)
+      if (errorStr.toLowerCase().includes("unauthorized")) {
+        return `Error: Failed to create session (Unauthorized). This may be due to:
+1. OAuth token restrictions (e.g., Claude Code credentials are restricted to Claude Code only)
+2. Provider authentication issues
+3. Session permission inheritance problems
+
+Try using a different provider or API key authentication.
+
+Original error: ${createResult.error}`
+      }
       return `Error: Failed to create session: ${createResult.error}`
     }
 

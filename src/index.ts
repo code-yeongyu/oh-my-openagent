@@ -40,7 +40,7 @@ import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
-import { applyAgentVariant, resolveAgentVariant } from "./shared/agent-variant";
+import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./shared/agent-variant";
 import { createFirstMessageVariantGate } from "./shared/first-message-variant";
 import {
   discoverUserClaudeSkills,
@@ -78,7 +78,7 @@ import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -136,9 +136,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         experimental: pluginConfig.experimental,
       })
     : null;
-  const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
-    ? createDirectoryAgentsInjectorHook(ctx)
-    : null;
+  // Check for native OpenCode AGENTS.md injection support before creating hook
+  let directoryAgentsInjector = null;
+  if (isHookEnabled("directory-agents-injector")) {
+    const currentVersion = getOpenCodeVersion();
+    const hasNativeSupport = currentVersion !== null &&
+      isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION);
+
+    if (hasNativeSupport) {
+      log("directory-agents-injector auto-disabled due to native OpenCode support", {
+        currentVersion,
+        nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+      });
+    } else {
+      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+    }
+  }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? createDirectoryReadmeInjectorHook(ctx)
     : null;
@@ -384,19 +397,39 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       const message = (output as { message: { variant?: string } }).message
       if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-        const variant = resolveAgentVariant(pluginConfig, input.agent)
+        const variant = input.model && input.agent
+          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+          : resolveAgentVariant(pluginConfig, input.agent)
         if (variant !== undefined) {
           message.variant = variant
         }
         firstMessageVariantGate.markApplied(input.sessionID)
       } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
+        if (input.model && input.agent && message.variant === undefined) {
+          const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
+          if (variant !== undefined) {
+            message.variant = variant
+          }
+        } else {
+          applyAgentVariant(pluginConfig, input.agent, message)
+        }
       }
 
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+
+      if (!hasConnectedProvidersCache()) {
+        ctx.client.tui.showToast({
+          body: {
+            title: "⚠️ Provider Cache Missing",
+            message: "Model filtering disabled. RESTART OpenCode to enable full functionality.",
+            variant: "warning" as const,
+            duration: 6000,
+          },
+        }).catch(() => {});
+      }
 
       if (ralphLoop) {
         const parts = (
@@ -637,6 +670,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
+      // Guard against undefined output (e.g., from /review command - see issue #1035)
+      if (!output) {
+        return;
+      }
       await claudeCodeHooks["tool.execute.after"](input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);

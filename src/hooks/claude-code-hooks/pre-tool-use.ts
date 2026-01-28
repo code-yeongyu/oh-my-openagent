@@ -117,7 +117,7 @@ export async function executePreToolUseHooks(
 
       if (result.stdout) {
         try {
-          const output = JSON.parse(result.stdout) as PreToolUseOutput
+          const output = JSON.parse(result.stdout || "{}") as PreToolUseOutput
 
           // Handle deprecated decision/reason fields (Claude Code backward compat)
           let decision: PermissionDecision | undefined

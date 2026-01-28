@@ -663,6 +663,11 @@ export function createAtlasHook(
       input: ToolExecuteAfterInput,
       output: ToolExecuteAfterOutput
     ): Promise<void> => {
+      // Guard against undefined output (e.g., from /review command - see issue #1035)
+      if (!output) {
+        return
+      }
+
       if (!isCallerOrchestrator(input.sessionID)) {
         return
       }

@@ -14,6 +14,8 @@ body:
       label: Prerequisites
       description: Please confirm the following before submitting
       options:
+        - label: I will write this issue in English (see our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy))
+          required: true
         - label: I have searched existing issues and discussions to avoid duplicates
           required: true
         - label: This feature request is specific to oh-my-opencode (not OpenCode core)
