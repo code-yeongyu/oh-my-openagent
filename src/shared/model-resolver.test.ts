@@ -1,6 +1,7 @@
-import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
 import * as logger from "./logger"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 describe("resolveModel", () => {
   describe("priority chain", () => {
@@ -336,8 +337,48 @@ describe("resolveModelWithFallback", () => {
       expect(logSpy).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
     })
 
-    test("uses first fallback entry when availableModels is empty (no cache scenario)", () => {
-      // #given - empty availableModels simulates CI environment without model cache
+    test("returns undefined when availableModels empty and no connected providers cache exists", () => {
+      // #given - both model cache and connected-providers cache are missing (first run)
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["anthropic"], model: "claude-opus-4-5" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: undefined, // no system default configured
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should return undefined to let OpenCode use Provider.defaultModel()
+      expect(result).toBeUndefined()
+      cacheSpy.mockRestore()
+    })
+
+    test("uses connected provider when availableModels empty but connected providers cache exists", () => {
+      // #given - model cache missing but connected-providers cache exists
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "google"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["anthropic", "openai"], model: "claude-opus-4-5" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use openai (second provider) since anthropic not in connected cache
+      expect(result!.model).toBe("openai/claude-opus-4-5")
+      expect(result!.source).toBe("provider-fallback")
+      cacheSpy.mockRestore()
+    })
+
+    test("falls through to system default when no cache and systemDefaultModel is provided", () => {
+      // #given - no cache but system default is configured
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["anthropic"], model: "claude-opus-4-5" },
@@ -349,9 +390,10 @@ describe("resolveModelWithFallback", () => {
       // #when
       const result = resolveModelWithFallback(input)
 
-      // #then - should use first fallback entry, not system default
-      expect(result!.model).toBe("anthropic/claude-opus-4-5")
-      expect(result!.source).toBe("provider-fallback")
+      // #then - should fall through to system default
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("system-default")
+      cacheSpy.mockRestore()
     })
 
     test("returns system default when fallbackChain is not provided", () => {
