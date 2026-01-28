@@ -215,7 +215,9 @@ export function checkEnvironment(): EnvironmentCheckResult {
 
   // Check NAPI availability
   try {
-    require("@ast-grep/napi")
+    const require = createRequire(import.meta.url)
+    const napiModuleId = "@ast-grep/" + "napi"
+    require(napiModuleId)
     result.napi.available = true
   } catch (e) {
     result.napi.available = false
