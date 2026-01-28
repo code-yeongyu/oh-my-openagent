@@ -40,7 +40,7 @@ import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
-import { applyAgentVariant, resolveAgentVariant } from "./shared/agent-variant";
+import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./shared/agent-variant";
 import { createFirstMessageVariantGate } from "./shared/first-message-variant";
 import {
   discoverUserClaudeSkills,
@@ -384,13 +384,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       const message = (output as { message: { variant?: string } }).message
       if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-        const variant = resolveAgentVariant(pluginConfig, input.agent)
+        const variant = input.model && input.agent
+          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+          : resolveAgentVariant(pluginConfig, input.agent)
         if (variant !== undefined) {
           message.variant = variant
         }
         firstMessageVariantGate.markApplied(input.sessionID)
       } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
+        if (input.model && input.agent && message.variant === undefined) {
+          const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
+          if (variant !== undefined) {
+            message.variant = variant
+          }
+        } else {
+          applyAgentVariant(pluginConfig, input.agent, message)
+        }
       }
 
       await keywordDetector?.["chat.message"]?.(input, output);
@@ -648,6 +657,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
+      // Guard against undefined output (e.g., from /review command - see issue #1035)
+      if (!output) {
+        return;
+      }
       await claudeCodeHooks["tool.execute.after"](input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);

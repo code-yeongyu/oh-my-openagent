@@ -170,6 +170,20 @@ export function getCachedVersion(): string | null {
     log("[auto-update-checker] Failed to resolve version from current directory:", err)
   }
 
+  // Fallback for compiled binaries (npm global install)
+  // process.execPath points to the actual binary location
+  try {
+    const execDir = path.dirname(fs.realpathSync(process.execPath))
+    const pkgPath = findPackageJsonUp(execDir)
+    if (pkgPath) {
+      const content = fs.readFileSync(pkgPath, "utf-8")
+      const pkg = JSON.parse(content) as PackageJson
+      if (pkg.version) return pkg.version
+    }
+  } catch (err) {
+    log("[auto-update-checker] Failed to resolve version from execPath:", err)
+  }
+
   return null
 }
 
