@@ -93,7 +93,7 @@ export async function executeStopHooks(
 
        if (result.stdout) {
          try {
-           const output = JSON.parse(result.stdout) as StopOutput
+           const output = JSON.parse(result.stdout || "{}") as StopOutput
            if (output.stop_hook_active !== undefined) {
              stopHookActiveState.set(ctx.sessionId, output.stop_hook_active)
            }
