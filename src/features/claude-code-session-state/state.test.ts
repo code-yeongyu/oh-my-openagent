@@ -92,9 +92,8 @@ describe("claude-code-session-state", () => {
       expect(getMainSessionID()).toBe(mainID)
     })
 
-    test.skip("should return undefined when not set", () => {
-      // #given - not set
-      // TODO: Fix flaky test - parallel test execution causes state pollution
+    test("should return undefined when not set", () => {
+      // #given - state reset by beforeEach
       // #then
       expect(getMainSessionID()).toBeUndefined()
     })
