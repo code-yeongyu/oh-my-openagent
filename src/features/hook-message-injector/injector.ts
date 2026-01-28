@@ -5,7 +5,7 @@ import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } fr
 
 export interface StoredMessage {
   agent?: string
-  model?: { providerID?: string; modelID?: string }
+  model?: { providerID?: string; modelID?: string; variant?: string }
   tools?: Record<string, ToolPermission>
 }
 

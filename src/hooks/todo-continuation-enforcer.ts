@@ -205,7 +205,11 @@ export function createTodoContinuationEnforcer(
       const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
       agentName = agentName ?? prevMessage?.agent
       model = model ?? (prevMessage?.model?.providerID && prevMessage?.model?.modelID
-        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        ? { 
+            providerID: prevMessage.model.providerID, 
+            modelID: prevMessage.model.modelID,
+            ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+          }
         : undefined)
       tools = tools ?? prevMessage?.tools
     }
