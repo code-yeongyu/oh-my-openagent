@@ -40,7 +40,7 @@
           buildPhase = ''
             export HOME=$(mktemp -d)
             export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
-            bun install --frozen-lockfile --no-progress
+            bun install --no-progress --ignore-scripts
           '';
 
           installPhase = ''
@@ -50,7 +50,7 @@
 
           outputHashMode = "recursive";
           outputHashAlgo = "sha256";
-          outputHash = "sha256-HMaAcUx7VhvnOIJ1Wl6f4dv/IzL6EVv17KcJ7ivVubk=";
+          outputHash = "sha256-kBdRmbbIdmGQFCAuuv27C6ZqWO9m8g6yxC6vcxlIJW8=";
         };
       in
       {
