@@ -1,5 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+
+const mockContext: ToolContext = {
+  sessionID: "test-session",
+  messageID: "test-message",
+  agent: "test-agent",
+  abort: new AbortController().signal,
+  directory: "/test/project",
+  worktree: "/test/project",
+  metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
+  ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
+}
 
 describe("look-at tool", () => {
   describe("normalizeArgs", () => {
@@ -92,16 +104,9 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
       const result = await tool.execute(
         { file_path: "/test/file.png", goal: "analyze image" },
-        toolContext
+        mockContext
       )
 
       expect(result).toContain("Error: Failed to analyze file")
@@ -130,16 +135,9 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
       const result = await tool.execute(
         { file_path: "/test/file.pdf", goal: "extract text" },
-        toolContext
+        mockContext
       )
 
       expect(result).toContain("Error: Failed to send prompt")
