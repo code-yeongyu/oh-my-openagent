@@ -15,19 +15,15 @@ cd "$SCRIPT_DIR"
 echo "Working directory: $SCRIPT_DIR"
 echo ""
 
-echo -e "${YELLOW}[1/4]${NC} Pulling latest code from GitHub..."
-git pull origin dev
-echo -e "${GREEN}✓${NC} Repository updated\n"
-
-echo -e "${YELLOW}[2/4]${NC} Installing dependencies with Bun..."
+echo -e "${YELLOW}[1/3]${NC} Installing dependencies with Bun..."
 bun install
 echo -e "${GREEN}✓${NC} Dependencies installed\n"
 
-echo -e "${YELLOW}[3/4]${NC} Building project with Bun..."
+echo -e "${YELLOW}[2/3]${NC} Building project with Bun..."
 bun run build
 echo -e "${GREEN}✓${NC} Build completed\n"
 
-echo -e "${YELLOW}[4/4]${NC} Verifying build output..."
+echo -e "${YELLOW}[3/3]${NC} Verifying build output..."
 if [ -f "dist/index.js" ] && [ -f "dist/index.d.ts" ]; then
     echo -e "${GREEN}✓${NC} Build verification successful"
     echo "  - dist/index.js exists"
