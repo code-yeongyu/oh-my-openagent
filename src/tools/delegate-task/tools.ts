@@ -5,6 +5,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
+import { getTimingConfig } from "./timing"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -409,9 +410,10 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         // Wait for message stability after prompt completes
-        const POLL_INTERVAL_MS = 500
-        const MIN_STABILITY_TIME_MS = 5000
-        const STABILITY_POLLS_REQUIRED = 3
+        const timing = getTimingConfig()
+        const POLL_INTERVAL_MS = timing.POLL_INTERVAL_MS
+        const MIN_STABILITY_TIME_MS = timing.SESSION_CONTINUATION_STABILITY_MS
+        const STABILITY_POLLS_REQUIRED = timing.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
@@ -662,10 +664,11 @@ Available categories: ${categoryNames.join(", ")}`
             const startTime = new Date()
 
             // Poll for completion (same logic as sync mode)
-            const POLL_INTERVAL_MS = 500
-            const MAX_POLL_TIME_MS = 10 * 60 * 1000
-            const MIN_STABILITY_TIME_MS = 10000
-            const STABILITY_POLLS_REQUIRED = 3
+            const timingCfg = getTimingConfig()
+            const POLL_INTERVAL_MS = timingCfg.POLL_INTERVAL_MS
+            const MAX_POLL_TIME_MS = timingCfg.MAX_POLL_TIME_MS
+            const MIN_STABILITY_TIME_MS = timingCfg.MIN_STABILITY_TIME_MS
+            const STABILITY_POLLS_REQUIRED = timingCfg.STABILITY_POLLS_REQUIRED
             const pollStart = Date.now()
             let lastMsgCount = 0
             let stablePolls = 0
@@ -965,10 +968,11 @@ To continue this session: session_id="${task.sessionID}"`
 
         // Poll for session completion with stability detection
         // The session may show as "idle" before messages appear, so we also check message stability
-        const POLL_INTERVAL_MS = 500
-        const MAX_POLL_TIME_MS = 10 * 60 * 1000
-        const MIN_STABILITY_TIME_MS = 10000  // Minimum 10s before accepting completion
-        const STABILITY_POLLS_REQUIRED = 3
+        const syncTiming = getTimingConfig()
+        const POLL_INTERVAL_MS = syncTiming.POLL_INTERVAL_MS
+        const MAX_POLL_TIME_MS = syncTiming.MAX_POLL_TIME_MS
+        const MIN_STABILITY_TIME_MS = syncTiming.MIN_STABILITY_TIME_MS
+        const STABILITY_POLLS_REQUIRED = syncTiming.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
