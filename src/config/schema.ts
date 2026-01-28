@@ -313,13 +313,14 @@ export const GitMasterConfigSchema = z.object({
   include_co_authored_by: z.boolean().default(true),
 })
 
-export const BrowserAutomationProviderSchema = z.enum(["playwright", "agent-browser"])
+export const BrowserAutomationProviderSchema = z.enum(["playwright", "agent-browser", "dev-browser"])
 
 export const BrowserAutomationConfigSchema = z.object({
   /**
    * Browser automation provider to use for the "playwright" skill.
    * - "playwright": Uses Playwright MCP server (@playwright/mcp) - default
    * - "agent-browser": Uses Vercel's agent-browser CLI (requires: bun add -g agent-browser)
+   * - "dev-browser": Uses dev-browser skill with persistent browser state
    */
   provider: BrowserAutomationProviderSchema.default("playwright"),
 })
@@ -338,6 +339,29 @@ export const TmuxConfigSchema = z.object({
   main_pane_size: z.number().min(20).max(80).default(60),
   main_pane_min_width: z.number().min(40).default(120),
   agent_pane_min_width: z.number().min(20).default(40),
+})
+
+export const SisyphusTasksConfigSchema = z.object({
+  /** Enable Sisyphus Tasks system (default: false) */
+  enabled: z.boolean().default(false),
+  /** Storage path for tasks (default: .sisyphus/tasks) */
+  storage_path: z.string().default(".sisyphus/tasks"),
+  /** Enable Claude Code path compatibility mode */
+  claude_code_compat: z.boolean().default(false),
+})
+
+export const SisyphusSwarmConfigSchema = z.object({
+  /** Enable Sisyphus Swarm system (default: false) */
+  enabled: z.boolean().default(false),
+  /** Storage path for teams (default: .sisyphus/teams) */
+  storage_path: z.string().default(".sisyphus/teams"),
+  /** UI mode: toast notifications, tmux panes, or both */
+  ui_mode: z.enum(["toast", "tmux", "both"]).default("toast"),
+})
+
+export const SisyphusConfigSchema = z.object({
+  tasks: SisyphusTasksConfigSchema.optional(),
+  swarm: SisyphusSwarmConfigSchema.optional(),
 })
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -360,6 +384,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  sisyphus: SisyphusConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -386,5 +411,8 @@ export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProvider
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
+export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
+export type SisyphusSwarmConfig = z.infer<typeof SisyphusSwarmConfigSchema>
+export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

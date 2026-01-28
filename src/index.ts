@@ -34,6 +34,7 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
+  createSubagentQuestionBlockerHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -77,7 +78,7 @@ import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -224,6 +225,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
+  const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
@@ -396,6 +398,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
 
+      if (!hasConnectedProvidersCache()) {
+        ctx.client.tui.showToast({
+          body: {
+            title: "⚠️ Provider Cache Missing",
+            message: "Model filtering disabled. RESTART OpenCode to enable full functionality.",
+            variant: "warning" as const,
+            duration: 6000,
+          },
+        }).catch(() => {});
+      }
+
       if (ralphLoop) {
         const parts = (
           output as { parts?: Array<{ type: string; text?: string }> }
@@ -555,6 +568,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
       await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);

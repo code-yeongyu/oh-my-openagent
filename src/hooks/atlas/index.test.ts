@@ -396,8 +396,8 @@ describe("atlas hook", () => {
         )
 
         // #then
-        expect(output.output).toContain("DELEGATION REQUIRED")
         expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).toContain("delegate_task")
         expect(output.output).toContain("delegate_task")
       })
 
@@ -417,7 +417,7 @@ describe("atlas hook", () => {
         )
 
         // #then
-        expect(output.output).toContain("DELEGATION REQUIRED")
+        expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
       })
 
       test("should NOT append reminder when orchestrator writes inside .sisyphus/", async () => {
@@ -438,7 +438,7 @@ describe("atlas hook", () => {
 
         // #then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
       })
 
       test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
@@ -462,7 +462,7 @@ describe("atlas hook", () => {
 
         // #then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         
         cleanupMessageStorage(nonOrchestratorSession)
       })
@@ -526,7 +526,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should NOT append reminder when orchestrator writes inside .sisyphus with mixed separators", async () => {
@@ -547,7 +547,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should NOT append reminder for absolute Windows path inside .sisyphus\\", async () => {
@@ -568,7 +568,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should append reminder for Windows path outside .sisyphus\\", async () => {
@@ -587,7 +587,7 @@ describe("atlas hook", () => {
           )
 
           // #then
-          expect(output.output).toContain("DELEGATION REQUIRED")
+          expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
       })
     })
@@ -636,7 +636,7 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("BOULDER CONTINUATION")
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
