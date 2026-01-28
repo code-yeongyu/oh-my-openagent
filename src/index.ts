@@ -78,7 +78,7 @@ import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -136,9 +136,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         experimental: pluginConfig.experimental,
       })
     : null;
-  const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
-    ? createDirectoryAgentsInjectorHook(ctx)
-    : null;
+  // Check for native OpenCode AGENTS.md injection support before creating hook
+  let directoryAgentsInjector = null;
+  if (isHookEnabled("directory-agents-injector")) {
+    const currentVersion = getOpenCodeVersion();
+    const hasNativeSupport = currentVersion !== null &&
+      isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION);
+
+    if (hasNativeSupport) {
+      console.warn(
+        `[oh-my-opencode] directory-agents-injector hook auto-disabled: ` +
+        `OpenCode ${currentVersion} has native AGENTS.md support (>= ${OPENCODE_NATIVE_AGENTS_INJECTION_VERSION})`
+      );
+      log("directory-agents-injector auto-disabled due to native OpenCode support", {
+        currentVersion,
+        nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+      });
+    } else {
+      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+    }
+  }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? createDirectoryReadmeInjectorHook(ctx)
     : null;
