@@ -141,9 +141,17 @@ export function injectHookMessage(
   const resolvedAgent = originalMessage.agent ?? fallback?.agent ?? "general"
   const resolvedModel =
     originalMessage.model?.providerID && originalMessage.model?.modelID
-      ? { providerID: originalMessage.model.providerID, modelID: originalMessage.model.modelID }
+      ? { 
+          providerID: originalMessage.model.providerID, 
+          modelID: originalMessage.model.modelID,
+          ...(originalMessage.model.variant ? { variant: originalMessage.model.variant } : {})
+        }
       : fallback?.model?.providerID && fallback?.model?.modelID
-        ? { providerID: fallback.model.providerID, modelID: fallback.model.modelID }
+        ? { 
+            providerID: fallback.model.providerID, 
+            modelID: fallback.model.modelID,
+            ...(fallback.model.variant ? { variant: fallback.model.variant } : {})
+          }
         : undefined
   const resolvedTools = originalMessage.tools ?? fallback?.tools
 
