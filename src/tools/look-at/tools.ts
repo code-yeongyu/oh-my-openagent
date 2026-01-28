@@ -102,7 +102,10 @@ If the requested information is not found, clearly state what is missing.`
         body: {
           parentID: toolContext.sessionID,
           title: `look_at: ${args.goal.substring(0, 50)}`,
-        },
+          permission: [
+            { permission: "question", action: "deny" as const, pattern: "*" },
+          ],
+        } as any,
         query: {
           directory: parentDirectory,
         },
@@ -110,6 +113,17 @@ If the requested information is not found, clearly state what is missing.`
 
       if (createResult.error) {
         log(`[look_at] Session create error:`, createResult.error)
+        const errorStr = String(createResult.error)
+        if (errorStr.toLowerCase().includes("unauthorized")) {
+          return `Error: Failed to create session (Unauthorized). This may be due to:
+1. OAuth token restrictions (e.g., Claude Code credentials are restricted to Claude Code only)
+2. Provider authentication issues
+3. Session permission inheritance problems
+
+Try using a different provider or API key authentication.
+
+Original error: ${createResult.error}`
+        }
         return `Error: Failed to create session: ${createResult.error}`
       }
 
