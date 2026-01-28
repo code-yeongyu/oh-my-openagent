@@ -35,8 +35,8 @@
 - Git commit 包含所有 22+ 个任务的更改
 
 ### Definition of Done
-- [ ] `bun run build` 构建成功
-- [ ] `bun test src/hooks/observation-recorder` 测试通过
+- [x] `bun run build` 构建成功
+- [x] `bun test src/hooks/observation-recorder` 测试通过
 - [ ] `bunx oh-my-opencode install` 能自动安装 MCP
 - [ ] 所有更改已提交到 git
 
@@ -92,7 +92,7 @@ Task 5 (Commit all changes)
 
 ## TODOs
 
-- [ ] 1. Edit observation-recorder to pure TypeScript (adapt from observe.sh)
+- [x] 1. Edit observation-recorder to pure TypeScript (adapt from observe.sh)
 
   **What to do**:
   - 移除 `child_process.spawn` 和 bash 脚本调用
@@ -185,18 +185,18 @@ Task 5 (Commit all changes)
   - `src/hooks/AGENTS.md:Hook Patterns` - 钩子实现模式
 
   **Acceptance Criteria**:
-  - [ ] 文件不包含 `spawn`、`child_process` 导入
-  - [ ] 文件使用 `fs` 模块的 `existsSync`、`mkdirSync`、`appendFileSync`、`statSync`、`renameSync`
-  - [ ] 包含 disabled 标志检查逻辑
-  - [ ] 包含文件大小检查和归档逻辑
-  - [ ] 写入路径为 `~/.claude/homunculus/observations.jsonl`
-  - [ ] TypeScript 编译无错误
+  - [x] 文件不包含 `spawn`、`child_process` 导入
+  - [x] 文件使用 `fs` 模块的 `existsSync`、`mkdirSync`、`appendFileSync`、`statSync`、`renameSync`
+  - [x] 包含 disabled 标志检查逻辑
+  - [x] 包含文件大小检查和归档逻辑
+  - [x] 写入路径为 `~/.claude/homunculus/observations.jsonl`
+  - [x] TypeScript 编译无错误
 
   **Commit**: NO (groups with Task 5)
 
 ---
 
-- [ ] 2. Update observation-recorder tests
+- [x] 2. Update observation-recorder tests
 
   **What to do**:
   - 更新测试以适配新的纯 TypeScript 实现
@@ -211,17 +211,17 @@ Task 5 (Commit all changes)
   - `src/hooks/comment-checker/index.test.ts` - 类似钩子测试模式参考
 
   **Acceptance Criteria**:
-  - [ ] `bun test src/hooks/observation-recorder` 通过
-  - [ ] 测试覆盖正常写入场景
-  - [ ] 测试覆盖 disabled 标志场景
-  - [ ] 测试覆盖文件归档场景
-  - [ ] 测试覆盖错误处理场景
+  - [x] `bun test src/hooks/observation-recorder` 通过
+  - [x] 测试覆盖正常写入场景
+  - [x] 测试覆盖 disabled 标志场景
+  - [x] 测试覆盖文件归档场景
+  - [x] 测试覆盖错误处理场景
 
   **Commit**: NO (groups with Task 5)
 
 ---
 
-- [ ] 3. Add MCP auto-install to CLI install flow
+- [x] 3. Add MCP auto-install to CLI install flow
 
   **What to do**:
   - 在 `src/cli/install.ts` 的安装流程中添加 MCP 自动安装步骤
@@ -291,16 +291,16 @@ Task 5 (Commit all changes)
   - Claude Code 官方 MCP 安装: `claude mcp add <name> -s user -- <command>`
 
   **Acceptance Criteria**:
-  - [ ] `bunx oh-my-opencode install` 包含 MCP 安装步骤
-  - [ ] 使用 `claude mcp add` CLI 命令安装
-  - [ ] 安装失败时显示警告但不阻止整体安装
-  - [ ] 在 TUI 和 non-TUI 模式下都能工作
+  - [x] `bunx oh-my-opencode install` 包含 MCP 安装步骤
+  - [x] 使用 `claude mcp add` CLI 命令安装
+  - [x] 安装失败时显示警告但不阻止整体安装
+  - [x] 在 TUI 和 non-TUI 模式下都能工作
 
   **Commit**: NO (groups with Task 5)
 
 ---
 
-- [ ] 4. Build verification
+- [x] 4. Build verification
 
   **What to do**:
   - 运行完整构建
@@ -312,8 +312,8 @@ Task 5 (Commit all changes)
   - `package.json:scripts.build` - 构建命令
 
   **Acceptance Criteria**:
-  - [ ] `bun run build` 成功，无错误
-  - [ ] `dist/` 目录包含编译输出
+  - [x] `bun run build` 成功，无错误
+  - [x] `dist/` 目录包含编译输出
 
   **Commit**: NO (verification only)
 
@@ -404,8 +404,8 @@ git log -1 --oneline   # Expected: Shows new commit
 ```
 
 ### Final Checklist
-- [ ] observation-recorder 使用纯 TypeScript，保留 observe.sh 的核心逻辑
-- [ ] CLI install 自动安装 Memory 和 Sequential Thinking MCP
+- [x] observation-recorder 使用纯 TypeScript，保留 observe.sh 的核心逻辑
+- [x] CLI install 自动安装 Memory 和 Sequential Thinking MCP
 - [ ] 所有 22+ 个功能实现已提交
-- [ ] 构建通过
-- [ ] 测试通过
+- [x] 构建通过
+- [x] 测试通过

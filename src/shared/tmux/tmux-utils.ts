@@ -6,8 +6,10 @@ import { getTmuxPath } from "../../tools/interactive-bash/utils"
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
 
-export function isInsideTmux(): boolean {
-  return !!process.env.TMUX
+export function isInsideTmux(env: NodeJS.ProcessEnv = process.env): boolean {
+  const hasOwnTmux = Object.prototype.hasOwnProperty.call(env, "TMUX")
+  const tmuxValue = hasOwnTmux ? env.TMUX : undefined
+  return !!tmuxValue
 }
 
 export async function isServerRunning(serverUrl: string): Promise<boolean> {

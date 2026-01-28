@@ -1,21 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, afterAll, spyOn } from "bun:test"
+import * as fs from "fs"
 
-// Mock fs module
-const mockExistsSync = mock((path?: string) => false)
-const mockMkdirSync = mock((path?: string, options?: any) => undefined)
-const mockAppendFileSync = mock((path?: string, data?: string) => undefined)
-const mockStatSync = mock((path?: string) => ({ size: 0 }))
-const mockRenameSync = mock((oldPath?: string, newPath?: string) => undefined)
-const mockReadFileSync = mock((path?: string, encoding?: string) => "")
-
-mock.module("fs", () => ({
-  existsSync: mockExistsSync,
-  mkdirSync: mockMkdirSync,
-  appendFileSync: mockAppendFileSync,
-  statSync: mockStatSync,
-  renameSync: mockRenameSync,
-  readFileSync: mockReadFileSync,
-}))
+// Spy on fs functions - scoped mocks that can be restored
+const mockExistsSync = spyOn(fs, "existsSync")
+const mockMkdirSync = spyOn(fs, "mkdirSync")
+const mockAppendFileSync = spyOn(fs, "appendFileSync")
+const mockStatSync = spyOn(fs, "statSync")
+const mockRenameSync = spyOn(fs, "renameSync")
+const mockReadFileSync = spyOn(fs, "readFileSync")
 
 // Mock process.kill
 const mockKill = spyOn(process, "kill").mockImplementation(() => true)
@@ -36,18 +28,34 @@ describe("observation-recorder hook", () => {
     mockKill.mockClear()
     
     // Default: directory doesn't exist, no disabled flag
-    mockExistsSync.mockImplementation((path?: string) => {
-      if (!path) return false
-      if (path.endsWith("homunculus")) return false
-      if (path.endsWith("disabled")) return false
-      if (path.endsWith("observations.jsonl")) return false
-      if (path.endsWith(".observer.pid")) return false
+    mockExistsSync.mockImplementation((path?: fs.PathLike) => {
+      const pathStr = String(path ?? "")
+      if (pathStr.endsWith("homunculus")) return false
+      if (pathStr.endsWith("disabled")) return false
+      if (pathStr.endsWith("observations.jsonl")) return false
+      if (pathStr.endsWith(".observer.pid")) return false
       return false
     })
+    mockMkdirSync.mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync)
+    mockAppendFileSync.mockImplementation((() => undefined) as unknown as typeof fs.appendFileSync)
+    mockStatSync.mockImplementation((() => ({ size: 0 })) as unknown as typeof fs.statSync)
+    mockRenameSync.mockImplementation((() => undefined) as unknown as typeof fs.renameSync)
+    mockReadFileSync.mockImplementation((() => "") as unknown as typeof fs.readFileSync)
   })
 
   afterEach(() => {
     consoleWarnSpy.mockRestore()
+  })
+
+  afterAll(() => {
+    // Restore all fs spies to prevent leakage to other test files
+    mockExistsSync.mockRestore()
+    mockMkdirSync.mockRestore()
+    mockAppendFileSync.mockRestore()
+    mockStatSync.mockRestore()
+    mockRenameSync.mockRestore()
+    mockReadFileSync.mockRestore()
+    mockKill.mockRestore()
   })
 
   it("should return an object with before and after handlers", () => {
@@ -89,9 +97,10 @@ describe("observation-recorder hook", () => {
   })
 
   it("should signal observer if PID file exists", async () => {
-    mockExistsSync.mockImplementation((path?: string) => {
-      if (path?.endsWith("disabled")) return false
-      if (path?.endsWith(".observer.pid")) return true
+    mockExistsSync.mockImplementation((path?: fs.PathLike) => {
+      const pathStr = String(path ?? "")
+      if (pathStr.endsWith("disabled")) return false
+      if (pathStr.endsWith(".observer.pid")) return true
       return true // other paths (config dir, etc)
     })
     mockReadFileSync.mockReturnValue("12345")
@@ -108,8 +117,9 @@ describe("observation-recorder hook", () => {
   })
 
   it("should skip if disabled flag exists", async () => {
-    mockExistsSync.mockImplementation((path?: string) => {
-      if (path?.endsWith("disabled")) return true
+    mockExistsSync.mockImplementation((path?: fs.PathLike) => {
+      const pathStr = String(path ?? "")
+      if (pathStr.endsWith("disabled")) return true
       return true // directory exists
     })
 
@@ -123,11 +133,12 @@ describe("observation-recorder hook", () => {
   })
 
   it("should archive file when too large", async () => {
-    mockExistsSync.mockImplementation((path?: string) => {
-      if (path?.endsWith("disabled")) return false
+    mockExistsSync.mockImplementation((path?: fs.PathLike) => {
+      const pathStr = String(path ?? "")
+      if (pathStr.endsWith("disabled")) return false
       return true // directory and file exist
     })
-    mockStatSync.mockReturnValue({ size: 15 * 1024 * 1024 }) // 15MB > 10MB
+    mockStatSync.mockReturnValue({ size: 15 * 1024 * 1024 } as fs.Stats) // 15MB > 10MB
 
     const hook = createObservationRecorderHook()
     await hook["tool.execute.after"](

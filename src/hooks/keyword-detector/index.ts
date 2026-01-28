@@ -95,6 +95,20 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
       })
+
+      // Register consult-metis keywords to context collector for downstream processing
+      if (collector) {
+        const consultMetisKeywords = detectedKeywords.filter((k) => k.type === "consult-metis")
+        for (const keyword of consultMetisKeywords) {
+          collector.register(input.sessionID, {
+            id: "keyword-consult-metis",
+            source: "keyword-detector",
+            content: keyword.message,
+            priority: "high",
+          })
+          log(`[keyword-detector] Registered consult-metis context`, { sessionID: input.sessionID })
+        }
+      }
     },
   }
 }

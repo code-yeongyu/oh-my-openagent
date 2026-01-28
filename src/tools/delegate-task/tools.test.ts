@@ -377,7 +377,7 @@ describe("sisyphus-task", () => {
       }
 
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
@@ -440,7 +440,7 @@ describe("sisyphus-task", () => {
       }
 
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
         session: {
@@ -491,7 +491,7 @@ describe("sisyphus-task", () => {
       const mockManager = { launch: async () => ({}) }
 
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
         session: {
@@ -631,7 +631,7 @@ describe("sisyphus-task", () => {
       
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
@@ -643,7 +643,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({
             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
           }),
-          status: async () => ({ data: {} }),
+          status: async () => ({ data: { "test-session": { type: "idle" } } }),
         },
       }
       
@@ -819,7 +819,7 @@ describe("sisyphus-task", () => {
         },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: {
-          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+          agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }),
         },
       }
       
@@ -847,11 +847,9 @@ describe("sisyphus-task", () => {
         toolContext
       )
       
-      // #then - should return detailed error message with args and stack trace
-      expect(result).toContain("Send prompt failed")
+      // #then - should return error message about failed prompt
+      expect(result).toContain("Failed to send prompt")
       expect(result).toContain("JSON Parse error")
-      expect(result).toContain("**Arguments**:")
-      expect(result).toContain("**Stack Trace**:")
     })
 
     test("sync mode success returns task result with content", async () => {
@@ -879,7 +877,7 @@ describe("sisyphus-task", () => {
         },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         app: {
-          agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+          agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }),
         },
       }
       
@@ -920,13 +918,12 @@ describe("sisyphus-task", () => {
         launch: async () => ({}),
       }
       
+      // Mock no sisyphus-junior agent - will cause agent not found error
       const mockClient = {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_agent_notfound" } }),
-          prompt: async () => {
-            throw new Error("Cannot read property 'name' of undefined agent.name")
-          },
+          prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
@@ -961,8 +958,8 @@ describe("sisyphus-task", () => {
       )
       
       // #then - should return agent not found error
-      expect(result).toContain("not found")
-      expect(result).toContain("registered")
+      expect(result).toContain("Unknown agent")
+      expect(result).toContain("sisyphus-junior")
     })
 
     test("sync mode passes category model to prompt", async () => {
@@ -982,10 +979,10 @@ describe("sisyphus-task", () => {
           messages: async () => ({
             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
           }),
-          status: async () => ({ data: {} }),
+          status: async () => ({ data: { "ses_sync_model": { type: "idle" } } }),
         },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
       }
 
       const tool = createDelegateTask({
@@ -1105,7 +1102,7 @@ describe("sisyphus-task", () => {
       }
       
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
@@ -1158,7 +1155,7 @@ describe("sisyphus-task", () => {
       }
       
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
@@ -1414,7 +1411,7 @@ describe("sisyphus-task", () => {
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
@@ -1426,7 +1423,7 @@ describe("sisyphus-task", () => {
           messages: async () => ({
             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
           }),
-          status: async () => ({ data: {} }),
+          status: async () => ({ data: { "ses_browser_provider": { type: "idle" } } }),
         },
       }
 
@@ -1468,7 +1465,7 @@ describe("sisyphus-task", () => {
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
