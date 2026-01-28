@@ -85,6 +85,66 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 
 **Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin (`@latest`). It provides multi-account load balancing, variant-based thinking levels, dual quota system (Antigravity + Gemini CLI), and active maintenance. See [Installation > Google Gemini](docs/guide/installation.md#google-gemini-antigravity-oauth).
 
+## Ollama Provider
+
+**IMPORTANT**: When using Ollama as a provider, you **must** disable streaming to avoid JSON parsing errors.
+
+### Required Configuration
+
+```json
+{
+  "agents": {
+    "explore": {
+      "model": "ollama/qwen3-coder",
+      "stream": false
+    }
+  }
+}
+```
+
+### Why `stream: false` is Required
+
+Ollama returns NDJSON (newline-delimited JSON) when streaming is enabled, but Claude Code SDK expects a single JSON object. This causes `JSON Parse error: Unexpected EOF` when agents attempt tool calls.
+
+**Example of the problem**:
+```json
+// Ollama streaming response (NDJSON - multiple lines)
+{"message":{"tool_calls":[...]}, "done":false}
+{"message":{"content":""}, "done":true}
+
+// Claude Code SDK expects (single JSON object)
+{"message":{"tool_calls":[...], "content":""}, "done":true}
+```
+
+### Supported Models
+
+Common Ollama models that work with oh-my-opencode:
+
+| Model | Best For | Configuration |
+|-------|----------|---------------|
+| `ollama/qwen3-coder` | Code generation, build fixes | `{"model": "ollama/qwen3-coder", "stream": false}` |
+| `ollama/ministral-3:14b` | Exploration, codebase search | `{"model": "ollama/ministral-3:14b", "stream": false}` |
+| `ollama/lfm2.5-thinking` | Documentation, writing | `{"model": "ollama/lfm2.5-thinking", "stream": false}` |
+
+### Troubleshooting
+
+If you encounter `JSON Parse error: Unexpected EOF`:
+
+1. **Verify `stream: false` is set** in your agent configuration
+2. **Check Ollama is running**: `curl http://localhost:11434/api/tags`
+3. **Test with curl**:
+   ```bash
+   curl -s http://localhost:11434/api/chat \
+     -d '{"model": "qwen3-coder", "messages": [{"role": "user", "content": "Hello"}], "stream": false}'
+   ```
+4. **See detailed troubleshooting**: [docs/troubleshooting/ollama-streaming-issue.md](troubleshooting/ollama-streaming-issue.md)
+
+### Future SDK Fix
+
+The proper long-term fix requires Claude Code SDK to parse NDJSON responses correctly. Until then, use `stream: false` as a workaround.
+
+**Tracking**: https://github.com/code-yeongyu/oh-my-opencode/issues/1124
+
 ## Agents
 
 Override built-in agent settings:
