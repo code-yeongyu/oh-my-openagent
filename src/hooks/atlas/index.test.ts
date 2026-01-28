@@ -66,6 +66,20 @@ describe("atlas hook", () => {
   })
 
   describe("tool.execute.after handler", () => {
+    test("should handle undefined output gracefully (issue #1035)", async () => {
+      // #given - hook and undefined output (e.g., from /review command)
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // #when - calling with undefined output
+      const result = await hook["tool.execute.after"](
+        { tool: "delegate_task", sessionID: "session-123" },
+        undefined as unknown as { title: string; output: string; metadata: Record<string, unknown> }
+      )
+
+      // #then - returns undefined without throwing
+      expect(result).toBeUndefined()
+    })
+
     test("should ignore non-delegate_task tools", async () => {
       // #given - hook and non-delegate_task tool
       const hook = createAtlasHook(createMockPluginInput())
