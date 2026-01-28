@@ -10,7 +10,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, findCaseInsensitive } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -150,42 +150,26 @@ function applyCategoryOverride(
   return result as AgentConfig
 }
 
-function applyModelResolution(input: {
-  uiSelectedModel?: string
-  userModel?: string
-  requirement?: { fallbackChain?: { providers: string[]; model: string; variant?: string }[] }
-  availableModels: Set<string>
-  systemDefaultModel?: string
-}) {
-  const { uiSelectedModel, userModel, requirement, availableModels, systemDefaultModel } = input
-  return resolveModelPipeline({
-    intent: { uiSelectedModel, userModel },
-    constraints: { availableModels },
-    policy: { fallbackChain: requirement?.fallbackChain, systemDefaultModel },
-  })
-}
-
-function applyEnvironmentContext(config: AgentConfig, directory?: string): AgentConfig {
-  if (!directory || !config.prompt) return config
-  const envContext = createEnvContext()
-  return { ...config, prompt: config.prompt + envContext }
-}
-
-function applyOverrides(
-  config: AgentConfig,
-  override: AgentOverrideConfig | undefined,
-  mergedCategories: Record<string, CategoryConfig>
-): AgentConfig {
+function applyCategoryDefaults(config: AgentConfig, category: CategoryConfig): AgentConfig {
   let result = config
-  const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
-  if (overrideCategory) {
-    result = applyCategoryOverride(result, overrideCategory, mergedCategories)
+  if (result.temperature === undefined && category.temperature !== undefined) {
+    result = { ...result, temperature: category.temperature }
   }
-
-  if (override) {
-    result = mergeAgentConfig(result, override)
+  if (result.top_p === undefined && category.top_p !== undefined) {
+    result = { ...result, top_p: category.top_p }
   }
-
+  if (result.maxTokens === undefined && category.maxTokens !== undefined) {
+    result = { ...result, maxTokens: category.maxTokens }
+  }
+  if (result.thinking === undefined && category.thinking !== undefined) {
+    result = { ...result, thinking: category.thinking }
+  }
+  if ((result as AgentConfig & { reasoningEffort?: string }).reasoningEffort === undefined && category.reasoningEffort !== undefined) {
+    result = { ...result, reasoningEffort: category.reasoningEffort } as AgentConfig
+  }
+  if ((result as AgentConfig & { textVerbosity?: string }).textVerbosity === undefined && category.textVerbosity !== undefined) {
+    result = { ...result, textVerbosity: category.textVerbosity } as AgentConfig
+  }
   return result
 }
 
@@ -267,8 +251,7 @@ export async function createBuiltinAgents(
      if (agentName === "atlas") continue
      if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 
-     const override = agentOverrides[agentName]
-       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+     const override = findCaseInsensitive(agentOverrides, agentName)
      const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
      
      // Check if agent requires a specific model
@@ -279,113 +262,168 @@ export async function createBuiltinAgents(
      }
      
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
+     const inheritedCategory = override?.category
+       ? mergedCategories[override.category]
+       : undefined
      
-    const resolution = applyModelResolution({
-      uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
-      userModel: override?.model,
-      requirement,
-      availableModels,
-      systemDefaultModel,
-    })
-    if (!resolution) continue
-    const { model, variant: resolvedVariant } = resolution
+     const resolution = resolveModelWithFallback({
+       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
+       userModel: override?.model ?? inheritedCategory?.model,
+       fallbackModels: override?.fallback_models ?? inheritedCategory?.fallback_models,
+       fallbackChain: requirement?.fallbackChain,
+       availableModels,
+       systemDefaultModel,
+     })
+     if (!resolution) continue
+     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
-    
-    // Apply resolved variant from model fallback chain
-    if (resolvedVariant) {
-      config = { ...config, variant: resolvedVariant }
-    }
+     let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
+     
+     // Apply resolved variant from model fallback chain
+     if (resolvedVariant) {
+       config = { ...config, variant: resolvedVariant }
+     }
 
-    // Expand override.category into concrete properties (higher priority than factory/resolved)
-    const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
-    if (overrideCategory) {
-      config = applyCategoryOverride(config, overrideCategory, mergedCategories)
-    }
+     // Expand override.category into concrete properties (higher priority than factory/resolved)
+     const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
+     if (overrideCategory) {
+       config = applyCategoryOverride(config, overrideCategory, mergedCategories)
+     }
 
-    if (agentName === "librarian") {
-      config = applyEnvironmentContext(config, directory)
-    }
+     if (agentName === "librarian") {
+       const envContext = createEnvContext()
+       config = { ...config, prompt: config.prompt + envContext }
+     }
 
-    config = applyOverrides(config, override, mergedCategories)
+     if (inheritedCategory) {
+       config = applyCategoryDefaults(config, inheritedCategory)
+     }
+     if (override) {
+       const overrideToMerge =
+         override.model && model !== override.model
+           ? { ...override, model }
+           : override
+       config = mergeAgentConfig(config, overrideToMerge)
+     }
 
-    result[name] = config
+     result[name] = config
 
-    const metadata = agentMetadata[agentName]
-    if (metadata) {
-      availableAgents.push({
-        name: agentName,
-        description: config.description ?? "",
-        metadata,
-      })
-    }
-  }
+     const metadata = agentMetadata[agentName]
+     if (metadata) {
+       availableAgents.push({
+         name: agentName,
+         description: config.description ?? "",
+         metadata,
+       })
+     }
+   }
 
-   if (!disabledAgents.includes("sisyphus")) {
+    if (!disabledAgents.includes("sisyphus")) {
      const sisyphusOverride = agentOverrides["sisyphus"]
      const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
-    
-    const sisyphusResolution = applyModelResolution({
-      uiSelectedModel,
-      userModel: sisyphusOverride?.model,
-      requirement: sisyphusRequirement,
-      availableModels,
-      systemDefaultModel,
-    })
+     const sisyphusInheritedCategory = sisyphusOverride?.category
+       ? mergedCategories[sisyphusOverride.category]
+       : undefined
+     
+     const sisyphusResolution = resolveModelWithFallback({
+       uiSelectedModel,
+       userModel: sisyphusOverride?.model ?? sisyphusInheritedCategory?.model,
+       fallbackModels: sisyphusOverride?.fallback_models ?? sisyphusInheritedCategory?.fallback_models,
+       fallbackChain: sisyphusRequirement?.fallbackChain,
+       availableModels,
+       systemDefaultModel,
+     })
 
-    if (sisyphusResolution) {
-      const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
+     if (sisyphusResolution) {
+       const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
-      let sisyphusConfig = createSisyphusAgent(
-        sisyphusModel,
-        availableAgents,
-        undefined,
-        availableSkills,
-        availableCategories
-      )
-      
-      if (sisyphusResolvedVariant) {
-        sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
-      }
+       let sisyphusConfig = createSisyphusAgent(
+         sisyphusModel,
+         availableAgents,
+         undefined,
+         availableSkills,
+         availableCategories
+       )
+       
+       if (sisyphusResolvedVariant) {
+         sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
+       }
 
-      sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories)
-      sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory)
+       const sisOverrideCategory = (sisyphusOverride as Record<string, unknown> | undefined)?.category as string | undefined
+       if (sisOverrideCategory) {
+         sisyphusConfig = applyCategoryOverride(sisyphusConfig, sisOverrideCategory, mergedCategories)
+       }
 
-      result["sisyphus"] = sisyphusConfig
+       if (directory && sisyphusConfig.prompt) {
+         const envContext = createEnvContext()
+         sisyphusConfig = { ...sisyphusConfig, prompt: sisyphusConfig.prompt + envContext }
+       }
+
+       if (sisyphusInheritedCategory) {
+         sisyphusConfig = applyCategoryDefaults(sisyphusConfig, sisyphusInheritedCategory)
+       }
+
+       if (sisyphusOverride) {
+         const overrideToMerge =
+           sisyphusOverride.model && sisyphusModel !== sisyphusOverride.model
+             ? { ...sisyphusOverride, model: sisyphusModel }
+             : sisyphusOverride
+         sisyphusConfig = mergeAgentConfig(sisyphusConfig, overrideToMerge)
+       }
+
+       result["sisyphus"] = sisyphusConfig
+     }
     }
-   }
 
-   if (!disabledAgents.includes("atlas")) {
+    if (!disabledAgents.includes("atlas")) {
      const orchestratorOverride = agentOverrides["atlas"]
      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
-    
-    const atlasResolution = applyModelResolution({
-      // NOTE: Atlas does NOT use uiSelectedModel - respects its own fallbackChain (k2p5 primary)
-      userModel: orchestratorOverride?.model,
-      requirement: atlasRequirement,
-      availableModels,
-      systemDefaultModel,
-    })
-    
-    if (atlasResolution) {
-      const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
+     const atlasInheritedCategory = orchestratorOverride?.category
+       ? mergedCategories[orchestratorOverride.category]
+       : undefined
+     
+     const atlasResolution = resolveModelWithFallback({
+       // NOTE: Atlas does NOT use uiSelectedModel - respects its own fallbackChain (k2p5 primary)
+       userModel: orchestratorOverride?.model ?? atlasInheritedCategory?.model,
+       fallbackModels: orchestratorOverride?.fallback_models ?? atlasInheritedCategory?.fallback_models,
+       fallbackChain: atlasRequirement?.fallbackChain,
+       availableModels,
+       systemDefaultModel,
+     })
+     
+     if (atlasResolution) {
+       const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
 
-      let orchestratorConfig = createAtlasAgent({
-        model: atlasModel,
-        availableAgents,
-        availableSkills,
-        userCategories: categories,
-      })
-      
-      if (atlasResolvedVariant) {
-        orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
-      }
+       let orchestratorConfig = createAtlasAgent({
+         model: atlasModel,
+         availableAgents,
+         availableSkills,
+         userCategories: categories,
+       })
+       
+       if (atlasResolvedVariant) {
+         orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
+       }
 
-      orchestratorConfig = applyOverrides(orchestratorConfig, orchestratorOverride, mergedCategories)
+       const atlasOverrideCategory = (orchestratorOverride as Record<string, unknown> | undefined)?.category as string | undefined
+       if (atlasOverrideCategory) {
+         orchestratorConfig = applyCategoryOverride(orchestratorConfig, atlasOverrideCategory, mergedCategories)
+       }
+       if (atlasInheritedCategory) {
+         orchestratorConfig = applyCategoryDefaults(orchestratorConfig, atlasInheritedCategory)
+       }
 
-      result["atlas"] = orchestratorConfig
+       if (orchestratorOverride) {
+         const overrideToMerge =
+           orchestratorOverride.model && atlasModel !== orchestratorOverride.model
+             ? { ...orchestratorOverride, model: atlasModel }
+             : orchestratorOverride
+         orchestratorConfig = mergeAgentConfig(orchestratorConfig, overrideToMerge)
+       }
+
+       result["atlas"] = orchestratorConfig
+     }
     }
-   }
 
-   return result
- }
+    return result
+  }

@@ -475,6 +475,76 @@ describe("sisyphus-task", () => {
   })
 
   describe("category variant", () => {
+    test("category fallback_models selects connected provider when primary model provider not connected", async () => {
+      // #given
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      cacheSpy.mockRestore()
+      cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-fallback-models",
+            sessionID: "session-fallback-models",
+            description: "Fallback models task",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          ultrabrain: {
+            model: "anthropic/claude-opus-4-5",
+            fallback_models: "openai/gpt-5.2",
+            variant: "xhigh",
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when
+      await tool.execute(
+        {
+          description: "Fallback models task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // #then
+      expect(launchInput.model).toEqual({
+        providerID: "openai",
+        modelID: "gpt-5.2",
+        variant: "xhigh",
+      })
+    })
+
     test("passes variant to background model payload", async () => {
       // #given
       const { createDelegateTask } = require("./tools")

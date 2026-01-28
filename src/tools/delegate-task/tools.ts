@@ -12,7 +12,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel, resolveModelPipeline, getOpenCodeConfigPaths, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel, resolveModelWithFallback, getOpenCodeConfigPaths, promptWithModelSuggestionRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -551,49 +551,47 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
            }
           } else {
-          const resolution = resolveModelPipeline({
-            intent: {
-              userModel: userCategories?.[args.category]?.model,
-              categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
-            },
-            constraints: { availableModels },
-            policy: {
-              fallbackChain: requirement.fallbackChain,
-              systemDefaultModel,
-            },
-          })
+			const resolution = resolveModelWithFallback({
+				userModel: userCategories?.[args.category]?.model ?? resolved.model,
+				categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
+				fallbackModels: resolved.config.fallback_models,
+				fallbackChain: requirement.fallbackChain,
+				availableModels,
+				systemDefaultModel,
+			})
 
             if (resolution) {
-              const { model: resolvedModel, provenance, variant: resolvedVariant } = resolution
+              const { model: resolvedModel, source, variant: resolvedVariant } = resolution
              actualModel = resolvedModel
 
              if (!parseModelString(actualModel)) {
                return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
              }
 
-              let type: "user-defined" | "inherited" | "category-default" | "system-default"
-              const source = provenance
-              switch (provenance) {
+              let modelType: "user-defined" | "inherited" | "category-default" | "system-default"
+              switch (source) {
                  case "override":
-                   type = "user-defined"
+                   modelType = "user-defined"
                    break
                  case "category-default":
                  case "provider-fallback":
-                   type = "category-default"
+                   modelType = "category-default"
                    break
                  case "system-default":
-                   type = "system-default"
+                   modelType = "system-default"
                    break
+                 default:
+                   modelType = "system-default"
               }
 
-              modelInfo = { model: actualModel, type, source }
+              modelInfo = { model: actualModel, type: modelType, source }
              
              const parsedModel = parseModelString(actualModel)
-             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
-             categoryModel = parsedModel
-               ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
-               : undefined
-           }
+				const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
+				categoryModel = parsedModel
+					? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+					: undefined
+			}
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT

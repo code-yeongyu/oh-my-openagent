@@ -25,7 +25,7 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline } from "../shared";
+import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelWithFallback } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -230,6 +230,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
                 category?: string
                 model?: string
                 variant?: string
+                fallback_models?: string | string[]
                 reasoningEffort?: string
                 textVerbosity?: string
                 thinking?: { type: string; budgetTokens?: number }
@@ -258,16 +259,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           connectedProviders: connectedProviders ?? undefined,
         });
 
-        const modelResolution = resolveModelPipeline({
-          intent: {
-            uiSelectedModel: currentModel,
-            userModel: prometheusOverride?.model ?? categoryConfig?.model,
-          },
-          constraints: { availableModels },
-          policy: {
-            fallbackChain: prometheusRequirement?.fallbackChain,
-            systemDefaultModel: undefined,
-          },
+        const modelResolution = resolveModelWithFallback({
+          uiSelectedModel: currentModel,
+          userModel: prometheusOverride?.model ?? categoryConfig?.model,
+          fallbackModels: prometheusOverride?.fallback_models ?? categoryConfig?.fallback_models,
+          fallbackChain: prometheusRequirement?.fallbackChain,
+          availableModels,
+          systemDefaultModel: undefined,
         });
         const resolvedModel = modelResolution?.model;
         const resolvedVariant = modelResolution?.variant;
@@ -301,9 +299,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             : {}),
         };
 
-        agentConfig["prometheus"] = prometheusOverride
-          ? { ...prometheusBase, ...prometheusOverride }
-          : prometheusBase;
+        if (prometheusOverride) {
+          // Preserve resolvedModel when override.model was unavailable and fallback was used
+          const overrideToMerge =
+            prometheusOverride.model && resolvedModel !== prometheusOverride.model
+              ? { ...prometheusOverride, model: resolvedModel }
+              : prometheusOverride;
+          agentConfig["prometheus"] = { ...prometheusBase, ...overrideToMerge };
+        } else {
+          agentConfig["prometheus"] = prometheusBase;
+        }
       }
 
     const filteredConfigAgents = configAgent

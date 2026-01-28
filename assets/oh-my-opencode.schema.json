@@ -104,6 +104,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -274,6 +287,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -446,6 +472,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -616,6 +655,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -788,6 +840,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -958,6 +1023,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -1130,6 +1208,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1300,6 +1391,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -1472,6 +1576,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1642,6 +1759,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -1814,6 +1944,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1985,6 +2128,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -2155,6 +2311,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -2336,6 +2505,19 @@
           },
           "model": {
             "type": "string"
+          },
+          "fallback_models": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "variant": {
             "type": "string"
@@ -2852,6 +3034,41 @@
               ]
             }
           }
+        }
+      }
+    },
+    "runtime_fallback": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "retry_on_errors": {
+          "default": [
+            429,
+            503,
+            529
+          ],
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "max_fallback_attempts": {
+          "default": 3,
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "cooldown_seconds": {
+          "default": 60,
+          "type": "number",
+          "minimum": 0
+        },
+        "notify_on_fallback": {
+          "default": true,
+          "type": "boolean"
         }
       }
     }

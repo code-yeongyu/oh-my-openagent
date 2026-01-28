@@ -96,9 +96,17 @@ export const BuiltinCommandNameSchema = z.enum([
   "start-work",
 ])
 
+/** Fallback models schema - supports single string or array of strings */
+export const FallbackModelsSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+])
+
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  /** Fallback models to use when primary model fails (rate limit, overload, etc.) */
+  fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
@@ -169,6 +177,7 @@ export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in delegate_task prompt. */
   description: z.string().optional(),
   model: z.string().optional(),
+  fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
@@ -365,6 +374,15 @@ export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
   swarm: SisyphusSwarmConfigSchema.optional(),
 })
+
+export const RuntimeFallbackConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  retry_on_errors: z.array(z.number()).default([429, 503, 529]),
+  max_fallback_attempts: z.number().min(1).max(10).default(3),
+  cooldown_seconds: z.number().min(0).default(60),
+  notify_on_fallback: z.boolean().default(true),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -387,6 +405,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  runtime_fallback: RuntimeFallbackConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -416,5 +435,7 @@ export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusSwarmConfig = z.infer<typeof SisyphusSwarmConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
+export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>
+export type FallbackModels = z.infer<typeof FallbackModelsSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
