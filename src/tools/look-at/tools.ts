@@ -131,22 +131,49 @@ Original error: ${createResult.error}`
       log(`[look_at] Created session: ${sessionID}`)
 
       log(`[look_at] Sending prompt with file passthrough to session ${sessionID}`)
-      await ctx.client.session.prompt({
-        path: { id: sessionID },
-        body: {
-          agent: MULTIMODAL_LOOKER_AGENT,
-          tools: {
-            task: false,
-            call_omo_agent: false,
-            look_at: false,
-            read: false,
+      try {
+        await ctx.client.session.prompt({
+          path: { id: sessionID },
+          body: {
+            agent: MULTIMODAL_LOOKER_AGENT,
+            tools: {
+              task: false,
+              call_omo_agent: false,
+              look_at: false,
+              read: false,
+            },
+            parts: [
+              { type: "text", text: prompt },
+              { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
+            ],
           },
-          parts: [
-            { type: "text", text: prompt },
-            { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
-          ],
-        },
-      })
+        })
+      } catch (promptError) {
+        const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+        log(`[look_at] Prompt error:`, promptError)
+
+        const isJsonParseError = errorMessage.includes("JSON") && (errorMessage.includes("EOF") || errorMessage.includes("parse"))
+        if (isJsonParseError) {
+          return `Error: Failed to analyze file - received malformed response from multimodal-looker agent.
+
+This typically occurs when:
+1. The multimodal-looker model is not available or not connected
+2. The model does not support this file type (${mimeType})
+3. The API returned an empty or truncated response
+
+File: ${args.file_path}
+MIME type: ${mimeType}
+
+Try:
+- Ensure a vision-capable model (e.g., gemini-3-flash, gpt-5.2) is available
+- Check provider connections in opencode settings
+- For text files like .md, .txt, use the Read tool instead
+
+Original error: ${errorMessage}`
+        }
+
+        return `Error: Failed to send prompt to multimodal-looker agent: ${errorMessage}`
+      }
 
       log(`[look_at] Prompt sent, fetching messages...`)
 
