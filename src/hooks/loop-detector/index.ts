@@ -1,4 +1,4 @@
-import type { PluginInput, PreToolUseInput, PreToolUseOutput } from "@opencode-ai/plugin"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "loop-detector"
@@ -168,24 +168,24 @@ Before continuing:
 
 export interface LoopDetectorHook {
   "tool.execute.before": (
-    input: PreToolUseInput,
-    output: PreToolUseOutput
-  ) => Promise<PreToolUseOutput>
+    input: { tool: string; sessionID: string; callID: string },
+    output: { args: Record<string, unknown>; output?: string }
+  ) => Promise<{ args: Record<string, unknown>; output?: string }>
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
 }
 
 export function createLoopDetectorHook(_ctx: PluginInput): LoopDetectorHook {
   return {
     "tool.execute.before": async (
-      input: PreToolUseInput,
-      output: PreToolUseOutput
-    ): Promise<PreToolUseOutput> => {
+      input: { tool: string; sessionID: string; callID: string },
+      output: { args: Record<string, unknown>; output?: string }
+    ): Promise<{ args: Record<string, unknown>; output?: string }> => {
       const sessionID = input.sessionID
       if (!sessionID) return output
 
       const state = getState(sessionID)
-      const toolName = input.tool.name
-      const toolArgs = (input.tool.input ?? {}) as Record<string, unknown>
+      const toolName = input.tool
+      const toolArgs = (output.args ?? {}) as Record<string, unknown>
 
       const record: ToolCallRecord = {
         tool: toolName,

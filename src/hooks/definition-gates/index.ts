@@ -1,4 +1,4 @@
-import type { PluginInput, PreToolUseInput, PreToolUseOutput } from "@opencode-ai/plugin"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "definition-gates"
@@ -156,21 +156,21 @@ function extractTaskContextFromPrompt(prompt: string): Partial<TaskContext> {
 
 export interface DefinitionGatesHook {
   "tool.execute.before": (
-    input: PreToolUseInput,
-    output: PreToolUseOutput
-  ) => Promise<PreToolUseOutput>
+    input: { tool: string; sessionID: string; callID: string },
+    output: { args: Record<string, unknown>; output?: string }
+  ) => Promise<{ args: Record<string, unknown>; output?: string }>
 }
 
 export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHook {
   return {
     "tool.execute.before": async (
-      input: PreToolUseInput,
-      output: PreToolUseOutput
-    ): Promise<PreToolUseOutput> => {
-      const toolName = input.tool.name
+      input: { tool: string; sessionID: string; callID: string },
+      output: { args: Record<string, unknown>; output?: string }
+    ): Promise<{ args: Record<string, unknown>; output?: string }> => {
+      const toolName = input.tool
 
       if (toolName === "mcp_delegate_task" || toolName === "delegate_task") {
-        const toolInput = input.tool.input as Record<string, unknown>
+        const toolInput = output.args as Record<string, unknown>
         const prompt = (toolInput.prompt as string) ?? ""
 
         const partialContext = extractTaskContextFromPrompt(prompt)
@@ -195,7 +195,7 @@ export function createDefinitionGatesHook(_ctx: PluginInput): DefinitionGatesHoo
       }
 
       if (toolName === "mcp_todowrite" || toolName === "todowrite") {
-        const toolInput = input.tool.input as Record<string, unknown>
+        const toolInput = output.args as Record<string, unknown>
         const todos = toolInput.todos as Array<{ status?: string }> | undefined
 
         const hasCompletingTodo = todos?.some(t => t.status === "completed")
