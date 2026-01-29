@@ -819,9 +819,10 @@ Create the work plan directly - that's your job as the planning agent.`
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }
 
-        // When using subagent_type directly, inherit parent model so agents don't default
-        // to their hardcoded models (like grok-code) which may not be available
-        if (parentModel) {
+        // When using subagent_type directly, inherit parent model only if agent has no configured model
+        // This prevents agents from defaulting to unavailable hardcoded models (like grok-code)
+        // while still respecting agent-specific model configurations from AGENT_MODEL_REQUIREMENTS
+        if (parentModel && !categoryModel) {
           categoryModel = parentModel
           modelInfo = { model: `${parentModel.providerID}/${parentModel.modelID}`, type: "inherited" }
         }
