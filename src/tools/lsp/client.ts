@@ -341,8 +341,9 @@ export class LSPClient {
       throw new Error(`LSP server already exited (code: ${this.proc?.exitCode})` + (stderr ? `\nstderr: ${stderr}` : ""))
     }
 
+    let timeoutId: ReturnType<typeof setTimeout>
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         const stderr = this.stderrBuffer.slice(-5).join("\n")
         reject(new Error(`LSP request timeout (method: ${method})` + (stderr ? `\nrecent stderr: ${stderr}` : "")))
       }, this.REQUEST_TIMEOUT)
@@ -350,7 +351,14 @@ export class LSPClient {
 
     const requestPromise = this.connection.sendRequest(method, params) as Promise<T>
 
-    return Promise.race([requestPromise, timeoutPromise])
+    try {
+      const result = await Promise.race([requestPromise, timeoutPromise])
+      clearTimeout(timeoutId!)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId!)
+      throw error
+    }
   }
 
   private sendNotification(method: string, params?: unknown): void {
