@@ -147,7 +147,7 @@ Some important details here.
     })
 
     test("should handle filename collision with timestamp suffix", () => {
-      // #given - two plans with same name archived
+      // #given - first plan archived, then second plan with same name
       const planPath = join(PLANS_DIR, "collision-plan.md")
       writeFileSync(planPath, `# Collision Plan
 - [x] Task 1
@@ -165,16 +165,32 @@ Some important details here.
       archiveCompletedPlan(TEST_DIR, boulderState, config)
       const firstArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
       expect(firstArchiveFiles.length).toBe(1)
+      expect(firstArchiveFiles[0]).toBe("collision-plan.md")
 
-      // Recreate boulder state for second archive
-      writeBoulderState(TEST_DIR, boulderState)
+      // Modify plan content and recreate boulder state (simulates new completion)
+      writeFileSync(planPath, `# Collision Plan
+- [x] Task 1
+- [x] Task 2
+`)
+      const boulderState2: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-01T11:00:00Z",
+        session_ids: ["session-2"],
+        plan_name: "collision-plan",
+      }
+      writeBoulderState(TEST_DIR, boulderState2)
 
-      // #when - archive again
-      archiveCompletedPlan(TEST_DIR, boulderState, config)
+      // #when - archive again with same plan name
+      archiveCompletedPlan(TEST_DIR, boulderState2, config)
 
-      // #then - should have different filename or handle collision
+      // #then - should have TWO files: original + timestamped
       const secondArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
-      expect(secondArchiveFiles.length).toBeGreaterThanOrEqual(1)
+      expect(secondArchiveFiles.length).toBe(2)
+      expect(secondArchiveFiles).toContain("collision-plan.md")
+      // Second file should have timestamp suffix (format: collision-plan-YYYY-MM-DDTHH-MM-SS-sssZ.md)
+      const timestampedFile = secondArchiveFiles.find((f: string) => f !== "collision-plan.md")
+      expect(timestampedFile).toBeDefined()
+      expect(timestampedFile).toMatch(/^collision-plan-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.md$/)
     })
 
     test("should skip archiving when config disables it", () => {
@@ -202,60 +218,112 @@ Some important details here.
       expect(readBoulderState(TEST_DIR)).not.toBeNull()
     })
 
-    test("should skip archiving if plan has zero checkboxes (draft protection)", () => {
-      // #given - draft plan with no checkboxes
-      const planPath = join(PLANS_DIR, "draft-plan.md")
-      writeFileSync(planPath, `# Draft Plan
+     test("should skip archiving if plan has zero checkboxes (draft protection)", () => {
+       // #given - draft plan with no checkboxes
+       const planPath = join(PLANS_DIR, "draft-plan.md")
+       writeFileSync(planPath, `# Draft Plan
 No tasks yet
 `)
-      const boulderState: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-01T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "draft-plan",
-      }
-      writeBoulderState(TEST_DIR, boulderState)
-      const config: SisyphusAgentConfig = { archive_completed_plans: true }
+       const boulderState: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-01T10:00:00Z",
+         session_ids: ["session-1"],
+         plan_name: "draft-plan",
+       }
+       writeBoulderState(TEST_DIR, boulderState)
+       const config: SisyphusAgentConfig = { archive_completed_plans: true }
 
-      // #when
-      const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+       // #when
+       const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
 
-      // #then
-      expect(result).toBe(false)
-      expect(existsSync(ARCHIVE_DIR)).toBe(false)
-      // Boulder state should still exist
-      expect(readBoulderState(TEST_DIR)).not.toBeNull()
-    })
+       // #then
+       expect(result).toBe(false)
+       expect(existsSync(ARCHIVE_DIR)).toBe(false)
+       // Boulder state should still exist
+       expect(readBoulderState(TEST_DIR)).not.toBeNull()
+     })
 
-    test("should skip if archive already exists (idempotency)", () => {
-      // #given - completed plan already archived
-      const planPath = join(PLANS_DIR, "idempotent-plan.md")
-      writeFileSync(planPath, `# Idempotent Plan
+     test("should return false for incomplete plan (defense-in-depth)", () => {
+       // #given - plan with incomplete tasks (3/5 done)
+       const planPath = join(PLANS_DIR, "incomplete-plan.md")
+       writeFileSync(planPath, `# Incomplete Plan
+- [x] Task 1
+- [x] Task 2
+- [x] Task 3
+- [ ] Task 4
+- [ ] Task 5
+`)
+       const boulderState: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-01T10:00:00Z",
+         session_ids: ["session-1"],
+         plan_name: "incomplete-plan",
+       }
+       writeBoulderState(TEST_DIR, boulderState)
+       const config: SisyphusAgentConfig = { archive_completed_plans: true }
+
+       // #when
+       const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+
+       // #then - should NOT archive incomplete plan
+       expect(result).toBe(false)
+       expect(existsSync(ARCHIVE_DIR)).toBe(false)
+       // Boulder state should be preserved
+       expect(readBoulderState(TEST_DIR)).not.toBeNull()
+     })
+
+      test("should skip if archive already exists (idempotency)", () => {
+       // #given - completed plan already archived
+       const planPath = join(PLANS_DIR, "idempotent-plan.md")
+       writeFileSync(planPath, `# Idempotent Plan
 - [x] Task 1
 `)
-      const boulderState: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-01T10:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "idempotent-plan",
-      }
-      writeBoulderState(TEST_DIR, boulderState)
-      const config: SisyphusAgentConfig = { archive_completed_plans: true }
+       const boulderState: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-01T10:00:00Z",
+         session_ids: ["session-1"],
+         plan_name: "idempotent-plan",
+       }
+       writeBoulderState(TEST_DIR, boulderState)
+       const config: SisyphusAgentConfig = { archive_completed_plans: true }
 
-      // First archive
-      archiveCompletedPlan(TEST_DIR, boulderState, config)
-      const firstArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
+       // First archive
+       archiveCompletedPlan(TEST_DIR, boulderState, config)
+       const firstArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
 
-      // Recreate boulder state
-      writeBoulderState(TEST_DIR, boulderState)
+       // Recreate boulder state
+       writeBoulderState(TEST_DIR, boulderState)
 
-      // #when - try to archive again
-      const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+       // #when - try to archive again
+       const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
 
-      // #then - should return true (already done) but not create duplicate
-      expect(result).toBe(true)
-      const secondArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
-      expect(secondArchiveFiles.length).toBe(firstArchiveFiles.length)
-    })
-  })
+       // #then - should return true (already done) but not create duplicate
+       expect(result).toBe(true)
+       const secondArchiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
+       expect(secondArchiveFiles.length).toBe(firstArchiveFiles.length)
+     })
+
+      test("should return false when plan file cannot be read (TOCTOU)", () => {
+        // #given
+        const planPath = join(PLANS_DIR, "toctou-plan.md")
+        writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
+        const boulderState: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-01T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "toctou-plan",
+        }
+        writeBoulderState(TEST_DIR, boulderState)
+        const config: SisyphusAgentConfig = { archive_completed_plans: true }
+
+        rmSync(planPath)
+
+        // #when
+        const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+
+        // #then
+        expect(result).toBe(false)
+        expect(readBoulderState(TEST_DIR)).not.toBeNull()
+      })
+   })
 })

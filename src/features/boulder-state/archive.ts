@@ -20,16 +20,21 @@ export function archiveCompletedPlan(
     return false
   }
 
-  const progress = getPlanProgress(boulderState.active_plan)
-  if (progress.total === 0) {
-    return false
-  }
+   const progress = getPlanProgress(boulderState.active_plan)
+   if (progress.total === 0 || !progress.isComplete) {
+     return false
+   }
 
   if (!existsSync(boulderState.active_plan)) {
     return false
   }
 
-  const planContent = readFileSync(boulderState.active_plan, "utf-8")
+  let planContent: string
+  try {
+    planContent = readFileSync(boulderState.active_plan, "utf-8")
+  } catch {
+    return false
+  }
 
   const completedAt = new Date().toISOString()
   const sessionCount = boulderState.session_ids.length
@@ -49,14 +54,25 @@ duration_hours: ${durationHours.toFixed(2)}
   const baseArchivePath = join(archiveDir, `${boulderState.plan_name}.md`)
   let archivePath = baseArchivePath
 
+  if (existsSync(baseArchivePath)) {
+    // Check if the existing archive has the same content (idempotency)
+    const existingContent = readFileSync(baseArchivePath, "utf-8")
+    const newContent = frontmatter + planContent
+    
+    if (existingContent === newContent) {
+      // Same content, it's idempotent
+      clearBoulderState(directory)
+      return true
+    }
+    
+    // Different content, it's a collision - create timestamped file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+    archivePath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
+  }
+
   if (existsSync(archivePath)) {
     clearBoulderState(directory)
     return true
-  }
-
-  if (existsSync(baseArchivePath)) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-    archivePath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
   }
 
   try {
