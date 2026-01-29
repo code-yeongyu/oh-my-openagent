@@ -227,7 +227,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
-            | (Record<string, unknown> & { category?: string; model?: string; variant?: string })
+            | (Record<string, unknown> & {
+                category?: string
+                model?: string
+                variant?: string
+                reasoningEffort?: string
+                textVerbosity?: string
+                thinking?: { type: string; budgetTokens?: number }
+                temperature?: number
+                top_p?: number
+                maxTokens?: number
+              })
             | undefined;
 
         const categoryConfig = prometheusOverride?.category
@@ -248,12 +258,18 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           userModel: prometheusOverride?.model ?? categoryConfig?.model,
           fallbackChain: prometheusRequirement?.fallbackChain,
           availableModels,
-          systemDefaultModel: undefined, // let fallback chain handle this
+          systemDefaultModel: undefined,
         });
         const resolvedModel = modelResolution?.model;
         const resolvedVariant = modelResolution?.variant;
 
         const variantToUse = prometheusOverride?.variant ?? resolvedVariant;
+        const reasoningEffortToUse = prometheusOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
+        const textVerbosityToUse = prometheusOverride?.textVerbosity ?? categoryConfig?.textVerbosity;
+        const thinkingToUse = prometheusOverride?.thinking ?? categoryConfig?.thinking;
+        const temperatureToUse = prometheusOverride?.temperature ?? categoryConfig?.temperature;
+        const topPToUse = prometheusOverride?.top_p ?? categoryConfig?.top_p;
+        const maxTokensToUse = prometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
         const prometheusBase = {
           name: "prometheus",
           ...(resolvedModel ? { model: resolvedModel } : {}),
@@ -263,22 +279,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
           color: (configAgent?.plan?.color as string) ?? "#FF6347",
-          ...(categoryConfig?.temperature !== undefined
-            ? { temperature: categoryConfig.temperature }
-            : {}),
-          ...(categoryConfig?.top_p !== undefined
-            ? { top_p: categoryConfig.top_p }
-            : {}),
-          ...(categoryConfig?.maxTokens !== undefined
-            ? { maxTokens: categoryConfig.maxTokens }
-            : {}),
+          ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
+          ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
+          ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
           ...(categoryConfig?.tools ? { tools: categoryConfig.tools } : {}),
-          ...(categoryConfig?.thinking ? { thinking: categoryConfig.thinking } : {}),
-          ...(categoryConfig?.reasoningEffort !== undefined
-            ? { reasoningEffort: categoryConfig.reasoningEffort }
+          ...(thinkingToUse ? { thinking: thinkingToUse } : {}),
+          ...(reasoningEffortToUse !== undefined
+            ? { reasoningEffort: reasoningEffortToUse }
             : {}),
-          ...(categoryConfig?.textVerbosity !== undefined
-            ? { textVerbosity: categoryConfig.textVerbosity }
+          ...(textVerbosityToUse !== undefined
+            ? { textVerbosity: textVerbosityToUse }
             : {}),
         };
 
