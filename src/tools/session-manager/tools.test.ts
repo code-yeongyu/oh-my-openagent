@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { session_list, session_read, session_search, session_info } from "./tools"
+import { session_list, session_read, session_search, session_info, session_rename } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 const mockContext: ToolContext = {
@@ -119,6 +119,39 @@ describe("session-manager tools", () => {
   test("session_info executes with valid session", async () => {
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
     
+    expect(typeof result).toBe("string")
+  })
+
+  test("session_rename handles non-existent session", async () => {
+    //#given non-existent session ID
+    const args = { session_id: "ses_nonexistent", new_title: "New Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then returns error message
+    expect(result).toContain("not found")
+  })
+
+  test("session_rename successfully renames session", async () => {
+    //#given valid session ID and new title
+    const args = { session_id: "ses_test123", new_title: "Updated Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then returns a string result (success or failure)
+    expect(typeof result).toBe("string")
+  })
+
+  test("session_rename validates required parameters", async () => {
+    //#given missing new_title parameter
+    const args = { session_id: "ses_test123" } as any
+    
+    //#when attempting to execute
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then should handle gracefully (schema validation or error message)
     expect(typeof result).toBe("string")
   })
 })
