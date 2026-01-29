@@ -144,15 +144,15 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
-  test("session_rename validates required parameters", async () => {
-    //#given missing new_title parameter
-    const args = { session_id: "ses_test123" } as any
+  test("session_rename rejects empty title", async () => {
+    //#given empty new_title parameter
+    const args = { session_id: "ses_test123", new_title: "" }
     
     //#when attempting to execute
     const result = await session_rename.execute(args, mockContext)
     
-    //#then should handle gracefully (schema validation or error message)
-    expect(typeof result).toBe("string")
+    //#then should return error about empty title
+    expect(result).toContain("cannot be empty")
   })
 
   test("session_rename uses current session when session_id not provided", async () => {
