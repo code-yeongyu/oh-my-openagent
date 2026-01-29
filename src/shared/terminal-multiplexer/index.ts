@@ -2,3 +2,4 @@ export type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities, Mu
 export { TmuxAdapter, type TmuxAdapterConfig } from "./tmux-adapter"
 export { ZellijAdapter, type ZellijAdapterConfig } from "./zellij-adapter"
 export { detectMultiplexer, createMultiplexer, resetDetectionCache } from "./detection"
+export { loadZellijState, saveZellijState, clearZellijState, type ZellijState } from "./zellij-storage"
