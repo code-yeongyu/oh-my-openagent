@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, mock } from "bun:test"
 import { afterEach } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -175,6 +175,53 @@ function createBackgroundManager(): BackgroundManager {
   }
   return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 }
+
+describe("BackgroundManager.notifyParentSession", () => {
+  test("should inherit variant from parent session last message when notifying", async () => {
+    // #given
+    const promptMock = mock(async () => ({}))
+    const messagesMock = mock(async () => ({
+      data: [
+        {
+          info: {
+            agent: "sisyphus",
+            model: { providerID: "openai", modelID: "gpt-5.2", variant: "xhigh" },
+          },
+        },
+      ],
+    }))
+    const client = {
+      session: {
+        prompt: promptMock,
+        messages: messagesMock,
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task = createMockTask({
+      id: "task-variant-test",
+      sessionID: "child-session-1",
+      parentSessionID: "parent-session-1",
+      parentAgent: "sisyphus",
+      status: "completed",
+      startedAt: new Date(Date.now() - 1000),
+      completedAt: new Date(),
+    })
+
+    // #when
+    await (manager as unknown as { notifyParentSession: (t: BackgroundTask) => Promise<void> }).notifyParentSession(task)
+
+    // Clean up process listeners started by BackgroundManager
+    manager.shutdown()
+
+    // #then
+    expect(promptMock).toHaveBeenCalled()
+    const callArgs = (promptMock as unknown as { mock: { calls: Array<[any]> } }).mock.calls[0]?.[0]
+    expect(callArgs).toBeDefined()
+    expect(callArgs.path.id).toBe("parent-session-1")
+    expect(callArgs.body.variant).toBe("xhigh")
+  })
+})
 
 function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
   return (manager as unknown as { concurrencyManager: ConcurrencyManager }).concurrencyManager
@@ -2086,4 +2133,3 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(() => manager.shutdown()).not.toThrow()
   })
 })
-

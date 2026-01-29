@@ -1024,17 +1024,27 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     let agent: string | undefined = task.parentAgent
     let model: { providerID: string; modelID: string } | undefined
+    let variant: string | undefined
 
     try {
       const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
       const messages = (messagesResp.data ?? []) as Array<{
-        info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+        info?: {
+          agent?: string
+          model?: { providerID: string; modelID: string; variant?: string }
+          modelID?: string
+          providerID?: string
+          variant?: string
+        }
       }>
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
           agent = info.agent ?? task.parentAgent
-          model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+          model = info.model
+            ? { providerID: info.model.providerID, modelID: info.model.modelID }
+            : (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+          variant = info.variant ?? info.model?.variant
           break
         }
       }
@@ -1045,12 +1055,14 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
         ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
         : undefined
+      variant = currentMessage?.model?.variant
     }
 
     log("[background-agent] notifyParentSession context:", {
       taskId: task.id,
       resolvedAgent: agent,
       resolvedModel: model,
+      resolvedVariant: variant,
     })
 
     try {
@@ -1060,6 +1072,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           noReply: !allComplete,
           ...(agent !== undefined ? { agent } : {}),
           ...(model !== undefined ? { model } : {}),
+          ...(variant !== undefined ? { variant } : {}),
           parts: [{ type: "text", text: notification }],
         },
       })

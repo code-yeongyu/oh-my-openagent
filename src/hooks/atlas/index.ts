@@ -449,20 +449,28 @@ export function createAtlasHook(
       log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
       let model: { providerID: string; modelID: string } | undefined
+      let variant: string | undefined
       try {
         const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
         const messages = (messagesResp.data ?? []) as Array<{
-          info?: { model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+          info?: {
+            model?: { providerID: string; modelID: string; variant?: string }
+            modelID?: string
+            providerID?: string
+            variant?: string
+          }
         }>
         for (let i = messages.length - 1; i >= 0; i--) {
           const info = messages[i].info
           const msgModel = info?.model
           if (msgModel?.providerID && msgModel?.modelID) {
             model = { providerID: msgModel.providerID, modelID: msgModel.modelID }
+            variant = info?.variant ?? msgModel.variant
             break
           }
           if (info?.providerID && info?.modelID) {
             model = { providerID: info.providerID, modelID: info.modelID }
+            variant = info.variant
             break
           }
         }
@@ -472,6 +480,7 @@ export function createAtlasHook(
         model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
           ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
           : undefined
+        variant = currentMessage?.model?.variant
       }
 
        await ctx.client.session.prompt({
@@ -479,6 +488,7 @@ export function createAtlasHook(
          body: {
             agent: "atlas",
            ...(model !== undefined ? { model } : {}),
+           ...(variant !== undefined ? { variant } : {}),
            parts: [{ type: "text", text: prompt }],
          },
          query: { directory: ctx.directory },

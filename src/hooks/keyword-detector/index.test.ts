@@ -5,6 +5,14 @@ import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
 
+function openaiModel() {
+  return { providerID: "openai", modelID: "gpt-5.2" }
+}
+
+function anthropicModel() {
+  return { providerID: "anthropic", modelID: "claude-opus-4-5" }
+}
+
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
   let logSpy: ReturnType<typeof spyOn>
@@ -164,7 +172,7 @@ describe("keyword-detector session filtering", () => {
 
     // #when - non-main session triggers ultrawork keyword
     await hook["chat.message"](
-      { sessionID: subagentSessionID },
+      { sessionID: subagentSessionID, model: anthropicModel() },
       output
     )
 
@@ -209,7 +217,7 @@ describe("keyword-detector session filtering", () => {
 
     // #when - any session triggers keyword detection
     await hook["chat.message"](
-      { sessionID: "any-session" },
+      { sessionID: "any-session", model: anthropicModel() },
       output
     )
 
@@ -237,6 +245,28 @@ describe("keyword-detector session filtering", () => {
 
     // #then - existing variant should remain
     expect(output.message.variant).toBe("low")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
+
+  test("should respect input.variant from OpenCode (ctrl+t) even in ultrawork", async () => {
+    // #given - user already selected a variant via OpenCode (variant_cycle)
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw do this task" }],
+    }
+
+    // #when
+    await hook["chat.message"](
+      { sessionID: "any-session", model: openaiModel(), variant: "high" },
+      output
+    )
+
+    // #then - plugin should preserve the user-selected variant
+    expect(output.message.variant).toBe("high")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
@@ -306,12 +336,56 @@ describe("keyword-detector word boundary", () => {
 
     // #when - message with standalone 'ulw' is processed
     await hook["chat.message"](
-      { sessionID: "any-session" },
+      { sessionID: "any-session", model: openaiModel() },
       output
     )
 
     // #then - ultrawork should be triggered
+    expect(output.message.variant).toBe("xhigh")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
+
+  test("should prefer model keywords over provider (google provider running claude)", async () => {
+    // #given
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw do this task" }],
+    }
+
+    // #when
+    await hook["chat.message"](
+      { sessionID: "any-session", model: { providerID: "google", modelID: "claude-opus-4.5" } },
+      output
+    )
+
+    // #then
     expect(output.message.variant).toBe("max")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
+
+  test("should infer xhigh for github-copilot running gpt", async () => {
+    // #given
+    setMainSession(undefined)
+
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork please" }],
+    }
+
+    // #when
+    await hook["chat.message"](
+      { sessionID: "any-session", model: { providerID: "github-copilot", modelID: "gpt-5.2" } },
+      output
+    )
+
+    // #then
+    expect(output.message.variant).toBe("xhigh")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 

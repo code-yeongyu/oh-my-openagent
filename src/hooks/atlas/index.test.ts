@@ -29,14 +29,14 @@ describe("atlas hook", () => {
     } as unknown as Parameters<typeof createAtlasHook>[0] & { _promptMock: ReturnType<typeof mock> }
   }
 
-  function setupMessageStorage(sessionID: string, agent: string): void {
+  function setupMessageStorage(sessionID: string, agent: string, model?: { providerID: string; modelID: string; variant?: string }): void {
     const messageDir = join(MESSAGE_STORAGE, sessionID)
     if (!existsSync(messageDir)) {
       mkdirSync(messageDir, { recursive: true })
     }
     const messageData = {
       agent,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+      model: model ?? { providerID: "anthropic", modelID: "claude-opus-4-5" },
     }
     writeFileSync(join(messageDir, "msg_test001.json"), JSON.stringify(messageData))
   }
@@ -652,6 +652,43 @@ describe("atlas hook", () => {
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
       expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should preserve parent session variant when injecting continuation", async () => {
+      // #given - boulder state with incomplete plan and parent message has a variant
+      const planPath = join(TEST_DIR, "test-plan-variant.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan-variant",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      // Force atlas hook to fall back to message storage (no session.messages mock)
+      setupMessageStorage(MAIN_SESSION_ID, "atlas", {
+        providerID: "openai",
+        modelID: "gpt-5.2",
+        variant: "xhigh",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // #when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // #then
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.body.variant).toBe("xhigh")
     })
 
     test("should not inject when no boulder state exists", async () => {

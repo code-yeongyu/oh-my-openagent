@@ -10,6 +10,32 @@ export * from "./detector"
 export * from "./constants"
 export * from "./types"
 
+type ModelInfo = { providerID: string; modelID: string }
+
+function inferUltraworkVariant(model?: ModelInfo): string | undefined {
+  // Best-effort: in practice, providers can be proxies (e.g., github-copilot)
+  // and some custom providers can route "claude" via a non-anthropic providerID.
+  // Model keywords are therefore the highest signal.
+  if (!model) {
+    // Backwards-compatible default when OpenCode doesn't provide model info.
+    return "max"
+  }
+
+  const modelID = model.modelID.toLowerCase()
+  const providerID = model.providerID.toLowerCase()
+
+  if (modelID.includes("claude")) return "max"
+  if (modelID.includes("gpt") || modelID.includes("o1") || modelID.includes("o3")) return "xhigh"
+  if (modelID.includes("gemini")) return "high"
+
+  if (providerID === "anthropic" || providerID === "amazon-bedrock") return "max"
+  if (providerID === "openai") return "xhigh"
+  if (providerID === "google" || providerID === "google-vertex") return "high"
+
+  // Unknown provider/model: do not guess a variant name.
+  return undefined
+}
+
 export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextCollector) {
   return {
     "chat.message": async (
@@ -17,6 +43,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
         sessionID: string
         agent?: string
         model?: { providerID: string; modelID: string }
+        variant?: string
         messageID?: string
       },
       output: {
@@ -25,6 +52,12 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       }
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
+
+      // Respect the user's selected variant (e.g. ctrl+t / variant_cycle) if OpenCode
+      // already decided on one for this message.
+      if (input.variant !== undefined && output.message.variant === undefined) {
+        output.message.variant = input.variant
+      }
 
       if (isSystemDirective(promptText)) {
         log(`[keyword-detector] Skipping system directive message`, { sessionID: input.sessionID })
@@ -71,7 +104,10 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
         log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
 
         if (output.message.variant === undefined) {
-          output.message.variant = "max"
+          const inferred = inferUltraworkVariant(input.model)
+          if (inferred !== undefined) {
+            output.message.variant = inferred
+          }
         }
 
         ctx.client.tui
