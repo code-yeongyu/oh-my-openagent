@@ -309,7 +309,7 @@ export async function renameSession(sessionID: string, newTitle: string): Promis
     const content = await readFile(sessionPath, "utf-8")
     const metadata = JSON.parse(content) as SessionMetadata
 
-    metadata.title = newTitle || undefined
+    metadata.title = newTitle && newTitle.trim() ? newTitle.trim() : metadata.title
     metadata.time.updated = Date.now()
 
     await writeFile(sessionPath, JSON.stringify(metadata, null, 2), "utf-8")

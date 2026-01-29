@@ -154,4 +154,30 @@ describe("session-manager tools", () => {
     //#then should handle gracefully (schema validation or error message)
     expect(typeof result).toBe("string")
   })
+
+  test("session_rename uses current session when session_id not provided", async () => {
+    //#given only new_title provided, no session_id
+    const args = { new_title: "Default Session Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then should attempt to rename using context.sessionID ("test-session")
+    expect(typeof result).toBe("string")
+    // Will return "not found" since test-session doesn't exist, but proves it used the context
+    expect(result).toContain("test-session")
+  })
+
+  test("session_rename prefers explicit session_id over context", async () => {
+    //#given both session_id and new_title provided
+    const args = { session_id: "ses_explicit", new_title: "Explicit Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then should use the explicit session_id, not context.sessionID
+    expect(typeof result).toBe("string")
+    expect(result).toContain("ses_explicit")
+    expect(result).not.toContain("test-session")
+  })
 })

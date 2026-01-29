@@ -100,6 +100,6 @@ export interface SessionDeleteArgs {
 }
 
 export interface SessionRenameArgs {
-  session_id: string
+  session_id?: string
   new_title: string
 }

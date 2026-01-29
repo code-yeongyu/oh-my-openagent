@@ -149,23 +149,34 @@ export const session_info: ToolDefinition = tool({
 export const session_rename: ToolDefinition = tool({
   description: SESSION_RENAME_DESCRIPTION,
   args: {
-    session_id: tool.schema.string().describe("Session ID to rename"),
+    session_id: tool.schema.string().optional().describe("Session ID to rename (default: current session)"),
     new_title: tool.schema.string().describe("New title for the session"),
   },
-  execute: async (args: SessionRenameArgs, _context) => {
+  execute: async (args: SessionRenameArgs, context) => {
     try {
-      if (!sessionExists(args.session_id)) {
-        return `Session not found: ${args.session_id}`
+      const toolCtx = context as { sessionID: string }
+      const sessionId = args.session_id || toolCtx.sessionID
+
+      if (!sessionId) {
+        return "Error: No session ID provided and could not determine current session"
       }
 
-      const success = await renameSession(args.session_id, args.new_title)
+      if (!args.new_title || args.new_title.trim() === "") {
+        return "Error: Title cannot be empty. Please provide a descriptive title for the session."
+      }
+
+      if (!sessionExists(sessionId)) {
+        return `Session not found: ${sessionId}`
+      }
+
+      const success = await renameSession(sessionId, args.new_title.trim())
 
       if (success) {
         const titleDisplay = args.new_title ? `"${args.new_title}"` : "(cleared)"
-        return `Successfully renamed session ${args.session_id} to ${titleDisplay}`
+        return `Successfully renamed session ${sessionId} to ${titleDisplay}`
       }
 
-      return `Failed to rename session ${args.session_id}`
+      return `Failed to rename session ${sessionId}`
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }

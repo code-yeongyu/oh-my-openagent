@@ -100,7 +100,7 @@ Updates the title field in session metadata. The title is displayed in session_l
 
 Arguments:
 - session_id (optional): Session ID to rename. Defaults to current session if not provided.
-- new_title (required): New title for the session (can be empty to clear)
+- new_title (required): New title for the session (cannot be empty)
 
 IMPORTANT: If the user asks to rename a session without specifying a title (e.g., "rename this session" or "give this session a descriptive name"), YOU must generate an appropriate title based on the conversation context before calling this tool. Analyze the key topics, tasks, or themes discussed and create a concise, descriptive title (max 80 chars).
 

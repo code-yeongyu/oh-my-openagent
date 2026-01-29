@@ -496,22 +496,23 @@ describe("session-manager storage - renameSession", () => {
     expect(afterMetadata.time.updated).toBeGreaterThan(originalUpdated)
   })
 
-  test("handles empty string title by clearing title field", async () => {
+  test("handles empty string title by keeping existing title", async () => {
     // #given existing session with title
     const projectID = "test-project-123"
     const sessionID = "ses_test_456"
-    createSessionMetadata(projectID, sessionID, "Some Title")
+    const originalTitle = "Some Title"
+    createSessionMetadata(projectID, sessionID, originalTitle)
 
     // #when renaming with empty string
     const result = await storage.renameSession(sessionID, "")
 
-    // #then title is cleared (undefined or empty)
+    // #then title is preserved (empty strings are ignored to prevent TUI crashes)
     expect(result).toBe(true)
 
     const sessionPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
     const content = await Bun.file(sessionPath).text()
     const metadata = JSON.parse(content)
-    expect(metadata.title === undefined || metadata.title === "").toBe(true)
+    expect(metadata.title).toBe(originalTitle)
   })
 
   test("preserves other metadata fields when renaming", async () => {
