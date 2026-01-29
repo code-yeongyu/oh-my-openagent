@@ -54,21 +54,31 @@ duration_hours: ${durationHours.toFixed(2)}
   const baseArchivePath = join(archiveDir, `${boulderState.plan_name}.md`)
   let archivePath = baseArchivePath
 
-  if (existsSync(baseArchivePath)) {
-    // Check if the existing archive has the same content (idempotency)
-    const existingContent = readFileSync(baseArchivePath, "utf-8")
-    const newContent = frontmatter + planContent
-    
-    if (existingContent === newContent) {
-      // Same content, it's idempotent
-      clearBoulderState(directory)
-      return true
-    }
-    
-    // Different content, it's a collision - create timestamped file
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-    archivePath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
-  }
+   if (existsSync(baseArchivePath)) {
+     // Check if the existing archive has the same plan content (idempotency)
+     // Extract plan content from existing archive (skip frontmatter)
+     const existingContent = readFileSync(baseArchivePath, "utf-8")
+     const frontmatterEndIndex = existingContent.indexOf("---\n", 4) + 4
+     const existingPlanContent = existingContent.slice(frontmatterEndIndex).trim()
+     const newPlanContent = planContent.trim()
+     
+     if (existingPlanContent === newPlanContent) {
+       // Same plan content, check if a collision file already exists
+       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+       const potentialCollisionPath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
+       
+       if (!existsSync(potentialCollisionPath)) {
+         // No collision file, it's idempotent
+         clearBoulderState(directory)
+         return true
+       }
+       // Collision file exists, fall through to fail below
+     } else {
+       // Different content, it's a collision - create timestamped file
+       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+       archivePath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
+     }
+   }
 
    if (existsSync(archivePath)) {
      return false
