@@ -264,6 +264,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       });
       log("[index] onSubagentSessionCreated callback completed");
     },
+    onShutdown: () => {
+      tmuxSessionManager.cleanup().catch((error) => {
+        log("[index] tmux cleanup error during shutdown:", error)
+      })
+    },
   });
 
   const atlasHook = isHookEnabled("atlas")
