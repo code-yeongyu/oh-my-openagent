@@ -60,6 +60,7 @@ export class TmuxSessionManager {
   private sessions = new Map<string, TrackedSession>()
   private sessionHandles = new Map<string, PaneHandle>()
   private pendingSessions = new Set<string>()
+  private openCodeSessions = new Map<string, string>()
   private pollInterval?: ReturnType<typeof setInterval>
   private deps: TmuxUtilDeps
 
@@ -141,37 +142,44 @@ export class TmuxSessionManager {
       infoParentID: event.properties?.info?.parentID,
     })
 
-    if (!enabled) return
-    if (event.type !== "session.created") return
+     if (!enabled) return
+     if (event.type !== "session.created") return
 
-    const info = event.properties?.info
-    if (!info?.id || !info?.parentID) return
+     const info = event.properties?.info
+     if (!info?.id || !info?.parentID) return
 
-    const sessionId = info.id
-    const title = info.title ?? "Subagent"
+     const sessionId = info.id
+     const opcSessionId = info.parentID
+     const title = info.title ?? "Subagent"
 
-    if (this.sessions.has(sessionId) || this.pendingSessions.has(sessionId)) {
-      log("[tmux-session-manager] session already tracked or pending", { sessionId })
-      return
-    }
+     if (this.sessions.has(sessionId) || this.pendingSessions.has(sessionId)) {
+       log("[tmux-session-manager] session already tracked or pending", { sessionId })
+       return
+     }
 
-    if (!this.sourcePaneId) {
-      log("[tmux-session-manager] no source pane id")
-      return
-    }
+     if (!this.sourcePaneId) {
+       log("[tmux-session-manager] no source pane id")
+       return
+     }
 
-    this.pendingSessions.add(sessionId)
+     this.openCodeSessions.set(sessionId, opcSessionId)
+     log("[tmux-session-manager] stored OpenCode session ID", {
+       sessionId,
+       opcSessionId,
+     })
 
-    try {
-      if (this.adapter.capabilities.manualLayout) {
-        await this.spawnWithDecisionEngine(sessionId, title)
-      } else {
-        await this.spawnSimple(sessionId, title)
-      }
-    } finally {
-      this.pendingSessions.delete(sessionId)
-    }
-  }
+     this.pendingSessions.add(sessionId)
+
+     try {
+       if (this.adapter.capabilities.manualLayout) {
+         await this.spawnWithDecisionEngine(sessionId, title)
+       } else {
+         await this.spawnSimple(sessionId, title)
+       }
+     } finally {
+       this.pendingSessions.delete(sessionId)
+     }
+   }
 
   private async spawnWithDecisionEngine(sessionId: string, title: string): Promise<void> {
     const state = await queryWindowState(this.sourcePaneId!)
@@ -271,43 +279,50 @@ export class TmuxSessionManager {
     }
   }
 
-  private async spawnSimple(sessionId: string, title: string): Promise<void> {
-    const label = `omo-subagent-${sessionId}`
-    const cmd = this.buildSpawnCommand(sessionId, title)
+   private async spawnSimple(sessionId: string, title: string): Promise<void> {
+     const label = `omo-subagent-${sessionId}`
+     const cmd = this.buildSpawnCommand(sessionId, title)
 
-    log("[tmux-session-manager] simple spawn (no manual layout)", {
-      sessionId,
-      label,
-      multiplexerType: this.adapter.type,
-    })
+     const opcSessionId = this.openCodeSessions.get(sessionId)
+     log("[tmux-session-manager] simple spawn (no manual layout)", {
+       sessionId,
+       opcSessionId,
+       label,
+       multiplexerType: this.adapter.type,
+     })
 
-    const handle = await this.adapter.spawnPane(cmd, { label })
+     const handle = await this.adapter.spawnPane(cmd, { label })
 
-    const sessionReady = await this.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
-        sessionId,
-        label: handle.label,
-      })
-    }
+     const sessionReady = await this.waitForSessionReady(sessionId)
+     if (!sessionReady) {
+       log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+         sessionId,
+         label: handle.label,
+       })
+     }
 
-    const now = Date.now()
-    this.sessions.set(sessionId, {
-      sessionId,
-      paneId: handle.nativeId ?? handle.label,
-      description: title,
-      createdAt: new Date(now),
-      lastSeenAt: new Date(now),
-    })
-    this.sessionHandles.set(sessionId, handle)
+     const now = Date.now()
+     this.sessions.set(sessionId, {
+       sessionId,
+       paneId: handle.nativeId ?? handle.label,
+       description: title,
+       createdAt: new Date(now),
+       lastSeenAt: new Date(now),
+     })
+     this.sessionHandles.set(sessionId, handle)
 
-    log("[tmux-session-manager] pane spawned via adapter", {
-      sessionId,
-      handle,
-      sessionReady,
-    })
-    this.startPolling()
-  }
+     log("[tmux-session-manager] pane spawned via adapter", {
+       sessionId,
+       handle,
+       sessionReady,
+     })
+
+     if (opcSessionId) {
+       // TODO(Task 5): Call adapter.setSessionID(opcSessionId) here to integrate with ZellijAdapter
+     }
+
+     this.startPolling()
+   }
 
   private buildSpawnCommand(sessionId: string, _title: string): string {
     return `opencode attach ${this.serverUrl} --session ${sessionId}`
@@ -341,13 +356,14 @@ export class TmuxSessionManager {
       }
     }
 
-    this.sessions.delete(event.sessionID)
-    this.sessionHandles.delete(event.sessionID)
+     this.sessions.delete(event.sessionID)
+     this.sessionHandles.delete(event.sessionID)
+     this.openCodeSessions.delete(event.sessionID)
 
-    if (this.sessions.size === 0) {
-      this.stopPolling()
-    }
-  }
+     if (this.sessions.size === 0) {
+       this.stopPolling()
+     }
+   }
 
   private startPolling(): void {
     if (this.pollInterval) return
@@ -504,15 +520,16 @@ export class TmuxSessionManager {
       }
     }
 
-    this.sessions.delete(sessionId)
-    this.sessionHandles.delete(sessionId)
+     this.sessions.delete(sessionId)
+     this.sessionHandles.delete(sessionId)
+     this.openCodeSessions.delete(sessionId)
 
-    if (this.sessions.size === 0) {
-      this.stopPolling()
-    }
-  }
+     if (this.sessions.size === 0) {
+       this.stopPolling()
+     }
+   }
 
-  createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
+   createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
     return async (input) => {
       await this.onSessionCreated(input.event as SessionCreatedEvent)
     }
@@ -554,10 +571,11 @@ export class TmuxSessionManager {
         await Promise.all(closePromises)
       }
 
-      this.sessions.clear()
-      this.sessionHandles.clear()
-    }
+       this.sessions.clear()
+       this.sessionHandles.clear()
+       this.openCodeSessions.clear()
+     }
 
-    log("[tmux-session-manager] cleanup complete")
-  }
+     log("[tmux-session-manager] cleanup complete")
+   }
 }
