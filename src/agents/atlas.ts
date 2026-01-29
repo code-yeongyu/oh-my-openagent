@@ -529,7 +529,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   ])
   return {
     description:
-      "Orchestrates work via delegate_task() to complete ALL tasks in a todo list until fully done",
+      "Orchestrates work via delegate_task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
     mode: "primary" as const,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
