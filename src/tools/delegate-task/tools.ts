@@ -16,7 +16,7 @@ import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, fi
 import { fetchAvailableModels } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
-import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { CATEGORY_MODEL_REQUIREMENTS, isVariantLikelySupported } from "../../shared/model-requirements"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -115,11 +115,10 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: {
     userCategories?: CategoriesConfig
-    inheritedModel?: string
     systemDefaultModel?: string
   }
 ): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
-  const { userCategories, inheritedModel, systemDefaultModel } = options
+  const { userCategories, systemDefaultModel } = options
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -128,11 +127,9 @@ export function resolveCategoryConfig(
     return null
   }
 
-  // Model priority for categories: user override > category default > system default
-  // Categories have explicit models - no inheritance from parent session
   const model = resolveModel({
     userModel: userConfig?.model,
-    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
+    inheritedModel: defaultConfig?.model,
     systemDefault: systemDefaultModel,
   })
   const config: CategoryConfig = {
@@ -367,17 +364,19 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         try {
           let resumeAgent: string | undefined
           let resumeModel: { providerID: string; modelID: string } | undefined
+          let resumeVariant: string | undefined
 
           try {
             const messagesResp = await client.session.messages({ path: { id: args.session_id } })
             const messages = (messagesResp.data ?? []) as Array<{
-              info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+              info?: { agent?: string; model?: { providerID: string; modelID: string; variant?: string }; modelID?: string; providerID?: string; variant?: string }
             }>
             for (let i = messages.length - 1; i >= 0; i--) {
               const info = messages[i].info
               if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
                 resumeAgent = info.agent
                 resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+                resumeVariant = info.model?.variant ?? info.variant
                 break
               }
             }
@@ -388,6 +387,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
               ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
               : undefined
+            resumeVariant = resumeMessage?.model?.variant
           }
 
           await client.session.prompt({
@@ -395,6 +395,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
             body: {
               ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
               ...(resumeModel !== undefined ? { model: resumeModel } : {}),
+              ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
               tools: {
                 ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
                 task: false,
@@ -510,10 +511,6 @@ To continue this session: session_id="${args.session_id}"`
        let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
        let categoryPromptAppend: string | undefined
 
-       const inheritedModel = parentModel
-         ? `${parentModel.providerID}/${parentModel.modelID}`
-         : undefined
-
        let modelInfo: ModelFallbackInfo | undefined
 
        if (args.category) {
@@ -524,7 +521,6 @@ To continue this session: session_id="${args.session_id}"`
 
          const resolved = resolveCategoryConfig(args.category, {
            userCategories,
-           inheritedModel,
            systemDefaultModel,
          })
          if (!resolved) {
@@ -541,7 +537,7 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -581,7 +577,11 @@ To continue this session: session_id="${args.session_id}"`
          agentToUse = SISYPHUS_JUNIOR_AGENT
           if (!categoryModel && actualModel) {
             const parsedModel = parseModelString(actualModel)
-            categoryModel = parsedModel ?? undefined
+            // Preserve variant when falling back to actualModel parsing
+            const variantToUse = resolved.config.variant
+            categoryModel = parsedModel
+              ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
+              : undefined
           }
           categoryPromptAppend = resolved.promptAppend || undefined
 
@@ -596,6 +596,17 @@ Configure in one of:
 
 Current category: ${args.category}
 Available categories: ${categoryNames.join(", ")}`
+          }
+
+          if (categoryModel?.variant && categoryModel.providerID) {
+            if (!isVariantLikelySupported(categoryModel.providerID, categoryModel.variant)) {
+              log(`[delegate_task] Variant "${categoryModel.variant}" may not be supported by provider "${categoryModel.providerID}"`, {
+                category: args.category,
+                model: categoryModel.modelID,
+                provider: categoryModel.providerID,
+                variant: categoryModel.variant,
+              })
+            }
           }
 
           const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)

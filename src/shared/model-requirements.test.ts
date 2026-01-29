@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import {
   AGENT_MODEL_REQUIREMENTS,
   CATEGORY_MODEL_REQUIREMENTS,
+  getKnownVariantsByProvider,
+  isVariantLikelySupported,
   type FallbackEntry,
   type ModelRequirement,
 } from "./model-requirements"
@@ -422,5 +424,114 @@ describe("ModelRequirement type", () => {
         expect(entry.providers.length).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe("getKnownVariantsByProvider", () => {
+  test("returns a Map of providers to their known variants", () => {
+    // #given - the function exists
+    // #when - calling getKnownVariantsByProvider
+    const result = getKnownVariantsByProvider()
+
+    // #then - result is a Map
+    expect(result).toBeInstanceOf(Map)
+  })
+
+  test("anthropic provider has known variants from fallbackChains", () => {
+    // #given - anthropic is used in multiple fallbackChains with variants
+    // #when - getting known variants
+    const knownVariants = getKnownVariantsByProvider()
+    const anthropicVariants = knownVariants.get("anthropic")
+
+    // #then - anthropic should have known variants (e.g., "max" from sisyphus)
+    expect(anthropicVariants).toBeDefined()
+    expect(anthropicVariants).toBeInstanceOf(Set)
+    expect(anthropicVariants!.has("max")).toBe(true)
+  })
+
+  test("openai provider has known variants from fallbackChains", () => {
+    // #given - openai is used with variants like "high", "xhigh", "medium"
+    // #when - getting known variants
+    const knownVariants = getKnownVariantsByProvider()
+    const openaiVariants = knownVariants.get("openai")
+
+    // #then - openai should have its known variants
+    expect(openaiVariants).toBeDefined()
+    expect(openaiVariants).toBeInstanceOf(Set)
+    expect(openaiVariants!.has("high")).toBe(true)
+    expect(openaiVariants!.has("xhigh")).toBe(true)
+  })
+
+  test("caches results on subsequent calls", () => {
+    // #given - first call populates cache
+    const firstResult = getKnownVariantsByProvider()
+
+    // #when - calling again
+    const secondResult = getKnownVariantsByProvider()
+
+    // #then - same reference is returned (cached)
+    expect(firstResult).toBe(secondResult)
+  })
+})
+
+describe("isVariantLikelySupported", () => {
+  test("returns true for known provider+variant combination", () => {
+    // #given - anthropic supports "max" variant (from sisyphus fallbackChain)
+    const providerID = "anthropic"
+    const variant = "max"
+
+    // #when - checking if variant is supported
+    const result = isVariantLikelySupported(providerID, variant)
+
+    // #then - should return true
+    expect(result).toBe(true)
+  })
+
+  test("returns false for known provider with unknown variant", () => {
+    // #given - anthropic is known but "super-ultra-max" is not a known variant
+    const providerID = "anthropic"
+    const variant = "super-ultra-max"
+
+    // #when - checking if variant is supported
+    const result = isVariantLikelySupported(providerID, variant)
+
+    // #then - should return false
+    expect(result).toBe(false)
+  })
+
+  test("returns true for unknown provider (assumes support)", () => {
+    // #given - a provider not in any fallbackChain
+    const providerID = "unknown-provider-xyz"
+    const variant = "any-variant"
+
+    // #when - checking if variant is supported
+    const result = isVariantLikelySupported(providerID, variant)
+
+    // #then - should return true (benefit of doubt for unknown providers)
+    expect(result).toBe(true)
+  })
+
+  test("returns true for openai with high variant", () => {
+    // #given - openai with "high" variant (from oracle fallbackChain)
+    const providerID = "openai"
+    const variant = "high"
+
+    // #when - checking if variant is supported
+    const result = isVariantLikelySupported(providerID, variant)
+
+    // #then - should return true
+    expect(result).toBe(true)
+  })
+
+  test("returns true for google with max variant", () => {
+    // #given - google with "max" variant (from artistry fallbackChain)
+    const providerID = "google"
+    const variant = "max"
+
+    // #when - checking if variant is supported
+    const result = isVariantLikelySupported(providerID, variant)
+
+    // #then - should return true
+    expect(result).toBe(true)
   })
 })

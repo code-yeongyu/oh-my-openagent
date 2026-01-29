@@ -130,3 +130,42 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
 }
+
+let cachedKnownVariants: Map<string, Set<string>> | null = null
+
+export function getKnownVariantsByProvider(): Map<string, Set<string>> {
+  if (cachedKnownVariants) return cachedKnownVariants
+
+  const variantsByProvider = new Map<string, Set<string>>()
+
+  const allRequirements = [
+    ...Object.values(AGENT_MODEL_REQUIREMENTS),
+    ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
+  ]
+
+  for (const req of allRequirements) {
+    for (const entry of req.fallbackChain) {
+      if (entry.variant) {
+        for (const provider of entry.providers) {
+          const existing = variantsByProvider.get(provider) ?? new Set<string>()
+          existing.add(entry.variant)
+          variantsByProvider.set(provider, existing)
+        }
+      }
+    }
+  }
+
+  cachedKnownVariants = variantsByProvider
+  return variantsByProvider
+}
+
+export function isVariantLikelySupported(providerID: string, variant: string): boolean {
+  const knownVariants = getKnownVariantsByProvider()
+  const providerVariants = knownVariants.get(providerID)
+  
+  if (!providerVariants) {
+    return true
+  }
+  
+  return providerVariants.has(variant)
+}
