@@ -79,6 +79,7 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
+  private onShutdown?: () => void
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -89,6 +90,7 @@ export class BackgroundManager {
     options?: {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
+      onShutdown?: () => void
     }
   ) {
     this.tasks = new Map()
@@ -100,6 +102,7 @@ export class BackgroundManager {
     this.config = config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
+    this.onShutdown = options?.onShutdown
     this.registerProcessCleanup()
   }
 
@@ -1346,7 +1349,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
 
-    // Release concurrency for all running tasks first
+    // Abort all running sessions to prevent zombie processes (#1240)
+    for (const task of this.tasks.values()) {
+      if (task.status === "running" && task.sessionID) {
+        this.client.session.abort({
+          path: { id: task.sessionID },
+        }).catch(() => {})
+      }
+    }
+
+    // Notify shutdown listeners (e.g., tmux cleanup)
+    if (this.onShutdown) {
+      try {
+        this.onShutdown()
+      } catch (error) {
+        log("[background-agent] Error in onShutdown callback:", error)
+      }
+    }
+
+    // Release concurrency for all running tasks
     for (const task of this.tasks.values()) {
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)

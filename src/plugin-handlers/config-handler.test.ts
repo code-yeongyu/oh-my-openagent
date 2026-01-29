@@ -280,3 +280,127 @@ describe("Prometheus category config resolution", () => {
     expect(config?.tools).toEqual({ tool1: true, tool2: false })
   })
 })
+
+describe("Prometheus direct override priority over category", () => {
+  test("direct reasoningEffort takes priority over category reasoningEffort", async () => {
+    // #given - category has reasoningEffort=xhigh, direct override says "low"
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+      categories: {
+        "test-planning": {
+          model: "openai/gpt-5.2",
+          reasoningEffort: "xhigh",
+        },
+      },
+      agents: {
+        prometheus: {
+          category: "test-planning",
+          reasoningEffort: "low",
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - direct override's reasoningEffort wins
+    const agents = config.agent as Record<string, { reasoningEffort?: string }>
+    expect(agents.prometheus).toBeDefined()
+    expect(agents.prometheus.reasoningEffort).toBe("low")
+  })
+
+  test("category reasoningEffort applied when no direct override", async () => {
+    // #given - category has reasoningEffort but no direct override
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+      categories: {
+        "reasoning-cat": {
+          model: "openai/gpt-5.2",
+          reasoningEffort: "high",
+        },
+      },
+      agents: {
+        prometheus: {
+          category: "reasoning-cat",
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - category's reasoningEffort is applied
+    const agents = config.agent as Record<string, { reasoningEffort?: string }>
+    expect(agents.prometheus).toBeDefined()
+    expect(agents.prometheus.reasoningEffort).toBe("high")
+  })
+
+  test("direct temperature takes priority over category temperature", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+      categories: {
+        "temp-cat": {
+          model: "openai/gpt-5.2",
+          temperature: 0.8,
+        },
+      },
+      agents: {
+        prometheus: {
+          category: "temp-cat",
+          temperature: 0.1,
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - direct temperature wins over category
+    const agents = config.agent as Record<string, { temperature?: number }>
+    expect(agents.prometheus).toBeDefined()
+    expect(agents.prometheus.temperature).toBe(0.1)
+  })
+})

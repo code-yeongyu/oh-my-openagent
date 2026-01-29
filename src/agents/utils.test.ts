@@ -407,3 +407,119 @@ describe("buildAgent with category and skills", () => {
     expect(agent.prompt).not.toContain("agent-browser open")
   })
 })
+
+describe("override.category expansion in createBuiltinAgents", () => {
+  test("standard agent override with category expands category properties", async () => {
+    // #given
+    const overrides = {
+      oracle: { category: "ultrabrain" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.oracle.variant).toBe("xhigh")
+  })
+
+  test("standard agent override with category AND direct variant - direct wins", async () => {
+    // #given - ultrabrain has variant=xhigh, but direct override says "max"
+    const overrides = {
+      oracle: { category: "ultrabrain", variant: "max" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - direct variant overrides category variant
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.variant).toBe("max")
+  })
+
+  test("standard agent override with category AND direct reasoningEffort - direct wins", async () => {
+    // #given - custom category has reasoningEffort=xhigh, direct override says "low"
+    const categories = {
+      "test-cat": {
+        model: "openai/gpt-5.2",
+        reasoningEffort: "xhigh" as const,
+      },
+    }
+    const overrides = {
+      oracle: { category: "test-cat", reasoningEffort: "low" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, categories)
+
+    // #then - direct reasoningEffort wins over category
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.reasoningEffort).toBe("low")
+  })
+
+  test("standard agent override with category applies reasoningEffort from category when no direct override", async () => {
+    // #given - custom category has reasoningEffort, no direct reasoningEffort in override
+    const categories = {
+      "reasoning-cat": {
+        model: "openai/gpt-5.2",
+        reasoningEffort: "high" as const,
+      },
+    }
+    const overrides = {
+      oracle: { category: "reasoning-cat" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, categories)
+
+    // #then - category reasoningEffort is applied
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.reasoningEffort).toBe("high")
+  })
+
+  test("sisyphus override with category expands category properties", async () => {
+    // #given
+    const overrides = {
+      sisyphus: { category: "ultrabrain" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.sisyphus.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.sisyphus.variant).toBe("xhigh")
+  })
+
+  test("atlas override with category expands category properties", async () => {
+    // #given
+    const overrides = {
+      atlas: { category: "ultrabrain" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    expect(agents.atlas).toBeDefined()
+    expect(agents.atlas.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.atlas.variant).toBe("xhigh")
+  })
+
+  test("override with non-existent category has no effect on config", async () => {
+    // #given
+    const overrides = {
+      oracle: { category: "non-existent-category" } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - no category-specific variant/reasoningEffort applied from non-existent category
+    expect(agents.oracle).toBeDefined()
+    const agentsWithoutOverride = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+    expect(agents.oracle.model).toBe(agentsWithoutOverride.oracle.model)
+  })
+})
