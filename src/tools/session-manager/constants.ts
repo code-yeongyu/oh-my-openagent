@@ -94,4 +94,16 @@ Example:
 session_delete(session_id="ses_abc123", confirm=true)
 Successfully deleted session ses_abc123`
 
+export const SESSION_RENAME_DESCRIPTION = `Rename/retitle an OpenCode session.
+
+Updates the title field in session metadata. The title is displayed in session_list and session_info outputs.
+
+Arguments:
+- session_id (required): Session ID to rename (e.g., "ses_abc123")
+- new_title (required): New title for the session (can be empty to clear)
+
+Example:
+session_rename(session_id="ses_abc123", new_title="Implement auth feature")
+Successfully renamed session ses_abc123 to "Implement auth feature"`
+
 export const TOOL_NAME_PREFIX = "session_"

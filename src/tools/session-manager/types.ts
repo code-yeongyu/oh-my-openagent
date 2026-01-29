@@ -29,6 +29,7 @@ export interface SessionInfo {
   agents_used: string[]
   has_todos: boolean
   has_transcript: boolean
+  title?: string
   todos?: TodoItem[]
   transcript_entries?: number
 }
@@ -96,4 +97,9 @@ export interface SessionInfoArgs {
 export interface SessionDeleteArgs {
   session_id: string
   confirm: boolean
+}
+
+export interface SessionRenameArgs {
+  session_id: string
+  new_title: string
 }
