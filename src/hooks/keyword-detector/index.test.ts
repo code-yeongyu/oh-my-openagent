@@ -16,8 +16,13 @@ describe("keyword-detector message transform", () => {
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
+    })
   })
-})
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    getMainSessionSpy?.mockRestore()
+  })
 
 describe("cleanTitleFromPrompt", () => {
   test("should remove ultrawork keyword from start", () => {
