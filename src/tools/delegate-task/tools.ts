@@ -784,7 +784,7 @@ Create the work plan directly - that's your job as the planning agent.`
         // Uses case-insensitive matching to allow "Oracle", "oracle", "ORACLE" etc.
         try {
           const agentsResult = await client.app.agents()
-          type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
+          type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all"; model?: { providerID: string; modelID: string } }
           const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
 
           const callableAgents = agents.filter((a) => a.mode !== "primary")
@@ -807,6 +807,14 @@ Create the work plan directly - that's your job as the planning agent.`
           }
           // Use the canonical agent name from registration
           agentToUse = matchedAgent.name
+
+          // Extract registered agent's model to pass explicitly to session.prompt.
+          // This ensures the model is always in the correct object format ({providerID, modelID})
+          // regardless of how OpenCode handles string→object conversion for plugin-registered agents.
+          // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1225
+          if (matchedAgent.model) {
+            categoryModel = matchedAgent.model
+          }
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }
