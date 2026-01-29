@@ -7,6 +7,10 @@ export interface ClaudeCodeMcpServer {
   args?: string[]
   env?: Record<string, string>
   headers?: Record<string, string>
+  oauth?: {
+    clientId?: string
+    scopes?: string[]
+  }
   disabled?: boolean
 }
 

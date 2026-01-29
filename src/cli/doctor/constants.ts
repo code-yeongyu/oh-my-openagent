@@ -32,6 +32,7 @@ export const CHECK_IDS = {
   LSP_SERVERS: "lsp-servers",
   MCP_BUILTIN: "mcp-builtin",
   MCP_USER: "mcp-user",
+  MCP_OAUTH_TOKENS: "mcp-oauth-tokens",
   VERSION_STATUS: "version-status",
 } as const
 
@@ -50,6 +51,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.LSP_SERVERS]: "LSP Servers",
   [CHECK_IDS.MCP_BUILTIN]: "Built-in MCP Servers",
   [CHECK_IDS.MCP_USER]: "User MCP Configuration",
+  [CHECK_IDS.MCP_OAUTH_TOKENS]: "MCP OAuth Tokens",
   [CHECK_IDS.VERSION_STATUS]: "Version Status",
 } as const
 
