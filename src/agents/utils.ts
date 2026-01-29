@@ -149,7 +149,8 @@ export async function createBuiltinAgents(
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
   client?: any,
-  browserProvider?: BrowserAutomationProvider
+  browserProvider?: BrowserAutomationProvider,
+  uiSelectedModel?: string
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   const availableModels = client 
@@ -198,6 +199,7 @@ export async function createBuiltinAgents(
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
     
     const resolution = resolveModelWithFallback({
+      uiSelectedModel,
       userModel: override?.model,
       fallbackChain: requirement?.fallbackChain,
       availableModels,
@@ -241,6 +243,7 @@ export async function createBuiltinAgents(
      const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
     
     const sisyphusResolution = resolveModelWithFallback({
+      uiSelectedModel,
       userModel: sisyphusOverride?.model,
       fallbackChain: sisyphusRequirement?.fallbackChain,
       availableModels,
@@ -282,6 +285,7 @@ export async function createBuiltinAgents(
      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
     
     const atlasResolution = resolveModelWithFallback({
+      uiSelectedModel,
       userModel: orchestratorOverride?.model,
       fallbackChain: atlasRequirement?.fallbackChain,
       availableModels,
