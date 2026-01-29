@@ -67,8 +67,9 @@
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "picomatch": "^4.0.3",
-    "zod": "^4.3.6"
+    "picomatch": "^4.0.2",
+    "vscode-jsonrpc": "^8.2.0",
+    "zod": "^4.1.8"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.55.2",

@@ -4,6 +4,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
+import { McpOAuthProvider } from "../mcp-oauth/provider"
+import { isStepUpRequired, mergeScopes } from "../mcp-oauth/step-up"
 import { createCleanMcpEnvironment } from "./env-cleaner"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 
@@ -60,12 +62,35 @@ function getConnectionType(config: ClaudeCodeMcpServer): ConnectionType | null {
 export class SkillMcpManager {
   private clients: Map<string, ManagedClient> = new Map()
   private pendingConnections: Map<string, Promise<Client>> = new Map()
+  private authProviders: Map<string, McpOAuthProvider> = new Map()
   private cleanupRegistered = false
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
   private readonly IDLE_TIMEOUT = 5 * 60 * 1000
 
   private getClientKey(info: SkillMcpClientInfo): string {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
+  }
+
+  /**
+   * Get or create an McpOAuthProvider for a given server URL + oauth config.
+   * Providers are cached by server URL to reuse tokens across reconnections.
+   */
+  private getOrCreateAuthProvider(
+    serverUrl: string,
+    oauth: NonNullable<ClaudeCodeMcpServer["oauth"]>
+  ): McpOAuthProvider {
+    const existing = this.authProviders.get(serverUrl)
+    if (existing) {
+      return existing
+    }
+
+    const provider = new McpOAuthProvider({
+      serverUrl,
+      clientId: oauth.clientId,
+      scopes: oauth.scopes,
+    })
+    this.authProviders.set(serverUrl, provider)
+    return provider
   }
 
   private registerProcessCleanup(): void {
@@ -204,7 +229,30 @@ export class SkillMcpManager {
     // Build request init with headers if provided
     const requestInit: RequestInit = {}
     if (config.headers && Object.keys(config.headers).length > 0) {
-      requestInit.headers = config.headers
+      requestInit.headers = { ...config.headers }
+    }
+
+    let authProvider: McpOAuthProvider | undefined
+    if (config.oauth) {
+      authProvider = this.getOrCreateAuthProvider(config.url, config.oauth)
+      let tokenData = authProvider.tokens()
+
+      const isExpired = tokenData?.expiresAt != null && tokenData.expiresAt < Math.floor(Date.now() / 1000)
+      if (!tokenData || isExpired) {
+        try {
+          tokenData = await authProvider.login()
+        } catch {
+          // Login failed — proceed without auth header
+        }
+      }
+
+      if (tokenData) {
+        const existingHeaders = (requestInit.headers ?? {}) as Record<string, string>
+        requestInit.headers = {
+          ...existingHeaders,
+          Authorization: `Bearer ${tokenData.accessToken}`,
+        }
+      }
     }
 
     const transport = new StreamableHTTPClientTransport(url, {
@@ -460,6 +508,12 @@ export class SkillMcpManager {
         lastError = error instanceof Error ? error : new Error(String(error))
         const errorMessage = lastError.message.toLowerCase()
 
+        const stepUpHandled = await this.handleStepUpIfNeeded(lastError, config)
+        if (stepUpHandled) {
+          await this.forceReconnect(info)
+          continue
+        }
+
         if (!errorMessage.includes("not connected")) {
           throw lastError
         }
@@ -470,21 +524,64 @@ export class SkillMcpManager {
           )
         }
 
-        const key = this.getClientKey(info)
-        const existing = this.clients.get(key)
-        if (existing) {
-          this.clients.delete(key)
-          try {
-            await existing.client.close()
-          } catch { /* process may already be terminated */ }
-          try {
-            await existing.transport.close()
-          } catch { /* transport may already be terminated */ }
-        }
+        await this.forceReconnect(info)
       }
     }
 
     throw lastError || new Error("Operation failed with unknown error")
+  }
+
+  private async handleStepUpIfNeeded(
+    error: Error,
+    config: ClaudeCodeMcpServer
+  ): Promise<boolean> {
+    if (!config.oauth || !config.url) {
+      return false
+    }
+
+    const statusMatch = /\b403\b/.exec(error.message)
+    if (!statusMatch) {
+      return false
+    }
+
+    const headers: Record<string, string> = {}
+    const wwwAuthMatch = /WWW-Authenticate:\s*(.+)/i.exec(error.message)
+    if (wwwAuthMatch?.[1]) {
+      headers["www-authenticate"] = wwwAuthMatch[1]
+    }
+
+    const stepUp = isStepUpRequired(403, headers)
+    if (!stepUp) {
+      return false
+    }
+
+    const currentScopes = config.oauth.scopes ?? []
+    const merged = mergeScopes(currentScopes, stepUp.requiredScopes)
+    config.oauth.scopes = merged
+
+    this.authProviders.delete(config.url)
+    const provider = this.getOrCreateAuthProvider(config.url, config.oauth)
+
+    try {
+      await provider.login()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async forceReconnect(info: SkillMcpClientInfo): Promise<void> {
+    const key = this.getClientKey(info)
+    const existing = this.clients.get(key)
+    if (existing) {
+      this.clients.delete(key)
+      try {
+        await existing.client.close()
+      } catch { /* process may already be terminated */ }
+      try {
+        await existing.transport.close()
+      } catch { /* transport may already be terminated */ }
+    }
   }
 
   private async getOrCreateClientWithRetry(
