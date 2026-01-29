@@ -482,7 +482,7 @@ describe("session-manager storage - renameSession", () => {
     const beforeMetadata = JSON.parse(beforeContent)
     const originalUpdated = beforeMetadata.time.updated
 
-    // Wait to ensure timestamp difference
+    // #given time has passed to ensure timestamp difference
     await new Promise((resolve) => setTimeout(resolve, 10))
 
     // #when renaming session

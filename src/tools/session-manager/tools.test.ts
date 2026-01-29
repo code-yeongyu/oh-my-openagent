@@ -162,9 +162,8 @@ describe("session-manager tools", () => {
     //#when executing rename
     const result = await session_rename.execute(args, mockContext)
     
-    //#then should attempt to rename using context.sessionID ("test-session")
+    //#then result references context.sessionID ("test-session"), proving fallback worked
     expect(typeof result).toBe("string")
-    // Will return "not found" since test-session doesn't exist, but proves it used the context
     expect(result).toContain("test-session")
   })
 

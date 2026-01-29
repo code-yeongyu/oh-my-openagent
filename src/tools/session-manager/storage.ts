@@ -204,6 +204,19 @@ export async function readSessionTranscript(sessionID: string): Promise<number> 
   }
 }
 
+async function getSessionTitle(sessionID: string): Promise<string | undefined> {
+  const metadataPath = findSessionMetadataPath(sessionID)
+  if (!metadataPath) return undefined
+
+  try {
+    const content = await readFile(metadataPath, "utf-8")
+    const meta = JSON.parse(content) as SessionMetadata
+    return meta.title
+  } catch {
+    return undefined
+  }
+}
+
 export async function getSessionInfo(sessionID: string): Promise<SessionInfo | null> {
   const messages = await readSessionMessages(sessionID)
   if (messages.length === 0) return null
@@ -224,39 +237,7 @@ export async function getSessionInfo(sessionID: string): Promise<SessionInfo | n
   const todos = await readSessionTodos(sessionID)
   const transcriptEntries = await readSessionTranscript(sessionID)
 
-  let title: string | undefined
-
-  if (existsSync(SESSION_STORAGE)) {
-    try {
-      const projectDirs = await readdir(SESSION_STORAGE, { withFileTypes: true })
-      for (const projectDir of projectDirs) {
-        if (!projectDir.isDirectory()) continue
-
-        const projectPath = join(SESSION_STORAGE, projectDir.name)
-        const sessionFiles = await readdir(projectPath)
-
-        for (const file of sessionFiles) {
-          if (!file.endsWith(".json")) continue
-
-          try {
-            const content = await readFile(join(projectPath, file), "utf-8")
-            const meta = JSON.parse(content) as SessionMetadata
-
-            if (meta.id === sessionID) {
-              title = meta.title
-              break
-            }
-          } catch {
-            continue
-          }
-        }
-
-        if (title !== undefined) break
-      }
-    } catch {
-      // Ignore errors
-    }
-  }
+  const title = await getSessionTitle(sessionID)
 
   return {
     id: sessionID,
