@@ -66,7 +66,8 @@ async function loadSkillFromPath(
   skillPath: string,
   resolvedPath: string,
   defaultName: string,
-  scope: SkillScope
+  scope: SkillScope,
+  namePrefix: string = ""
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
@@ -75,7 +76,10 @@ async function loadSkillFromPath(
     const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
-    const skillName = data.name || defaultName
+    // For nested skills, use the full path as the name (e.g., "superpowers/brainstorming")
+    // For flat skills, use frontmatter name or directory name
+    const baseName = data.name || defaultName
+    const skillName = namePrefix ? `${namePrefix}/${baseName}` : baseName
     const originalDescription = data.description || ""
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
@@ -128,7 +132,13 @@ $ARGUMENTS
   }
 }
 
-async function loadSkillsFromDir(skillsDir: string, scope: SkillScope): Promise<LoadedSkill[]> {
+async function loadSkillsFromDir(
+  skillsDir: string,
+  scope: SkillScope,
+  namePrefix: string = "",
+  depth: number = 0,
+  maxDepth: number = 2
+): Promise<LoadedSkill[]> {
   const entries = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => [])
   const skills: LoadedSkill[] = []
 
@@ -144,7 +154,7 @@ async function loadSkillsFromDir(skillsDir: string, scope: SkillScope): Promise<
       const skillMdPath = join(resolvedPath, "SKILL.md")
       try {
         await fs.access(skillMdPath)
-        const skill = await loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope)
+        const skill = await loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope, namePrefix)
         if (skill) skills.push(skill)
         continue
       } catch {
@@ -153,18 +163,25 @@ async function loadSkillsFromDir(skillsDir: string, scope: SkillScope): Promise<
       const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
       try {
         await fs.access(namedSkillMdPath)
-        const skill = await loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope)
+        const skill = await loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope, namePrefix)
         if (skill) skills.push(skill)
         continue
       } catch {
+      }
+
+      // Recurse into subdirectories if no skill found and within depth limit
+      if (depth < maxDepth) {
+        const newPrefix = namePrefix ? `${namePrefix}/${dirName}` : dirName
+        const nestedSkills = await loadSkillsFromDir(resolvedPath, scope, newPrefix, depth + 1, maxDepth)
+        skills.push(...nestedSkills)
       }
 
       continue
     }
 
     if (isMarkdownFile(entry)) {
-      const skillName = basename(entry.name, ".md")
-      const skill = await loadSkillFromPath(entryPath, skillsDir, skillName, scope)
+      const baseName = basename(entry.name, ".md")
+      const skill = await loadSkillFromPath(entryPath, skillsDir, baseName, scope, namePrefix)
       if (skill) skills.push(skill)
     }
   }
