@@ -14,9 +14,10 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
     return "No valid sessions found."
   }
 
-  const headers = ["Session ID", "Messages", "First", "Last", "Agents"]
+  const headers = ["Session ID", "Title", "Messages", "First", "Last", "Agents"]
   const rows = infos.map((info) => [
     info.id,
+    info.title || "(no title)",
     info.message_count.toString(),
     info.first_message?.toISOString().split("T")[0] ?? "N/A",
     info.last_message?.toISOString().split("T")[0] ?? "N/A",
@@ -86,6 +87,7 @@ export function formatSessionMessages(
 export function formatSessionInfo(info: SessionInfo): string {
   const lines = [
     `Session ID: ${info.id}`,
+    `Title: ${info.title || "(no title)"}`,
     `Messages: ${info.message_count}`,
     `Date Range: ${info.first_message?.toISOString() ?? "N/A"} to ${info.last_message?.toISOString() ?? "N/A"}`,
     `Agents Used: ${info.agents_used.join(", ") || "none"}`,
