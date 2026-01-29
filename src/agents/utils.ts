@@ -140,7 +140,7 @@ function applyCategoryOverride(
   if (categoryConfig.temperature !== undefined) result.temperature = categoryConfig.temperature
   if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
   if (categoryConfig.textVerbosity !== undefined) result.textVerbosity = categoryConfig.textVerbosity
-  if (categoryConfig.thinking) result.thinking = categoryConfig.thinking
+  if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
   if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
