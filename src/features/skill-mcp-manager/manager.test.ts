@@ -3,8 +3,6 @@ import { SkillMcpManager } from "./manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 
-
-
 // Mock the MCP SDK transports to avoid network calls
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
 const mockHttpClose = mock(() => Promise.resolve())
@@ -20,6 +18,21 @@ mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
     }
     async close() {
       await mockHttpClose()
+    }
+  },
+}))
+
+const mockTokens = mock(() => null as { accessToken: string; refreshToken?: string; expiresAt?: number } | null)
+const mockLogin = mock(() => Promise.resolve({ accessToken: "new-token" }))
+
+mock.module("../mcp-oauth/provider", () => ({
+  McpOAuthProvider: class MockMcpOAuthProvider {
+    constructor(public options: { serverUrl: string; clientId?: string; scopes?: string[] }) {}
+    tokens() {
+      return mockTokens()
+    }
+    async login() {
+      return mockLogin()
     }
   },
 }))
@@ -518,7 +531,6 @@ describe("SkillMcpManager", () => {
         skillName: "retry-skill",
       }
 
-      // Mock client that fails first time with "Not connected", then succeeds
       let callCount = 0
       const mockClient = {
         callTool: mock(async () => {
@@ -531,7 +543,6 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      // Spy on getOrCreateClientWithRetry to inject mock client
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
@@ -539,9 +550,9 @@ describe("SkillMcpManager", () => {
       const result = await manager.callTool(info, context, "test-tool", {})
 
       // #then
-      expect(callCount).toBe(2) // First call fails, second succeeds
+      expect(callCount).toBe(2)
       expect(result).toEqual([{ type: "text", text: "success" }])
-      expect(getOrCreateSpy).toHaveBeenCalledTimes(2) // Called twice due to retry
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(2)
     })
 
     it("should fail after 3 retry attempts", async () => {
@@ -558,7 +569,6 @@ describe("SkillMcpManager", () => {
         skillName: "fail-skill",
       }
 
-      // Mock client that always fails with "Not connected"
       const mockClient = {
         callTool: mock(async () => {
           throw new Error("Not connected")
@@ -573,7 +583,7 @@ describe("SkillMcpManager", () => {
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
         /Failed after 3 reconnection attempts/
       )
-      expect(getOrCreateSpy).toHaveBeenCalledTimes(3) // Initial + 2 retries
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(3)
     })
 
     it("should not retry on non-connection errors", async () => {
@@ -590,7 +600,6 @@ describe("SkillMcpManager", () => {
         skillName: "error-skill",
       }
 
-      // Mock client that fails with non-connection error
       const mockClient = {
         callTool: mock(async () => {
           throw new Error("Tool not found")
@@ -605,7 +614,194 @@ describe("SkillMcpManager", () => {
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
         "Tool not found"
       )
-      expect(getOrCreateSpy).toHaveBeenCalledTimes(1) // No retry
+      expect(getOrCreateSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("OAuth integration", () => {
+    beforeEach(() => {
+      mockTokens.mockClear()
+      mockLogin.mockClear()
+    })
+
+    it("injects Authorization header when oauth config has stored tokens", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "oauth-server",
+        skillName: "oauth-skill",
+        sessionID: "session-oauth-1",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://mcp.example.com/mcp",
+        oauth: {
+          clientId: "my-client",
+          scopes: ["read", "write"],
+        },
+      }
+      mockTokens.mockReturnValue({ accessToken: "stored-access-token" })
+
+      // #when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch { /* connection fails in test */ }
+
+      // #then
+      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
+      expect(headers?.Authorization).toBe("Bearer stored-access-token")
+    })
+
+    it("does not inject Authorization header when no stored tokens exist and login fails", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "oauth-no-token",
+        skillName: "oauth-skill",
+        sessionID: "session-oauth-2",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://mcp.example.com/mcp",
+        oauth: {
+          clientId: "my-client",
+        },
+      }
+      mockTokens.mockReturnValue(null)
+      mockLogin.mockRejectedValue(new Error("Login failed"))
+
+      // #when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch { /* connection fails in test */ }
+
+      // #then
+      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
+      expect(headers?.Authorization).toBeUndefined()
+    })
+
+    it("preserves existing static headers alongside OAuth token", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "oauth-with-headers",
+        skillName: "oauth-skill",
+        sessionID: "session-oauth-3",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://mcp.example.com/mcp",
+        headers: {
+          "X-Custom": "custom-value",
+        },
+        oauth: {
+          clientId: "my-client",
+        },
+      }
+      mockTokens.mockReturnValue({ accessToken: "oauth-token" })
+
+      // #when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch { /* connection fails in test */ }
+
+      // #then
+      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
+      expect(headers?.["X-Custom"]).toBe("custom-value")
+      expect(headers?.Authorization).toBe("Bearer oauth-token")
+    })
+
+    it("does not create auth provider when oauth config is absent", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "no-oauth-server",
+        skillName: "test-skill",
+        sessionID: "session-no-oauth",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://mcp.example.com/mcp",
+        headers: {
+          Authorization: "Bearer static-token",
+        },
+      }
+
+      // #when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch { /* connection fails in test */ }
+
+      // #then
+      const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
+      expect(headers?.Authorization).toBe("Bearer static-token")
+      expect(mockTokens).not.toHaveBeenCalled()
+    })
+
+    it("handles step-up auth by triggering re-login on 403 with scope", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "stepup-server",
+        skillName: "stepup-skill",
+        sessionID: "session-stepup-1",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://mcp.example.com/mcp",
+        oauth: {
+          clientId: "my-client",
+          scopes: ["read"],
+        },
+      }
+      const context: SkillMcpServerContext = {
+        config,
+        skillName: "stepup-skill",
+      }
+
+      mockTokens.mockReturnValue({ accessToken: "initial-token" })
+      mockLogin.mockResolvedValue({ accessToken: "upgraded-token" })
+
+      let callCount = 0
+      const mockClient = {
+        callTool: mock(async () => {
+          callCount++
+          if (callCount === 1) {
+            throw new Error('403 WWW-Authenticate: Bearer scope="admin write"')
+          }
+          return { content: [{ type: "text", text: "success" }] }
+        }),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // #when
+      const result = await manager.callTool(info, context, "test-tool", {})
+
+      // #then
+      expect(result).toEqual([{ type: "text", text: "success" }])
+      expect(mockLogin).toHaveBeenCalled()
+    })
+
+    it("does not attempt step-up when oauth config is absent", async () => {
+      // #given
+      const info: SkillMcpClientInfo = {
+        serverName: "no-stepup-server",
+        skillName: "no-stepup-skill",
+        sessionID: "session-no-stepup",
+      }
+      const context: SkillMcpServerContext = {
+        config: {
+          url: "https://mcp.example.com/mcp",
+        },
+        skillName: "no-stepup-skill",
+      }
+
+      const mockClient = {
+        callTool: mock(async () => {
+          throw new Error('403 WWW-Authenticate: Bearer scope="admin"')
+        }),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // #when / #then
+      await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(/403/)
+      expect(mockLogin).not.toHaveBeenCalled()
     })
   })
 })
