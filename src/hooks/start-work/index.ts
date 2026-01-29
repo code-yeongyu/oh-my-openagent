@@ -10,7 +10,7 @@ import {
   clearBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
-import { updateSessionAgent } from "../../features/claude-code-session-state"
+import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 
 export const HOOK_NAME = "start-work"
 
@@ -71,7 +71,10 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      updateSessionAgent(input.sessionID, "atlas")
+      const currentAgent = getSessionAgent(input.sessionID)
+      if (!currentAgent) {
+        updateSessionAgent(input.sessionID, "atlas")
+      }
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
