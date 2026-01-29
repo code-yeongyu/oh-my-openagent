@@ -1,4 +1,5 @@
 import type { RalphLoopConfig } from "../../config"
+import type { AgentConfig } from "@opencode-ai/sdk"
 
 export interface RalphLoopState {
   active: boolean
@@ -16,4 +17,5 @@ export interface RalphLoopOptions {
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  agentConfigs?: Record<string, AgentConfig> | (() => Record<string, AgentConfig>)
 }

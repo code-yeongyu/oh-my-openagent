@@ -40,6 +40,7 @@ export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+  agentConfigsRef?: { current: Record<string, any> };
 }
 
 export function resolveCategoryConfig(
@@ -50,7 +51,7 @@ export function resolveCategoryConfig(
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
-  const { ctx, pluginConfig, modelCacheState } = deps;
+  const { ctx, pluginConfig, modelCacheState, agentConfigsRef } = deps;
 
   return async (config: Record<string, unknown>) => {
     type ProviderConfig = {
@@ -385,6 +386,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     if (agentResult["sisyphus-junior"]) {
       const agent = agentResult["sisyphus-junior"] as AgentWithPermission;
       agent.permission = { ...agent.permission, delegate_task: "allow" };
+    }
+
+    if (agentConfigsRef) {
+      agentConfigsRef.current = agentResult;
     }
 
     config.permission = {

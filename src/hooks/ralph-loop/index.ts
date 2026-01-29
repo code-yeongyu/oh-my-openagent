@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { AgentConfig } from "@opencode-ai/sdk"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
@@ -79,6 +80,15 @@ export function createRalphLoopHook(
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
   const checkSessionExists = options?.checkSessionExists
+  let getAgentConfigs: (() => Record<string, AgentConfig>) | undefined
+  if (options?.agentConfigs) {
+    if (typeof options.agentConfigs === 'function') {
+      getAgentConfigs = options.agentConfigs
+    } else {
+      const configs = options.agentConfigs
+      getAgentConfigs = () => configs
+    }
+  }
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -342,6 +352,7 @@ export function createRalphLoopHook(
         let agent: string | undefined
         let model: { providerID: string; modelID: string } | undefined
 
+        // First, get the agent name from session history
         try {
           const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
           const messages = (messagesResp.data ?? []) as Array<{
@@ -349,9 +360,8 @@ export function createRalphLoopHook(
           }>
           for (let i = messages.length - 1; i >= 0; i--) {
             const info = messages[i].info
-            if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+            if (info?.agent) {
               agent = info.agent
-              model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
               break
             }
           }
@@ -359,9 +369,43 @@ export function createRalphLoopHook(
           const messageDir = getMessageDir(sessionID)
           const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
           agent = currentMessage?.agent
-          model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-            ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-            : undefined
+        }
+
+        // If agentConfigs is provided and we have an agent name, resolve model from config
+        // This ensures we use the configured model, not the historical one
+        if (getAgentConfigs && agent) {
+          const agentConfigs = getAgentConfigs()
+          const agentConfig = agentConfigs[agent]
+          if (agentConfig?.model) {
+            const parts = agentConfig.model.split('/')
+            if (parts.length === 2) {
+              model = { providerID: parts[0], modelID: parts[1] }
+              log(`[${HOOK_NAME}] Using configured model for agent ${agent}`, { model: agentConfig.model })
+            }
+          }
+        }
+
+        // Fallback: if no model resolved from config, try to get it from session history
+        if (!model) {
+          try {
+            const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+            const messages = (messagesResp.data ?? []) as Array<{
+              info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+            }>
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const info = messages[i].info
+              if (info?.model || (info?.modelID && info?.providerID)) {
+                model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+                break
+              }
+            }
+          } catch {
+            const messageDir = getMessageDir(sessionID)
+            const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+            model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+              ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+              : undefined
+          }
         }
 
         await ctx.client.session.prompt({

@@ -210,10 +210,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createCategorySkillReminderHook(ctx)
     : null;
 
+  const agentConfigsRef = { current: {} as Record<string, any> };
+
   const ralphLoop = isHookEnabled("ralph-loop")
     ? createRalphLoopHook(ctx, {
         config: pluginConfig.ralph_loop,
         checkSessionExists: async (sessionId) => sessionExists(sessionId),
+        agentConfigs: () => agentConfigsRef.current,
       })
     : null;
 
@@ -380,6 +383,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
+    agentConfigsRef,
   });
 
   return {

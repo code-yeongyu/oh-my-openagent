@@ -8,19 +8,21 @@ import type { RalphLoopState } from "./types"
 
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
-  let promptCalls: Array<{ sessionID: string; text: string }>
+  let promptCalls: Array<{ sessionID: string; text: string; agent?: string; model?: { providerID: string; modelID: string } }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
-  let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
+  let mockSessionMessages: Array<{ info?: { role?: string; agent?: string; model?: { providerID: string; modelID: string } }; parts?: Array<{ type: string; text?: string }> }>
 
   function createMockPluginInput() {
     return {
       client: {
         session: {
-          prompt: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+          prompt: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }>; agent?: string; model?: { providerID: string; modelID: string } } }) => {
             promptCalls.push({
               sessionID: opts.path.id,
               text: opts.body.parts[0].text,
+              agent: opts.body.agent,
+              model: opts.body.model,
             })
             return {}
           },
@@ -48,7 +50,15 @@ describe("ralph-loop", () => {
     promptCalls = []
     toastCalls = []
     messagesCalls = []
-    mockSessionMessages = []
+    mockSessionMessages = [
+      {
+        info: {
+          role: "assistant",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" }
+        }
+      }
+    ]
 
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
@@ -925,6 +935,109 @@ Original task: Build something`
       // #then - loop should continue (API error = no completion detected)
       expect(promptCalls.length).toBe(1)
       expect(apiCallCount).toBeGreaterThan(0)
+    })
+  })
+
+  describe("agent model resolution from config", () => {
+    test("should use configured model from agentConfigs when available", async () => {
+      // #given - hook with agentConfigs containing sisyphus with custom model
+      const mockAgentConfigs = {
+        sisyphus: {
+          model: "openai/gpt-5.2",
+          prompt: "test prompt",
+        },
+      }
+      
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        agentConfigs: mockAgentConfigs,
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      
+      // #when - start loop and trigger continuation
+      hook.startLoop("session-123", "Build API")
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should use configured model (openai/gpt-5.2) not session history model
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+      expect(promptCalls[0].agent).toBe("sisyphus")
+    })
+
+    test("should use getter function for agentConfigs", async () => {
+      // #given - hook with agentConfigs as a getter function
+      const mockAgentConfigs = {
+        sisyphus: {
+          model: "anthropic/claude-opus-4-5",
+          prompt: "test prompt",
+        },
+      }
+      
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        agentConfigs: () => mockAgentConfigs,
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      
+      // #when - start loop and trigger continuation
+      hook.startLoop("session-123", "Build API")
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should call getter and use model from it
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    })
+
+    test("should fallback to session history when agentConfigs doesn't have the agent", async () => {
+      // #given - hook with agentConfigs that doesn't include the agent used in session
+      const mockAgentConfigs = {
+        oracle: {
+          model: "openai/gpt-5.2",
+          prompt: "test prompt",
+        },
+      }
+      
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        agentConfigs: mockAgentConfigs,
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      
+      // #when - start loop and trigger continuation
+      hook.startLoop("session-123", "Build API")
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should fallback to session history model (anthropic/claude-sonnet-4-5 from mock)
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })
+    })
+
+    test("should fallback to session history when agentConfigs agent has no model", async () => {
+      // #given - hook with agentConfigs where agent exists but has no model
+      const mockAgentConfigs = {
+        sisyphus: {
+          prompt: "test prompt",
+          // no model field
+        },
+      }
+      
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        agentConfigs: mockAgentConfigs as any,
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      
+      // #when - start loop and trigger continuation
+      hook.startLoop("session-123", "Build API")
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - should fallback to session history model
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })
     })
   })
 })
