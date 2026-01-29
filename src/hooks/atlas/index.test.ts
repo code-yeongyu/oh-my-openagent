@@ -1706,44 +1706,93 @@ session_id: ses_untrusted_999
        expect(callArgs.body.agent).toBe("sisyphus")
      })
 
-    test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
-      // given - boulder state with incomplete plan
-      const planPath = join(TEST_DIR, "test-plan.md")
-      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+      test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
+        // #given - boulder state with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
-      const state: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: [MAIN_SESSION_ID],
-        plan_name: "test-plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
 
-      const mockInput = createMockPluginInput()
-      const hook = createAtlasHook(mockInput)
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
 
-      // when - fire multiple idle events in rapid succession (simulating infinite loop bug)
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
+        // #when - fire multiple idle events in rapid succession (simulating infinite loop bug)
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+
+        // #then - should only call prompt ONCE due to debouncing
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       })
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
-      })
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
-      })
 
-      // then - should only call prompt ONCE due to debouncing
-      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      test("should cleanup on session.deleted", async () => {
+        // #given - boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // #when - create abort state then delete
+        await hook.handler({
+          event: {
+            type: "session.error",
+            properties: {
+              sessionID: MAIN_SESSION_ID,
+              error: { name: "AbortError" },
+            },
+          },
+        })
+        await hook.handler({
+          event: {
+            type: "session.deleted",
+            properties: { info: { id: MAIN_SESSION_ID } },
+          },
+        })
+
+        // Re-create boulder after deletion
+        writeBoulderState(TEST_DIR, state)
+
+        // Trigger idle - should inject because state was cleaned up
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: MAIN_SESSION_ID },
+          },
+        })
+
+        // #then - should call prompt because session state was cleaned
+        expect(mockInput._promptMock).toHaveBeenCalled()
+      })
     })
 
     test("should stop continuation after 2 consecutive prompt failures (issue #1355)", async () => {
@@ -2013,52 +2062,55 @@ session_id: ses_untrusted_999
       }
     })
 
-    test("should cleanup on session.deleted", async () => {
-      // given - boulder state
-      const planPath = join(TEST_DIR, "test-plan.md")
-      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+    describe("plan archive integration", () => {
+      const ARCHIVE_SESSION_ID = "session-archive-test"
 
-      const state: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-02T10:00:00Z",
-        session_ids: [MAIN_SESSION_ID],
-        plan_name: "test-plan",
-      }
-      writeBoulderState(TEST_DIR, state)
+      beforeEach(() => {
+        setupMessageStorage(ARCHIVE_SESSION_ID, "atlas")
+      })
 
-      const mockInput = createMockPluginInput()
-      const hook = createAtlasHook(mockInput)
+      afterEach(() => {
+        cleanupMessageStorage(ARCHIVE_SESSION_ID)
+      })
 
-      // when - create abort state then delete
-      await hook.handler({
-        event: {
-          type: "session.error",
-          properties: {
-            sessionID: MAIN_SESSION_ID,
-            error: { name: "AbortError" },
+      test("should archive completed plan and clear boulder state", async () => {
+        // #given - completed plan with boulder state
+        const ARCHIVE_DIR = join(SISYPHUS_DIR, "archive")
+        const planPath = join(TEST_DIR, "completed-plan.md")
+        writeFileSync(planPath, `# Completed Plan
+ - [x] Task 1
+ - [x] Task 2
+ - [x] Task 3
+ `)
+        const boulderState: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [ARCHIVE_SESSION_ID],
+          plan_name: "completed-plan",
+        }
+        writeBoulderState(TEST_DIR, boulderState)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // #when - trigger idle event with completed plan
+        await hook.handler({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: ARCHIVE_SESSION_ID },
           },
-        },
-      })
-      await hook.handler({
-        event: {
-          type: "session.deleted",
-          properties: { info: { id: MAIN_SESSION_ID } },
-        },
-      })
+        })
 
-      // Re-create boulder after deletion
-      writeBoulderState(TEST_DIR, state)
+        // #then - archive file should exist in .sisyphus/archive/
+        expect(existsSync(ARCHIVE_DIR)).toBe(true)
+        const archiveFiles = require("node:fs").readdirSync(ARCHIVE_DIR)
+        expect(archiveFiles.length).toBeGreaterThan(0)
+        expect(archiveFiles[0]).toContain("completed-plan")
 
-      // Trigger idle - should inject because state was cleaned up
-      await hook.handler({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: MAIN_SESSION_ID },
-        },
+        // Boulder state should be cleared
+        const clearedState = readBoulderState(TEST_DIR)
+        expect(clearedState).toBeNull()
       })
-
-      // then - should call prompt because session state was cleaned
-      expect(mockInput._promptMock).toHaveBeenCalled()
     })
 
     test("should inject when session agent was updated to atlas by start-work even if message storage agent differs", async () => {
