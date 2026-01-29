@@ -37,8 +37,8 @@ describe("mcp-oauth check", () => {
     })
 
     it("returns pass when all tokens valid", async () => {
-      // #given valid tokens with future expiry
-      const futureTime = Date.now() + 3600000 // 1 hour from now
+      // #given valid tokens with future expiry (expiresAt is in epoch seconds)
+      const futureTime = Math.floor(Date.now() / 1000) + 3600
       readStoreSpy = spyOn(mcpOauth, "readTokenStore").mockReturnValue({
         "example.com/resource1": {
           accessToken: "token1",
@@ -60,9 +60,9 @@ describe("mcp-oauth check", () => {
     })
 
     it("returns warn when some tokens expired", async () => {
-      // #given mix of valid and expired tokens
-      const futureTime = Date.now() + 3600000
-      const pastTime = Date.now() - 3600000
+      // #given mix of valid and expired tokens (expiresAt is in epoch seconds)
+      const futureTime = Math.floor(Date.now() / 1000) + 3600
+      const pastTime = Math.floor(Date.now() / 1000) - 3600
       readStoreSpy = spyOn(mcpOauth, "readTokenStore").mockReturnValue({
         "example.com/resource1": {
           accessToken: "token1",
@@ -104,7 +104,7 @@ describe("mcp-oauth check", () => {
 
     it("includes token details in output", async () => {
       // #given multiple tokens
-      const futureTime = Date.now() + 3600000
+      const futureTime = Math.floor(Date.now() / 1000) + 3600
       readStoreSpy = spyOn(mcpOauth, "readTokenStore").mockReturnValue({
         "api.example.com/v1": {
           accessToken: "token1",

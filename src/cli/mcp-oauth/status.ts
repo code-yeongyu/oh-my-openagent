@@ -13,9 +13,9 @@ export async function status(serverName: string | undefined): Promise<number> {
       console.log(`OAuth Status for ${serverName}:`)
       for (const [key, token] of Object.entries(tokens)) {
         console.log(`  ${key}:`)
-        console.log(`    Access Token: ${token.accessToken.slice(0, 20)}...`)
+        console.log(`    Access Token: [REDACTED]`)
         if (token.refreshToken) {
-          console.log(`    Refresh Token: ${token.refreshToken.slice(0, 20)}...`)
+          console.log(`    Refresh Token: [REDACTED]`)
         }
         if (token.expiresAt) {
           const expiryDate = new Date(token.expiresAt * 1000)

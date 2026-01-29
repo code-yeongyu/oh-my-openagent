@@ -255,7 +255,19 @@ export class McpOAuthProvider {
     })
 
     if (!tokenResponse.ok) {
-      throw new Error(`Token exchange failed: ${tokenResponse.status}`)
+      let errorDetail = `${tokenResponse.status}`
+      try {
+        const body = (await tokenResponse.json()) as Record<string, unknown>
+        if (body.error) {
+          errorDetail = `${tokenResponse.status} ${body.error}`
+          if (body.error_description) {
+            errorDetail += `: ${body.error_description}`
+          }
+        }
+      } catch {
+        // Response body not JSON
+      }
+      throw new Error(`Token exchange failed: ${errorDetail}`)
     }
 
     const tokenData = (await tokenResponse.json()) as Record<string, unknown>
