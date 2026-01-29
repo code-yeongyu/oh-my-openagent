@@ -431,4 +431,58 @@ describe("generateModelConfig", () => {
       )
     })
   })
+
+  describe("GitHub Copilot model transformations", () => {
+    test("transforms Gemini models to preview variant for GitHub Copilot", () => {
+      // #given only Copilot is available (no native Gemini)
+      const config = createConfig({ hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Gemini models should have -preview suffix
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("github-copilot/gemini-3-flash-preview")
+      expect(result.categories?.["visual-engineering"]?.model).toBe("github-copilot/gemini-3-pro-preview")
+      expect(result.categories?.artistry?.model).toBe("github-copilot/gemini-3-pro-preview")
+      expect(result.categories?.writing?.model).toBe("github-copilot/gemini-3-flash-preview")
+    })
+
+    test("transforms Claude models to dot notation for GitHub Copilot", () => {
+      // #given only Copilot is available (no native Claude)
+      const config = createConfig({ hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Claude models should use dot notation
+      expect(result.agents?.sisyphus?.model).toBe("github-copilot/claude-sonnet-4.5")
+      expect(result.agents?.oracle?.model).toBe("github-copilot/gpt-5.2")
+      expect(result.agents?.atlas?.model).toBe("github-copilot/claude-sonnet-4.5")
+    })
+
+    test("prefers native Gemini over GitHub Copilot Gemini", () => {
+      // #given both Gemini and Copilot are available
+      const config = createConfig({ hasGemini: true, hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use native google/ models without -preview suffix
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("google/gemini-3-flash")
+      expect(result.categories?.["visual-engineering"]?.model).toBe("google/gemini-3-pro")
+      expect(result.categories?.artistry?.model).toBe("google/gemini-3-pro")
+      expect(result.categories?.writing?.model).toBe("google/gemini-3-flash")
+    })
+
+    test("uses GitHub Copilot as fallback for Gemini when native not available", () => {
+      // #given only Copilot is available (no native Gemini, Claude, OpenAI)
+      const config = createConfig({ hasCopilot: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use github-copilot/ with appropriate transformations
+      expect(result).toMatchSnapshot()
+    })
+  })
 })

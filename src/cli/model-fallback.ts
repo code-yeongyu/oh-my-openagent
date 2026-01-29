@@ -67,11 +67,17 @@ function isProviderAvailable(provider: string, avail: ProviderAvailability): boo
 
 function transformModelForProvider(provider: string, model: string): string {
   if (provider === "github-copilot") {
-    return model
+    let transformed = model
       .replace("claude-opus-4-5", "claude-opus-4.5")
       .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
       .replace("claude-haiku-4-5", "claude-haiku-4.5")
       .replace("claude-sonnet-4", "claude-sonnet-4")
+    
+    if (transformed.startsWith("gemini-") && !transformed.endsWith("-preview")) {
+      transformed = `${transformed}-preview`
+    }
+    
+    return transformed
   }
   return model
 }
