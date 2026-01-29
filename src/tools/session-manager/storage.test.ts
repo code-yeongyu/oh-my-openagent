@@ -22,6 +22,7 @@ mock.module("./constants", () => ({
   SESSION_SEARCH_DESCRIPTION: "test",
   SESSION_INFO_DESCRIPTION: "test",
   SESSION_DELETE_DESCRIPTION: "test",
+  SESSION_RENAME_DESCRIPTION: "test",
   TOOL_NAME_PREFIX: "session_",
 }))
 
