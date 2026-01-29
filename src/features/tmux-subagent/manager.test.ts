@@ -244,39 +244,6 @@ describe('TmuxSessionManager', () => {
 
       //#when
       const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
-      mockIsInsideTmux.mockReturnValue(false)
-      const { TmuxSessionManager } = await import('./manager')
-      const ctx = createMockContext()
-      const multiplexer = createMockMultiplexer()
-      const config: TmuxConfig = {
-        enabled: true,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-
-      //#when
-
-      //#then
-      expect(manager).toBeDefined()
-    })
-
-    test('disabled when config.enabled=false', async () => {
-      //#given
-      mockIsInsideTmux.mockReturnValue(true)
-      const { TmuxSessionManager } = await import('./manager')
-      const ctx = createMockContext()
-      const multiplexer = createMockMultiplexer()
-      const config: TmuxConfig = {
-        enabled: false,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-
-      //#when
 
       //#then
       expect(manager).toBeDefined()
@@ -304,6 +271,7 @@ describe('TmuxSessionManager', () => {
         'ses_parent',
         'Background: Test Task'
       )
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(event)
@@ -339,7 +307,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
       const event = createSessionCreatedEvent(
         'ses_child',
         'ses_parent',
@@ -390,6 +358,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(
@@ -423,6 +392,7 @@ describe('TmuxSessionManager', () => {
         agent_pane_min_width: 40,
       }
       const event = createSessionCreatedEvent('ses_root', undefined, 'Root Session')
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(event)
@@ -450,6 +420,7 @@ describe('TmuxSessionManager', () => {
         'ses_parent',
         'Background: Test Task'
       )
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(event)
@@ -459,16 +430,7 @@ describe('TmuxSessionManager', () => {
       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
     })
 
-
-       //#when
-       await manager.onSessionCreated(event)
-
-       //#then
-       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
-     })
-
-     test('extracts and stores OpenCode session ID from event.properties.info.parentID', async () => {
+    test('extracts and stores OpenCode session ID from event.properties.info.parentID', async () => {
        //#given
        mockIsInsideTmux.mockReturnValue(true)
        const { TmuxSessionManager } = await import('./manager')
@@ -481,7 +443,7 @@ describe('TmuxSessionManager', () => {
          main_pane_min_width: 80,
          agent_pane_min_width: 40,
        }
-       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+       const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
        const opcSessionId = 'opc_parent_session_123'
        const bgSessionId = 'ses_background_456'
        const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Test Task')
@@ -524,7 +486,7 @@ describe('TmuxSessionManager', () => {
          main_pane_min_width: 80,
          agent_pane_min_width: 40,
        }
-       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+       const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
        const opcSessionId = 'opc_session_xyz'
        const bgSessionId = 'ses_bg_xyz'
        const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Test Task')
@@ -551,7 +513,7 @@ describe('TmuxSessionManager', () => {
          main_pane_min_width: 80,
          agent_pane_min_width: 40,
        }
-       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+       const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
        //#when - create multiple sessions with different OpenCode parent IDs
        const event1 = createSessionCreatedEvent('ses_bg_1', 'opc_parent_1', 'Task 1')
@@ -600,7 +562,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(
@@ -653,7 +615,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent(
@@ -692,7 +654,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent(
@@ -723,7 +685,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
@@ -748,7 +710,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent(
@@ -782,7 +744,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
@@ -817,7 +779,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
@@ -849,7 +811,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
@@ -1174,4 +1136,3 @@ describe('DecisionEngine', () => {
      })
    })
 })
->>>>>>> 0b2e5d8 (feat(zellij): clean up state on session deletion)
