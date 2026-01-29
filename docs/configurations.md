@@ -163,7 +163,39 @@ Override built-in agent settings:
 }
 ```
 
-Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `category`, `variant`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`.
+
+### Additional Agent Options
+
+| Option              | Type    | Description                                                                                     |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `category`          | string  | Category name to inherit model and other settings from category defaults                             |
+| `variant`           | string  | Model variant (e.g., `max`, `high`, `medium`, `low`, `xhigh`)                                 |
+| `maxTokens`         | number  | Maximum tokens for response. Passed directly to OpenCode SDK.                                      |
+| `thinking`          | object  | Extended thinking configuration for Anthropic models. See [Thinking Options](#thinking-options) below. |
+| `reasoningEffort`   | string  | OpenAI reasoning effort level. Values: `low`, `medium`, `high`, `xhigh`.                         |
+| `textVerbosity`      | string  | Text verbosity level. Values: `low`, `medium`, `high`.                                        |
+| `providerOptions`    | object  | Provider-specific options passed directly to OpenCode SDK.                                      |
+
+#### Thinking Options (Anthropic)
+
+```json
+{
+  "agents": {
+    "oracle": {
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 200000
+      }
+    }
+  }
+}
+```
+
+| Option        | Type    | Default | Description                                  |
+| ------------- | ------- | ------- | -------------------------------------------- |
+| `type`        | string  | -       | `enabled` or `disabled`                      |
+| `budgetTokens`| number  | -       | Maximum budget tokens for extended thinking  |
 
 Use `prompt_append` to add extra instructions without replacing the default system prompt:
 
@@ -213,7 +245,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `oracle`, `librarian`, `explore`, `multimodal-looker`
+Available agents: `sisyphus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
 
 ## Built-in Skills
 
@@ -231,6 +263,105 @@ Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-openc
 ```
 
 Available built-in skills: `playwright`, `agent-browser`, `git-master`
+
+## Skills Configuration
+
+Configure advanced skills settings including custom skill sources, enabling/disabling specific skills, and defining custom skills.
+
+```json
+{
+  "skills": {
+    "sources": [
+      { "path": "./custom-skills", "recursive": true },
+      "https://example.com/skill.yaml"
+    ],
+    "enable": ["my-custom-skill"],
+    "disable": ["other-skill"],
+    "my-skill": {
+      "description": "Custom skill description",
+      "template": "Custom prompt template",
+      "from": "source-file.ts",
+      "model": "custom/model",
+      "agent": "custom-agent",
+      "subtask": true,
+      "argument-hint": "usage hint",
+      "license": "MIT",
+      "compatibility": ">= 3.0.0",
+      "metadata": {
+        "author": "Your Name"
+      },
+      "allowed-tools": ["tool1", "tool2"]
+    }
+  }
+}
+```
+
+### Sources
+
+Load skills from local directories or remote URLs:
+
+```json
+{
+  "skills": {
+    "sources": [
+      { "path": "./custom-skills", "recursive": true },
+      { "path": "./single-skill.yaml" },
+      "https://example.com/skill.yaml",
+      "https://raw.githubusercontent.com/user/repo/main/skills/*"
+    ]
+  }
+}
+```
+
+| Option      | Default | Description                                    |
+| ----------- | ------- | ---------------------------------------------- |
+| `path`      | -       | Local file/directory path or remote URL            |
+| `recursive`  | `false`  | Recursively load from directory                 |
+| `glob`      | -       | Glob pattern for file selection                 |
+
+### Enable/Disable Skills
+
+```json
+{
+  "skills": {
+    "enable": ["skill-1", "skill-2"],
+    "disable": ["disabled-skill"]
+  }
+}
+```
+
+### Custom Skill Definition
+
+Define custom skills directly in your config:
+
+| Option           | Default | Description                                                                          |
+| ---------------- | ------- | ------------------------------------------------------------------------------------ |
+| `description`     | -       | Human-readable description of the skill                                                 |
+| `template`        | -       | Custom prompt template for the skill                                                    |
+| `from`           | -       | Source file to load template from                                                     |
+| `model`           | -       | Override model for this skill                                                         |
+| `agent`           | -       | Override agent for this skill                                                         |
+| `subtask`         | `false`  | Whether to run as a subtask                                                           |
+| `argument-hint`   | -       | Hint for how to use the skill                                                        |
+| `license`          | -       | Skill license                                                                       |
+| `compatibility`    | -       | Required oh-my-opencode version compatibility                                           |
+| `metadata`         | -       | Additional metadata as key-value pairs                                                |
+| `allowed-tools`    | -       | Array of tools this skill is allowed to use                                            |
+
+**Example: Custom skill**
+
+```json
+{
+  "skills": {
+    "data-analyst": {
+      "description": "Specialized for data analysis tasks",
+      "template": "You are a data analyst. Focus on statistical analysis, visualization, and data interpretation.",
+      "model": "openai/gpt-5.2",
+      "allowed-tools": ["read", "bash", "lsp_diagnostics"]
+    }
+  }
+}
+```
 
 ## Browser Automation
 
@@ -555,6 +686,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
 {
   "background_task": {
     "defaultConcurrency": 5,
+    "staleTimeoutMs": 180000,
     "providerConcurrency": {
       "anthropic": 3,
       "openai": 5,
@@ -571,6 +703,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
 | Option                | Default | Description                                                                                                             |
 | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `defaultConcurrency`  | -       | Default maximum concurrent background tasks for all providers/models                                                    |
+| `staleTimeoutMs`      | `180000` | Stale timeout in milliseconds - interrupt tasks with no activity for this duration (minimum: 60000 = 1 minute)             |
 | `providerConcurrency` | -       | Per-provider concurrency limits. Keys are provider names (e.g., `anthropic`, `openai`, `google`)                        |
 | `modelConcurrency`    | -       | Per-model concurrency limits. Keys are full model names (e.g., `anthropic/claude-opus-4-5`). Overrides provider limits. |
 
@@ -692,7 +825,14 @@ Add your own categories or override built-in ones:
 }
 ```
 
-Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`.
+Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`, `description`, `is_unstable_agent`.
+
+### Additional Category Options
+
+| Option             | Type    | Default | Description                                                                                         |
+| ------------------ | ------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `description`       | string  | -       | Human-readable description of the category's purpose. Shown in delegate_task prompt.                     |
+| `is_unstable_agent`| boolean | `false`  | Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. |
 
 ## Model Resolution System
 
@@ -826,11 +966,92 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `start-work`
 
 **Note on `directory-agents-injector`**: This hook is **automatically disabled** when running on OpenCode 1.1.37+ because OpenCode now has native support for dynamically resolving AGENTS.md files from subdirectories (PR #10678). This prevents duplicate AGENTS.md injection. For older OpenCode versions, the hook remains active to provide the same functionality.
 
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
+
+## Disabled Commands
+
+Disable specific built-in commands via `disabled_commands` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+```json
+{
+  "disabled_commands": ["init-deep", "start-work"]
+}
+```
+
+Available commands: `init-deep`, `start-work`
+
+## Comment Checker
+
+Configure comment-checker hook behavior. The comment checker warns when excessive comments are added to code.
+
+```json
+{
+  "comment_checker": {
+    "custom_prompt": "Your custom warning message. Use {{comments}} placeholder for detected comments XML."
+  }
+}
+```
+
+| Option        | Default | Description                                                                |
+| ------------- | ------- | -------------------------------------------------------------------------- |
+| `custom_prompt` | -       | Custom warning message to replace the default. Use `{{comments}}` placeholder. |
+
+## Notification
+
+Configure notification behavior for background task completion.
+
+```json
+{
+  "notification": {
+    "force_enable": true
+  }
+}
+```
+
+| Option         | Default | Description                                                                                   |
+| -------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `force_enable` | `false` | Force enable session-notification even if external notification plugins are detected. Default: `false`. |
+
+## Sisyphus Tasks & Swarm
+
+Configure Sisyphus Tasks and Swarm systems for advanced task management and multi-agent orchestration.
+
+```json
+{
+  "sisyphus": {
+    "tasks": {
+      "enabled": false,
+      "storage_path": ".sisyphus/tasks",
+      "claude_code_compat": false
+    },
+    "swarm": {
+      "enabled": false,
+      "storage_path": ".sisyphus/teams",
+      "ui_mode": "toast"
+    }
+  }
+}
+```
+
+### Tasks Configuration
+
+| Option               | Default            | Description                                                               |
+| -------------------- | ------------------ | ------------------------------------------------------------------------- |
+| `enabled`            | `false`            | Enable Sisyphus Tasks system                                               |
+| `storage_path`       | `.sisyphus/tasks`  | Storage path for tasks (relative to project root)                           |
+| `claude_code_compat` | `false`            | Enable Claude Code path compatibility mode                                   |
+
+### Swarm Configuration
+
+| Option         | Default            | Description                                                    |
+| -------------- | ------------------ | -------------------------------------------------------------- |
+| `enabled`      | `false`            | Enable Sisyphus Swarm system for multi-agent orchestration        |
+| `storage_path` | `.sisyphus/teams`  | Storage path for teams (relative to project root)                |
+| `ui_mode`      | `toast`            | UI mode: `toast` (notifications), `tmux` (panes), or `both`     |
 
 ## MCPs
 
@@ -873,6 +1094,38 @@ Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json`
 
 Each server supports: `command`, `extensions`, `priority`, `env`, `initialization`, `disabled`.
 
+| Option         | Type     | Default | Description                                                            |
+| -------------- | -------- | ------- | ---------------------------------------------------------------------- |
+| `command`       | array    | -       | Command to start the LSP server (executable + args)                          |
+| `extensions`    | array    | -       | File extensions this server handles (e.g., `[".ts", ".tsx"]`)               |
+| `priority`      | number   | -       | Server priority when multiple servers match a file                               |
+| `env`           | object   | -       | Environment variables for the LSP server (key-value pairs)                     |
+| `initialization`| object   | -       | Custom initialization options passed to the LSP server                        |
+| `disabled`      | boolean  | `false`  | Whether to disable this LSP server                                         |
+
+**Example with advanced options:**
+
+```json
+{
+  "lsp": {
+    "typescript-language-server": {
+      "command": ["typescript-language-server", "--stdio"],
+      "extensions": [".ts", ".tsx"],
+      "priority": 10,
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "initialization": {
+        "preferences": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayFunctionParameterTypeHints": true
+        }
+      }
+    }
+  }
+}
+```
+
 ## Experimental
 
 Opt-in experimental features that may change or be removed in future versions. Use with caution.
@@ -882,7 +1135,29 @@ Opt-in experimental features that may change or be removed in future versions. U
   "experimental": {
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
-    "auto_resume": true
+    "auto_resume": true,
+    "dynamic_context_pruning": {
+      "enabled": false,
+      "notification": "detailed",
+      "turn_protection": {
+        "enabled": true,
+        "turns": 3
+      },
+      "protected_tools": ["task", "todowrite", "lsp_rename"],
+      "strategies": {
+        "deduplication": {
+          "enabled": true
+        },
+        "supersede_writes": {
+          "enabled": true,
+          "aggressive": false
+        },
+        "purge_errors": {
+          "enabled": true,
+          "turns": 5
+        }
+      }
+    }
   }
 }
 ```
@@ -891,7 +1166,72 @@ Opt-in experimental features that may change or be removed in future versions. U
 | --------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `truncate_all_tool_outputs` | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
-| `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts the last user message and continues.                             |
+| `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts last user message and continues.                             |
+| `dynamic_context_pruning`    | See below | Dynamic context pruning configuration for managing context window usage automatically. See [Dynamic Context Pruning](#dynamic-context-pruning) below.                              |
+
+### Dynamic Context Pruning
+
+Dynamic context pruning automatically manages context window by intelligently pruning old tool outputs. This feature helps maintain performance in long sessions.
+
+```json
+{
+  "experimental": {
+    "dynamic_context_pruning": {
+      "enabled": false,
+      "notification": "detailed",
+      "turn_protection": {
+        "enabled": true,
+        "turns": 3
+      },
+      "protected_tools": ["task", "todowrite", "todoread", "lsp_rename", "session_read", "session_write", "session_search"],
+      "strategies": {
+        "deduplication": {
+          "enabled": true
+        },
+        "supersede_writes": {
+          "enabled": true,
+          "aggressive": false
+        },
+        "purge_errors": {
+          "enabled": true,
+          "turns": 5
+        }
+      }
+    }
+  }
+}
+```
+
+| Option            | Default | Description                                                                               |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `enabled`         | `false`  | Enable dynamic context pruning                                                               |
+| `notification`     | `detailed` | Notification level: `off`, `minimal`, or `detailed`                                        |
+| `turn_protection` | See below | Turn protection settings - prevent pruning recent tool outputs                                 |
+
+#### Turn Protection
+
+| Option    | Default | Description                                                  |
+| --------- | ------- | ------------------------------------------------------------ |
+| `enabled` | `true`  | Enable turn protection                                         |
+| `turns`   | `3`     | Number of recent turns to protect from pruning (1-10)           |
+
+#### Protected Tools
+
+Tools that should never be pruned (default):
+
+```json
+["task", "todowrite", "todoread", "lsp_rename", "session_read", "session_write", "session_search"]
+```
+
+#### Pruning Strategies
+
+| Strategy            | Option       | Default | Description                                                                  |
+| ------------------- | ------------ | ------- | ---------------------------------------------------------------------------- |
+| **deduplication**   | `enabled`    | `true`  | Remove duplicate tool calls (same tool + same args)                              |
+| **supersede_writes**| `enabled`    | `true`  | Prune write inputs when file subsequently read                                   |
+|                     | `aggressive` | `false` | Aggressive mode: prune any write if ANY subsequent read                         |
+| **purge_errors**   | `enabled`    | `true`  | Prune errored tool inputs after N turns                                        |
+|                     | `turns`      | `5`     | Number of turns before pruning errors (1-20)                                    |
 
 **Warning**: These features are experimental and may cause unexpected behavior. Enable only if you understand the implications.
 
