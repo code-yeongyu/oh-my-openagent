@@ -9,6 +9,7 @@ import {
   resetVersionCache,
   setVersionCache,
   MINIMUM_OPENCODE_VERSION,
+  OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
 } from "./opencode-version"
 
 describe("opencode-version", () => {
@@ -218,6 +219,48 @@ describe("opencode-version", () => {
   describe("MINIMUM_OPENCODE_VERSION", () => {
     test("is set to 1.1.1", () => {
       expect(MINIMUM_OPENCODE_VERSION).toBe("1.1.1")
+    })
+  })
+
+  describe("OPENCODE_NATIVE_AGENTS_INJECTION_VERSION", () => {
+    test("is set to 1.1.37", () => {
+      // #given the native agents injection version constant
+      // #when exported
+      // #then it should be 1.1.37 (PR #10678)
+      expect(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION).toBe("1.1.37")
+    })
+
+    test("version detection works correctly with native agents version", () => {
+      // #given OpenCode version at or above native agents injection version
+      setVersionCache("1.1.37")
+
+      // #when checking against native agents version
+      const result = isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
+
+      // #then returns true (native support available)
+      expect(result).toBe(true)
+    })
+
+    test("version detection returns false for older versions", () => {
+      // #given OpenCode version below native agents injection version
+      setVersionCache("1.1.36")
+
+      // #when checking against native agents version
+      const result = isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
+
+      // #then returns false (no native support)
+      expect(result).toBe(false)
+    })
+
+    test("returns true when version detection fails (fail-safe)", () => {
+      // #given version cannot be detected
+      setVersionCache(null)
+
+      // #when checking against native agents version
+      const result = isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
+
+      // #then returns true (assume latest, enable native support)
+      expect(result).toBe(true)
     })
   })
 })

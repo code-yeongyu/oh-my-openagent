@@ -5,6 +5,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
+import { getTimingConfig } from "./timing"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
@@ -286,7 +287,11 @@ Prompts MUST be in English.`
         resolvedParentAgent: parentAgent,
       })
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        ? { 
+            providerID: prevMessage.model.providerID, 
+            modelID: prevMessage.model.modelID,
+            ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+          }
         : undefined
 
       if (args.session_id) {
@@ -409,9 +414,10 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         // Wait for message stability after prompt completes
-        const POLL_INTERVAL_MS = 500
-        const MIN_STABILITY_TIME_MS = 5000
-        const STABILITY_POLLS_REQUIRED = 3
+        const timing = getTimingConfig()
+        const POLL_INTERVAL_MS = timing.POLL_INTERVAL_MS
+        const MIN_STABILITY_TIME_MS = timing.SESSION_CONTINUATION_STABILITY_MS
+        const STABILITY_POLLS_REQUIRED = timing.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
@@ -565,7 +571,7 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type, source }
              
              const parsedModel = parseModelString(actualModel)
-             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
              categoryModel = parsedModel
                ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
                : undefined
@@ -662,10 +668,11 @@ Available categories: ${categoryNames.join(", ")}`
             const startTime = new Date()
 
             // Poll for completion (same logic as sync mode)
-            const POLL_INTERVAL_MS = 500
-            const MAX_POLL_TIME_MS = 10 * 60 * 1000
-            const MIN_STABILITY_TIME_MS = 10000
-            const STABILITY_POLLS_REQUIRED = 3
+            const timingCfg = getTimingConfig()
+            const POLL_INTERVAL_MS = timingCfg.POLL_INTERVAL_MS
+            const MAX_POLL_TIME_MS = timingCfg.MAX_POLL_TIME_MS
+            const MIN_STABILITY_TIME_MS = timingCfg.MIN_STABILITY_TIME_MS
+            const STABILITY_POLLS_REQUIRED = timingCfg.STABILITY_POLLS_REQUIRED
             const pollStart = Date.now()
             let lastMsgCount = 0
             let stablePolls = 0
@@ -765,6 +772,12 @@ To continue this session: session_id="${sessionID}"`
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
         }
 
+        if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
+          return `You are prometheus. You cannot delegate to prometheus via delegate_task.
+
+Create the work plan directly - that's your job as the planning agent.`
+        }
+
         agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
@@ -796,6 +809,13 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
           agentToUse = matchedAgent.name
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
+        }
+
+        // When using subagent_type directly, inherit parent model so agents don't default
+        // to their hardcoded models (like grok-code) which may not be available
+        if (parentModel) {
+          categoryModel = parentModel
+          modelInfo = { model: `${parentModel.providerID}/${parentModel.modelID}`, type: "inherited" }
         }
       }
 
@@ -924,6 +944,7 @@ To continue this session: session_id="${task.sessionID}"`
         })
 
         try {
+          const allowDelegateTask = isPlanAgent(agentToUse)
           await client.session.prompt({
             path: { id: sessionID },
             body: {
@@ -931,7 +952,7 @@ To continue this session: session_id="${task.sessionID}"`
               system: systemContent,
               tools: {
                 task: false,
-                delegate_task: false,
+                delegate_task: allowDelegateTask,
                 call_omo_agent: true,
                 question: false,
               },
@@ -965,10 +986,11 @@ To continue this session: session_id="${task.sessionID}"`
 
         // Poll for session completion with stability detection
         // The session may show as "idle" before messages appear, so we also check message stability
-        const POLL_INTERVAL_MS = 500
-        const MAX_POLL_TIME_MS = 10 * 60 * 1000
-        const MIN_STABILITY_TIME_MS = 10000  // Minimum 10s before accepting completion
-        const STABILITY_POLLS_REQUIRED = 3
+        const syncTiming = getTimingConfig()
+        const POLL_INTERVAL_MS = syncTiming.POLL_INTERVAL_MS
+        const MAX_POLL_TIME_MS = syncTiming.MAX_POLL_TIME_MS
+        const MIN_STABILITY_TIME_MS = syncTiming.MIN_STABILITY_TIME_MS
+        const STABILITY_POLLS_REQUIRED = syncTiming.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0

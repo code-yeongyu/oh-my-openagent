@@ -73,7 +73,7 @@ export async function executePreCompactHooks(
 
       if (result.stdout) {
         try {
-          const output = JSON.parse(result.stdout) as PreCompactOutput
+          const output = JSON.parse(result.stdout || "{}") as PreCompactOutput
 
           if (output.hookSpecificOutput?.additionalContext) {
             collectedContext.push(...output.hookSpecificOutput.additionalContext)

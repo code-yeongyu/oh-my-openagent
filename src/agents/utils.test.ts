@@ -1,7 +1,8 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, spyOn, afterEach } from "bun:test"
 import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
@@ -46,17 +47,31 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.reasoningEffort).toBeUndefined()
   })
 
-  test("Oracle uses first fallback entry when no availableModels provided (no cache scenario)", async () => {
-    // #given - no available models simulates CI without model cache
+  test("Oracle falls back to system default when availableModels is empty (even with connected cache)", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - uses first fallback entry (openai/gpt-5.2) instead of system default
-    expect(agents.oracle.model).toBe("openai/gpt-5.2")
-    expect(agents.oracle.reasoningEffort).toBe("medium")
-    expect(agents.oracle.textVerbosity).toBe("high")
-    expect(agents.oracle.thinking).toBeUndefined()
+    // #then
+    expect(agents.oracle.model).toBe(TEST_DEFAULT_MODEL)
+    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.oracle.reasoningEffort).toBeUndefined()
+    cacheSpy.mockRestore()
+  })
+
+  test("Oracle created without model field when no cache exists (first run scenario)", async () => {
+    // #given - no cache at all (first run)
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - oracle should be created with system default model (fallback to systemDefaultModel)
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.model).toBe(TEST_DEFAULT_MODEL)
+    cacheSpy.mockRestore()
   })
 
   test("Oracle with GPT model override has reasoningEffort, no thinking", async () => {
@@ -107,26 +122,40 @@ describe("createBuiltinAgents with model overrides", () => {
 })
 
 describe("createBuiltinAgents without systemDefaultModel", () => {
-  test("creates agents successfully without systemDefaultModel", async () => {
-    // #given - no systemDefaultModel provided
+  test("agents NOT created when availableModels empty and no systemDefaultModel", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, undefined)
 
-    // #then - agents should still be created using fallback chain
-    expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.model).toBe("openai/gpt-5.2")
+    // #then
+    expect(agents.oracle).toBeUndefined()
+    cacheSpy.mockRestore()
   })
 
-  test("sisyphus uses fallback chain when systemDefaultModel undefined", async () => {
-    // #given - no systemDefaultModel
+  test("agents NOT created when no cache and no systemDefaultModel (first run without defaults)", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 
     // #when
     const agents = await createBuiltinAgents([], {}, undefined, undefined)
 
-    // #then - sisyphus should use its fallback chain
-    expect(agents.sisyphus).toBeDefined()
-    expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    // #then
+    expect(agents.oracle).toBeUndefined()
+    cacheSpy.mockRestore()
+  })
+
+  test("sisyphus NOT created when availableModels empty and no systemDefaultModel", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+    // #then
+    expect(agents.sisyphus).toBeUndefined()
+    cacheSpy.mockRestore()
   })
 })
 

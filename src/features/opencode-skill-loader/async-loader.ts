@@ -128,8 +128,15 @@ $ARGUMENTS
   }
 }
 
-function parseAllowedTools(allowedTools: string | undefined): string[] | undefined {
+function parseAllowedTools(allowedTools: string | string[] | undefined): string[] | undefined {
   if (!allowedTools) return undefined
+  
+  // Handle YAML array format: already parsed as string[]
+  if (Array.isArray(allowedTools)) {
+    return allowedTools.map(t => t.trim()).filter(Boolean)
+  }
+  
+  // Handle space-separated string format: "Read Write Edit Bash"
   return allowedTools.split(/\s+/).filter(Boolean)
 }
 
