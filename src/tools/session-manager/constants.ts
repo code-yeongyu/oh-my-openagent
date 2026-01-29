@@ -99,11 +99,18 @@ export const SESSION_RENAME_DESCRIPTION = `Rename/retitle an OpenCode session.
 Updates the title field in session metadata. The title is displayed in session_list and session_info outputs.
 
 Arguments:
-- session_id (required): Session ID to rename (e.g., "ses_abc123")
+- session_id (optional): Session ID to rename. Defaults to current session if not provided.
 - new_title (required): New title for the session (can be empty to clear)
 
-Example:
-session_rename(session_id="ses_abc123", new_title="Implement auth feature")
-Successfully renamed session ses_abc123 to "Implement auth feature"`
+IMPORTANT: If the user asks to rename a session without specifying a title (e.g., "rename this session" or "give this session a descriptive name"), YOU must generate an appropriate title based on the conversation context before calling this tool. Analyze the key topics, tasks, or themes discussed and create a concise, descriptive title (max 80 chars).
+
+Example - user provides title:
+User: "rename this session to Auth Implementation"
+session_rename(new_title="Auth Implementation")
+
+Example - user doesn't provide title (YOU generate it):
+User: "rename this session"
+[You analyze the conversation: discussed React hooks, state management, useEffect patterns]
+session_rename(new_title="React Hooks & State Management Deep Dive")`
 
 export const TOOL_NAME_PREFIX = "session_"
