@@ -4,6 +4,7 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { createMcpOAuthCommand } from "./mcp-oauth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -149,5 +150,7 @@ program
   .action(() => {
     console.log(`oh-my-opencode v${VERSION}`)
   })
+
+program.addCommand(createMcpOAuthCommand())
 
 program.parse()
