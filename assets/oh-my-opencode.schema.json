@@ -3301,6 +3301,12 @@
         },
         "replace_plan": {
           "type": "boolean"
+        },
+        "archive_completed_plans": {
+          "type": "boolean"
+        },
+        "archive_path": {
+          "type": "string"
         }
       },
       "additionalProperties": false
