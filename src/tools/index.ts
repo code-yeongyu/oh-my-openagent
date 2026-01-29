@@ -19,6 +19,9 @@ import { grep } from "./grep"
 import { glob } from "./glob"
 export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
 
+
+import { fixflow_knowledge_base } from "./fixflow"
+
 import {
   session_list,
   session_read,
@@ -69,4 +72,5 @@ export const builtinTools: Record<string, ToolDefinition> = {
   session_read,
   session_search,
   session_info,
+  fixflow_knowledge_base,
 }
