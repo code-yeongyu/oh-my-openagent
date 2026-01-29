@@ -303,27 +303,73 @@ No tasks yet
        expect(secondArchiveFiles.length).toBe(firstArchiveFiles.length)
      })
 
-      test("should return false when plan file cannot be read (TOCTOU)", () => {
-        // #given
-        const planPath = join(PLANS_DIR, "toctou-plan.md")
-        writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
-        const boulderState: BoulderState = {
-          active_plan: planPath,
-          started_at: "2026-01-01T10:00:00Z",
-          session_ids: ["session-1"],
-          plan_name: "toctou-plan",
-        }
-        writeBoulderState(TEST_DIR, boulderState)
-        const config: SisyphusAgentConfig = { archive_completed_plans: true }
+       test("should return false when plan file cannot be read (TOCTOU)", () => {
+         // #given
+         const planPath = join(PLANS_DIR, "toctou-plan.md")
+         writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
+         const boulderState: BoulderState = {
+           active_plan: planPath,
+           started_at: "2026-01-01T10:00:00Z",
+           session_ids: ["session-1"],
+           plan_name: "toctou-plan",
+         }
+         writeBoulderState(TEST_DIR, boulderState)
+         const config: SisyphusAgentConfig = { archive_completed_plans: true }
 
-        rmSync(planPath)
+         rmSync(planPath)
 
-        // #when
-        const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+         // #when
+         const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
 
-        // #then
-        expect(result).toBe(false)
-        expect(readBoulderState(TEST_DIR)).not.toBeNull()
-      })
-   })
+         // #then
+         expect(result).toBe(false)
+         expect(readBoulderState(TEST_DIR)).not.toBeNull()
+       })
+
+       test("should return false when sub-second collision occurs", () => {
+         // #given - create situation where timestamped file already exists
+         const planPath = join(PLANS_DIR, "subsecond-plan.md")
+         writeFileSync(planPath, "# Plan\n- [x] Task 1")
+         
+         // Pre-create the archive directory
+         if (!existsSync(ARCHIVE_DIR)) {
+           mkdirSync(ARCHIVE_DIR, { recursive: true })
+         }
+         
+         // First, create the base archive file (simulates first completion)
+         writeFileSync(join(ARCHIVE_DIR, "subsecond-plan.md"), "---\ncompleted_at: old\n---\n# Plan\n- [x] Task 1")
+         
+         const boulderState: BoulderState = {
+           active_plan: planPath,
+           started_at: "2026-01-01T10:00:00Z",
+           session_ids: ["session-1"],
+           plan_name: "subsecond-plan",
+         }
+         writeBoulderState(TEST_DIR, boulderState)
+         const config: SisyphusAgentConfig = { archive_completed_plans: true }
+
+         // Mock Date to force same timestamp
+         const originalDate = Date
+         const fixedTime = new Date("2026-01-29T10:00:00.000Z")
+         global.Date = class extends originalDate {
+           constructor() { super(); return fixedTime }
+           static now() { return fixedTime.getTime() }
+         } as any
+         
+         // Pre-create the timestamped file (simulates sub-second collision)
+         const timestamp = fixedTime.toISOString().replace(/[:.]/g, "-")
+         writeFileSync(join(ARCHIVE_DIR, `subsecond-plan-${timestamp}.md`), "collision content")
+
+         // #when
+         const result = archiveCompletedPlan(TEST_DIR, boulderState, config)
+         
+         // Restore Date
+         global.Date = originalDate
+
+         // #then - should return false (fail explicitly, don't lose data)
+         expect(result).toBe(false)
+         // Boulder state should be preserved (don't clear on failure)
+         expect(readBoulderState(TEST_DIR)).not.toBeNull()
+       })
+    })
 })

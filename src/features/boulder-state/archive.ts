@@ -70,10 +70,9 @@ duration_hours: ${durationHours.toFixed(2)}
     archivePath = join(archiveDir, `${boulderState.plan_name}-${timestamp}.md`)
   }
 
-  if (existsSync(archivePath)) {
-    clearBoulderState(directory)
-    return true
-  }
+   if (existsSync(archivePath)) {
+     return false
+   }
 
   try {
     if (!existsSync(archiveDir)) {
