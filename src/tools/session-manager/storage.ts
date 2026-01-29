@@ -257,20 +257,14 @@ export function findSessionMetadataPath(sessionID: string): string {
   if (!existsSync(SESSION_STORAGE)) return ""
 
   try {
-    const projectDirs = readdirSync(SESSION_STORAGE)
+    const projectDirs = readdirSync(SESSION_STORAGE, { withFileTypes: true })
     for (const projectDir of projectDirs) {
-      const projectPath = join(SESSION_STORAGE, projectDir)
-      
-      try {
-        const stat = Bun.file(projectPath)
-        if (!stat) continue
-      } catch {
-        continue
-      }
+      if (!projectDir.isDirectory()) continue
 
+      const projectPath = join(SESSION_STORAGE, projectDir.name)
       const sessionFile = `${sessionID}.json`
       const sessionPath = join(projectPath, sessionFile)
-      
+
       if (existsSync(sessionPath)) {
         return sessionPath
       }
