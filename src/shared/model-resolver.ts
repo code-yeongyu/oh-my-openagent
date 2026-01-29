@@ -21,6 +21,7 @@ export type ModelResolutionResult = {
 }
 
 export type ExtendedModelResolutionInput = {
+	uiSelectedModel?: string
 	userModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
@@ -43,22 +44,46 @@ export function resolveModel(input: ModelResolutionInput): string | undefined {
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
 ): ModelResolutionResult | undefined {
-	const { userModel, fallbackChain, availableModels, systemDefaultModel } = input
+	const { uiSelectedModel, userModel, fallbackChain, availableModels, systemDefaultModel } = input
 
-	// Step 1: Override
+	// Step 1: UI Selection (highest priority - respects user's model choice in OpenCode UI)
+	const normalizedUiModel = normalizeModel(uiSelectedModel)
+	if (normalizedUiModel) {
+		log("Model resolved via UI selection", { model: normalizedUiModel })
+		return { model: normalizedUiModel, source: "override" }
+	}
+
+	// Step 2: Config Override (from oh-my-opencode.json)
 	const normalizedUserModel = normalizeModel(userModel)
 	if (normalizedUserModel) {
-		log("Model resolved via override", { model: normalizedUserModel })
+		log("Model resolved via config override", { model: normalizedUserModel })
 		return { model: normalizedUserModel, source: "override" }
 	}
 
-	// Step 2: Provider fallback chain (with availability check)
+	// Step 3: Provider fallback chain (with availability check)
 	if (fallbackChain && fallbackChain.length > 0) {
 		if (availableModels.size === 0) {
-			// When model cache is empty, we cannot verify if a provider actually has the model.
-			// Skip fallback chain entirely and fall through to system default.
-			// This prevents selecting provider/model combinations that may not exist.
-			log("No model cache available, skipping fallback chain to use system default")
+			const connectedProviders = readConnectedProvidersCache()
+			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+
+			if (connectedSet === null) {
+				log("Model fallback chain skipped (no connected providers cache) - falling through to system default")
+			} else {
+				for (const entry of fallbackChain) {
+					for (const provider of entry.providers) {
+						if (connectedSet.has(provider)) {
+							const model = `${provider}/${entry.model}`
+							log("Model resolved via fallback chain (no model cache, using connected provider)", { 
+								provider, 
+								model: entry.model, 
+								variant: entry.variant,
+							})
+							return { model, source: "provider-fallback", variant: entry.variant }
+						}
+					}
+				}
+				log("No connected provider found in fallback chain, falling through to system default")
+			}
 		}
 
 		for (const entry of fallbackChain) {
@@ -74,7 +99,7 @@ export function resolveModelWithFallback(
 		log("No available model found in fallback chain, falling through to system default")
 	}
 
-	// Step 3: System default (if provided)
+	// Step 4: System default (if provided)
 	if (systemDefaultModel === undefined) {
 		log("No model resolved - systemDefaultModel not configured")
 		return undefined

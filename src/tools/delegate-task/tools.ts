@@ -287,7 +287,11 @@ Prompts MUST be in English.`
         resolvedParentAgent: parentAgent,
       })
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        ? { 
+            providerID: prevMessage.model.providerID, 
+            modelID: prevMessage.model.modelID,
+            ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+          }
         : undefined
 
       if (args.session_id) {
@@ -537,7 +541,7 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? resolved.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -805,6 +809,13 @@ Create the work plan directly - that's your job as the planning agent.`
           agentToUse = matchedAgent.name
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
+        }
+
+        // When using subagent_type directly, inherit parent model so agents don't default
+        // to their hardcoded models (like grok-code) which may not be available
+        if (parentModel) {
+          categoryModel = parentModel
+          modelInfo = { model: `${parentModel.providerID}/${parentModel.modelID}`, type: "inherited" }
         }
       }
 

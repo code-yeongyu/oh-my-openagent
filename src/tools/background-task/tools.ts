@@ -80,7 +80,11 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
         })
         
         const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-          ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+          ? { 
+              providerID: prevMessage.model.providerID, 
+              modelID: prevMessage.model.modelID,
+              ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+            }
           : undefined
 
         const task = await manager.launch({
