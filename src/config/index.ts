@@ -4,6 +4,7 @@ export {
   AgentOverridesSchema,
   FallbackModelsSchema,
   RuntimeFallbackConfigSchema,
+  CategoriesConfigSchema,
   McpNameSchema,
   AgentNameSchema,
   HookNameSchema,
