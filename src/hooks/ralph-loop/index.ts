@@ -377,9 +377,9 @@ export function createRalphLoopHook(
           const agentConfigs = getAgentConfigs()
           const agentConfig = agentConfigs[agent]
           if (agentConfig?.model) {
-            const parts = agentConfig.model.split('/')
-            if (parts.length === 2) {
-              model = { providerID: parts[0], modelID: parts[1] }
+            const [providerID, ...modelParts] = agentConfig.model.split('/')
+            if (providerID && modelParts.length) {
+              model = { providerID, modelID: modelParts.join('/') }
               log(`[${HOOK_NAME}] Using configured model for agent ${agent}`, { model: agentConfig.model })
             }
           }
