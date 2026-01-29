@@ -77,7 +77,7 @@ export const fixflow_knowledge_base: ToolDefinition = tool({
         clearTimeout(timeoutId)
         
         if (!response.ok) return `Error storing: ${response.statusText}`
-        const data = await response.json()
+        const data = await response.json() as { id: string }
         return `Successfully stored knowledge. ID: ${data.id}`
 
       } else if (action === "feedback") {

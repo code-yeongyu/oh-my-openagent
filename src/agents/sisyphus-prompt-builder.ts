@@ -24,7 +24,7 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
       category = "lsp"
     } else if (name.startsWith("ast_grep")) {
       category = "ast"
-    } else if (name === "grep" || name === "glob") {
+    } else if (name === "grep" || name === "glob" || name === "fixflow_knowledge_base") {
       category = "search"
     } else if (name.startsWith("session_")) {
       category = "session"
