@@ -11,6 +11,7 @@ import {
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
 import { log } from "../../shared"
+import { clearZellijState } from "../../shared/terminal-multiplexer/zellij-storage"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -356,14 +357,19 @@ export class TmuxSessionManager {
       }
     }
 
-     this.sessions.delete(event.sessionID)
-     this.sessionHandles.delete(event.sessionID)
-     this.openCodeSessions.delete(event.sessionID)
+     const opcSessionId = this.openCodeSessions.get(event.sessionID)
+      if (opcSessionId) {
+        clearZellijState(opcSessionId)
+      }
 
-     if (this.sessions.size === 0) {
-       this.stopPolling()
-     }
-   }
+      this.sessions.delete(event.sessionID)
+      this.sessionHandles.delete(event.sessionID)
+      this.openCodeSessions.delete(event.sessionID)
+
+      if (this.sessions.size === 0) {
+        this.stopPolling()
+      }
+    }
 
   private startPolling(): void {
     if (this.pollInterval) return

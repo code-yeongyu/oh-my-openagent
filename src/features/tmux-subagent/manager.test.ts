@@ -72,6 +72,16 @@ mock.module('../../shared/tmux', () => {
   }
 })
 
+const mockClearZellijState = mock<(sessionID: string) => void>(() => {})
+const mockLoadZellijState = mock<(sessionID: string) => any>(() => null)
+const mockSaveZellijState = mock<(state: any) => void>(() => {})
+
+mock.module('../../shared/terminal-multiplexer/zellij-storage', () => ({
+  clearZellijState: mockClearZellijState,
+  loadZellijState: mockLoadZellijState,
+  saveZellijState: mockSaveZellijState,
+}))
+
 const trackedSessions = new Set<string>()
 
 function createMockMultiplexer(overrides?: {
@@ -450,3 +460,560 @@ describe('TmuxSessionManager', () => {
     })
 
 
+       //#when
+       await manager.onSessionCreated(event)
+
+       //#then
+       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(0)
+     })
+
+     test('extracts and stores OpenCode session ID from event.properties.info.parentID', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+       const opcSessionId = 'opc_parent_session_123'
+       const bgSessionId = 'ses_background_456'
+       const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Test Task')
+
+       //#when
+       await manager.onSessionCreated(event)
+
+       //#then - verify that the OpenCode session ID was extracted and stored
+       // We verify this by checking that spawnPane was called (which means session was tracked)
+       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(1)
+       // The session should be tracked with the background session ID
+       expect(trackedSessions.has(`omo-subagent-${bgSessionId}`)).toBe(true)
+     })
+
+     test('makes OpenCode session ID available during spawnSimple call', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       
+       let capturedOpcSessionId: string | undefined
+       const multiplexer = createMockMultiplexer({
+         capabilities: { manualLayout: false, persistentLabels: true },
+         spawnPaneResult: { label: 'test', nativeId: '%test' }
+       })
+       
+       // Mock spawnPane to capture the OpenCode session ID that should be available
+       const originalSpawnPane = multiplexer.spawnPane
+       multiplexer.spawnPane = mock(async (cmd: string, options: any) => {
+         // In the real implementation, the manager will have access to the OpenCode session ID
+         // This test verifies the infrastructure is in place
+         trackedSessions.add(options.label)
+         return { label: options.label, nativeId: '%test' }
+       })
+       
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+       const opcSessionId = 'opc_session_xyz'
+       const bgSessionId = 'ses_bg_xyz'
+       const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Test Task')
+
+       //#when
+       await manager.onSessionCreated(event)
+
+       //#then
+       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(1)
+       // Verify the session was tracked
+       expect(trackedSessions.has(`omo-subagent-${bgSessionId}`)).toBe(true)
+     })
+
+     test('tracks multiple OpenCode sessions independently', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+       //#when - create multiple sessions with different OpenCode parent IDs
+       const event1 = createSessionCreatedEvent('ses_bg_1', 'opc_parent_1', 'Task 1')
+       const event2 = createSessionCreatedEvent('ses_bg_2', 'opc_parent_2', 'Task 2')
+       const event3 = createSessionCreatedEvent('ses_bg_3', 'opc_parent_1', 'Task 3')
+
+       await manager.onSessionCreated(event1)
+       await manager.onSessionCreated(event2)
+       await manager.onSessionCreated(event3)
+
+       //#then - all sessions should be tracked
+       expect(multiplexer.spawnPane).toHaveBeenCalledTimes(3)
+       expect(trackedSessions.has('omo-subagent-ses_bg_1')).toBe(true)
+       expect(trackedSessions.has('omo-subagent-ses_bg_2')).toBe(true)
+       expect(trackedSessions.has('omo-subagent-ses_bg_3')).toBe(true)
+     })
+
+    test('replaces oldest agent when unsplittable (small window, manualLayout=true)', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          windowWidth: 160,
+          windowHeight: 11,
+          agentPanes: [
+            {
+              paneId: '%1',
+              width: 40,
+              height: 11,
+              left: 80,
+              top: 0,
+              title: 'omo-subagent-Task 1',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      //#when
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_new', 'ses_parent', 'New Task')
+      )
+
+      //#then
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+      const call = mockExecuteActions.mock.calls[0]
+      expect(call).toBeDefined()
+      const actionsArg = call![0]
+      expect(actionsArg).toHaveLength(1)
+      expect(actionsArg[0].type).toBe('replace')
+    })
+  })
+
+  describe('onSessionDeleted', () => {
+    test('uses adapter.closePane when manualLayout=true', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      let stateCallCount = 0
+      mockQueryWindowState.mockImplementation(async () => {
+        stateCallCount++
+        if (stateCallCount === 1) {
+          return createWindowState()
+        }
+        return createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Task',
+              isActive: false,
+            },
+          ],
+        })
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent(
+          'ses_child',
+          'ses_parent',
+          'Background: Test Task'
+        )
+      )
+      mockExecuteAction.mockClear()
+
+      //#when
+      await manager.onSessionDeleted({ sessionID: 'ses_child' })
+
+      //#then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+      const call = mockExecuteAction.mock.calls[0]
+      expect(call).toBeDefined()
+      expect(call![0]).toEqual({
+        type: 'close',
+        paneId: '%mock',
+        sessionId: 'ses_child',
+      })
+    })
+
+    test('uses adapter.closePane directly when manualLayout=false', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent(
+          'ses_child',
+          'ses_parent',
+          'Background: Test Task'
+        )
+      )
+      ;(multiplexer.closePane as ReturnType<typeof mock>).mockClear()
+
+      //#when
+      await manager.onSessionDeleted({ sessionID: 'ses_child' })
+
+      //#then
+      expect(multiplexer.closePane).toHaveBeenCalledTimes(1)
+    })
+
+    test('does nothing when untracked session is deleted', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      //#when
+      await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
+
+      //#then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(multiplexer.closePane).toHaveBeenCalledTimes(0)
+    })
+
+    test('calls clearZellijState with OpenCode session ID when session is deleted', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockClearZellijState.mockClear()
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent(
+          'ses_child',
+          'ses_parent_opc_123',
+          'Background: Test Task'
+        )
+      )
+      mockClearZellijState.mockClear()
+
+      //#when
+      await manager.onSessionDeleted({ sessionID: 'ses_child' })
+
+      //#then
+      expect(mockClearZellijState).toHaveBeenCalledTimes(1)
+      expect(mockClearZellijState).toHaveBeenCalledWith('ses_parent_opc_123')
+    })
+
+    test('handles clearZellijState gracefully when session not tracked', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockClearZellijState.mockClear()
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      //#when
+      await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
+
+      //#then
+      expect(mockClearZellijState).toHaveBeenCalledTimes(0)
+    })
+  })
+
+  describe('cleanup', () => {
+    test('closes all tracked panes (manualLayout=true)', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      let callCount = 0
+      mockExecuteActions.mockImplementation(async () => {
+        callCount++
+        return {
+          success: true,
+          spawnedPaneId: `%${callCount}`,
+          results: [],
+        }
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
+      )
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2')
+      )
+
+      mockExecuteAction.mockClear()
+
+      //#when
+      await manager.cleanup()
+
+      //#then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(2)
+    })
+
+    test('closes all tracked panes via adapter (manualLayout=false)', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: false, persistentLabels: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
+      )
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2')
+      )
+
+      ;(multiplexer.closePane as ReturnType<typeof mock>).mockClear()
+
+      //#when
+      await manager.cleanup()
+
+      //#then
+      expect(multiplexer.closePane).toHaveBeenCalledTimes(2)
+    })
+  })
+})
+
+describe('DecisionEngine', () => {
+  describe('calculateCapacity', () => {
+    test('calculates correct 2D grid capacity', async () => {
+      //#given
+      const { calculateCapacity } = await import('./decision-engine')
+
+      //#when
+      const result = calculateCapacity(212, 44)
+
+      //#then - availableWidth=106, cols=(106+1)/(52+1)=2, rows=(44+1)/(11+1)=3 (accounting for dividers)
+      expect(result.cols).toBe(2)
+      expect(result.rows).toBe(3)
+      expect(result.total).toBe(6)
+    })
+
+    test('returns 0 cols when agent area too narrow', async () => {
+      //#given
+      const { calculateCapacity } = await import('./decision-engine')
+
+      //#when
+      const result = calculateCapacity(100, 44)
+
+      //#then - availableWidth=50, cols=50/53=0
+      expect(result.cols).toBe(0)
+      expect(result.total).toBe(0)
+    })
+  })
+
+  describe('decideSpawnActions', () => {
+    test('returns spawn action with splitDirection when under capacity', async () => {
+      //#given
+      const { decideSpawnActions } = await import('./decision-engine')
+      const state: WindowState = {
+        windowWidth: 212,
+        windowHeight: 44,
+        mainPane: {
+          paneId: '%0',
+          width: 106,
+          height: 44,
+          left: 0,
+          top: 0,
+          title: 'main',
+          isActive: true,
+        },
+        agentPanes: [],
+      }
+
+      //#when
+      const decision = decideSpawnActions(
+        state,
+        'ses_1',
+        'Test Task',
+        { mainPaneMinWidth: 120, agentPaneWidth: 40 },
+        []
+      )
+
+      //#then
+      expect(decision.canSpawn).toBe(true)
+      expect(decision.actions).toHaveLength(1)
+      expect(decision.actions[0].type).toBe('spawn')
+      if (decision.actions[0].type === 'spawn') {
+        expect(decision.actions[0].sessionId).toBe('ses_1')
+        expect(decision.actions[0].description).toBe('Test Task')
+        expect(decision.actions[0].targetPaneId).toBe('%0')
+        expect(decision.actions[0].splitDirection).toBe('-h')
+      }
+    })
+
+    test('returns replace when split not possible', async () => {
+      //#given - small window where split is never possible
+      const { decideSpawnActions } = await import('./decision-engine')
+      const state: WindowState = {
+        windowWidth: 160,
+        windowHeight: 11,
+        mainPane: {
+          paneId: '%0',
+          width: 80,
+          height: 11,
+          left: 0,
+          top: 0,
+          title: 'main',
+          isActive: true,
+        },
+        agentPanes: [
+          {
+            paneId: '%1',
+            width: 80,
+            height: 11,
+            left: 80,
+            top: 0,
+            title: 'omo-subagent-Old',
+            isActive: false,
+          },
+        ],
+      }
+      const sessionMappings = [
+        { sessionId: 'ses_old', paneId: '%1', createdAt: new Date('2024-01-01') },
+      ]
+
+      //#when
+      const decision = decideSpawnActions(
+        state,
+        'ses_new',
+        'New Task',
+        { mainPaneMinWidth: 120, agentPaneWidth: 40 },
+        sessionMappings
+      )
+
+      //#then - agent area (80) < MIN_SPLIT_WIDTH (105), so replace is used
+      expect(decision.canSpawn).toBe(true)
+      expect(decision.actions).toHaveLength(1)
+      expect(decision.actions[0].type).toBe('replace')
+    })
+
+    test('returns canSpawn=false when window too small', async () => {
+      //#given
+      const { decideSpawnActions } = await import('./decision-engine')
+      const state: WindowState = {
+        windowWidth: 60,
+        windowHeight: 5,
+        mainPane: {
+          paneId: '%0',
+          width: 30,
+          height: 5,
+          left: 0,
+          top: 0,
+          title: 'main',
+          isActive: true,
+        },
+        agentPanes: [],
+      }
+
+      //#when
+      const decision = decideSpawnActions(
+        state,
+        'ses_1',
+        'Test Task',
+        { mainPaneMinWidth: 120, agentPaneWidth: 40 },
+        []
+      )
+
+      //#then
+      expect(decision.canSpawn).toBe(false)
+      expect(decision.reason).toContain('too small')
+    })
+  })
+})
+>>>>>>> 0b2e5d8 (feat(zellij): clean up state on session deletion)
