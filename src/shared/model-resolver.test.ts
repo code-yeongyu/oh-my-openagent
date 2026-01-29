@@ -113,7 +113,80 @@ describe("resolveModelWithFallback", () => {
     logSpy.mockRestore()
   })
 
-  describe("Step 1: Override", () => {
+  describe("Step 1: UI Selection (highest priority)", () => {
+    test("returns uiSelectedModel with override source when provided", () => {
+      // #given
+      const input: ExtendedModelResolutionInput = {
+        uiSelectedModel: "opencode/glm-4.7-free",
+        userModel: "anthropic/claude-opus-4-5",
+        fallbackChain: [
+          { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-5" },
+        ],
+        availableModels: new Set(["anthropic/claude-opus-4-5", "github-copilot/claude-opus-4-5-preview"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then
+      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.source).toBe("override")
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/glm-4.7-free" })
+    })
+
+    test("UI selection takes priority over config override", () => {
+      // #given
+      const input: ExtendedModelResolutionInput = {
+        uiSelectedModel: "opencode/glm-4.7-free",
+        userModel: "anthropic/claude-opus-4-5",
+        availableModels: new Set(["anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then
+      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.source).toBe("override")
+    })
+
+    test("whitespace-only uiSelectedModel is treated as not provided", () => {
+      // #given
+      const input: ExtendedModelResolutionInput = {
+        uiSelectedModel: "   ",
+        userModel: "anthropic/claude-opus-4-5",
+        availableModels: new Set(["anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-5" })
+    })
+
+    test("empty string uiSelectedModel falls through to config override", () => {
+      // #given
+      const input: ExtendedModelResolutionInput = {
+        uiSelectedModel: "",
+        userModel: "anthropic/claude-opus-4-5",
+        availableModels: new Set(["anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+    })
+  })
+
+  describe("Step 2: Config Override", () => {
     test("returns userModel with override source when userModel is provided", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
@@ -131,7 +204,7 @@ describe("resolveModelWithFallback", () => {
       // #then
       expect(result!.model).toBe("anthropic/claude-opus-4-5")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via override", { model: "anthropic/claude-opus-4-5" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-5" })
     })
 
     test("override takes priority even if model not in availableModels", () => {
@@ -190,7 +263,7 @@ describe("resolveModelWithFallback", () => {
     })
   })
 
-  describe("Step 2: Provider fallback chain", () => {
+  describe("Step 3: Provider fallback chain", () => {
     test("tries providers in order within entry and returns first match", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
@@ -317,7 +390,7 @@ describe("resolveModelWithFallback", () => {
     })
   })
 
-  describe("Step 3: System default fallback (no availability match)", () => {
+  describe("Step 4: System default fallback (no availability match)", () => {
     test("returns system default when no availability match found in fallback chain", () => {
       // #given
       const input: ExtendedModelResolutionInput = {
