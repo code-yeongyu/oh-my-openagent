@@ -4,8 +4,9 @@ import {
   SESSION_READ_DESCRIPTION,
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
+  SESSION_RENAME_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, renameSession, sessionExists } from "./storage"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -14,7 +15,7 @@ import {
   formatSearchResults,
   searchInSession,
 } from "./utils"
-import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SessionRenameArgs, SearchResult } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
@@ -139,6 +140,32 @@ export const session_info: ToolDefinition = tool({
       }
 
       return formatSessionInfo(info)
+    } catch (e) {
+      return `Error: ${e instanceof Error ? e.message : String(e)}`
+    }
+  },
+})
+
+export const session_rename: ToolDefinition = tool({
+  description: SESSION_RENAME_DESCRIPTION,
+  args: {
+    session_id: tool.schema.string().describe("Session ID to rename"),
+    new_title: tool.schema.string().describe("New title for the session"),
+  },
+  execute: async (args: SessionRenameArgs, _context) => {
+    try {
+      if (!sessionExists(args.session_id)) {
+        return `Session not found: ${args.session_id}`
+      }
+
+      const success = await renameSession(args.session_id, args.new_title)
+
+      if (success) {
+        const titleDisplay = args.new_title ? `"${args.new_title}"` : "(cleared)"
+        return `Successfully renamed session ${args.session_id} to ${titleDisplay}`
+      }
+
+      return `Failed to rename session ${args.session_id}`
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
