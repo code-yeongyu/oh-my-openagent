@@ -95,9 +95,14 @@ export const BuiltinCommandNameSchema = z.enum([
   "start-work",
 ])
 
+export const FallbackModelsSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+])
+
 export const AgentOverrideConfigSchema = z.object({
-  /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
@@ -195,6 +200,14 @@ export const BuiltinCategoryNameSchema = z.enum([
 ])
 
 export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)
+
+export const RuntimeFallbackConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  retry_on_errors: z.array(z.number()).default([429, 503, 529]),
+  max_fallback_attempts: z.number().min(1).max(10).default(3),
+  cooldown_seconds: z.number().min(0).default(60),
+  notify_on_fallback: z.boolean().default(true),
+})
 
 export const CommentCheckerConfigSchema = z.object({
   /** Custom prompt to replace the default warning message. Use {{comments}} placeholder for detected comments XML. */

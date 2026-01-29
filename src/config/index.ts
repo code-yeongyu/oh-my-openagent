@@ -2,6 +2,8 @@ export {
   OhMyOpenCodeConfigSchema,
   AgentOverrideConfigSchema,
   AgentOverridesSchema,
+  FallbackModelsSchema,
+  RuntimeFallbackConfigSchema,
   McpNameSchema,
   AgentNameSchema,
   HookNameSchema,
@@ -11,12 +13,16 @@ export {
   RalphLoopConfigSchema,
   TmuxConfigSchema,
   TmuxLayoutSchema,
+  DynamicContextPruningConfigSchema,
+  CommentCheckerConfigSchema,
 } from "./schema"
 
 export type {
   OhMyOpenCodeConfig,
   AgentOverrideConfig,
   AgentOverrides,
+  FallbackModels,
+  RuntimeFallbackConfig,
   McpName,
   AgentName,
   HookName,
@@ -27,4 +33,5 @@ export type {
   RalphLoopConfig,
   TmuxConfig,
   TmuxLayout,
+  CommentCheckerConfig,
 } from "./schema"
