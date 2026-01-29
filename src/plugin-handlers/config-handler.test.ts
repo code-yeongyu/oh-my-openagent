@@ -1,56 +1,56 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
 
-mock.module("../agents", () => ({
-  createBuiltinAgents: async () => ({
+import * as agents from "../agents"
+import * as sisyphusJunior from "../agents/sisyphus-junior"
+import * as commandLoader from "../features/claude-code-command-loader"
+import * as builtinCommands from "../features/builtin-commands"
+import * as skillLoader from "../features/opencode-skill-loader"
+import * as agentLoader from "../features/claude-code-agent-loader"
+import * as mcpLoader from "../features/claude-code-mcp-loader"
+import * as pluginLoader from "../features/claude-code-plugin-loader"
+import * as mcpModule from "../mcp"
+import * as shared from "../shared"
+import * as configDir from "../shared/opencode-config-dir"
+import * as permissionCompat from "../shared/permission-compat"
+import * as modelResolver from "../shared/model-resolver"
+
+beforeEach(() => {
+  spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
     sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
     oracle: { name: "oracle", prompt: "test", mode: "subagent" },
-  }),
-}))
+  })
 
-mock.module("../agents/sisyphus-junior", () => ({
-  createSisyphusJuniorAgentWithOverrides: () => ({
+  spyOn(sisyphusJunior, "createSisyphusJuniorAgentWithOverrides" as any).mockReturnValue({
     name: "sisyphus-junior",
     prompt: "test",
     mode: "subagent",
-  }),
-}))
+  })
 
-mock.module("../features/claude-code-command-loader", () => ({
-  loadUserCommands: async () => ({}),
-  loadProjectCommands: async () => ({}),
-  loadOpencodeGlobalCommands: async () => ({}),
-  loadOpencodeProjectCommands: async () => ({}),
-}))
+  spyOn(commandLoader, "loadUserCommands" as any).mockResolvedValue({})
+  spyOn(commandLoader, "loadProjectCommands" as any).mockResolvedValue({})
+  spyOn(commandLoader, "loadOpencodeGlobalCommands" as any).mockResolvedValue({})
+  spyOn(commandLoader, "loadOpencodeProjectCommands" as any).mockResolvedValue({})
 
-mock.module("../features/builtin-commands", () => ({
-  loadBuiltinCommands: () => ({}),
-}))
+  spyOn(builtinCommands, "loadBuiltinCommands" as any).mockReturnValue({})
 
-mock.module("../features/opencode-skill-loader", () => ({
-  loadUserSkills: async () => ({}),
-  loadProjectSkills: async () => ({}),
-  loadOpencodeGlobalSkills: async () => ({}),
-  loadOpencodeProjectSkills: async () => ({}),
-  discoverUserClaudeSkills: async () => [],
-  discoverProjectClaudeSkills: async () => [],
-  discoverOpencodeGlobalSkills: async () => [],
-  discoverOpencodeProjectSkills: async () => [],
-}))
+  spyOn(skillLoader, "loadUserSkills" as any).mockResolvedValue({})
+  spyOn(skillLoader, "loadProjectSkills" as any).mockResolvedValue({})
+  spyOn(skillLoader, "loadOpencodeGlobalSkills" as any).mockResolvedValue({})
+  spyOn(skillLoader, "loadOpencodeProjectSkills" as any).mockResolvedValue({})
+  spyOn(skillLoader, "discoverUserClaudeSkills" as any).mockResolvedValue([])
+  spyOn(skillLoader, "discoverProjectClaudeSkills" as any).mockResolvedValue([])
+  spyOn(skillLoader, "discoverOpencodeGlobalSkills" as any).mockResolvedValue([])
+  spyOn(skillLoader, "discoverOpencodeProjectSkills" as any).mockResolvedValue([])
 
-mock.module("../features/claude-code-agent-loader", () => ({
-  loadUserAgents: () => ({}),
-  loadProjectAgents: () => ({}),
-}))
+  spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
+  spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
 
-mock.module("../features/claude-code-mcp-loader", () => ({
-  loadMcpConfigs: async () => ({ servers: {} }),
-}))
+  spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
 
-mock.module("../features/claude-code-plugin-loader", () => ({
-  loadAllPluginComponents: async () => ({
+  spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
     commands: {},
     skills: {},
     agents: {},
@@ -58,60 +58,52 @@ mock.module("../features/claude-code-plugin-loader", () => ({
     hooksConfigs: [],
     plugins: [],
     errors: [],
-  }),
-}))
+  })
 
-mock.module("../mcp", () => ({
-  createBuiltinMcps: () => ({}),
-}))
+  spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
 
-mock.module("../shared", () => ({
-  log: () => {},
-  fetchAvailableModels: async () => new Set(["anthropic/claude-opus-4-5"]),
-  readConnectedProvidersCache: () => null,
-}))
+  spyOn(shared, "log" as any).mockImplementation(() => {})
+  spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-5"]))
+  spyOn(shared, "readConnectedProvidersCache" as any).mockReturnValue(null)
 
-mock.module("../shared/opencode-config-dir", () => ({
-  getOpenCodeConfigPaths: () => ({
+  spyOn(configDir, "getOpenCodeConfigPaths" as any).mockReturnValue({
     global: "/tmp/.config/opencode",
     project: "/tmp/.opencode",
-  }),
-}))
+  })
 
-mock.module("../shared/permission-compat", () => ({
-  migrateAgentConfig: (config: Record<string, unknown>) => config,
-}))
+  spyOn(permissionCompat, "migrateAgentConfig" as any).mockImplementation((config: Record<string, unknown>) => config)
 
-mock.module("../shared/migration", () => ({
-  AGENT_NAME_MAP: {},
-}))
+  spyOn(modelResolver, "resolveModelWithFallback" as any).mockReturnValue({ model: "anthropic/claude-opus-4-5" })
+})
 
-mock.module("../shared/model-resolver", () => ({
-  resolveModelWithFallback: () => ({ model: "anthropic/claude-opus-4-5" }),
-}))
-
-mock.module("../shared/model-requirements", () => ({
-  AGENT_MODEL_REQUIREMENTS: {
-    sisyphus: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
-    oracle: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" }] },
-    librarian: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
-    explore: { fallbackChain: [{ providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" }] },
-    "multimodal-looker": { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" }] },
-    prometheus: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
-    metis: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
-    momus: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" }] },
-    atlas: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
-  },
-  CATEGORY_MODEL_REQUIREMENTS: {
-    "visual-engineering": { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" }] },
-    ultrabrain: { fallbackChain: [{ providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex" }] },
-    artistry: { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" }] },
-    quick: { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" }] },
-    "unspecified-low": { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" }] },
-    "unspecified-high": { fallbackChain: [{ providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5" }] },
-    writing: { fallbackChain: [{ providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" }] },
-  },
-}))
+afterEach(() => {
+  (agents.createBuiltinAgents as any)?.mockRestore?.()
+  ;(sisyphusJunior.createSisyphusJuniorAgentWithOverrides as any)?.mockRestore?.()
+  ;(commandLoader.loadUserCommands as any)?.mockRestore?.()
+  ;(commandLoader.loadProjectCommands as any)?.mockRestore?.()
+  ;(commandLoader.loadOpencodeGlobalCommands as any)?.mockRestore?.()
+  ;(commandLoader.loadOpencodeProjectCommands as any)?.mockRestore?.()
+  ;(builtinCommands.loadBuiltinCommands as any)?.mockRestore?.()
+  ;(skillLoader.loadUserSkills as any)?.mockRestore?.()
+  ;(skillLoader.loadProjectSkills as any)?.mockRestore?.()
+  ;(skillLoader.loadOpencodeGlobalSkills as any)?.mockRestore?.()
+  ;(skillLoader.loadOpencodeProjectSkills as any)?.mockRestore?.()
+  ;(skillLoader.discoverUserClaudeSkills as any)?.mockRestore?.()
+  ;(skillLoader.discoverProjectClaudeSkills as any)?.mockRestore?.()
+  ;(skillLoader.discoverOpencodeGlobalSkills as any)?.mockRestore?.()
+  ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
+  ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
+  ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
+  ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
+  ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
+  ;(mcpModule.createBuiltinMcps as any)?.mockRestore?.()
+  ;(shared.log as any)?.mockRestore?.()
+  ;(shared.fetchAvailableModels as any)?.mockRestore?.()
+  ;(shared.readConnectedProvidersCache as any)?.mockRestore?.()
+  ;(configDir.getOpenCodeConfigPaths as any)?.mockRestore?.()
+  ;(permissionCompat.migrateAgentConfig as any)?.mockRestore?.()
+  ;(modelResolver.resolveModelWithFallback as any)?.mockRestore?.()
+})
 
 describe("Plan agent demote behavior", () => {
   test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
