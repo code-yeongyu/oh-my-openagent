@@ -105,7 +105,7 @@ export function createOracleAgent(model: string): AgentConfig {
 
   const base = {
     description:
-      "Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design.",
+      "Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design. (Oracle - OhMyOpenCode)",
     mode: "subagent" as const,
     model,
     temperature: 0.1,

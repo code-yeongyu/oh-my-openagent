@@ -399,7 +399,7 @@ export function createMomusAgent(model: string): AgentConfig {
 
   const base = {
     description:
-      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards.",
+      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - OhMyOpenCode)",
     mode: "subagent" as const,
     model,
     temperature: 0.1,
