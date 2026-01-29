@@ -120,6 +120,33 @@ export function createEnvContext(): string {
 </omo-env>`
 }
 
+/**
+ * Expands a category reference from an agent override into concrete config properties.
+ * Category properties are applied unconditionally (overwriting factory defaults),
+ * because the user's chosen category should take priority over factory base values.
+ * Direct override properties applied later via mergeAgentConfig() will supersede these.
+ */
+function applyCategoryOverride(
+  config: AgentConfig,
+  categoryName: string,
+  mergedCategories: Record<string, CategoryConfig>
+): AgentConfig {
+  const categoryConfig = mergedCategories[categoryName]
+  if (!categoryConfig) return config
+
+  const result = { ...config } as AgentConfig & Record<string, unknown>
+  if (categoryConfig.model) result.model = categoryConfig.model
+  if (categoryConfig.variant !== undefined) result.variant = categoryConfig.variant
+  if (categoryConfig.temperature !== undefined) result.temperature = categoryConfig.temperature
+  if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
+  if (categoryConfig.textVerbosity !== undefined) result.textVerbosity = categoryConfig.textVerbosity
+  if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
+  if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
+  if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
+
+  return result as AgentConfig
+}
+
 function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
@@ -210,11 +237,15 @@ export async function createBuiltinAgents(
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
     
-    // Apply variant from override or resolved fallback chain
-    if (override?.variant) {
-      config = { ...config, variant: override.variant }
-    } else if (resolvedVariant) {
+    // Apply resolved variant from model fallback chain
+    if (resolvedVariant) {
       config = { ...config, variant: resolvedVariant }
+    }
+
+    // Expand override.category into concrete properties (higher priority than factory/resolved)
+    const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
+    if (overrideCategory) {
+      config = applyCategoryOverride(config, overrideCategory, mergedCategories)
     }
 
     if (agentName === "librarian" && directory && config.prompt) {
@@ -222,6 +253,7 @@ export async function createBuiltinAgents(
       config = { ...config, prompt: config.prompt + envContext }
     }
 
+    // Direct override properties take highest priority
     if (override) {
       config = mergeAgentConfig(config, override)
     }
@@ -261,10 +293,13 @@ export async function createBuiltinAgents(
         availableCategories
       )
       
-      if (sisyphusOverride?.variant) {
-        sisyphusConfig = { ...sisyphusConfig, variant: sisyphusOverride.variant }
-      } else if (sisyphusResolvedVariant) {
+      if (sisyphusResolvedVariant) {
         sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
+      }
+
+      const sisOverrideCategory = (sisyphusOverride as Record<string, unknown> | undefined)?.category as string | undefined
+      if (sisOverrideCategory) {
+        sisyphusConfig = applyCategoryOverride(sisyphusConfig, sisOverrideCategory, mergedCategories)
       }
 
       if (directory && sisyphusConfig.prompt) {
@@ -302,10 +337,13 @@ export async function createBuiltinAgents(
         userCategories: categories,
       })
       
-      if (orchestratorOverride?.variant) {
-        orchestratorConfig = { ...orchestratorConfig, variant: orchestratorOverride.variant }
-      } else if (atlasResolvedVariant) {
+      if (atlasResolvedVariant) {
         orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
+      }
+
+      const atlasOverrideCategory = (orchestratorOverride as Record<string, unknown> | undefined)?.category as string | undefined
+      if (atlasOverrideCategory) {
+        orchestratorConfig = applyCategoryOverride(orchestratorConfig, atlasOverrideCategory, mergedCategories)
       }
 
       if (orchestratorOverride) {
