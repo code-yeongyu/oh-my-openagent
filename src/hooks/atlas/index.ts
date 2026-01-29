@@ -10,12 +10,16 @@ import {
   isExecutingPhase,
   markBoulderComplete,
   updatePhaseStatus,
+  incrementRetry,
+  isMaxRetries,
+  resetRetry,
 } from "../../features/boulder-state"
 import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
+import { isBlockedResponse } from "../../shared/blocked-task-detector"
 import type { BackgroundManager } from "../../features/background-agent"
 import { isInCompactionCooldown, getCompactionCooldownRemaining } from "../compaction-state"
 
@@ -742,6 +746,53 @@ export function createAtlasHook(
         if (state.lastContinuationInjectedAt && now - state.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
           log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, { sessionID, cooldownRemaining: CONTINUATION_COOLDOWN_MS - (now - state.lastContinuationInjectedAt) })
           return
+        }
+
+        // Check for blocked response in last assistant message
+        try {
+          const messagesResp = await ctx.client.session.messages({
+            path: { id: sessionID },
+            query: { directory: ctx.directory },
+          })
+          const messages = (messagesResp as { data?: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }> }).data ?? []
+          
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i]
+            if (msg.info?.role === "assistant" && msg.parts) {
+              const assistantContent = msg.parts
+                .filter(p => p.type === "text" && p.text)
+                .map(p => p.text)
+                .join(" ")
+              
+              if (isBlockedResponse(assistantContent)) {
+                const taskId = boulderState.plan_name
+                const retryCount = incrementRetry(ctx.directory, taskId, assistantContent.slice(0, 200))
+                
+                if (isMaxRetries(ctx.directory, taskId)) {
+                  // Update boulder phase to blocked
+                  updatePhaseStatus(ctx.directory, "blocked")
+                  log(`[${HOOK_NAME}] Boulder blocked after ${retryCount} retries`, { 
+                    sessionID, 
+                    plan: taskId,
+                    preview: assistantContent.slice(0, 100) 
+                  })
+                  return
+                }
+                
+                log(`[${HOOK_NAME}] Blocked response detected, retry ${retryCount}/3`, { 
+                  sessionID, 
+                  plan: taskId,
+                  preview: assistantContent.slice(0, 100) 
+                })
+              } else {
+                // Reset retry counter on non-blocked response
+                resetRetry(ctx.directory, boulderState.plan_name)
+              }
+              break
+            }
+          }
+        } catch (err) {
+          log(`[${HOOK_NAME}] Failed to check for blocked response`, { sessionID, error: String(err) })
         }
 
         state.lastContinuationInjectedAt = now

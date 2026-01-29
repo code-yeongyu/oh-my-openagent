@@ -3,7 +3,7 @@ import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { execSync } from "node:child_process"
 import type { BackgroundManager } from "../features/background-agent"
-import { readBoulderState } from "../features/boulder-state"
+import { readBoulderState, incrementRetry, isMaxRetries, resetRetry } from "../features/boulder-state"
 import { readPlanProgress } from "../features/plan-progress-reader"
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
@@ -13,7 +13,9 @@ import {
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { isBlockedResponse } from "../shared/blocked-task-detector"
 import { isInCompactionCooldown, getCompactionCooldownRemaining, clearCompactionState } from "./compaction-state"
+import { tryAcquireContinuationMutex, releaseContinuationMutex, getContinuationMutexHolder } from "./continuation-mutex"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -311,12 +313,26 @@ export function createTodoContinuationEnforcer(
       return
     }
 
+    // Check mutex - skip if boulder already acquired
+    const mutexHolder = getContinuationMutexHolder(sessionID)
+    if (mutexHolder === "boulder") {
+      log(`[${HOOK_NAME}] Skipped injection: boulder mutex held`, { sessionID })
+      return
+    }
+
+    // Try to acquire mutex for todo
+    if (!tryAcquireContinuationMutex(sessionID, "todo")) {
+      log(`[${HOOK_NAME}] Skipped injection: failed to acquire mutex`, { sessionID })
+      return
+    }
+
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
 
     if (hasRunningBgTasks) {
       log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
+      releaseContinuationMutex(sessionID)
       return
     }
 
@@ -720,6 +736,44 @@ export function createTodoContinuationEnforcer(
               log(`[${HOOK_NAME}] Skipped: git/publish keywords detected in last assistant message`, { sessionID, preview: assistantContent.slice(0, 100) })
               return
             }
+            
+            // Check 2.6: Blocked task detection
+            // When AI reports task is blocked, increment retry counter and stop if max reached
+            if (isBlockedResponse(assistantContent)) {
+              const taskId = boulderState?.plan_name ?? sessionID
+              const retryCount = incrementRetry(ctx.directory, taskId, assistantContent.slice(0, 200))
+              
+              if (isMaxRetries(ctx.directory, taskId)) {
+                log(`[${HOOK_NAME}] Skipped: task blocked after ${retryCount} retries`, { 
+                  sessionID, 
+                  taskId,
+                  preview: assistantContent.slice(0, 100) 
+                })
+                
+                // Show toast to user
+                await ctx.client.tui.showToast({
+                  body: {
+                    title: "Task Blocked",
+                    message: `Task "${taskId}" blocked after ${retryCount} retries. Use /reset-retries to continue.`,
+                    variant: "error" as const,
+                    duration: 5000,
+                  },
+                }).catch(() => {})
+                
+                return
+              }
+              
+              log(`[${HOOK_NAME}] Blocked response detected, retry ${retryCount}/3`, { 
+                sessionID, 
+                taskId,
+                preview: assistantContent.slice(0, 100) 
+              })
+            } else {
+              // Reset retry counter on non-blocked response
+              const taskId = boulderState?.plan_name ?? sessionID
+              resetRetry(ctx.directory, taskId)
+            }
+            
             break // Only check the last assistant message
           }
         }

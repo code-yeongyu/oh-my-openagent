@@ -8,7 +8,7 @@
 /**
  * Phase status for workflow state machine (Task 9.1)
  */
-export type PhaseStatus = "idle" | "planning" | "reviewing" | "executing" | "awaiting_user" | "completed" | "failed"
+export type PhaseStatus = "idle" | "planning" | "reviewing" | "executing" | "awaiting_user" | "completed" | "failed" | "blocked"
 
 /**
  * Worktree status for Wave execution (Task 10.3)

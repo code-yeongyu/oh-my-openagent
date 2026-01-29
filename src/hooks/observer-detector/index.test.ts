@@ -1,15 +1,19 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test"
 import { createObserverDetectorHook, type DelegateTaskFn } from "./index"
 
+// Mock the log function from shared/logger
+const logMessages: string[] = []
+mock.module("../../shared/logger", () => ({
+  log: (message: string, meta?: Record<string, unknown>) => {
+    logMessages.push(message + (meta ? ` ${JSON.stringify(meta)}` : ""))
+  },
+}))
+
 describe("observer-detector hook", () => {
   let hook: ReturnType<typeof createObserverDetectorHook>
-  let logMessages: string[]
 
   beforeEach(() => {
-    logMessages = []
-    global.console.warn = (...args: unknown[]) => {
-      logMessages.push(args.join(" "))
-    }
+    logMessages.length = 0 // Clear messages
     hook = createObserverDetectorHook()
   })
 
