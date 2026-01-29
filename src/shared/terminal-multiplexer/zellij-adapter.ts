@@ -1,6 +1,7 @@
 import { spawn } from "bun"
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from "./types"
 import { log } from "../logger"
+import { loadZellijState, saveZellijState } from "./zellij-storage"
 
 export interface ZellijAdapterConfig {
   enabled: boolean
@@ -18,9 +19,35 @@ export class ZellijAdapter implements Multiplexer {
   private hasCreatedFirstPane = false
   private anchorPaneId: string | null = null
   private config: ZellijAdapterConfig
+  private sessionID: string | null = null
 
   constructor(config: ZellijAdapterConfig) {
     this.config = config
+  }
+
+  async setSessionID(sessionID: string): Promise<void> {
+    this.sessionID = sessionID
+    const loaded = loadZellijState(sessionID)
+    if (loaded) {
+      this.anchorPaneId = loaded.anchorPaneId
+      this.hasCreatedFirstPane = loaded.hasCreatedFirstPane
+      log("[ZellijAdapter.setSessionID] loaded persisted state", {
+        sessionID,
+        anchorPaneId: this.anchorPaneId,
+        hasCreatedFirstPane: this.hasCreatedFirstPane,
+      })
+
+      const valid = await this.validateAnchorPane()
+      if (!valid) {
+        this.anchorPaneId = null
+        this.hasCreatedFirstPane = false
+        log("[ZellijAdapter] Anchor pane invalid, reset state")
+      }
+    }
+  }
+
+  private async validateAnchorPane(): Promise<boolean> {
+    return this.anchorPaneId !== null
   }
 
   async ensureSession(name: string): Promise<void> {
@@ -112,6 +139,16 @@ export class ZellijAdapter implements Multiplexer {
     if (isFirstPane) {
       this.anchorPaneId = paneId
       log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
+      
+      // Save state after setting anchor pane
+      if (this.sessionID) {
+        saveZellijState({
+          sessionID: this.sessionID,
+          anchorPaneId: this.anchorPaneId,
+          hasCreatedFirstPane: this.hasCreatedFirstPane,
+          updatedAt: Date.now(),
+        })
+      }
     } else if (this.anchorPaneId) {
       // Stack with anchor
       const stackProc = spawn(["zellij", "action", "stack-panes", "--", this.anchorPaneId, paneId], {
@@ -123,6 +160,16 @@ export class ZellijAdapter implements Multiplexer {
     }
 
     this.labelToSpawned.set(label, true)
+
+    // Save state after any changes to hasCreatedFirstPane
+    if (this.sessionID && isFirstPane) {
+      saveZellijState({
+        sessionID: this.sessionID,
+        anchorPaneId: this.anchorPaneId,
+        hasCreatedFirstPane: this.hasCreatedFirstPane,
+        updatedAt: Date.now(),
+      })
+    }
 
     return {
       label,
