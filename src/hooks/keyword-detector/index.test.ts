@@ -4,6 +4,7 @@ import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+import { cleanTitleFromPrompt } from "./detector"
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -15,13 +16,52 @@ describe("keyword-detector message transform", () => {
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
-    })
+  })
+})
+
+describe("cleanTitleFromPrompt", () => {
+  test("should remove ultrawork keyword from start", () => {
+    // #given - prompt with ulw at start
+    // #when - cleanTitleFromPrompt is called
+    // #then - keyword is removed, text is trimmed
+    expect(cleanTitleFromPrompt("ulw fix the login bug")).toBe("fix the login bug")
   })
 
-  afterEach(() => {
-    logSpy?.mockRestore()
-    getMainSessionSpy?.mockRestore()
+  test("should remove ultrawork keyword case-insensitively", () => {
+    expect(cleanTitleFromPrompt("ultrawork refactor auth")).toBe("refactor auth")
   })
+
+  test("should remove keyword from middle of text", () => {
+    expect(cleanTitleFromPrompt("fix ULW bug")).toBe("fix bug")
+  })
+
+  test("should handle multiple keywords globally", () => {
+    expect(cleanTitleFromPrompt("ulw ultrawork test ulw")).toBe("test")
+  })
+
+  test("should return empty string when only keywords", () => {
+    expect(cleanTitleFromPrompt("   ulw   ")).toBe("")
+    expect(cleanTitleFromPrompt("ulw")).toBe("")
+  })
+
+  test("should return empty string for empty input", () => {
+    expect(cleanTitleFromPrompt("")).toBe("")
+  })
+
+  test("should NOT truncate 80-char string", () => {
+    const exactly80 = "a".repeat(80)
+    expect(cleanTitleFromPrompt(exactly80)).toBe(exactly80)
+    expect(cleanTitleFromPrompt(exactly80).length).toBe(80)
+  })
+
+  test("should truncate string over 80 chars to 77 + ellipsis", () => {
+    const chars81 = "a".repeat(81)
+    const result = cleanTitleFromPrompt(chars81)
+    expect(result.length).toBe(80)
+    expect(result).toBe("a".repeat(77) + "...")
+  })
+})
+
 
   function createMockPluginInput() {
     return {
