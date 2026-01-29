@@ -2,7 +2,7 @@
   description = "The Best AI Agent Harness - Batteries-Included OpenCode Plugin";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -61,12 +61,15 @@
           inherit version;
           src = self;
 
-          nativeBuildInputs = with pkgs; [
-            bun
-            nodejs_24
-            makeWrapper
-            autoPatchelfHook
-          ];
+          nativeBuildInputs =
+            with pkgs;
+            [
+              bun
+              nodejs_24
+              makeWrapper
+              autoPatchelfHook
+            ]
+            ++ (with pkgs.nodePackages; [ typescript ]);
 
           buildInputs = with pkgs; [
             pkgs.stdenv.cc.cc.lib
@@ -80,6 +83,7 @@
           buildPhase = ''
             cp -r ${node_modules}/node_modules .
             chmod -R u+w node_modules
+            patchShebangs node_modules/
             export HOME=$(mktemp -d)
             bun run build
           '';
