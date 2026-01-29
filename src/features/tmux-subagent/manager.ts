@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
 import type { Multiplexer, PaneHandle } from "../../shared/terminal-multiplexer/types"
+import type { ZellijAdapter } from "../../shared/terminal-multiplexer/zellij-adapter"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -281,18 +282,23 @@ export class TmuxSessionManager {
   }
 
    private async spawnSimple(sessionId: string, title: string): Promise<void> {
-     const label = `omo-subagent-${sessionId}`
-     const cmd = this.buildSpawnCommand(sessionId, title)
+      const label = `omo-subagent-${sessionId}`
+      const cmd = this.buildSpawnCommand(sessionId, title)
 
-     const opcSessionId = this.openCodeSessions.get(sessionId)
-     log("[tmux-session-manager] simple spawn (no manual layout)", {
-       sessionId,
-       opcSessionId,
-       label,
-       multiplexerType: this.adapter.type,
-     })
+      const opcSessionId = this.openCodeSessions.get(sessionId)
+      log("[tmux-session-manager] simple spawn (no manual layout)", {
+        sessionId,
+        opcSessionId,
+        label,
+        multiplexerType: this.adapter.type,
+      })
 
-     const handle = await this.adapter.spawnPane(cmd, { label })
+      if (opcSessionId && this.adapter.type === "zellij") {
+        const zellijAdapter = this.adapter as ZellijAdapter
+        await zellijAdapter.setSessionID(opcSessionId)
+      }
+
+      const handle = await this.adapter.spawnPane(cmd, { label })
 
      const sessionReady = await this.waitForSessionReady(sessionId)
      if (!sessionReady) {
@@ -312,17 +318,13 @@ export class TmuxSessionManager {
      })
      this.sessionHandles.set(sessionId, handle)
 
-     log("[tmux-session-manager] pane spawned via adapter", {
-       sessionId,
-       handle,
-       sessionReady,
-     })
+      log("[tmux-session-manager] pane spawned via adapter", {
+        sessionId,
+        handle,
+        sessionReady,
+      })
 
-     if (opcSessionId) {
-       // TODO(Task 5): Call adapter.setSessionID(opcSessionId) here to integrate with ZellijAdapter
-     }
-
-     this.startPolling()
+      this.startPolling()
    }
 
   private buildSpawnCommand(sessionId: string, _title: string): string {

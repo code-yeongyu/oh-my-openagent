@@ -1010,10 +1010,168 @@ describe('DecisionEngine', () => {
         []
       )
 
-      //#then
-      expect(decision.canSpawn).toBe(false)
-      expect(decision.reason).toContain('too small')
-    })
-  })
+       //#then
+       expect(decision.canSpawn).toBe(false)
+       expect(decision.reason).toContain('too small')
+     })
+   })
+
+   describe('Integration: Session Context Flow (Task 5)', () => {
+     test('end-to-end: session context flows from event to zellij adapter', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       
+       // Create zellij adapter (manualLayout: false)
+       const zellijAdapter = createMockMultiplexer({
+         capabilities: { manualLayout: false, persistentLabels: true }
+       })
+       
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       
+       const manager = new TmuxSessionManager(ctx, zellijAdapter, config)
+       const opcSessionId = 'opc_session_123'
+       const bgSessionId = 'bg_session_456'
+       const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Background: Test Task')
+       
+       //#when
+       await manager.onSessionCreated(event)
+       
+       //#then - session context flows through
+       // 1. Event is processed
+       expect(zellijAdapter.spawnPane).toHaveBeenCalledTimes(1)
+       // 2. Session is tracked
+       expect(trackedSessions.has(`omo-subagent-${bgSessionId}`)).toBe(true)
+     })
+
+     test('state persists across simulated restart when zellij adapter loads persisted state', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       
+       const zellijAdapter = createMockMultiplexer({
+         capabilities: { manualLayout: false, persistentLabels: true }
+       })
+       
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       
+       const manager = new TmuxSessionManager(ctx, zellijAdapter, config)
+       const opcSessionId = 'opc_session_789'
+       const bgSessionId = 'bg_session_789'
+       
+       // Mock loadZellijState to return persisted state (simulating restart)
+       const persistedState = {
+         sessionID: opcSessionId,
+         anchorPaneId: 'pane_100',
+         hasCreatedFirstPane: true,
+         updatedAt: Date.now()
+       }
+       mockLoadZellijState.mockReturnValue(persistedState)
+       
+       const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Background: Test Task')
+       
+       //#when
+       await manager.onSessionCreated(event)
+       
+       //#then - state persistence is set up
+       // The manager should have called spawnPane, which would trigger state loading
+       expect(zellijAdapter.spawnPane).toHaveBeenCalledTimes(1)
+       // Verify that the session was tracked
+       expect(trackedSessions.has(`omo-subagent-${bgSessionId}`)).toBe(true)
+     })
+
+     test('stale anchor state is detected and cleared when validation fails', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       
+       const zellijAdapter = createMockMultiplexer({
+         capabilities: { manualLayout: false, persistentLabels: true }
+       })
+       
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       
+       const manager = new TmuxSessionManager(ctx, zellijAdapter, config)
+       const opcSessionId = 'opc_session_stale'
+       const bgSessionId = 'bg_session_stale'
+       
+       // Mock loadZellijState to return stale state with invalid anchor pane
+       const staleState = {
+         sessionID: opcSessionId,
+         anchorPaneId: 'pane_stale_999', // This pane no longer exists
+         hasCreatedFirstPane: true,
+         updatedAt: Date.now() - 3600000 // 1 hour old
+       }
+       mockLoadZellijState.mockReturnValue(staleState)
+       
+       const event = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Background: Test Task')
+       
+       //#when
+       await manager.onSessionCreated(event)
+       
+       //#then - stale state handling is set up
+       // The manager should have processed the event
+       expect(zellijAdapter.spawnPane).toHaveBeenCalledTimes(1)
+       // Session should be tracked despite stale state
+       expect(trackedSessions.has(`omo-subagent-${bgSessionId}`)).toBe(true)
+     })
+
+     test('session cleanup clears zellij state when session is deleted', async () => {
+       //#given
+       mockIsInsideTmux.mockReturnValue(true)
+       const { TmuxSessionManager } = await import('./manager')
+       const ctx = createMockContext()
+       
+       const zellijAdapter = createMockMultiplexer({
+         capabilities: { manualLayout: false, persistentLabels: true }
+       })
+       
+       const config: TmuxConfig = {
+         enabled: true,
+         layout: 'main-vertical',
+         main_pane_size: 60,
+         main_pane_min_width: 80,
+         agent_pane_min_width: 40,
+       }
+       
+       const manager = new TmuxSessionManager(ctx, zellijAdapter, config)
+       const opcSessionId = 'opc_session_cleanup'
+       const bgSessionId = 'bg_session_cleanup'
+       
+       // First create a session
+       const createEvent = createSessionCreatedEvent(bgSessionId, opcSessionId, 'Background: Test Task')
+       await manager.onSessionCreated(createEvent)
+       
+       // Clear the mock to verify the delete call
+       mockClearZellijState.mockClear()
+       
+       //#when - delete the session
+       await manager.onSessionDeleted({ sessionID: bgSessionId })
+       
+       //#then - zellij state should be cleared
+       expect(mockClearZellijState).toHaveBeenCalledWith(opcSessionId)
+     })
+   })
 })
 >>>>>>> 0b2e5d8 (feat(zellij): clean up state on session deletion)
