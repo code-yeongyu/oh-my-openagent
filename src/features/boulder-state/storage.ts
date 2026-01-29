@@ -210,6 +210,50 @@ export function getPlanProgress(planPath: string): PlanProgress {
 }
 
 /**
+ * Get the first incomplete task from a plan file.
+ * Used for fine-grained retry tracking per task instead of per plan.
+ * 
+ * Matches top-level unchecked tasks like:
+ * - [ ] 1. Task Name
+ * - [ ] Task Name
+ * 
+ * @param planPath - Path to the tasks.md file
+ * @returns Task name/description or null if all complete
+ */
+export function getFirstIncompleteTask(planPath: string): string | null {
+  if (!existsSync(planPath)) {
+    return null
+  }
+
+  try {
+    const content = readFileSync(planPath, "utf-8")
+    const lines = content.split(/\r?\n/)
+    
+    // Find first unchecked top-level task (- [ ] N. Task Name or - [ ] Task Name)
+    // Only match lines that start with - [ ] (no leading whitespace = top-level)
+    const taskRegex = /^[-*]\s*\[\s*\]\s*(\d+\.\s*)?(.+)$/
+    
+    for (const line of lines) {
+      const match = line.match(taskRegex)
+      if (match) {
+        // Return the task name (group 2), cleaned up
+        const taskName = match[2]
+          .trim()
+          .replace(/\*\*/g, "")  // Remove bold markdown
+          .replace(/`/g, "")     // Remove code ticks
+          .slice(0, 80)          // Limit length for key storage
+        
+        return taskName || null
+      }
+    }
+    
+    return null // All tasks complete
+  } catch {
+    return null
+  }
+}
+
+/**
  * Extract plan name from file path.
  */
 export function getPlanName(planPath: string): string {

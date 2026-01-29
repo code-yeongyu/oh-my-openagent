@@ -3,7 +3,7 @@ import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { execSync } from "node:child_process"
 import type { BackgroundManager } from "../features/background-agent"
-import { readBoulderState, incrementRetry, isMaxRetries, resetRetry } from "../features/boulder-state"
+import { readBoulderState, incrementRetry, isMaxRetries, resetRetry, getFirstIncompleteTask } from "../features/boulder-state"
 import { readPlanProgress } from "../features/plan-progress-reader"
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
@@ -740,13 +740,20 @@ export function createTodoContinuationEnforcer(
             // Check 2.6: Blocked task detection
             // When AI reports task is blocked, increment retry counter and stop if max reached
             if (isBlockedResponse(assistantContent)) {
-              const taskId = boulderState?.plan_name ?? sessionID
+              // Use fine-grained task ID: plan::currentTask
+              const currentTask = boulderState?.active_plan 
+                ? getFirstIncompleteTask(boulderState.active_plan)
+                : null
+              const taskId = currentTask 
+                ? `${boulderState?.plan_name}::${currentTask}`
+                : (boulderState?.plan_name ?? sessionID)
               const retryCount = incrementRetry(ctx.directory, taskId, assistantContent.slice(0, 200))
               
               if (isMaxRetries(ctx.directory, taskId)) {
                 log(`[${HOOK_NAME}] Skipped: task blocked after ${retryCount} retries`, { 
                   sessionID, 
                   taskId,
+                  task: currentTask,
                   preview: assistantContent.slice(0, 100) 
                 })
                 
@@ -754,7 +761,7 @@ export function createTodoContinuationEnforcer(
                 await ctx.client.tui.showToast({
                   body: {
                     title: "Task Blocked",
-                    message: `Task "${taskId}" blocked after ${retryCount} retries. Use /reset-retries to continue.`,
+                    message: `Task "${currentTask ?? taskId}" blocked after ${retryCount} retries. Use /reset-retries to continue.`,
                     variant: "error" as const,
                     duration: 5000,
                   },
@@ -766,11 +773,17 @@ export function createTodoContinuationEnforcer(
               log(`[${HOOK_NAME}] Blocked response detected, retry ${retryCount}/3`, { 
                 sessionID, 
                 taskId,
+                task: currentTask,
                 preview: assistantContent.slice(0, 100) 
               })
             } else {
-              // Reset retry counter on non-blocked response
-              const taskId = boulderState?.plan_name ?? sessionID
+              // Reset retry counter for current task on non-blocked response
+              const currentTask = boulderState?.active_plan 
+                ? getFirstIncompleteTask(boulderState.active_plan)
+                : null
+              const taskId = currentTask 
+                ? `${boulderState?.plan_name}::${currentTask}`
+                : (boulderState?.plan_name ?? sessionID)
               resetRetry(ctx.directory, taskId)
             }
             

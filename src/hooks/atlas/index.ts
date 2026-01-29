@@ -6,6 +6,7 @@ import {
   readBoulderState,
   appendSessionId,
   getPlanProgress,
+  getFirstIncompleteTask,
   getCurrentPhase,
   isExecutingPhase,
   markBoulderComplete,
@@ -765,15 +766,20 @@ export function createAtlasHook(
                 .join(" ")
               
               if (isBlockedResponse(assistantContent)) {
-                const taskId = boulderState.plan_name
+                // Use fine-grained task ID: plan::currentTask
+                const currentTask = getFirstIncompleteTask(boulderState.active_plan)
+                const taskId = currentTask 
+                  ? `${boulderState.plan_name}::${currentTask}`
+                  : boulderState.plan_name
                 const retryCount = incrementRetry(ctx.directory, taskId, assistantContent.slice(0, 200))
                 
                 if (isMaxRetries(ctx.directory, taskId)) {
                   // Update boulder phase to blocked
                   updatePhaseStatus(ctx.directory, "blocked")
-                  log(`[${HOOK_NAME}] Boulder blocked after ${retryCount} retries`, { 
+                  log(`[${HOOK_NAME}] Task blocked after ${retryCount} retries`, { 
                     sessionID, 
-                    plan: taskId,
+                    plan: boulderState.plan_name,
+                    task: currentTask,
                     preview: assistantContent.slice(0, 100) 
                   })
                   return
@@ -781,12 +787,17 @@ export function createAtlasHook(
                 
                 log(`[${HOOK_NAME}] Blocked response detected, retry ${retryCount}/3`, { 
                   sessionID, 
-                  plan: taskId,
+                  plan: boulderState.plan_name,
+                  task: currentTask,
                   preview: assistantContent.slice(0, 100) 
                 })
               } else {
-                // Reset retry counter on non-blocked response
-                resetRetry(ctx.directory, boulderState.plan_name)
+                // Reset retry counter for current task on non-blocked response
+                const currentTask = getFirstIncompleteTask(boulderState.active_plan)
+                const taskId = currentTask 
+                  ? `${boulderState.plan_name}::${currentTask}`
+                  : boulderState.plan_name
+                resetRetry(ctx.directory, taskId)
               }
               break
             }

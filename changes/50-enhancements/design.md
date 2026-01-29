@@ -1,66 +1,80 @@
-# 50项功能增强 - 设计文档
+# Design: 50项功能增强
 
-## 一句话说明
+## Goal
 
-**从 everything-claude-code 复制最佳实践，增强 oh-my-opencode 现有的9个系统。**
+增强 oh-my-opencode 的 9 个核心系统，使其达到 everything-claude-code 的最佳实践水平。
 
----
+## Architecture
 
-## 为什么要做这个？
+本次增强不引入新架构，只优化现有组件：
 
-| 问题 | 解决方案 |
-|------|----------|
-| TDD守卫只是"假装"检查测试 | 真正运行测试命令验证 |
-| 敏感信息可能被写入代码 | 写入前自动扫描拦截 |
-| 技能需要手动调用 | 自动检测任务类型并注入 |
-| Agent 交接信息丢失 | 强制结构化交接格式 |
-| 并行任务可能冲突 | 分析依赖后再并行 |
+- **规则系统** → 增加角色感知、TDD真实验证、安全扫描
+- **技能系统** → 自动注入、文档标准化
+- **上下文系统** → 意图模式、主动压缩
+- **代理系统** → 决策框架、结构化交接
+- **并行系统** → 依赖感知、缓存友好
+- **MCP系统** → 本地支持、工具数量约束
+- **钩子系统** → 标准化匹配器
+- **测试系统** → 模板生成
+- **命令系统** → 风险矩阵
 
----
+## Tech Stack
 
-## 做什么？不做什么？
+- Runtime: Bun
+- Language: TypeScript
+- Testing: bun test
+- Build: bun build + tsc
 
-### ✅ 做
-- 增强现有功能的可靠性
-- 从 everything-claude-code 复制已验证的模式
-- 每个改动都有测试
-
-### ❌ 不做
-- 不新增架构（本能模型、Observer等是另一个计划）
-- 不破坏现有API
-- 不引入新依赖
-
----
-
-## 涉及哪些文件？
+## File Structure
 
 ```
-主要修改 (按修改量排序):
-├── src/hooks/tdd-guard/index.ts          ← 5项增强
-├── src/hooks/rules-injector/index.ts     ← 4项增强  
-├── src/features/context-injector/        ← 3项增强
-├── src/mcp/index.ts                      ← 3项增强
-├── src/agents/oracle.ts                  ← 2项增强
-├── src/agents/prometheus-prompt.ts       ← 2项增强
-└── src/features/background-agent/        ← 2项增强
+src/
+├── hooks/
+│   ├── tdd-guard/index.ts              # Modify: 真实测试执行、模板生成
+│   ├── rules-injector/index.ts         # Modify: 角色感知、安全审计
+│   ├── secret-scanner/                 # Create: 敏感信息扫描钩子
+│   │   ├── index.ts
+│   │   ├── patterns.ts
+│   │   └── index.test.ts
+│   └── index.ts                        # Modify: HookMatcher 抽象
+├── features/
+│   ├── context-injector/collector.ts   # Modify: 意图模式、缓存排序
+│   ├── builtin-skills/
+│   │   ├── skills.ts                   # Modify: 自动注入逻辑
+│   │   └── types.ts                    # Modify: 扩展接口
+│   └── background-agent/manager.ts     # Modify: 依赖图、交接协议
+├── agents/
+│   ├── oracle.ts                       # Modify: 决策框架
+│   └── prometheus-prompt.ts            # Modify: 风险矩阵
+├── mcp/
+│   └── index.ts                        # Modify: 本地支持、工具约束
+└── config/
+    └── schema.ts                       # Modify: 新配置项
 ```
 
----
+## Key Decisions
 
-## 分几期做？
+1. **Decision**: 采用复制粘贴+适配策略
+   - **Why**: everything-claude-code 的实现已验证
+   - **Trade-off**: 需要理解两个代码库
 
-| 期数 | 时间 | 数量 | 重点 |
-|------|------|------|------|
-| **Phase 1** | 1-2周 | 17项 | 安全+TDD+自动化 |
-| **Phase 2** | 3-4周 | 28项 | 优化+体验 |
-| **Phase 3** | 按需 | 5项 | 锦上添花 |
+2. **Decision**: 每项增强独立提交
+   - **Why**: 便于回滚和审查
+   - **Trade-off**: 提交数量多
 
----
+3. **Decision**: TDD 真实执行添加超时
+   - **Why**: 防止测试执行拖慢开发流程
+   - **Trade-off**: 超时可能误判
 
-## 怎么验证成功？
+## Edge Cases
 
-```bash
-bun run typecheck  # 0 错误
-bun test           # 全部通过
-bun run build      # 构建成功
-```
+- TDD 执行超时：设置 30 秒超时，超时视为通过（保守策略）
+- 敏感信息误报：提供白名单配置
+- 技能自动注入冲突：用户手动调用优先
+- 依赖分析不确定：保守串行执行
+
+## Open Questions
+
+- [x] 选择哪些增强项？→ 用户选择全部 50 项
+- [ ] TDD 真实执行的超时时间？建议 30 秒
+- [ ] 敏感信息扫描的正则模式？参考 everything-claude-code
