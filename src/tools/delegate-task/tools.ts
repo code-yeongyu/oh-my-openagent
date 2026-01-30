@@ -541,7 +541,7 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model ?? resolved.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
