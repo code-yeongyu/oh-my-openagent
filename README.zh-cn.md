@@ -193,7 +193,7 @@
   - Oracle：设计、调试 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer：前端开发 (Gemini 3 Pro)
   - Librarian：官方文档、开源实现、代码库探索 (Claude Sonnet 4.5)
-  - Explore：极速代码库探索（上下文感知 Grep）(Grok Code)
+   - Explore：极速代码库探索（上下文感知 Grep）(Claude Haiku 4.5)
 - 完整 LSP / AstGrep 支持：果断重构。
 - Todo 继续执行器：如果智能体中途退出，强制它继续。**这就是让 Sisyphus 继续推动巨石的关键。**
 - 注释检查器：防止 AI 添加过多注释。Sisyphus 生成的代码应该与人类编写的代码无法区分。
