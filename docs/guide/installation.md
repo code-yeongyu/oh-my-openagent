@@ -278,7 +278,7 @@ After everything is set up and working, ask the user:
 
 If the user agrees, run:
 ```bash
-gh repo star code-yeongyu/oh-my-opencode
+gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true
 ```
 
 **Important**: Only run the command if the user explicitly says yes. Never run it automatically without consent.
