@@ -541,7 +541,8 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? resolved.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model,
+              categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -555,18 +556,19 @@ To continue this session: session_id="${args.session_id}"`
                return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
              }
 
-             let type: "user-defined" | "inherited" | "category-default" | "system-default"
-             switch (source) {
-                case "override":
-                  type = "user-defined"
-                  break
-                case "provider-fallback":
-                  type = "category-default"
-                  break
-                case "system-default":
-                  type = "system-default"
-                  break
-             }
+              let type: "user-defined" | "inherited" | "category-default" | "system-default"
+              switch (source) {
+                 case "override":
+                   type = "user-defined"
+                   break
+                 case "category-default":
+                 case "provider-fallback":
+                   type = "category-default"
+                   break
+                 case "system-default":
+                   type = "system-default"
+                   break
+              }
 
              modelInfo = { model: actualModel, type, source }
              
