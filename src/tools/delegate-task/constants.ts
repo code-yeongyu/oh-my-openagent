@@ -14,8 +14,8 @@ Design-first mindset:
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
 </Category_Context>`
 
-export const STRATEGIC_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on BUSINESS LOGIC / ARCHITECTURE tasks.
+export const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on DEEP LOGICAL REASONING / COMPLEX ARCHITECTURE tasks.
 
 Strategic advisor mindset:
 - Bias toward simplicity: least complex solution that fulfills requirements
@@ -167,7 +167,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
-  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
+  ultrabrain: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
   "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
@@ -177,7 +177,7 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
-  ultrabrain: "Deep logical reasoning, complex architecture decisions requiring extensive analysis",
+  ultrabrain: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
   artistry: "Highly creative/artistic tasks, novel ideas",
   quick: "Trivial tasks - single file changes, typo fixes, simple modifications",
   "unspecified-low": "Tasks that don't fit other categories, low effort required",

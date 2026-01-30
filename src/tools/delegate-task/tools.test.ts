@@ -63,12 +63,12 @@ describe("sisyphus-task", () => {
       expect(promptAppend).toContain("Design-first")
     })
 
-    test("ultrabrain category has strategic prompt", () => {
+    test("ultrabrain category has deep logical reasoning prompt", () => {
       // #given
       const promptAppend = CATEGORY_PROMPT_APPENDS["ultrabrain"]
 
       // #when / #then
-      expect(promptAppend).toContain("BUSINESS LOGIC")
+      expect(promptAppend).toContain("DEEP LOGICAL REASONING")
       expect(promptAppend).toContain("Strategic advisor")
     })
   })
