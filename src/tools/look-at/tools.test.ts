@@ -146,4 +146,62 @@ describe("look-at tool", () => {
       expect(result).toContain("Network connection failed")
     })
   })
+
+  describe("createLookAt model passthrough", () => {
+    // #given multimodal-looker agent has resolved model info
+    // #when LookAt 도구 실행
+    // #then session.prompt에 model 정보가 전달되어야 함
+    test("passes multimodal-looker model to session.prompt when available", async () => {
+      let promptBody: any
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              {
+                name: "multimodal-looker",
+                mode: "subagent",
+                model: { providerID: "google", modelID: "gemini-3-flash" },
+              },
+            ],
+          }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_model_passthrough" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        toolContext
+      )
+
+      expect(promptBody.model).toEqual({
+        providerID: "google",
+        modelID: "gemini-3-flash",
+      })
+    })
+  })
 })

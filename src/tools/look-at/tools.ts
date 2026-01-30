@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log } from "../../shared/logger"
+import { findByNameCaseInsensitive, log, promptWithModelSuggestionRetry } from "../../shared"
 
 interface LookAtArgsWithAlias extends LookAtArgs {
   path?: string
@@ -130,9 +130,34 @@ Original error: ${createResult.error}`
       const sessionID = createResult.data.id
       log(`[look_at] Created session: ${sessionID}`)
 
+      let agentModel: { providerID: string; modelID: string } | undefined
+      let agentVariant: string | undefined
+
+      try {
+        const agentsResult = await ctx.client.app?.agents?.()
+        type AgentInfo = {
+          name: string
+          mode?: "subagent" | "primary" | "all"
+          model?: { providerID: string; modelID: string }
+          variant?: string
+        }
+        const agents = ((agentsResult as { data?: AgentInfo[] })?.data ?? agentsResult) as AgentInfo[] | undefined
+        if (agents?.length) {
+          const matchedAgent = findByNameCaseInsensitive(agents, MULTIMODAL_LOOKER_AGENT)
+          if (matchedAgent?.model) {
+            agentModel = matchedAgent.model
+          }
+          if (matchedAgent?.variant) {
+            agentVariant = matchedAgent.variant
+          }
+        }
+      } catch (error) {
+        log("[look_at] Failed to resolve multimodal-looker model info", error)
+      }
+
       log(`[look_at] Sending prompt with file passthrough to session ${sessionID}`)
       try {
-        await ctx.client.session.prompt({
+        await promptWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
           body: {
             agent: MULTIMODAL_LOOKER_AGENT,
@@ -146,6 +171,8 @@ Original error: ${createResult.error}`
               { type: "text", text: prompt },
               { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
             ],
+            ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
+            ...(agentVariant ? { variant: agentVariant } : {}),
           },
         })
       } catch (promptError) {
