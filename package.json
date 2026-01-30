@@ -75,7 +75,7 @@
     "@microsoft/api-extractor": "^7.56.0",
     "@rsdoctor/core": "^1.5.1",
     "@rsdoctor/rspack-plugin": "^1.5.1",
-    "@rslib/core": "^0.19.3",
+    "@rslib/core": "^0.19.4",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.2",
     "bun-types": "latest",
