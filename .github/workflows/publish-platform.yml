@@ -28,29 +28,37 @@ permissions:
   id-token: write
 
 jobs:
-  publish-platform:
-    # Use windows-latest for Windows to avoid cross-compilation segfault (oven-sh/bun#18416)
-    # Fixes: #873, #844
+  # =============================================================================
+  # Job 1: Build binaries for all platforms
+  # - Windows builds on windows-latest (avoid bun cross-compile segfault)
+  # - All other platforms build on ubuntu-latest
+  # - Uploads compressed artifacts for the publish job
+  # =============================================================================
+  build:
     runs-on: ${{ matrix.platform == 'windows-x64' && 'windows-latest' || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 7
       matrix:
         platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+    outputs:
+      # Pass skip status to publish job
+      skip_darwin_arm64: ${{ steps.check.outputs.skip_darwin_arm64 }}
+      skip_darwin_x64: ${{ steps.check.outputs.skip_darwin_x64 }}
+      skip_linux_x64: ${{ steps.check.outputs.skip_linux_x64 }}
+      skip_linux_arm64: ${{ steps.check.outputs.skip_linux_arm64 }}
+      skip_linux_x64_musl: ${{ steps.check.outputs.skip_linux_x64_musl }}
+      skip_linux_arm64_musl: ${{ steps.check.outputs.skip_linux_arm64_musl }}
+      skip_windows_x64: ${{ steps.check.outputs.skip_windows_x64 }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: bun install
@@ -63,15 +71,20 @@ jobs:
           PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
           VERSION="${{ inputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
+          # Convert platform name for output (replace - with _)
+          PLATFORM_KEY="${{ matrix.platform }}"
+          PLATFORM_KEY="${PLATFORM_KEY//-/_}"
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip_${PLATFORM_KEY}=true" >> $GITHUB_OUTPUT
             echo "✓ ${PKG_NAME}@${VERSION} already published"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip_${PLATFORM_KEY}=false" >> $GITHUB_OUTPUT
             echo "→ ${PKG_NAME}@${VERSION} needs publishing"
           fi
 
-      - name: Update version
+      - name: Update version in package.json
         if: steps.check.outputs.skip != 'true'
         run: |
           VERSION="${{ inputs.version }}"
@@ -99,15 +112,120 @@ jobs:
           fi
           
           bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
+          
+          echo "Built binary:"
+          ls -lh "$OUTPUT"
 
-      - name: Publish ${{ matrix.platform }}
+      - name: Compress binary
         if: steps.check.outputs.skip != 'true'
         run: |
+          PLATFORM="${{ matrix.platform }}"
+          cd packages/${PLATFORM}
+          
+          if [ "$PLATFORM" = "windows-x64" ]; then
+            # Windows: use zip
+            zip -r ../../binary-${PLATFORM}.zip bin/ package.json
+          else
+            # Unix: use tar.gz
+            tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
+          fi
+          
+          cd ../..
+          echo "Compressed artifact:"
+          ls -lh binary-${PLATFORM}.*
+
+      - name: Upload artifact
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: |
+            binary-${{ matrix.platform }}.tar.gz
+            binary-${{ matrix.platform }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
+  # =============================================================================
+  # Job 2: Publish all platforms using OIDC/Provenance
+  # - Runs on ubuntu-latest for ALL platforms (just downloading artifacts)
+  # - Uses npm Trusted Publishing (OIDC) - no NODE_AUTH_TOKEN needed
+  # - Fresh OIDC token at publish time avoids timeout issues
+  # =============================================================================
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+    steps:
+      - name: Check if should skip
+        id: should_skip
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          PLATFORM_KEY="${PLATFORM//-/_}"
+          
+          # Check the corresponding skip output from build job
+          case "$PLATFORM" in
+            darwin-arm64) SKIP="${{ needs.build.outputs.skip_darwin_arm64 }}" ;;
+            darwin-x64) SKIP="${{ needs.build.outputs.skip_darwin_x64 }}" ;;
+            linux-x64) SKIP="${{ needs.build.outputs.skip_linux_x64 }}" ;;
+            linux-arm64) SKIP="${{ needs.build.outputs.skip_linux_arm64 }}" ;;
+            linux-x64-musl) SKIP="${{ needs.build.outputs.skip_linux_x64_musl }}" ;;
+            linux-arm64-musl) SKIP="${{ needs.build.outputs.skip_linux_arm64_musl }}" ;;
+            windows-x64) SKIP="${{ needs.build.outputs.skip_windows_x64 }}" ;;
+          esac
+          
+          echo "skip=${SKIP:-false}" >> $GITHUB_OUTPUT
+          echo "Platform: $PLATFORM, Skip: ${SKIP:-false}"
+
+      - name: Download artifact
+        if: steps.should_skip.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: .
+
+      - name: Extract artifact
+        if: steps.should_skip.outputs.skip != 'true'
+        run: |
+          PLATFORM="${{ matrix.platform }}"
+          mkdir -p packages/${PLATFORM}
+          
+          if [ "$PLATFORM" = "windows-x64" ]; then
+            unzip binary-${PLATFORM}.zip -d packages/${PLATFORM}/
+          else
+            tar -xzvf binary-${PLATFORM}.tar.gz -C packages/${PLATFORM}/
+          fi
+          
+          echo "Extracted contents:"
+          ls -la packages/${PLATFORM}/
+          ls -la packages/${PLATFORM}/bin/
+
+      - uses: actions/setup-node@v4
+        if: steps.should_skip.outputs.skip != 'true'
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish ${{ matrix.platform }}
+        if: steps.should_skip.outputs.skip != 'true'
+        run: |
           cd packages/${{ matrix.platform }}
+          
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
             TAG_ARG="--tag ${{ inputs.dist_tag }}"
           fi
-          npm publish --access public $TAG_ARG
+          
+          # Publish with provenance (OIDC authentication)
+          # Increased timeout for large binary uploads (40-120MB)
+          npm publish --access public --provenance $TAG_ARG
         env:
-          NPM_CONFIG_PROVENANCE: false
+          # Use OIDC - no NODE_AUTH_TOKEN needed
+          NPM_CONFIG_PROVENANCE: "true"
+          # Increase timeout for large packages (10 minutes)
+          npm_config_fetch_timeout: "600000"
+          npm_config_fetch_retry_maxtimeout: "120000"
+        timeout-minutes: 15
