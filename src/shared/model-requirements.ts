@@ -13,7 +13,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["kimi-for-coding", "opencode"], model: "k2p5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["zai-coding-plan"], model: "glm-4.7" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
@@ -45,7 +46,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
-      { providers: ["kimi-for-coding", "opencode"], model: "k2p5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
@@ -53,7 +55,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   prometheus: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["kimi-for-coding", "opencode"], model: "k2p5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
@@ -61,7 +64,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   metis: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["kimi-for-coding", "opencode"], model: "k2p5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
     ],
@@ -75,8 +79,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
