@@ -82,6 +82,7 @@ describe("createEventState", () => {
     expect(state.lastOutput).toBe("")
     expect(state.lastPartText).toBe("")
     expect(state.currentTool).toBe(null)
+    expect(state.hasReceivedMeaningfulWork).toBe(false)
   })
 })
 
@@ -126,6 +127,121 @@ describe("event handling", () => {
     expect(state.mainSessionIdle).toBe(false)
   })
 
+  it("hasReceivedMeaningfulWork is false initially after session.idle", async () => {
+    // #given - session goes idle without any assistant output (race condition scenario)
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "session.idle",
+      properties: { sessionID: "my-session" },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // #when
+    await processEvents(ctx, events, state)
+
+    // #then - idle but no meaningful work yet
+    expect(state.mainSessionIdle).toBe(true)
+    expect(state.hasReceivedMeaningfulWork).toBe(false)
+  })
+
+  it("message.updated with assistant content sets hasReceivedMeaningfulWork", async () => {
+    // #given
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "message.updated",
+      properties: {
+        info: { sessionID: "my-session", role: "assistant" },
+        content: "Hello, I will fix this bug.",
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // #when
+    await processEvents(ctx, events, state)
+
+    // #then
+    expect(state.hasReceivedMeaningfulWork).toBe(true)
+  })
+
+  it("message.updated with empty assistant content does not set hasReceivedMeaningfulWork", async () => {
+    // #given - empty assistant message (race condition: message created but no content yet)
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "message.updated",
+      properties: {
+        info: { sessionID: "my-session", role: "assistant" },
+        content: "",
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // #when
+    await processEvents(ctx, events, state)
+
+    // #then - empty content should not count as meaningful work
+    expect(state.hasReceivedMeaningfulWork).toBe(false)
+  })
+
+  it("tool.execute sets hasReceivedMeaningfulWork", async () => {
+    // #given
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "tool.execute",
+      properties: {
+        sessionID: "my-session",
+        name: "read_file",
+        input: { filePath: "/src/index.ts" },
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // #when
+    await processEvents(ctx, events, state)
+
+    // #then
+    expect(state.hasReceivedMeaningfulWork).toBe(true)
+  })
+
+  it("tool.execute from different session does not set hasReceivedMeaningfulWork", async () => {
+    // #given
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "tool.execute",
+      properties: {
+        sessionID: "other-session",
+        name: "read_file",
+        input: { filePath: "/src/index.ts" },
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // #when
+    await processEvents(ctx, events, state)
+
+    // #then - different session's tool call shouldn't count
+    expect(state.hasReceivedMeaningfulWork).toBe(false)
+  })
+
   it("session.status with busy type sets mainSessionIdle to false", async () => {
     // #given
     const ctx = createMockContext("my-session")
@@ -136,6 +252,7 @@ describe("event handling", () => {
       lastOutput: "",
       lastPartText: "",
       currentTool: null,
+      hasReceivedMeaningfulWork: false,
     }
 
     const payload: EventPayload = {
