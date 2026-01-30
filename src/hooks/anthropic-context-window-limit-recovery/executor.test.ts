@@ -1,11 +1,83 @@
-import { describe, test, expect, mock, beforeEach, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as storage from "./storage"
 
+type TimerCallback = (...args: any[]) => void
+
+interface FakeTimeouts {
+  advanceBy: (ms: number) => Promise<void>
+  restore: () => void
+}
+
+function createFakeTimeouts(): FakeTimeouts {
+  let now = 0
+  let nextId = 1
+  const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: any[] }>()
+  const cleared = new Set<number>()
+
+  const original = {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+  }
+
+  const normalizeDelay = (delay?: number) => {
+    if (typeof delay !== "number" || !Number.isFinite(delay)) return 0
+    return delay < 0 ? 0 : delay
+  }
+
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+    const id = nextId++
+    timers.set(id, {
+      id,
+      time: now + normalizeDelay(delay),
+      callback,
+      args,
+    })
+    return id as unknown as ReturnType<typeof setTimeout>
+  }) as typeof setTimeout
+
+  globalThis.clearTimeout = ((id?: number) => {
+    if (typeof id !== "number") return
+    cleared.add(id)
+    timers.delete(id)
+  }) as typeof clearTimeout
+
+  const advanceBy = async (ms: number) => {
+    const target = now + Math.max(0, ms)
+    while (true) {
+      let next: { id: number; time: number; callback: TimerCallback; args: any[] } | undefined
+      for (const timer of timers.values()) {
+        if (timer.time <= target && (!next || timer.time < next.time)) {
+          next = timer
+        }
+      }
+      if (!next) break
+
+      now = next.time
+      timers.delete(next.id)
+      if (!cleared.has(next.id)) {
+        next.callback(...next.args)
+      }
+      cleared.delete(next.id)
+      await Promise.resolve()
+    }
+    now = target
+    await Promise.resolve()
+  }
+
+  const restore = () => {
+    globalThis.setTimeout = original.setTimeout
+    globalThis.clearTimeout = original.clearTimeout
+  }
+
+  return { advanceBy, restore }
+}
+
 describe("executeCompact lock management", () => {
   let autoCompactState: AutoCompactState
   let mockClient: any
+  let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
   const directory = "/test/dir"
   const msg = { providerID: "anthropic", modelID: "claude-opus-4-5" }
@@ -32,6 +104,12 @@ describe("executeCompact lock management", () => {
         showToast: mock(() => Promise.resolve()),
       },
     }
+
+    fakeTimeouts = createFakeTimeouts()
+  })
+
+  afterEach(() => {
+    fakeTimeouts.restore()
   })
 
   test("clears lock on successful summarize completion", async () => {
@@ -216,7 +294,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // Wait for setTimeout callback
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await fakeTimeouts.advanceBy(600)
 
     // #then: Lock should be cleared
     // The continuation happens in setTimeout, but lock is cleared in finally before that
@@ -288,7 +366,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // Wait for setTimeout callback
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await fakeTimeouts.advanceBy(600)
 
     // #then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
