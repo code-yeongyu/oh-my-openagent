@@ -310,7 +310,7 @@ const metisRestrictions = createAgentToolRestrictions([
 export function createMetisAgent(model: string): AgentConfig {
   return {
     description:
-      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
+      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
     mode: "subagent" as const,
     model,
     temperature: 0.3,
