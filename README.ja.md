@@ -189,7 +189,7 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
   - Oracle: 設計、デバッグ (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: フロントエンド開発 (Gemini 3 Pro)
   - Librarian: 公式ドキュメント、オープンソース実装、コードベース探索 (Claude Sonnet 4.5)
-  - Explore: 超高速コードベース探索 (Contextual Grep) (Grok Code)
+   - Explore: 超高速コードベース探索 (Contextual Grep) (Claude Haiku 4.5)
 - Full LSP / AstGrep Support: 決定的にリファクタリングしましょう。
 - Todo Continuation Enforcer: 途中で諦めたら、続行を強制します。これがシジフォスに岩を転がし続けさせる秘訣です。
 - Comment Checker: AIが過剰なコメントを付けないようにします。シジフォスが生成したコードは、人間が書いたものと区別がつかないべきです。
