@@ -23,7 +23,7 @@ A Category is an agent configuration preset optimized for specific domains.
 |----------|---------------|-----------|
 | `visual-engineering` | `google/gemini-3-pro` | Frontend, UI/UX, design, styling, animation |
 | `ultrabrain` | `openai/gpt-5.2-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
-| `deep` | `openai/gpt-5.2-codex` (medium) | Moderate complexity tasks requiring deeper reasoning |
+| `deep` | `openai/gpt-5.2-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry` | `google/gemini-3-pro` (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
 | `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
