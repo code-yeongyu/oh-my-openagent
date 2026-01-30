@@ -13,7 +13,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase, promptWithModelSuggestionRetry } from "../../shared"
-import { fetchAvailableModels } from "../../shared/model-availability"
+import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -117,9 +117,20 @@ export function resolveCategoryConfig(
     userCategories?: CategoriesConfig
     inheritedModel?: string
     systemDefaultModel?: string
+    availableModels?: Set<string>
   }
 ): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
-  const { userCategories, inheritedModel, systemDefaultModel } = options
+  const { userCategories, inheritedModel, systemDefaultModel, availableModels } = options
+
+  // Check if category requires a specific model
+  const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  if (categoryReq?.requiresModel && availableModels) {
+    if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
+      log(`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`)
+      return null
+    }
+  }
+
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -522,11 +533,12 @@ To continue this session: session_id="${args.session_id}"`
             connectedProviders: connectedProviders ?? undefined
           })
 
-         const resolved = resolveCategoryConfig(args.category, {
-           userCategories,
-           inheritedModel,
-           systemDefaultModel,
-         })
+          const resolved = resolveCategoryConfig(args.category, {
+            userCategories,
+            inheritedModel,
+            systemDefaultModel,
+            availableModels,
+          })
          if (!resolved) {
            return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
          }
