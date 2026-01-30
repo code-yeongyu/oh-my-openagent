@@ -136,6 +136,8 @@ Following is the configuration guides for each providers. Please use interactive
 
 #### Anthropic (Claude)
 
+> **Note:** If you installed with isolated mode (using `--isolated` flag or `ohmyoc` command), use `ohmyoc auth login` instead of `opencode auth login`.
+
 ```bash
 opencode auth login
 # Interactive Terminal: find Provider: Select Anthropic
@@ -178,6 +180,8 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 **Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro`, `google/gemini-3-flash`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
 
 Then authenticate:
+
+> **Note:** If you installed with isolated mode (using `--isolated` flag or `ohmyoc` command), use `ohmyoc auth login` instead.
 
 ```bash
 opencode auth login
@@ -253,6 +257,8 @@ bunx oh-my-opencode install --no-tui --claude=no --openai=no --gemini=no --copil
 
 Then authenticate with GitHub:
 
+> **Note:** If you installed with isolated mode (using `--isolated` flag or `ohmyoc` command), use `ohmyoc auth login` instead.
+
 ```bash
 opencode auth login
 # Select: GitHub → Authenticate via OAuth
@@ -271,7 +277,11 @@ Read this document again, think about you have done everything correctly.
 
 ### Say 'Congratulations! 🎉' to the user
 
-Say to user: Congratulations! 🎉 You have successfully set up OhMyOpenCode! Type `opencode` in your terminal to start using it.
+Say to user: Congratulations! 🎉 You have successfully set up OhMyOpenCode!
+
+Based on your installation mode:
+- If you used **isolated mode** (with `--isolated` flag or `ohmyoc` command): Type `ohmyoc` in your terminal to start using it.
+- If you used **shared mode** (default): Type `opencode` in your terminal to start using it.
 
 ### Free advertising
 

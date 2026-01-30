@@ -74,6 +74,14 @@ function printHeader(isUpdate: boolean): void {
   console.log()
 }
 
+function getCommand(config: InstallConfig): string {
+  return config.isolated ? "ohmyoc" : "opencode"
+}
+
+function getAuthCommand(config: InstallConfig): string {
+  return config.isolated ? "ohmyoc auth login" : "opencode auth login"
+}
+
 function printStep(step: number, total: number, message: string): void {
   const progress = color.dim(`[${step}/${total}]`)
   console.log(`${progress} ${message}`)
@@ -414,7 +422,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
-  console.log(`  Run ${color.cyan("opencode")} to start!`)
+  console.log(`  Run ${color.cyan(getCommand(config))} to start!`)
   console.log()
 
   printBox(
@@ -432,7 +440,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(
-      `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
+      `Run ${color.cyan(getAuthCommand(config))} and select your provider:\n` +
       (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
       (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
       (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
@@ -533,7 +541,7 @@ export async function install(args: InstallArgs): Promise<number> {
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
-  p.log.message(`Run ${color.cyan("opencode")} to start!`)
+  p.log.message(`Run ${color.cyan(getCommand(config))} to start!`)
 
   p.note(
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
@@ -556,7 +564,7 @@ export async function install(args: InstallArgs): Promise<number> {
     console.log()
     console.log(color.bold("Authenticate Your Providers"))
     console.log()
-    console.log(`   Run ${color.cyan("opencode auth login")} and select:`)
+    console.log(`   Run ${color.cyan(getAuthCommand(config))} and select:`)
     for (const provider of providers) {
       console.log(`   ${SYMBOLS.bullet} ${provider}`)
     }
