@@ -35,6 +35,7 @@ import {
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
+  createTaskToDelegateRedirectHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -241,6 +242,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
 
   const taskResumeInfo = createTaskResumeInfoHook();
+
+  const taskToDelegateRedirect = isHookEnabled("task-to-delegate-redirect")
+    ? createTaskToDelegateRedirectHook(ctx)
+    : null;
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
 
@@ -606,6 +611,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
+      await taskToDelegateRedirect?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
