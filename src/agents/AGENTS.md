@@ -25,15 +25,15 @@ agents/
 ## AGENT MODELS
 | Agent | Model | Temp | Purpose |
 |-------|-------|------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator |
-| Atlas | anthropic/claude-opus-4-5 | 0.1 | Master orchestrator |
+| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7) |
+| Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
-| librarian | opencode/glm-4.7-free | 0.1 | Docs, GitHub search |
-| explore | opencode/gpt-5-nano | 0.1 | Fast contextual grep |
+| librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
+| explore | anthropic/claude-haiku-4-5 | 0.1 | Fast contextual grep (fallback: gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
-| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning |
-| Metis | anthropic/claude-sonnet-4-5 | 0.3 | Pre-planning analysis |
-| Momus | anthropic/claude-sonnet-4-5 | 0.1 | Plan validation |
+| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
+| Metis | anthropic/claude-opus-4-5 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
+| Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-5) |
 | Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
 
 ## HOW TO ADD

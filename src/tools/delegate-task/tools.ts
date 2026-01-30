@@ -13,7 +13,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase, promptWithModelSuggestionRetry } from "../../shared"
-import { fetchAvailableModels } from "../../shared/model-availability"
+import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -117,9 +117,20 @@ export function resolveCategoryConfig(
     userCategories?: CategoriesConfig
     inheritedModel?: string
     systemDefaultModel?: string
+    availableModels?: Set<string>
   }
 ): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
-  const { userCategories, inheritedModel, systemDefaultModel } = options
+  const { userCategories, inheritedModel, systemDefaultModel, availableModels } = options
+
+  // Check if category requires a specific model
+  const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  if (categoryReq?.requiresModel && availableModels) {
+    if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
+      log(`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`)
+      return null
+    }
+  }
+
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -522,11 +533,12 @@ To continue this session: session_id="${args.session_id}"`
             connectedProviders: connectedProviders ?? undefined
           })
 
-         const resolved = resolveCategoryConfig(args.category, {
-           userCategories,
-           inheritedModel,
-           systemDefaultModel,
-         })
+          const resolved = resolveCategoryConfig(args.category, {
+            userCategories,
+            inheritedModel,
+            systemDefaultModel,
+            availableModels,
+          })
          if (!resolved) {
            return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
          }
@@ -541,7 +553,8 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? resolved.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model,
+              categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -555,18 +568,19 @@ To continue this session: session_id="${args.session_id}"`
                return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
              }
 
-             let type: "user-defined" | "inherited" | "category-default" | "system-default"
-             switch (source) {
-                case "override":
-                  type = "user-defined"
-                  break
-                case "provider-fallback":
-                  type = "category-default"
-                  break
-                case "system-default":
-                  type = "system-default"
-                  break
-             }
+              let type: "user-defined" | "inherited" | "category-default" | "system-default"
+              switch (source) {
+                 case "override":
+                   type = "user-defined"
+                   break
+                 case "category-default":
+                 case "provider-fallback":
+                   type = "category-default"
+                   break
+                 case "system-default":
+                   type = "system-default"
+                   break
+              }
 
              modelInfo = { model: actualModel, type, source }
              

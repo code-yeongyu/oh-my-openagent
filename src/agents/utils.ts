@@ -10,7 +10,7 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createMomusAgent } from "./momus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive, readConnectedProvidersCache } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelWithFallback, AGENT_MODEL_REQUIREMENTS, findCaseInsensitive, includesCaseInsensitive, readConnectedProvidersCache, isModelAvailable } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -222,12 +222,19 @@ export async function createBuiltinAgents(
      if (agentName === "atlas") continue
      if (includesCaseInsensitive(disabledAgents, agentName)) continue
 
-    const override = findCaseInsensitive(agentOverrides, agentName)
-    const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
-    
-    const isPrimaryAgent = isFactory(source) && source.mode === "primary"
-    
-    const resolution = resolveModelWithFallback({
+     const override = findCaseInsensitive(agentOverrides, agentName)
+     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
+     
+     // Check if agent requires a specific model
+     if (requirement?.requiresModel && availableModels) {
+       if (!isModelAvailable(requirement.requiresModel, availableModels)) {
+         continue
+       }
+     }
+     
+     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
+     
+     const resolution = resolveModelWithFallback({
       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
       userModel: override?.model,
       fallbackChain: requirement?.fallbackChain,

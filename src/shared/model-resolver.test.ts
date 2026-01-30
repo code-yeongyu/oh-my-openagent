@@ -388,6 +388,85 @@ describe("resolveModelWithFallback", () => {
       expect(result!.model).toBe("anthropic/claude-opus-4-5")
       expect(result!.source).toBe("provider-fallback")
     })
+
+    test("cross-provider fuzzy match when preferred provider unavailable (librarian scenario)", () => {
+      // #given - glm-4.7 is defined for zai-coding-plan, but only opencode has it
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["zai-coding-plan"], model: "glm-4.7" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+        ],
+        availableModels: new Set(["opencode/glm-4.7", "anthropic/claude-sonnet-4-5"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should find glm-4.7 from opencode via cross-provider fuzzy match
+      expect(result!.model).toBe("opencode/glm-4.7")
+      expect(result!.source).toBe("provider-fallback")
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
+        model: "glm-4.7",
+        match: "opencode/glm-4.7",
+        variant: undefined,
+      })
+    })
+
+    test("prefers specified provider over cross-provider match", () => {
+      // #given - both zai-coding-plan and opencode have glm-4.7
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["zai-coding-plan"], model: "glm-4.7" },
+        ],
+        availableModels: new Set(["zai-coding-plan/glm-4.7", "opencode/glm-4.7"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should prefer zai-coding-plan (specified provider) over opencode
+      expect(result!.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result!.source).toBe("provider-fallback")
+    })
+
+    test("cross-provider match preserves variant from entry", () => {
+      // #given - entry has variant, model found via cross-provider
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["zai-coding-plan"], model: "glm-4.7", variant: "high" },
+        ],
+        availableModels: new Set(["opencode/glm-4.7"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - variant should be preserved
+      expect(result!.model).toBe("opencode/glm-4.7")
+      expect(result!.variant).toBe("high")
+    })
+
+    test("cross-provider match tries next entry if no match found anywhere", () => {
+      // #given - first entry model not available anywhere, second entry available
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["zai-coding-plan"], model: "nonexistent-model" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+        ],
+        availableModels: new Set(["anthropic/claude-sonnet-4-5"]),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should fall through to second entry
+      expect(result!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(result!.source).toBe("provider-fallback")
+    })
   })
 
   describe("Step 4: System default fallback (no availability match)", () => {
@@ -623,6 +702,103 @@ describe("resolveModelWithFallback", () => {
       expect(result).toBeDefined()
       expect(typeof result!.model).toBe("string")
       expect(["override", "provider-fallback", "system-default"]).toContain(result!.source)
+    })
+  })
+
+  describe("categoryDefaultModel (fuzzy matching for category defaults)", () => {
+    test("applies fuzzy matching to categoryDefaultModel when userModel not provided", () => {
+      // #given - gemini-3-pro is the category default, but only gemini-3-pro-preview is available
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should fuzzy match gemini-3-pro → gemini-3-pro-preview
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+    })
+
+    test("categoryDefaultModel uses exact match when available", () => {
+      // #given - exact match exists
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro", "google/gemini-3-pro-preview"]),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use exact match
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("category-default")
+    })
+
+    test("categoryDefaultModel falls through to fallbackChain when no match in availableModels", () => {
+      // #given - categoryDefaultModel has no match, but fallbackChain does
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["anthropic"], model: "claude-opus-4-5" },
+        ],
+        availableModels: new Set(["anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should fall through to fallbackChain
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(result!.source).toBe("provider-fallback")
+    })
+
+    test("userModel takes priority over categoryDefaultModel", () => {
+      // #given - both userModel and categoryDefaultModel provided
+      const input: ExtendedModelResolutionInput = {
+        userModel: "anthropic/claude-opus-4-5",
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - userModel wins
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(result!.source).toBe("override")
+    })
+
+    test("categoryDefaultModel works when availableModels is empty but connected provider exists", () => {
+      // #given - no availableModels but connected provider cache exists
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use categoryDefaultModel since google is connected
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
     })
   })
 

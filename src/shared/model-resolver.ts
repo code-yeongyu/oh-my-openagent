@@ -11,6 +11,7 @@ export type ModelResolutionInput = {
 
 export type ModelSource =
 	| "override"
+	| "category-default"
 	| "provider-fallback"
 	| "system-default"
 
@@ -23,6 +24,7 @@ export type ModelResolutionResult = {
 export type ExtendedModelResolutionInput = {
 	uiSelectedModel?: string
 	userModel?: string
+	categoryDefaultModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
 	systemDefaultModel?: string
@@ -44,7 +46,7 @@ export function resolveModel(input: ModelResolutionInput): string | undefined {
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
 ): ModelResolutionResult | undefined {
-	const { uiSelectedModel, userModel, fallbackChain, availableModels, systemDefaultModel } = input
+	const { uiSelectedModel, userModel, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
 
 	// Step 1: UI Selection (highest priority - respects user's model choice in OpenCode UI)
 	const normalizedUiModel = normalizeModel(uiSelectedModel)
@@ -53,11 +55,40 @@ export function resolveModelWithFallback(
 		return { model: normalizedUiModel, source: "override" }
 	}
 
-	// Step 2: Config Override (from oh-my-opencode.json)
+	// Step 2: Config Override (from oh-my-opencode.json user config)
 	const normalizedUserModel = normalizeModel(userModel)
 	if (normalizedUserModel) {
 		log("Model resolved via config override", { model: normalizedUserModel })
 		return { model: normalizedUserModel, source: "override" }
+	}
+
+	// Step 2.5: Category Default Model (from DEFAULT_CATEGORIES, with fuzzy matching)
+	const normalizedCategoryDefault = normalizeModel(categoryDefaultModel)
+	if (normalizedCategoryDefault) {
+		if (availableModels.size > 0) {
+			const parts = normalizedCategoryDefault.split("/")
+			const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+			const match = fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
+			if (match) {
+				log("Model resolved via category default (fuzzy matched)", { original: normalizedCategoryDefault, matched: match })
+				return { model: match, source: "category-default" }
+			}
+		} else {
+			const connectedProviders = readConnectedProvidersCache()
+			if (connectedProviders === null) {
+				log("Model resolved via category default (no cache, first run)", { model: normalizedCategoryDefault })
+				return { model: normalizedCategoryDefault, source: "category-default" }
+			}
+			const parts = normalizedCategoryDefault.split("/")
+			if (parts.length >= 2) {
+				const provider = parts[0]
+				if (connectedProviders.includes(provider)) {
+					log("Model resolved via category default (connected provider)", { model: normalizedCategoryDefault })
+					return { model: normalizedCategoryDefault, source: "category-default" }
+				}
+			}
+		}
+		log("Category default model not available, falling through to fallback chain", { model: normalizedCategoryDefault })
 	}
 
 	// Step 3: Provider fallback chain (exact match → fuzzy match → next provider)
@@ -86,6 +117,7 @@ export function resolveModelWithFallback(
 			}
 		} else {
 			for (const entry of fallbackChain) {
+				// Step 1: Try with provider filter (preferred providers first)
 				for (const provider of entry.providers) {
 					const fullModel = `${provider}/${entry.model}`
 					const match = fuzzyMatchModel(fullModel, availableModels, [provider])
@@ -93,6 +125,17 @@ export function resolveModelWithFallback(
 						log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
 						return { model: match, source: "provider-fallback", variant: entry.variant }
 					}
+				}
+
+				// Step 2: Try without provider filter (cross-provider fuzzy match)
+				const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
+				if (crossProviderMatch) {
+					log("Model resolved via fallback chain (cross-provider fuzzy match)", {
+						model: entry.model,
+						match: crossProviderMatch,
+						variant: entry.variant,
+					})
+					return { model: crossProviderMatch, source: "provider-fallback", variant: entry.variant }
 				}
 			}
 			log("No available model found in fallback chain, falling through to system default")

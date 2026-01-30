@@ -250,6 +250,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -271,6 +272,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -290,6 +292,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: true,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -309,6 +312,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -329,6 +333,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: true,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -350,6 +355,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -373,6 +379,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -392,6 +399,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
