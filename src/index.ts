@@ -118,7 +118,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     
     if (externalNotifier.detected && !forceEnable) {
       // External notification plugin detected - skip our notification to avoid conflicts
-      console.warn(getNotificationConflictWarning(externalNotifier.pluginName!));
+      log(getNotificationConflictWarning(externalNotifier.pluginName!));
       log("session-notification disabled due to external notifier conflict", {
         detected: externalNotifier.pluginName,
         allPlugins: externalNotifier.allPlugins,

@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -307,7 +307,7 @@ export class BackgroundManager {
       : undefined
     const launchVariant = input.model?.variant
 
-    this.client.session.prompt({
+    promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
       body: {
         agent: input.agent,

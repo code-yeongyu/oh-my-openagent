@@ -55,6 +55,7 @@ ${REFACTOR_TEMPLATE}
   },
   "start-work": {
     description: "(builtin) Start Sisyphus work session from Prometheus plan",
+    agent: "atlas",
     template: `<command-instruction>
 ${START_WORK_TEMPLATE}
 </command-instruction>
