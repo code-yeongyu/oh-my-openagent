@@ -87,6 +87,20 @@ export function fuzzyMatchModel(
 	return result
 }
 
+/**
+ * Check if a target model is available (fuzzy match by model name, no provider filtering)
+ * 
+ * @param targetModel - Model name to check (e.g., "gpt-5.2-codex")
+ * @param availableModels - Set of available models in "provider/model" format
+ * @returns true if model is available, false otherwise
+ */
+export function isModelAvailable(
+	targetModel: string,
+	availableModels: Set<string>,
+): boolean {
+	return fuzzyMatchModel(targetModel, availableModels) !== null
+}
+
 export async function getConnectedProviders(client: any): Promise<string[]> {
 	if (!client?.provider?.list) {
 		log("[getConnectedProviders] client.provider.list not available")

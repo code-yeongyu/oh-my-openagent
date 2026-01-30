@@ -7,6 +7,7 @@ export type FallbackEntry = {
 export type ModelRequirement = {
   fallbackChain: FallbackEntry[]
   variant?: string // Default variant (used when entry doesn't specify one)
+  requiresModel?: string // If set, only activates when this model is available (fuzzy match)
 }
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
@@ -103,20 +104,22 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
     ],
   },
-  deep: {
-    fallbackChain: [
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
-    ],
-  },
-  artistry: {
-    fallbackChain: [
-      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
-      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
-    ],
-  },
+   deep: {
+     fallbackChain: [
+       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
+       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
+       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
+     ],
+     requiresModel: "gpt-5.2-codex",
+   },
+   artistry: {
+     fallbackChain: [
+       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
+       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
+       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
+     ],
+     requiresModel: "gemini-3-pro",
+   },
   quick: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
