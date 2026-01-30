@@ -320,12 +320,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
+      // Extract only model-related settings from prometheus for plan agent
+      // DO NOT include prompt or permission - plan agent should use OpenCode defaults
       const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { 
-            ...agentConfig["prometheus"],
-            name: "plan", 
-            mode: "subagent" as const 
-          }
+        ? (() => {
+            const { prompt: _prompt, permission: _permission, ...modelSettings } = agentConfig["prometheus"] as Record<string, unknown>;
+            return { 
+              ...modelSettings,
+              name: "plan", 
+              mode: "subagent" as const 
+            };
+          })()
         : undefined;
 
       config.agent = {
