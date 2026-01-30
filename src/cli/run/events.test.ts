@@ -148,7 +148,7 @@ describe("event handling", () => {
     expect(state.hasReceivedMeaningfulWork).toBe(false)
   })
 
-  it("message.updated with assistant content sets hasReceivedMeaningfulWork", async () => {
+  it("message.updated with assistant role sets hasReceivedMeaningfulWork", async () => {
     // #given
     const ctx = createMockContext("my-session")
     const state = createEventState()
@@ -157,7 +157,6 @@ describe("event handling", () => {
       type: "message.updated",
       properties: {
         info: { sessionID: "my-session", role: "assistant" },
-        content: "Hello, I will fix this bug.",
       },
     }
 
@@ -171,16 +170,15 @@ describe("event handling", () => {
     expect(state.hasReceivedMeaningfulWork).toBe(true)
   })
 
-  it("message.updated with empty assistant content does not set hasReceivedMeaningfulWork", async () => {
-    // #given - empty assistant message (race condition: message created but no content yet)
+  it("message.updated with user role does not set hasReceivedMeaningfulWork", async () => {
+    // #given - user message should not count as meaningful work
     const ctx = createMockContext("my-session")
     const state = createEventState()
 
     const payload: EventPayload = {
       type: "message.updated",
       properties: {
-        info: { sessionID: "my-session", role: "assistant" },
-        content: "",
+        info: { sessionID: "my-session", role: "user" },
       },
     }
 
@@ -190,7 +188,7 @@ describe("event handling", () => {
     // #when
     await processEvents(ctx, events, state)
 
-    // #then - empty content should not count as meaningful work
+    // #then - user role should not count as meaningful work
     expect(state.hasReceivedMeaningfulWork).toBe(false)
   })
 
