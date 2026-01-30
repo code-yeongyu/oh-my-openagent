@@ -249,9 +249,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
         const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
         const connectedProviders = readConnectedProvidersCache();
-        const availableModels = ctx.client
-          ? await fetchAvailableModels(ctx.client, { connectedProviders: connectedProviders ?? undefined })
-          : new Set<string>();
+        // IMPORTANT: Do NOT pass ctx.client to fetchAvailableModels during plugin initialization.
+        // Calling client API (e.g., client.provider.list()) from config handler causes deadlock:
+        // - Plugin init waits for server response
+        // - Server waits for plugin init to complete before handling requests
+        // Use cache-only mode instead. If cache is unavailable, fallback chain uses first model.
+        // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
+        const availableModels = await fetchAvailableModels(undefined, {
+          connectedProviders: connectedProviders ?? undefined,
+        });
 
         const modelResolution = resolveModelWithFallback({
           uiSelectedModel: currentModel,
