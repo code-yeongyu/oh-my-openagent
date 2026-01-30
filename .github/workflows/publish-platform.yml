@@ -199,10 +199,14 @@ jobs:
         run: |
           cd packages/${{ matrix.platform }}
           
-          # Remove .npmrc created by setup-node to enable pure OIDC auth
-          # setup-node adds //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
-          # which breaks OIDC when NODE_AUTH_TOKEN is empty
+          # Remove all .npmrc files created by setup-node to enable pure OIDC auth
+          # setup-node sets NPM_CONFIG_USERCONFIG=/home/runner/work/_temp/.npmrc
+          # with //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+          # This breaks OIDC when the token is expired/revoked
           rm -f ~/.npmrc
+          rm -f "$NPM_CONFIG_USERCONFIG" 2>/dev/null || true
+          unset NPM_CONFIG_USERCONFIG
+          unset NODE_AUTH_TOKEN
           
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
