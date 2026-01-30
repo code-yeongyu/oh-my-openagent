@@ -141,19 +141,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("atlas has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
+  test("atlas has valid fallbackChain with k2p5 as primary (kimi-for-coding prioritized)", () => {
     // #given - atlas agent requirement
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // #when - accessing Atlas requirement
-    // #then - fallbackChain exists with claude-sonnet-4-5 as first entry
+    // #then - fallbackChain exists with k2p5 as first entry (kimi-for-coding prioritized)
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
     expect(atlas.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = atlas.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-5")
-    expect(primary.providers[0]).toBe("anthropic")
+    expect(primary.model).toBe("k2p5")
+    expect(primary.providers[0]).toBe("kimi-for-coding")
   })
 
   test("all 9 builtin agents have valid fallbackChain arrays", () => {
