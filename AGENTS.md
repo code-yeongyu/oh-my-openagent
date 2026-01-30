@@ -98,13 +98,13 @@ oh-my-opencode/
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
-| Atlas | anthropic/claude-opus-4-5 | Master orchestrator |
+| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7) |
+| Atlas | anthropic/claude-sonnet-4-5 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | Consultation, debugging |
-| librarian | opencode/glm-4.7-free | Docs, GitHub search |
-| explore | opencode/gpt-5-nano | Fast codebase grep |
+| librarian | zai-coding-plan/glm-4.7 | Docs, GitHub search (fallback: glm-4.7-free) |
+| explore | anthropic/claude-haiku-4-5 | Fast codebase grep (fallback: gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
-| Prometheus | anthropic/claude-opus-4-5 | Strategic planning |
+| Prometheus | anthropic/claude-opus-4-5 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 
 ## COMMANDS
 
