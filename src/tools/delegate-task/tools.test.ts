@@ -302,6 +302,36 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
+    test("blocks requiresModel when availability is known and missing the required model", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-5"])
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+      })
+
+      // #then
+      expect(result).toBeNull()
+    })
+
+    test("blocks requiresModel when availability is empty", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>()
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+      })
+
+      // #then
+      expect(result).toBeNull()
+    })
+
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
       // #given
       const categoryName = "visual-engineering"
