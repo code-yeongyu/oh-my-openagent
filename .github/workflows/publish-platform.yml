@@ -192,7 +192,12 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
+
+      - name: Configure npm for OIDC publishing
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          echo "registry=https://registry.npmjs.org/" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=" >> ~/.npmrc
 
       - name: Publish ${{ matrix.platform }}
         if: steps.check.outputs.skip != 'true'
