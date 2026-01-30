@@ -11,9 +11,10 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
     const prompt = MOMUS_SYSTEM_PROMPT
     
     // #when / #then
-    expect(prompt).toContain("[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]")
-    // Should explicitly mention stripping or ignoring these
-    expect(prompt.toLowerCase()).toMatch(/ignore|strip|system directive/)
+    // Should mention that system directives are ignored
+    expect(prompt.toLowerCase()).toMatch(/system directive.*ignore|ignore.*system directive/)
+    // Should give examples of system directive patterns
+    expect(prompt).toMatch(/<system-reminder>|system-reminder/)
   })
 
   test("should extract paths containing .sisyphus/plans/ and ending in .md", () => {
