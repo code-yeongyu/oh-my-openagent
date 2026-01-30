@@ -176,8 +176,8 @@ describe("ConcurrencyManager.acquire/release", () => {
     await manager.acquire("model-a")
     await manager.acquire("model-a")
 
-    // #then - both resolved without waiting
-    expect(true).toBe(true)
+    // #then - both resolved without waiting, count should be 2
+    expect(manager.getCount("model-a")).toBe(2)
   })
 
   test("should allow acquires up to default limit of 5", async () => {
@@ -190,8 +190,8 @@ describe("ConcurrencyManager.acquire/release", () => {
     await manager.acquire("model-a")
     await manager.acquire("model-a")
 
-    // #then - all 5 resolved
-    expect(true).toBe(true)
+    // #then - all 5 resolved, count should be 5
+    expect(manager.getCount("model-a")).toBe(5)
   })
 
   test("should queue when limit reached", async () => {
@@ -276,8 +276,8 @@ describe("ConcurrencyManager.acquire/release", () => {
     manager.release("model-a")
     await manager.acquire("model-a")
 
-    // #then
-    expect(true).toBe(true)
+    // #then - count should be 1 after re-acquiring
+    expect(manager.getCount("model-a")).toBe(1)
   })
 
   test("should handle release when no acquire", () => {
@@ -288,21 +288,21 @@ describe("ConcurrencyManager.acquire/release", () => {
     // #when - release without acquire
     manager.release("model-a")
 
-    // #then - should not throw
-    expect(true).toBe(true)
+    // #then - count should be 0 (no negative count)
+    expect(manager.getCount("model-a")).toBe(0)
   })
 
   test("should handle release when no prior acquire", () => {
     // #given - default config
 
-    // #when - release without acquire
-    manager.release("model-a")
+     // #when - release without acquire
+     manager.release("model-a")
 
-    // #then - should not throw
-    expect(true).toBe(true)
-  })
+     // #then - count should be 0 (no negative count)
+     expect(manager.getCount("model-a")).toBe(0)
+   })
 
-  test("should handle multiple acquires and releases correctly", async () => {
+   test("should handle multiple acquires and releases correctly", async () => {
     // #given
     const config: BackgroundTaskConfig = { defaultConcurrency: 3 }
     manager = new ConcurrencyManager(config)
@@ -317,11 +317,11 @@ describe("ConcurrencyManager.acquire/release", () => {
     manager.release("model-a")
     manager.release("model-a")
 
-    // Should be able to acquire again
-    await manager.acquire("model-a")
+     // Should be able to acquire again
+     await manager.acquire("model-a")
 
-    // #then
-    expect(true).toBe(true)
+     // #then - count should be 1 after re-acquiring
+     expect(manager.getCount("model-a")).toBe(1)
   })
 
   test("should use model-specific limit for acquire", async () => {

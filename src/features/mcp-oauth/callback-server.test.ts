@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { findAvailablePort, startCallbackServer, type CallbackServer } from "./callback-server"
 
+const nativeFetch = Bun.fetch.bind(Bun)
+
 describe("findAvailablePort", () => {
   it("returns the start port when it is available", async () => {
     //#given
@@ -34,9 +36,11 @@ describe("findAvailablePort", () => {
 describe("startCallbackServer", () => {
   let server: CallbackServer | null = null
 
-  afterEach(() => {
+  afterEach(async () => {
     server?.close()
     server = null
+    // Allow time for port to be released before next test
+    await Bun.sleep(10)
   })
 
   it("starts server and returns port", async () => {
@@ -57,9 +61,12 @@ describe("startCallbackServer", () => {
     const callbackUrl = `http://127.0.0.1:${server.port}/oauth/callback?code=test-code&state=test-state`
 
     //#when
-    const fetchPromise = fetch(callbackUrl)
-    const result = await server.waitForCallback()
-    const response = await fetchPromise
+    // Use Promise.all to ensure fetch and waitForCallback run concurrently
+    // This prevents race condition where waitForCallback blocks before fetch starts
+    const [result, response] = await Promise.all([
+      server.waitForCallback(),
+      nativeFetch(callbackUrl)
+    ])
 
     //#then
     expect(result).toEqual({ code: "test-code", state: "test-state" })
@@ -73,7 +80,7 @@ describe("startCallbackServer", () => {
     server = await startCallbackServer()
 
     //#when
-    const response = await fetch(`http://127.0.0.1:${server.port}/other`)
+    const response = await nativeFetch(`http://127.0.0.1:${server.port}/other`)
 
     //#then
     expect(response.status).toBe(404)
@@ -85,7 +92,7 @@ describe("startCallbackServer", () => {
     const callbackRejection = server.waitForCallback().catch((e: Error) => e)
 
     //#when
-    const response = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?state=s`)
+    const response = await nativeFetch(`http://127.0.0.1:${server.port}/oauth/callback?state=s`)
 
     //#then
     expect(response.status).toBe(400)
@@ -100,7 +107,7 @@ describe("startCallbackServer", () => {
     const callbackRejection = server.waitForCallback().catch((e: Error) => e)
 
     //#when
-    const response = await fetch(`http://127.0.0.1:${server.port}/oauth/callback?code=c`)
+    const response = await nativeFetch(`http://127.0.0.1:${server.port}/oauth/callback?code=c`)
 
     //#then
     expect(response.status).toBe(400)
@@ -120,7 +127,7 @@ describe("startCallbackServer", () => {
 
     //#then
     try {
-      await fetch(`http://127.0.0.1:${port}/oauth/callback?code=c&state=s`)
+      await nativeFetch(`http://127.0.0.1:${port}/oauth/callback?code=c&state=s`)
       expect(true).toBe(false)
     } catch (error) {
       expect(error).toBeDefined()
