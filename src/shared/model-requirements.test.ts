@@ -424,20 +424,38 @@ describe("ModelRequirement type", () => {
     }
   })
 
-  test("all fallbackChain entries have non-empty providers array", () => {
-    // #given - all agent and category requirements
-    const allRequirements = [
-      ...Object.values(AGENT_MODEL_REQUIREMENTS),
-      ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
-    ]
+   test("all fallbackChain entries have non-empty providers array", () => {
+     // #given - all agent and category requirements
+     const allRequirements = [
+       ...Object.values(AGENT_MODEL_REQUIREMENTS),
+       ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
+     ]
 
-    // #when - checking each entry in fallbackChain
-    // #then - all have non-empty providers array
-    for (const req of allRequirements) {
-      for (const entry of req.fallbackChain) {
-        expect(entry.providers).toBeArray()
-        expect(entry.providers.length).toBeGreaterThan(0)
-      }
-    }
+     // #when - checking each entry in fallbackChain
+     // #then - all have non-empty providers array
+     for (const req of allRequirements) {
+       for (const entry of req.fallbackChain) {
+         expect(entry.providers).toBeArray()
+         expect(entry.providers.length).toBeGreaterThan(0)
+       }
+     }
+   })
+})
+
+describe("requiresModel field in categories", () => {
+  test("deep category has requiresModel set to gpt-5.2-codex", () => {
+    // #given
+    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
+
+    // #when / #then
+    expect(deep.requiresModel).toBe("gpt-5.2-codex")
+  })
+
+  test("artistry category has requiresModel set to gemini-3-pro", () => {
+    // #given
+    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+
+    // #when / #then
+    expect(artistry.requiresModel).toBe("gemini-3-pro")
   })
 })

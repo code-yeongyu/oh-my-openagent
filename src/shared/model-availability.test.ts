@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { fetchAvailableModels, fuzzyMatchModel, getConnectedProviders, __resetModelCache } from "./model-availability"
+import { fetchAvailableModels, fuzzyMatchModel, getConnectedProviders, __resetModelCache, isModelAvailable } from "./model-availability"
 
 describe("fetchAvailableModels", () => {
   let tempDir: string
@@ -608,5 +608,40 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(result.has("opencode/glm-4.7-free")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-5")).toBe(false)
 		expect(result.has("google/gemini-3-pro")).toBe(false)
+	})
+})
+
+describe("isModelAvailable", () => {
+	it("returns true when model exists via fuzzy match", () => {
+		// #given
+		const available = new Set(["openai/gpt-5.2-codex", "anthropic/claude-opus-4-5"])
+
+		// #when
+		const result = isModelAvailable("gpt-5.2-codex", available)
+
+		// #then
+		expect(result).toBe(true)
+	})
+
+	it("returns false when model not found", () => {
+		// #given
+		const available = new Set(["anthropic/claude-opus-4-5"])
+
+		// #when
+		const result = isModelAvailable("gpt-5.2-codex", available)
+
+		// #then
+		expect(result).toBe(false)
+	})
+
+	it("returns false for empty available set", () => {
+		// #given
+		const available = new Set<string>()
+
+		// #when
+		const result = isModelAvailable("gpt-5.2-codex", available)
+
+		// #then
+		expect(result).toBe(false)
 	})
 })
