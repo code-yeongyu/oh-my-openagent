@@ -46,7 +46,7 @@ describe("Agent Config Integration", () => {
       const config = {
         sisyphus: { model: "anthropic/claude-opus-4-5" },
         oracle: { model: "openai/gpt-5.2" },
-        librarian: { model: "opencode/big-pickle" },
+        librarian: { model: "opencode/glm-4.7-free" },
       }
 
       // #when - migration is applied
@@ -65,7 +65,7 @@ describe("Agent Config Integration", () => {
         Sisyphus: { model: "anthropic/claude-opus-4-5" },
         oracle: { model: "openai/gpt-5.2" },
         "Prometheus (Planner)": { model: "anthropic/claude-opus-4-5" },
-        librarian: { model: "opencode/big-pickle" },
+        librarian: { model: "opencode/glm-4.7-free" },
       }
 
       // #when - migration is applied
