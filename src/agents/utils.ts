@@ -329,7 +329,7 @@ export async function createBuiltinAgents(
      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
     
     const atlasResolution = resolveModelWithFallback({
-      uiSelectedModel,
+      // NOTE: Atlas does NOT use uiSelectedModel - respects its own fallbackChain (k2p5 primary)
       userModel: orchestratorOverride?.model,
       fallbackChain: atlasRequirement?.fallbackChain,
       availableModels,
