@@ -1,9 +1,12 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { existsSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from '../../shared/terminal-multiplexer/types'
+import { getOpenCodeStorageDir } from '../../shared/data-path'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -183,6 +186,13 @@ describe('TmuxSessionManager', () => {
         results: [],
       }
     })
+  })
+
+  afterEach(() => {
+    const zellijStorageDir = join(getOpenCodeStorageDir(), 'zellij-adapter')
+    if (existsSync(zellijStorageDir)) {
+      rmSync(zellijStorageDir, { recursive: true, force: true })
+    }
   })
 
   describe('constructor', () => {

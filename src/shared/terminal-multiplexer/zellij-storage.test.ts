@@ -8,17 +8,26 @@ import {
   clearZellijState,
 } from "./zellij-storage"
 import type { ZellijState } from "./zellij-storage"
+import { getOpenCodeStorageDir } from "../data-path"
 
 //#given a temporary storage directory for testing
 let testStorageDir: string
 
 beforeEach(() => {
   testStorageDir = join(tmpdir(), `zellij-storage-test-${Date.now()}`)
+  const zellijStorageDir = join(getOpenCodeStorageDir(), 'zellij-adapter')
+  if (existsSync(zellijStorageDir)) {
+    rmSync(zellijStorageDir, { recursive: true, force: true })
+  }
 })
 
 afterEach(() => {
   if (existsSync(testStorageDir)) {
     rmSync(testStorageDir, { recursive: true, force: true })
+  }
+  const zellijStorageDir = join(getOpenCodeStorageDir(), 'zellij-adapter')
+  if (existsSync(zellijStorageDir)) {
+    rmSync(zellijStorageDir, { recursive: true, force: true })
   }
 })
 
