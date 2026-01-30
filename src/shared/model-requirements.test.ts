@@ -208,6 +208,22 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
+  test("deep has valid fallbackChain with gpt-5.2-codex as primary", () => {
+    // #given - deep category requirement
+    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
+
+    // #when - accessing deep requirement
+    // #then - fallbackChain exists with gpt-5.2-codex as first entry, medium variant
+    expect(deep).toBeDefined()
+    expect(deep.fallbackChain).toBeArray()
+    expect(deep.fallbackChain.length).toBeGreaterThan(0)
+
+    const primary = deep.fallbackChain[0]
+    expect(primary.variant).toBe("medium")
+    expect(primary.model).toBe("gpt-5.2-codex")
+    expect(primary.providers[0]).toBe("openai")
+  })
+
   test("visual-engineering has valid fallbackChain with gemini-3-pro as primary", () => {
     // #given - visual-engineering category requirement
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
@@ -300,11 +316,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("google")
   })
 
-  test("all 7 categories have valid fallbackChain arrays", () => {
-    // #given - list of 7 category names
+  test("all 8 categories have valid fallbackChain arrays", () => {
+    // #given - list of 8 category names
     const expectedCategories = [
       "visual-engineering",
       "ultrabrain",
+      "deep",
       "artistry",
       "quick",
       "unspecified-low",
@@ -316,7 +333,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const definedCategories = Object.keys(CATEGORY_MODEL_REQUIREMENTS)
 
     // #then - all categories present with valid fallbackChain
-    expect(definedCategories).toHaveLength(7)
+    expect(definedCategories).toHaveLength(8)
     for (const category of expectedCategories) {
       const requirement = CATEGORY_MODEL_REQUIREMENTS[category]
       expect(requirement).toBeDefined()

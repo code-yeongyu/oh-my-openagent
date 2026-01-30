@@ -51,6 +51,16 @@ describe("sisyphus-task", () => {
       expect(category.model).toBe("openai/gpt-5.2-codex")
       expect(category.variant).toBe("xhigh")
     })
+
+    test("deep category has model and variant config", () => {
+      // #given
+      const category = DEFAULT_CATEGORIES["deep"]
+
+      // #when / #then
+      expect(category).toBeDefined()
+      expect(category.model).toBe("openai/gpt-5.2-codex")
+      expect(category.variant).toBe("medium")
+    })
   })
 
   describe("CATEGORY_PROMPT_APPENDS", () => {
@@ -70,6 +80,15 @@ describe("sisyphus-task", () => {
       // #when / #then
       expect(promptAppend).toContain("DEEP LOGICAL REASONING")
       expect(promptAppend).toContain("Strategic advisor")
+    })
+
+    test("deep category has goal-oriented autonomous prompt", () => {
+      // #given
+      const promptAppend = CATEGORY_PROMPT_APPENDS["deep"]
+
+      // #when / #then
+      expect(promptAppend).toContain("GOAL-ORIENTED")
+      expect(promptAppend).toContain("autonomous")
     })
   })
 
