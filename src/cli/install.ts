@@ -198,7 +198,7 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
 }
 
 async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | null> {
-  const initial = detectedToInitialValues(detected)
+  let initial = detectedToInitialValues(detected)
 
   const configMode = await p.select({
     message: "Choose configuration mode:",
@@ -227,6 +227,9 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     process.env.OH_MY_OPENCODE_CONFIG_DIR = omoDefaultDir
     resetConfigContext()
     initConfigContext("opencode", null)
+    // Re-detect config from isolated directory to get correct initial values
+    detected = detectCurrentConfig()
+    initial = detectedToInitialValues(detected)
   }
 
   const claude = await p.select({

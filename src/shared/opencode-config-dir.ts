@@ -65,12 +65,7 @@ function getTauriConfigDir(identifier: string): string {
   }
 }
 
-function getCliConfigDir(): string {
-  const omoEnvConfigDir = process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim()
-  if (omoEnvConfigDir) {
-    return resolve(omoEnvConfigDir)
-  }
-
+function getCliConfigDirWithoutIsolatedEnv(): string {
   const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
   if (envConfigDir) {
     return resolve(envConfigDir)
@@ -99,6 +94,32 @@ function getCliConfigDir(): string {
   return join(xdgConfig, "opencode")
 }
 
+function getCliConfigDir(): string {
+  const omoEnvConfigDir = process.env.OH_MY_OPENCODE_CONFIG_DIR?.trim()
+  if (omoEnvConfigDir) {
+    return resolve(omoEnvConfigDir)
+  }
+
+  return getCliConfigDirWithoutIsolatedEnv()
+}
+
+function getCliConfigDirForLegacyDetection(): string {
+  // For desktop legacy detection, we should NOT check OH_MY_OPENCODE_CONFIG_DIR
+  // because desktop app should not use CLI isolated config
+  const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (envConfigDir) {
+    return resolve(envConfigDir)
+  }
+
+  if (process.platform === "win32") {
+    const crossPlatformDir = join(homedir(), ".config", "opencode")
+    return crossPlatformDir
+  }
+
+  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+  return join(xdgConfig, "opencode")
+}
+
 export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string {
   const { binary, version, checkExisting = true } = options
 
@@ -110,7 +131,9 @@ export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string 
   const tauriDir = getTauriConfigDir(identifier)
 
   if (checkExisting) {
-    const legacyDir = getCliConfigDir()
+    // Use getCliConfigDirForLegacyDetection to avoid OH_MY_OPENCODE_CONFIG_DIR
+    // affecting desktop config resolution
+    const legacyDir = getCliConfigDirForLegacyDetection()
     const legacyConfig = join(legacyDir, "opencode.json")
     const legacyConfigC = join(legacyDir, "opencode.jsonc")
 
