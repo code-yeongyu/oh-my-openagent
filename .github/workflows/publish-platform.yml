@@ -199,14 +199,9 @@ jobs:
         run: |
           cd packages/${{ matrix.platform }}
           
-          # Remove all .npmrc files created by setup-node to enable pure OIDC auth
-          # setup-node sets NPM_CONFIG_USERCONFIG=/home/runner/work/_temp/.npmrc
-          # with //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
-          # This breaks OIDC when the token is expired/revoked
+          # Remove .npmrc files created by setup-node
           rm -f ~/.npmrc
-          rm -f "$NPM_CONFIG_USERCONFIG" 2>/dev/null || true
-          unset NPM_CONFIG_USERCONFIG
-          unset NODE_AUTH_TOKEN
+          rm -f /home/runner/work/_temp/.npmrc 2>/dev/null || true
           
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
@@ -214,9 +209,13 @@ jobs:
           fi
           
           # Publish with provenance (OIDC authentication)
-          # npm 11.5.1+ auto-detects OIDC environment
+          # npm 11.5.1+ auto-detects OIDC environment when no token is present
           npm publish --access public --provenance $TAG_ARG
         env:
+          # Override setup-node env vars to disable token-based auth
+          # This forces npm to use OIDC instead
+          NPM_CONFIG_USERCONFIG: ""
+          NODE_AUTH_TOKEN: ""
           NPM_CONFIG_PROVENANCE: "true"
           npm_config_fetch_timeout: "600000"
           npm_config_fetch_retry_maxtimeout: "120000"
