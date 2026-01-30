@@ -4,6 +4,7 @@ import { join } from "path"
 import { homedir, tmpdir } from "os"
 import { createRequire } from "module"
 import { extractZip } from "../../shared"
+import { log } from "../../shared/logger"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
@@ -127,7 +128,7 @@ export async function downloadCommentChecker(): Promise<string | null> {
   const downloadUrl = `https://github.com/${REPO}/releases/download/v${version}/${assetName}`
   
   debugLog(`Downloading from: ${downloadUrl}`)
-  console.log(`[oh-my-opencode] Downloading comment-checker binary...`)
+  log(`[oh-my-opencode] Downloading comment-checker binary...`)
   
   try {
     // Ensure cache directory exists
@@ -166,14 +167,14 @@ export async function downloadCommentChecker(): Promise<string | null> {
     }
     
     debugLog(`Successfully downloaded binary to: ${binaryPath}`)
-    console.log(`[oh-my-opencode] comment-checker binary ready.`)
+    log(`[oh-my-opencode] comment-checker binary ready.`)
     
     return binaryPath
     
   } catch (err) {
     debugLog(`Failed to download: ${err}`)
-    console.error(`[oh-my-opencode] Failed to download comment-checker: ${err instanceof Error ? err.message : err}`)
-    console.error(`[oh-my-opencode] Comment checking disabled.`)
+    log(`[oh-my-opencode] Failed to download comment-checker: ${err instanceof Error ? err.message : err}`)
+    log(`[oh-my-opencode] Comment checking disabled.`)
     return null
   }
 }

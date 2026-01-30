@@ -11,6 +11,7 @@ import {
 } from "vscode-jsonrpc/node"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
+import { log } from "../../shared/logger"
 
 interface ManagedClient {
   client: LSPClient
@@ -306,7 +307,7 @@ export class LSPClient {
     })
 
     this.connection.onError((error) => {
-      console.error("LSP connection error:", error)
+      log("LSP connection error:", error)
     })
 
     this.connection.listen()

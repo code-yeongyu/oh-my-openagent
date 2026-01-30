@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
+import { log } from "../../shared/logger"
 
 export interface StoredMessage {
   agent?: string
@@ -117,7 +118,7 @@ export function injectHookMessage(
 ): boolean {
   // Validate hook content to prevent empty message injection
   if (!hookContent || hookContent.trim().length === 0) {
-    console.warn("[hook-message-injector] Attempted to inject empty hook content, skipping injection", {
+    log("[hook-message-injector] Attempted to inject empty hook content, skipping injection", {
       sessionID,
       hasAgent: !!originalMessage.agent,
       hasModel: !!(originalMessage.model?.providerID && originalMessage.model?.modelID)
