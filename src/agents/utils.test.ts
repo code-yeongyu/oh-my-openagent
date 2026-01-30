@@ -3,6 +3,7 @@ import { createBuiltinAgents } from "./utils"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import * as modelAvailability from "../shared/model-availability"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
@@ -521,5 +522,42 @@ describe("override.category expansion in createBuiltinAgents", () => {
     expect(agents.oracle).toBeDefined()
     const agentsWithoutOverride = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL)
     expect(agents.oracle.model).toBe(agentsWithoutOverride.oracle.model)
+  })
+})
+
+describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
+  test("createBuiltinAgents should call fetchAvailableModels with undefined client to prevent deadlock", async () => {
+    // #given - This test ensures we don't regress on issue #1301
+    // Passing client to fetchAvailableModels during createBuiltinAgents (called from config handler)
+    // causes deadlock:
+    // - Plugin init waits for server response (client.provider.list())
+    // - Server waits for plugin init to complete before handling requests
+    const fetchSpy = spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(new Set<string>())
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+
+    const mockClient = {
+      provider: { list: () => Promise.resolve({ data: { connected: [] } }) },
+      model: { list: () => Promise.resolve({ data: [] }) },
+    }
+
+    // #when - Even when client is provided, fetchAvailableModels must be called with undefined
+    await createBuiltinAgents(
+      [],
+      {},
+      undefined,
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      mockClient // client is passed but should NOT be forwarded to fetchAvailableModels
+    )
+
+    // #then - fetchAvailableModels must be called with undefined as first argument (no client)
+    // This prevents the deadlock described in issue #1301
+    expect(fetchSpy).toHaveBeenCalled()
+    const firstCallArgs = fetchSpy.mock.calls[0]
+    expect(firstCallArgs[0]).toBeUndefined()
+
+    fetchSpy.mockRestore()
   })
 })
