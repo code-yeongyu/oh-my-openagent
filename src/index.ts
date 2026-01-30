@@ -42,6 +42,7 @@ import {
 } from "./features/context-injector";
 import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./shared/agent-variant";
 import { createFirstMessageVariantGate } from "./shared/first-message-variant";
+import { applyChatMessageVariant } from "./shared/chat-message-variant";
 import {
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
@@ -401,24 +402,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       const message = (output as { message: { variant?: string } }).message
-      if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-        const variant = input.model && input.agent
-          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-          : resolveAgentVariant(pluginConfig, input.agent)
-        if (variant !== undefined) {
-          message.variant = variant
-        }
-        firstMessageVariantGate.markApplied(input.sessionID)
-      } else {
-        if (input.model && input.agent && message.variant === undefined) {
-          const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
-          if (variant !== undefined) {
-            message.variant = variant
-          }
-        } else {
-          applyAgentVariant(pluginConfig, input.agent, message)
-        }
-      }
+      applyChatMessageVariant(pluginConfig, firstMessageVariantGate, input, message)
 
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
