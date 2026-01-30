@@ -63,6 +63,8 @@ export interface EventState {
   lastOutput: string
   lastPartText: string
   currentTool: string | null
+  /** Set to true when the main session has produced meaningful work (text, tool call, or tool result) */
+  hasReceivedMeaningfulWork: boolean
 }
 
 export function createEventState(): EventState {
@@ -73,6 +75,7 @@ export function createEventState(): EventState {
     lastOutput: "",
     lastPartText: "",
     currentTool: null,
+    hasReceivedMeaningfulWork: false,
   }
 }
 
@@ -241,6 +244,7 @@ function handleMessagePartUpdated(
     const newText = part.text.slice(state.lastPartText.length)
     if (newText) {
       process.stdout.write(newText)
+      state.hasReceivedMeaningfulWork = true
     }
     state.lastPartText = part.text
   }
@@ -267,6 +271,7 @@ function handleMessageUpdated(
     }
   }
   state.lastOutput = content
+  state.hasReceivedMeaningfulWork = true
 }
 
 function handleToolExecute(
@@ -296,6 +301,7 @@ function handleToolExecute(
     }
   }
 
+  state.hasReceivedMeaningfulWork = true
   process.stdout.write(`\n${pc.cyan(">")} ${pc.bold(toolName)}${inputPreview}\n`)
 }
 
