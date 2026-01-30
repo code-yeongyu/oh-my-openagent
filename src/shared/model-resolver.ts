@@ -60,7 +60,7 @@ export function resolveModelWithFallback(
 		return { model: normalizedUserModel, source: "override" }
 	}
 
-	// Step 3: Provider fallback chain (with availability check)
+	// Step 3: Provider fallback chain (exact match → fuzzy match → next provider)
 	if (fallbackChain && fallbackChain.length > 0) {
 		if (availableModels.size === 0) {
 			const connectedProviders = readConnectedProvidersCache()
@@ -73,7 +73,7 @@ export function resolveModelWithFallback(
 					for (const provider of entry.providers) {
 						if (connectedSet.has(provider)) {
 							const model = `${provider}/${entry.model}`
-							log("Model resolved via fallback chain (no model cache, using connected provider)", { 
+							log("Model resolved via fallback chain (connected provider)", { 
 								provider, 
 								model: entry.model, 
 								variant: entry.variant,
@@ -84,19 +84,19 @@ export function resolveModelWithFallback(
 				}
 				log("No connected provider found in fallback chain, falling through to system default")
 			}
-		}
-
-		for (const entry of fallbackChain) {
-			for (const provider of entry.providers) {
-				const fullModel = `${provider}/${entry.model}`
-				const match = fuzzyMatchModel(fullModel, availableModels, [provider])
-				if (match) {
-					log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
-					return { model: match, source: "provider-fallback", variant: entry.variant }
+		} else {
+			for (const entry of fallbackChain) {
+				for (const provider of entry.providers) {
+					const fullModel = `${provider}/${entry.model}`
+					const match = fuzzyMatchModel(fullModel, availableModels, [provider])
+					if (match) {
+						log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
+						return { model: match, source: "provider-fallback", variant: entry.variant }
+					}
 				}
 			}
+			log("No available model found in fallback chain, falling through to system default")
 		}
-		log("No available model found in fallback chain, falling through to system default")
 	}
 
 	// Step 4: System default (if provided)
