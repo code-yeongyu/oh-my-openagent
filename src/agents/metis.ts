@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 /**
  * Metis - Plan Consultant Agent
@@ -311,7 +313,7 @@ export function createMetisAgent(model: string): AgentConfig {
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
-    mode: "subagent" as const,
+    mode: MODE,
     model,
     temperature: 0.3,
     ...metisRestrictions,
@@ -319,7 +321,7 @@ export function createMetisAgent(model: string): AgentConfig {
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
-
+createMetisAgent.mode = MODE
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
