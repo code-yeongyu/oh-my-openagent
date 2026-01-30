@@ -2,6 +2,7 @@ import { describe, test, expect, mock, beforeEach } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
+import type { TmuxUtilDeps } from './manager'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -33,6 +34,11 @@ const mockExecuteAction = mock<(
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
+const mockTmuxDeps: TmuxUtilDeps = {
+  isInsideTmux: mockIsInsideTmux,
+  getCurrentPaneId: mockGetCurrentPaneId,
+}
+
 mock.module('./pane-state-querier', () => ({
   queryWindowState: mockQueryWindowState,
   paneExists: mockPaneExists,
@@ -51,15 +57,19 @@ mock.module('./action-executor', () => ({
   executeAction: mockExecuteAction,
 }))
 
-mock.module('../../shared/tmux', () => ({
-  isInsideTmux: mockIsInsideTmux,
-  getCurrentPaneId: mockGetCurrentPaneId,
-  POLL_INTERVAL_BACKGROUND_MS: 2000,
-  SESSION_TIMEOUT_MS: 600000,
-  SESSION_MISSING_GRACE_MS: 6000,
-  SESSION_READY_POLL_INTERVAL_MS: 100,
-  SESSION_READY_TIMEOUT_MS: 500,
-}))
+mock.module('../../shared/tmux', () => {
+  const { isInsideTmux, getCurrentPaneId } = require('../../shared/tmux/tmux-utils')
+  const { POLL_INTERVAL_BACKGROUND_MS, SESSION_TIMEOUT_MS, SESSION_MISSING_GRACE_MS } = require('../../shared/tmux/constants')
+  return {
+    isInsideTmux,
+    getCurrentPaneId,
+    POLL_INTERVAL_BACKGROUND_MS,
+    SESSION_TIMEOUT_MS,
+    SESSION_MISSING_GRACE_MS,
+    SESSION_READY_POLL_INTERVAL_MS: 100,
+    SESSION_READY_TIMEOUT_MS: 500,
+  }
+})
 
 const trackedSessions = new Set<string>()
 
@@ -148,7 +158,7 @@ describe('TmuxSessionManager', () => {
       }
 
       //#when
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#then
       expect(manager).toBeDefined()
@@ -168,7 +178,7 @@ describe('TmuxSessionManager', () => {
       }
 
       //#when
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#then
       expect(manager).toBeDefined()
@@ -188,7 +198,7 @@ describe('TmuxSessionManager', () => {
       }
 
       //#when
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#then
       expect(manager).toBeDefined()
@@ -210,7 +220,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = createSessionCreatedEvent(
         'ses_child',
         'ses_parent',
@@ -271,7 +281,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#when - first agent
       await manager.onSessionCreated(
@@ -305,7 +315,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = createSessionCreatedEvent('ses_root', undefined, 'Root Session')
 
       //#when
@@ -327,7 +337,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = createSessionCreatedEvent(
         'ses_child',
         'ses_parent',
@@ -353,7 +363,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
       const event = {
         type: 'session.deleted',
         properties: {
@@ -398,7 +408,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionCreated(
@@ -450,7 +460,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent(
@@ -487,7 +497,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       //#when
       await manager.onSessionDeleted({ sessionID: 'ses_unknown' })
@@ -521,7 +531,7 @@ describe('TmuxSessionManager', () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       }
-      const manager = new TmuxSessionManager(ctx, config)
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1')
