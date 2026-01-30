@@ -1159,7 +1159,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-pro" }] },
+        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -1325,6 +1325,13 @@ describe("sisyphus-task", () => {
     test("artistry category (gemini) with run_in_background=false should force background but wait for result", async () => {
       // #given - artistry also uses gemini model
       const { createDelegateTask } = require("./tools")
+      const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+        connected: ["anthropic", "google", "openai"],
+        updatedAt: new Date().toISOString(),
+        models: {
+          google: ["gemini-3-pro", "gemini-3-flash"],
+        },
+      })
       let launchCalled = false
       
       const mockManager = {
@@ -1343,7 +1350,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-pro" }] },
+        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -1385,6 +1392,7 @@ describe("sisyphus-task", () => {
       expect(launchCalled).toBe(true)
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Artistry result here")
+      providerModelsSpy.mockRestore()
     }, { timeout: 20000 })
 
     test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {

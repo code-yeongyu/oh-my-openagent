@@ -4,9 +4,123 @@ import type { BackgroundManager } from "../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
 
+type TimerCallback = (...args: any[]) => void
+
+interface FakeTimers {
+  advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
+  restore: () => void
+}
+
+function createFakeTimers(): FakeTimers {
+  const originalNow = Date.now()
+  let clockNow = originalNow
+  let timerNow = 0
+  let nextId = 1
+  const timers = new Map<number, { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] }>()
+  const cleared = new Set<number>()
+
+  const original = {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    setInterval: globalThis.setInterval,
+    clearInterval: globalThis.clearInterval,
+    dateNow: Date.now,
+  }
+
+  const normalizeDelay = (delay?: number) => {
+    if (typeof delay !== "number" || !Number.isFinite(delay)) return 0
+    return delay < 0 ? 0 : delay
+  }
+
+  const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
+    const id = nextId++
+    timers.set(id, {
+      id,
+      time: timerNow + normalizeDelay(delay),
+      interval,
+      callback,
+      args,
+    })
+    return id
+  }
+
+  const clear = (id: number | undefined) => {
+    if (typeof id !== "number") return
+    cleared.add(id)
+    timers.delete(id)
+  }
+
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+    return schedule(callback, delay, null, args) as unknown as ReturnType<typeof setTimeout>
+  }) as typeof setTimeout
+
+  globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+    const interval = normalizeDelay(delay)
+    return schedule(callback, delay, interval, args) as unknown as ReturnType<typeof setInterval>
+  }) as typeof setInterval
+
+  globalThis.clearTimeout = ((id?: number) => {
+    clear(id)
+  }) as typeof clearTimeout
+
+  globalThis.clearInterval = ((id?: number) => {
+    clear(id)
+  }) as typeof clearInterval
+
+  Date.now = () => clockNow
+
+  const advanceBy = async (ms: number, advanceClock: boolean = false) => {
+    const clamped = Math.max(0, ms)
+    const target = timerNow + clamped
+    if (advanceClock) {
+      clockNow += clamped
+    }
+    while (true) {
+      let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: any[] } | undefined
+      for (const timer of timers.values()) {
+        if (timer.time <= target && (!next || timer.time < next.time)) {
+          next = timer
+        }
+      }
+      if (!next) break
+
+      timerNow = next.time
+      timers.delete(next.id)
+      next.callback(...next.args)
+
+      if (next.interval !== null && !cleared.has(next.id)) {
+        timers.set(next.id, {
+          id: next.id,
+          time: timerNow + next.interval,
+          interval: next.interval,
+          callback: next.callback,
+          args: next.args,
+        })
+      } else {
+        cleared.delete(next.id)
+      }
+
+      await Promise.resolve()
+    }
+    timerNow = target
+    await Promise.resolve()
+  }
+
+  const restore = () => {
+    globalThis.setTimeout = original.setTimeout
+    globalThis.clearTimeout = original.clearTimeout
+    globalThis.setInterval = original.setInterval
+    globalThis.clearInterval = original.clearInterval
+    Date.now = original.dateNow
+  }
+
+  return { advanceBy, restore }
+}
+
 describe("todo-continuation-enforcer", () => {
   let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
   let toastCalls: Array<{ title: string; message: string }>
+  let fakeTimers: FakeTimers
 
   interface MockMessage {
     info: {
@@ -60,6 +174,7 @@ describe("todo-continuation-enforcer", () => {
   }
 
   beforeEach(() => {
+    fakeTimers = createFakeTimers()
     _resetForTesting()
     promptCalls = []
     toastCalls = []
@@ -67,6 +182,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   afterEach(() => {
+    fakeTimers.restore()
     _resetForTesting()
   })
 
@@ -85,12 +201,12 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #then - countdown toast shown
-    await new Promise(r => setTimeout(r, 100))
+    await fakeTimers.advanceBy(100)
     expect(toastCalls.length).toBeGreaterThanOrEqual(1)
     expect(toastCalls[0].title).toBe("Todo Continuation")
 
     // #then - after countdown, continuation injected
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].text).toContain("TODO CONTINUATION")
   })
@@ -112,7 +228,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected
     expect(promptCalls).toHaveLength(0)
@@ -132,7 +248,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected
     expect(promptCalls).toHaveLength(0)
@@ -150,7 +266,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID: otherSession } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected
     expect(promptCalls).toHaveLength(0)
@@ -170,7 +286,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #then - continuation injected for background task session
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].sessionID).toBe(bgTaskSession)
   })
@@ -190,7 +306,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - wait past grace period (500ms), then user sends message
-    await new Promise(r => setTimeout(r, 600))
+    await fakeTimers.advanceBy(600, true)
     await hook.handler({
       event: {
         type: "message.updated",
@@ -199,7 +315,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #then - wait past countdown time and verify no injection (countdown was cancelled)
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
     expect(promptCalls).toHaveLength(0)
   })
 
@@ -223,9 +339,9 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // #then - countdown should continue (message was ignored)
+     // #then - countdown should continue (message was ignored)
     // wait past 2s countdown and verify injection happens
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
     expect(promptCalls).toHaveLength(1)
   })
 
@@ -242,7 +358,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - assistant starts responding
-    await new Promise(r => setTimeout(r, 500))
+    await fakeTimers.advanceBy(500)
     await hook.handler({
       event: {
         type: "message.part.updated",
@@ -250,7 +366,7 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected (cancelled)
     expect(promptCalls).toHaveLength(0)
@@ -269,12 +385,12 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - tool starts executing
-    await new Promise(r => setTimeout(r, 500))
+    await fakeTimers.advanceBy(500)
     await hook.handler({
       event: { type: "tool.execute.before", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected (cancelled)
     expect(promptCalls).toHaveLength(0)
@@ -295,7 +411,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected
     expect(promptCalls).toHaveLength(0)
@@ -317,7 +433,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected
     expect(promptCalls.length).toBe(1)
@@ -336,12 +452,12 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - session is deleted during countdown
-    await new Promise(r => setTimeout(r, 500))
+    await fakeTimers.advanceBy(500)
     await hook.handler({
       event: { type: "session.deleted", properties: { info: { id: sessionID } } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation injected (cleaned up)
     expect(promptCalls).toHaveLength(0)
@@ -362,7 +478,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 100))
+    await fakeTimers.advanceBy(100)
     expect(toastCalls.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -379,7 +495,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #then - multiple toast updates during countdown (2s countdown = 2 toasts: "2s" and "1s")
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
     expect(toastCalls.length).toBeGreaterThanOrEqual(2)
     expect(toastCalls[0].message).toContain("2s")
   })
@@ -395,7 +511,7 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await new Promise(r => setTimeout(r, 3500))
+    await fakeTimers.advanceBy(3500)
 
     // #then - first injection happened
     expect(promptCalls.length).toBe(1)
@@ -404,7 +520,7 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await new Promise(r => setTimeout(r, 3500))
+    await fakeTimers.advanceBy(3500)
 
     // #then - second injection also happened (no throttle blocking)
     expect(promptCalls.length).toBe(2)
@@ -439,7 +555,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
 
     // #then - continuation injected (non-abort errors don't block)
     expect(promptCalls.length).toBe(1)
@@ -472,7 +588,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (last message was aborted)
     expect(promptCalls).toHaveLength(0)
@@ -490,12 +606,12 @@ describe("todo-continuation-enforcer", () => {
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
-    // #when - session goes idle
+     // #when - session goes idle
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (no abort)
     expect(promptCalls.length).toBe(1)
@@ -518,7 +634,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (last message is user, not aborted assistant)
     expect(promptCalls.length).toBe(1)
@@ -541,7 +657,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (abort error detected)
     expect(promptCalls).toHaveLength(0)
@@ -566,12 +682,12 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // #when - session goes idle immediately after
+     // #when - session goes idle immediately after
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (abort detected via event)
     expect(promptCalls).toHaveLength(0)
@@ -601,7 +717,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (abort detected via event)
     expect(promptCalls).toHaveLength(0)
@@ -627,13 +743,13 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - wait >3s then idle fires
-    await new Promise(r => setTimeout(r, 3100))
+    await fakeTimers.advanceBy(3100, true)
 
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (abort flag is stale)
     expect(promptCalls.length).toBeGreaterThan(0)
@@ -659,7 +775,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // #when - user sends new message (clears abort flag)
-    await new Promise(r => setTimeout(r, 600))
+    await fakeTimers.advanceBy(600)
     await hook.handler({
       event: {
         type: "message.updated",
@@ -672,7 +788,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (abort flag was cleared by user activity)
     expect(promptCalls.length).toBeGreaterThan(0)
@@ -710,7 +826,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (abort flag was cleared by assistant activity)
     expect(promptCalls.length).toBeGreaterThan(0)
@@ -748,7 +864,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (abort flag was cleared by tool execution)
     expect(promptCalls.length).toBeGreaterThan(0)
@@ -778,7 +894,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (event-based detection wins over API)
     expect(promptCalls).toHaveLength(0)
@@ -800,7 +916,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (API fallback detected the abort)
     expect(promptCalls).toHaveLength(0)
@@ -820,7 +936,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
 
     // #then - prompt call made, model is undefined when no context (expected behavior)
     expect(promptCalls.length).toBe(1)
@@ -867,7 +983,7 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - session goes idle
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
 
     // #then - model should be extracted from assistant message's flat modelID/providerID
     expect(promptCalls.length).toBe(1)
@@ -919,7 +1035,7 @@ describe("todo-continuation-enforcer", () => {
 
     // #when - session goes idle
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await new Promise(r => setTimeout(r, 2500))
+    await fakeTimers.advanceBy(2500)
 
     // #then - continuation uses Sisyphus (skipped compaction agent)
     expect(promptCalls.length).toBe(1)
@@ -964,7 +1080,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (compaction is in default skipAgents)
     expect(promptCalls).toHaveLength(0)
@@ -1010,7 +1126,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - no continuation (prometheus found after filtering compaction, prometheus is in skipAgents)
     expect(promptCalls).toHaveLength(0)
@@ -1057,7 +1173,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await new Promise(r => setTimeout(r, 3000))
+    await fakeTimers.advanceBy(3000)
 
     // #then - continuation injected (no agents to skip)
     expect(promptCalls.length).toBe(1)
