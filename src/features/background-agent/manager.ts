@@ -1394,6 +1394,15 @@ function registerProcessSignal(
   exitAfter: boolean
 ): () => void {
   const listener = () => {
+    // DEADLOCK FIX: If cleanup involves API calls to a deadlocked server,
+    // the handler() call may hang forever. Set a force-exit timeout so
+    // Ctrl+C always works even when the server is unresponsive.
+    if (exitAfter) {
+      const forceExitTimer = setTimeout(() => {
+        process.exit(1)
+      }, 3000)
+      forceExitTimer.unref()
+    }
     handler()
     if (exitAfter) {
       process.exit(0)

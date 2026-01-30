@@ -26,6 +26,14 @@ import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, fetchAvailableModels, readConnectedProvidersCache } from "../shared";
+
+// DEADLOCK FIX: The config handler is called by OpenCode during startup, before
+// the TUI/web UI renders. If the handler calls back to the OpenCode server via
+// client API (e.g., client.provider.list() inside fetchAvailableModels), it creates
+// a circular dependency: server waits for config → config waits for server.
+// To break this, we avoid passing the client for model fetching in the config handler
+// and rely on cache-based resolution instead.
+const CONFIG_HANDLER_CLIENT = undefined;
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -144,7 +152,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.categories,
       pluginConfig.git_master,
       allDiscoveredSkills,
-      ctx.client,
+      CONFIG_HANDLER_CLIENT, // DEADLOCK FIX: use cache-only model resolution
       browserProvider,
       currentModel // uiSelectedModel - takes highest priority
     );
@@ -249,9 +257,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
         const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
         const connectedProviders = readConnectedProvidersCache();
-        const availableModels = ctx.client
-          ? await fetchAvailableModels(ctx.client, { connectedProviders: connectedProviders ?? undefined })
-          : new Set<string>();
+        // DEADLOCK FIX: use cache-only resolution to avoid calling back to server
+        const availableModels = await fetchAvailableModels(CONFIG_HANDLER_CLIENT, {
+          connectedProviders: connectedProviders ?? undefined,
+        });
 
         const modelResolution = resolveModelWithFallback({
           uiSelectedModel: currentModel,
