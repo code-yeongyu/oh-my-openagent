@@ -2768,7 +2768,8 @@
           "type": "string",
           "enum": [
             "playwright",
-            "agent-browser"
+            "agent-browser",
+            "dev-browser"
           ]
         }
       }
@@ -2806,6 +2807,50 @@
           "default": 40,
           "type": "number",
           "minimum": 20
+        }
+      }
+    },
+    "sisyphus": {
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "storage_path": {
+              "default": ".sisyphus/tasks",
+              "type": "string"
+            },
+            "claude_code_compat": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        },
+        "swarm": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "storage_path": {
+              "default": ".sisyphus/teams",
+              "type": "string"
+            },
+            "ui_mode": {
+              "default": "toast",
+              "type": "string",
+              "enum": [
+                "toast",
+                "tmux",
+                "both"
+              ]
+            }
+          }
         }
       }
     }

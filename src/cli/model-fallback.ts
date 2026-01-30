@@ -14,6 +14,7 @@ interface ProviderAvailability {
   opencodeZen: boolean
   copilot: boolean
   zai: boolean
+  kimiForCoding: boolean
   isMaxPlan: boolean
 }
 
@@ -36,7 +37,7 @@ export interface GeneratedOmoConfig {
 
 const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
-const ULTIMATE_FALLBACK = "opencode/big-pickle"
+const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
 
 function toProviderAvailability(config: InstallConfig): ProviderAvailability {
@@ -49,6 +50,7 @@ function toProviderAvailability(config: InstallConfig): ProviderAvailability {
     opencodeZen: config.hasOpencodeZen,
     copilot: config.hasCopilot,
     zai: config.hasZaiCodingPlan,
+    kimiForCoding: config.hasKimiForCoding,
     isMaxPlan: config.isMax20,
   }
 }
@@ -61,6 +63,7 @@ function isProviderAvailable(provider: string, avail: ProviderAvailability): boo
     "github-copilot": avail.copilot,
     opencode: avail.opencodeZen,
     "zai-coding-plan": avail.zai,
+    "kimi-for-coding": avail.kimiForCoding,
   }
   return mapping[provider] ?? false
 }
@@ -102,6 +105,8 @@ function getSisyphusFallbackChain(isMaxPlan: boolean): FallbackEntry[] {
   // For non-max plan, use sonnet instead of opus
   return [
     { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
+    { providers: ["kimi-for-coding"], model: "k2p5" },
+    { providers: ["opencode"], model: "kimi-k2.5-free" },
     { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
     { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
   ]
@@ -115,7 +120,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.gemini ||
     avail.opencodeZen ||
     avail.copilot ||
-    avail.zai
+    avail.zai ||
+    avail.kimiForCoding
 
   if (!hasAnyProvider) {
     return {

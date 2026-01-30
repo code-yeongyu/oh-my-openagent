@@ -2,8 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
 import {
-  isInsideTmux,
-  getCurrentPaneId,
+  isInsideTmux as defaultIsInsideTmux,
+  getCurrentPaneId as defaultGetCurrentPaneId,
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_MISSING_GRACE_MS,
   SESSION_READY_POLL_INTERVAL_MS,
@@ -19,6 +19,16 @@ type OpencodeClient = PluginInput["client"]
 interface SessionCreatedEvent {
   type: string
   properties?: { info?: { id?: string; parentID?: string; title?: string } }
+}
+
+export interface TmuxUtilDeps {
+  isInsideTmux: () => boolean
+  getCurrentPaneId: () => string | undefined
+}
+
+const defaultTmuxDeps: TmuxUtilDeps = {
+  isInsideTmux: defaultIsInsideTmux,
+  getCurrentPaneId: defaultGetCurrentPaneId,
 }
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
@@ -43,13 +53,15 @@ export class TmuxSessionManager {
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
   private pollInterval?: ReturnType<typeof setInterval>
+  private deps: TmuxUtilDeps
 
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig) {
+  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
+    this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
-    this.sourcePaneId = getCurrentPaneId()
+    this.sourcePaneId = deps.getCurrentPaneId()
 
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -60,7 +72,7 @@ export class TmuxSessionManager {
   }
 
   private isEnabled(): boolean {
-    return this.tmuxConfig.enabled && isInsideTmux()
+    return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 
   private getCapacityConfig(): CapacityConfig {
@@ -113,7 +125,7 @@ export class TmuxSessionManager {
     log("[tmux-session-manager] onSessionCreated called", {
       enabled,
       tmuxConfigEnabled: this.tmuxConfig.enabled,
-      isInsideTmux: isInsideTmux(),
+      isInsideTmux: this.deps.isInsideTmux(),
       eventType: event.type,
       infoId: event.properties?.info?.id,
       infoParentID: event.properties?.info?.parentID,

@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -79,6 +79,7 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
+  private onShutdown?: () => void
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -89,6 +90,7 @@ export class BackgroundManager {
     options?: {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
+      onShutdown?: () => void
     }
   ) {
     this.tasks = new Map()
@@ -100,6 +102,7 @@ export class BackgroundManager {
     this.config = config
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
+    this.onShutdown = options?.onShutdown
     this.registerProcessCleanup()
   }
 
@@ -224,7 +227,10 @@ export class BackgroundManager {
       body: {
         parentID: input.parentSessionID,
         title: `Background: ${input.description}`,
-      },
+        permission: [
+          { permission: "question", action: "deny" as const, pattern: "*" },
+        ],
+      } as any,
       query: {
         directory: parentDirectory,
       },
@@ -294,11 +300,19 @@ export class BackgroundManager {
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
     // Include model if caller provided one (e.g., from Sisyphus category configs)
-    this.client.session.prompt({
+    // IMPORTANT: variant must be a top-level field in the body, NOT nested inside model
+    // OpenCode's PromptInput schema expects: { model: { providerID, modelID }, variant: "max" }
+    const launchModel = input.model
+      ? { providerID: input.model.providerID, modelID: input.model.modelID }
+      : undefined
+    const launchVariant = input.model?.variant
+
+    promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
       body: {
         agent: input.agent,
-        ...(input.model ? { model: input.model } : {}),
+        ...(launchModel ? { model: launchModel } : {}),
+        ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
         tools: {
           ...getAgentToolRestrictions(input.agent),
@@ -542,11 +556,18 @@ export class BackgroundManager {
 
     // Use prompt() instead of promptAsync() to properly initialize agent loop
     // Include model if task has one (preserved from original launch with category config)
+    // variant must be top-level in body, not nested inside model (OpenCode PromptInput schema)
+    const resumeModel = existingTask.model
+      ? { providerID: existingTask.model.providerID, modelID: existingTask.model.modelID }
+      : undefined
+    const resumeVariant = existingTask.model?.variant
+
     this.client.session.prompt({
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
-        ...(existingTask.model ? { model: existingTask.model } : {}),
+        ...(resumeModel ? { model: resumeModel } : {}),
+        ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: {
           ...getAgentToolRestrictions(existingTask.agent),
           task: false,
@@ -1328,7 +1349,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
 
-    // Release concurrency for all running tasks first
+    // Abort all running sessions to prevent zombie processes (#1240)
+    for (const task of this.tasks.values()) {
+      if (task.status === "running" && task.sessionID) {
+        this.client.session.abort({
+          path: { id: task.sessionID },
+        }).catch(() => {})
+      }
+    }
+
+    // Notify shutdown listeners (e.g., tmux cleanup)
+    if (this.onShutdown) {
+      try {
+        this.onShutdown()
+      } catch (error) {
+        log("[background-agent] Error in onShutdown callback:", error)
+      }
+    }
+
+    // Release concurrency for all running tasks
     for (const task of this.tasks.values()) {
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)

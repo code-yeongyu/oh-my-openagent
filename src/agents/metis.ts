@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 /**
  * Metis - Plan Consultant Agent
@@ -230,12 +232,37 @@ call_omo_agent(subagent_type="librarian", prompt="Find OSS implementations of Z.
 - [Risk 2]: [Mitigation]
 
 ## Directives for Prometheus
+
+### Core Directives
 - MUST: [Required action]
 - MUST: [Required action]
 - MUST NOT: [Forbidden action]
 - MUST NOT: [Forbidden action]
 - PATTERN: Follow \`[file:lines]\`
 - TOOL: Use \`[specific tool]\` for [purpose]
+
+### QA/Acceptance Criteria Directives (MANDATORY)
+> **ZERO USER INTERVENTION PRINCIPLE**: All acceptance criteria MUST be executable by agents.
+
+- MUST: Write acceptance criteria as executable commands (curl, bun test, playwright actions)
+- MUST: Include exact expected outputs, not vague descriptions
+- MUST: Specify verification tool for each deliverable type (playwright for UI, curl for API, etc.)
+- MUST NOT: Create criteria requiring "user manually tests..."
+- MUST NOT: Create criteria requiring "user visually confirms..."
+- MUST NOT: Create criteria requiring "user clicks/interacts..."
+- MUST NOT: Use placeholders without concrete examples (bad: "[endpoint]", good: "/api/users")
+
+Example of GOOD acceptance criteria:
+\`\`\`
+curl -s http://localhost:3000/api/health | jq '.status'
+# Assert: Output is "ok"
+\`\`\`
+
+Example of BAD acceptance criteria (FORBIDDEN):
+\`\`\`
+User opens browser and checks if the page loads correctly.
+User confirms the button works as expected.
+\`\`\`
 
 ## Recommended Approach
 [1-2 sentence summary of how to proceed]
@@ -263,12 +290,16 @@ call_omo_agent(subagent_type="librarian", prompt="Find OSS implementations of Z.
 - Ask generic questions ("What's the scope?")
 - Proceed without addressing ambiguity
 - Make assumptions about user's codebase
+- Suggest acceptance criteria requiring user intervention ("user manually tests", "user confirms", "user clicks")
+- Leave QA/acceptance criteria vague or placeholder-heavy
 
 **ALWAYS**:
 - Classify intent FIRST
 - Be specific ("Should this change UserService only, or also AuthService?")
 - Explore before asking (for Build/Research intents)
 - Provide actionable directives for Prometheus
+- Include QA automation directives in every output
+- Ensure acceptance criteria are agent-executable (commands, not human actions)
 `
 
 const metisRestrictions = createAgentToolRestrictions([
@@ -281,8 +312,8 @@ const metisRestrictions = createAgentToolRestrictions([
 export function createMetisAgent(model: string): AgentConfig {
   return {
     description:
-      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points.",
-    mode: "subagent" as const,
+      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
+    mode: MODE,
     model,
     temperature: 0.3,
     ...metisRestrictions,
@@ -290,7 +321,7 @@ export function createMetisAgent(model: string): AgentConfig {
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
-
+createMetisAgent.mode = MODE
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

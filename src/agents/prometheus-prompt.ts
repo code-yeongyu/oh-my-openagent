@@ -863,6 +863,20 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 \`\`\`markdown
 # {Plan Title}
 
+## TL;DR
+
+> **Quick Summary**: [1-2 sentences capturing the core objective and approach]
+> 
+> **Deliverables**: [Bullet list of concrete outputs]
+> - [Output 1]
+> - [Output 2]
+> 
+> **Estimated Effort**: [Quick | Short | Medium | Large | XL]
+> **Parallel Execution**: [YES - N waves | NO - sequential]
+> **Critical Path**: [Task X → Task Y → Task Z]
+
+---
+
 ## Context
 
 ### Original Request
@@ -939,53 +953,89 @@ Each TODO follows RED-GREEN-REFACTOR:
   - Example: Create \`src/__tests__/example.test.ts\`
   - Verify: \`bun test\` → 1 test passes
 
-### If Manual QA Only
+### If Automated Verification Only (NO User Intervention)
 
-**CRITICAL**: Without automated tests, manual verification MUST be exhaustive.
+> **CRITICAL PRINCIPLE: ZERO USER INTERVENTION**
+>
+> **NEVER** create acceptance criteria that require:
+> - "User manually tests..." / "사용자가 직접 테스트..."
+> - "User visually confirms..." / "사용자가 눈으로 확인..."
+> - "User interacts with..." / "사용자가 직접 조작..."
+> - "Ask user to verify..." / "사용자에게 확인 요청..."
+> - ANY step that requires a human to perform an action
+>
+> **ALL verification MUST be automated and executable by the agent.**
+> If a verification cannot be automated, find an automated alternative or explicitly note it as a known limitation.
 
-Each TODO includes detailed verification procedures:
+Each TODO includes EXECUTABLE verification procedures that agents can run directly:
 
 **By Deliverable Type:**
 
-| Type | Verification Tool | Procedure |
-|------|------------------|-----------|
-| **Frontend/UI** | Playwright browser | Navigate, interact, screenshot |
-| **TUI/CLI** | interactive_bash (tmux) | Run command, verify output |
-| **API/Backend** | curl / httpie | Send request, verify response |
-| **Library/Module** | Node/Python REPL | Import, call, verify |
-| **Config/Infra** | Shell commands | Apply, verify state |
+| Type | Verification Tool | Automated Procedure |
+|------|------------------|---------------------|
+| **Frontend/UI** | Playwright browser via playwright skill | Agent navigates, clicks, screenshots, asserts DOM state |
+| **TUI/CLI** | interactive_bash (tmux) | Agent runs command, captures output, validates expected strings |
+| **API/Backend** | curl / httpie via Bash | Agent sends request, parses response, validates JSON fields |
+| **Library/Module** | Node/Python REPL via Bash | Agent imports, calls function, compares output |
+| **Config/Infra** | Shell commands via Bash | Agent applies config, runs state check, validates output |
 
-**Evidence Required:**
-- Commands run with actual output
-- Screenshots for visual changes
-- Response bodies for API changes
-- Terminal output for CLI changes
+**Evidence Requirements (Agent-Executable):**
+- Command output captured and compared against expected patterns
+- Screenshots saved to .sisyphus/evidence/ for visual verification
+- JSON response fields validated with specific assertions
+- Exit codes checked (0 = success)
 
 ---
 
-## Task Flow
+## Execution Strategy
+
+### Parallel Execution Waves
+
+> Maximize throughput by grouping independent tasks into parallel waves.
+> Each wave completes before the next begins.
 
 \`\`\`
-Task 1 → Task 2 → Task 3
-              ↘ Task 4 (parallel)
+Wave 1 (Start Immediately):
+├── Task 1: [no dependencies]
+└── Task 5: [no dependencies]
+
+Wave 2 (After Wave 1):
+├── Task 2: [depends: 1]
+├── Task 3: [depends: 1]
+└── Task 6: [depends: 5]
+
+Wave 3 (After Wave 2):
+└── Task 4: [depends: 2, 3]
+
+Critical Path: Task 1 → Task 2 → Task 4
+Parallel Speedup: ~40% faster than sequential
 \`\`\`
 
-## Parallelization
+### Dependency Matrix
 
-| Group | Tasks | Reason |
-|-------|-------|--------|
-| A | 2, 3 | Independent files |
+| Task | Depends On | Blocks | Can Parallelize With |
+|------|------------|--------|---------------------|
+| 1 | None | 2, 3 | 5 |
+| 2 | 1 | 4 | 3, 6 |
+| 3 | 1 | 4 | 2, 6 |
+| 4 | 2, 3 | None | None (final) |
+| 5 | None | 6 | 1 |
+| 6 | 5 | None | 2, 3 |
 
-| Task | Depends On | Reason |
-|------|------------|--------|
-| 4 | 1 | Requires output from 1 |
+### Agent Dispatch Summary
+
+| Wave | Tasks | Recommended Agents |
+|------|-------|-------------------|
+| 1 | 1, 5 | delegate_task(category="...", load_skills=[...], run_in_background=true) |
+| 2 | 2, 3, 6 | dispatch parallel after Wave 1 completes |
+| 3 | 4 | final integration task |
 
 ---
 
 ## TODOs
 
 > Implementation + Test = ONE Task. Never separate.
-> Specify parallelizability for EVERY task.
+> EVERY task MUST have: Recommended Agent Profile + Parallelization info.
 
 - [ ] 1. [Task Title]
 
@@ -996,7 +1046,21 @@ Task 1 → Task 2 → Task 3
   **Must NOT do**:
   - [Specific exclusions from guardrails]
 
-  **Parallelizable**: YES (with 3, 4) | NO (depends on 0)
+  **Recommended Agent Profile**:
+  > Select category + skills based on task domain. Justify each choice.
+  - **Category**: \`[visual-engineering | ultrabrain | artistry | quick | unspecified-low | unspecified-high | writing]\`
+    - Reason: [Why this category fits the task domain]
+  - **Skills**: [\`skill-1\`, \`skill-2\`]
+    - \`skill-1\`: [Why needed - domain overlap explanation]
+    - \`skill-2\`: [Why needed - domain overlap explanation]
+  - **Skills Evaluated but Omitted**:
+    - \`omitted-skill\`: [Why domain doesn't overlap]
+
+  **Parallelization**:
+  - **Can Run In Parallel**: YES | NO
+  - **Parallel Group**: Wave N (with Tasks X, Y) | Sequential
+  - **Blocks**: [Tasks that depend on this task completing]
+  - **Blocked By**: [Tasks this depends on] | None (can start immediately)
 
   **References** (CRITICAL - Be Exhaustive):
 
@@ -1029,53 +1093,76 @@ Task 1 → Task 2 → Task 3
 
   **Acceptance Criteria**:
 
-  > CRITICAL: Acceptance = EXECUTION, not just "it should work".
-  > The executor MUST run these commands and verify output.
+  > **CRITICAL: AGENT-EXECUTABLE VERIFICATION ONLY**
+  >
+  > - Acceptance = EXECUTION by the agent, not "user checks if it works"
+  > - Every criterion MUST be verifiable by running a command or using a tool
+  > - NO steps like "user opens browser", "user clicks", "user confirms"
+  > - If you write "[placeholder]" - REPLACE IT with actual values based on task context
 
   **If TDD (tests enabled):**
-  - [ ] Test file created: \`[path].test.ts\`
-  - [ ] Test covers: [specific scenario]
-  - [ ] \`bun test [file]\` → PASS (N tests, 0 failures)
+  - [ ] Test file created: src/auth/login.test.ts
+  - [ ] Test covers: successful login returns JWT token
+  - [ ] bun test src/auth/login.test.ts → PASS (3 tests, 0 failures)
 
-  **Manual Execution Verification (ALWAYS include, even with tests):**
+  **Automated Verification (ALWAYS include, choose by deliverable type):**
 
-  *Choose based on deliverable type:*
+  **For Frontend/UI changes** (using playwright skill):
+  \\\`\\\`\\\`
+  # Agent executes via playwright browser automation:
+  1. Navigate to: http://localhost:3000/login
+  2. Fill: input[name="email"] with "test@example.com"
+  3. Fill: input[name="password"] with "password123"
+  4. Click: button[type="submit"]
+  5. Wait for: selector ".dashboard-welcome" to be visible
+  6. Assert: text "Welcome back" appears on page
+  7. Screenshot: .sisyphus/evidence/task-1-login-success.png
+  \\\`\\\`\\\`
 
-  **For Frontend/UI changes:**
-  - [ ] Using playwright browser automation:
-    - Navigate to: \`http://localhost:[port]/[path]\`
-    - Action: [click X, fill Y, scroll to Z]
-    - Verify: [visual element appears, animation completes, state changes]
-    - Screenshot: Save evidence to \`.sisyphus/evidence/[task-id]-[step].png\`
+  **For TUI/CLI changes** (using interactive_bash):
+  \\\`\\\`\\\`
+  # Agent executes via tmux session:
+  1. Command: ./my-cli --config test.yaml
+  2. Wait for: "Configuration loaded" in output
+  3. Send keys: "q" to quit
+  4. Assert: Exit code 0
+  5. Assert: Output contains "Goodbye"
+  \\\`\\\`\\\`
 
-  **For TUI/CLI changes:**
-  - [ ] Using interactive_bash (tmux session):
-    - Command: \`[exact command to run]\`
-    - Input sequence: [if interactive, list inputs]
-    - Expected output contains: \`[expected string or pattern]\`
-    - Exit code: [0 for success, specific code if relevant]
+  **For API/Backend changes** (using Bash curl):
+  \\\`\\\`\\\`bash
+  # Agent runs:
+  curl -s -X POST http://localhost:8080/api/users \\
+    -H "Content-Type: application/json" \\
+    -d '{"email":"new@test.com","name":"Test User"}' \\
+    | jq '.id'
+  # Assert: Returns non-empty UUID
+  # Assert: HTTP status 201
+  \\\`\\\`\\\`
 
-  **For API/Backend changes:**
-  - [ ] Request: \`curl -X [METHOD] http://localhost:[port]/[endpoint] -H "Content-Type: application/json" -d '[body]'\`
-  - [ ] Response status: [200/201/etc]
-  - [ ] Response body contains: \`{"key": "expected_value"}\`
+  **For Library/Module changes** (using Bash node/bun):
+  \\\`\\\`\\\`bash
+  # Agent runs:
+  bun -e "import { validateEmail } from './src/utils/validate'; console.log(validateEmail('test@example.com'))"
+  # Assert: Output is "true"
+  
+  bun -e "import { validateEmail } from './src/utils/validate'; console.log(validateEmail('invalid'))"
+  # Assert: Output is "false"
+  \\\`\\\`\\\`
 
-  **For Library/Module changes:**
-  - [ ] REPL verification:
-    \`\`\`
-    > import { [function] } from '[module]'
-    > [function]([args])
-    Expected: [output]
-    \`\`\`
+  **For Config/Infra changes** (using Bash):
+  \\\`\\\`\\\`bash
+  # Agent runs:
+  docker compose up -d
+  # Wait 5s for containers
+  docker compose ps --format json | jq '.[].State'
+  # Assert: All states are "running"
+  \\\`\\\`\\\`
 
-  **For Config/Infra changes:**
-  - [ ] Apply: \`[command to apply config]\`
-  - [ ] Verify state: \`[command to check state]\` → \`[expected output]\`
-
-  **Evidence Required:**
-  - [ ] Command output captured (copy-paste actual terminal output)
-  - [ ] Screenshot saved (for visual changes)
-  - [ ] Response body logged (for API changes)
+  **Evidence to Capture:**
+  - [ ] Terminal output from verification commands (actual output, not expected)
+  - [ ] Screenshot files in .sisyphus/evidence/ for UI changes
+  - [ ] JSON response bodies for API changes
 
   **Commit**: YES | NO (groups with N)
   - Message: \`type(scope): desc\`

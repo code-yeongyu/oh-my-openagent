@@ -213,7 +213,7 @@ If Z.ai is the only provider available, all agents will use GLM models:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/big-pickle`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
@@ -222,7 +222,7 @@ When OpenCode Zen is the best available provider (no native or Copilot), these m
 | **Sisyphus**  | `opencode/claude-opus-4-5`       |
 | **Oracle**    | `opencode/gpt-5.2`               |
 | **Explore**   | `opencode/gpt-5-nano`             |
-| **Librarian** | `opencode/big-pickle`          |
+| **Librarian** | `opencode/glm-4.7-free`          |
 
 ##### Setup
 
@@ -278,7 +278,7 @@ After everything is set up and working, ask the user:
 
 If the user agrees, run:
 ```bash
-gh repo star code-yeongyu/oh-my-opencode
+gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true
 ```
 
 **Important**: Only run the command if the user explicitly says yes. Never run it automatically without consent.

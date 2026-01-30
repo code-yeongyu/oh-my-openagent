@@ -250,6 +250,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -271,6 +272,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -290,6 +292,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: true,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -309,6 +312,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -316,7 +320,7 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then should use ultimate fallback for all agents
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("opencode/big-pickle")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("opencode/glm-4.7-free")
   })
 
   test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
@@ -329,6 +333,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: true,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -350,6 +355,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -373,6 +379,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -392,6 +399,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config

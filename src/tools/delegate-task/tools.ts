@@ -5,14 +5,15 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { DelegateTaskArgs } from "./types"
 import type { CategoryConfig, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, PLAN_AGENT_SYSTEM_PREPEND, isPlanAgent } from "./constants"
+import { getTimingConfig } from "./timing"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader/skill-content"
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase } from "../../shared"
-import { fetchAvailableModels } from "../../shared/model-availability"
+import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase, promptWithModelSuggestionRetry } from "../../shared"
+import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -116,9 +117,20 @@ export function resolveCategoryConfig(
     userCategories?: CategoriesConfig
     inheritedModel?: string
     systemDefaultModel?: string
+    availableModels?: Set<string>
   }
 ): { config: CategoryConfig; promptAppend: string; model: string | undefined } | null {
-  const { userCategories, inheritedModel, systemDefaultModel } = options
+  const { userCategories, inheritedModel, systemDefaultModel, availableModels } = options
+
+  // Check if category requires a specific model
+  const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  if (categoryReq?.requiresModel && availableModels) {
+    if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
+      log(`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`)
+      return null
+    }
+  }
+
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
@@ -286,7 +298,11 @@ Prompts MUST be in English.`
         resolvedParentAgent: parentAgent,
       })
       const parentModel = prevMessage?.model?.providerID && prevMessage?.model?.modelID
-        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        ? { 
+            providerID: prevMessage.model.providerID, 
+            modelID: prevMessage.model.modelID,
+            ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+          }
         : undefined
 
       if (args.session_id) {
@@ -409,9 +425,10 @@ Use \`background_output\` with task_id="${task.id}" to check progress.`
         }
 
         // Wait for message stability after prompt completes
-        const POLL_INTERVAL_MS = 500
-        const MIN_STABILITY_TIME_MS = 5000
-        const STABILITY_POLLS_REQUIRED = 3
+        const timing = getTimingConfig()
+        const POLL_INTERVAL_MS = timing.POLL_INTERVAL_MS
+        const MIN_STABILITY_TIME_MS = timing.SESSION_CONTINUATION_STABILITY_MS
+        const STABILITY_POLLS_REQUIRED = timing.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0
@@ -516,11 +533,12 @@ To continue this session: session_id="${args.session_id}"`
             connectedProviders: connectedProviders ?? undefined
           })
 
-         const resolved = resolveCategoryConfig(args.category, {
-           userCategories,
-           inheritedModel,
-           systemDefaultModel,
-         })
+          const resolved = resolveCategoryConfig(args.category, {
+            userCategories,
+            inheritedModel,
+            systemDefaultModel,
+            availableModels,
+          })
          if (!resolved) {
            return `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`
          }
@@ -535,7 +553,8 @@ To continue this session: session_id="${args.session_id}"`
            }
           } else {
           const resolution = resolveModelWithFallback({
-              userModel: userCategories?.[args.category]?.model ?? sisyphusJuniorModel,
+              userModel: userCategories?.[args.category]?.model,
+              categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
               fallbackChain: requirement.fallbackChain,
               availableModels,
               systemDefaultModel,
@@ -549,23 +568,24 @@ To continue this session: session_id="${args.session_id}"`
                return `Invalid model format "${actualModel}". Expected "provider/model" format (e.g., "anthropic/claude-sonnet-4-5").`
              }
 
-             let type: "user-defined" | "inherited" | "category-default" | "system-default"
-             switch (source) {
-                case "override":
-                  type = "user-defined"
-                  break
-                case "provider-fallback":
-                  type = "category-default"
-                  break
-                case "system-default":
-                  type = "system-default"
-                  break
-             }
+              let type: "user-defined" | "inherited" | "category-default" | "system-default"
+              switch (source) {
+                 case "override":
+                   type = "user-defined"
+                   break
+                 case "category-default":
+                 case "provider-fallback":
+                   type = "category-default"
+                   break
+                 case "system-default":
+                   type = "system-default"
+                   break
+              }
 
              modelInfo = { model: actualModel, type, source }
              
              const parsedModel = parseModelString(actualModel)
-             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant
+             const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
              categoryModel = parsedModel
                ? (variantToUse ? { ...parsedModel, variant: variantToUse } : parsedModel)
                : undefined
@@ -573,13 +593,26 @@ To continue this session: session_id="${args.session_id}"`
          }
 
          agentToUse = SISYPHUS_JUNIOR_AGENT
-         if (!categoryModel && actualModel) {
-           const parsedModel = parseModelString(actualModel)
-           categoryModel = parsedModel ?? undefined
-         }
-         categoryPromptAppend = resolved.promptAppend || undefined
+          if (!categoryModel && actualModel) {
+            const parsedModel = parseModelString(actualModel)
+            categoryModel = parsedModel ?? undefined
+          }
+          categoryPromptAppend = resolved.promptAppend || undefined
 
-         const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
+          if (!categoryModel && !actualModel) {
+            const categoryNames = Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories })
+            return `Model not configured for category "${args.category}".
+
+Configure in one of:
+1. OpenCode: Set "model" in opencode.json
+2. Oh-My-OpenCode: Set category model in oh-my-opencode.json
+3. Provider: Connect a provider with available models
+
+Current category: ${args.category}
+Available categories: ${categoryNames.join(", ")}`
+          }
+
+          const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
         // Handle both boolean false and string "false" due to potential serialization
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
@@ -649,10 +682,11 @@ To continue this session: session_id="${args.session_id}"`
             const startTime = new Date()
 
             // Poll for completion (same logic as sync mode)
-            const POLL_INTERVAL_MS = 500
-            const MAX_POLL_TIME_MS = 10 * 60 * 1000
-            const MIN_STABILITY_TIME_MS = 10000
-            const STABILITY_POLLS_REQUIRED = 3
+            const timingCfg = getTimingConfig()
+            const POLL_INTERVAL_MS = timingCfg.POLL_INTERVAL_MS
+            const MAX_POLL_TIME_MS = timingCfg.MAX_POLL_TIME_MS
+            const MIN_STABILITY_TIME_MS = timingCfg.MIN_STABILITY_TIME_MS
+            const STABILITY_POLLS_REQUIRED = timingCfg.STABILITY_POLLS_REQUIRED
             const pollStart = Date.now()
             let lastMsgCount = 0
             let stablePolls = 0
@@ -752,13 +786,19 @@ To continue this session: session_id="${sessionID}"`
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
         }
 
+        if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
+          return `You are prometheus. You cannot delegate to prometheus via delegate_task.
+
+Create the work plan directly - that's your job as the planning agent.`
+        }
+
         agentToUse = agentName
 
         // Validate agent exists and is callable (not a primary agent)
         // Uses case-insensitive matching to allow "Oracle", "oracle", "ORACLE" etc.
         try {
           const agentsResult = await client.app.agents()
-          type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all" }
+          type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all"; model?: { providerID: string; modelID: string } }
           const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
 
           const callableAgents = agents.filter((a) => a.mode !== "primary")
@@ -781,9 +821,18 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
           }
           // Use the canonical agent name from registration
           agentToUse = matchedAgent.name
+
+          // Extract registered agent's model to pass explicitly to session.prompt.
+          // This ensures the model is always in the correct object format ({providerID, modelID})
+          // regardless of how OpenCode handles string→object conversion for plugin-registered agents.
+          // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1225
+          if (matchedAgent.model) {
+            categoryModel = matchedAgent.model
+          }
         } catch {
           // If we can't fetch agents, proceed anyway - the session.prompt will fail with a clearer error
         }
+
       }
 
       const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
@@ -851,7 +900,10 @@ To continue this session: session_id="${task.sessionID}"`
           body: {
             parentID: ctx.sessionID,
             title: `Task: ${args.description}`,
-          },
+            permission: [
+              { permission: "question", action: "deny" as const, pattern: "*" },
+            ],
+          } as any,
           query: {
             directory: parentDirectory,
           },
@@ -908,19 +960,21 @@ To continue this session: session_id="${task.sessionID}"`
         })
 
         try {
-          await client.session.prompt({
+          const allowDelegateTask = isPlanAgent(agentToUse)
+          await promptWithModelSuggestionRetry(client, {
             path: { id: sessionID },
             body: {
               agent: agentToUse,
               system: systemContent,
               tools: {
                 task: false,
-                delegate_task: false,
+                delegate_task: allowDelegateTask,
                 call_omo_agent: true,
                 question: false,
               },
               parts: [{ type: "text", text: args.prompt }],
-              ...(categoryModel ? { model: categoryModel } : {}),
+              ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+              ...(categoryModel?.variant ? { variant: categoryModel.variant } : {}),
             },
           })
         } catch (promptError) {
@@ -948,10 +1002,11 @@ To continue this session: session_id="${task.sessionID}"`
 
         // Poll for session completion with stability detection
         // The session may show as "idle" before messages appear, so we also check message stability
-        const POLL_INTERVAL_MS = 500
-        const MAX_POLL_TIME_MS = 10 * 60 * 1000
-        const MIN_STABILITY_TIME_MS = 10000  // Minimum 10s before accepting completion
-        const STABILITY_POLLS_REQUIRED = 3
+        const syncTiming = getTimingConfig()
+        const POLL_INTERVAL_MS = syncTiming.POLL_INTERVAL_MS
+        const MAX_POLL_TIME_MS = syncTiming.MAX_POLL_TIME_MS
+        const MIN_STABILITY_TIME_MS = syncTiming.MIN_STABILITY_TIME_MS
+        const STABILITY_POLLS_REQUIRED = syncTiming.STABILITY_POLLS_REQUIRED
         const pollStart = Date.now()
         let lastMsgCount = 0
         let stablePolls = 0

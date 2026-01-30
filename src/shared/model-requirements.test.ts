@@ -141,19 +141,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("atlas has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
+  test("atlas has valid fallbackChain with k2p5 as primary (kimi-for-coding prioritized)", () => {
     // #given - atlas agent requirement
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // #when - accessing Atlas requirement
-    // #then - fallbackChain exists with claude-sonnet-4-5 as first entry
+    // #then - fallbackChain exists with k2p5 as first entry (kimi-for-coding prioritized)
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
     expect(atlas.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = atlas.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-5")
-    expect(primary.providers[0]).toBe("anthropic")
+    expect(primary.model).toBe("k2p5")
+    expect(primary.providers[0]).toBe("kimi-for-coding")
   })
 
   test("all 9 builtin agents have valid fallbackChain arrays", () => {
@@ -204,6 +204,22 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     const primary = ultrabrain.fallbackChain[0]
     expect(primary.variant).toBe("xhigh")
+    expect(primary.model).toBe("gpt-5.2-codex")
+    expect(primary.providers[0]).toBe("openai")
+  })
+
+  test("deep has valid fallbackChain with gpt-5.2-codex as primary", () => {
+    // #given - deep category requirement
+    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
+
+    // #when - accessing deep requirement
+    // #then - fallbackChain exists with gpt-5.2-codex as first entry, medium variant
+    expect(deep).toBeDefined()
+    expect(deep.fallbackChain).toBeArray()
+    expect(deep.fallbackChain.length).toBeGreaterThan(0)
+
+    const primary = deep.fallbackChain[0]
+    expect(primary.variant).toBe("medium")
     expect(primary.model).toBe("gpt-5.2-codex")
     expect(primary.providers[0]).toBe("openai")
   })
@@ -300,11 +316,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("google")
   })
 
-  test("all 7 categories have valid fallbackChain arrays", () => {
-    // #given - list of 7 category names
+  test("all 8 categories have valid fallbackChain arrays", () => {
+    // #given - list of 8 category names
     const expectedCategories = [
       "visual-engineering",
       "ultrabrain",
+      "deep",
       "artistry",
       "quick",
       "unspecified-low",
@@ -316,7 +333,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const definedCategories = Object.keys(CATEGORY_MODEL_REQUIREMENTS)
 
     // #then - all categories present with valid fallbackChain
-    expect(definedCategories).toHaveLength(7)
+    expect(definedCategories).toHaveLength(8)
     for (const category of expectedCategories) {
       const requirement = CATEGORY_MODEL_REQUIREMENTS[category]
       expect(requirement).toBeDefined()
@@ -353,7 +370,7 @@ describe("FallbackEntry type", () => {
     // #given - a FallbackEntry without variant
     const entry: FallbackEntry = {
       providers: ["opencode", "anthropic"],
-      model: "big-pickle",
+      model: "glm-4.7-free",
     }
 
     // #when - accessing variant
@@ -383,7 +400,7 @@ describe("ModelRequirement type", () => {
   test("ModelRequirement variant is optional", () => {
     // #given - a ModelRequirement without top-level variant
     const requirement: ModelRequirement = {
-      fallbackChain: [{ providers: ["opencode"], model: "big-pickle" }],
+      fallbackChain: [{ providers: ["opencode"], model: "glm-4.7-free" }],
     }
 
     // #when - accessing variant
@@ -407,20 +424,38 @@ describe("ModelRequirement type", () => {
     }
   })
 
-  test("all fallbackChain entries have non-empty providers array", () => {
-    // #given - all agent and category requirements
-    const allRequirements = [
-      ...Object.values(AGENT_MODEL_REQUIREMENTS),
-      ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
-    ]
+   test("all fallbackChain entries have non-empty providers array", () => {
+     // #given - all agent and category requirements
+     const allRequirements = [
+       ...Object.values(AGENT_MODEL_REQUIREMENTS),
+       ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
+     ]
 
-    // #when - checking each entry in fallbackChain
-    // #then - all have non-empty providers array
-    for (const req of allRequirements) {
-      for (const entry of req.fallbackChain) {
-        expect(entry.providers).toBeArray()
-        expect(entry.providers.length).toBeGreaterThan(0)
-      }
-    }
+     // #when - checking each entry in fallbackChain
+     // #then - all have non-empty providers array
+     for (const req of allRequirements) {
+       for (const entry of req.fallbackChain) {
+         expect(entry.providers).toBeArray()
+         expect(entry.providers.length).toBeGreaterThan(0)
+       }
+     }
+   })
+})
+
+describe("requiresModel field in categories", () => {
+  test("deep category has requiresModel set to gpt-5.2-codex", () => {
+    // #given
+    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
+
+    // #when / #then
+    expect(deep.requiresModel).toBe("gpt-5.2-codex")
+  })
+
+  test("artistry category has requiresModel set to gemini-3-pro", () => {
+    // #given
+    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
+
+    // #when / #then
+    expect(artistry.requiresModel).toBe("gemini-3-pro")
   })
 })

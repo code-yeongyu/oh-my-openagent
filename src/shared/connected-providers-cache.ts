@@ -159,13 +159,13 @@ export async function updateConnectedProvidersCache(client: {
 
 		writeConnectedProvidersCache(connected)
 
-		// Also update provider-models cache if model.list is available
+		// Always update provider-models cache (overwrite with fresh data)
+		let modelsByProvider: Record<string, string[]> = {}
 		if (client.model?.list) {
 			try {
 				const modelsResult = await client.model.list()
 				const models = modelsResult.data ?? []
 
-				const modelsByProvider: Record<string, string[]> = {}
 				for (const model of models) {
 					if (!modelsByProvider[model.provider]) {
 						modelsByProvider[model.provider] = []
@@ -173,19 +173,21 @@ export async function updateConnectedProvidersCache(client: {
 					modelsByProvider[model.provider].push(model.id)
 				}
 
-				writeProviderModelsCache({
-					models: modelsByProvider,
-					connected,
-				})
-
-				log("[connected-providers-cache] Provider-models cache updated", {
+				log("[connected-providers-cache] Fetched models from API", {
 					providerCount: Object.keys(modelsByProvider).length,
 					totalModels: models.length,
 				})
 			} catch (modelErr) {
-				log("[connected-providers-cache] Error fetching models", { error: String(modelErr) })
+				log("[connected-providers-cache] Error fetching models, writing empty cache", { error: String(modelErr) })
 			}
+		} else {
+			log("[connected-providers-cache] client.model.list not available, writing empty cache")
 		}
+
+		writeProviderModelsCache({
+			models: modelsByProvider,
+			connected,
+		})
 	} catch (err) {
 		log("[connected-providers-cache] Error updating cache", { error: String(err) })
 	}

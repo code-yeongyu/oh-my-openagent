@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { normalizeArgs, validateArgs } from "./tools"
+import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 
 describe("look-at tool", () => {
   describe("normalizeArgs", () => {
@@ -68,6 +68,140 @@ describe("look-at tool", () => {
       const args = { file_path: "", goal: "analyze" }
       const error = validateArgs(args)
       expect(error).toContain("file_path")
+    })
+  })
+
+  describe("createLookAt error handling", () => {
+    // #given session.prompt에서 JSON parse 에러 발생
+    // #when LookAt 도구 실행
+    // #then 사용자 친화적 에러 메시지 반환
+    test("handles JSON parse error from session.prompt gracefully", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_test_json_error" } }),
+          prompt: async () => {
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        toolContext
+      )
+
+      expect(result).toContain("Error: Failed to analyze file")
+      expect(result).toContain("malformed response")
+      expect(result).toContain("multimodal-looker")
+      expect(result).toContain("image/png")
+    })
+
+    // #given session.prompt에서 일반 에러 발생
+    // #when LookAt 도구 실행
+    // #then 원본 에러 메시지 포함한 에러 반환
+    test("handles generic prompt error gracefully", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_test_generic_error" } }),
+          prompt: async () => {
+            throw new Error("Network connection failed")
+          },
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.pdf", goal: "extract text" },
+        toolContext
+      )
+
+      expect(result).toContain("Error: Failed to send prompt")
+      expect(result).toContain("Network connection failed")
+    })
+  })
+
+  describe("createLookAt model passthrough", () => {
+    // #given multimodal-looker agent has resolved model info
+    // #when LookAt 도구 실행
+    // #then session.prompt에 model 정보가 전달되어야 함
+    test("passes multimodal-looker model to session.prompt when available", async () => {
+      let promptBody: any
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              {
+                name: "multimodal-looker",
+                mode: "subagent",
+                model: { providerID: "google", modelID: "gemini-3-flash" },
+              },
+            ],
+          }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_model_passthrough" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        toolContext
+      )
+
+      expect(promptBody.model).toEqual({
+        providerID: "google",
+        modelID: "gemini-3-flash",
+      })
     })
   })
 })
