@@ -192,11 +192,17 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Publish ${{ matrix.platform }}
         if: steps.check.outputs.skip != 'true'
         run: |
           cd packages/${{ matrix.platform }}
+          
+          # Remove .npmrc created by setup-node to enable pure OIDC auth
+          # setup-node adds //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+          # which breaks OIDC when NODE_AUTH_TOKEN is empty
+          rm -f ~/.npmrc
           
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
@@ -204,12 +210,10 @@ jobs:
           fi
           
           # Publish with provenance (OIDC authentication)
-          # Increased timeout for large binary uploads (40-120MB)
+          # npm 11.5.1+ auto-detects OIDC environment
           npm publish --access public --provenance $TAG_ARG
         env:
-          # Use OIDC - no NODE_AUTH_TOKEN needed
           NPM_CONFIG_PROVENANCE: "true"
-          # Increase timeout for large packages (10 minutes)
           npm_config_fetch_timeout: "600000"
           npm_config_fetch_retry_maxtimeout: "120000"
         timeout-minutes: 15
