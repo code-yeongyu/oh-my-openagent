@@ -170,7 +170,7 @@ describe("fetchNpmDistTags", () => {
 })
 
 describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
-  test("Gemini models include full spec (limit + modalities)", () => {
+  test("all models include full spec (limit + modalities + Antigravity label)", () => {
     const google = (ANTIGRAVITY_PROVIDER_CONFIG as any).google
     expect(google).toBeTruthy()
 
@@ -178,9 +178,11 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     expect(models).toBeTruthy()
 
     const required = [
-      "antigravity-gemini-3-pro-high",
-      "antigravity-gemini-3-pro-low",
+      "antigravity-gemini-3-pro",
       "antigravity-gemini-3-flash",
+      "antigravity-claude-sonnet-4-5",
+      "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-opus-4-5-thinking",
     ]
 
     for (const key of required) {
@@ -198,6 +200,43 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
       expect(Array.isArray(model.modalities.output)).toBe(true)
     }
   })
+
+  test("Gemini models have variant definitions", () => {
+    // #given the antigravity provider config
+    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+
+    // #when checking Gemini Pro variants
+    const pro = models["antigravity-gemini-3-pro"]
+    // #then should have low and high variants
+    expect(pro.variants).toBeTruthy()
+    expect(pro.variants.low).toBeTruthy()
+    expect(pro.variants.high).toBeTruthy()
+
+    // #when checking Gemini Flash variants
+    const flash = models["antigravity-gemini-3-flash"]
+    // #then should have minimal, low, medium, high variants
+    expect(flash.variants).toBeTruthy()
+    expect(flash.variants.minimal).toBeTruthy()
+    expect(flash.variants.low).toBeTruthy()
+    expect(flash.variants.medium).toBeTruthy()
+    expect(flash.variants.high).toBeTruthy()
+  })
+
+  test("Claude thinking models have variant definitions", () => {
+    // #given the antigravity provider config
+    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
+
+    // #when checking Claude thinking variants
+    const sonnetThinking = models["antigravity-claude-sonnet-4-5-thinking"]
+    const opusThinking = models["antigravity-claude-opus-4-5-thinking"]
+
+    // #then both should have low and max variants
+    for (const model of [sonnetThinking, opusThinking]) {
+      expect(model.variants).toBeTruthy()
+      expect(model.variants.low).toBeTruthy()
+      expect(model.variants.max).toBeTruthy()
+    }
+  })
 })
 
 describe("generateOmoConfig - model fallback system", () => {
@@ -211,6 +250,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -232,6 +272,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -251,6 +292,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: true,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -270,6 +312,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -277,7 +320,7 @@ describe("generateOmoConfig - model fallback system", () => {
 
     // #then should use ultimate fallback for all agents
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("opencode/big-pickle")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("opencode/glm-4.7-free")
   })
 
   test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
@@ -290,6 +333,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: true,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -311,6 +355,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -334,6 +379,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config
@@ -353,6 +399,7 @@ describe("generateOmoConfig - model fallback system", () => {
       hasCopilot: false,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
     }
 
     // #when generating config

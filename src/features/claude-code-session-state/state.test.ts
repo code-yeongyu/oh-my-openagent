@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
   setSessionAgent,
   getSessionAgent,
@@ -13,9 +13,11 @@ describe("claude-code-session-state", () => {
   beforeEach(() => {
     // #given - clean state before each test
     _resetForTesting()
-    clearSessionAgent("test-session-1")
-    clearSessionAgent("test-session-2")
-    clearSessionAgent("test-prometheus-session")
+  })
+
+  afterEach(() => {
+    // #then - cleanup after each test to prevent pollution
+    _resetForTesting()
   })
 
   describe("setSessionAgent", () => {
@@ -37,7 +39,7 @@ describe("claude-code-session-state", () => {
       setSessionAgent(sessionID, "Prometheus (Planner)")
 
       // #when - try to overwrite
-      setSessionAgent(sessionID, "Sisyphus")
+      setSessionAgent(sessionID, "sisyphus")
 
       // #then - first agent preserved
       expect(getSessionAgent(sessionID)).toBe("Prometheus (Planner)")
@@ -58,10 +60,10 @@ describe("claude-code-session-state", () => {
       setSessionAgent(sessionID, "Prometheus (Planner)")
 
       // #when - force update
-      updateSessionAgent(sessionID, "Sisyphus")
+      updateSessionAgent(sessionID, "sisyphus")
 
       // #then
-      expect(getSessionAgent(sessionID)).toBe("Sisyphus")
+      expect(getSessionAgent(sessionID)).toBe("sisyphus")
     })
   })
 
@@ -92,9 +94,9 @@ describe("claude-code-session-state", () => {
       expect(getMainSessionID()).toBe(mainID)
     })
 
-    test.skip("should return undefined when not set", () => {
-      // #given - not set
-      // TODO: Fix flaky test - parallel test execution causes state pollution
+    test("should return undefined when not set", () => {
+      // #given - explicit reset to ensure clean state (parallel test isolation)
+      _resetForTesting()
       // #then
       expect(getMainSessionID()).toBeUndefined()
     })
@@ -129,7 +131,7 @@ describe("claude-code-session-state", () => {
       // #given - user switches to custom agent "MyCustomAgent"
       const sessionID = "test-session-custom"
       const customAgent = "MyCustomAgent"
-      const defaultAgent = "Sisyphus"
+      const defaultAgent = "sisyphus"
 
       // User switches to custom agent (via UI)
       setSessionAgent(sessionID, customAgent)

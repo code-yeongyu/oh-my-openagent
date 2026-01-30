@@ -149,7 +149,41 @@ bunx oh-my-opencode run [prompt]
 
 ---
 
-## 6. `auth` - Authentication Management
+## 6. `mcp oauth` - MCP OAuth Management
+
+Manages OAuth 2.1 authentication for remote MCP servers.
+
+### Usage
+
+```bash
+# Login to an OAuth-protected MCP server
+bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+
+# Login with explicit client ID and scopes
+bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
+
+# Remove stored OAuth tokens
+bunx oh-my-opencode mcp oauth logout <server-name>
+
+# Check OAuth token status
+bunx oh-my-opencode mcp oauth status [server-name]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--server-url <url>` | MCP server URL (required for login) |
+| `--client-id <id>` | OAuth client ID (optional if server supports Dynamic Client Registration) |
+| `--scopes <scopes>` | Comma-separated OAuth scopes |
+
+### Token Storage
+
+Tokens are stored in `~/.config/opencode/mcp-oauth.json` with `0600` permissions (owner read/write only). Key format: `{serverHost}/{resource}`.
+
+---
+
+## 7. `auth` - Authentication Management
 
 Manages Google Antigravity OAuth authentication. Required for using Gemini models.
 
@@ -168,7 +202,7 @@ bunx oh-my-opencode auth status
 
 ---
 
-## 7. Configuration Files
+## 8. Configuration Files
 
 The CLI searches for configuration files in the following locations (in priority order):
 
@@ -198,7 +232,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### "OpenCode version too old" Error
 
@@ -228,7 +262,7 @@ bunx oh-my-opencode doctor --category authentication
 
 ---
 
-## 9. Non-Interactive Mode
+## 10. Non-Interactive Mode
 
 Use the `--no-tui` option for CI/CD environments.
 
@@ -242,7 +276,7 @@ bunx oh-my-opencode doctor --json > doctor-report.json
 
 ---
 
-## 10. Developer Information
+## 11. Developer Information
 
 ### CLI Structure
 

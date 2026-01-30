@@ -1,10 +1,13 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode } from "./types"
 import { isGptModel } from "./types"
 import type { AgentOverrideConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
 } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 const SISYPHUS_JUNIOR_PROMPT = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
@@ -19,32 +22,6 @@ BLOCKED ACTIONS (will fail if attempted):
 ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
 You work ALONE for implementation. No delegation of implementation tasks.
 </Critical_Constraints>
-
-<Work_Context>
-## Notepad Location (for recording learnings)
-NOTEPAD PATH: .sisyphus/notepads/{plan-name}/
-- learnings.md: Record patterns, conventions, successful approaches
-- issues.md: Record problems, blockers, gotchas encountered
-- decisions.md: Record architectural choices and rationales
-- problems.md: Record unresolved issues, technical debt
-
-You SHOULD append findings to notepad files after completing work.
-IMPORTANT: Always APPEND to notepad files - never overwrite or use Edit tool.
-
-## Plan Location (READ ONLY)
-PLAN PATH: .sisyphus/plans/{plan-name}.md
-
-CRITICAL RULE: NEVER MODIFY THE PLAN FILE
-
-The plan file (.sisyphus/plans/*.md) is SACRED and READ-ONLY.
-- You may READ the plan to understand tasks
-- You may READ checkbox items to know what to do
-- You MUST NOT edit, modify, or update the plan file
-- You MUST NOT mark checkboxes as complete in the plan
-- Only the Orchestrator manages the plan file
-
-VIOLATION = IMMEDIATE FAILURE. The Orchestrator tracks plan state.
-</Work_Context>
 
 <Todo_Discipline>
 TODO OBSESSION (NON-NEGOTIABLE):
@@ -110,8 +87,8 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   const base: AgentConfig = {
     description: override?.description ??
-      "Sisyphus-Junior - Focused task executor. Same discipline, no delegation.",
-    mode: "subagent" as const,
+      "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
+    mode: MODE,
     model,
     temperature,
     maxTokens: 64000,
@@ -133,3 +110,5 @@ export function createSisyphusJuniorAgentWithOverrides(
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
+
+createSisyphusJuniorAgentWithOverrides.mode = MODE

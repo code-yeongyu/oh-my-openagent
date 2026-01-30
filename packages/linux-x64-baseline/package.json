@@ -1,0 +1,25 @@
+{
+  "name": "oh-my-opencode-linux-x64-baseline",
+  "version": "3.1.1",
+  "description": "Platform-specific binary for oh-my-opencode (linux-x64-baseline, no AVX2)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/code-yeongyu/oh-my-opencode"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin"
+  ],
+  "bin": {
+    "oh-my-opencode": "./bin/oh-my-opencode"
+  }
+}

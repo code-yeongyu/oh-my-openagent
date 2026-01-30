@@ -16,8 +16,8 @@
 
 > [!TIP]
 >
-> [![Orchestrator 现已进入测试阶段。](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
-> > **Orchestrator 现已进入测试阶段。使用 `oh-my-opencode@3.0.0-beta.10` 安装。**
+> [![Oh My OpenCode 3.0 正式发布！](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
+> > **Oh My OpenCode 3.0 正式发布！使用 `oh-my-opencode@latest` 安装。**
 >
 > 加入我们！
 >
@@ -74,7 +74,9 @@
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![许可证](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
 
-[English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 </div>
 
@@ -191,7 +193,7 @@
   - Oracle：设计、调试 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer：前端开发 (Gemini 3 Pro)
   - Librarian：官方文档、开源实现、代码库探索 (Claude Sonnet 4.5)
-  - Explore：极速代码库探索（上下文感知 Grep）(Grok Code)
+   - Explore：极速代码库探索（上下文感知 Grep）(Claude Haiku 4.5)
 - 完整 LSP / AstGrep 支持：果断重构。
 - Todo 继续执行器：如果智能体中途退出，强制它继续。**这就是让 Sisyphus 继续推动巨石的关键。**
 - 注释检查器：防止 AI 添加过多注释。Sisyphus 生成的代码应该与人类编写的代码无法区分。

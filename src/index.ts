@@ -23,6 +23,7 @@ import {
   createInteractiveBashSessionHook,
 
   createThinkingBlockValidatorHook,
+  createCategorySkillReminderHook,
   createRalphLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
@@ -31,12 +32,15 @@ import {
   createStartWorkHook,
   createAtlasHook,
   createPrometheusMdOnlyHook,
+  createSisyphusJuniorNotepadHook,
+  createQuestionLabelTruncatorHook,
+  createSubagentQuestionBlockerHook,
 } from "./hooks";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
 } from "./features/context-injector";
-import { applyAgentVariant, resolveAgentVariant } from "./shared/agent-variant";
+import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./shared/agent-variant";
 import { createFirstMessageVariantGate } from "./shared/first-message-variant";
 import {
   discoverUserClaudeSkills,
@@ -72,8 +76,9 @@ import {
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
+import { TmuxSessionManager } from "./features/tmux-subagent";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState, getModelLimit } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -86,6 +91,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const firstMessageVariantGate = createFirstMessageVariantGate();
+
+  const tmuxConfig = {
+    enabled: pluginConfig.tmux?.enabled ?? false,
+    layout: pluginConfig.tmux?.layout ?? 'main-vertical',
+    main_pane_size: pluginConfig.tmux?.main_pane_size ?? 60,
+    main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
+    agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
+  } as const;
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
   const modelCacheState = createModelCacheState();
@@ -105,7 +118,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     
     if (externalNotifier.detected && !forceEnable) {
       // External notification plugin detected - skip our notification to avoid conflicts
-      console.warn(getNotificationConflictWarning(externalNotifier.pluginName!));
+      log(getNotificationConflictWarning(externalNotifier.pluginName!));
       log("session-notification disabled due to external notifier conflict", {
         detected: externalNotifier.pluginName,
         allPlugins: externalNotifier.allPlugins,
@@ -123,9 +136,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         experimental: pluginConfig.experimental,
       })
     : null;
-  const directoryAgentsInjector = isHookEnabled("directory-agents-injector")
-    ? createDirectoryAgentsInjectorHook(ctx)
-    : null;
+  // Check for native OpenCode AGENTS.md injection support before creating hook
+  let directoryAgentsInjector = null;
+  if (isHookEnabled("directory-agents-injector")) {
+    const currentVersion = getOpenCodeVersion();
+    const hasNativeSupport = currentVersion !== null &&
+      isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION);
+
+    if (hasNativeSupport) {
+      log("directory-agents-injector auto-disabled due to native OpenCode support", {
+        currentVersion,
+        nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+      });
+    } else {
+      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+    }
+  }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? createDirectoryReadmeInjectorHook(ctx)
     : null;
@@ -180,6 +206,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createThinkingBlockValidatorHook()
     : null;
 
+  const categorySkillReminder = isHookEnabled("category-skill-reminder")
+    ? createCategorySkillReminderHook(ctx)
+    : null;
+
   const ralphLoop = isHookEnabled("ralph-loop")
     ? createRalphLoopHook(ctx, {
         config: pluginConfig.ralph_loop,
@@ -203,9 +233,43 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createPrometheusMdOnlyHook(ctx)
     : null;
 
+  const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
+    ? createSisyphusJuniorNotepadHook(ctx)
+    : null;
+
+  const questionLabelTruncator = createQuestionLabelTruncatorHook();
+  const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
+
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task);
+  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
+
+  const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task, {
+    tmuxConfig,
+    onSubagentSessionCreated: async (event) => {
+      log("[index] onSubagentSessionCreated callback received", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+      log("[index] onSubagentSessionCreated callback completed");
+    },
+    onShutdown: () => {
+      tmuxSessionManager.cleanup().catch((error) => {
+        log("[index] tmux cleanup error during shutdown:", error)
+      })
+    },
+  });
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
@@ -235,6 +299,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "multimodal-looker"
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
+  const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
     client: ctx.client,
@@ -242,10 +307,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    browserProvider,
+    onSyncSessionCreated: async (event) => {
+      log("[index] onSyncSessionCreated callback", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+    },
   });
   const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills().filter((skill) => {
+  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill) => {
     if (disabledSkills.has(skill.name as never)) return false;
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {
@@ -319,19 +402,39 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       const message = (output as { message: { variant?: string } }).message
       if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-        const variant = resolveAgentVariant(pluginConfig, input.agent)
+        const variant = input.model && input.agent
+          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+          : resolveAgentVariant(pluginConfig, input.agent)
         if (variant !== undefined) {
           message.variant = variant
         }
         firstMessageVariantGate.markApplied(input.sessionID)
       } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
+        if (input.model && input.agent && message.variant === undefined) {
+          const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
+          if (variant !== undefined) {
+            message.variant = variant
+          }
+        } else {
+          applyAgentVariant(pluginConfig, input.agent, message)
+        }
       }
 
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+
+      if (!hasConnectedProvidersCache()) {
+        ctx.client.tui.showToast({
+          body: {
+            title: "⚠️ Provider Cache Missing",
+            message: "Model filtering disabled. RESTART OpenCode to enable full functionality.",
+            variant: "warning" as const,
+            duration: 6000,
+          },
+        }).catch(() => {});
+      }
 
       if (ralphLoop) {
         const parts = (
@@ -415,6 +518,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await thinkMode?.event(input);
       await anthropicContextWindowLimitRecovery?.event(input);
       await agentUsageReminder?.event(input);
+      await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
       await atlasHook?.handler(input);
@@ -422,29 +526,36 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
 
-      if (event.type === "session.created") {
-        const sessionInfo = props?.info as
-          | { id?: string; title?: string; parentID?: string }
-          | undefined;
-        if (!sessionInfo?.parentID) {
-          setMainSession(sessionInfo?.id);
-        }
-        firstMessageVariantGate.markSessionCreated(sessionInfo);
-      }
+       if (event.type === "session.created") {
+         const sessionInfo = props?.info as
+           | { id?: string; title?: string; parentID?: string }
+           | undefined;
+         log("[event] session.created", { sessionInfo, props });
+         if (!sessionInfo?.parentID) {
+           setMainSession(sessionInfo?.id);
+         }
+         firstMessageVariantGate.markSessionCreated(sessionInfo);
+         await tmuxSessionManager.onSessionCreated(
+           event as { type: string; properties?: { info?: { id?: string; parentID?: string; title?: string } } }
+         );
+       }
 
-      if (event.type === "session.deleted") {
-        const sessionInfo = props?.info as { id?: string } | undefined;
-        if (sessionInfo?.id === getMainSessionID()) {
-          setMainSession(undefined);
-        }
-        if (sessionInfo?.id) {
-          clearSessionAgent(sessionInfo.id);
-          resetMessageCursor(sessionInfo.id);
-          firstMessageVariantGate.clear(sessionInfo.id);
-          await skillMcpManager.disconnectSession(sessionInfo.id);
-          await lspManager.cleanupTempDirectoryClients();
-        }
-      }
+       if (event.type === "session.deleted") {
+         const sessionInfo = props?.info as { id?: string } | undefined;
+         if (sessionInfo?.id === getMainSessionID()) {
+           setMainSession(undefined);
+         }
+         if (sessionInfo?.id) {
+           clearSessionAgent(sessionInfo.id);
+           resetMessageCursor(sessionInfo.id);
+           firstMessageVariantGate.clear(sessionInfo.id);
+           await skillMcpManager.disconnectSession(sessionInfo.id);
+           await lspManager.cleanupTempDirectoryClients();
+           await tmuxSessionManager.onSessionDeleted({
+             sessionID: sessionInfo.id,
+           });
+         }
+       }
 
       if (event.type === "message.updated") {
         const info = props?.info as Record<string, unknown> | undefined;
@@ -484,6 +595,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
+      await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
+      await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"](input, output);
@@ -491,6 +604,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
+      await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
@@ -561,6 +675,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.after": async (input, output) => {
+      // Guard against undefined output (e.g., from /review command - see issue #1035)
+      if (!output) {
+        return;
+      }
       await claudeCodeHooks["tool.execute.after"](input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);
@@ -570,6 +688,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.["tool.execute.after"](input, output);
       await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
       await agentUsageReminder?.["tool.execute.after"](input, output);
+      await categorySkillReminder?.["tool.execute.after"](input, output);
       await interactiveBashSession?.["tool.execute.after"](input, output);
 await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);

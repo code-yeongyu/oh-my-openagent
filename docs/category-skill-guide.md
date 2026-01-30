@@ -23,6 +23,7 @@ A Category is an agent configuration preset optimized for specific domains.
 |----------|---------------|-----------|
 | `visual-engineering` | `google/gemini-3-pro` | Frontend, UI/UX, design, styling, animation |
 | `ultrabrain` | `openai/gpt-5.2-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
+| `deep` | `openai/gpt-5.2-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry` | `google/gemini-3-pro` (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
 | `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
@@ -70,12 +71,12 @@ A Skill is a mechanism that injects **specialized knowledge (Context)** and **to
 
 ### Usage
 
-Add desired skill names to the `skills` array.
+Add desired skill names to the `load_skills` array.
 
 ```typescript
 delegate_task(
   category="quick",
-  skills=["git-master"],
+  load_skills=["git-master"],
   prompt="Commit current changes. Follow commit message style."
 )
 ```
@@ -110,17 +111,17 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 ### 🎨 The Designer (UI Implementation)
 - **Category**: `visual-engineering`
-- **Skills**: `["frontend-ui-ux", "playwright"]`
+- **load_skills**: `["frontend-ui-ux", "playwright"]`
 - **Effect**: Implements aesthetic UI and verifies rendering results directly in browser.
 
 ### 🏗️ The Architect (Design Review)
 - **Category**: `ultrabrain`
-- **Skills**: `[]` (pure reasoning)
+- **load_skills**: `[]` (pure reasoning)
 - **Effect**: Leverages GPT-5.2's logical reasoning for in-depth system architecture analysis.
 
 ### ⚡ The Maintainer (Quick Fixes)
 - **Category**: `quick`
-- **Skills**: `["git-master"]`
+- **load_skills**: `["git-master"]`
 - **Effect**: Uses cost-effective models to quickly fix code and generate clean commits.
 
 ---
@@ -131,7 +132,7 @@ When delegating, **clear and specific** prompts are essential. Include these 7 e
 
 1. **TASK**: What needs to be done? (single objective)
 2. **EXPECTED OUTCOME**: What is the deliverable?
-3. **REQUIRED SKILLS**: Which skills should be used?
+3. **REQUIRED SKILLS**: Which skills should be loaded via `load_skills`?
 4. **REQUIRED TOOLS**: Which tools must be used? (whitelist)
 5. **MUST DO**: What must be done (constraints)
 6. **MUST NOT DO**: What must never be done

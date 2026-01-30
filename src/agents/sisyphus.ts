@@ -1,5 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode } from "./types"
 import { isGptModel } from "./types"
+
+const MODE: AgentMode = "primary"
 import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   buildKeyTriggersSection,
@@ -144,11 +147,11 @@ ${librarianSection}
 \`\`\`typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find auth implementations in our codebase...")
-delegate_task(subagent_type="explore", run_in_background=true, skills=[], prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find JWT best practices in official docs...")
-delegate_task(subagent_type="librarian", run_in_background=true, skills=[], prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
@@ -209,15 +212,15 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 Every \`delegate_task()\` output includes a session_id. **USE IT.**
 
-**ALWAYS resume when:**
+**ALWAYS continue when:**
 | Scenario | Action |
 |----------|--------|
-| Task failed/incomplete | \`resume="{session_id}", prompt="Fix: {specific error}"\` |
-| Follow-up question on result | \`resume="{session_id}", prompt="Also: {question}"\` |
-| Multi-turn with same agent | \`resume="{session_id}"\` - NEVER start fresh |
-| Verification failed | \`resume="{session_id}", prompt="Failed verification: {error}. Fix."\` |
+| Task failed/incomplete | \`session_id="{session_id}", prompt="Fix: {specific error}"\` |
+| Follow-up question on result | \`session_id="{session_id}", prompt="Also: {question}"\` |
+| Multi-turn with same agent | \`session_id="{session_id}"\` - NEVER start fresh |
+| Verification failed | \`session_id="{session_id}", prompt="Failed verification: {error}. Fix."\` |
 
-**Why resume is CRITICAL:**
+**Why session_id is CRITICAL:**
 - Subagent has FULL conversation context preserved
 - No repeated file reads, exploration, or setup
 - Saves 70%+ tokens on follow-ups
@@ -228,10 +231,10 @@ Every \`delegate_task()\` output includes a session_id. **USE IT.**
 delegate_task(category="quick", prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
-delegate_task(resume="ses_abc123", prompt="Fix: Type error on line 42")
+delegate_task(session_id="ses_abc123", prompt="Fix: Type error on line 42")
 \`\`\`
 
-**After EVERY delegation, STORE the session_id for potential resume.**
+**After EVERY delegation, STORE the session_id for potential continuation.**
 
 ### Code Changes:
 - Match existing patterns (if codebase is disciplined)
@@ -433,8 +436,8 @@ export function createSisyphusAgent(
   const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
-      "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs.",
-    mode: "primary" as const,
+      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+    mode: MODE,
     model,
     maxTokens: 64000,
     prompt,
@@ -448,3 +451,4 @@ export function createSisyphusAgent(
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
+createSisyphusAgent.mode = MODE

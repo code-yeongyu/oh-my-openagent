@@ -31,8 +31,18 @@ export async function run(options: RunOptions): Promise<number> {
   }
 
   try {
+    // Support custom OpenCode server port via environment variable
+    // This allows Open Agent and other orchestrators to run multiple
+    // concurrent missions without port conflicts
+    const serverPort = process.env.OPENCODE_SERVER_PORT
+      ? parseInt(process.env.OPENCODE_SERVER_PORT, 10)
+      : undefined
+    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || undefined
+
     const { client, server } = await createOpencode({
       signal: abortController.signal,
+      ...(serverPort && !isNaN(serverPort) ? { port: serverPort } : {}),
+      ...(serverHostname ? { hostname: serverHostname } : {}),
     })
 
     const cleanup = () => {
@@ -131,6 +141,14 @@ export async function run(options: RunOptions): Promise<number> {
           console.error(pc.yellow("Check if todos were completed before the error."))
           cleanup()
           process.exit(1)
+        }
+
+        // Guard against premature completion: don't check completion until the
+        // session has produced meaningful work (text output, tool call, or tool result).
+        // Without this, a session that goes busy->idle before the LLM responds
+        // would exit immediately because 0 todos + 0 children = "complete".
+        if (!eventState.hasReceivedMeaningfulWork) {
+          continue
         }
 
         const shouldExit = await checkCompletionConditions(ctx)

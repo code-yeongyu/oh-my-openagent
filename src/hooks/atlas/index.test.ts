@@ -66,6 +66,20 @@ describe("atlas hook", () => {
   })
 
   describe("tool.execute.after handler", () => {
+    test("should handle undefined output gracefully (issue #1035)", async () => {
+      // #given - hook and undefined output (e.g., from /review command)
+      const hook = createAtlasHook(createMockPluginInput())
+
+      // #when - calling with undefined output
+      const result = await hook["tool.execute.after"](
+        { tool: "delegate_task", sessionID: "session-123" },
+        undefined as unknown as { title: string; output: string; metadata: Record<string, unknown> }
+      )
+
+      // #then - returns undefined without throwing
+      expect(result).toBeUndefined()
+    })
+
     test("should ignore non-delegate_task tools", async () => {
       // #given - hook and non-delegate_task tool
       const hook = createAtlasHook(createMockPluginInput())
@@ -141,7 +155,7 @@ describe("atlas hook", () => {
       // #then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("MANDATORY:")
-      expect(output.output).toContain("delegate_task(resume=")
+      expect(output.output).toContain("delegate_task(session_id=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -180,7 +194,7 @@ describe("atlas hook", () => {
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
       expect(output.output).toContain("LIE")
-      expect(output.output).toContain("delegate_task(resume=")
+      expect(output.output).toContain("delegate_task(session_id=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -332,7 +346,7 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
-     test("should include resume and checkbox instructions in reminder", async () => {
+     test("should include session_id and checkbox instructions in reminder", async () => {
        // #given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
        setupMessageStorage(sessionID, "atlas")
@@ -361,8 +375,8 @@ describe("atlas hook", () => {
         output
       )
 
-      // #then - should include resume instructions and verification
-      expect(output.output).toContain("delegate_task(resume=")
+      // #then - should include session_id instructions and verification
+      expect(output.output).toContain("delegate_task(session_id=")
       expect(output.output).toContain("[x]")
       expect(output.output).toContain("MANDATORY:")
       
@@ -373,7 +387,7 @@ describe("atlas hook", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
        beforeEach(() => {
-         setupMessageStorage(ORCHESTRATOR_SESSION, "Atlas")
+         setupMessageStorage(ORCHESTRATOR_SESSION, "atlas")
        })
 
       afterEach(() => {
@@ -396,8 +410,8 @@ describe("atlas hook", () => {
         )
 
         // #then
-        expect(output.output).toContain("DELEGATION REQUIRED")
         expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
+        expect(output.output).toContain("delegate_task")
         expect(output.output).toContain("delegate_task")
       })
 
@@ -417,7 +431,7 @@ describe("atlas hook", () => {
         )
 
         // #then
-        expect(output.output).toContain("DELEGATION REQUIRED")
+        expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
       })
 
       test("should NOT append reminder when orchestrator writes inside .sisyphus/", async () => {
@@ -438,13 +452,13 @@ describe("atlas hook", () => {
 
         // #then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
       })
 
       test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
         // #given
         const nonOrchestratorSession = "non-orchestrator-session"
-        setupMessageStorage(nonOrchestratorSession, "Sisyphus-Junior")
+        setupMessageStorage(nonOrchestratorSession, "sisyphus-junior")
         
         const hook = createAtlasHook(createMockPluginInput())
         const originalOutput = "File written successfully"
@@ -462,7 +476,7 @@ describe("atlas hook", () => {
 
         // #then
         expect(output.output).toBe(originalOutput)
-        expect(output.output).not.toContain("DELEGATION REQUIRED")
+        expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         
         cleanupMessageStorage(nonOrchestratorSession)
       })
@@ -526,7 +540,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should NOT append reminder when orchestrator writes inside .sisyphus with mixed separators", async () => {
@@ -547,7 +561,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should NOT append reminder for absolute Windows path inside .sisyphus\\", async () => {
@@ -568,7 +582,7 @@ describe("atlas hook", () => {
 
           // #then
           expect(output.output).toBe(originalOutput)
-          expect(output.output).not.toContain("DELEGATION REQUIRED")
+          expect(output.output).not.toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
 
         test("should append reminder for Windows path outside .sisyphus\\", async () => {
@@ -587,7 +601,7 @@ describe("atlas hook", () => {
           )
 
           // #then
-          expect(output.output).toContain("DELEGATION REQUIRED")
+          expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
         })
       })
     })
@@ -601,7 +615,7 @@ describe("atlas hook", () => {
          getMainSessionID: () => MAIN_SESSION_ID,
          subagentSessions: new Set<string>(),
        }))
-       setupMessageStorage(MAIN_SESSION_ID, "Atlas")
+       setupMessageStorage(MAIN_SESSION_ID, "atlas")
      })
 
     afterEach(() => {
@@ -636,7 +650,7 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
-      expect(callArgs.body.parts[0].text).toContain("BOULDER CONTINUATION")
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
@@ -845,7 +859,7 @@ describe("atlas hook", () => {
 
        // #given - last agent is NOT Atlas
        cleanupMessageStorage(MAIN_SESSION_ID)
-       setupMessageStorage(MAIN_SESSION_ID, "Sisyphus")
+       setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
 
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput)

@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import { findCaseInsensitive } from "./case-insensitive"
+import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 export function resolveAgentVariant(
   config: OhMyOpenCodeConfig,
@@ -27,6 +28,43 @@ export function resolveAgentVariant(
   }
 
   return config.categories?.[categoryName]?.variant
+}
+
+export function resolveVariantForModel(
+  config: OhMyOpenCodeConfig,
+  agentName: string,
+  currentModel: { providerID: string; modelID: string },
+): string | undefined {
+  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentName]
+  if (agentRequirement) {
+    return findVariantInChain(agentRequirement.fallbackChain, currentModel.providerID)
+  }
+
+  const agentOverrides = config.agents as
+    | Record<string, { category?: string }>
+    | undefined
+  const agentOverride = agentOverrides ? findCaseInsensitive(agentOverrides, agentName) : undefined
+  const categoryName = agentOverride?.category
+  if (categoryName) {
+    const categoryRequirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+    if (categoryRequirement) {
+      return findVariantInChain(categoryRequirement.fallbackChain, currentModel.providerID)
+    }
+  }
+
+  return undefined
+}
+
+function findVariantInChain(
+  fallbackChain: { providers: string[]; model: string; variant?: string }[],
+  providerID: string,
+): string | undefined {
+  for (const entry of fallbackChain) {
+    if (entry.providers.includes(providerID)) {
+      return entry.variant
+    }
+  }
+  return undefined
 }
 
 export function applyAgentVariant(

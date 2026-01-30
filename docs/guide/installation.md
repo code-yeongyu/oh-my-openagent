@@ -155,7 +155,7 @@ First, add the opencode-antigravity-auth plugin:
 {
   "plugin": [
     "oh-my-opencode",
-    "opencode-antigravity-auth@1.2.8"
+    "opencode-antigravity-auth@latest"
   ]
 }
 ```
@@ -163,7 +163,7 @@ First, add the opencode-antigravity-auth plugin:
 ##### Model Configuration
 
 You'll also need full model settings in `opencode.json`.
-Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy provider/models config from the README, and merge carefully to avoid breaking the user's existing setup.
+Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth), copy the full model configuration from the README, and merge carefully to avoid breaking the user's existing setup. The plugin now uses a **variant system** — models like `antigravity-gemini-3-pro` support `low`/`high` variants instead of separate `-low`/`-high` model entries.
 
 ##### oh-my-opencode Agent Model Override
 
@@ -177,7 +177,17 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 }
 ```
 
-**Available model names**: `google/antigravity-gemini-3-pro-high`, `google/antigravity-gemini-3-pro-low`, `google/antigravity-gemini-3-flash`, `google/antigravity-claude-sonnet-4-5`, `google/antigravity-claude-sonnet-4-5-thinking-low`, `google/antigravity-claude-sonnet-4-5-thinking-medium`, `google/antigravity-claude-sonnet-4-5-thinking-high`, `google/antigravity-claude-opus-4-5-thinking-low`, `google/antigravity-claude-opus-4-5-thinking-medium`, `google/antigravity-claude-opus-4-5-thinking-high`, `google/gemini-3-pro`, `google/gemini-3-flash`, `google/gemini-2.5-pro`, `google/gemini-2.5-flash`
+**Available models (Antigravity quota)**:
+- `google/antigravity-gemini-3-pro` — variants: `low`, `high`
+- `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
+- `google/antigravity-claude-sonnet-4-5` — no variants
+- `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
+
+**Available models (Gemini CLI quota)**:
+- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
+
+> **Note**: Legacy tier-suffixed names like `google/antigravity-gemini-3-pro-high` still work but variants are recommended. Use `--variant=high` with the base model name instead.
 
 Then authenticate:
 
@@ -208,7 +218,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 | ------------- | -------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
-| **Explore**   | `github-copilot/gpt-5-nano-fast-1`|
+| **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
@@ -228,7 +238,7 @@ If Z.ai is the only provider available, all agents will use GLM models:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/big-pickle`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
@@ -237,7 +247,7 @@ When OpenCode Zen is the best available provider (no native or Copilot), these m
 | **Sisyphus**  | `opencode/claude-opus-4-5`       |
 | **Oracle**    | `opencode/gpt-5.2`               |
 | **Explore**   | `opencode/gpt-5-nano`             |
-| **Librarian** | `opencode/big-pickle`          |
+| **Librarian** | `opencode/glm-4.7-free`          |
 
 ##### Setup
 
@@ -299,7 +309,7 @@ After everything is set up and working, ask the user:
 
 If the user agrees, run:
 ```bash
-gh repo star code-yeongyu/oh-my-opencode
+gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true
 ```
 
 **Important**: Only run the command if the user explicitly says yes. Never run it automatically without consent.

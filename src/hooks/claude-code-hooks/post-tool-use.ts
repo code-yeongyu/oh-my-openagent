@@ -123,7 +123,7 @@ export async function executePostToolUseHooks(
 
         if (result.exitCode === 0 && result.stdout) {
           try {
-            const output = JSON.parse(result.stdout) as PostToolUseOutput
+            const output = JSON.parse(result.stdout || "{}") as PostToolUseOutput
             if (output.decision === "block") {
               return {
                 block: true,

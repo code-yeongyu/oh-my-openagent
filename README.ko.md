@@ -16,8 +16,8 @@
 >
 > [!TIP]
 >
-> [![The Orchestrator is now available in beta.](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0-beta.10)
-> > **오케스트레이터가 베타 버전으로 사용 가능합니다. 설치하려면 `oh-my-opencode@3.0.0-beta.10`을 사용하세요.**
+> [![Oh My OpenCode 3.0이 정식 출시되었습니다!](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
+> > **Oh My OpenCode 3.0이 정식 출시되었습니다! `oh-my-opencode@latest`를 사용하여 설치하세요.**
 >
 > 함께해요!
 >
@@ -73,9 +73,10 @@
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 </div>
 
@@ -196,7 +197,7 @@ Hey please read this readme and tell me why it is different from other agent har
   - Oracle: 디자인, 디버깅 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: 프론트엔드 개발 (Gemini 3 Pro)
   - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (Claude Sonnet 4.5)
-  - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Grok Code)
+   - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Claude Haiku 4.5)
 - 완전한 LSP / AstGrep 지원: 결정적으로 리팩토링합니다.
 - TODO 연속 강제: 에이전트가 중간에 멈추면 계속하도록 강제합니다. **이것이 Sisyphus가 그 바위를 굴리게 하는 것입니다.**
 - 주석 검사기: AI가 과도한 주석을 추가하는 것을 방지합니다. Sisyphus가 생성한 코드는 인간이 작성한 것과 구별할 수 없어야 합니다.

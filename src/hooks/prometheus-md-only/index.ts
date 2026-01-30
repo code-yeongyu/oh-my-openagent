@@ -89,10 +89,10 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       const toolName = input.tool
 
       // Inject read-only warning for task tools called by Prometheus
-      if (TASK_TOOLS.includes(toolName)) {
-        const prompt = output.args.prompt as string | undefined
-        if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
-          output.args.prompt = prompt + PLANNING_CONSULT_WARNING
+       if (TASK_TOOLS.includes(toolName)) {
+         const prompt = output.args.prompt as string | undefined
+         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
+           output.args.prompt = PLANNING_CONSULT_WARNING + prompt
           log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
             sessionID: input.sessionID,
             tool: toolName,

@@ -44,8 +44,13 @@ export interface SessionStatusProps {
 }
 
 export interface MessageUpdatedProps {
-  info?: { sessionID?: string; role?: string }
-  content?: string
+  info?: {
+    sessionID?: string
+    role?: string
+    modelID?: string
+    providerID?: string
+    agent?: string
+  }
 }
 
 export interface MessagePartUpdatedProps {

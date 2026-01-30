@@ -57,6 +57,45 @@ const mockContext = {
   abort: new AbortController().signal,
 }
 
+describe("skill tool - synchronous description", () => {
+  it("includes available_skills immediately when skills are pre-provided", () => {
+    // #given
+    const loadedSkills = [createMockSkill("test-skill")]
+
+    // #when
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // #then
+    expect(tool.description).toContain("<available_skills>")
+    expect(tool.description).toContain("test-skill")
+  })
+
+  it("includes all pre-provided skills in available_skills immediately", () => {
+    // #given
+    const loadedSkills = [
+      createMockSkill("playwright"),
+      createMockSkill("frontend-ui-ux"),
+      createMockSkill("git-master"),
+    ]
+
+    // #when
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // #then
+    expect(tool.description).toContain("playwright")
+    expect(tool.description).toContain("frontend-ui-ux")
+    expect(tool.description).toContain("git-master")
+  })
+
+  it("shows no-skills message immediately when empty skills are pre-provided", () => {
+    // #given / #when
+    const tool = createSkillTool({ skills: [] })
+
+    // #then
+    expect(tool.description).toContain("No skills are currently available")
+  })
+})
+
 describe("skill tool - agent restriction", () => {
   it("allows skill without agent restriction to any agent", async () => {
     // #given

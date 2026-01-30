@@ -71,14 +71,19 @@ function loadOpencodePlugins(directory: string): string[] {
 function matchesNotificationPlugin(entry: string): string | null {
   const normalized = entry.toLowerCase()
   for (const known of KNOWN_NOTIFICATION_PLUGINS) {
-    if (
-      normalized === known ||
-      normalized.startsWith(`${known}@`) ||
-      normalized.includes(`/${known}`) ||
-      normalized.endsWith(`/${known}`)
-    ) {
-      return known
-    }
+    // Exact match
+    if (normalized === known) return known
+    // Version suffix: "opencode-notifier@1.2.3"
+    if (normalized.startsWith(`${known}@`)) return known
+    // Scoped package: "@mohak34/opencode-notifier" or "@mohak34/opencode-notifier@1.2.3"
+    if (normalized === `@mohak34/${known}` || normalized.startsWith(`@mohak34/${known}@`)) return known
+    // npm: prefix
+    if (normalized === `npm:${known}` || normalized.startsWith(`npm:${known}@`)) return known
+    // file:// path ending exactly with package name
+    if (normalized.startsWith("file://") && (
+      normalized.endsWith(`/${known}`) || 
+      normalized.endsWith(`\\${known}`)
+    )) return known
   }
   return null
 }
