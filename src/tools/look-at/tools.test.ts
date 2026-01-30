@@ -184,11 +184,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
+        directory: "/project",
+        worktree: "/project",
+        metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
+        ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
       }
 
       await tool.execute(
