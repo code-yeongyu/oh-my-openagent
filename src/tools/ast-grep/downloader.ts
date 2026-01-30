@@ -3,6 +3,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { createRequire } from "module"
 import { extractZip } from "../../shared"
+import { log } from "../../shared/logger"
 
 const REPO = "ast-grep/ast-grep"
 
@@ -63,7 +64,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const platformInfo = PLATFORM_MAP[platformKey]
 
   if (!platformInfo) {
-    console.error(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
+    log(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
     return null
   }
 
@@ -79,7 +80,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const assetName = `app-${arch}-${os}.zip`
   const downloadUrl = `https://github.com/${REPO}/releases/download/${version}/${assetName}`
 
-  console.log(`[oh-my-opencode] Downloading ast-grep binary...`)
+  log(`[oh-my-opencode] Downloading ast-grep binary...`)
 
   try {
     if (!existsSync(cacheDir)) {
@@ -106,11 +107,11 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
       chmodSync(binaryPath, 0o755)
     }
 
-    console.log(`[oh-my-opencode] ast-grep binary ready.`)
+    log(`[oh-my-opencode] ast-grep binary ready.`)
 
     return binaryPath
   } catch (err) {
-    console.error(
+    log(
       `[oh-my-opencode] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
     )
     return null
