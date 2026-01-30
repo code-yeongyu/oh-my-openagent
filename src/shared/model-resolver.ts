@@ -117,6 +117,7 @@ export function resolveModelWithFallback(
 			}
 		} else {
 			for (const entry of fallbackChain) {
+				// Step 1: Try with provider filter (preferred providers first)
 				for (const provider of entry.providers) {
 					const fullModel = `${provider}/${entry.model}`
 					const match = fuzzyMatchModel(fullModel, availableModels, [provider])
@@ -124,6 +125,17 @@ export function resolveModelWithFallback(
 						log("Model resolved via fallback chain (availability confirmed)", { provider, model: entry.model, match, variant: entry.variant })
 						return { model: match, source: "provider-fallback", variant: entry.variant }
 					}
+				}
+
+				// Step 2: Try without provider filter (cross-provider fuzzy match)
+				const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
+				if (crossProviderMatch) {
+					log("Model resolved via fallback chain (cross-provider fuzzy match)", {
+						model: entry.model,
+						match: crossProviderMatch,
+						variant: entry.variant,
+					})
+					return { model: crossProviderMatch, source: "provider-fallback", variant: entry.variant }
 				}
 			}
 			log("No available model found in fallback chain, falling through to system default")

@@ -894,15 +894,15 @@ Each agent has a defined provider priority chain. The system tries providers in 
 
 | Agent | Model (no prefix) | Provider Priority Chain |
 |-------|-------------------|-------------------------|
-| **Sisyphus** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **oracle** | `gpt-5.2` | openai → anthropic → google → github-copilot → opencode |
-| **librarian** | `glm-4.7-free` | opencode → github-copilot → anthropic |
-| **explore** | `gpt-5-nano` | anthropic → opencode |
-| **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → anthropic → opencode |
-| **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **Metis (Plan Consultant)** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **Momus (Plan Reviewer)** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **Atlas** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
+| **Sisyphus** | `claude-opus-4-5` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
+| **oracle** | `gpt-5.2` | openai → google → anthropic |
+| **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic |
+| **explore** | `claude-haiku-4-5` | anthropic → github-copilot → opencode |
+| **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → kimi-for-coding → anthropic → opencode |
+| **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → kimi-for-coding → openai → google |
+| **Metis (Plan Consultant)** | `claude-opus-4-5` | anthropic → kimi-for-coding → openai → google |
+| **Momus (Plan Reviewer)** | `gpt-5.2` | openai → anthropic → google |
+| **Atlas** | `claude-sonnet-4-5` | anthropic → kimi-for-coding → openai → google |
 
 ### Category Provider Chains
 
@@ -910,13 +910,14 @@ Categories follow the same resolution logic:
 
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
-| **visual-engineering** | `gemini-3-pro` | google → openai → anthropic → github-copilot → opencode |
-| **ultrabrain** | `gpt-5.2-codex` | openai → anthropic → google → github-copilot → opencode |
-| **artistry** | `gemini-3-pro` | google → openai → anthropic → github-copilot → opencode |
-| **quick** | `claude-haiku-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **unspecified-low** | `claude-sonnet-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **unspecified-high** | `claude-opus-4-5` | anthropic → github-copilot → opencode → antigravity → google |
-| **writing** | `gemini-3-flash` | google → openai → anthropic → github-copilot → opencode |
+| **visual-engineering** | `gemini-3-pro` | google → anthropic → zai-coding-plan |
+| **ultrabrain** | `gpt-5.2-codex` | openai → google → anthropic |
+| **deep** | `gpt-5.2-codex` | openai → anthropic → google |
+| **artistry** | `gemini-3-pro` | google → anthropic → openai |
+| **quick** | `claude-haiku-4-5` | anthropic → google → opencode |
+| **unspecified-low** | `claude-sonnet-4-5` | anthropic → openai → google |
+| **unspecified-high** | `claude-opus-4-5` | anthropic → openai → google |
+| **writing** | `gemini-3-flash` | google → anthropic → zai-coding-plan → openai |
 
 ### Checking Your Configuration
 
