@@ -12,7 +12,7 @@ Use this tool when:
 // 環境変数があればそれを使い、なければlocalhostを使う（grepのパス解決ロジックの流儀にならう）
 export function getFixFlowApiUrl(): string {
   // process.envはNode.js環境で有効
-  return process.env.FIXFLOW_API_URL || "http://localhost:8000/api/v1"
+  return process.env.FIXFLOW_API_URL || "http://localhost:8009/api/v1"
 }
 
 // タイムアウト設定などもここに
