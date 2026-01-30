@@ -353,7 +353,7 @@ describe("FallbackEntry type", () => {
     // #given - a FallbackEntry without variant
     const entry: FallbackEntry = {
       providers: ["opencode", "anthropic"],
-      model: "big-pickle",
+      model: "glm-4.7-free",
     }
 
     // #when - accessing variant
@@ -383,7 +383,7 @@ describe("ModelRequirement type", () => {
   test("ModelRequirement variant is optional", () => {
     // #given - a ModelRequirement without top-level variant
     const requirement: ModelRequirement = {
-      fallbackChain: [{ providers: ["opencode"], model: "big-pickle" }],
+      fallbackChain: [{ providers: ["opencode"], model: "glm-4.7-free" }],
     }
 
     // #when - accessing variant

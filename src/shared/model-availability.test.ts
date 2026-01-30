@@ -547,13 +547,13 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	it("should prefer provider-models cache over models.json", async () => {
 		writeProviderModelsCache({
 			models: {
-				opencode: ["big-pickle", "gpt-5-nano"],
+				opencode: ["glm-4.7-free", "gpt-5-nano"],
 				anthropic: ["claude-opus-4-5"]
 			},
 			connected: ["opencode", "anthropic"]
 		})
 		writeModelsCache({
-			opencode: { models: { "big-pickle": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
+			opencode: { models: { "glm-4.7-free": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
 			anthropic: { models: { "claude-opus-4-5": {}, "claude-sonnet-4-5": {} } }
 		})
 
@@ -562,7 +562,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(3)
-		expect(result.has("opencode/big-pickle")).toBe(true)
+		expect(result.has("opencode/glm-4.7-free")).toBe(true)
 		expect(result.has("opencode/gpt-5-nano")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-5")).toBe(true)
 		expect(result.has("opencode/gpt-5.2")).toBe(false)
@@ -574,7 +574,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	//#then falls back to models.json (no whitelist filtering)
 	it("should fallback to models.json when provider-models cache not found", async () => {
 		writeModelsCache({
-			opencode: { models: { "big-pickle": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
+			opencode: { models: { "glm-4.7-free": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
 		})
 
 		const result = await fetchAvailableModels(undefined, {
@@ -582,7 +582,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(3)
-		expect(result.has("opencode/big-pickle")).toBe(true)
+		expect(result.has("opencode/glm-4.7-free")).toBe(true)
 		expect(result.has("opencode/gpt-5-nano")).toBe(true)
 		expect(result.has("opencode/gpt-5.2")).toBe(true)
 	})
@@ -593,7 +593,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	it("should filter by connectedProviders even with provider-models cache", async () => {
 		writeProviderModelsCache({
 			models: {
-				opencode: ["big-pickle"],
+				opencode: ["glm-4.7-free"],
 				anthropic: ["claude-opus-4-5"],
 				google: ["gemini-3-pro"]
 			},
@@ -605,7 +605,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(1)
-		expect(result.has("opencode/big-pickle")).toBe(true)
+		expect(result.has("opencode/glm-4.7-free")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-5")).toBe(false)
 		expect(result.has("google/gemini-3-pro")).toBe(false)
 	})
