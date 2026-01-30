@@ -94,6 +94,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
     ],
   },
+  deep: {
+    fallbackChain: [
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
+    ],
+  },
   artistry: {
     fallbackChain: [
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "max" },
