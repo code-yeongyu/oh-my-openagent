@@ -44,15 +44,6 @@ jobs:
       max-parallel: 7
       matrix:
         platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
-    outputs:
-      # Pass skip status to publish job
-      skip_darwin_arm64: ${{ steps.check.outputs.skip_darwin_arm64 }}
-      skip_darwin_x64: ${{ steps.check.outputs.skip_darwin_x64 }}
-      skip_linux_x64: ${{ steps.check.outputs.skip_linux_x64 }}
-      skip_linux_arm64: ${{ steps.check.outputs.skip_linux_arm64 }}
-      skip_linux_x64_musl: ${{ steps.check.outputs.skip_linux_x64_musl }}
-      skip_linux_arm64_musl: ${{ steps.check.outputs.skip_linux_arm64_musl }}
-      skip_windows_x64: ${{ steps.check.outputs.skip_windows_x64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -123,8 +114,8 @@ jobs:
           cd packages/${PLATFORM}
           
           if [ "$PLATFORM" = "windows-x64" ]; then
-            # Windows: use zip
-            zip -r ../../binary-${PLATFORM}.zip bin/ package.json
+            # Windows: use 7z (pre-installed on windows-latest)
+            7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
           else
             # Unix: use tar.gz
             tar -czvf ../../binary-${PLATFORM}.tar.gz bin/ package.json
@@ -160,35 +151,29 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
     steps:
-      - name: Check if should skip
-        id: should_skip
+      - name: Check if already published
+        id: check
         run: |
-          PLATFORM="${{ matrix.platform }}"
-          PLATFORM_KEY="${PLATFORM//-/_}"
-          
-          # Check the corresponding skip output from build job
-          case "$PLATFORM" in
-            darwin-arm64) SKIP="${{ needs.build.outputs.skip_darwin_arm64 }}" ;;
-            darwin-x64) SKIP="${{ needs.build.outputs.skip_darwin_x64 }}" ;;
-            linux-x64) SKIP="${{ needs.build.outputs.skip_linux_x64 }}" ;;
-            linux-arm64) SKIP="${{ needs.build.outputs.skip_linux_arm64 }}" ;;
-            linux-x64-musl) SKIP="${{ needs.build.outputs.skip_linux_x64_musl }}" ;;
-            linux-arm64-musl) SKIP="${{ needs.build.outputs.skip_linux_arm64_musl }}" ;;
-            windows-x64) SKIP="${{ needs.build.outputs.skip_windows_x64 }}" ;;
-          esac
-          
-          echo "skip=${SKIP:-false}" >> $GITHUB_OUTPUT
-          echo "Platform: $PLATFORM, Skip: ${SKIP:-false}"
+          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
+          VERSION="${{ inputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ ${PKG_NAME}@${VERSION} already published, skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "→ ${PKG_NAME}@${VERSION} will be published"
+          fi
 
       - name: Download artifact
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
           name: binary-${{ matrix.platform }}
           path: .
 
       - name: Extract artifact
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true'
         run: |
           PLATFORM="${{ matrix.platform }}"
           mkdir -p packages/${PLATFORM}
@@ -204,13 +189,13 @@ jobs:
           ls -la packages/${PLATFORM}/bin/
 
       - uses: actions/setup-node@v4
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Publish ${{ matrix.platform }}
-        if: steps.should_skip.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true'
         run: |
           cd packages/${{ matrix.platform }}
           
