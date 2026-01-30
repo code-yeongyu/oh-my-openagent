@@ -45,6 +45,7 @@ function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
+  lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -141,6 +142,10 @@ function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string
     errors.push(`Invalid --zai-coding-plan value: ${args.zaiCodingPlan} (expected: no, yes)`)
   }
 
+  if (args.kimiForCoding !== undefined && !["no", "yes"].includes(args.kimiForCoding)) {
+    errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -153,10 +158,11 @@ function argsToConfig(args: InstallArgs): InstallConfig {
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
+    hasKimiForCoding: args.kimiForCoding === "yes",
   }
 }
 
-function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; openai: BooleanArg; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg } {
+function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; openai: BooleanArg; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg; kimiForCoding: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
     claude = detected.isMax20 ? "max20" : "yes"
@@ -169,6 +175,7 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
+    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
   }
 }
 
@@ -260,6 +267,20 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     return null
   }
 
+  const kimiForCoding = await p.select({
+    message: "Do you have a Kimi For Coding subscription?",
+    options: [
+      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+      { value: "yes" as const, label: "Yes", hint: "Kimi K2.5 for Sisyphus/Prometheus fallback" },
+    ],
+    initialValue: initial.kimiForCoding,
+  })
+
+  if (p.isCancel(kimiForCoding)) {
+    p.cancel("Installation cancelled.")
+    return null
+  }
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -268,6 +289,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     hasCopilot: copilot === "yes",
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
+    hasKimiForCoding: kimiForCoding === "yes",
   }
 }
 
