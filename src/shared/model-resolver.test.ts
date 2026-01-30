@@ -626,6 +626,103 @@ describe("resolveModelWithFallback", () => {
     })
   })
 
+  describe("categoryDefaultModel (fuzzy matching for category defaults)", () => {
+    test("applies fuzzy matching to categoryDefaultModel when userModel not provided", () => {
+      // #given - gemini-3-pro is the category default, but only gemini-3-pro-preview is available
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should fuzzy match gemini-3-pro → gemini-3-pro-preview
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+    })
+
+    test("categoryDefaultModel uses exact match when available", () => {
+      // #given - exact match exists
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro", "google/gemini-3-pro-preview"]),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use exact match
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("category-default")
+    })
+
+    test("categoryDefaultModel falls through to fallbackChain when no match in availableModels", () => {
+      // #given - categoryDefaultModel has no match, but fallbackChain does
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["anthropic"], model: "claude-opus-4-5" },
+        ],
+        availableModels: new Set(["anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should fall through to fallbackChain
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(result!.source).toBe("provider-fallback")
+    })
+
+    test("userModel takes priority over categoryDefaultModel", () => {
+      // #given - both userModel and categoryDefaultModel provided
+      const input: ExtendedModelResolutionInput = {
+        userModel: "anthropic/claude-opus-4-5",
+        categoryDefaultModel: "google/gemini-3-pro",
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-5"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - userModel wins
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(result!.source).toBe("override")
+    })
+
+    test("categoryDefaultModel works when availableModels is empty but connected provider exists", () => {
+      // #given - no availableModels but connected provider cache exists
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // #when
+      const result = resolveModelWithFallback(input)
+
+      // #then - should use categoryDefaultModel since google is connected
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+  })
+
   describe("Optional systemDefaultModel", () => {
     test("returns undefined when systemDefaultModel is undefined and no fallback found", () => {
       // #given
