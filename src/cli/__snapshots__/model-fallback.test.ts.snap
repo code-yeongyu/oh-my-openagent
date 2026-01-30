@@ -5,54 +5,54 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "multimodal-looker": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "prometheus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "sisyphus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "artistry": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "quick": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-high": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-low": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "visual-engineering": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "writing": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -199,7 +199,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "openai/gpt-5.2",
@@ -230,7 +230,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "openai/gpt-5.2",
     },
     "quick": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.2-codex",
@@ -266,7 +266,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "openai/gpt-5.2",
@@ -297,7 +297,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "openai/gpt-5.2",
     },
     "quick": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.2-codex",
@@ -333,7 +333,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "google/gemini-3-pro",
@@ -394,7 +394,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "google/gemini-3-pro",
@@ -585,7 +585,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "opencode/claude-opus-4-5",
@@ -649,7 +649,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "opencode/claude-opus-4-5",
@@ -839,7 +839,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -848,42 +848,42 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "prometheus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "sisyphus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
     "artistry": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "quick": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-high": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-low": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "visual-engineering": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "writing": {
       "model": "zai-coding-plan/glm-4.7",
@@ -897,7 +897,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -906,19 +906,19 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "prometheus": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "sisyphus": {
       "model": "zai-coding-plan/glm-4.7",
@@ -926,22 +926,22 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
   },
   "categories": {
     "artistry": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "quick": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "ultrabrain": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-high": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-low": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "visual-engineering": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "writing": {
       "model": "zai-coding-plan/glm-4.7",
@@ -961,7 +961,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "opencode/big-pickle",
+      "model": "opencode/glm-4.7-free",
     },
     "metis": {
       "model": "anthropic/claude-opus-4-5",
