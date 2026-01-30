@@ -523,3 +523,49 @@ describe("override.category expansion in createBuiltinAgents", () => {
     expect(agents.oracle.model).toBe(agentsWithoutOverride.oracle.model)
   })
 })
+
+describe("agent override tools migration", () => {
+  test("tools: { x: false } is migrated to permission: { x: deny }", async () => {
+    // #given
+    const overrides = {
+      explore: { tools: { "jetbrains_*": false } } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then
+    expect(agents.explore).toBeDefined()
+    const permission = agents.explore.permission as Record<string, string>
+    expect(permission["jetbrains_*"]).toBe("deny")
+  })
+
+  test("tools: { x: true } is migrated to permission: { x: allow }", async () => {
+    // #given
+    const overrides = {
+      librarian: { tools: { "jetbrains_get_*": true } } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then
+    expect(agents.librarian).toBeDefined()
+    const permission = agents.librarian.permission as Record<string, string>
+    expect(permission["jetbrains_get_*"]).toBe("allow")
+  })
+
+  test("tools config is removed after migration", async () => {
+    // #given
+    const overrides = {
+      explore: { tools: { "some_tool": false } } as any,
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then
+    expect(agents.explore).toBeDefined()
+    expect((agents.explore as any).tools).toBeUndefined()
+  })
+})
