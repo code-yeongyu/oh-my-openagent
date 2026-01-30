@@ -1,7 +1,9 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 /**
  * Momus - Plan Reviewer Agent
@@ -400,7 +402,7 @@ export function createMomusAgent(model: string): AgentConfig {
   const base = {
     description:
       "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - OhMyOpenCode)",
-    mode: "subagent" as const,
+    mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
@@ -413,7 +415,7 @@ export function createMomusAgent(model: string): AgentConfig {
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
-
+createMomusAgent.mode = MODE
 
 export const momusPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

@@ -225,8 +225,10 @@ export async function createBuiltinAgents(
     const override = findCaseInsensitive(agentOverrides, agentName)
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
     
+    const isPrimaryAgent = isFactory(source) && source.mode === "primary"
+    
     const resolution = resolveModelWithFallback({
-      uiSelectedModel,
+      uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
       userModel: override?.model,
       fallbackChain: requirement?.fallbackChain,
       availableModels,
