@@ -1,10 +1,13 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode } from "./types"
 import { isGptModel } from "./types"
 import type { AgentOverrideConfig } from "../config/schema"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
 } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 const SISYPHUS_JUNIOR_PROMPT = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
@@ -85,7 +88,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   const base: AgentConfig = {
     description: override?.description ??
       "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
-    mode: "subagent" as const,
+    mode: MODE,
     model,
     temperature,
     maxTokens: 64000,
@@ -107,3 +110,5 @@ export function createSisyphusJuniorAgentWithOverrides(
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
+
+createSisyphusJuniorAgentWithOverrides.mode = MODE
