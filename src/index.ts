@@ -353,7 +353,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       },
     },
-  );
+    onShutdown: () => {
+      tmuxSessionManager?.cleanup().catch((error) => {
+        log("[index] tmux cleanup error during shutdown:", error)
+      })
+    },
+  });
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
