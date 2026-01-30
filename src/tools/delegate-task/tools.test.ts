@@ -1474,6 +1474,73 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
+  describe("category model resolution fallback", () => {
+    test("category uses resolved.model when connectedProvidersCache is null and availableModels is empty", async () => {
+      // #given - connectedProvidersCache returns null (simulates missing cache file)
+      // This is a regression test for PR #1227 which removed resolved.model from userModel chain
+      cacheSpy.mockReturnValue(null)
+
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-fallback",
+            sessionID: "ses_fallback_test",
+            description: "Fallback test task",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      // NO userCategories override, NO sisyphusJuniorModel
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        // userCategories: undefined - use DEFAULT_CATEGORIES only
+        // sisyphusJuniorModel: undefined
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // #when - using "quick" category which should use "anthropic/claude-haiku-4-5"
+      await tool.execute(
+        {
+          description: "Test category fallback",
+          prompt: "Do something quick",
+          category: "quick",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // #then - model should be anthropic/claude-haiku-4-5 from DEFAULT_CATEGORIES
+      //         NOT anthropic/claude-sonnet-4-5 (system default)
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
+    })
+  })
+
   describe("browserProvider propagation", () => {
     test("should resolve agent-browser skill when browserProvider is passed", async () => {
       // #given - delegate_task configured with browserProvider: "agent-browser"
