@@ -188,35 +188,63 @@ jobs:
           ls -la packages/${PLATFORM}/
           ls -la packages/${PLATFORM}/bin/
 
+      # Use setup-node WITHOUT registry-url to avoid NODE_AUTH_TOKEN injection
+      # OIDC requires npm 11.5.1+ and NO token to be set
       - uses: actions/setup-node@v4
         if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
+          # DO NOT set registry-url - it injects NODE_AUTH_TOKEN which breaks OIDC
+
+      - name: Check npm version and OIDC environment
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          echo "=== Environment Check ==="
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          echo ""
+          echo "=== OIDC Environment Variables ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-(not set)}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+[REDACTED]}"
+          echo ""
+          echo "=== Auth-related env vars ==="
+          echo "NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-(not set)}"
+          echo "NPM_CONFIG_USERCONFIG: ${NPM_CONFIG_USERCONFIG:-(not set)}"
+          echo ""
+          # Verify npm version >= 11.5.1 for OIDC support
+          NPM_VERSION=$(npm --version)
+          NPM_MAJOR=$(echo $NPM_VERSION | cut -d. -f1)
+          NPM_MINOR=$(echo $NPM_VERSION | cut -d. -f2)
+          NPM_PATCH=$(echo $NPM_VERSION | cut -d. -f3)
+          if [ "$NPM_MAJOR" -lt 11 ] || ([ "$NPM_MAJOR" -eq 11 ] && [ "$NPM_MINOR" -lt 5 ]) || ([ "$NPM_MAJOR" -eq 11 ] && [ "$NPM_MINOR" -eq 5 ] && [ "$NPM_PATCH" -lt 1 ]); then
+            echo "::warning::npm version $NPM_VERSION may not support OIDC. Upgrading to latest..."
+            npm install -g npm@latest
+            echo "Updated npm version: $(npm --version)"
+          else
+            echo "✓ npm version $NPM_VERSION supports OIDC"
+          fi
 
       - name: Publish ${{ matrix.platform }}
         if: steps.check.outputs.skip != 'true'
         run: |
           cd packages/${{ matrix.platform }}
           
-          # Remove .npmrc files created by setup-node
-          rm -f ~/.npmrc
-          rm -f /home/runner/work/_temp/.npmrc 2>/dev/null || true
+          # Ensure no .npmrc files interfere
+          rm -f ~/.npmrc 2>/dev/null || true
+          rm -f .npmrc 2>/dev/null || true
           
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then
             TAG_ARG="--tag ${{ inputs.dist_tag }}"
           fi
           
-          # Publish with provenance (OIDC authentication)
-          # npm 11.5.1+ auto-detects OIDC environment when no token is present
-          npm publish --access public --provenance $TAG_ARG
+          echo "Publishing oh-my-opencode-${{ matrix.platform }}..."
+          echo "Registry: https://registry.npmjs.org"
+          
+          # Publish with provenance - npm will use OIDC automatically
+          # when ACTIONS_ID_TOKEN_REQUEST_URL is set and no token is present
+          npm publish --access public --provenance --registry https://registry.npmjs.org $TAG_ARG
         env:
-          # Override setup-node env vars to disable token-based auth
-          # This forces npm to use OIDC instead
-          NPM_CONFIG_USERCONFIG: ""
-          NODE_AUTH_TOKEN: ""
-          NPM_CONFIG_PROVENANCE: "true"
           npm_config_fetch_timeout: "600000"
           npm_config_fetch_retry_maxtimeout: "120000"
         timeout-minutes: 15
