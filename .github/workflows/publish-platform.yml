@@ -192,7 +192,6 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Publish ${{ matrix.platform }}
         if: steps.check.outputs.skip != 'true'
