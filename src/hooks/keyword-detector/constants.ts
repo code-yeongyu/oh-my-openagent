@@ -180,11 +180,9 @@ ${ULTRAWORK_PLANNER_SECTION}
 
 1. **THINK DEEPLY** - What is the user's TRUE intent? What problem are they REALLY trying to solve?
 2. **EXPLORE THOROUGHLY** - Fire explore/librarian agents to gather ALL relevant context
-3. **CONSULT SPECIALISTS** - DO NOT struggle alone. Delegate to the right specialist:
-   | Problem Type | Delegate To | When |
-   |--------------|-------------|------|
-   | **Oracle** | Architecture, debugging, conventional complex logic | Structured problems with established patterns |
-   | **Artistry** | Unconventional solutions, creative workarounds, "make it work somehow" | When standard approaches don't fit, need novel solutions |
+3. **CONSULT SPECIALISTS** - For hard/complex tasks, DO NOT struggle alone. Delegate:
+   - **Oracle**: Conventional problems - architecture, debugging, complex logic
+   - **Artistry**: Non-conventional problems - different approach needed, unusual constraints
 4. **ASK THE USER** - If ambiguity remains after exploration, ASK. Don't guess.
 
 **SIGNS YOU ARE NOT READY TO IMPLEMENT:**
@@ -199,11 +197,9 @@ ${ULTRAWORK_PLANNER_SECTION}
 delegate_task(agent="explore", prompt="Find [X] patterns in codebase", background=true)
 delegate_task(agent="librarian", prompt="Find docs/examples for [Y]", background=true)
 
-// For structured/conventional problems:
-delegate_task(agent="oracle", prompt="Review my approach: [describe plan]")
-
-// For unconventional/creative solutions needed:
-delegate_task(category="artistry", prompt="Find creative solution for: [describe problem that standard patterns don't solve]")
+// Hard problem? DON'T struggle alone:
+delegate_task(agent="oracle", prompt="...")         // conventional: architecture, debugging
+delegate_task(category="artistry", prompt="...")    // non-conventional: needs different approach
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**
@@ -238,9 +234,7 @@ delegate_task(category="artistry", prompt="Find creative solution for: [describe
 **IF YOU ENCOUNTER A BLOCKER:**
 1. **DO NOT** give up
 2. **DO NOT** deliver a compromised version
-3. **DO** consult specialists:
-   - **Oracle**: For conventional architecture/debugging problems
-   - **Artistry**: For unconventional problems requiring creative workarounds
+3. **DO** consult specialists (oracle for conventional, artistry for non-conventional)
 4. **DO** ask the user for guidance
 5. **DO** explore alternative approaches
 
@@ -309,8 +303,8 @@ delegate_task(session_id="ses_abc123", prompt="Here's my answer to your question
 | Codebase exploration | delegate_task(subagent_type="explore", run_in_background=true) | Parallel, context-efficient |
 | Documentation lookup | delegate_task(subagent_type="librarian", run_in_background=true) | Specialized knowledge |
 | Planning | delegate_task(subagent_type="plan") | Parallel task graph + structured TODO list |
-| Architecture/Debugging (conventional) | delegate_task(subagent_type="oracle") | High-IQ reasoning for structured problems |
-| Creative/Unconventional solutions | delegate_task(category="artistry", load_skills=[...]) | Novel approaches beyond standard patterns |
+| Hard problem (conventional) | delegate_task(subagent_type="oracle") | Architecture, debugging, complex logic |
+| Hard problem (non-conventional) | delegate_task(category="artistry", load_skills=[...]) | Different approach needed |
 | Implementation | delegate_task(category="...", load_skills=[...]) | Domain-optimized models |
 
 **CATEGORY + SKILL DELEGATION:**
@@ -502,8 +496,9 @@ CONTEXT GATHERING (parallel):
 - 1-2 librarian agents (if external library involved)
 - Direct tools: Grep, AST-grep, LSP for targeted searches
 
-IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
-- Consult oracle for strategic guidance
+IF COMPLEX - DO NOT STRUGGLE ALONE. Consult specialists:
+- **Oracle**: Conventional problems (architecture, debugging, complex logic)
+- **Artistry**: Non-conventional problems (different approach needed)
 
 SYNTHESIZE findings before proceeding.`,
   },
