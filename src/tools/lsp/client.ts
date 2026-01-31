@@ -71,7 +71,7 @@ class LSPServerManager {
     process.on("SIGTERM", () => void asyncCleanup())
 
     if (process.platform === "win32") {
-      process.on("SIGBREAK", syncCleanup)
+      process.on("SIGBREAK", () => void asyncCleanup())
     }
   }
 

@@ -146,7 +146,10 @@ export async function spawnTmuxPane(
   const titleExitCode = await titleProc.exited
   if (titleExitCode !== 0) {
     const { log } = await import("../logger")
-    const titleStderr = await new Response(titleProc.stderr).text()
+    let titleStderr = ""
+    try {
+      titleStderr = await new Response(titleProc.stderr).text()
+    } catch {}
     log("[spawnTmuxPane] WARNING: failed to set pane title", {
       paneId,
       title,
