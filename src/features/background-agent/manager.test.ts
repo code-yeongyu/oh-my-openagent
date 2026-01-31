@@ -2087,3 +2087,95 @@ describe("BackgroundManager.shutdown session abort", () => {
   })
 })
 
+describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
+  function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+    return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
+  }
+
+  function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
+    const completionTimers = getCompletionTimers(manager)
+    const timer = setTimeout(() => {
+      completionTimers.delete(taskId)
+    }, 5 * 60 * 1000)
+    completionTimers.set(taskId, timer)
+  }
+
+  test("should have completionTimers Map initialized", () => {
+    // #given
+    const manager = createBackgroundManager()
+
+    // #when
+    const completionTimers = getCompletionTimers(manager)
+
+    // #then
+    expect(completionTimers).toBeDefined()
+    expect(completionTimers).toBeInstanceOf(Map)
+    expect(completionTimers.size).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("should clear all completion timers on shutdown", () => {
+    // #given
+    const manager = createBackgroundManager()
+    setCompletionTimer(manager, "task-1")
+    setCompletionTimer(manager, "task-2")
+
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(2)
+
+    // #when
+    manager.shutdown()
+
+    // #then
+    expect(completionTimers.size).toBe(0)
+  })
+
+  test("should cancel timer when task is deleted via session.deleted", () => {
+    // #given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-timer-4",
+      sessionID: "session-timer-4",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Test task",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    setCompletionTimer(manager, task.id)
+
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(1)
+
+    // #when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: {
+        info: { id: "session-timer-4" },
+      },
+    })
+
+    // #then
+    expect(completionTimers.has(task.id)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should not leak timers across multiple shutdown calls", () => {
+    // #given
+    const manager = createBackgroundManager()
+    setCompletionTimer(manager, "task-1")
+
+    // #when
+    manager.shutdown()
+    manager.shutdown()
+
+    // #then
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(0)
+  })
+})
