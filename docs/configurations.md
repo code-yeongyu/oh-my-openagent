@@ -864,11 +864,34 @@ Categories also support `fallback_models` (string or string array). Fallback mod
 }
 ```
 
-## Runtime Fallback (Planned)
+## Runtime Fallback
 
-> **Note**: Runtime fallback is planned but not yet implemented. Currently, model switching only happens at initialization time via `fallback_models`.
+The `runtime_fallback` feature enables automatic model switching when the primary model encounters transient errors (rate limits, service unavailable, overload). This works together with `fallback_models` configured on agents or categories.
 
-The `runtime_fallback` configuration will enable automatic model switching on transient provider errors (e.g. rate limits or overload):
+### How It Works
+
+Oh My OpenCode has two related but distinct fallback mechanisms:
+
+| Mechanism | When It Runs | Purpose |
+|-----------|--------------|---------|
+| `fallback_models` | **Init-time** | If primary model is unavailable when agent starts, try fallback models in order |
+| `runtime_fallback` | **Runtime** | If primary model fails mid-session (rate limit, overload), automatically switch to fallback |
+
+**Key Difference**: `fallback_models` only helps at agent startup. `runtime_fallback` handles failures that occur mid-session without requiring a restart.
+
+### Error Codes
+
+The runtime fallback triggers on these HTTP status codes by default:
+
+| Code | Meaning | When It Happens |
+|------|---------|-----------------|
+| **429** | Rate Limit Exceeded | Too many requests, quota exhausted |
+| **503** | Service Unavailable | Provider temporarily down |
+| **529** | Overloaded | Model is at capacity |
+
+### Configuration
+
+Enable and configure runtime fallback in your `oh-my-opencode.json`:
 
 ```jsonc
 {
@@ -881,6 +904,120 @@ The `runtime_fallback` configuration will enable automatic model switching on tr
   }
 }
 ```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable runtime fallback |
+| `retry_on_errors` | number[] | `[429, 503, 529]` | HTTP status codes that trigger fallback |
+| `max_fallback_attempts` | number | `3` | Maximum fallback attempts per session (1-10) |
+| `cooldown_seconds` | number | `60` | Cooldown before retrying a failed model |
+| `notify_on_fallback` | boolean | `true` | Show toast notification when switching models |
+
+### Agent-Level Fallback Models
+
+Configure `fallback_models` on specific agents. The runtime fallback uses these models when errors occur:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+    },
+    "oracle": {
+      "model": "openai/gpt-5.2",
+      "fallback_models": "anthropic/claude-opus-4-5"
+    },
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+      "fallback_models": ["opencode/gpt-5-nano", "google/gemini-3-flash"]
+    }
+  }
+}
+```
+
+Note: `fallback_models` accepts a single string or an array of strings.
+
+### Category-Level Fallback
+
+You can also configure fallback models for categories:
+
+```jsonc
+{
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
+    }
+  }
+}
+```
+
+### Complete Example
+
+Here's a full configuration with both init-time and runtime fallback:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+
+  // Runtime fallback configuration
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "notify_on_fallback": true
+  },
+
+  // Agent configurations with fallback chains
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": [
+        "openai/gpt-5.2",
+        "google/gemini-3-pro",
+        "zai-coding-plan/glm-4.7"
+      ]
+    },
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+      "fallback_models": "opencode/gpt-5-nano"
+    }
+  },
+
+  // Category-level fallback
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5"]
+    }
+  }
+}
+```
+
+### Disabling the Hook
+
+To disable runtime fallback entirely, add it to `disabled_hooks`:
+
+```json
+{
+  "disabled_hooks": ["runtime-fallback"]
+}
+```
+
+### How Fallback Works
+
+When a model error occurs:
+
+1. **Error Detection**: Hook intercepts `session.error` or `message.updated` events
+2. **Retryability Check**: Error code/pattern matches `retry_on_errors`
+3. **Fallback Lookup**: Checks if `fallback_models` configured for the agent
+4. **Cooldown Check**: Skips models in cooldown period
+5. **Model Switch**: Updates session to use fallback model for next request
+6. **Notification**: Shows toast (if enabled): "Switching to gpt-5.2 for next request"
+
+The original model is marked as failed and won't be retried until the cooldown period expires.
 
 ## Model Resolution System
 

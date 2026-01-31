@@ -1,5 +1,7 @@
 # RFC: Runtime Model Fallback (Per-Agent Fallback Models)
 
+**Status**: ✅ **IMPLEMENTED** - Feature is fully functional with 18 passing tests
+
 ## Summary
 
 Enable per-agent runtime model fallback configuration, allowing automatic switching to backup models when the primary model fails (rate limit, overload, unavailable, etc.).
@@ -290,22 +292,48 @@ When fallback occurs, notify user via:
    - Real rate limit scenarios (with test accounts)
    - Multi-fallback chain traversal
 
-## Open Questions
+## Implementation Notes
 
-1. **Should fallback be session-scoped or request-scoped?**
-   - Session: Switch model for entire session
-   - Request: Only for failed request, reset on next
+### Architecture Decision: Hook-Based Approach (Option A)
 
-2. **Should we support fallback for specific operations only?**
-   - e.g., Only fallback for code generation, not for exploration
+The implementation follows the **hook-based approach** (Option A from the original RFC):
 
-3. **How to handle variant compatibility?**
-   - Primary: `claude-opus-4-5` with `variant: max`
-   - Fallback: `gpt-5.2` - what variant to use?
+- **Hook Name**: `runtime-fallback`
+- **Events**: Intercepts `session.error`, `session.created`, `session.deleted`, and `message.updated`
+- **Model Switching**: Uses `chat.message` hook to modify the model for the next request
 
-4. **SDK support requirements?**
-   - Does OpenCode SDK support mid-session model switching?
-   - If not, what's the workaround?
+### Key Implementation Details
+
+1. **Session-Scoped Fallback**: Once a fallback is triggered, the new model is used for the remainder of the session (or until it also fails)
+2. **Agent Detection**: Automatically detects agent from session ID or event properties
+3. **Cooldown Management**: Failed models are tracked per-session and skipped during cooldown
+4. **Error Pattern Matching**: Supports both HTTP status codes (429, 503, 529) and regex pattern matching for error messages
+
+### Files
+
+- `src/hooks/runtime-fallback/index.ts` - Main hook implementation (362 lines)
+- `src/hooks/runtime-fallback/constants.ts` - Default config and error patterns
+- `src/hooks/runtime-fallback/types.ts` - TypeScript type definitions
+- `src/hooks/runtime-fallback/index.test.ts` - Test suite (18 tests)
+- `src/config/schema.ts` - Configuration schema (`RuntimeFallbackConfigSchema`)
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| Session vs Request scoped? | **Session-scoped** - Model switch persists for the session |
+| Operation-specific fallback? | **Not implemented** - Applies to all operations for the agent |
+| Variant compatibility? | **Fallback models use their default variant** - Variants not propagated |
+| SDK support? | **No SDK changes needed** - Hook-based approach works with existing SDK |
+
+## Open Questions (Historical)
+
+These questions were answered during implementation:
+
+1. ~~Should fallback be session-scoped or request-scoped?~~ → Session-scoped
+2. ~~Should we support fallback for specific operations only?~~ → Future enhancement
+3. ~~How to handle variant compatibility?~~ → Fallback uses its own defaults
+4. ~~SDK support requirements?~~ → Hook-based approach, no SDK changes needed
 
 ## Related Work
 
@@ -331,3 +359,4 @@ When fallback occurs, notify user via:
 - [OpenCode SDK Documentation](https://opencode.ai/docs/)
 - [Anthropic Rate Limits](https://docs.anthropic.com/en/api/rate-limits)
 - [OpenAI Rate Limits](https://platform.openai.com/docs/guides/rate-limits)
+- [Configuration Documentation](./configurations.md#runtime-fallback) - User-facing documentation
