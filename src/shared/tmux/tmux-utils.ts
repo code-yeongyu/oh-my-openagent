@@ -141,10 +141,19 @@ export async function spawnTmuxPane(
   const title = `omo-subagent-${description.slice(0, 20)}`
   const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
-    stderr: "ignore",
+    stderr: "pipe",
   })
-  // Await process exit to prevent zombie processes
-  await titleProc.exited
+  const titleExitCode = await titleProc.exited
+  if (titleExitCode !== 0) {
+    const { log } = await import("../logger")
+    const titleStderr = await new Response(titleProc.stderr).text()
+    log("[spawnTmuxPane] WARNING: failed to set pane title", {
+      paneId,
+      title,
+      exitCode: titleExitCode,
+      stderr: titleStderr.trim(),
+    })
+  }
 
   return { success: true, paneId }
 }
@@ -221,10 +230,20 @@ export async function replaceTmuxPane(
   const title = `omo-subagent-${description.slice(0, 20)}`
   const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
-    stderr: "ignore",
+    stderr: "pipe",
   })
-  // Await process exit to prevent zombie processes
-  await titleProc.exited
+  const titleExitCode = await titleProc.exited
+  if (titleExitCode !== 0) {
+    let titleStderr = ""
+    try {
+      titleStderr = await new Response(titleProc.stderr).text()
+    } catch {}
+    log("[replaceTmuxPane] WARNING: failed to set pane title", {
+      paneId,
+      exitCode: titleExitCode,
+      stderr: titleStderr.trim(),
+    })
+  }
 
   log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
   return { success: true, paneId }

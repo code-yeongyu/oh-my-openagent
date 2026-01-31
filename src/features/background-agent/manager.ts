@@ -1396,7 +1396,8 @@ function registerProcessSignal(
   const listener = () => {
     handler()
     if (exitAfter) {
-      process.exit(0)
+      // Delay exit to next tick so other signal handlers can complete their cleanup
+      setImmediate(() => process.exit(0))
     }
   }
   process.on(signal, listener)

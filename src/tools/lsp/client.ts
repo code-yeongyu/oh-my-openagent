@@ -546,7 +546,12 @@ export class LSPClient {
       this.proc = null
       try {
         proc.kill()
-        await proc.exited
+        // Wait for exit with timeout to prevent indefinite hang
+        const exitWithTimeout = Promise.race([
+          proc.exited,
+          new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+        ])
+        await exitWithTimeout
       } catch {}
     }
     this.processExited = true
