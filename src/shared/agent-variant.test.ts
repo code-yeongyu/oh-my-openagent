@@ -211,4 +211,98 @@ describe("resolveVariantForModel", () => {
     // then
     expect(variant).toBe("max")
   })
+
+  test("matches model with antigravity- prefix to base model", () => {
+    // #given
+    const config = {} as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: "antigravity-claude-opus-4-5" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "sisyphus", model)
+
+    // #then
+    expect(variant).toBe("max")
+  })
+
+  test("uses user-defined fallback_chain when provided for agent", () => {
+    // #given
+    const config = {
+      agents: {
+        sisyphus: {
+          fallback_chain: [
+            { providers: ["custom-provider"], model: "custom-model", variant: "custom-variant" }
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "custom-provider", modelID: "custom-model" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "sisyphus", model)
+
+    // #then
+    expect(variant).toBe("custom-variant")
+  })
+
+  test("uses user-defined fallback_chain when provided for category", () => {
+    // #given
+    const config = {
+      agents: {
+        "custom-agent": { category: "my-category" }
+      },
+      categories: {
+        "my-category": {
+          model: "some/model",
+          fallback_chain: [
+            { providers: ["google"], model: "gemini-3-pro", variant: "high" }
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "google", modelID: "antigravity-gemini-3-pro" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "custom-agent", model)
+
+    // #then
+    expect(variant).toBe("high")
+  })
+
+  test("falls back to agent variant when no fallback chain matches", () => {
+    // #given
+    const config = {
+      agents: {
+        "custom-agent": { variant: "fallback-variant" }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "unknown-provider", modelID: "unknown-model" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "custom-agent", model)
+
+    // #then
+    expect(variant).toBe("fallback-variant")
+  })
+
+  test("falls back to category variant when no fallback chain matches", () => {
+    // #given
+    const config = {
+      agents: {
+        "custom-agent": { category: "my-category" }
+      },
+      categories: {
+        "my-category": {
+          model: "some/model",
+          variant: "category-fallback-variant"
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "unknown-provider", modelID: "unknown-model" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "custom-agent", model)
+
+    // #then
+    expect(variant).toBe("category-fallback-variant")
+  })
 })
