@@ -67,11 +67,11 @@ class LSPServerManager {
     // Don't call process.exit() here - let other handlers complete their cleanup first
     // The background-agent manager handles the final exit call
     // Use async handlers to properly await LSP subprocess cleanup
-    process.on("SIGINT", () => void asyncCleanup())
-    process.on("SIGTERM", () => void asyncCleanup())
+    process.on("SIGINT", () => void asyncCleanup().catch(() => {}))
+    process.on("SIGTERM", () => void asyncCleanup().catch(() => {}))
 
     if (process.platform === "win32") {
-      process.on("SIGBREAK", () => void asyncCleanup())
+      process.on("SIGBREAK", () => void asyncCleanup().catch(() => {}))
     }
   }
 
@@ -560,6 +560,11 @@ export class LSPClient {
           log("[LSPClient] Process did not exit within timeout, escalating to SIGKILL")
           try {
             proc.kill("SIGKILL")
+            // Wait briefly for SIGKILL to take effect
+            await Promise.race([
+              proc.exited,
+              new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+            ])
           } catch {}
         }
       } catch {}
