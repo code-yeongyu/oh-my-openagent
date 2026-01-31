@@ -1,8 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 
 const MODE: AgentMode = "primary"
+export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "utility",
+  cost: "EXPENSIVE",
+  promptAlias: "Sisyphus",
+  triggers: [],
+}
 import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   buildKeyTriggersSection,
