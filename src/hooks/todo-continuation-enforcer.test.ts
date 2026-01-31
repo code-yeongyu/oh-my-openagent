@@ -1178,4 +1178,68 @@ describe("todo-continuation-enforcer", () => {
     // #then - continuation injected (no agents to skip)
     expect(promptCalls.length).toBe(1)
   })
+
+  test("should not inject when isContinuationStopped returns true", async () => {
+    // #given - session with continuation stopped
+    const sessionID = "main-stopped"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      isContinuationStopped: (id) => id === sessionID,
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // #then - no continuation injected (stopped flag is true)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should inject when isContinuationStopped returns false", async () => {
+    // #given - session with continuation not stopped
+    const sessionID = "main-not-stopped"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      isContinuationStopped: () => false,
+    })
+
+    // #when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // #then - continuation injected (stopped flag is false)
+    expect(promptCalls.length).toBe(1)
+  })
+
+  test("should cancel all countdowns via cancelAllCountdowns", async () => {
+    // #given - multiple sessions with running countdowns
+    const session1 = "main-cancel-all-1"
+    const session2 = "main-cancel-all-2"
+    setMainSession(session1)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // #when - first session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID: session1 } },
+    })
+    await fakeTimers.advanceBy(500)
+
+    // #when - cancel all countdowns
+    hook.cancelAllCountdowns()
+
+    // #when - advance past countdown time
+    await fakeTimers.advanceBy(3000)
+
+    // #then - no continuation injected (all countdowns cancelled)
+    expect(promptCalls).toHaveLength(0)
+  })
 })
