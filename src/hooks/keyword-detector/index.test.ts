@@ -21,6 +21,7 @@ describe("keyword-detector message transform", () => {
   afterEach(() => {
     logSpy?.mockRestore()
     getMainSessionSpy?.mockRestore()
+    _resetForTesting()
   })
 
   function createMockPluginInput() {
@@ -101,7 +102,7 @@ describe("keyword-detector session filtering", () => {
   let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    setMainSession(undefined)
+    _resetForTesting()
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
@@ -110,7 +111,7 @@ describe("keyword-detector session filtering", () => {
 
   afterEach(() => {
     logSpy?.mockRestore()
-    setMainSession(undefined)
+    _resetForTesting()
   })
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
@@ -246,7 +247,7 @@ describe("keyword-detector word boundary", () => {
   let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    setMainSession(undefined)
+    _resetForTesting()
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
@@ -255,7 +256,7 @@ describe("keyword-detector word boundary", () => {
 
   afterEach(() => {
     logSpy?.mockRestore()
-    setMainSession(undefined)
+    _resetForTesting()
   })
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
@@ -343,7 +344,7 @@ describe("keyword-detector system-reminder filtering", () => {
   let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    setMainSession(undefined)
+    _resetForTesting()
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
@@ -352,7 +353,7 @@ describe("keyword-detector system-reminder filtering", () => {
 
   afterEach(() => {
     logSpy?.mockRestore()
-    setMainSession(undefined)
+    _resetForTesting()
   })
 
   function createMockPluginInput() {
@@ -534,7 +535,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
   let logSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    setMainSession(undefined)
+    _resetForTesting()
     logCalls = []
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
@@ -543,7 +544,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
 
   afterEach(() => {
     logSpy?.mockRestore()
-    setMainSession(undefined)
+    _resetForTesting()
   })
 
   function createMockPluginInput() {
