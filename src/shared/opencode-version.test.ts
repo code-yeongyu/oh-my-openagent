@@ -2,8 +2,6 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import {
   parseVersion,
   compareVersions,
-  isVersionGte,
-  isVersionLt,
   getOpenCodeVersion,
   isOpenCodeVersionAtLeast,
   resetVersionCache,
@@ -103,32 +101,6 @@ describe("opencode-version", () => {
     })
   })
 
-  describe("isVersionGte", () => {
-    test("returns true when a >= b", () => {
-      expect(isVersionGte("1.1.1", "1.1.1")).toBe(true)
-      expect(isVersionGte("1.1.2", "1.1.1")).toBe(true)
-      expect(isVersionGte("1.2.0", "1.1.1")).toBe(true)
-      expect(isVersionGte("2.0.0", "1.1.1")).toBe(true)
-    })
-
-    test("returns false when a < b", () => {
-      expect(isVersionGte("1.1.0", "1.1.1")).toBe(false)
-      expect(isVersionGte("1.0.9", "1.1.1")).toBe(false)
-      expect(isVersionGte("0.9.9", "1.1.1")).toBe(false)
-    })
-  })
-
-  describe("isVersionLt", () => {
-    test("returns true when a < b", () => {
-      expect(isVersionLt("1.1.0", "1.1.1")).toBe(true)
-      expect(isVersionLt("1.0.150", "1.1.1")).toBe(true)
-    })
-
-    test("returns false when a >= b", () => {
-      expect(isVersionLt("1.1.1", "1.1.1")).toBe(false)
-      expect(isVersionLt("1.1.2", "1.1.1")).toBe(false)
-    })
-  })
 
   describe("getOpenCodeVersion", () => {
     beforeEach(() => {

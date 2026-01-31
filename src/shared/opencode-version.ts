@@ -37,13 +37,6 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
-export function isVersionGte(a: string, b: string): boolean {
-  return compareVersions(a, b) >= 0
-}
-
-export function isVersionLt(a: string, b: string): boolean {
-  return compareVersions(a, b) < 0
-}
 
 export function getOpenCodeVersion(): string | null {
   if (cachedVersion !== NOT_CACHED) {
@@ -69,7 +62,7 @@ export function getOpenCodeVersion(): string | null {
 export function isOpenCodeVersionAtLeast(version: string): boolean {
   const current = getOpenCodeVersion()
   if (!current) return true
-  return isVersionGte(current, version)
+  return compareVersions(current, version) >= 0
 }
 
 export function resetVersionCache(): void {
