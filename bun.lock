@@ -18,7 +18,6 @@
         "jsonc-parser": "^3.3.1",
         "picocolors": "^1.1.1",
         "picomatch": "^4.0.2",
-        "vscode-jsonrpc": "^8.2.0",
         "zod": "^4.1.8",
       },
       "devDependencies": {
@@ -28,13 +27,13 @@
         "typescript": "^5.7.3",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "3.1.10",
-        "oh-my-opencode-darwin-x64": "3.1.10",
-        "oh-my-opencode-linux-arm64": "3.1.10",
-        "oh-my-opencode-linux-arm64-musl": "3.1.10",
-        "oh-my-opencode-linux-x64": "3.1.10",
-        "oh-my-opencode-linux-x64-musl": "3.1.10",
-        "oh-my-opencode-windows-x64": "3.1.10",
+        "oh-my-opencode-darwin-arm64": "3.0.0-beta.8",
+        "oh-my-opencode-darwin-x64": "3.0.0-beta.8",
+        "oh-my-opencode-linux-arm64": "3.0.0-beta.8",
+        "oh-my-opencode-linux-arm64-musl": "3.0.0-beta.8",
+        "oh-my-opencode-linux-x64": "3.0.0-beta.8",
+        "oh-my-opencode-linux-x64-musl": "3.0.0-beta.8",
+        "oh-my-opencode-windows-x64": "3.0.0-beta.8",
       },
     },
   },
@@ -226,20 +225,6 @@
 
     "object-inspect": ["object-inspect@1.13.4", "", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
 
-    "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@3.1.10", "", { "os": "darwin", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-6qsZQtrtBYZLufcXTTuUUMEG9PoG9Y98pX+HFVn2xHIEc6GpwR6i5xY8McFHmqPkC388tzybD556JhKqPX7Pnw=="],
-
-    "oh-my-opencode-darwin-x64": ["oh-my-opencode-darwin-x64@3.1.10", "", { "os": "darwin", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-I1tQQbcpSBvLGXTO652mBqlyIpwYhYuIlSJmrSM33YRGBiaUuhMASnHQsms+E0eC3U/TOyqomU/4KPnbWyxs4w=="],
-
-    "oh-my-opencode-linux-arm64": ["oh-my-opencode-linux-arm64@3.1.10", "", { "os": "linux", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-r6Rm5Ru/WwcBKKuPIP0RreI0gnf+MYRV0mmzPBVhMZdPWSC/eTT3GdyqFDZ4cCN76n5aea0sa5PPW7iPF+Uw6Q=="],
-
-    "oh-my-opencode-linux-arm64-musl": ["oh-my-opencode-linux-arm64-musl@3.1.10", "", { "os": "linux", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-UVo5OWO92DPIFhoEkw0tj8IcZyUKOG6NlFs1+tSExz7qrgkr0IloxpLslGMmdc895xxpljrr/FobYktLxyJbcg=="],
-
-    "oh-my-opencode-linux-x64": ["oh-my-opencode-linux-x64@3.1.10", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-3g99z2FweMzHSUYuzgU0E2H0kjVmtOhPZdavwVqcHQtLQ9NNhwfnIvj3yFBif+kGJphP9RDnByC1oA8Q26UrCg=="],
-
-    "oh-my-opencode-linux-x64-musl": ["oh-my-opencode-linux-x64-musl@3.1.10", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-2HS9Ju0Cr433lMFJtu/7bShApOJywp+zmVCduQUBWFi3xbX1nm5sJwWDhw1Wx+VcqHEuJl/SQzWPE4vaqkEQng=="],
-
-    "oh-my-opencode-windows-x64": ["oh-my-opencode-windows-x64@3.1.10", "", { "os": "win32", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode.exe" } }, "sha512-QLncZJSlWmmcuXrAVKIH6a9Om1Ym6pkhG4hAxaD5K5aF1jw2QFsadjoT12VNq2WzQb+Pg5Y6IWvoow0ZR0aEvw=="],
-
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 
     "once": ["once@1.4.0", "", { "dependencies": { "wrappy": "1" } }, "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w=="],
@@ -303,8 +288,6 @@
     "unpipe": ["unpipe@1.0.0", "", {}, "sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ=="],
 
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
-
-    "vscode-jsonrpc": ["vscode-jsonrpc@8.2.1", "", {}, "sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ=="],
 
     "which": ["which@2.0.2", "", { "dependencies": { "isexe": "^2.0.0" }, "bin": { "node-which": "./bin/node-which" } }, "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA=="],
 
