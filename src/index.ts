@@ -35,6 +35,7 @@ import {
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
+  createStopContinuationGuardHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -77,6 +78,7 @@ import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
+import { clearBoulderState } from "./features/boulder-state";
 import { type HookName } from "./config";
 import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
@@ -277,8 +279,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   initTaskToastManager(ctx.client);
 
+  const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
+    ? createStopContinuationGuardHook(ctx)
+    : null;
+
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? createTodoContinuationEnforcer(ctx, { backgroundManager })
+    ? createTodoContinuationEnforcer(ctx, {
+        backgroundManager,
+        isContinuationStopped: stopContinuationGuard?.isStopped,
+      })
     : null;
 
   if (sessionRecovery && todoContinuationEnforcer) {
@@ -521,6 +530,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await stopContinuationGuard?.event(input);
       await atlasHook?.handler(input);
 
       const { event } = input;
@@ -664,13 +674,27 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
            );
 
            ralphLoop.startLoop(sessionID, prompt, {
-             ultrawork: true,
-             maxIterations: maxIterMatch
-               ? parseInt(maxIterMatch[1], 10)
-               : undefined,
-             completionPromise: promiseMatch?.[1],
-           });
+              ultrawork: true,
+              maxIterations: maxIterMatch
+                ? parseInt(maxIterMatch[1], 10)
+                : undefined,
+              completionPromise: promiseMatch?.[1],
+            });
          }
+      }
+
+      if (input.tool === "slashcommand") {
+        const args = output.args as { command?: string } | undefined;
+        const command = args?.command?.replace(/^\//, "").toLowerCase();
+        const sessionID = input.sessionID || getMainSessionID();
+
+        if (command === "stop-continuation" && sessionID) {
+          stopContinuationGuard?.stop(sessionID);
+          todoContinuationEnforcer?.cancelAllCountdowns();
+          ralphLoop?.cancelLoop(sessionID);
+          clearBoulderState(ctx.directory);
+          log("[stop-continuation] All continuation mechanisms stopped", { sessionID });
+        }
       }
     },
 
