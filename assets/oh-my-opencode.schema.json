@@ -80,7 +80,8 @@
           "prometheus-md-only",
           "sisyphus-junior-notepad",
           "start-work",
-          "atlas"
+          "atlas",
+          "stop-continuation-guard"
         ]
       }
     },
