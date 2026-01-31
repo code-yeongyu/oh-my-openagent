@@ -103,4 +103,42 @@ describe("stop-continuation-guard", () => {
     expect(guard.isStopped(session1)).toBe(true)
     expect(guard.isStopped(session2)).toBe(false)
   })
+
+  test("should clear stopped state on new user message (chat.message)", async () => {
+    // #given - a session that was stopped
+    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const sessionID = "test-session-4"
+    guard.stop(sessionID)
+    expect(guard.isStopped(sessionID)).toBe(true)
+
+    // #when - user sends a new message
+    await guard["chat.message"]({ sessionID })
+
+    // #then - stop state should be cleared (one-time only)
+    expect(guard.isStopped(sessionID)).toBe(false)
+  })
+
+  test("should not affect non-stopped sessions on chat.message", async () => {
+    // #given - a session that was never stopped
+    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const sessionID = "test-session-5"
+
+    // #when - user sends a message (session was never stopped)
+    await guard["chat.message"]({ sessionID })
+
+    // #then - should not throw and session remains not stopped
+    expect(guard.isStopped(sessionID)).toBe(false)
+  })
+
+  test("should handle undefined sessionID in chat.message", async () => {
+    // #given - a guard with a stopped session
+    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    guard.stop("some-session")
+
+    // #when - chat.message is called without sessionID
+    await guard["chat.message"]({ sessionID: undefined })
+
+    // #then - should not throw and stopped session remains stopped
+    expect(guard.isStopped("some-session")).toBe(true)
+  })
 })
