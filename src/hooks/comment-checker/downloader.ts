@@ -1,9 +1,16 @@
-import { spawn } from "bun"
-import { existsSync, mkdirSync, chmodSync, unlinkSync, appendFileSync } from "fs"
+import { existsSync, appendFileSync } from "fs"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
 import { createRequire } from "module"
-import { extractZip } from "../../shared"
+import {
+  cleanupArchive,
+  downloadArchive,
+  ensureCacheDir,
+  ensureExecutable,
+  extractTarGz,
+  extractZipArchive,
+  getCachedBinaryPath as getCachedBinaryPathShared,
+} from "../../shared/binary-downloader"
 import { log } from "../../shared/logger"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
@@ -60,8 +67,7 @@ export function getBinaryName(): string {
  * Get the cached binary path if it exists.
  */
 export function getCachedBinaryPath(): string | null {
-  const binaryPath = join(getCacheDir(), getBinaryName())
-  return existsSync(binaryPath) ? binaryPath : null
+  return getCachedBinaryPathShared(getCacheDir(), getBinaryName())
 }
 
 /**
@@ -77,27 +83,6 @@ function getPackageVersion(): string {
     return "0.4.1"
   }
 }
-
-/**
- * Extract tar.gz archive using system tar command.
- */
-async function extractTarGz(archivePath: string, destDir: string): Promise<void> {
-  debugLog("Extracting tar.gz:", archivePath, "to", destDir)
-  
-  const proc = spawn(["tar", "-xzf", archivePath, "-C", destDir], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-  
-  const exitCode = await proc.exited
-  
-  if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text()
-    throw new Error(`tar extraction failed (exit ${exitCode}): ${stderr}`)
-  }
-}
-
-
 
 /**
  * Download the comment-checker binary from GitHub Releases.
@@ -132,39 +117,26 @@ export async function downloadCommentChecker(): Promise<string | null> {
   
   try {
     // Ensure cache directory exists
-    if (!existsSync(cacheDir)) {
-      mkdirSync(cacheDir, { recursive: true })
-    }
-    
-    // Download with fetch() - Bun handles redirects automatically
-    const response = await fetch(downloadUrl, { redirect: "follow" })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
+    ensureCacheDir(cacheDir)
     
     const archivePath = join(cacheDir, assetName)
-    const arrayBuffer = await response.arrayBuffer()
-    await Bun.write(archivePath, arrayBuffer)
+    await downloadArchive(downloadUrl, archivePath)
     
     debugLog(`Downloaded archive to: ${archivePath}`)
     
     // Extract based on file type
     if (ext === "tar.gz") {
+      debugLog("Extracting tar.gz:", archivePath, "to", cacheDir)
       await extractTarGz(archivePath, cacheDir)
     } else {
-      await extractZip(archivePath, cacheDir)
+      await extractZipArchive(archivePath, cacheDir)
     }
     
     // Clean up archive
-    if (existsSync(archivePath)) {
-      unlinkSync(archivePath)
-    }
+    cleanupArchive(archivePath)
     
     // Set execute permission on Unix
-    if (process.platform !== "win32" && existsSync(binaryPath)) {
-      chmodSync(binaryPath, 0o755)
-    }
+    ensureExecutable(binaryPath)
     
     debugLog(`Successfully downloaded binary to: ${binaryPath}`)
     log(`[oh-my-opencode] comment-checker binary ready.`)
