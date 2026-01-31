@@ -435,5 +435,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     expect(fetchSpy).toHaveBeenCalled()
     const firstCallArgs = fetchSpy.mock.calls[0]
     expect(firstCallArgs[0]).toBeUndefined()
+
+    fetchSpy.mockRestore?.()
   })
 })
