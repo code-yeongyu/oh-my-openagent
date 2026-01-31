@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, DEFAULT_CONTEXT_STRATEGY } from "./constants"
+import { writeState } from "./storage"
 import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
@@ -15,7 +16,7 @@ type SessionRecovery = {
 	clear: (sessionID: string) => void
 }
 type LoopStateController = { getState: () => RalphLoopState | null; clear: () => boolean; incrementIteration: () => RalphLoopState | null }
-type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
+type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController; config?: RalphLoopOptions["config"]; stateDir?: string }
 
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
@@ -116,6 +117,49 @@ export function createRalphLoopEventHandler(
 				max: newState.max_iterations,
 			})
 
+			const contextStrategy = options.config?.context_strategy ?? DEFAULT_CONTEXT_STRATEGY
+			let targetSessionID = sessionID
+
+			if (contextStrategy === "reset") {
+				try {
+					log(`[${HOOK_NAME}] Creating new session for fresh context`, { sessionID })
+					const createResp = await ctx.client.session.create({
+						body: { title: `Ralph Loop - Iteration ${newState.iteration}` },
+						query: { directory: options.directory },
+					})
+					const newSessionID = (createResp as { data?: { id?: string } })?.data?.id
+					if (newSessionID) {
+						targetSessionID = newSessionID
+						const updatedState = { ...newState, session_id: newSessionID }
+						writeState(options.directory, updatedState, options.stateDir)
+						log(`[${HOOK_NAME}] Switched to new session`, { oldSessionID: sessionID, newSessionID })
+
+						try {
+							const client = (ctx.client as unknown as { _client: { post: (opts: unknown) => Promise<unknown> } })._client
+							await client.post({
+								url: "/tui/select-session",
+								body: { sessionID: newSessionID },
+								query: { directory: options.directory },
+								headers: { "Content-Type": "application/json" },
+							})
+							log(`[${HOOK_NAME}] TUI switched to new session`, { newSessionID })
+						} catch (tuiErr) {
+							log(`[${HOOK_NAME}] TUI session switch failed (continuing anyway)`, {
+								newSessionID,
+								error: String(tuiErr),
+							})
+						}
+					} else {
+						log(`[${HOOK_NAME}] Failed to create new session, using original`, { sessionID })
+					}
+				} catch (err) {
+					log(`[${HOOK_NAME}] Session creation failed, using original session`, {
+						sessionID,
+						error: String(err),
+					})
+				}
+			}
+
 			await ctx.client.tui
 				.showToast({
 					body: {
@@ -129,14 +173,14 @@ export function createRalphLoopEventHandler(
 
 			try {
 				await injectContinuationPrompt(ctx, {
-					sessionID,
+					sessionID: targetSessionID,
 					prompt: buildContinuationPrompt(newState),
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
 				})
 			} catch (err) {
 				log(`[${HOOK_NAME}] Failed to inject continuation`, {
-					sessionID,
+					sessionID: targetSessionID,
 					error: String(err),
 				})
 			}

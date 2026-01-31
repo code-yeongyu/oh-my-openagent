@@ -42,6 +42,8 @@ export function createRalphLoopHook(
 		checkSessionExists,
 		sessionRecovery,
 		loopState,
+		config,
+		stateDir,
 	})
 
 	return {
