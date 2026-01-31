@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { findByNameCaseInsensitive, log, promptWithModelSuggestionRetry } from "../../shared"
+import { log, promptWithModelSuggestionRetry } from "../../shared"
 
 interface LookAtArgsWithAlias extends LookAtArgs {
   path?: string
@@ -143,7 +143,9 @@ Original error: ${createResult.error}`
         }
         const agents = ((agentsResult as { data?: AgentInfo[] })?.data ?? agentsResult) as AgentInfo[] | undefined
         if (agents?.length) {
-          const matchedAgent = findByNameCaseInsensitive(agents, MULTIMODAL_LOOKER_AGENT)
+          const matchedAgent = agents.find(
+            (agent) => agent.name.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
+          )
           if (matchedAgent?.model) {
             agentModel = matchedAgent.model
           }
