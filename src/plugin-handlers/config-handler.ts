@@ -25,11 +25,10 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, fetchAvailableModels, readConnectedProvidersCache } from "../shared";
+import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { resolveModelWithFallback } from "../shared/model-resolver";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
@@ -259,12 +258,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           connectedProviders: connectedProviders ?? undefined,
         });
 
-        const modelResolution = resolveModelWithFallback({
-          uiSelectedModel: currentModel,
-          userModel: prometheusOverride?.model ?? categoryConfig?.model,
-          fallbackChain: prometheusRequirement?.fallbackChain,
-          availableModels,
-          systemDefaultModel: undefined,
+        const modelResolution = resolveModelPipeline({
+          intent: {
+            uiSelectedModel: currentModel,
+            userModel: prometheusOverride?.model ?? categoryConfig?.model,
+          },
+          constraints: { availableModels },
+          policy: {
+            fallbackChain: prometheusRequirement?.fallbackChain,
+            systemDefaultModel: undefined,
+          },
         });
         const resolvedModel = modelResolution?.model;
         const resolvedVariant = modelResolution?.variant;

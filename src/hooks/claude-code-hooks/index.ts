@@ -24,7 +24,7 @@ import {
   type PreCompactContext,
 } from "./pre-compact"
 import { cacheToolInput, getToolInput } from "./tool-input-cache"
-import { recordToolUse, recordToolResult, getTranscriptPath, recordUserMessage } from "./transcript"
+import { appendTranscriptEntry, getTranscriptPath } from "./transcript"
 import type { PluginConfig } from "./types"
 import { log, isHookDisabled } from "../../shared"
 import type { ContextCollector } from "../../features/context-injector"
@@ -92,7 +92,11 @@ export function createClaudeCodeHooksHook(
       const textParts = output.parts.filter((p) => p.type === "text" && p.text)
       const prompt = textParts.map((p) => p.text ?? "").join("\n")
 
-      recordUserMessage(input.sessionID, prompt)
+      appendTranscriptEntry(input.sessionID, {
+        type: "user",
+        timestamp: new Date().toISOString(),
+        content: prompt,
+      })
 
       const messageParts: MessagePart[] = textParts.map((p) => ({
         type: p.type as "text",
@@ -198,7 +202,12 @@ export function createClaudeCodeHooksHook(
       const claudeConfig = await loadClaudeHooksConfig()
       const extendedConfig = await loadPluginExtendedConfig()
 
-      recordToolUse(input.sessionID, input.tool, output.args as Record<string, unknown>)
+      appendTranscriptEntry(input.sessionID, {
+        type: "tool_use",
+        timestamp: new Date().toISOString(),
+        tool_name: input.tool,
+        tool_input: output.args as Record<string, unknown>,
+      })
 
       cacheToolInput(input.sessionID, input.tool, input.callID, output.args as Record<string, unknown>)
 
@@ -253,7 +262,13 @@ export function createClaudeCodeHooksHook(
       const metadata = output.metadata as Record<string, unknown> | undefined
       const hasMetadata = metadata && typeof metadata === "object" && Object.keys(metadata).length > 0
       const toolOutput = hasMetadata ? metadata : { output: output.output }
-      recordToolResult(input.sessionID, input.tool, cachedInput, toolOutput)
+      appendTranscriptEntry(input.sessionID, {
+        type: "tool_result",
+        timestamp: new Date().toISOString(),
+        tool_name: input.tool,
+        tool_input: cachedInput,
+        tool_output: toolOutput,
+      })
 
       if (!isHookDisabled(config, "PostToolUse")) {
         const postClient: PostToolUseClient = {

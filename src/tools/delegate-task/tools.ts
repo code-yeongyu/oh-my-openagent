@@ -12,10 +12,9 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModel, getOpenCodeConfigPaths, findByNameCaseInsensitive, equalsIgnoreCase, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModel, resolveModelPipeline, getOpenCodeConfigPaths, promptWithModelSuggestionRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { resolveModelWithFallback } from "../../shared/model-resolver"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 type OpencodeClient = PluginInput["client"]
@@ -552,16 +551,20 @@ To continue this session: session_id="${args.session_id}"`
              modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
            }
           } else {
-          const resolution = resolveModelWithFallback({
+          const resolution = resolveModelPipeline({
+            intent: {
               userModel: userCategories?.[args.category]?.model,
               categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
+            },
+            constraints: { availableModels },
+            policy: {
               fallbackChain: requirement.fallbackChain,
-              availableModels,
               systemDefaultModel,
-            })
+            },
+          })
 
-           if (resolution) {
-             const { model: resolvedModel, source, variant: resolvedVariant } = resolution
+            if (resolution) {
+              const { model: resolvedModel, provenance, variant: resolvedVariant } = resolution
              actualModel = resolvedModel
 
              if (!parseModelString(actualModel)) {
@@ -569,7 +572,8 @@ To continue this session: session_id="${args.session_id}"`
              }
 
               let type: "user-defined" | "inherited" | "category-default" | "system-default"
-              switch (source) {
+              const source = provenance
+              switch (provenance) {
                  case "override":
                    type = "user-defined"
                    break
@@ -582,7 +586,7 @@ To continue this session: session_id="${args.session_id}"`
                    break
               }
 
-             modelInfo = { model: actualModel, type, source }
+              modelInfo = { model: actualModel, type, source }
              
              const parsedModel = parseModelString(actualModel)
              const variantToUse = userCategories?.[args.category]?.variant ?? resolvedVariant ?? resolved.config.variant
@@ -780,7 +784,7 @@ To continue this session: session_id="${sessionID}"`
         }
         const agentName = args.subagent_type.trim()
 
-        if (equalsIgnoreCase(agentName, SISYPHUS_JUNIOR_AGENT)) {
+        if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
           return `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`
@@ -803,12 +807,13 @@ Create the work plan directly - that's your job as the planning agent.`
 
           const callableAgents = agents.filter((a) => a.mode !== "primary")
 
-          const matchedAgent = findByNameCaseInsensitive(callableAgents, agentToUse)
+          const matchedAgent = callableAgents.find(
+            (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+          )
           if (!matchedAgent) {
-            const isPrimaryAgent = findByNameCaseInsensitive(
-              agents.filter((a) => a.mode === "primary"),
-              agentToUse
-            )
+            const isPrimaryAgent = agents
+              .filter((a) => a.mode === "primary")
+              .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase())
             if (isPrimaryAgent) {
               return `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`
             }
