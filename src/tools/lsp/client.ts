@@ -48,21 +48,13 @@ class LSPServerManager {
 
     process.on("exit", cleanup)
 
-    process.on("SIGINT", () => {
-      cleanup()
-      process.exit(0)
-    })
-
-    process.on("SIGTERM", () => {
-      cleanup()
-      process.exit(0)
-    })
+    // Don't call process.exit() here - let other handlers complete their cleanup first
+    // The background-agent manager handles the final exit call
+    process.on("SIGINT", cleanup)
+    process.on("SIGTERM", cleanup)
 
     if (process.platform === "win32") {
-      process.on("SIGBREAK", () => {
-        cleanup()
-        process.exit(0)
-      })
+      process.on("SIGBREAK", cleanup)
     }
   }
 
@@ -532,8 +524,11 @@ export class LSPClient {
       this.connection.dispose()
       this.connection = null
     }
-    this.proc?.kill()
-    this.proc = null
+    if (this.proc) {
+      this.proc.kill()
+      await this.proc.exited
+      this.proc = null
+    }
     this.processExited = true
     this.diagnosticsStore.clear()
   }

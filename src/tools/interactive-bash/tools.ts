@@ -95,8 +95,9 @@ The Bash tool can execute these commands directly. Do NOT retry with interactive
       })
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        const id = setTimeout(() => {
+        const id = setTimeout(async () => {
           proc.kill()
+          await proc.exited
           reject(new Error(`Timeout after ${DEFAULT_TIMEOUT_MS}ms`))
         }, DEFAULT_TIMEOUT_MS)
         proc.exited.then(() => clearTimeout(id))

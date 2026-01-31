@@ -117,19 +117,17 @@ export class SkillMcpManager {
     // Note: 'exit' event is synchronous-only in Node.js, so we use 'beforeExit' for async cleanup
     // However, 'beforeExit' is not emitted on explicit process.exit() calls
     // Signal handlers are made async to properly await cleanup
+    // Don't call process.exit() - let background-agent manager handle the final exit
 
     process.on("SIGINT", async () => {
       await cleanup()
-      process.exit(0)
     })
     process.on("SIGTERM", async () => {
       await cleanup()
-      process.exit(0)
     })
     if (process.platform === "win32") {
       process.on("SIGBREAK", async () => {
         await cleanup()
-        process.exit(0)
       })
     }
   }

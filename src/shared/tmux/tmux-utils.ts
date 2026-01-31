@@ -139,10 +139,12 @@ export async function spawnTmuxPane(
   }
 
   const title = `omo-subagent-${description.slice(0, 20)}`
-  spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
+  const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
     stderr: "ignore",
   })
+  // Await process exit to prevent zombie processes
+  await titleProc.exited
 
   return { success: true, paneId }
 }
@@ -217,10 +219,12 @@ export async function replaceTmuxPane(
   }
 
   const title = `omo-subagent-${description.slice(0, 20)}`
-  spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
+  const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
     stderr: "ignore",
   })
+  // Await process exit to prevent zombie processes
+  await titleProc.exited
 
   log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
   return { success: true, paneId }
