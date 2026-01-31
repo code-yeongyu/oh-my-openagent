@@ -180,9 +180,12 @@ export async function createBuiltinAgents(
   uiSelectedModel?: string
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
-  const availableModels = client 
-    ? await fetchAvailableModels(client, { connectedProviders: connectedProviders ?? undefined }) 
-    : new Set<string>()
+  // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
+  // This function is called from config handler, and calling client API causes deadlock.
+  // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
+  const availableModels = await fetchAvailableModels(undefined, {
+    connectedProviders: connectedProviders ?? undefined,
+  })
 
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
