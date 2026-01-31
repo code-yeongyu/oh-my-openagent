@@ -77,6 +77,20 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task
 
+**MANDATORY FIRST ACTION** (Context Loading):
+1. Use \`progressive-disclosure-md\` skill to read tasks.md:
+   \`\`\`bash
+   node ~/.claude/skills/progressive-disclosure-md/cli/dist/cli.mjs {TASKS_PATH}
+   \`\`\`
+
+2. Parse each \`### Task X.Y: [Title]\` and write to \`todowrite\`:
+   - id: "task-X.Y"
+   - content: "[Title] - [Description first sentence]"
+   - priority: Phase 1 = high, Phase 2 = medium, Phase 3+ = low
+   - status: Based on checkbox - \`[x]\` = completed, \`[ ]\` = pending, \`[~]\` = in_progress
+   
+   **IMPORTANT**: Only write incomplete tasks (\`[ ]\` or \`[~]\`) to todo.
+
 SYNC REQUIREMENT (tasks.md is source of truth):
 After reading this message, you MUST:
 1. **Read the plan file at \`{TASKS_PATH}\`** to get the authoritative task list
@@ -519,9 +533,11 @@ interface ToolExecuteAfterOutput {
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  lastToolExecutionAt?: number
 }
 
 const CONTINUATION_COOLDOWN_MS = 5000
+const POST_TOOL_COOLDOWN_MS = 10000
 
 export interface AtlasHookOptions {
   directory: string
@@ -691,6 +707,21 @@ export function createAtlasHook(
           return
         }
 
+        // Post-tool execution cooldown (prevents interrupting active work)
+        if (state.lastToolExecutionAt) {
+          const timeSinceToolExec = Date.now() - state.lastToolExecutionAt
+          if (timeSinceToolExec < POST_TOOL_COOLDOWN_MS) {
+            log(`[${HOOK_NAME}] Skipped: post-tool cooldown active (${timeSinceToolExec}ms < ${POST_TOOL_COOLDOWN_MS}ms)`, { sessionID })
+            return
+          }
+        }
+
+        // Post-compact cooldown (1 minute after compact, don't auto-continue)
+        if (isInCompactionCooldown(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: post-compact cooldown active`, { sessionID, cooldownRemaining: getCompactionCooldownRemaining(sessionID) })
+          return
+        }
+
 
         if (!boulderState) {
           log(`[${HOOK_NAME}] No active boulder`, { sessionID })
@@ -851,9 +882,11 @@ export function createAtlasHook(
       if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
         const sessionID = props?.sessionID as string | undefined
         if (sessionID) {
-          const state = sessions.get(sessionID)
-          if (state) {
-            state.lastEventWasAbortError = false
+          const state = getState(sessionID)
+          state.lastEventWasAbortError = false
+          // Track last tool execution to prevent interrupting active work
+          if (event.type === "tool.execute.after") {
+            state.lastToolExecutionAt = Date.now()
           }
         }
         return

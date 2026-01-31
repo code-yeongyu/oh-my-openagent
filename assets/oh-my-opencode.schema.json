@@ -3583,6 +3583,55 @@
           "type": "boolean"
         }
       }
+    },
+    "mcp": {
+      "type": "object",
+      "properties": {
+        "tool_count_warning_threshold": {
+          "default": 80,
+          "type": "number",
+          "minimum": 1
+        },
+        "templates": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "template": {
+                    "type": "string"
+                  },
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "template"
+                ]
+              }
+            ]
+          }
+        }
+      }
     }
   }
 }

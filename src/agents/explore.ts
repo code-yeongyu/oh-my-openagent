@@ -72,6 +72,20 @@ Always end with this exact format:
 - /absolute/path/to/file2.ts — [why this file is relevant]
 </files>
 
+<dimensions>
+**Security Assessment**:
+- [List any security-related findings: auth, validation, sanitization, secrets]
+- Risk Level: LOW | MEDIUM | HIGH | N/A
+
+**Code Quality Assessment**:
+- [List quality observations: patterns, anti-patterns, complexity, maintainability]
+- Quality Level: GOOD | ACCEPTABLE | NEEDS_IMPROVEMENT | N/A
+
+**Performance Assessment**:
+- [List performance observations: complexity, caching, async patterns, bottlenecks]
+- Performance Level: OPTIMAL | ACCEPTABLE | CONCERN | N/A
+</dimensions>
+
 <answer>
 [Direct answer to their actual need, not just file list]
 [If they asked "where is auth?", explain the auth flow you found]

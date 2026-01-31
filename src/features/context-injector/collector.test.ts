@@ -327,4 +327,110 @@ describe("ContextCollector", () => {
       expect(collector.hasPending(sessionID)).toBe(false)
     })
   })
+
+  describe("cache-friendly source ordering", () => {
+    it("orders contexts by source type for cache optimization", () => {
+      // #given
+      const sessionID = "ses_source_order"
+      collector.register(sessionID, {
+        id: "custom-ctx",
+        source: "custom",
+        content: "Custom content",
+      })
+      collector.register(sessionID, {
+        id: "agents-ctx",
+        source: "directory-agents",
+        content: "Agents content",
+      })
+      collector.register(sessionID, {
+        id: "rules-ctx",
+        source: "rules-injector",
+        content: "Rules content",
+      })
+      collector.register(sessionID, {
+        id: "system-ctx",
+        source: "system",
+        content: "System content",
+      })
+
+      // #when
+      const pending = collector.getPending(sessionID)
+
+      // #then - should be ordered: system -> directory-agents -> rules -> custom
+      const sources = pending.entries.map((e) => e.source)
+      expect(sources).toEqual(["system", "directory-agents", "rules-injector", "custom"])
+    })
+
+    it("respects priority within same source type", () => {
+      // #given
+      const sessionID = "ses_priority_within_source"
+      collector.register(sessionID, {
+        id: "low-priority",
+        source: "rules-injector",
+        content: "Low",
+        priority: "low",
+      })
+      collector.register(sessionID, {
+        id: "high-priority",
+        source: "rules-injector",
+        content: "High",
+        priority: "high",
+      })
+
+      // #when
+      const pending = collector.getPending(sessionID)
+
+      // #then - high priority should come before low within same source
+      const priorities = pending.entries.map((e) => e.priority)
+      expect(priorities).toEqual(["high", "low"])
+    })
+
+    it("allows custom source order via constructor options", () => {
+      // #given
+      const customCollector = new ContextCollector({
+        sourceOrder: ["custom", "rules-injector", "directory-agents", "system"],
+      })
+      const sessionID = "ses_custom_order"
+      
+      customCollector.register(sessionID, {
+        id: "system-ctx",
+        source: "system",
+        content: "System",
+      })
+      customCollector.register(sessionID, {
+        id: "custom-ctx",
+        source: "custom",
+        content: "Custom",
+      })
+
+      // #when
+      const pending = customCollector.getPending(sessionID)
+
+      // #then - custom order: custom should come before system
+      const sources = pending.entries.map((e) => e.source)
+      expect(sources).toEqual(["custom", "system"])
+    })
+
+    it("places unknown sources at the end", () => {
+      // #given
+      const sessionID = "ses_unknown_source"
+      collector.register(sessionID, {
+        id: "system-ctx",
+        source: "system",
+        content: "System",
+      })
+      collector.register(sessionID, {
+        id: "dynamic-ctx",
+        source: "dynamic",
+        content: "Dynamic",
+      })
+
+      // #when
+      const pending = collector.getPending(sessionID)
+
+      // #then - system before dynamic (based on DEFAULT_SOURCE_ORDER)
+      const sources = pending.entries.map((e) => e.source)
+      expect(sources[0]).toBe("system")
+    })
+  })
 })

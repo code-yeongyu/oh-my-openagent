@@ -380,6 +380,30 @@ export const TmuxConfigSchema = z.object({
   agent_pane_min_width: z.number().min(20).default(40),
 })
 
+export const McpTemplateConfigSchema = z.union([
+  z.string(), // Shorthand: just the template name, e.g., "exa"
+  z.object({
+    /** Template name to use (e.g., "exa", "tavily", "firecrawl") */
+    template: z.string(),
+    /** API key (optional if env var is set) */
+    apiKey: z.string().optional(),
+    /** Override the default URL */
+    url: z.string().optional(),
+    /** Additional headers */
+    headers: z.record(z.string(), z.string()).optional(),
+  }),
+])
+
+export const McpConfigSchema = z.object({
+  /** Maximum number of MCP tools before warning (default: 80) */
+  tool_count_warning_threshold: z.number().min(1).default(80),
+  /** 
+   * MCP Templates - activate preset MCPs by just providing a name or API key.
+   * Example: { "my-search": "exa" } or { "my-search": { template: "exa", apiKey: "..." } }
+   */
+  templates: z.record(z.string(), McpTemplateConfigSchema).optional(),
+})
+
 export const RiskTierSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])
 
 export const TddGuardConfigSchema = z.object({
@@ -427,6 +451,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   tdd_guard: TddGuardConfigSchema.optional(),
   checkbox_enforcement: CheckboxEnforcementConfigSchema.optional(),
+  mcp: McpConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -456,5 +481,6 @@ export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type TddGuardConfig = z.infer<typeof TddGuardConfigSchema>
 export type RiskTier = z.infer<typeof RiskTierSchema>
 export type CheckboxEnforcementConfig = z.infer<typeof CheckboxEnforcementConfigSchema>
+export type McpConfig = z.infer<typeof McpConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

@@ -13,6 +13,7 @@
  */
 
 import type { PluginInput } from "@opencode-ai/plugin"
+import { resolve } from "node:path"
 import { readBoulderState } from "../../features/boulder-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
@@ -28,6 +29,9 @@ const EXCLUDED_PATTERNS = [
 /** Track code changes per session for 2-Action Rule */
 const sessionCodeChanges = new Map<string, number>()
 
+/** Store filePath from tool.execute.before for use in tool.execute.after */
+const pendingFilePaths = new Map<string, string>()
+
 /**
  * Check if a file path should trigger the reminder
  * Returns false for markdown files (including tasks.md)
@@ -40,39 +44,92 @@ export function createPlanUpdateReminderHook(ctx: PluginInput) {
   return {
     name: HOOK_NAME,
     
-    "tool.execute.after": async (
-      input: { tool: string; input?: { filePath?: string; path?: string }; sessionID?: string },
-      output: { output?: string }
+    // Capture filePath in tool.execute.before (where output.args is available)
+    "tool.execute.before": async (
+      input: { tool: string; sessionID?: string; callID?: string },
+      output: { args?: Record<string, unknown> }
     ): Promise<void> => {
-      const toolName = input.tool
-      const sessionID = input.sessionID || "default"
+      const toolName = input.tool.toLowerCase()
       
-      // Skip subagent sessions - they don't need planning file reminders
-      if (subagentSessions.has(sessionID)) {
+      // Only capture for Edit or Write tools
+      if (toolName !== "edit" && toolName !== "write") {
         return
       }
+      
+      // Get file path from args
+      const filePath = (output.args?.filePath ?? output.args?.file_path ?? output.args?.path) as string | undefined
+      
+      if (filePath && input.callID) {
+        pendingFilePaths.set(input.callID, filePath)
+        log(`[${HOOK_NAME}] DEBUG - Stored filePath`, { callID: input.callID, filePath })
+      }
+    },
+    
+    "tool.execute.after": async (
+      input: { tool: string; sessionID?: string; callID?: string },
+      output: { output?: string }
+    ): Promise<void> => {
+      const toolName = input.tool.toLowerCase()
+      const sessionID = input.sessionID || "default"
+      
+      // DEBUG: Log tool.execute.after call
+      log(`[${HOOK_NAME}] DEBUG - tool.execute.after`, {
+        toolName,
+        callID: input.callID,
+        sessionID,
+        pendingSize: pendingFilePaths.size
+      })
       
       // Only trigger on Edit or Write tools
       if (toolName !== "edit" && toolName !== "write") {
         return
       }
       
-      // Get file path from input
-      const filePath = input.input?.filePath || input.input?.path
+      // Get filePath from pendingFilePaths (captured in tool.execute.before)
+      const filePath = input.callID ? pendingFilePaths.get(input.callID) : undefined
+      
+      log(`[${HOOK_NAME}] DEBUG - Retrieved filePath`, {
+        callID: input.callID,
+        filePath,
+        found: !!filePath
+      })
+      
+      // Clean up pending entry
+      if (input.callID) {
+        pendingFilePaths.delete(input.callID)
+      }
+      
+      // Skip subagent sessions - they don't need planning file reminders
+      if (subagentSessions.has(sessionID)) {
+        log(`[${HOOK_NAME}] DEBUG - Skipping: subagent session`)
+        return
+      }
+      
       if (!filePath) {
+        log(`[${HOOK_NAME}] DEBUG - Skipping: no filePath`)
         return
       }
       
       // Skip markdown files (including tasks.md)
       if (!shouldTriggerReminder(filePath)) {
+        log(`[${HOOK_NAME}] DEBUG - Skipping: markdown file`)
         return
       }
       
       // Check if boulder.json exists and has active plan
-      const boulderState = readBoulderState(ctx.directory)
+      // Use resolve() to handle Windows path issues
+      const resolvedDir = resolve(ctx.directory)
+      const boulderState = readBoulderState(resolvedDir)
       if (!boulderState || !boulderState.active_plan) {
+        log(`[${HOOK_NAME}] DEBUG - Skipping: no boulder state`, { 
+          boulderState, 
+          directory: ctx.directory,
+          resolvedDir
+        })
         return
       }
+      
+      log(`[${HOOK_NAME}] DEBUG - All checks passed, appending reminder`)
       
       // Track code changes for 2-Action Rule
       const currentCount = (sessionCodeChanges.get(sessionID) || 0) + 1

@@ -1,9 +1,11 @@
 import type {
   ContextEntry,
   ContextPriority,
+  ContextSourceType,
   PendingContext,
   RegisterContextOptions,
 } from "./types"
+import { DEFAULT_SOURCE_ORDER } from "./types"
 
 const PRIORITY_ORDER: Record<ContextPriority, number> = {
   critical: 0,
@@ -14,8 +16,33 @@ const PRIORITY_ORDER: Record<ContextPriority, number> = {
 
 const CONTEXT_SEPARATOR = "\n\n---\n\n"
 
+/**
+ * Build source order map from array for O(1) lookups
+ */
+function buildSourceOrderMap(sourceOrder: ContextSourceType[]): Map<ContextSourceType, number> {
+  const map = new Map<ContextSourceType, number>()
+  sourceOrder.forEach((source, index) => {
+    map.set(source, index)
+  })
+  return map
+}
+
+export interface ContextCollectorOptions {
+  /**
+   * Custom source order for cache-friendly injection
+   * Default: system → directory-agents → directory-readme → rules → skills → dynamic → custom
+   */
+  sourceOrder?: ContextSourceType[]
+}
+
 export class ContextCollector {
   private sessions: Map<string, Map<string, ContextEntry>> = new Map()
+  private sourceOrderMap: Map<ContextSourceType, number>
+
+  constructor(options?: ContextCollectorOptions) {
+    const sourceOrder = options?.sourceOrder ?? DEFAULT_SOURCE_ORDER
+    this.sourceOrderMap = buildSourceOrderMap(sourceOrder)
+  }
 
   register(sessionID: string, options: RegisterContextOptions): void {
     if (!this.sessions.has(sessionID)) {
@@ -73,10 +100,18 @@ export class ContextCollector {
     return sessionMap !== undefined && sessionMap.size > 0
   }
 
-  private sortEntries(entries: ContextEntry[]): ContextEntry[] {
+private sortEntries(entries: ContextEntry[]): ContextEntry[] {
     return entries.sort((a, b) => {
+      // First: sort by source order (for cache-friendly injection)
+      const sourceOrderA = this.sourceOrderMap.get(a.source) ?? 999
+      const sourceOrderB = this.sourceOrderMap.get(b.source) ?? 999
+      if (sourceOrderA !== sourceOrderB) return sourceOrderA - sourceOrderB
+
+      // Second: sort by priority within same source
       const priorityDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
       if (priorityDiff !== 0) return priorityDiff
+
+      // Third: sort by timestamp within same priority
       return a.timestamp - b.timestamp
     })
   }

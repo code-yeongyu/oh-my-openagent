@@ -18,6 +18,8 @@ export const DEFAULT_TDD_GUARD_CONFIG: TddGuardConfig = {
   reject_missing_assertions: true,
   reject_trivial_assertions: true,
   inject_skill_on_block: true,
+  enable_real_test_execution: false, // Disabled by default for safety
+  test_timeout_ms: 30_000,
 }
 
 /**

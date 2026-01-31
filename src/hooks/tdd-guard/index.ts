@@ -16,6 +16,7 @@ import { determineRiskTier, shouldBlockEdit, matchesIgnorePattern } from "./risk
 import { isTestFile } from "./language-adapter"
 import { FileStorage } from "./storage"
 import { UserPromptHandler, SessionHandler, PostToolLintHandler } from "./handlers"
+import { executeTests } from "./test-executor"
 
 // Inline TDD skill content (loaded at module init, fallback if external file not found)
 const TDD_SKILL_CONTENT = `# TDD Workflow (Auto-Injected)
@@ -227,11 +228,28 @@ export function createTddGuardHook(
       const content = (output.args.content ?? output.args.newString ?? output.args.new_string) as string | undefined
       const hasExemption = tier.allowsExemption && hasExemptionComment(content)
 
-      // For now, we don't have a way to check for failing tests at runtime
-      // This would require running the test suite, which is expensive
-      // Instead, we rely on the AI following TDD practices after seeing the skill
-      // The hook will warn but not hard-block for now
-      const hasFailingTest = false // TODO: Could integrate with test runner
+      // Check for failing tests using real test execution (if enabled)
+      let hasFailingTest = false
+      if (config.enable_real_test_execution) {
+        const testResult = executeTests({
+          cwd: ctx.cwd,
+          enableRealExecution: true,
+          timeoutMs: config.test_timeout_ms,
+        })
+        hasFailingTest = testResult.hasFailingTests
+        
+        // Log test execution result for debugging
+        if (ctx.log) {
+          if (testResult.timedOut) {
+            ctx.log(`[TDD Guard] Test execution timed out after ${config.test_timeout_ms}ms`)
+          } else if (testResult.noTestsFound) {
+            ctx.log(`[TDD Guard] No tests found`)
+          } else if (testResult.error) {
+            ctx.log(`[TDD Guard] Test execution error: ${testResult.error}`)
+          }
+        }
+      }
+      // If real execution is disabled, we rely on the AI following TDD practices
 
       // Check if edit should be blocked
       const blockResult = shouldBlockEdit(tier, hasFailingTest, hasExemption)

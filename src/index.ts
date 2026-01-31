@@ -701,6 +701,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await instinctTrigger?.["tool.execute.before"]?.(input, output);
+      await planUpdateReminder?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {

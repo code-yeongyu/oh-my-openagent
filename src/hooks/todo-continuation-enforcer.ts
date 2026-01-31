@@ -45,6 +45,8 @@ interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  /** Last tool execution timestamp (to prevent interrupting active work) */
+  lastToolExecutionAt?: number
   /** Checkbox enforcement state */
   checkboxEnforcement?: {
     /** Last git diff hash (to detect code changes) */
@@ -67,6 +69,20 @@ RULES:
 - Mark each task complete when finished
 - Do not stop until all tasks are done
 
+**MANDATORY FIRST ACTION** (Context Loading):
+1. Use \`progressive-disclosure-md\` skill to read tasks.md:
+   \`\`\`bash
+   node ~/.claude/skills/progressive-disclosure-md/cli/dist/cli.mjs {TASKS_PATH}
+   \`\`\`
+
+2. Parse each \`### Task X.Y: [Title]\` and write to \`todowrite\`:
+   - id: "task-X.Y"
+   - content: "[Title] - [Description first sentence]"
+   - priority: Phase 1 = high, Phase 2 = medium, Phase 3+ = low
+   - status: Based on checkbox - \`[x]\` = completed, \`[ ]\` = pending, \`[~]\` = in_progress
+   
+   **IMPORTANT**: Only write incomplete tasks (\`[ ]\` or \`[~]\`) to todo.
+
 SYNC REQUIREMENT (tasks.md is source of truth):
 - If .sisyphus/boulder.json exists and has active_plan:
   1. **Read the plan file at \`{TASKS_PATH}\`** to get the authoritative task list
@@ -80,6 +96,8 @@ SYNC REQUIREMENT (tasks.md is source of truth):
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
 const COUNTDOWN_GRACE_PERIOD_MS = 500
+/** Cooldown after tool execution before triggering continuation (prevents interrupting active work) */
+const POST_TOOL_COOLDOWN_MS = 10000
 
 /**
  * Keywords that indicate user is making a git/publish decision.
@@ -535,6 +553,16 @@ export function createTodoContinuationEnforcer(
         return
       }
 
+      // Check 1.5.1: Post-tool execution cooldown (prevents interrupting active work)
+      // When agent is actively executing tools (e.g., batch edits), don't inject continuation
+      if (state.lastToolExecutionAt) {
+        const timeSinceToolExec = Date.now() - state.lastToolExecutionAt
+        if (timeSinceToolExec < POST_TOOL_COOLDOWN_MS) {
+          log(`[${HOOK_NAME}] Skipped: post-tool cooldown active (${timeSinceToolExec}ms < ${POST_TOOL_COOLDOWN_MS}ms)`, { sessionID })
+          return
+        }
+      }
+
       // Check 1.6: Boulder state - don't auto-continue when completed
       // This prevents todo-continuation from interfering with completed workflows
       const boulderState = readBoulderState(ctx.directory)
@@ -935,8 +963,12 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
-        const state = sessions.get(sessionID)
-        if (state) state.abortDetectedAt = undefined
+        const state = getState(sessionID)
+        state.abortDetectedAt = undefined
+        // Track last tool execution to prevent interrupting active work
+        if (event.type === "tool.execute.after") {
+          state.lastToolExecutionAt = Date.now()
+        }
         cancelCountdown(sessionID)
       }
       return

@@ -952,6 +952,34 @@ Each TODO includes detailed verification procedures:
 
 ---
 
+## Risk Assessment (MANDATORY)
+
+> Every plan MUST include risk analysis. Breaking changes and high-impact tasks require explicit mitigation.
+
+### Risk Matrix
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| [Risk 1: e.g., Breaking API changes] | [High/Medium/Low] | [High/Medium/Low] | [Specific mitigation strategy] |
+| [Risk 2: e.g., Data loss during migration] | [High/Medium/Low] | [High/Medium/Low] | [Backup strategy, rollback plan] |
+
+### Breaking Changes (Mark Explicitly)
+
+> ⚠️ **BREAKING**: [List any breaking changes with migration guidance]
+> 
+> - API changes requiring client updates
+> - Database schema migrations
+> - Configuration format changes
+> - Removed/renamed public exports
+
+### Rollback Strategy
+
+- **If task fails**: [How to revert to previous state]
+- **Data backup**: [Required before: task X]
+- **Feature flag**: [If applicable, how to disable]
+
+---
+
 ## Task Flow
 
 \`\`\`

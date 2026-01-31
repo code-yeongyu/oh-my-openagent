@@ -30,6 +30,10 @@ export interface TddGuardConfig {
   reject_trivial_assertions: boolean
   /** Inject TDD Skill when edit is blocked (default: true) */
   inject_skill_on_block: boolean
+  /** Enable real test execution to verify failing tests (default: false for safety) */
+  enable_real_test_execution: boolean
+  /** Timeout for test execution in milliseconds (default: 30000) */
+  test_timeout_ms: number
 }
 
 export type SupportedLanguage = "typescript" | "javascript" | "python" | "go" | "rust" | "unknown"
@@ -55,4 +59,34 @@ export interface TestQualityOptions {
 export interface BlockResult {
   blocked: boolean
   reason?: string
+}
+
+/**
+ * Result of running tests to check for failing tests
+ */
+export interface TestExecutionResult {
+  /** Whether there are failing tests */
+  hasFailingTests: boolean
+  /** Whether the execution timed out */
+  timedOut: boolean
+  /** Whether no tests were found */
+  noTestsFound: boolean
+  /** Error message if execution failed */
+  error?: string
+  /** Execution time in milliseconds */
+  executionTimeMs?: number
+}
+
+/**
+ * Configuration for test execution
+ */
+export interface TestExecutionConfig {
+  /** Timeout in milliseconds (default: 30000) */
+  timeoutMs: number
+  /** Test command to run (default: auto-detect) */
+  testCommand?: string
+  /** Working directory */
+  cwd: string
+  /** Whether to enable real test execution (default: false for safety) */
+  enableRealExecution: boolean
 }

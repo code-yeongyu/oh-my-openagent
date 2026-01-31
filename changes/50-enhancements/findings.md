@@ -66,3 +66,43 @@
 ---
 
 *Update after every 2 view/browser/search operations*
+
+## Task 2.4: 战略性主动压缩 - Milestone Detection
+
+### Implementation Summary
+- Created milestone-detector.ts with bilingual keyword detection (EN/ZH)
+- Implemented session-based suggestion tracking with cooldown (max 3 per session)
+- 16 tests, 41 assertions, 100% pass rate
+
+### Key Patterns Discovered
+1. **Keyword Detection**: Use case-insensitive matching for English, case-sensitive for Chinese
+2. **Phase Transitions**: Regex pattern /phase\s+(\d+)\s+(done|完成|finished)/i captures both phase number and keyword
+3. **Session State**: Map-based tracking enables independent session management with rejection flags
+4. **Non-blocking Design**: Returns CompactionSuggestion object instead of blocking execution
+
+### Test Coverage
+- Completion keywords: done, finished, completed, 完成, 已完成
+- Phase transitions: "Phase N done", "Phase N 完成", "phase complete"
+- Session management: rejection tracking, cooldown limits, independent sessions
+
+### Acceptance Criteria Met
+✓ Keyword detection triggers suggestions
+✓ Phase transition detection works
+✓ Non-blocking suggestion mechanism
+✓ User rejection prevents re-prompting
+
+### Technical Decisions
+- Used Map<string, SessionState> for O(1) session lookups
+- Separate EN/ZH keyword arrays for maintainability
+- Factory pattern (createMilestoneDetector) for encapsulated state
+- BDD test structure with //#given, //#when, //#then comments
+
+### Files Created
+- src/hooks/compaction-context-injector/milestone-detector.ts (172 lines)
+- src/hooks/compaction-context-injector/milestone-detector.test.ts (196 lines)
+
+### Next Steps (for integration)
+- Hook into compaction-context-injector index.ts
+- Add onSummarize event listener to check milestones
+- Display suggestion UI when shouldSuggest = true
+

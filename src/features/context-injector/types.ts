@@ -1,14 +1,37 @@
 /**
  * Source identifier for context injection
  * Each source registers context that will be merged and injected together
+ * 
+ * Order matters for prompt caching optimization:
+ * - Static sources (system, agents.md) should be first
+ * - Dynamic sources (skills, custom) should be last
  */
 export type ContextSourceType =
-  | "keyword-detector"
-  | "rules-injector"
+  | "system"
   | "directory-agents"
   | "directory-readme"
+  | "rules-injector"
+  | "skills"
+  | "keyword-detector"
   | "agent-skill-reminder"
+  | "dynamic"
   | "custom"
+
+/**
+ * Default source order for cache-friendly injection
+ * Static content first, dynamic content last
+ */
+export const DEFAULT_SOURCE_ORDER: ContextSourceType[] = [
+  "system",
+  "directory-agents",
+  "directory-readme",
+  "rules-injector",
+  "skills",
+  "keyword-detector",
+  "agent-skill-reminder",
+  "dynamic",
+  "custom",
+]
 
 /**
  * Priority levels for context ordering

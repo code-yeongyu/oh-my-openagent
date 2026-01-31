@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createBuiltinMcps } from "./index"
+import { createBuiltinMcps, checkMcpToolCount } from "./index"
 
 describe("createBuiltinMcps", () => {
   test("should return all MCPs when disabled_mcps is empty", () => {
@@ -82,5 +82,68 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
     expect(Object.keys(result)).toHaveLength(3)
+  })
+})
+
+describe("checkMcpToolCount", () => {
+  test("should not warn when tool count is below threshold", () => {
+    //#given
+    const toolCount = 50
+
+    //#when
+    const result = checkMcpToolCount(toolCount)
+
+    //#then
+    expect(result.warned).toBe(false)
+    expect(result.message).toBeUndefined()
+  })
+
+  test("should not warn when tool count equals threshold", () => {
+    //#given
+    const toolCount = 80
+
+    //#when
+    const result = checkMcpToolCount(toolCount)
+
+    //#then
+    expect(result.warned).toBe(false)
+    expect(result.message).toBeUndefined()
+  })
+
+  test("should warn when tool count exceeds default threshold of 80", () => {
+    //#given
+    const toolCount = 85
+
+    //#when
+    const result = checkMcpToolCount(toolCount)
+
+    //#then
+    expect(result.warned).toBe(true)
+    expect(result.message).toContain("85")
+    expect(result.message).toContain("80")
+  })
+
+  test("should use custom threshold when provided", () => {
+    //#given
+    const toolCount = 60
+
+    //#when
+    const result = checkMcpToolCount(toolCount, { threshold: 50 })
+
+    //#then
+    expect(result.warned).toBe(true)
+    expect(result.message).toContain("60")
+    expect(result.message).toContain("50")
+  })
+
+  test("should not warn with custom threshold when below", () => {
+    //#given
+    const toolCount = 40
+
+    //#when
+    const result = checkMcpToolCount(toolCount, { threshold: 50 })
+
+    //#then
+    expect(result.warned).toBe(false)
   })
 })
