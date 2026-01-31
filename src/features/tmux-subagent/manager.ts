@@ -12,7 +12,7 @@ import {
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
 import { log } from "../../shared"
-import { clearZellijState } from "../../shared/terminal-multiplexer/zellij-storage"
+import { defaultZellijStorage, type ZellijStorage } from "../../shared/terminal-multiplexer/zellij-storage"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -27,11 +27,13 @@ interface SessionCreatedEvent {
 export interface TmuxUtilDeps {
   isInsideTmux: () => boolean
   getCurrentPaneId: () => string | undefined
+  zellijStorage?: ZellijStorage
 }
 
 const defaultTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: defaultIsInsideTmux,
   getCurrentPaneId: defaultGetCurrentPaneId,
+  zellijStorage: defaultZellijStorage,
 }
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
@@ -65,11 +67,13 @@ export class TmuxSessionManager {
   private openCodeSessions = new Map<string, string>()
   private pollInterval?: ReturnType<typeof setInterval>
   private deps: TmuxUtilDeps
+  private zellijStorage: ZellijStorage
 
   constructor(ctx: PluginInput, adapter: Multiplexer, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.adapter = adapter
     this.tmuxConfig = tmuxConfig
+    this.zellijStorage = deps.zellijStorage ?? defaultZellijStorage
     this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
@@ -361,7 +365,7 @@ export class TmuxSessionManager {
 
      const opcSessionId = this.openCodeSessions.get(event.sessionID)
       if (opcSessionId) {
-        clearZellijState(opcSessionId)
+        this.zellijStorage.clearZellijState(opcSessionId)
       }
 
       this.sessions.delete(event.sessionID)

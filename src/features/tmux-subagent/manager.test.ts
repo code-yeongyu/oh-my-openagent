@@ -38,9 +38,20 @@ const mockExecuteAction = mock<(
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
+const mockClearZellijState = mock<(sessionID: string) => void>(() => {})
+const mockLoadZellijState = mock<(sessionID: string) => any>(() => null)
+const mockSaveZellijState = mock<(state: any) => void>(() => {})
+
+const mockZellijStorage = {
+  clearZellijState: mockClearZellijState,
+  loadZellijState: mockLoadZellijState,
+  saveZellijState: mockSaveZellijState,
+}
+
 const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
+  zellijStorage: mockZellijStorage,
 }
 
 mock.module('./pane-state-querier', () => ({
@@ -74,16 +85,6 @@ mock.module('../../shared/tmux', () => {
     SESSION_READY_TIMEOUT_MS: 500,
   }
 })
-
-const mockClearZellijState = mock<(sessionID: string) => void>(() => {})
-const mockLoadZellijState = mock<(sessionID: string) => any>(() => null)
-const mockSaveZellijState = mock<(state: any) => void>(() => {})
-
-mock.module('../../shared/terminal-multiplexer/zellij-storage', () => ({
-  clearZellijState: mockClearZellijState,
-  loadZellijState: mockLoadZellijState,
-  saveZellijState: mockSaveZellijState,
-}))
 
 const trackedSessions = new Set<string>()
 
@@ -171,9 +172,13 @@ describe('TmuxSessionManager', () => {
     mockExecuteAction.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
+    mockLoadZellijState.mockReset()
+    mockSaveZellijState.mockReset()
+    mockClearZellijState.mockReset()
     trackedSessions.clear()
 
     mockQueryWindowState.mockImplementation(async () => createWindowState())
+    mockLoadZellijState.mockImplementation(() => null)
     mockExecuteActions.mockImplementation(async (actions) => {
       for (const action of actions) {
         if (action.type === 'spawn') {
@@ -1127,8 +1132,8 @@ describe('DecisionEngine', () => {
          agent_pane_min_width: 40,
        }
        
-       const manager = new TmuxSessionManager(ctx, zellijAdapter, config)
-       const opcSessionId = 'opc_session_cleanup'
+        const manager = new TmuxSessionManager(ctx, zellijAdapter, config, mockTmuxDeps)
+        const opcSessionId = 'opc_session_cleanup'
        const bgSessionId = 'bg_session_cleanup'
        
        // First create a session

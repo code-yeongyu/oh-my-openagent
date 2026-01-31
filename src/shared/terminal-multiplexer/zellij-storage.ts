@@ -9,6 +9,12 @@ export interface ZellijState {
   updatedAt: number
 }
 
+export interface ZellijStorage {
+  loadZellijState(sessionID: string): ZellijState | null
+  saveZellijState(state: ZellijState): void
+  clearZellijState(sessionID: string): void
+}
+
 const ZELLIJ_ADAPTER_STORAGE = join(
   getOpenCodeStorageDir(),
   "zellij-adapter",
@@ -45,4 +51,10 @@ export function clearZellijState(sessionID: string): void {
   if (existsSync(filePath)) {
     unlinkSync(filePath)
   }
+}
+
+export const defaultZellijStorage: ZellijStorage = {
+  loadZellijState,
+  saveZellijState,
+  clearZellijState,
 }

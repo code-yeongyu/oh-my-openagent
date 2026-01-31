@@ -1,7 +1,7 @@
 import { spawn } from "bun"
 import type { Multiplexer, PaneHandle, SpawnOptions, MultiplexerCapabilities } from "./types"
 import { log } from "../logger"
-import { loadZellijState, saveZellijState } from "./zellij-storage"
+import { defaultZellijStorage, type ZellijStorage } from "./zellij-storage"
 
 export interface ZellijAdapterConfig {
   enabled: boolean
@@ -20,14 +20,16 @@ export class ZellijAdapter implements Multiplexer {
   private anchorPaneId: string | null = null
   private config: ZellijAdapterConfig
   private sessionID: string | null = null
+  private storage: ZellijStorage
 
-  constructor(config: ZellijAdapterConfig) {
+  constructor(config: ZellijAdapterConfig, storage: ZellijStorage = defaultZellijStorage) {
     this.config = config
+    this.storage = storage
   }
 
   async setSessionID(sessionID: string): Promise<void> {
     this.sessionID = sessionID
-    const loaded = loadZellijState(sessionID)
+    const loaded = this.storage.loadZellijState(sessionID)
     if (loaded) {
       this.anchorPaneId = loaded.anchorPaneId
       this.hasCreatedFirstPane = loaded.hasCreatedFirstPane
@@ -142,7 +144,7 @@ export class ZellijAdapter implements Multiplexer {
       
       // Save state after setting anchor pane
       if (this.sessionID) {
-        saveZellijState({
+        this.storage.saveZellijState({
           sessionID: this.sessionID,
           anchorPaneId: this.anchorPaneId,
           hasCreatedFirstPane: this.hasCreatedFirstPane,
@@ -163,7 +165,7 @@ export class ZellijAdapter implements Multiplexer {
 
     // Save state after any changes to hasCreatedFirstPane
     if (this.sessionID && isFirstPane) {
-      saveZellijState({
+      this.storage.saveZellijState({
         sessionID: this.sessionID,
         anchorPaneId: this.anchorPaneId,
         hasCreatedFirstPane: this.hasCreatedFirstPane,
