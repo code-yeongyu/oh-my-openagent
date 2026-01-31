@@ -558,18 +558,17 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('Stability Detection (Issue #1330)', () => {
-    test('does NOT close session immediately when idle - waits for stability', async () => {
-      //#given - session that just became idle
+    test('does NOT close session immediately when idle - requires 4 polls (1 baseline + 3 stable)', async () => {
+      //#given - session that is old enough (>10s) and idle
       mockIsInsideTmux.mockReturnValue(true)
       
       const { TmuxSessionManager } = await import('./manager')
       
-      // Create context where session is idle but we haven't reached stability
       const statusMock = mock(async () => ({
         data: { 'ses_child': { type: 'idle' } }
       }))
       const messagesMock = mock(async () => ({
-        data: [{ id: 'msg1' }]  // 1 message
+        data: [{ id: 'msg1' }]  // Same message count each time
       }))
       
       const ctx = {
@@ -595,12 +594,20 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionCreated(
         createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
       )
+      
+      // Make session old enough for stability detection (>10s)
+      const sessions = (manager as any).sessions as Map<string, any>
+      const tracked = sessions.get('ses_child')
+      tracked.createdAt = new Date(Date.now() - 15000)  // 15 seconds ago
+      
       mockExecuteAction.mockClear()
 
-      //#when - poll once (should NOT close - need 3 stable polls)
-      await (manager as any).pollSessions()
+      //#when - poll only 3 times (need 4: 1 baseline + 3 stable)
+      await (manager as any).pollSessions()  // sets lastMessageCount = 1
+      await (manager as any).pollSessions()  // stableIdlePolls = 1
+      await (manager as any).pollSessions()  // stableIdlePolls = 2
 
-      //#then - should NOT have closed the session yet
+      //#then - should NOT have closed yet (need one more poll)
       expect(mockExecuteAction).not.toHaveBeenCalled()
     })
 
@@ -715,7 +722,7 @@ describe('TmuxSessionManager', () => {
     })
 
     test('does NOT apply stability detection for sessions younger than 10s', async () => {
-      //#given - freshly created session
+      //#given - freshly created session (age < 10s)
       mockIsInsideTmux.mockReturnValue(true)
       
       const { TmuxSessionManager } = await import('./manager')
@@ -724,7 +731,7 @@ describe('TmuxSessionManager', () => {
         data: { 'ses_child': { type: 'idle' } }
       }))
       const messagesMock = mock(async () => ({
-        data: [{ id: 'msg1' }]
+        data: [{ id: 'msg1' }]  // Same message count - would trigger close if age check wasn't there
       }))
       
       const ctx = {
@@ -751,12 +758,15 @@ describe('TmuxSessionManager', () => {
       )
       
       // Session is fresh (createdAt is now) - don't manipulate it
+      // This tests the 10s age gate - stability detection should NOT activate
       mockExecuteAction.mockClear()
 
-      //#when - poll multiple times
-      await (manager as any).pollSessions()
-      await (manager as any).pollSessions()
-      await (manager as any).pollSessions()
+      //#when - poll 5 times (more than enough to close if age check wasn't there)
+      await (manager as any).pollSessions()  // Would set lastMessageCount if age check passed
+      await (manager as any).pollSessions()  // Would be stableIdlePolls = 1
+      await (manager as any).pollSessions()  // Would be stableIdlePolls = 2
+      await (manager as any).pollSessions()  // Would be stableIdlePolls = 3 -> would close
+      await (manager as any).pollSessions()  // Extra poll to be sure
 
       //#then - should NOT have closed (session too young for stability detection)
       expect(mockExecuteAction).not.toHaveBeenCalled()
