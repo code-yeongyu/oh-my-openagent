@@ -98,7 +98,18 @@ export function resolveModelWithFallback(
 			const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
 			if (connectedSet === null) {
-				log("Model fallback chain skipped (no connected providers cache) - falling through to system default")
+				// FIX: Use fallback chain first entry instead of skipping to systemDefault
+				const firstEntry = fallbackChain[0]
+				if (firstEntry && firstEntry.providers.length > 0) {
+					const model = `${firstEntry.providers[0]}/${firstEntry.model}`
+					log("Model resolved via fallback chain (no cache, using first entry)", {
+						provider: firstEntry.providers[0],
+						model: firstEntry.model,
+						variant: firstEntry.variant,
+					})
+					return { model, source: "provider-fallback", variant: firstEntry.variant }
+				}
+				log("Model fallback chain empty - falling through to system default")
 			} else {
 				for (const entry of fallbackChain) {
 					for (const provider of entry.providers) {
