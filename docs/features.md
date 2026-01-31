@@ -257,7 +257,24 @@ project/
 - Auto-continues if agent stops without completion
 - Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
 
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+**Configure**:
+```json
+{
+  "ralph_loop": {
+    "enabled": true,
+    "default_max_iterations": 100,
+    "context_strategy": "reset"
+  }
+}
+```
+
+**Context Strategy Options**:
+| Strategy | Description |
+|----------|-------------|
+| `"reset"` | Create a fresh session with clean context for each iteration (default) |
+| `"continue"` | Keep full context between iterations (accumulates context) |
+
+Use `"reset"` (default) to prevent context overflow on long-running loops. Use `"continue"` when you need full conversation history preserved.
 
 ### Command: /ulw-loop
 

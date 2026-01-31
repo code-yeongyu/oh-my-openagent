@@ -2877,6 +2877,13 @@
         },
         "state_dir": {
           "type": "string"
+        },
+        "context_strategy": {
+          "type": "string",
+          "enum": [
+            "reset",
+            "continue"
+          ]
         }
       }
     },

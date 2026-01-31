@@ -8,6 +8,7 @@ import {
   HOOK_NAME,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_COMPLETION_PROMISE,
+  DEFAULT_CONTEXT_STRATEGY,
 } from "./constants"
 import type { RalphLoopState, RalphLoopOptions } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
@@ -318,6 +319,50 @@ export function createRalphLoopHook(
         max: newState.max_iterations,
       })
 
+      const contextStrategy = config?.context_strategy ?? DEFAULT_CONTEXT_STRATEGY
+      let targetSessionID = sessionID
+
+      if (contextStrategy === "reset") {
+        try {
+          log(`[${HOOK_NAME}] Creating new session for fresh context`, { sessionID })
+          const createResp = await ctx.client.session.create({
+            body: { title: `Ralph Loop - Iteration ${newState.iteration}` },
+            query: { directory: ctx.directory },
+          })
+          const newSessionID = (createResp as { data?: { id?: string } })?.data?.id
+          if (newSessionID) {
+            targetSessionID = newSessionID
+            const updatedState = { ...newState, session_id: newSessionID }
+            writeState(ctx.directory, updatedState, stateDir)
+            log(`[${HOOK_NAME}] Switched to new session`, { oldSessionID: sessionID, newSessionID })
+
+            // Switch TUI focus to the new session via raw API call
+            try {
+              const client = (ctx.client as unknown as { _client: { post: (opts: unknown) => Promise<unknown> } })._client
+              await client.post({
+                url: "/tui/select-session",
+                body: { sessionID: newSessionID },
+                query: { directory: ctx.directory },
+                headers: { "Content-Type": "application/json" },
+              })
+              log(`[${HOOK_NAME}] TUI switched to new session`, { newSessionID })
+            } catch (tuiErr) {
+              log(`[${HOOK_NAME}] TUI session switch failed (continuing anyway)`, {
+                newSessionID,
+                error: String(tuiErr),
+              })
+            }
+          } else {
+            log(`[${HOOK_NAME}] Failed to create new session, using original`, { sessionID })
+          }
+        } catch (err) {
+          log(`[${HOOK_NAME}] Session creation failed, using original session`, {
+            sessionID,
+            error: String(err),
+          })
+        }
+      }
+
       const continuationPrompt = CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
         .replace("{{MAX}}", String(newState.max_iterations))
         .replace("{{PROMISE}}", newState.completion_promise)
@@ -365,7 +410,7 @@ export function createRalphLoopHook(
         }
 
         await ctx.client.session.prompt({
-          path: { id: sessionID },
+          path: { id: targetSessionID },
           body: {
             ...(agent !== undefined ? { agent } : {}),
             ...(model !== undefined ? { model } : {}),
@@ -375,7 +420,7 @@ export function createRalphLoopHook(
         })
       } catch (err) {
         log(`[${HOOK_NAME}] Failed to inject continuation`, {
-          sessionID,
+          sessionID: targetSessionID,
           error: String(err),
         })
       }

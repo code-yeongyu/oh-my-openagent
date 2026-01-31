@@ -290,6 +290,8 @@ export const SkillsConfigSchema = z.union([
   }).partial()),
 ])
 
+export const ContextStrategySchema = z.enum(["reset", "continue"])
+
 export const RalphLoopConfigSchema = z.object({
   /** Enable ralph loop functionality (default: false - opt-in feature) */
   enabled: z.boolean().default(false),
@@ -297,6 +299,12 @@ export const RalphLoopConfigSchema = z.object({
   default_max_iterations: z.number().min(1).max(1000).default(100),
   /** Custom state file directory relative to project root (default: .opencode/) */
   state_dir: z.string().optional(),
+  /**
+   * Context management strategy between loop iterations (default: "reset")
+   * - "reset": Create a new session with fresh context for each iteration (recommended)
+   * - "continue": Keep same session and accumulate context across iterations
+   */
+  context_strategy: ContextStrategySchema.optional(),
 })
 
 export const BackgroundTaskConfigSchema = z.object({
@@ -413,6 +421,7 @@ export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningCo
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
+export type ContextStrategy = z.infer<typeof ContextStrategySchema>
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
 export type BabysittingConfig = z.infer<typeof BabysittingConfigSchema>
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
