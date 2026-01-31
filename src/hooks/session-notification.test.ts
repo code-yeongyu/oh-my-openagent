@@ -45,7 +45,7 @@ describe("session-notification", () => {
   afterEach(() => {
     // #given - cleanup after each test
     subagentSessions.clear()
-    setMainSession(undefined)
+    _resetForTesting()
   })
 
   test("should not trigger notification for subagent session", async () => {
