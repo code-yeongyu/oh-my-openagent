@@ -129,6 +129,12 @@ export const AgentOverrideConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Custom fallback chain for model resolution. Overrides built-in agent fallback chains. */
+  fallback_chain: z.array(z.object({
+    providers: z.array(z.string()),
+    model: z.string(),
+    variant: z.string().optional(),
+  })).optional(),
 })
 
 export const AgentOverridesSchema = z.object({
@@ -182,6 +188,12 @@ export const CategoryConfigSchema = z.object({
   prompt_append: z.string().optional(),
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. */
   is_unstable_agent: z.boolean().optional(),
+  /** Custom fallback chain for model resolution. Each entry specifies providers, model, and optional variant. */
+  fallback_chain: z.array(z.object({
+    providers: z.array(z.string()),
+    model: z.string(),
+    variant: z.string().optional(),
+  })).optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([

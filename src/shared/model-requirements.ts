@@ -1,13 +1,39 @@
 export type FallbackEntry = {
   providers: string[]
   model: string
-  variant?: string // Entry-specific variant (e.g., GPT→high, Opus→max)
+  variant?: string
 }
 
 export type ModelRequirement = {
   fallbackChain: FallbackEntry[]
-  variant?: string // Default variant (used when entry doesn't specify one)
-  requiresModel?: string // If set, only activates when this model is available (fuzzy match)
+  variant?: string
+  requiresModel?: string
+}
+
+export type FallbackChainConfig = {
+  providers: string[]
+  model: string
+  variant?: string
+}
+
+export function getEffectiveFallbackChain(
+  agentName: string,
+  userFallbackChain?: FallbackChainConfig[],
+): FallbackEntry[] {
+  if (userFallbackChain && userFallbackChain.length > 0) {
+    return userFallbackChain
+  }
+  return AGENT_MODEL_REQUIREMENTS[agentName]?.fallbackChain ?? []
+}
+
+export function getEffectiveCategoryFallbackChain(
+  categoryName: string,
+  userFallbackChain?: FallbackChainConfig[],
+): FallbackEntry[] {
+  if (userFallbackChain && userFallbackChain.length > 0) {
+    return userFallbackChain
+  }
+  return CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain ?? []
 }
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
