@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log, getAgentToolRestrictions, includesCaseInsensitive } from "../../shared"
+import { log, getAgentToolRestrictions } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -58,7 +58,9 @@ export function createCallOmoAgent(
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
       // Case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
-      if (!includesCaseInsensitive([...ALLOWED_AGENTS], args.subagent_type)) {
+      if (![...ALLOWED_AGENTS].some(
+        (name) => name.toLowerCase() === args.subagent_type.toLowerCase()
+      )) {
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
       

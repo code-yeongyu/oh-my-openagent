@@ -1,6 +1,4 @@
 import { describe, expect, it } from "bun:test"
-import { includesCaseInsensitive } from "./shared"
-
 /**
  * Tests for conditional tool registration logic in index.ts
  * 
@@ -13,8 +11,10 @@ describe("look_at tool conditional registration", () => {
     // #when checking if agent is enabled
     // #then should return false (disabled)
     it("returns false when multimodal-looker is disabled (exact case)", () => {
-      const disabledAgents = ["multimodal-looker"]
-      const isEnabled = !includesCaseInsensitive(disabledAgents, "multimodal-looker")
+      const disabledAgents: string[] = ["multimodal-looker"]
+      const isEnabled = !disabledAgents.some(
+        (agent) => agent.toLowerCase() === "multimodal-looker"
+      )
       expect(isEnabled).toBe(false)
     })
 
@@ -22,8 +22,10 @@ describe("look_at tool conditional registration", () => {
     // #when checking if agent is enabled
     // #then should return false (case-insensitive match)
     it("returns false when multimodal-looker is disabled (case-insensitive)", () => {
-      const disabledAgents = ["Multimodal-Looker"]
-      const isEnabled = !includesCaseInsensitive(disabledAgents, "multimodal-looker")
+      const disabledAgents: string[] = ["Multimodal-Looker"]
+      const isEnabled = !disabledAgents.some(
+        (agent) => agent.toLowerCase() === "multimodal-looker"
+      )
       expect(isEnabled).toBe(false)
     })
 
@@ -31,8 +33,10 @@ describe("look_at tool conditional registration", () => {
     // #when checking if agent is enabled
     // #then should return true (enabled)
     it("returns true when multimodal-looker is not disabled", () => {
-      const disabledAgents = ["oracle", "librarian"]
-      const isEnabled = !includesCaseInsensitive(disabledAgents, "multimodal-looker")
+      const disabledAgents: string[] = ["oracle", "librarian"]
+      const isEnabled = !disabledAgents.some(
+        (agent) => agent.toLowerCase() === "multimodal-looker"
+      )
       expect(isEnabled).toBe(true)
     })
 
@@ -41,7 +45,9 @@ describe("look_at tool conditional registration", () => {
     // #then should return true (enabled by default)
     it("returns true when disabled_agents is empty", () => {
       const disabledAgents: string[] = []
-      const isEnabled = !includesCaseInsensitive(disabledAgents, "multimodal-looker")
+      const isEnabled = !disabledAgents.some(
+        (agent) => agent.toLowerCase() === "multimodal-looker"
+      )
       expect(isEnabled).toBe(true)
     })
 
@@ -49,8 +55,11 @@ describe("look_at tool conditional registration", () => {
     // #when checking if agent is enabled
     // #then should return true (enabled by default)
     it("returns true when disabled_agents is undefined (fallback to empty)", () => {
-      const disabledAgents = undefined
-      const isEnabled = !includesCaseInsensitive(disabledAgents ?? [], "multimodal-looker")
+      const disabledAgents: string[] | undefined = undefined
+      const list: string[] = disabledAgents ?? []
+      const isEnabled = !list.some(
+        (agent) => agent.toLowerCase() === "multimodal-looker"
+      )
       expect(isEnabled).toBe(true)
     })
   })
