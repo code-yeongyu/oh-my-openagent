@@ -5,6 +5,7 @@ const HOOK_NAME = "stop-continuation-guard"
 
 export interface StopContinuationGuard {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
+  "chat.message": (input: { sessionID?: string }) => Promise<void>
   stop: (sessionID: string) => void
   isStopped: (sessionID: string) => boolean
   clear: (sessionID: string) => void
@@ -45,8 +46,20 @@ export function createStopContinuationGuardHook(
     }
   }
 
+  const chatMessage = async ({
+    sessionID,
+  }: {
+    sessionID?: string
+  }): Promise<void> => {
+    if (sessionID && stoppedSessions.has(sessionID)) {
+      clear(sessionID)
+      log(`[${HOOK_NAME}] Cleared stop state on new user message`, { sessionID })
+    }
+  }
+
   return {
     event,
+    "chat.message": chatMessage,
     stop,
     isStopped,
     clear,
