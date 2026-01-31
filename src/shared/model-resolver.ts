@@ -118,7 +118,7 @@ export function resolveModelWithFallback(
 		log("Override model not available, trying fallback_models", { model: normalizedUserModel })
 	}
 
-	// Step 1.5: User-configured fallback_models
+	// Step 3: User-configured fallback_models
 	if (normalizedFallbackModels.length > 0) {
 		if (availableModels.size === 0) {
 			const connectedProviders = readConnectedProvidersCache()
@@ -141,7 +141,7 @@ export function resolveModelWithFallback(
 		}
 	}
 
-	// Step 2.5: Category Default Model (from DEFAULT_CATEGORIES, with fuzzy matching)
+	// Step 4: Category Default Model (from DEFAULT_CATEGORIES, with fuzzy matching)
 	const normalizedCategoryDefault = normalizeModel(categoryDefaultModel)
 	if (normalizedCategoryDefault) {
 		if (availableModels.size > 0) {
@@ -170,7 +170,7 @@ export function resolveModelWithFallback(
 		log("Category default model not available, falling through to fallback chain", { model: normalizedCategoryDefault })
 	}
 
-	// Step 3: Provider fallback chain (exact match → fuzzy match → next provider)
+	// Step 5: Provider fallback chain (exact match → fuzzy match → next provider)
 	if (fallbackChain && fallbackChain.length > 0) {
 		if (availableModels.size === 0) {
 			const connectedProviders = readConnectedProvidersCache()
@@ -196,7 +196,7 @@ export function resolveModelWithFallback(
 			}
 		} else {
 			for (const entry of fallbackChain) {
-				// Step 1: Try with provider filter (preferred providers first)
+				// Step 5.1: Try with provider filter (preferred providers first)
 				for (const provider of entry.providers) {
 					const fullModel = `${provider}/${entry.model}`
 					const match = fuzzyMatchModel(fullModel, availableModels, [provider])
@@ -206,7 +206,7 @@ export function resolveModelWithFallback(
 					}
 				}
 
-				// Step 2: Try without provider filter (cross-provider fuzzy match)
+				// Step 5.2: Try without provider filter (cross-provider fuzzy match)
 				const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
 				if (crossProviderMatch) {
 					log("Model resolved via fallback chain (cross-provider fuzzy match)", {
@@ -221,7 +221,7 @@ export function resolveModelWithFallback(
 		}
 	}
 
-	// Step 4: System default (if provided)
+	// Step 6: System default (if provided)
 	if (systemDefaultModel === undefined) {
 		log("No model resolved - systemDefaultModel not configured")
 		return undefined
