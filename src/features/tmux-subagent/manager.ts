@@ -36,25 +36,9 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   zellijStorage: defaultZellijStorage,
 }
 
+const MIN_AGE_MS = 10 * 1000  // 10 seconds
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 
-// Stability detection constants (prevents premature closure - see issue #1330)
-// Mirrors the proven pattern from background-agent/manager.ts
-const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
-const STABLE_POLLS_REQUIRED = 3          // 3 consecutive idle polls (~6s with 2s poll interval)
-
-/**
- * State-first Tmux Session Manager
- * 
- * Architecture:
- * 1. QUERY: Get actual tmux pane state (source of truth)
- * 2. DECIDE: Pure function determines actions based on state
- * 3. EXECUTE: Execute actions with verification
- * 4. UPDATE: Update internal cache only after tmux confirms success
- * 
- * The internal `sessions` Map is just a cache for sessionId<->paneId mapping.
- * The REAL source of truth is always queried from tmux.
- */
 export class TmuxSessionManager {
   private client: OpencodeClient
   private adapter: Multiplexer
@@ -413,91 +397,37 @@ export class TmuxSessionManager {
       const now = Date.now()
       const sessionsToClose: string[] = []
 
-      for (const [sessionId, tracked] of this.sessions.entries()) {
-        const status = allStatuses[sessionId]
-        const isIdle = status?.type === "idle"
+       for (const [sessionId, tracked] of this.sessions.entries()) {
+         const status = allStatuses[sessionId]
+         const isIdle = status?.type === "idle"
 
-        if (status) {
-          tracked.lastSeenAt = new Date(now)
-        }
+         if (status) {
+           tracked.lastSeenAt = new Date(now)
+         }
 
-        const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
-        const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
-        const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
-        const elapsedMs = now - tracked.createdAt.getTime()
+         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
+         const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
+         const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
+         
+         const sessionAge = now - tracked.createdAt.getTime()
+         const meetsMinAge = sessionAge >= MIN_AGE_MS
 
-        // Stability detection: Don't close immediately on idle
-        // Wait for STABLE_POLLS_REQUIRED consecutive polls with same message count
-        let shouldCloseViaStability = false
+         log("[tmux-session-manager] session check", {
+           sessionId,
+           statusType: status?.type,
+           isIdle,
+           missingSince,
+           missingTooLong,
+           isTimedOut,
+           sessionAge,
+           meetsMinAge,
+           shouldClose: (isIdle || missingTooLong || isTimedOut) && meetsMinAge,
+         })
 
-        if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
-          // Fetch message count to detect if agent is still producing output
-          try {
-            const messagesResult = await this.client.session.messages({ 
-              path: { id: sessionId } 
-            })
-            const currentMsgCount = Array.isArray(messagesResult.data) 
-              ? messagesResult.data.length 
-              : 0
-
-            if (tracked.lastMessageCount === currentMsgCount) {
-              // Message count unchanged - increment stable polls
-              tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
-              
-              if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
-                // Double-check status before closing
-                const recheckResult = await this.client.session.status({ path: undefined })
-                const recheckStatuses = (recheckResult.data ?? {}) as Record<string, { type: string }>
-                const recheckStatus = recheckStatuses[sessionId]
-                
-                if (recheckStatus?.type === "idle") {
-                  shouldCloseViaStability = true
-                } else {
-                  // Status changed - reset stability counter
-                  tracked.stableIdlePolls = 0
-                  log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
-                    sessionId,
-                    recheckStatus: recheckStatus?.type,
-                  })
-                }
-              }
-            } else {
-              // New messages - agent is still working, reset stability counter
-              tracked.stableIdlePolls = 0
-            }
-            
-            tracked.lastMessageCount = currentMsgCount
-          } catch (msgErr) {
-            log("[tmux-session-manager] failed to fetch messages for stability check", {
-              sessionId,
-              error: String(msgErr),
-            })
-            // On error, don't close - be conservative
-          }
-        } else if (!isIdle) {
-          // Not idle - reset stability counter
-          tracked.stableIdlePolls = 0
-        }
-
-        log("[tmux-session-manager] session check", {
-          sessionId,
-          statusType: status?.type,
-          isIdle,
-          elapsedMs,
-          stableIdlePolls: tracked.stableIdlePolls,
-          lastMessageCount: tracked.lastMessageCount,
-          missingSince,
-          missingTooLong,
-          isTimedOut,
-          shouldCloseViaStability,
-        })
-
-        // Close if: stability detection confirmed OR missing too long OR timed out
-        // Note: We no longer close immediately on idle - stability detection handles that
-        if (shouldCloseViaStability || missingTooLong || isTimedOut) {
-          sessionsToClose.push(sessionId)
-        }
-      }
+         if ((isIdle || missingTooLong || isTimedOut) && meetsMinAge) {
+           sessionsToClose.push(sessionId)
+         }
+       }
 
       for (const sessionId of sessionsToClose) {
         log("[tmux-session-manager] closing session due to poll", { sessionId })

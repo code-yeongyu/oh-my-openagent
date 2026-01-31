@@ -595,6 +595,115 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('onSessionDeleted', () => {
+    test('enforces MIN_AGE_MS (10s) before closing idle sessions via polling', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+
+      // Mock time for age calculations
+      const BASE_TIME = 1_700_000_000_000
+      let mockNow = BASE_TIME
+      const originalDateNow = Date.now
+      Date.now = () => mockNow
+
+      let queryCallCount = 0
+      mockQueryWindowState.mockImplementation(async () => {
+        queryCallCount++
+        // First call (session creation) - no agent panes
+        if (queryCallCount === 1) {
+          return createWindowState()
+        }
+        // Subsequent calls (polling) - agent pane exists
+        return createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Task',
+              isActive: false,
+            },
+          ],
+        })
+      })
+
+      // Session returns "idle" immediately - but age gate should prevent closure
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({
+        sessionStatusResult: {
+          data: {
+            ses_child: { type: 'idle' },
+          },
+        },
+      })
+      const multiplexer = createMockMultiplexer({ capabilities: { manualLayout: true } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, multiplexer, config, mockTmuxDeps)
+
+      // Create session at BASE_TIME
+      await manager.onSessionCreated(
+        createSessionCreatedEvent(
+          'ses_child',
+          'ses_parent',
+          'Background: Test Task'
+        )
+      )
+      mockExecuteAction.mockClear()
+      queryCallCount = 0 // Reset for poll counting
+
+      try {
+        //#when - Poll 1 (baseline): Session is 0 seconds old, status=idle
+        // @ts-ignore - accessing private method for testing
+        await manager['pollSessions']()
+
+        //#then - should NOT close because session age < MIN_AGE_MS (10s)
+        expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+
+        //#when - Poll 2: Advance to 3 seconds
+        mockNow = BASE_TIME + 3_000
+        // @ts-ignore
+        await manager['pollSessions']()
+
+        //#then - still should NOT close (3s < 10s)
+        expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+
+        //#when - Poll 3: Advance to 7 seconds
+        mockNow = BASE_TIME + 7_000
+        // @ts-ignore
+        await manager['pollSessions']()
+
+        //#then - still should NOT close (7s < 10s)
+        expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+
+        //#when - Poll 4: Advance to 11 seconds (past MIN_AGE_MS threshold)
+        mockNow = BASE_TIME + 11_000
+        // @ts-ignore
+        await manager['pollSessions']()
+
+        //#then - NOW it should close because session age (11s) >= MIN_AGE_MS (10s)
+        expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+        const call = mockExecuteAction.mock.calls[0]
+        expect(call).toBeDefined()
+        expect(call![0]).toEqual({
+          type: 'close',
+          paneId: '%mock',
+          sessionId: 'ses_child',
+        })
+
+        // Verify queryWindowState was called once during the close (poll 4)
+        expect(queryCallCount).toBe(1)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test('uses adapter.closePane when manualLayout=true', async () => {
       //#given
       mockIsInsideTmux.mockReturnValue(true)
