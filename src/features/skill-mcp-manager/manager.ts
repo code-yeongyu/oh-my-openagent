@@ -118,17 +118,12 @@ export class SkillMcpManager {
     // However, 'beforeExit' is not emitted on explicit process.exit() calls
     // Signal handlers are made async to properly await cleanup
     // Don't call process.exit() - let background-agent manager handle the final exit
+    // Use void + catch to handle async cleanup without blocking or throwing
 
-    process.on("SIGINT", async () => {
-      await cleanup()
-    })
-    process.on("SIGTERM", async () => {
-      await cleanup()
-    })
+    process.on("SIGINT", () => void cleanup().catch(() => {}))
+    process.on("SIGTERM", () => void cleanup().catch(() => {}))
     if (process.platform === "win32") {
-      process.on("SIGBREAK", async () => {
-        await cleanup()
-      })
+      process.on("SIGBREAK", () => void cleanup().catch(() => {}))
     }
   }
 

@@ -33,10 +33,12 @@ class LSPServerManager {
   }
 
   private registerProcessCleanup(): void {
-    const cleanup = () => {
+    // Synchronous cleanup for 'exit' event (cannot await)
+    const syncCleanup = () => {
       for (const [, managed] of this.clients) {
         try {
-          managed.client.stop()
+          // Fire-and-forget during sync exit - process is terminating
+          void managed.client.stop().catch(() => {})
         } catch {}
       }
       this.clients.clear()
@@ -46,15 +48,30 @@ class LSPServerManager {
       }
     }
 
-    process.on("exit", cleanup)
+    // Async cleanup for signal handlers - properly await all stops
+    const asyncCleanup = async () => {
+      const stopPromises: Promise<void>[] = []
+      for (const [, managed] of this.clients) {
+        stopPromises.push(managed.client.stop().catch(() => {}))
+      }
+      await Promise.allSettled(stopPromises)
+      this.clients.clear()
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval)
+        this.cleanupInterval = null
+      }
+    }
+
+    process.on("exit", syncCleanup)
 
     // Don't call process.exit() here - let other handlers complete their cleanup first
     // The background-agent manager handles the final exit call
-    process.on("SIGINT", cleanup)
-    process.on("SIGTERM", cleanup)
+    // Use async handlers to properly await LSP subprocess cleanup
+    process.on("SIGINT", () => void asyncCleanup())
+    process.on("SIGTERM", () => void asyncCleanup())
 
     if (process.platform === "win32") {
-      process.on("SIGBREAK", cleanup)
+      process.on("SIGBREAK", syncCleanup)
     }
   }
 
@@ -524,10 +541,13 @@ export class LSPClient {
       this.connection.dispose()
       this.connection = null
     }
-    if (this.proc) {
-      this.proc.kill()
-      await this.proc.exited
+    const proc = this.proc
+    if (proc) {
       this.proc = null
+      try {
+        proc.kill()
+        await proc.exited
+      } catch {}
     }
     this.processExited = true
     this.diagnosticsStore.clear()
