@@ -89,6 +89,7 @@ export const HookNameSchema = z.enum([
   "start-work",
   "atlas",
   "stop-continuation-guard",
+  "runtime-fallback",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
