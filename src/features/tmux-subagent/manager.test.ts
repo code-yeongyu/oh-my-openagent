@@ -75,6 +75,7 @@ const trackedSessions = new Set<string>()
 
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
+  sessionMessagesResult?: { data?: unknown[] }
 }) {
   return {
     serverUrl: new URL('http://localhost:4096'),
@@ -89,6 +90,12 @@ function createMockContext(overrides?: {
             data[sessionId] = { type: 'running' }
           }
           return { data }
+        }),
+        messages: mock(async () => {
+          if (overrides?.sessionMessagesResult) {
+            return overrides.sessionMessagesResult
+          }
+          return { data: [] }
         }),
       },
     },
@@ -547,6 +554,212 @@ describe('TmuxSessionManager', () => {
 
       //#then
       expect(mockExecuteAction).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('Stability Detection (Issue #1330)', () => {
+    test('does NOT close session immediately when idle - waits for stability', async () => {
+      //#given - session that just became idle
+      mockIsInsideTmux.mockReturnValue(true)
+      
+      const { TmuxSessionManager } = await import('./manager')
+      
+      // Create context where session is idle but we haven't reached stability
+      const statusMock = mock(async () => ({
+        data: { 'ses_child': { type: 'idle' } }
+      }))
+      const messagesMock = mock(async () => ({
+        data: [{ id: 'msg1' }]  // 1 message
+      }))
+      
+      const ctx = {
+        serverUrl: new URL('http://localhost:4096'),
+        client: {
+          session: {
+            status: statusMock,
+            messages: messagesMock,
+          },
+        },
+      } as any
+      
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // Spawn a session first
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
+      )
+      mockExecuteAction.mockClear()
+
+      //#when - poll once (should NOT close - need 3 stable polls)
+      await (manager as any).pollSessions()
+
+      //#then - should NOT have closed the session yet
+      expect(mockExecuteAction).not.toHaveBeenCalled()
+    })
+
+    test('closes session after 3 consecutive stable idle polls', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      
+      const { TmuxSessionManager } = await import('./manager')
+      
+      const statusMock = mock(async () => ({
+        data: { 'ses_child': { type: 'idle' } }
+      }))
+      const messagesMock = mock(async () => ({
+        data: [{ id: 'msg1' }]  // Same message count each time
+      }))
+      
+      const ctx = {
+        serverUrl: new URL('http://localhost:4096'),
+        client: {
+          session: {
+            status: statusMock,
+            messages: messagesMock,
+          },
+        },
+      } as any
+      
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
+      )
+      
+      // Simulate session being old enough (>10s) by manipulating createdAt
+      const sessions = (manager as any).sessions as Map<string, any>
+      const tracked = sessions.get('ses_child')
+      tracked.createdAt = new Date(Date.now() - 15000)  // 15 seconds ago
+      
+      mockExecuteAction.mockClear()
+
+      //#when - poll 4 times (1st sets lastMessageCount, then 3 stable polls)
+      await (manager as any).pollSessions()  // sets lastMessageCount = 1
+      await (manager as any).pollSessions()  // stableIdlePolls = 1
+      await (manager as any).pollSessions()  // stableIdlePolls = 2
+      await (manager as any).pollSessions()  // stableIdlePolls = 3 -> close
+
+      //#then - should have closed the session
+      expect(mockExecuteAction).toHaveBeenCalled()
+      const call = mockExecuteAction.mock.calls[0]
+      expect(call![0].type).toBe('close')
+    })
+
+    test('resets stability counter when new messages arrive', async () => {
+      //#given
+      mockIsInsideTmux.mockReturnValue(true)
+      
+      const { TmuxSessionManager } = await import('./manager')
+      
+      let messageCount = 1
+      const statusMock = mock(async () => ({
+        data: { 'ses_child': { type: 'idle' } }
+      }))
+      const messagesMock = mock(async () => {
+        // Simulate new messages arriving each poll
+        messageCount++
+        return { data: Array(messageCount).fill({ id: 'msg' }) }
+      })
+      
+      const ctx = {
+        serverUrl: new URL('http://localhost:4096'),
+        client: {
+          session: {
+            status: statusMock,
+            messages: messagesMock,
+          },
+        },
+      } as any
+      
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
+      )
+      
+      const sessions = (manager as any).sessions as Map<string, any>
+      const tracked = sessions.get('ses_child')
+      tracked.createdAt = new Date(Date.now() - 15000)
+      
+      mockExecuteAction.mockClear()
+
+      //#when - poll multiple times (message count keeps changing)
+      await (manager as any).pollSessions()
+      await (manager as any).pollSessions()
+      await (manager as any).pollSessions()
+      await (manager as any).pollSessions()
+
+      //#then - should NOT have closed (stability never reached due to changing messages)
+      expect(mockExecuteAction).not.toHaveBeenCalled()
+    })
+
+    test('does NOT apply stability detection for sessions younger than 10s', async () => {
+      //#given - freshly created session
+      mockIsInsideTmux.mockReturnValue(true)
+      
+      const { TmuxSessionManager } = await import('./manager')
+      
+      const statusMock = mock(async () => ({
+        data: { 'ses_child': { type: 'idle' } }
+      }))
+      const messagesMock = mock(async () => ({
+        data: [{ id: 'msg1' }]
+      }))
+      
+      const ctx = {
+        serverUrl: new URL('http://localhost:4096'),
+        client: {
+          session: {
+            status: statusMock,
+            messages: messagesMock,
+          },
+        },
+      } as any
+      
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
+      )
+      
+      // Session is fresh (createdAt is now) - don't manipulate it
+      mockExecuteAction.mockClear()
+
+      //#when - poll multiple times
+      await (manager as any).pollSessions()
+      await (manager as any).pollSessions()
+      await (manager as any).pollSessions()
+
+      //#then - should NOT have closed (session too young for stability detection)
+      expect(mockExecuteAction).not.toHaveBeenCalled()
     })
   })
 })
