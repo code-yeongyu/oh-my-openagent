@@ -429,6 +429,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       }
 
+      await stopContinuationGuard?.["chat.message"]?.(input);
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
@@ -591,7 +592,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           const recovered =
             await sessionRecovery.handleSessionRecovery(messageInfo);
 
-          if (recovered && sessionID && sessionID === getMainSessionID()) {
+          if (
+            recovered &&
+            sessionID &&
+            sessionID === getMainSessionID() &&
+            !stopContinuationGuard?.isStopped(sessionID)
+          ) {
             await ctx.client.session
               .prompt({
                 path: { id: sessionID },
