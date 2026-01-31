@@ -166,7 +166,7 @@ describe("resolveModelWithFallback", () => {
 
       // #then
       expect(result!.model).toBe("anthropic/claude-opus-4-5")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-5" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via override", { model: "anthropic/claude-opus-4-5" })
     })
 
     test("empty string uiSelectedModel falls through to config override", () => {
@@ -204,7 +204,7 @@ describe("resolveModelWithFallback", () => {
       // #then
       expect(result!.model).toBe("anthropic/claude-opus-4-5")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-5" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via override", { model: "anthropic/claude-opus-4-5" })
     })
 
     test("override takes priority even if model not in availableModels", () => {

@@ -138,7 +138,7 @@ function applyCategoryOverride(
   if (!categoryConfig) return config
 
   const result = { ...config } as AgentConfig & Record<string, unknown>
-  if (categoryConfig.model) result.model = categoryConfig.model
+  if (categoryConfig.model && !result.model) result.model = categoryConfig.model
   if (categoryConfig.variant !== undefined) result.variant = categoryConfig.variant
   if (categoryConfig.temperature !== undefined) result.temperature = categoryConfig.temperature
   if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
