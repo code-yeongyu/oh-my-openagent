@@ -46,6 +46,14 @@ When summarizing this session, you MUST include the following sections in your s
 - User's explicit restrictions or preferences
 - Anti-patterns identified during the session
 
+## 7. Todo List Preservation (CRITICAL)
+**DO NOT modify the todo list during compaction.**
+- Preserve ALL existing todo items exactly as they are
+- Do NOT consolidate multiple todos into a single generic item
+- Do NOT rewrite todo descriptions
+- Do NOT change todo statuses (pending/in_progress/completed)
+- The todo list is managed by external hooks - your job is ONLY to summarize the conversation
+
 This context is critical for maintaining continuity after compaction.
 `
 

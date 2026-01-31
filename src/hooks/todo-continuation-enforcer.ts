@@ -3,8 +3,8 @@ import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { execSync } from "node:child_process"
 import type { BackgroundManager } from "../features/background-agent"
-import { readBoulderState, incrementRetry, isMaxRetries, resetRetry, getFirstIncompleteTask } from "../features/boulder-state"
-import { readPlanProgress } from "../features/plan-progress-reader"
+// Boulder imports removed - Todo enforcer now only uses OpenCode Todo API
+// Boulder continuation is handled separately by atlas/index.ts
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
     findNearestMessageWithFields,
@@ -354,29 +354,12 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    // Check if boulder is active - if so, tasks.md is source of truth
-    const boulderState = readBoulderState(ctx.directory)
-    const planProgress = boulderState?.active_plan ? readPlanProgress(ctx.directory) : null
-    
+    // Todo enforcer now only uses OpenCode Todo API (Boulder removed)
     let effectiveIncompleteCount = incompleteCount
     let effectiveTotal = total
-    let usedTasksMd = false
 
-    // If boulder is active and tasks.md has data, use tasks.md counts (source of truth)
-    if (planProgress && planProgress.total > 0) {
-      effectiveIncompleteCount = planProgress.total - planProgress.completed
-      effectiveTotal = planProgress.total
-      usedTasksMd = true
-      log(`[${HOOK_NAME}] Using tasks.md as source of truth`, { 
-        sessionID, 
-        planPath: planProgress.planPath,
-        tasksIncomplete: effectiveIncompleteCount,
-        tasksTotal: effectiveTotal
-      })
-    }
-
-    // If tasks.md shows complete but we still have incomplete count from caller, check todos as fallback
-    if (effectiveIncompleteCount === 0 && !usedTasksMd) {
+    // If no incomplete count from caller, fetch fresh from Todo API
+    if (effectiveIncompleteCount === 0) {
       let todos: Todo[] = []
       try {
         const response = await ctx.client.session.todo({ path: { id: sessionID } })
@@ -430,12 +413,11 @@ export function createTodoContinuationEnforcer(
     }
 
     const completed = effectiveTotal - effectiveIncompleteCount
-    const sourceNote = usedTasksMd ? " (from tasks.md)" : ""
-    const tasksPath = planProgress?.planPath ?? boulderState?.active_plan ?? "tasks.md"
-    const prompt = `${CONTINUATION_PROMPT.replace(/{TASKS_PATH}/g, tasksPath)}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining${sourceNote}]`
+    const tasksPath = "tasks.md"
+    const prompt = `${CONTINUATION_PROMPT.replace(/{TASKS_PATH}/g, tasksPath)}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining]`
 
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: effectiveIncompleteCount, usedTasksMd })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: effectiveIncompleteCount })
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
@@ -563,172 +545,8 @@ export function createTodoContinuationEnforcer(
         }
       }
 
-      // Check 1.6: Boulder state - don't auto-continue when completed
-      // This prevents todo-continuation from interfering with completed workflows
-      const boulderState = readBoulderState(ctx.directory)
-      if (boulderState?.phase === "completed") {
-        log(`[${HOOK_NAME}] Skipped: boulder completed`, { sessionID, plan: boulderState.plan_name })
-        return
-      }
-
-      // Check 1.6.1: Smart override for awaiting_user state
-      // When AI is asking "continue?" (not git strategy), allow auto-continuation
-      if (boulderState?.phase === "awaiting_user") {
-        // Get last assistant message to check for continue patterns
-        let lastAssistantContent = ""
-        try {
-          const messagesResp = await ctx.client.session.messages({
-            path: { id: sessionID },
-            query: { directory: ctx.directory },
-          })
-          const messages = (messagesResp as { data?: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }> }).data ?? []
-          
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const msg = messages[i]
-            if (msg.info?.role === "assistant" && msg.parts) {
-              lastAssistantContent = msg.parts
-                .filter(p => p.type === "text" && p.text)
-                .map(p => p.text)
-                .join(" ")
-              break
-            }
-          }
-        } catch (err) {
-          log(`[${HOOK_NAME}] Failed to fetch messages for continue check`, { sessionID, error: String(err) })
-        }
-        
-        if (!shouldOverrideAwaitingUser(lastAssistantContent)) {
-          log(`[${HOOK_NAME}] Skipped: awaiting_user (not a continue prompt)`, { 
-            sessionID, 
-            plan: boulderState.plan_name,
-            preview: lastAssistantContent.slice(0, 100)
-          })
-          return
-        }
-        
-        log(`[${HOOK_NAME}] Override: awaiting_user but AI is asking to continue`, { 
-          sessionID,
-          plan: boulderState.plan_name,
-          preview: lastAssistantContent.slice(0, 100)
-        })
-        // Continue to normal flow - allow auto-continuation
-      }
-
-      // Check 1.7: Plan progress check (File is Source of Truth)
-      // Priority: boulder.phase === "completed" > tasks.md > OpenCode todos
-      // Note: tasks.md is used as fallback when OpenCode todos API returns empty
-      // IMPORTANT: Only read plan progress if boulder has an active plan
-      const planProgress = boulderState?.active_plan ? readPlanProgress(ctx.directory) : null
-      const planSource = planProgress
-        ? {
-            incompleteCount: Math.max(planProgress.total - planProgress.completed, 0),
-            phasesComplete:
-              !planProgress.phases ||
-              planProgress.phases.length === 0 ||
-              planProgress.phases.every(p => p.status === "complete"),
-            planPath: planProgress.planPath,
-            total: planProgress.total,
-            completed: planProgress.completed,
-            phaseCount: planProgress.phases?.length ?? 0,
-          }
-        : null
-
-      if (planSource) {
-        // Fix: total===0 should NOT be treated as complete unless phases are also complete
-        // This prevents false "complete" when checkbox parsing fails
-        const checkboxesComplete =
-          planSource.total > 0
-            ? planSource.completed === planSource.total
-            : planSource.phasesComplete // Only treat as complete if phases also complete
-
-        // Note: Don't return here even if tasks.md is complete
-        // We need to also check OpenCode TODO API below (line ~563)
-        // Both sources must be complete before skipping continuation
-        if (checkboxesComplete && planSource.phasesComplete) {
-          log(`[${HOOK_NAME}] tasks.md complete, will verify OpenCode TODO status`, {
-            sessionID,
-            planPath: planSource.planPath,
-            checkboxes: `${planSource.completed}/${planSource.total}`,
-            phases: planSource.phaseCount,
-          })
-          // Continue to OpenCode TODO check below instead of returning
-        }
-
-        // Plan not complete - will inject continuation below
-        log(`[${HOOK_NAME}] Plan incomplete (tasks.md)`, {
-          sessionID,
-          checkboxes: `${planSource.completed}/${planSource.total}`,
-          phasesComplete: planSource.phasesComplete,
-          incompleteTasks: planSource.incompleteCount,
-        })
-
-        // Check 1.8: Checkbox update enforcement (3-strike system)
-        // Detect code changes without tasks.md update
-        const state = getState(sessionID)
-        if (!state.checkboxEnforcement) {
-          state.checkboxEnforcement = { reminderCount: 0 }
-        }
-        const enforcement = state.checkboxEnforcement
-
-        try {
-          // Get current tasks.md mtime
-          const currentTasksMtime = existsSync(planSource.planPath) 
-            ? statSync(planSource.planPath).mtimeMs 
-            : 0
-
-          // Get git diff hash for code files (excluding .md files)
-          let currentDiffHash = ""
-          try {
-            const diffOutput = execSync("git diff --name-only", { 
-              cwd: ctx.directory, 
-              encoding: "utf-8",
-              timeout: 5000
-            }).trim()
-            // Filter to code files only (exclude .md)
-            const codeFiles = diffOutput.split("\n").filter(f => f && !f.endsWith(".md"))
-            currentDiffHash = codeFiles.join(",")
-          } catch {
-            // Git not available or not a repo - skip enforcement
-            currentDiffHash = ""
-          }
-
-          // Check if code changed but tasks.md didn't
-          const codeChanged = currentDiffHash && currentDiffHash !== enforcement.lastCodeDiffHash
-          const tasksUpdated = currentTasksMtime !== enforcement.lastTasksMtime
-
-          if (codeChanged && !tasksUpdated && enforcement.lastTasksMtime !== undefined) {
-            enforcement.reminderCount++
-            log(`[${HOOK_NAME}] Code changed but tasks.md not updated`, {
-              sessionID,
-              reminderCount: enforcement.reminderCount,
-              codeFiles: currentDiffHash.slice(0, 100)
-            })
-
-            if (enforcement.reminderCount >= 3) {
-              // 3rd strike - refuse auto-continuation
-              log(`[${HOOK_NAME}] Checkbox enforcement: 3-strike limit reached, refusing auto-continue`, { sessionID })
-              await ctx.client.tui.showToast({
-                body: {
-                  title: "Tasks.md Update Required",
-                  message: "Code changed 3+ times without updating tasks.md. Please update manually.",
-                  variant: "error" as const,
-                  duration: 5000,
-                },
-              }).catch(() => {})
-              return
-            }
-          } else if (tasksUpdated) {
-            // tasks.md updated - reset counter
-            enforcement.reminderCount = 0
-          }
-
-          // Update tracking state
-          enforcement.lastCodeDiffHash = currentDiffHash
-          enforcement.lastTasksMtime = currentTasksMtime
-        } catch (err) {
-          log(`[${HOOK_NAME}] Checkbox enforcement check failed`, { sessionID, error: String(err) })
-        }
-      }
+      // Note: Boulder state checks removed - Todo enforcer now only uses OpenCode Todo API
+      // Boulder continuation is handled separately by atlas/index.ts
 
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
@@ -766,53 +584,14 @@ export function createTodoContinuationEnforcer(
             }
             
             // Check 2.6: Blocked task detection
-            // When AI reports task is blocked, increment retry counter and stop if max reached
+            // When AI reports task is blocked, log and continue (retry logic removed - was boulder-dependent)
             if (isBlockedResponse(assistantContent)) {
-              // Use fine-grained task ID: plan::currentTask
-              const currentTask = boulderState?.active_plan 
-                ? getFirstIncompleteTask(boulderState.active_plan)
-                : null
-              const taskId = currentTask 
-                ? `${boulderState?.plan_name}::${currentTask}`
-                : (boulderState?.plan_name ?? sessionID)
-              const retryCount = incrementRetry(ctx.directory, taskId, assistantContent.slice(0, 200))
-              
-              if (isMaxRetries(ctx.directory, taskId)) {
-                log(`[${HOOK_NAME}] Skipped: task blocked after ${retryCount} retries`, { 
-                  sessionID, 
-                  taskId,
-                  task: currentTask,
-                  preview: assistantContent.slice(0, 100) 
-                })
-                
-                // Show toast to user
-                await ctx.client.tui.showToast({
-                  body: {
-                    title: "Task Blocked",
-                    message: `Task "${currentTask ?? taskId}" blocked after ${retryCount} retries. Use /reset-retries to continue.`,
-                    variant: "error" as const,
-                    duration: 5000,
-                  },
-                }).catch(() => {})
-                
-                return
-              }
-              
-              log(`[${HOOK_NAME}] Blocked response detected, retry ${retryCount}/3`, { 
+              log(`[${HOOK_NAME}] Blocked response detected`, { 
                 sessionID, 
-                taskId,
-                task: currentTask,
                 preview: assistantContent.slice(0, 100) 
               })
-            } else {
-              // Reset retry counter for current task on non-blocked response
-              const currentTask = boulderState?.active_plan 
-                ? getFirstIncompleteTask(boulderState.active_plan)
-                : null
-              const taskId = currentTask 
-                ? `${boulderState?.plan_name}::${currentTask}`
-                : (boulderState?.plan_name ?? sessionID)
-              resetRetry(ctx.directory, taskId)
+              // Note: Retry tracking removed - was dependent on boulder state
+              // Todo enforcer now just logs and continues
             }
             
             break // Only check the last assistant message
@@ -828,38 +607,25 @@ export function createTodoContinuationEnforcer(
         todos = (response.data ?? response) as Todo[]
       } catch (err) {
         log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(err) })
-        // Don't return here - we may have planSource as fallback
+        return // Can't continue without todos
       }
 
-      // Calculate incomplete counts from both sources
+      // Calculate incomplete count from OpenCode Todo API only
       const apiIncompleteCount = todos ? getIncompleteCount(todos) : 0
-      const fileIncompleteCount = planSource?.incompleteCount ?? 0
-      // IMPORTANT: Only use fileIncompleteCount if boulder has an active plan
-      // This prevents triggering continuation when no work session is active
-      const hasIncomplete = apiIncompleteCount > 0 || (boulderState?.active_plan && fileIncompleteCount > 0)
+      const hasIncomplete = apiIncompleteCount > 0
 
-      // Check if all tasks are complete (both sources agree)
+      // Check if all tasks are complete
       if (!hasIncomplete) {
         log(`[${HOOK_NAME}] All todos complete`, {
           sessionID,
           total: todos?.length ?? 0,
-          planPath: planSource?.planPath,
         })
         return
       }
 
-      // If OpenCode todos is empty but tasks.md has incomplete items, use tasks.md as fallback
-      if ((!todos || todos.length === 0) && fileIncompleteCount > 0) {
-        log(`[${HOOK_NAME}] No OpenCode todos, falling back to tasks.md`, {
-          sessionID,
-          incompleteFromPlan: fileIncompleteCount,
-          planPath: planSource?.planPath,
-        })
-      }
-
-      // Use whichever source has incomplete tasks (prefer API, fallback to file)
-      const resolvedIncomplete = apiIncompleteCount || fileIncompleteCount
-      const resolvedTotal = todos?.length || planSource?.total || resolvedIncomplete
+      // Use API-based counts only
+      const resolvedIncomplete = apiIncompleteCount
+      const resolvedTotal = todos?.length || resolvedIncomplete
 
       let resolvedInfo: ResolvedMessageInfo | undefined
       let hasCompactionMessage = false
