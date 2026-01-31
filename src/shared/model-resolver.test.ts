@@ -637,6 +637,40 @@ describe("resolveModelWithFallback", () => {
       expect(result!.model).toBe("anthropic/claude-opus-4-5")
       cacheSpy.mockRestore()
     })
+
+    test("empty fallback_models array preserves override semantics", () => {
+      // #given
+      const availableModels = new Set(["openai/gpt-5.2"])
+
+      // #when - empty array preserves override semantics (same as no fallback_models)
+      const result = resolveModelWithFallback({
+        userModel: "anthropic/claude-opus-4-5",
+        fallbackModels: [],
+        availableModels,
+        systemDefaultModel: "system/default",
+      })
+
+      // #then - should return override model (empty fallback_models preserves override semantics)
+      expect(result!.model).toBe("anthropic/claude-opus-4-5")
+      expect(result!.source).toBe("override")
+    })
+
+    test("deduplicates duplicate entries in fallback_models", () => {
+      // #given - duplicate entries in fallback_models
+      const availableModels = new Set(["openai/gpt-5.2"])
+
+      // #when
+      const result = resolveModelWithFallback({
+        userModel: "anthropic/claude-opus-4-5",
+        fallbackModels: ["openai/gpt-5.2", "openai/gpt-5.2", "openai/gpt-5.2"],
+        availableModels,
+        systemDefaultModel: "system/default",
+      })
+
+      // #then - should resolve to the deduplicated model
+      expect(result!.model).toBe("openai/gpt-5.2")
+      expect(result!.source).toBe("provider-fallback")
+    })
   })
 
   describe("Multi-entry fallbackChain", () => {
