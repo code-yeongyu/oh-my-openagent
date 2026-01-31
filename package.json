@@ -62,7 +62,7 @@
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@opencode-ai/plugin": "^1.1.47",
     "@opencode-ai/sdk": "^1.1.47",
-    "commander": "^14.0.2",
+    "commander": "^14.0.3",
     "detect-libc": "^2.1.2",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
@@ -82,13 +82,13 @@
     "typescript": "^5.9.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.1.10",
-    "oh-my-opencode-darwin-x64": "3.1.10",
-    "oh-my-opencode-linux-arm64": "3.1.10",
-    "oh-my-opencode-linux-arm64-musl": "3.1.10",
-    "oh-my-opencode-linux-x64": "3.1.10",
-    "oh-my-opencode-linux-x64-musl": "3.1.10",
-    "oh-my-opencode-windows-x64": "3.1.10"
+    "oh-my-opencode-darwin-arm64": "3.1.9",
+    "oh-my-opencode-darwin-x64": "3.1.9",
+    "oh-my-opencode-linux-arm64": "3.1.9",
+    "oh-my-opencode-linux-arm64-musl": "3.1.9",
+    "oh-my-opencode-linux-x64": "3.1.9",
+    "oh-my-opencode-linux-x64-musl": "3.1.9",
+    "oh-my-opencode-windows-x64": "3.1.9"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
