@@ -1396,8 +1396,9 @@ function registerProcessSignal(
   const listener = () => {
     handler()
     if (exitAfter) {
-      // Delay exit to allow other signal handlers time to complete async cleanup
-      setTimeout(() => process.exit(0), 100)
+      // Set exitCode and schedule exit after delay to allow other handlers to complete async cleanup
+      process.exitCode = 0
+      setTimeout(() => process.exit(), 100)
     }
   }
   process.on(signal, listener)

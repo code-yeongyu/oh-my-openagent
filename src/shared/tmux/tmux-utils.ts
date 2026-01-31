@@ -145,7 +145,6 @@ export async function spawnTmuxPane(
   })
   const titleExitCode = await titleProc.exited
   if (titleExitCode !== 0) {
-    const { log } = await import("../logger")
     let titleStderr = ""
     try {
       titleStderr = await new Response(titleProc.stderr).text()
