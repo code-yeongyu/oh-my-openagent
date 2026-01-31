@@ -143,12 +143,11 @@ export async function spawnTmuxPane(
     stdout: "ignore",
     stderr: "pipe",
   })
+  // Drain stderr immediately to avoid backpressure
+  const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
   const titleExitCode = await titleProc.exited
   if (titleExitCode !== 0) {
-    let titleStderr = ""
-    try {
-      titleStderr = await new Response(titleProc.stderr).text()
-    } catch {}
+    const titleStderr = await stderrPromise
     log("[spawnTmuxPane] WARNING: failed to set pane title", {
       paneId,
       title,
@@ -234,12 +233,11 @@ export async function replaceTmuxPane(
     stdout: "ignore",
     stderr: "pipe",
   })
+  // Drain stderr immediately to avoid backpressure
+  const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
   const titleExitCode = await titleProc.exited
   if (titleExitCode !== 0) {
-    let titleStderr = ""
-    try {
-      titleStderr = await new Response(titleProc.stderr).text()
-    } catch {}
+    const titleStderr = await stderrPromise
     log("[replaceTmuxPane] WARNING: failed to set pane title", {
       paneId,
       exitCode: titleExitCode,

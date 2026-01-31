@@ -544,6 +544,7 @@ export class LSPClient {
     const proc = this.proc
     if (proc) {
       this.proc = null
+      let exitedBeforeTimeout = false
       try {
         proc.kill()
         // Wait for exit with timeout to prevent indefinite hang
@@ -552,9 +553,15 @@ export class LSPClient {
           timeoutId = setTimeout(resolve, 5000)
         })
         await Promise.race([
-          proc.exited.finally(() => timeoutId && clearTimeout(timeoutId)),
+          proc.exited.then(() => { exitedBeforeTimeout = true }).finally(() => timeoutId && clearTimeout(timeoutId)),
           timeoutPromise,
         ])
+        if (!exitedBeforeTimeout) {
+          log("[LSPClient] Process did not exit within timeout, escalating to SIGKILL")
+          try {
+            proc.kill("SIGKILL")
+          } catch {}
+        }
       } catch {}
     }
     this.processExited = true
