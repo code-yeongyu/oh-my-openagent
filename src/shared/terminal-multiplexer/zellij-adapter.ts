@@ -18,6 +18,9 @@ export class ZellijAdapter implements Multiplexer {
   private labelToSpawned = new Map<string, boolean>()
   private hasCreatedFirstPane = false
   private anchorPaneId: string | null = null
+  // Tracks when first pane's ID is ready for other spawns to use
+  private anchorReadyPromise: Promise<string> | null = null
+  private anchorReadyResolver: ((paneId: string) => void) | null = null
   private config: ZellijAdapterConfig
   private sessionID: string | null = null
   private storage: ZellijStorage
@@ -85,6 +88,9 @@ export class ZellijAdapter implements Multiplexer {
     // Mark first pane as created BEFORE spawning to prevent race condition
     if (isFirstPane) {
       this.hasCreatedFirstPane = true
+      this.anchorReadyPromise = new Promise(resolve => {
+        this.anchorReadyResolver = resolve
+      })
     }
 
     // Wrap command to capture pane ID
@@ -140,6 +146,8 @@ export class ZellijAdapter implements Multiplexer {
     // Track anchor or stack with anchor
     if (isFirstPane) {
       this.anchorPaneId = paneId
+      this.anchorReadyResolver?.(paneId)
+      this.anchorReadyResolver = null
       log("[ZellijAdapter.spawnPane] set anchor pane", { paneId })
       
       // Save state after setting anchor pane
@@ -151,14 +159,14 @@ export class ZellijAdapter implements Multiplexer {
           updatedAt: Date.now(),
         })
       }
-    } else if (this.anchorPaneId) {
-      // Stack with anchor
-      const stackProc = spawn(["zellij", "action", "stack-panes", "--", this.anchorPaneId, paneId], {
+    } else if (this.anchorReadyPromise) {
+      const anchorId = await this.anchorReadyPromise
+      const stackProc = spawn(["zellij", "action", "stack-panes", "--", anchorId, paneId], {
         stdout: "pipe",
         stderr: "pipe",
       })
       await stackProc.exited
-      log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: this.anchorPaneId, newPaneId: paneId })
+      log("[ZellijAdapter.spawnPane] stacked with anchor", { anchorPaneId: anchorId, newPaneId: paneId })
     }
 
     this.labelToSpawned.set(label, true)
