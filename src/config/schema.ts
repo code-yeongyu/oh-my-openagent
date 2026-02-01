@@ -365,7 +365,7 @@ export const SisyphusConfigSchema = z.object({
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   /** Enable new task system (default: false) */
-  new_task_system_enabled: z.boolean().default(false),
+  new_task_system_enabled: z.boolean().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),

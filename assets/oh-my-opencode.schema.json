@@ -8,6 +8,9 @@
     "$schema": {
       "type": "string"
     },
+    "new_task_system_enabled": {
+      "type": "boolean"
+    },
     "disabled_mcps": {
       "type": "array",
       "items": {
@@ -83,7 +86,8 @@
           "start-work",
           "atlas",
           "unstable-agent-babysitter",
-          "stop-continuation-guard"
+          "stop-continuation-guard",
+          "tasks-todowrite-disabler"
         ]
       }
     },
@@ -3005,10 +3009,6 @@
         "tasks": {
           "type": "object",
           "properties": {
-            "enabled": {
-              "default": false,
-              "type": "boolean"
-            },
             "storage_path": {
               "default": ".sisyphus/tasks",
               "type": "string"
@@ -3016,28 +3016,6 @@
             "claude_code_compat": {
               "default": false,
               "type": "boolean"
-            }
-          }
-        },
-        "swarm": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "default": false,
-              "type": "boolean"
-            },
-            "storage_path": {
-              "default": ".sisyphus/teams",
-              "type": "string"
-            },
-            "ui_mode": {
-              "default": "toast",
-              "type": "string",
-              "enum": [
-                "toast",
-                "tmux",
-                "both"
-              ]
             }
           }
         }
