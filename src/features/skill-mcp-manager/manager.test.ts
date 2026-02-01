@@ -395,6 +395,35 @@ describe("SkillMcpManager", () => {
       // then
       expect(manager.getConnectedServers()).toEqual([])
     })
+
+    it("unregisters signal handlers after disconnectAll", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "signal-server",
+        skillName: "signal-skill",
+        sessionID: "session-1",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://example.com/mcp",
+      }
+
+      const before = process.listenerCount("SIGINT")
+
+      // when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch {
+        // Expected to fail connection, still registers cleanup handlers
+      }
+      const afterRegister = process.listenerCount("SIGINT")
+
+      await manager.disconnectAll()
+      const afterDisconnect = process.listenerCount("SIGINT")
+
+      // then
+      expect(afterRegister).toBe(before + 1)
+      expect(afterDisconnect).toBe(before)
+    })
   })
 
   describe("isConnected", () => {
