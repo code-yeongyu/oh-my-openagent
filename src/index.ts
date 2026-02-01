@@ -291,9 +291,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  const unstableAgentBabysitter =
-    isHookEnabled("unstable-agent-babysitter") && pluginConfig.babysitting?.enabled === true
-      ? createUnstableAgentBabysitterHook(
+  const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
+    ? createUnstableAgentBabysitterHook(
           {
             directory: ctx.directory,
             client: {

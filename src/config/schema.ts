@@ -313,7 +313,6 @@ export const NotificationConfigSchema = z.object({
 })
 
 export const BabysittingConfigSchema = z.object({
-  enabled: z.boolean().default(false),
   timeout_ms: z.number().default(120000),
 })
 
