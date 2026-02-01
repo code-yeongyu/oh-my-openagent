@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
-import * as fs from "node:fs"
-import { createSkillTool } from "./tools"
-import { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import * as fs from "node:fs"
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { SkillMcpManager } from "../../features/skill-mcp-manager"
+import { createSkillTool } from "./tools"
 
 const originalReadFileSync = fs.readFileSync.bind(fs)
 
@@ -50,15 +51,15 @@ function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown
   }
 }
 
-const mockContext = {
+const mockContext: ToolContext = {
   sessionID: "test-session",
   messageID: "msg-1",
   agent: "test-agent",
+  directory: "/test",
+  worktree: "/test",
   abort: new AbortController().signal,
-  directory: "/test/project",
-  worktree: "/test/project",
-  metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
-  ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("skill tool - synchronous description", () => {

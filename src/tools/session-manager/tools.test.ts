@@ -1,28 +1,30 @@
-import { describe, test, expect } from "bun:test"
-import { session_list, session_read, session_search, session_info } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { describe, expect, test } from "bun:test"
+import { session_info, session_list, session_read, session_search } from "./tools"
+
+const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
 const mockContext: ToolContext = {
   sessionID: "test-session",
   messageID: "test-message",
   agent: "test-agent",
+  directory: projectDir,
+  worktree: projectDir,
   abort: new AbortController().signal,
-  directory: "/test/project",
-  worktree: "/test/project",
-  metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
-  ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("session-manager tools", () => {
   test("session_list executes without error", async () => {
     const result = await session_list.execute({}, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_list respects limit parameter", async () => {
     const result = await session_list.execute({ limit: 5 }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -31,7 +33,7 @@ describe("session-manager tools", () => {
       from_date: "2025-12-01T00:00:00Z",
       to_date: "2025-12-31T23:59:59Z",
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -58,7 +60,7 @@ describe("session-manager tools", () => {
 
   test("session_read handles non-existent session", async () => {
     const result = await session_read.execute({ session_id: "ses_nonexistent" }, mockContext)
-    
+
     expect(result).toContain("not found")
   })
 
@@ -68,7 +70,7 @@ describe("session-manager tools", () => {
       include_todos: true,
       include_transcript: true,
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -77,13 +79,13 @@ describe("session-manager tools", () => {
       session_id: "ses_test123",
       limit: 10,
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_search executes without error", async () => {
     const result = await session_search.execute({ query: "test" }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -92,7 +94,7 @@ describe("session-manager tools", () => {
       query: "test",
       session_id: "ses_test123",
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -101,7 +103,7 @@ describe("session-manager tools", () => {
       query: "TEST",
       case_sensitive: true,
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -110,19 +112,19 @@ describe("session-manager tools", () => {
       query: "test",
       limit: 5,
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_info handles non-existent session", async () => {
     const result = await session_info.execute({ session_id: "ses_nonexistent" }, mockContext)
-    
+
     expect(result).toContain("not found")
   })
 
   test("session_info executes with valid session", async () => {
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 })

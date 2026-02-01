@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test"
-import { normalizeArgs, validateArgs, createLookAt } from "./tools"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
+import type { ToolContext } from "@opencode-ai/plugin/tool";
+import { describe, expect, test } from "bun:test";
+import { createLookAt, normalizeArgs, validateArgs } from "./tools";
 
 const mockContext: ToolContext = {
   sessionID: "test-session",
@@ -188,11 +188,11 @@ describe("look-at tool", () => {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
-        abort: new AbortController().signal,
         directory: "/project",
         worktree: "/project",
-        metadata: (_input: { title?: string; metadata?: Record<string, unknown> }) => {},
-        ask: (_input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise.resolve(),
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       await tool.execute(
