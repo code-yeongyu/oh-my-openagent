@@ -56,6 +56,7 @@ import {
   createInstinctTriggerHook,
   createInstinctLearnerHook,
   createPatternExtractionHook,
+  createObservationWriteGuardHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -258,6 +259,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const notepadWriteGuard = isHookEnabled("notepad-write-guard")
     ? createNotepadWriteGuardHook(ctx)
+    : null;
+
+  const observationWriteGuard = isHookEnabled("observation-write-guard")
+    ? createObservationWriteGuardHook(ctx)
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
@@ -710,6 +715,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
+      await observationWriteGuard?.["tool.execute.before"]?.(input, output);
       
       // Check if any hook blocked the operation
       if ((output as { blocked?: boolean }).blocked) {

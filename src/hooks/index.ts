@@ -86,3 +86,4 @@ export { createInstinctTriggerHook } from "./instinct-trigger";
 export { createInstinctLearnerHook } from "./instinct-learner";
 export { createPatternExtractionHook } from "./pattern-extraction";
 export { createNotepadWriteGuardHook } from "./notepad-write-guard";
+export { createObservationWriteGuardHook } from "./observation-write-guard";

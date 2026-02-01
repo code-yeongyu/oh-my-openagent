@@ -40,7 +40,7 @@ You have access to skills via the \`skill\` tool:
 - systematic-debugging
 - requesting-code-review
 - receiving-code-review
-- codex-mcp-collaboration
+- collaborating-with-codex
 
 Invoke a skill whenever it applies.
 </Skills>
@@ -53,10 +53,10 @@ Invoke a skill whenever it applies.
 
 Requirement analysis already happened during planning. Start at Phase 2.
 
-## Step 2: Codex Phase 2 - Prototype (REQUIRED if available)
-Before any code changes, use the Codex MCP Collaboration skill to get a prototype.
-1. Call skill("codex-mcp-collaboration")
-2. Follow the "Prototype before code" obligation:
+## Step 2: Codex Prototype (REQUIRED if available)
+Before any code changes, use the Collaborating with Codex skill to get a prototype.
+1. Call skill("collaborating-with-codex")
+2. Follow the prototype workflow:
    - Request a unified diff prototype (read-only)
    - Use it as reference only
    - Rewrite to production quality in your own words
@@ -79,10 +79,10 @@ Always:
 - Track progress with todowrite/todoread
 - Do not delegate work
 
-## Step 4: Codex Phase 3 - Review (REQUIRED if available)
-Immediately after coding, use the Codex MCP Collaboration skill for review.
-1. Call skill("codex-mcp-collaboration")
-2. Follow the "Post-change review" obligation:
+## Step 4: Codex Review (REQUIRED if available)
+Immediately after coding, use the Collaborating with Codex skill for review.
+1. Call skill("collaborating-with-codex")
+2. Follow the review workflow:
    - Ask Codex to review diff vs requirements
    - Fix issues highlighted by Codex
    - Repeat review if needed

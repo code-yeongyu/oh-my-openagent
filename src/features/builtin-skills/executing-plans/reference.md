@@ -2,7 +2,7 @@
 
 ## Codex Collaboration
 
-本 Skill 与 Codex (via CodexMCP) 协作，分工如下:
+本 Skill 与 Codex 协作，分工如下:
 
 - **Claude Code**: 重写为生产级代码、架构一致性审查
 - **Codex**: 生成代码原型、逻辑正确性审查、bug 定位
@@ -14,23 +14,7 @@
 
 ### 调用方式
 
-```typescript
-// 获取代码原型
-mcp_codex_codex({
-  PROMPT: "为 Task {taskId} 生成 unified diff patch，要求:\n1. 仅输出 diff，不实际修改\n2. {具体要求}",
-  cd: "{项目根目录}",
-  sandbox: "read-only",
-  SESSION_ID: session.implementSession
-})
-
-// 代码审查
-mcp_codex_codex({
-  PROMPT: "请审查以下代码改动，检查逻辑正确性和潜在 bug:\n\n{diff 内容}",
-  cd: "{项目根目录}",
-  sandbox: "read-only",
-  SESSION_ID: session.reviewSession
-})
-```
+调用 `skill("collaborating-with-codex")` 即可，skill 会指导如何与 Codex 协作。
 
 ## Commit Message Format
 

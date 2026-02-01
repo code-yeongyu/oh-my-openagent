@@ -485,11 +485,18 @@ const receivingCodeReviewSkill: BuiltinSkill = {
   template: readBuiltinSkillTemplate("receiving-code-review"),
 }
 
-const codexMcpCollaborationSkill: BuiltinSkill = {
-  name: "codex-mcp-collaboration",
+const collaboratingWithCodexSkill: BuiltinSkill = {
+  name: "collaborating-with-codex",
   description:
-    "Use to enforce Codex MCP collaboration at analysis, prototype-before-code, and post-change review; all three checkpoints are mandatory and read-only",
-  template: readBuiltinSkillTemplate("codex-mcp-collaboration"),
+    "Delegates coding tasks to Codex CLI for prototyping, debugging, and code review. Use when needing algorithm implementation, bug analysis, or code quality feedback. Supports multi-turn sessions via SESSION_ID.",
+  template: readBuiltinSkillTemplate("collaborating-with-codex"),
+}
+
+const collaboratingWithGeminiSkill: BuiltinSkill = {
+  name: "collaborating-with-gemini",
+  description:
+    "Delegates coding tasks to Gemini CLI for prototyping, debugging, and code review. Use when needing algorithm implementation, bug analysis, or code quality feedback. Supports multi-turn sessions via SESSION_ID.",
+  template: readBuiltinSkillTemplate("collaborating-with-gemini"),
 }
 
 const finishingADevelopmentBranchSkill: BuiltinSkill = {
@@ -2003,7 +2010,8 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     systematicDebuggingSkill,
     requestingCodeReviewSkill,
     receivingCodeReviewSkill,
-    codexMcpCollaborationSkill,
+    collaboratingWithCodexSkill,
+    collaboratingWithGeminiSkill,
     finishingADevelopmentBranchSkill,
     archivingChangesSkill,
     writingSkillsSkill,

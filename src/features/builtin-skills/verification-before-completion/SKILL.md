@@ -30,7 +30,7 @@ Verify deliverables meet acceptance criteria, are test-validated, and ready for 
 - [ ] TODOs addressed or documented
 - [ ] README/docs updated if needed
 - [ ] Commit messages follow convention
-- [ ] Code reviewed (self or Codex)
+- [ ] Code reviewed (self or via collaborating-with-codex skill)
 ```
 
 ## Verification Commands

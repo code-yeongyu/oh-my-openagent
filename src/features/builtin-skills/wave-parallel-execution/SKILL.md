@@ -109,7 +109,7 @@ For each Wave:
 |----------|---------------------|-------|--------|
 | **文档** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
 | **视觉/UI** | `.tsx`, `.jsx`, `.vue`, `.css` + 样式关键词 | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
-| **代码** | `.ts`, `.js`, `.py` 等 (逻辑, API, 后端) | `implementer` | ["test-driven-development", "codex-mcp-collaboration"] |
+| **代码** | `.ts`, `.js`, `.py` 等 (逻辑, API, 后端) | `implementer` | [\"test-driven-development\", \"collaborating-with-codex\"] |
 
 **分类决策树:**
 
@@ -164,7 +164,7 @@ For each Wave (并行 dispatch):
      sisyphus_task({
        subagent_type: "implementer",
        description: `Execute Wave ${wave.id} tasks`,
-       skills: ["test-driven-development", "codex-mcp-collaboration"],
+        skills: ["test-driven-development", "collaborating-with-codex"],
        run_in_background: true,
        prompt: `
 ## Wave ${wave.id} Execution

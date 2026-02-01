@@ -123,6 +123,7 @@ export const HookNameSchema = z.enum([
   "instinct-trigger",
   "instinct-learner",
   "pattern-extraction",
+  "observation-write-guard",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

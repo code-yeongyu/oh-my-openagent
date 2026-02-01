@@ -325,11 +325,20 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
       block: tool.schema.boolean().optional().describe("Wait for completion (default: false). System notifies when done, so blocking is rarely needed."),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
     },
-    async execute(args: BackgroundOutputArgs) {
+    async execute(args: BackgroundOutputArgs, toolContext) {
+      const ctx = toolContext as ToolContextWithMetadata
       try {
         const task = manager.getTask(args.task_id)
         if (!task) {
           return `Task not found: ${args.task_id}`
+        }
+
+        // Attach metadata for UI subagent view
+        if (task.sessionID) {
+          ctx.metadata?.({
+            title: task.description,
+            metadata: { sessionId: task.sessionID },
+          })
         }
 
         const shouldBlock = args.block === true

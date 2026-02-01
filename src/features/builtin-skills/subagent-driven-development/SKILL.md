@@ -241,20 +241,20 @@ Done!
 
 ---
 
-## Codex 协作规范 (Superpowers-Fusion 增强)
+## Codex 协作规范 (via collaborating-with-codex skill)
 
 保留原版三阶段评审流程，在各阶段添加 Codex 辅助：
 
 | 阶段 | Codex 协作要求 |
 |------|----------------|
-| **Implementer 实现** | **必须**: 向 Codex 索要代码原型 (unified diff)，以此为参考重写 |
-| **Spec Review** | **必须**: Codex 审查 task -> diff 范围，检查遗漏/越界 |
-| **Quality Review** | **可选**: Codex 检查代码质量、风格、潜在 bug |
+| **Implementer 实现** | **必须**: 调用 `skill("collaborating-with-codex")` 索要代码原型 (unified diff)，以此为参考重写 |
+| **Spec Review** | **必须**: 调用 Codex 审查 task -> diff 范围，检查遗漏/越界 |
+| **Quality Review** | **可选**: 调用 Codex 检查代码质量、风格、潜在 bug |
 
 **Codex 调用规范:**
 
 1. **阶段 1 (Implementer 实现)**: 
-   - 要求 Codex 提供 unified diff 原型
+   - 调用 `skill("collaborating-with-codex")` 获取 unified diff 原型
    - 限定范围为当前任务相关文件
    - 不允许实际修改
 

@@ -266,7 +266,7 @@ Sisyphus 创建
       "model": "openai/gpt-5.2",
       "temperature": 0.1,
       "prompt_append": "Focus on strategic architecture and system design.",
-      "defaultSkills": ["test-driven-development", "codex-mcp-collaboration", "systematic-debugging"]
+      "defaultSkills": ["test-driven-development", "collaborating-with-codex", "systematic-debugging"]
     },
     "most-capable": {
       "model": "anthropic/claude-opus-4-5",

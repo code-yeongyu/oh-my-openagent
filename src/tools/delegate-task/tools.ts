@@ -472,7 +472,11 @@ Session ID: ${args.session_id}
 ${textContent || "(No text output)"}
 
 ---
-To continue this session: session_id="${args.session_id}"`
+To continue this session: session_id="${args.session_id}"
+
+<task_metadata>
+session_id: ${args.session_id}
+</task_metadata>`
       }
 
       if (args.category && args.subagent_type) {
@@ -725,7 +729,11 @@ RESULT:
 ${textContent || "(No text output)"}
 
 ---
-To continue this session: session_id="${sessionID}"`
+To continue this session: session_id="${sessionID}"
+
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
           } catch (error) {
             return formatDetailedError(error, {
               operation: "Launch monitored background task",
@@ -896,18 +904,17 @@ To continue this session: session_id="${task.sessionID}"`
           })
         }
 
+        // Build model object matching OpenCode's task tool format for UI compatibility
+        const modelForMetadata = modelInfo?.model ? (() => {
+          const parsed = parseModelString(modelInfo.model)
+          return parsed ? { providerID: parsed.providerID, modelID: parsed.modelID } : undefined
+        })() : undefined
+
         ctx.metadata?.({
           title: args.description,
           metadata: {
-            prompt: args.prompt,
-            agent: agentToUse,
-            category: args.category,
-            load_skills: args.load_skills,
-            description: args.description,
-            run_in_background: args.run_in_background,
             sessionId: sessionID,
-            sync: true,
-            command: args.command,
+            model: modelForMetadata,
           },
         })
 
@@ -1025,7 +1032,11 @@ Session ID: ${sessionID}
 ${textContent || "(No text output)"}
 
 ---
-To continue this session: session_id="${sessionID}"`
+To continue this session: session_id="${sessionID}"
+
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
       } catch (error) {
         if (toastManager && taskId !== undefined) {
           toastManager.removeTask(taskId)

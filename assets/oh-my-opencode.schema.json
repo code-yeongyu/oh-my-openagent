@@ -108,7 +108,8 @@
           "observer-detector",
           "instinct-trigger",
           "instinct-learner",
-          "pattern-extraction"
+          "pattern-extraction",
+          "observation-write-guard"
         ]
       }
     },

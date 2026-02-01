@@ -60,7 +60,7 @@ Before dispatching each task, classify the task type and select the appropriate 
 |-----------|---------------------------|-------|--------|
 | **Documentation** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
 | **Visual/UI** | `.tsx`, `.jsx`, `.vue`, `.css` with styling keywords | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
-| **Code** | `.ts`, `.js`, `.py`, etc. (logic, API, backend) | `implementer` | ["test-driven-development", "codex-mcp-collaboration"] |
+| **Code** | `.ts`, `.js`, `.py`, etc. (logic, API, backend) | `implementer` | [\"test-driven-development\", \"collaborating-with-codex\"] |
 
 **Classification Decision Tree:**
 
@@ -78,7 +78,7 @@ For each task, dispatch to the appropriate agent:
 sisyphus_task({
   subagent_type: "implementer",
   description: `Implement Task ${taskId}: ${taskName}`,
-  skills: ["test-driven-development", "codex-mcp-collaboration"],
+  skills: [\"test-driven-development\", \"collaborating-with-codex\"],
   run_in_background: false,
   prompt: `
 ## ImplementerTaskContext

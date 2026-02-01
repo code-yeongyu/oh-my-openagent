@@ -290,48 +290,20 @@ These techniques are part of systematic debugging and available in this director
 
 ---
 
-## Codex 协作规范 (Superpowers-Fusion 增强)
+## Codex 协作规范
 
-在四阶段调试流程中，必须与 Codex 协作以确保分析的客观性和全面性：
+在四阶段调试流程中，可与 Codex 协作以确保分析的客观性和全面性：
 
 | 阶段 | Codex 协作要求 |
 |------|----------------|
-| **Phase 1: 根因调查** | **必须**: 初步分析完成后，将错误现象、初步假设告知 Codex，要求其完善根因分析 |
+| **Phase 1: 根因调查** | **必须**: 初步分析完成后，调用 `skill("collaborating-with-codex")` 将错误现象、初步假设告知 Codex，要求其完善根因分析 |
 | **Phase 2: 模式分析** | 可选: 让 Codex 帮助分析代码模式差异 |
 | **Phase 3: 假设测试** | **必须**: 向 Codex 索要修复原型 (unified diff)，以此为参考重写 |
 | **Phase 4: 实施修复** | **必须**: 修复代码后立即让 Codex review 代码改动 |
 
-### Codex 调用示例
+### 调用方式
 
-```typescript
-// Phase 1: 让 Codex 完善根因假设
-mcp_codex_codex({
-  PROMPT: `调试分析：
-错误现象: ${errorDescription}
-初步假设: ${hypothesis}
-请完善根因分析，指出可能遗漏的调查方向。`,
-  cd: projectRoot,
-  sandbox: "read-only"
-})
-
-// Phase 3: 索要修复原型
-mcp_codex_codex({
-  PROMPT: `基于根因分析，请提供修复原型 (unified diff)。
-严禁实际修改代码，仅给出 diff patch。`,
-  cd: projectRoot,
-  sandbox: "read-only",
-  SESSION_ID: previousSessionId
-})
-
-// Phase 4: 修复后 review
-mcp_codex_codex({
-  PROMPT: `请 review 以下修复代码，确认是否完全解决根因问题。
-修改范围: ${changedFiles}`,
-  cd: projectRoot,
-  sandbox: "read-only",
-  SESSION_ID: previousSessionId
-})
-```
+调用 `skill("collaborating-with-codex")` 即可，skill 会指导如何与 Codex 协作。
 
 ### 独立思考原则
 

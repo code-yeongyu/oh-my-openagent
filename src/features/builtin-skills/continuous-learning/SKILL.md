@@ -194,13 +194,106 @@ Edit `config.json`:
     └── commands/           # Generated commands
 ```
 
-## Integration with Skill Creator
+## Local Storage Structure (Mode B)
 
-When you use the [Skill Creator GitHub App](https://skill-creator.app), it now generates **both**:
-- Traditional SKILL.md files (for backward compatibility)
-- Instinct collections (for v2 learning system)
+为了实现项目隔离和便携性，oh-my-opencode 采用了 **Mode B** 架构，将所有学习产物存储在 skill 本地的 `references/` 目录中，而非全局路径。
 
-Instincts from repo analysis have `source: "repo-analysis"` and include the source repository URL.
+### Storage Layers
+
+- **Storage Layer (观察存储)**: `references/observations/`
+  - 记录原始观察、模式检测结果和初步本能。
+  - `index.md`: 观察索引，记录所有已识别的模式。
+- **Output Layer (演化产物)**: `references/evolved/`
+  - **Drafts (`drafts/`)**: 由观察演化而来的草稿，待用户审核。
+  - **Published (`published/`)**: 已通过审核并发布的知识，可直接被其他 Agent 调用。
+
+```
+references/
+├── observations/           # 存储层：原始观察
+│   ├── index.md           # 观察索引
+│   └── {pattern-name}.md  # 单个观察记录
+└── evolved/                # 产出层：演化知识
+    ├── drafts/            # 草稿（待审核）
+    └── published/         # 已发布（正式本能）
+```
+
+## Linkage Mechanism: Observations → Evolution → Skills
+
+系统的核心流程是从分散的观察中提取规律，并最终沉淀为可复用的技能。
+
+```
+观察阶段 (Hooks)                 演化阶段 (Commands)
+┌─────────────────┐         ┌─────────────────┐
+│ observer-detector│         │ /evolve         │
+│ instinct-learner │    →    │ skill-create    │
+│ pattern-extraction│        │                 │
+└────────┬────────┘         └────────┬────────┘
+         │ 写入                      │ 生成
+         ▼                           ▼
+┌─────────────────────────────────────────────┐
+│         references/                          │
+│  observations/  ───────→  evolved/drafts/   │
+│  (存储层：数据收集)           (产出层：知识演化)      │
+└─────────────────────────────────────────────┘
+```
+
+## Agent Behavior Guide: When to Observe
+
+### 何时写入 observations/
+
+Agent 在执行任务时，若发现以下情况，**必须**主动将观察记录到 `references/observations/`：
+
+| 触发场景 | 说明 | 写入内容 |
+|----------|------|----------|
+| **错误循环** | 连续失败 2 次以上或陷入逻辑死循环 | 错误模式、失败原因及绕过方案 |
+| **用户纠偏** | 用户对代码风格、逻辑或工具选择提出明确修改意见 | 用户偏好、强制约束 |
+| **工作流提取** | 成功完成一个复杂的多步骤任务（如重构、新功能实现） | 任务链条、关键决策点、依赖关系 |
+| **重复模式** | 发现相同的操作或代码结构出现 3 次以上 | 抽象后的行为模式 |
+
+### 观察文件格式
+
+所有观察文件必须包含标准的 YAML 元数据，以便演化工具解析：
+
+
+```yaml
+---
+name: pattern-name
+type: observation
+confidence: 0.7
+domain: workflow-optimization
+session_count: 3
+last_observed: 2026-02-01T12:00:00Z
+created: 2026-02-01T10:00:00Z
+---
+```
+
+## Linkage Mechanism
+
+```
+观察者 Hooks                    演化命令
+┌─────────────────┐         ┌─────────────────┐
+│ observer-detector│         │ /evolve         │
+│ instinct-learner │    →    │ skill-create    │
+│ pattern-extraction│        │                 │
+└────────┬────────┘         └────────┬────────┘
+         │ 写入                      │ 生成
+         ▼                           ▼
+┌─────────────────────────────────────────────┐
+│         references/                          │
+│  observations/  ───────→  evolved/drafts/   │
+│  (存储层)                  (产出层)          │
+└─────────────────────────────────────────────┘
+```
+
+### Two-Stage Evolution
+
+1. **草稿阶段** → `references/evolved/drafts/`
+   - 高置信度观察（>= 0.7）可通过 `/evolve` 演化
+   - 生成 Skill 草稿待审核
+
+2. **发布阶段** → 用户确认后
+   - 移动到 `references/evolved/published/`
+   - 或发布到 `~/.claude/skills/` 全局可用
 
 ## Confidence Scoring
 

@@ -22,6 +22,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "multimodal-looker": {
       "model": "opencode/big-pickle",
     },
+    "observer": {
+      "model": "opencode/big-pickle",
+    },
     "oracle": {
       "model": "opencode/big-pickle",
     },
@@ -79,6 +82,9 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-opus-4-5",
     },
     "multimodal-looker": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
+    "observer": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
@@ -143,6 +149,9 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-opus-4-5",
     },
     "multimodal-looker": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
+    "observer": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
@@ -212,6 +221,9 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     "multimodal-looker": {
       "model": "openai/gpt-5.2",
     },
+    "observer": {
+      "model": "opencode/big-pickle",
+    },
     "oracle": {
       "model": "openai/gpt-5.2",
       "variant": "high",
@@ -278,6 +290,9 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     },
     "multimodal-looker": {
       "model": "openai/gpt-5.2",
+    },
+    "observer": {
+      "model": "opencode/big-pickle",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -346,6 +361,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
     },
+    "observer": {
+      "model": "google/gemini-3-flash",
+    },
     "oracle": {
       "model": "google/gemini-3-pro",
     },
@@ -405,6 +423,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "variant": "max",
     },
     "multimodal-looker": {
+      "model": "google/gemini-3-flash",
+    },
+    "observer": {
       "model": "google/gemini-3-flash",
     },
     "oracle": {
@@ -467,6 +488,9 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
+    },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -531,6 +555,9 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
+    },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -598,6 +625,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "multimodal-looker": {
       "model": "opencode/gemini-3-flash",
     },
+    "observer": {
+      "model": "opencode/claude-haiku-4-5",
+    },
     "oracle": {
       "model": "opencode/gpt-5.2",
       "variant": "high",
@@ -661,6 +691,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     },
     "multimodal-looker": {
       "model": "opencode/gemini-3-flash",
+    },
+    "observer": {
+      "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/gpt-5.2",
@@ -728,6 +761,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "multimodal-looker": {
       "model": "github-copilot/gemini-3-flash",
     },
+    "observer": {
+      "model": "github-copilot/gemini-3-flash",
+    },
     "oracle": {
       "model": "github-copilot/gpt-5.2",
       "variant": "high",
@@ -790,6 +826,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "medium",
     },
     "multimodal-looker": {
+      "model": "github-copilot/gemini-3-flash",
+    },
+    "observer": {
       "model": "github-copilot/gemini-3-flash",
     },
     "oracle": {
@@ -856,6 +895,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
+    "observer": {
+      "model": "opencode/big-pickle",
+    },
     "oracle": {
       "model": "opencode/big-pickle",
     },
@@ -913,6 +955,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
+    },
+    "observer": {
+      "model": "opencode/big-pickle",
     },
     "oracle": {
       "model": "opencode/big-pickle",
@@ -973,6 +1018,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     },
     "multimodal-looker": {
       "model": "opencode/gemini-3-flash",
+    },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "opencode/gpt-5.2",
@@ -1038,6 +1086,9 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "multimodal-looker": {
       "model": "github-copilot/gemini-3-flash",
     },
+    "observer": {
+      "model": "github-copilot/gemini-3-flash",
+    },
     "oracle": {
       "model": "openai/gpt-5.2",
       "variant": "high",
@@ -1100,6 +1151,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
+    },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-5",
@@ -1165,6 +1219,9 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
     },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
     "oracle": {
       "model": "anthropic/claude-opus-4-5",
       "variant": "max",
@@ -1228,6 +1285,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     },
     "multimodal-looker": {
       "model": "github-copilot/gemini-3-flash",
+    },
+    "observer": {
+      "model": "opencode/claude-haiku-4-5",
     },
     "oracle": {
       "model": "github-copilot/gpt-5.2",
@@ -1293,6 +1353,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
     },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
+    },
     "oracle": {
       "model": "openai/gpt-5.2",
       "variant": "high",
@@ -1356,6 +1419,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
+    },
+    "observer": {
+      "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
       "model": "openai/gpt-5.2",

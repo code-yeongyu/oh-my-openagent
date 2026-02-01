@@ -58,15 +58,7 @@ Key sections:
 
 **Codex Collaboration (optional):**
 
-For complex designs, invoke Codex for validation:
-
-```
-mcp_codex_codex({
-  PROMPT: "请审查以下技术设计，识别潜在问题和改进建议:\n\n{design_content}",
-  cd: "{project_root}",
-  sandbox: "read-only"
-})
-```
+For complex designs, invoke `skill("collaborating-with-codex")` for validation.
 
 ### Step 4: Write tasks.md
 

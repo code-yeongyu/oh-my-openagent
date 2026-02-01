@@ -19,8 +19,10 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
     "Write design.md and tasks.md after brainstorming is complete",
   "dispatching-parallel-agents":
     "Use when facing 2+ independent tasks that can be worked on in parallel",
-  "codex-mcp-collaboration":
-    "Enforce Codex MCP collaboration at analysis, prototype-before-code, and post-change review",
+  "collaborating-with-codex":
+    "Delegate coding tasks to Codex CLI for prototyping, debugging, and code review",
+  "collaborating-with-gemini":
+    "Delegate coding tasks to Gemini CLI for prototyping, debugging, and code review",
   "verification-before-completion":
     "Verify deliverables meet acceptance criteria before handoff",
   "finishing-a-development-branch":

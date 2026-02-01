@@ -223,7 +223,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   ultrabrain: {
     model: "openai/gpt-5.2-codex",
     variant: "xhigh",
-    defaultSkills: ["systematic-debugging", "codex-mcp-collaboration"],
+    defaultSkills: ["systematic-debugging", "collaborating-with-codex"],
   },
   artistry: {
     model: "google/gemini-3-pro",
@@ -300,7 +300,7 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
  */
 export const AGENT_DEFAULT_SKILLS: Record<string, string[]> = {
   // Metis: Pre-planning analysis - needs brainstorming for requirements exploration
-  "Metis (Plan Consultant)": ["brainstorming", "codex-mcp-collaboration"],
+  "Metis (Plan Consultant)": ["brainstorming", "collaborating-with-codex"],
   // Prometheus: Planning - needs brainstorming FIRST, then creating-changes
   "Prometheus (Planner)": ["brainstorming", "creating-changes", "dispatching-parallel-agents"],
   "Momus (Plan Reviewer)": ["verification-before-completion"],

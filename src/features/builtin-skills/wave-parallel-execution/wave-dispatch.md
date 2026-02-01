@@ -52,9 +52,9 @@ const wavePromises = waves.map(wave =>
 2. Use subagent-driven-development skill
 3. Execute tasks in order: ${wave.tasks.map(t => t.id).join(' → ')}
 4. For each task:
-   - Pre-Implementation: Codex prototype
+   - Pre-Implementation: Call `skill("collaborating-with-codex")` for prototype
    - Implementation: Follow plan exactly
-   - Post-Implementation: Codex review
+   - Post-Implementation: Call `skill("collaborating-with-codex")` for review
    - Checkpoint: git commit with "checkpoint: Task {id}: {desc}"
 5. Report completion with all checkpoint SHAs
 

@@ -1,0 +1,14 @@
+{
+  "name": "fix-findings-overwrite-and-lsp",
+  "strategy": "keep",
+  "commit": "a1170beffd509096efeb35e04daceb6e3ff5de29",
+  "files": [
+    "src/features/background-agent/manager.ts",
+    "src/hooks/atlas/index.test.ts",
+    "src/hooks/atlas/index.ts",
+    "src/index.ts"
+  ],
+  "timestamp": "2026-02-01T15:20:00Z",
+  "build": "success",
+  "diagnostics": "skipped (lsp server missing, verified via tsc during build)"
+}

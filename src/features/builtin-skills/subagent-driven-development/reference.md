@@ -7,16 +7,15 @@
 - **主 Agent (Claude Code)**: 总体协调、架构决策
 - **Subagent (Codex)**: 具体代码实现、单元测试编写
 
-### 调用时机
+### 调用方式
 
-1. 分配具体编码任务给 Codex
-2. 获取实现后进行整合和审查
+调用 `skill("collaborating-with-codex")` 即可，skill 会指导如何与 Codex 协作。
 
 ### 注意事项
 
 - Codex 仅提供参考，需独立判断
 - 可以质疑 Codex 的建议
-- 始终使用 `sandbox: "read-only"`
+- 默认使用 read-only 模式
 
 ## Session Management
 

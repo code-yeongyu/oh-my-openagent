@@ -42,18 +42,4 @@ The system performs static analysis to detect:
 5. Refine and integrate implementation
 6. Request Codex review
 
-```typescript
-// Step 1: Generate test
-mcp_codex_codex({
-  PROMPT: "为以下功能生成单元测试:\n\n{specification}",
-  cd: "{project}",
-  sandbox: "read-only"
-})
-
-// Step 2: Generate implementation
-mcp_codex_codex({
-  PROMPT: "实现以下函数使测试通过:\n\n{test_code}",
-  cd: "{project}",
-  sandbox: "read-only"
-})
-```
+调用 `skill("collaborating-with-codex")` 即可，skill 会指导如何与 Codex 协作。

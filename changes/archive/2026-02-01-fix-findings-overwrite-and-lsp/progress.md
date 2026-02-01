@@ -1,0 +1,3 @@
+- [x] Fix contradictory prompt in `src/hooks/sisyphus-junior-notepad/constants.ts`
+- [x] Verify changes with typecheck
+- [x] Update findings and progress logs
