@@ -15,18 +15,18 @@ type RemoteMcpConfig = {
 }
 
 export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpenCodeConfig) {
-  const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
-    websearch: createWebsearchConfig(config?.websearch),
-    context7,
-    grep_app,
-  }
-
   const mcps: Record<string, RemoteMcpConfig> = {}
 
-  for (const [name, mcp] of Object.entries(allBuiltinMcps)) {
-    if (!disabledMcps.includes(name)) {
-      mcps[name] = mcp
-    }
+  if (!disabledMcps.includes("websearch")) {
+    mcps.websearch = createWebsearchConfig(config?.websearch)
+  }
+
+  if (!disabledMcps.includes("context7")) {
+    mcps.context7 = context7
+  }
+
+  if (!disabledMcps.includes("grep_app")) {
+    mcps.grep_app = grep_app
   }
 
   return mcps

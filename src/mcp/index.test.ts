@@ -83,4 +83,22 @@ describe("createBuiltinMcps", () => {
     expect(result).toHaveProperty("grep_app")
     expect(Object.keys(result)).toHaveLength(3)
   })
+
+  test("should not throw when websearch disabled even if tavily configured without API key", () => {
+    // given
+    const originalTavilyKey = process.env.TAVILY_API_KEY
+    delete process.env.TAVILY_API_KEY
+    const disabledMcps = ["websearch"]
+    const config = { websearch: { provider: "tavily" as const } }
+
+    // when
+    const createMcps = () => createBuiltinMcps(disabledMcps, config)
+
+    // then
+    expect(createMcps).not.toThrow()
+    const result = createMcps()
+    expect(result).not.toHaveProperty("websearch")
+
+    if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
+  })
 })
