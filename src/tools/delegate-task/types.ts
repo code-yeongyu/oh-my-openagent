@@ -41,6 +41,7 @@ export interface DelegateTaskToolOptions {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  disabledSkills?: Set<string>
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
 }
 
