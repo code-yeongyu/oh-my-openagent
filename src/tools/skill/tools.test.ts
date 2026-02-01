@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
@@ -50,11 +51,15 @@ function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown
   }
 }
 
-const mockContext = {
+const mockContext: ToolContext = {
   sessionID: "test-session",
   messageID: "msg-1",
   agent: "test-agent",
+  directory: "/test",
+  worktree: "/test",
   abort: new AbortController().signal,
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("skill tool - synchronous description", () => {
