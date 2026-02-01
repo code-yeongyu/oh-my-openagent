@@ -73,6 +73,7 @@ import {
   interactive_bash,
   startTmuxCheck,
   lspManager,
+  createTask,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
@@ -419,6 +420,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     modelCacheState,
   });
 
+  const newTaskSystemEnabled = pluginConfig.new_task_system_enabled ?? false;
+  const taskTool = newTaskSystemEnabled ? createTask(pluginConfig) : null;
+
   return {
     tool: {
       ...builtinTools,
@@ -430,6 +434,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,
       interactive_bash,
+      ...(taskTool ? { task: taskTool } : {}),
     },
 
     "chat.message": async (input, output) => {
