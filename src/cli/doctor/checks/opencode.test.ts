@@ -1,6 +1,4 @@
 import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
-import { join } from "node:path"
-import { homedir } from "node:os"
 import * as opencode from "./opencode"
 import { MIN_OPENCODE_VERSION } from "../constants"
 
