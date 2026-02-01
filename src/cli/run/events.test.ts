@@ -17,7 +17,7 @@ async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
 
 describe("serializeError", () => {
   it("returns 'Unknown error' for null/undefined", () => {
-    // given / #when / #then
+    // given / when / then
     expect(serializeError(null)).toBe("Unknown error")
     expect(serializeError(undefined)).toBe("Unknown error")
   })
@@ -26,12 +26,12 @@ describe("serializeError", () => {
     // given
     const error = new Error("Something went wrong")
 
-    // when / #then
+    // when / then
     expect(serializeError(error)).toBe("Something went wrong")
   })
 
   it("returns string as-is", () => {
-    // given / #when / #then
+    // given / when / then
     expect(serializeError("Direct error message")).toBe("Direct error message")
   })
 
@@ -39,7 +39,7 @@ describe("serializeError", () => {
     // given
     const errorObj = { message: "Object error message", code: "ERR_001" }
 
-    // when / #then
+    // when / then
     expect(serializeError(errorObj)).toBe("Object error message")
   })
 
@@ -47,7 +47,7 @@ describe("serializeError", () => {
     // given
     const errorObj = { error: { message: "Nested error message" } }
 
-    // when / #then
+    // when / then
     expect(serializeError(errorObj)).toBe("Nested error message")
   })
 
@@ -55,7 +55,7 @@ describe("serializeError", () => {
     // given
     const errorObj = { data: { message: "Data error message" } }
 
-    // when / #then
+    // when / then
     expect(serializeError(errorObj)).toBe("Data error message")
   })
 
@@ -74,7 +74,7 @@ describe("serializeError", () => {
 
 describe("createEventState", () => {
   it("creates initial state with correct defaults", () => {
-    // given / #when
+    // given / when
     const state = createEventState()
 
     // then

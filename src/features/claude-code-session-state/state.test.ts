@@ -48,7 +48,7 @@ describe("claude-code-session-state", () => {
     test("should return undefined for unknown session", () => {
       // given - no session set
 
-      // when / #then
+      // when / then
       expect(getSessionAgent("unknown-session")).toBeUndefined()
     })
   })
@@ -121,7 +121,7 @@ describe("claude-code-session-state", () => {
       // given - session exists but no agent set (the bug)
       const sessionID = "test-prometheus-session"
 
-      // when / #then - this is the bug: agent is undefined
+      // when / then - this is the bug: agent is undefined
       expect(getSessionAgent(sessionID)).toBeUndefined()
     })
   })
