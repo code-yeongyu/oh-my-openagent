@@ -127,13 +127,16 @@ export async function executeBackgroundContinuation(
     return `Background task continued.
 
 Task ID: ${task.id}
-Session ID: ${task.sessionID}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-Use \`background_output\` with task_id="${task.id}" to check progress.`
+Use \`background_output\` with task_id="${task.id}" to check progress.
+
+<task_metadata>
+session_id: ${task.sessionID}
+</task_metadata>`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
@@ -277,14 +280,13 @@ export async function executeSyncContinuation(
 
   return `Task continued and completed in ${duration}.
 
-Session ID: ${args.session_id}
-
 ---
 
 ${textContent || "(No text output)"}
 
----
-To continue this session: session_id="${args.session_id}"`
+<task_metadata>
+session_id: ${args.session_id}
+</task_metadata>`
 }
 
 export async function executeUnstableAgentTask(
@@ -311,6 +313,7 @@ export async function executeUnstableAgentTask(
       model: categoryModel,
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
+      category: args.category,
     })
 
     const WAIT_FOR_SESSION_INTERVAL_MS = 100
@@ -408,7 +411,6 @@ Your run_in_background=false was automatically converted to background mode for 
 
 Duration: ${duration}
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
-Session ID: ${sessionID}
 
 MONITORING INSTRUCTIONS:
 - The task was monitored and completed successfully
@@ -422,8 +424,9 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
----
-To continue this session: session_id="${sessionID}"`
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch monitored background task",
@@ -457,6 +460,7 @@ export async function executeBackgroundTask(
       model: categoryModel,
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
+      category: args.category,
     })
 
     ctx.metadata?.({
@@ -476,13 +480,15 @@ export async function executeBackgroundTask(
     return `Background task launched.
 
 Task ID: ${task.id}
-Session ID: ${task.sessionID}
 Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
 System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-To continue this session: session_id="${task.sessionID}"`
+
+<task_metadata>
+session_id: ${task.sessionID}
+</task_metadata>`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
@@ -517,7 +523,7 @@ export async function executeSyncTask(
     const createResult = await client.session.create({
       body: {
         parentID: parentContext.sessionID,
-        title: `Task: ${args.description}`,
+        title: `${args.description} (@${agentToUse} subagent)`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
@@ -715,14 +721,14 @@ export async function executeSyncTask(
     return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
-Session ID: ${sessionID}
 
 ---
 
 ${textContent || "(No text output)"}
 
----
-To continue this session: session_id="${sessionID}"`
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
   } catch (error) {
     if (toastManager && taskId !== undefined) {
       toastManager.removeTask(taskId)

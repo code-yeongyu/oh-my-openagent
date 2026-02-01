@@ -138,6 +138,7 @@ export class BackgroundManager {
       parentModel: input.parentModel,
       parentAgent: input.parentAgent,
       model: input.model,
+      category: input.category,
     }
 
     this.tasks.set(task.id, task)
@@ -231,7 +232,7 @@ export class BackgroundManager {
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
-        title: `Background: ${input.description}`,
+        title: `${input.description} (@${input.agent} subagent)`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
