@@ -40,11 +40,13 @@ export function createInstinctLearnerHook(options: InstinctLearnerOptions = {}) 
       output: { title: string; output: string; metadata: unknown }
     ): Promise<void> => {
       try {
-        // Detect if this call was a failure
+        // Detect if this call was a failure - guard against undefined output
+        const outputText = output.output ?? ""
+        const outputLower = outputText.toLowerCase()
         const isFailure =
-          output.output.toLowerCase().includes("error") ||
-          output.output.toLowerCase().includes("failed") ||
-          output.output.toLowerCase().includes("could not")
+          outputLower.includes("error") ||
+          outputLower.includes("failed") ||
+          outputLower.includes("could not")
 
         // Record the tool call for pattern tracking
         detector.recordToolCall(input.sessionID, input.tool, !isFailure, output.metadata)

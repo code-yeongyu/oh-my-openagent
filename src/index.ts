@@ -34,6 +34,7 @@ import {
   createAtlasHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
+  createNotepadWriteGuardHook,
   createQuestionLabelTruncatorHook,
   // TDD Guard hook
   createTddGuardHook,
@@ -255,6 +256,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createSisyphusJuniorNotepadHook(ctx)
     : null;
 
+  const notepadWriteGuard = isHookEnabled("notepad-write-guard")
+    ? createNotepadWriteGuardHook(ctx)
+    : null;
+
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
 
   // TDD Guard hook - enforces Test-Driven Development
@@ -391,13 +396,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const observerDetector = isHookEnabled("observer-detector")
     ? createObserverDetectorHook({
         delegateTask: async (args) => {
-          return ctx.client.session.prompt({
-            path: { id: getMainSessionID() || "" },
-            body: {
-              parts: [{ type: "text", text: args.prompt }],
-            },
-            query: { directory: ctx.directory },
+          // Use backgroundManager to launch a detached task
+          // This prevents polluting the main session with observer prompts
+          const task = await backgroundManager.launch({
+            description: "Observer Analysis",
+            prompt: args.prompt,
+            agent: args.subagent_type || "sisyphus-junior",
+            skills: [],
+            parentSessionID: getMainSessionID() || "global",
+            parentMessageID: "hook:observer-detector",
           });
+          return task;
         },
       })
     : null;
@@ -700,6 +709,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await codebaseAssessment?.["tool.execute.before"]?.(input, output);
       await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
+      await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
       await instinctTrigger?.["tool.execute.before"]?.(input, output);
       await planUpdateReminder?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);

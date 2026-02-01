@@ -45,9 +45,9 @@ export function createObservationRecorderHook() {
         session: sessionID,
       }
 
-      // Handle input/output data
-      const dataStr = typeof data === "string" ? data : JSON.stringify(data)
-      const truncated = dataStr.slice(0, 5000)
+      // Handle input/output data - guard against undefined
+      const dataStr = typeof data === "string" ? data : (data !== undefined ? JSON.stringify(data) : "")
+      const truncated = (dataStr ?? "").slice(0, 5000)
       
       if (event === "tool_start") {
         observation.input = truncated

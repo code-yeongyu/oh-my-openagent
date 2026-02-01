@@ -54,6 +54,9 @@
   },
   "homepage": "https://github.com/code-yeongyu/oh-my-opencode#readme",
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.34",
+    "@ai-sdk/google": "^3.0.19",
+    "@ai-sdk/openai": "^3.0.24",
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^0.11.0",

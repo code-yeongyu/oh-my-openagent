@@ -189,7 +189,7 @@ Every \`delegate_task()\` prompt MUST include ALL 6 sections:
 ## 4. MUST DO
 - Follow pattern in [reference file:lines]
 - Write tests for [specific cases]
-- Append findings to notepad (never overwrite)
+- Use Edit tool to APPEND findings to notepad (NEVER use Write on existing files)
 
 ## 5. MUST NOT DO
 - Do NOT modify files outside [scope]

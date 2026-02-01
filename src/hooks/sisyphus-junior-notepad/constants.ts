@@ -8,7 +8,12 @@ NOTEPAD PATH: changes/{plan-name}/findings.md
 - Append all learnings to this single file
 
 You SHOULD append findings to the notepad file after completing work.
-IMPORTANT: Always APPEND to notepad files - never overwrite or use Edit tool.
+IMPORTANT: Always use Edit tool to APPEND content to findings.md and progress.md.
+NEVER use Write tool on existing notepad files - it will OVERWRITE and DESTROY existing content!
+
+After completing each Task:
+1. Use Edit to append findings to findings.md
+2. Use Edit to append progress to progress.md
 
 ## Plan Location (READ ONLY)
 PLAN PATH: changes/{plan-name}/tasks.md

@@ -645,6 +645,17 @@ delegate_task(
 )
 \`\`\`
 
+## Batch Writing Protocol (CRITICAL)
+
+To prevent \`AI_TypeValidationError\` and stream errors caused by large file writes, you MUST write the \`tasks.md\` file in batches:
+
+1. **Write the Skeleton First**: Create the initial file with the title, context sections (Original Request, Interview Summary, Research Findings), and phase headers.
+2. **Append Tasks Incrementally**: Use the \`Edit\` tool to append each Task/TODO one at a time. Do NOT attempt to write 50 TODOs in a single \`Write\` call.
+3. **Preserve Context**: Ensure each task entry includes relevant context from the proposal or design so the executor has all necessary information.
+4. **Iterative Progress**: This batch approach ensures stability and avoids session-crashing validation errors for large plans.
+
+Remember: Large file writes = Crash. Small batch edits = Success.
+
 ## Post-Metis: Auto-Generate Plan and Summarize
 
 After receiving Metis's analysis, **DO NOT ask additional questions**. Instead:

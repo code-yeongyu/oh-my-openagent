@@ -303,65 +303,20 @@ NEVER stop at first result - be exhaustive.`,
     pattern:
       /\b(analyze|analyse|investigate|examine|research|study|deep[\s-]?dive|inspect|audit|evaluate|assess|review|diagnose|scrutinize|dissect|debug|comprehend|interpret|breakdown|understand)\b|why\s+is|how\s+does|how\s+to|분석|조사|파악|연구|검토|진단|이해|설명|원인|이유|뜯어봐|따져봐|평가|해석|디버깅|디버그|어떻게|왜|살펴|分析|調査|解析|検討|研究|診断|理解|説明|検証|精査|究明|デバッグ|なぜ|どう|仕組み|调查|检查|剖析|深入|诊断|解释|调试|为什么|原理|搞清楚|弄明白|phân tích|điều tra|nghiên cứu|kiểm tra|xem xét|chẩn đoán|giải thích|tìm hiểu|gỡ lỗi|tại sao/i,
     message: `[analyze-mode]
-ANALYSIS MODE. Gather context before diving deep:
-
-CONTEXT GATHERING (parallel):
-- 1-2 explore agents (codebase patterns, implementations)
-- 1-2 librarian agents (if external library involved)
-- Direct tools: Grep, AST-grep, LSP for targeted searches
-
-IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
-- Consult oracle for strategic guidance
-
-SYNTHESIZE findings before proceeding.`,
+ANALYSIS MODE ACTIVATED. Gather context via parallel agents. For complex debugging, invoke skill("systematic-debugging").`,
   },
   // BRAINSTORM: EN/KO/JP/CN/VN - Triggers brainstorming skill for design work
   {
     pattern:
       /\b(brainstorm|brain\s*storm|ideate|design|architect|plan\s+out|sketch\s+out|draft|propose|prototype|conceptualize|envision|blueprint|whiteboard|spitball)ing?\b|let'?s\s+(build|create|make|develop|implement)|build\s+a|create\s+a|make\s+a|add\s+(a\s+)?(new|feature)|new\s+feature|头脑风暴|脑暴|设计|构思|规划|方案|草拟|브레인스토밍|아이디어|설계|구상|기획|ブレスト|ブレインストーミング|設計|構想|企画|アイデア出し|動腦|腦力激盪|構思|đột phá|ý tưởng|thiết kế|phác thảo/i,
     message: `[brainstorm-mode]
-DESIGN MODE ACTIVATED. Before implementing, use the brainstorming skill.
-
-**MANDATORY**: Invoke skill("brainstorming") NOW.
-
-This skill will guide you through:
-1. Understanding the idea (ask clarifying questions)
-2. Exploring 2-3 approaches with trade-offs
-3. Presenting the design incrementally
-4. Creating changes/<name>/proposal.md
-
-DO NOT skip to implementation. Design first, code second.
-
-After brainstorming → use skill("creating-changes") to write design.md and tasks.md.`,
+DESIGN MODE ACTIVATED. Invoke skill("brainstorming") for detailed instructions.`,
   },
   // CONSULT-METIS: Complex/ambiguous requests that need pre-planning analysis (Task 10.2)
   {
     pattern:
       /\b(refactor|restructure|migrate|overhaul|rewrite|rearchitect|redesign|revamp|modernize|upgrade|consolidate)(ing)?\b|\b(complex|complicated|tricky|nuanced|subtle|intricate|elaborate|multifaceted)\b.*\b(task|feature|system|module|change)\b|\b(not\s+sure|unclear|ambiguous|vague|open[\s-]?ended|undefined|flexible|depends)\b.*\b(how|what|which|where|scope|approach|strategy)\b|what\s+should\s+(i|we)\s+(do|build|implement|change)|how\s+should\s+(i|we)\s+(approach|handle|structure|organize)|i'?m\s+not\s+sure\s+(how|what|if)|need\s+(help|guidance|advice)\s+(with|on|for)\s+(planning|scoping|defining)|clarify.*requirements|define.*scope|scope.*unclear|리팩토링|리팩터|재구성|재설계|마이그레이션|복잡한|애매한|범위|어떻게|リファクタリング|再構築|移行|複雑|曖昧|スコープ|どうすれば|重构|迁移|复杂|模糊|范围|怎么/i,
     message: `[consult-metis-mode]
-COMPLEX/AMBIGUOUS REQUEST DETECTED. Consider consulting Metis (Plan Consultant) first.
-
-**RECOMMENDATION**: Before planning, use Metis to:
-1. Classify intent (Refactoring, Build, Mid-sized, Collaborative, Architecture, Research)
-2. Identify hidden requirements and ambiguities
-3. Prevent AI over-engineering patterns
-4. Generate clarifying questions for the user
-
-**HOW TO USE**:
-\`\`\`
-sisyphus_task(
-  subagent_type="Metis (Plan Consultant)",
-  prompt="Analyze this request and prepare directives for planning:
-  
-  User request: [paste user's request]
-  
-  Identify: intent type, hidden requirements, ambiguities, AI-slop risks.
-  Output: Questions for user + Directives for Prometheus."
-)
-\`\`\`
-
-**WHEN TO SKIP**: Simple, well-defined tasks with clear scope and acceptance criteria.
-
-Metis → Prometheus → Momus is the recommended planning flow for non-trivial work.`,
+COMPLEX/AMBIGUOUS REQUEST DETECTED. Invoke Metis (Plan Consultant) to resolve ambiguity and identify requirements before planning.`,
   },
 ]

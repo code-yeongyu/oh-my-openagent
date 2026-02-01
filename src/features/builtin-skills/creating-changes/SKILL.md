@@ -108,6 +108,10 @@ Key sections:
 
 **2-Action Rule:** After every 2 browser/view operations, save findings to this file.
 
+**IMPORTANT: Use Edit to APPEND**
+- When updating findings.md during execution, ALWAYS use Edit tool to APPEND content
+- NEVER use Write tool on existing findings.md - it will OVERWRITE and DESTROY existing content
+
 ### Step 6: Write progress.md
 
 Create `changes/<name>/progress.md` to track execution progress.
@@ -119,6 +123,10 @@ Key sections:
 - Test Results (pass/fail status)
 - Error Log (issues encountered)
 - 5-Question Reboot Check (for session recovery)
+
+**IMPORTANT: Use Edit to APPEND**
+- When updating progress.md during execution, ALWAYS use Edit tool to APPEND content
+- NEVER use Write tool on existing progress.md - it will OVERWRITE and DESTROY existing content
 
 ### Step 7: Update Status
 

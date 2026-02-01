@@ -71,7 +71,7 @@ export function createObserverDetectorHook(options: ObserverDetectorHookOptions 
           delegateTask({
             subagent_type: "observer",
             run_in_background: true,
-            prompt: `Analyze the last 20 tool calls for patterns, anomalies, or inefficiencies.\n\n${summary}\n\nLook for:\n- Repeated tool calls that might indicate loops\n- Failure patterns that suggest issues\n- Opportunities to optimize tool usage`,
+            prompt: `Analyze the last 20 tool calls for patterns, anomalies, or inefficiencies.\n\n${summary}\n\nLook for:\n- Repeated tool calls that might indicate loops\n- Failure patterns that suggest issues\n- Opportunities to optimize tool usage\n\nREQUIRED ACTION:\nIf you find actionable insights, you MUST use the 'write' tool to append them to:\n'.sisyphus/instincts/observations.md'\n\nFormat:\n## Observation [YYYY-MM-DD HH:mm]\n- **Pattern**: [Description]\n- **Recommendation**: [Actionable advice]`,
           }).catch((err) => {
             log(
               `[observer-detector] L2 analysis dispatch failed: ${err instanceof Error ? err.message : String(err)}`,

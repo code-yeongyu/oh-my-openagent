@@ -70,6 +70,7 @@ export type BuiltinAgentName =
   | "momus"
   | "atlas"
   | "prometheus"
+  | "observer"
 
 export type OverridableAgentName =
   | "build"

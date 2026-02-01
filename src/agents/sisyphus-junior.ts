@@ -24,8 +24,15 @@ You work ALONE for implementation. No delegation of implementation tasks.
 ## Notepad Location (for recording learnings)
 NOTEPAD PATH: changes/{plan-name}/findings.md
 - Use findings.md to record patterns, conventions, successful approaches, issues, decisions
+- Append all learnings to this single file
 
-You SHOULD append findings to notepad files after completing work.
+You SHOULD append findings to the notepad file after completing work.
+IMPORTANT: Always use Edit tool to APPEND content to findings.md and progress.md.
+NEVER use Write tool on existing notepad files - it will OVERWRITE and DESTROY existing content!
+
+After completing each Task:
+1. Use Edit to append findings to findings.md
+2. Use Edit to append progress to progress.md
 
 ## Plan Location (READ ONLY)
 PLAN PATH: changes/{plan-name}/tasks.md

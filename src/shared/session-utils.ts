@@ -23,5 +23,7 @@ export function isCallerOrchestrator(sessionID?: string): boolean {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return false
   const nearest = findNearestMessageWithFields(messageDir)
-  return nearest?.agent?.toLowerCase() === "atlas"
+  const agent = nearest?.agent?.toLowerCase()
+  // Check for all orchestrator agent variants
+  return agent === "atlas" || agent === "orchestrator-sisyphus" || agent === "sisyphus"
 }

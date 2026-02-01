@@ -41,7 +41,34 @@ export const DEFAULT_MAX_SYMBOLS = 200
 export const DEFAULT_MAX_DIAGNOSTICS = 200
 
 export const LSP_INSTALL_HINTS: Record<string, string> = {
-  typescript: "npm install -g typescript-language-server typescript",
+  typescript: `To install:
+  npm install -g typescript-language-server typescript
+
+Alternative package managers:
+  bun install -g typescript-language-server typescript
+  pnpm add -g typescript-language-server typescript
+
+Windows notes:
+  - Ensure Node.js is in PATH
+  - May need to restart terminal after installation
+  - If using WSL, install in WSL environment
+
+Verify installation:
+  typescript-language-server --version`,
+  "typescript-language-server": `To install:
+  npm install -g typescript-language-server typescript
+
+Alternative package managers:
+  bun install -g typescript-language-server typescript
+  pnpm add -g typescript-language-server typescript
+
+Windows notes:
+  - Ensure Node.js is in PATH
+  - May need to restart terminal after installation
+  - If using WSL, install in WSL environment
+
+Verify installation:
+  typescript-language-server --version`,
   deno: "Install Deno from https://deno.land",
   vue: "npm install -g @vue/language-server",
   eslint: "npm install -g vscode-langservers-extracted",

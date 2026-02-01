@@ -728,6 +728,17 @@ export function createAtlasHook(
           return
         }
 
+        // CRITICAL: Check if current session is in boulder's session_ids
+        // This ensures Boulder continuation only triggers for sessions that started/joined the boulder
+        if (!boulderState.session_ids.includes(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: session not in boulder session_ids`, { 
+            sessionID, 
+            plan: boulderState.plan_name,
+            allowedSessions: boulderState.session_ids 
+          })
+          return
+        }
+
         if (!isCallerOrchestrator(sessionID)) {
           log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
           return

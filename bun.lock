@@ -5,6 +5,9 @@
     "": {
       "name": "oh-my-opencode",
       "dependencies": {
+        "@ai-sdk/anthropic": "^3.0.34",
+        "@ai-sdk/google": "^3.0.19",
+        "@ai-sdk/openai": "^3.0.24",
         "@ast-grep/cli": "^0.40.0",
         "@ast-grep/napi": "^0.40.0",
         "@clack/prompts": "^0.11.0",
@@ -51,6 +54,16 @@
     "@code-yeongyu/comment-checker",
   ],
   "packages": {
+    "@ai-sdk/anthropic": ["@ai-sdk/anthropic@3.0.34", "", { "dependencies": { "@ai-sdk/provider": "3.0.6", "@ai-sdk/provider-utils": "4.0.12" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-xL219yXepIcQHl0iApRns0Vj/JeGI9qtLhc491cctI6G5Ipnseh3cAv8xmzy/rEndP0WiLpmyDNuEXiItrC0Xg=="],
+
+    "@ai-sdk/google": ["@ai-sdk/google@3.0.19", "", { "dependencies": { "@ai-sdk/provider": "3.0.6", "@ai-sdk/provider-utils": "4.0.12" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-/975gEaiA5oTEhX6FbeYGPqXSo2qjoAuvkzwoEfmI+3XM41UGccY3t5Ye/pAL0tSfeX37j0d1h1yppeXrreCEw=="],
+
+    "@ai-sdk/openai": ["@ai-sdk/openai@3.0.24", "", { "dependencies": { "@ai-sdk/provider": "3.0.6", "@ai-sdk/provider-utils": "4.0.12" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-f4d2z4cQpaLnCxlhL5X+/FIpA7u55eYbfCtu7hJxukav7MIQi+5uufy5OAXdCieqPnsdoiGRWaI+VTPh151mZQ=="],
+
+    "@ai-sdk/provider": ["@ai-sdk/provider@3.0.6", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-hSfoJtLtpMd7YxKM+iTqlJ0ZB+kJ83WESMiWuWrNVey3X8gg97x0OdAAaeAeclZByCX3UdPOTqhvJdK8qYA3ww=="],
+
+    "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.12", "", { "dependencies": { "@ai-sdk/provider": "3.0.6", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-sdC3eUTa5W4r/bISlF3nxmM6zc8mV7Nj3mWI9iUO0cib70h0Zr52Tz5gGzO6HcDirbKVTR2ywmZb61MHU68prA=="],
+
     "@ast-grep/cli": ["@ast-grep/cli@0.40.5", "", { "dependencies": { "detect-libc": "2.1.2" }, "optionalDependencies": { "@ast-grep/cli-darwin-arm64": "0.40.5", "@ast-grep/cli-darwin-x64": "0.40.5", "@ast-grep/cli-linux-arm64-gnu": "0.40.5", "@ast-grep/cli-linux-x64-gnu": "0.40.5", "@ast-grep/cli-win32-arm64-msvc": "0.40.5", "@ast-grep/cli-win32-ia32-msvc": "0.40.5", "@ast-grep/cli-win32-x64-msvc": "0.40.5" }, "bin": { "sg": "sg", "ast-grep": "ast-grep" } }, "sha512-yVXL7Gz0WIHerQLf+MVaVSkhIhidtWReG5akNVr/JS9OVCVkSdz7gWm7H8jVv2M9OO1tauuG76K3UaRGBPu5lQ=="],
 
     "@ast-grep/cli-darwin-arm64": ["@ast-grep/cli-darwin-arm64@0.40.5", "", { "os": "darwin", "cpu": "arm64" }, "sha512-T9CzwJ1GqQhnANdsu6c7iT1akpvTVMK+AZrxnhIPv33Ze5hrXUUkqan+j4wUAukRJDqU7u94EhXLSLD+5tcJ8g=="],
@@ -100,6 +113,8 @@
     "@opencode-ai/plugin": ["@opencode-ai/plugin@1.1.36", "", { "dependencies": { "@opencode-ai/sdk": "1.1.36", "zod": "4.1.8" } }, "sha512-b2XWeFZN7UzgwkkzTIi6qSntkpEA9En2zvpqakQzZAGQm6QBdGAlv6r1u5hEnmF12Gzyj5umTMWr5GzVbP/oAA=="],
 
     "@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.36", "", {}, "sha512-feNHWnbxhg03TI2QrWnw3Chc0eYrWSDSmHIy/ejpSVfcKlfXREw1Tpg0L4EjrpeSc4jB1eM673dh+WM/Ko2SFQ=="],
+
+    "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
     "@types/debug": ["@types/debug@4.1.12", "", { "dependencies": { "@types/ms": "*" } }, "sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ=="],
 
@@ -234,6 +249,8 @@
     "jose": ["jose@6.1.3", "", {}, "sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ=="],
 
     "js-yaml": ["js-yaml@4.1.1", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA=="],
+
+    "json-schema": ["json-schema@0.4.0", "", {}, "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA=="],
 
     "json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
 
