@@ -54,7 +54,7 @@ Run agents in the background and continue working:
 
 ```
 # Launch in background
-delegate_task(agent="explore", background=true, prompt="Find auth implementations")
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find auth implementations", run_in_background=true)
 
 # Continue working...
 # System notifies on completion
