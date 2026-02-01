@@ -35,3 +35,4 @@ export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
 export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
+export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
