@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 
 describe("look-at tool", () => {
@@ -92,11 +93,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -130,11 +135,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -186,11 +195,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       await tool.execute(
