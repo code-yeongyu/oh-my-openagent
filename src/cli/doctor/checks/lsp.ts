@@ -13,6 +13,7 @@ const DEFAULT_LSP_SERVERS: Array<{
 ]
 
 import { isServerInstalled } from "../../../tools/lsp/config"
+import { LSP_INSTALL_HINTS } from "../../../tools/lsp/constants"
 
 export async function getLspServersInfo(): Promise<LspServerInfo[]> {
   const servers: LspServerInfo[] = []
@@ -48,15 +49,22 @@ export async function checkLspServers(): Promise<CheckResult> {
       message: "No LSP servers detected",
       details: [
         "LSP tools will have limited functionality",
-        ...missingServers.map((s) => `Missing: ${s.id}`),
+        ...missingServers.map((s) => {
+          const hint = LSP_INSTALL_HINTS[s.id] || LSP_INSTALL_HINTS[s.id.split("-")[0]]
+          return `Missing: ${s.id}${hint ? `\nHint: ${hint}` : ""}`
+        }),
       ],
     }
   }
 
   const details = [
     ...installedServers.map((s) => `Installed: ${s.id}`),
-    ...missingServers.map((s) => `Not found: ${s.id} (optional)`),
+    ...missingServers.map((s) => {
+      const hint = LSP_INSTALL_HINTS[s.id] || LSP_INSTALL_HINTS[s.id.split("-")[0]]
+      return `Not found: ${s.id} (optional)${hint ? `\nHint: ${hint}` : ""}`
+    }),
   ]
+
 
   return {
     name: CHECK_NAMES[CHECK_IDS.LSP_SERVERS],
