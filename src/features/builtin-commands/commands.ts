@@ -27,7 +27,7 @@ ${RALPH_LOOP_TEMPLATE}
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
    },
    "ulw-loop": {
      description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
@@ -38,7 +38,7 @@ ${RALPH_LOOP_TEMPLATE}
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]',
    },
   "cancel-ralph": {
     description: "(builtin) Cancel active Ralph Loop",

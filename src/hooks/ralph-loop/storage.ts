@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import type { RalphLoopState } from "./types"
 import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
+import type { ContextStrategy } from "../../config"
 
 export function getStateFilePath(directory: string, customPath?: string): string {
   return customPath
@@ -40,6 +41,11 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       return str.replace(/^["']|["']$/g, "")
     }
 
+    const parseStrategy = (val: unknown): ContextStrategy | undefined => {
+      if (val === "reset" || val === "continue") return val
+      return undefined
+    }
+
     return {
       active: isActive,
       iteration: iterationNum,
@@ -49,6 +55,7 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork: data.ultrawork === true || data.ultrawork === "true" ? true : undefined,
+      strategy: parseStrategy(data.strategy),
     }
   } catch {
     return null
@@ -70,13 +77,14 @@ export function writeState(
 
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
+    const strategyLine = state.strategy ? `strategy: "${state.strategy}"\n` : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}---
+${sessionIdLine}${ultraworkLine}${strategyLine}---
 ${state.prompt}
 `
 

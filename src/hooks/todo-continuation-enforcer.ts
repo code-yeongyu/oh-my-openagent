@@ -10,6 +10,7 @@ import {
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { readState as readRalphLoopState } from "./ralph-loop"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -19,6 +20,8 @@ export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  directory?: string
+  ralphLoopStateDir?: string
 }
 
 export interface TodoContinuationEnforcer {
@@ -97,7 +100,13 @@ export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
 ): TodoContinuationEnforcer {
-  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS, isContinuationStopped } = options
+  const { 
+    backgroundManager, 
+    skipAgents = DEFAULT_SKIP_AGENTS, 
+    isContinuationStopped,
+    directory,
+    ralphLoopStateDir,
+  } = options
   const sessions = new Map<string, SessionState>()
 
   function getState(sessionID: string): SessionState {
@@ -349,6 +358,14 @@ ${todoList}`
       if (hasRunningBgTasks) {
         log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
         return
+      }
+
+      if (directory) {
+        const ralphLoopState = readRalphLoopState(directory, ralphLoopStateDir)
+        if (ralphLoopState?.active) {
+          log(`[${HOOK_NAME}] Skipped: ralph-loop is active`, { sessionID, ralphLoopSessionID: ralphLoopState.session_id })
+          return
+        }
       }
 
       // Check 2: API-based abort detection (fallback, for cases where event was missed)

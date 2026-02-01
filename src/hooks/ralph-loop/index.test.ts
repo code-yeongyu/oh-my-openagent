@@ -232,9 +232,9 @@ describe("ralph-loop", () => {
     })
 
     test("should inject continuation when loop active and no completion detected", async () => {
-      // #given - active loop state with context_strategy: continue to preserve session
+      // #given - active loop state with default_strategy: continue to preserve session
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 100, context_strategy: "continue" },
+        config: { enabled: true, default_max_iterations: 100, default_strategy: "continue" },
       })
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
@@ -529,9 +529,9 @@ describe("ralph-loop", () => {
     })
 
     test("should handle multiple iterations correctly", async () => {
-      // #given - active loop with context_strategy: continue
+      // #given - active loop with default_strategy: continue
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 100, context_strategy: "continue" },
+        config: { enabled: true, default_max_iterations: 100, default_strategy: "continue" },
       })
       hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
 
@@ -663,9 +663,9 @@ describe("ralph-loop", () => {
     })
 
     test("should allow starting new loop while previous loop is active (different session)", async () => {
-      // #given - active loop in session A with context_strategy: continue
+      // #given - active loop in session A with default_strategy: continue
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 100, context_strategy: "continue" },
+        config: { enabled: true, default_max_iterations: 100, default_strategy: "continue" },
       })
       hook.startLoop("session-A", "First task", { maxIterations: 10 })
       expect(hook.getState()?.session_id).toBe("session-A")
@@ -696,9 +696,9 @@ describe("ralph-loop", () => {
     })
 
     test("should allow starting new loop in same session (restart)", async () => {
-      // #given - active loop in session A at iteration 5 with context_strategy: continue
+      // #given - active loop in session A at iteration 5 with default_strategy: continue
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 100, context_strategy: "continue" },
+        config: { enabled: true, default_max_iterations: 100, default_strategy: "continue" },
       })
       hook.startLoop("session-A", "First task", { maxIterations: 10 })
       
@@ -958,9 +958,9 @@ Original task: Build something`
     })
   })
 
-  describe("context_strategy", () => {
-    test("should create new session when context_strategy is 'reset' (default)", async () => {
-      // #given - hook with default context_strategy (reset)
+  describe("default_strategy", () => {
+    test("should create new session when default_strategy is 'reset' (default)", async () => {
+      // #given - hook with default strategy (reset)
       const hook = createRalphLoopHook(createMockPluginInput(), {
         config: { enabled: true, default_max_iterations: 10 },
       })
@@ -980,10 +980,10 @@ Original task: Build something`
       expect(hook.getState()?.session_id).toBe("created-session-new")
     })
 
-    test("should keep same session when context_strategy is 'continue'", async () => {
-      // #given - hook with context_strategy: continue
+    test("should keep same session when default_strategy is 'continue'", async () => {
+      // #given - hook with default_strategy: continue
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 10, context_strategy: "continue" },
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "continue" },
       })
       hook.startLoop("session-123", "Build something")
 
@@ -1002,10 +1002,10 @@ Original task: Build something`
     })
 
     test("should continue with original session if reset/create fails", async () => {
-      // #given - hook with context_strategy: reset but create fails
+      // #given - hook with default_strategy: reset but create fails
       mockCreateResult = { data: undefined }
       const hook = createRalphLoopHook(createMockPluginInput(), {
-        config: { enabled: true, default_max_iterations: 10, context_strategy: "reset" },
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "reset" },
       })
       hook.startLoop("session-123", "Build something")
 
@@ -1019,6 +1019,23 @@ Original task: Build something`
       expect(promptCalls[0].sessionID).toBe("session-123")
       // #then - state retains original session ID
       expect(hook.getState()?.session_id).toBe("session-123")
+    })
+
+    test("should allow overriding strategy via startLoop option", async () => {
+      // #given - hook with default_strategy: reset, but startLoop overrides to continue
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "reset" },
+      })
+      hook.startLoop("session-123", "Build something", { strategy: "continue" })
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - no create called because strategy was overridden to continue
+      expect(createCalls.length).toBe(0)
+      expect(promptCalls[0].sessionID).toBe("session-123")
     })
   })
 })

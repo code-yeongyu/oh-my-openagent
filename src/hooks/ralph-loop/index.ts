@@ -8,9 +8,10 @@ import {
   HOOK_NAME,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_COMPLETION_PROMISE,
-  DEFAULT_CONTEXT_STRATEGY,
+  DEFAULT_STRATEGY,
 } from "./constants"
 import type { RalphLoopState, RalphLoopOptions } from "./types"
+import type { ContextStrategy } from "../../config"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
@@ -44,9 +45,7 @@ interface OpenCodeSessionMessage {
   }>
 }
 
-const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
-
-Your previous attempt did not output the completion promise. Continue working on the task.
+const CONTINUATION_PROMPT_BASE = `Your previous attempt did not output the completion promise. Continue working on the task.
 
 IMPORTANT:
 - Review your progress so far
@@ -57,12 +56,25 @@ IMPORTANT:
 Original task:
 {{PROMPT}}`
 
+/**
+ * Generates the continuation prompt with appropriate prefix based on context strategy.
+ * - "reset": Uses plain prefix to allow keyword detection (new session needs mode injections)
+ * - "continue": Uses system directive prefix to skip keyword detection (mode already applied in iteration 1)
+ */
+function getContinuationPrompt(iteration: number, max: number, strategy: "reset" | "continue"): string {
+  const prefix =
+    strategy === "continue"
+      ? `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP ${iteration}/${max}]`
+      : `[RALPH LOOP - Iteration ${iteration}/${max}]`
+  return `${prefix}\n\n${CONTINUATION_PROMPT_BASE}`
+}
+
 export interface RalphLoopHook {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
+    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean; strategy?: ContextStrategy }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
@@ -162,7 +174,7 @@ export function createRalphLoopHook(
   const startLoop = (
     sessionID: string,
     prompt: string,
-    loopOptions?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
+    loopOptions?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean; strategy?: ContextStrategy }
   ): boolean => {
     const state: RalphLoopState = {
       active: true,
@@ -171,6 +183,7 @@ export function createRalphLoopHook(
         loopOptions?.maxIterations ?? config?.default_max_iterations ?? DEFAULT_MAX_ITERATIONS,
       completion_promise: loopOptions?.completionPromise ?? DEFAULT_COMPLETION_PROMISE,
       ultrawork: loopOptions?.ultrawork,
+      strategy: loopOptions?.strategy ?? config?.default_strategy ?? DEFAULT_STRATEGY,
       started_at: new Date().toISOString(),
       prompt,
       session_id: sessionID,
@@ -182,6 +195,7 @@ export function createRalphLoopHook(
         sessionID,
         maxIterations: state.max_iterations,
         completionPromise: state.completion_promise,
+        strategy: state.strategy,
       })
     }
     return success
@@ -319,10 +333,10 @@ export function createRalphLoopHook(
         max: newState.max_iterations,
       })
 
-      const contextStrategy = config?.context_strategy ?? DEFAULT_CONTEXT_STRATEGY
+      const strategy = newState.strategy ?? config?.default_strategy ?? DEFAULT_STRATEGY
       let targetSessionID = sessionID
 
-      if (contextStrategy === "reset") {
+      if (strategy === "reset") {
         try {
           log(`[${HOOK_NAME}] Creating new session for fresh context`, { sessionID })
           const createResp = await ctx.client.session.create({
@@ -363,8 +377,11 @@ export function createRalphLoopHook(
         }
       }
 
-      const continuationPrompt = CONTINUATION_PROMPT.replace("{{ITERATION}}", String(newState.iteration))
-        .replace("{{MAX}}", String(newState.max_iterations))
+      const continuationPrompt = getContinuationPrompt(
+        newState.iteration,
+        newState.max_iterations,
+        strategy
+      )
         .replace("{{PROMISE}}", newState.completion_promise)
         .replace("{{PROMPT}}", newState.prompt)
 

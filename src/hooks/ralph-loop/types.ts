@@ -1,4 +1,4 @@
-import type { RalphLoopConfig } from "../../config"
+import type { ContextStrategy, RalphLoopConfig } from "../../config"
 
 export interface RalphLoopState {
   active: boolean
@@ -9,6 +9,7 @@ export interface RalphLoopState {
   prompt: string
   session_id?: string
   ultrawork?: boolean
+  strategy?: ContextStrategy
 }
 
 export interface RalphLoopOptions {
