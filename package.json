@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.1.11",
+  "version": "3.2.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -74,13 +74,13 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.1.11",
-    "oh-my-opencode-darwin-x64": "3.1.11",
-    "oh-my-opencode-linux-arm64": "3.1.11",
-    "oh-my-opencode-linux-arm64-musl": "3.1.11",
-    "oh-my-opencode-linux-x64": "3.1.11",
-    "oh-my-opencode-linux-x64-musl": "3.1.11",
-    "oh-my-opencode-windows-x64": "3.1.11"
+    "oh-my-opencode-darwin-arm64": "3.2.0",
+    "oh-my-opencode-darwin-x64": "3.2.0",
+    "oh-my-opencode-linux-arm64": "3.2.0",
+    "oh-my-opencode-linux-arm64-musl": "3.2.0",
+    "oh-my-opencode-linux-x64": "3.2.0",
+    "oh-my-opencode-linux-x64-musl": "3.2.0",
+    "oh-my-opencode-windows-x64": "3.2.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
