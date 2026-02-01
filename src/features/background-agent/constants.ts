@@ -6,8 +6,8 @@ export const MIN_STABILITY_TIME_MS = 10 * 1000
 export const DEFAULT_STALE_TIMEOUT_MS = 180_000
 export const MIN_RUNTIME_BEFORE_STALE_MS = 30_000
 export const MIN_IDLE_TIME_MS = 5000
-export const POLLING_INTERVAL_MS = 2000
-export const TASK_CLEANUP_DELAY_MS = 5 * 60 * 1000
+export const POLLING_INTERVAL_MS = 3000
+export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000
 export const TMUX_CALLBACK_DELAY_MS = 200
 
 export type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
