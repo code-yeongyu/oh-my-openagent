@@ -3,12 +3,12 @@ import { createBuiltinSkills } from "./skills"
 
 describe("createBuiltinSkills", () => {
 	test("returns playwright skill by default", () => {
-		// #given - no options (default)
+		// given - no options (default)
 
-		// #when
+		// when
 		const skills = createBuiltinSkills()
 
-		// #then
+		// then
 		const browserSkill = skills.find((s) => s.name === "playwright")
 		expect(browserSkill).toBeDefined()
 		expect(browserSkill!.description).toContain("browser")
@@ -16,13 +16,13 @@ describe("createBuiltinSkills", () => {
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
-		// #given
+		// given
 		const options = { browserProvider: "playwright" as const }
 
-		// #when
+		// when
 		const skills = createBuiltinSkills(options)
 
-		// #then
+		// then
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		expect(playwrightSkill).toBeDefined()
@@ -30,13 +30,13 @@ describe("createBuiltinSkills", () => {
 	})
 
 	test("returns agent-browser skill when browserProvider is 'agent-browser'", () => {
-		// #given
+		// given
 		const options = { browserProvider: "agent-browser" as const }
 
-		// #when
+		// when
 		const skills = createBuiltinSkills(options)
 
-		// #then
+		// then
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		expect(agentBrowserSkill).toBeDefined()
@@ -47,14 +47,14 @@ describe("createBuiltinSkills", () => {
 	})
 
 	test("agent-browser skill template is inlined (not loaded from file)", () => {
-		// #given
+		// given
 		const options = { browserProvider: "agent-browser" as const }
 
-		// #when
+		// when
 		const skills = createBuiltinSkills(options)
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
-		// #then - template should contain substantial content (inlined, not fallback)
+		// then - template should contain substantial content (inlined, not fallback)
 		expect(agentBrowserSkill!.template).toContain("## Quick start")
 		expect(agentBrowserSkill!.template).toContain("## Commands")
 		expect(agentBrowserSkill!.template).toContain("agent-browser open")
@@ -62,13 +62,13 @@ describe("createBuiltinSkills", () => {
 	})
 
 	test("always includes frontend-ui-ux and git-master skills", () => {
-		// #given - both provider options
+		// given - both provider options
 
-		// #when
+		// when
 		const defaultSkills = createBuiltinSkills()
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
-		// #then
+		// then
 		for (const skills of [defaultSkills, agentBrowserSkills]) {
 			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
@@ -76,13 +76,13 @@ describe("createBuiltinSkills", () => {
 	})
 
 	test("returns exactly 4 skills regardless of provider", () => {
-		// #given
+		// given
 
-		// #when
+		// when
 		const defaultSkills = createBuiltinSkills()
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
-		// #then
+		// then
 		expect(defaultSkills).toHaveLength(4)
 		expect(agentBrowserSkills).toHaveLength(4)
 	})

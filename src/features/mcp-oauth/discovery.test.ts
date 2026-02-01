@@ -13,7 +13,7 @@ describe("discoverOAuthServerMetadata", () => {
   })
 
   test("returns endpoints from PRM + AS discovery", () => {
-    // #given
+    // given
     const resource = "https://mcp.example.com"
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
     const authServer = "https://auth.example.com"
@@ -39,9 +39,9 @@ describe("discoverOAuthServerMetadata", () => {
     }
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
 
-    // #when
+    // when
     return discoverOAuthServerMetadata(resource).then((result) => {
-      // #then
+      // then
       expect(result).toEqual({
         authorizationEndpoint: "https://auth.example.com/authorize",
         tokenEndpoint: "https://auth.example.com/token",
@@ -53,7 +53,7 @@ describe("discoverOAuthServerMetadata", () => {
   })
 
   test("falls back to RFC 8414 when PRM returns 404", () => {
-    // #given
+    // given
     const resource = "https://mcp.example.com"
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
     const asUrl = new URL("/.well-known/oauth-authorization-server", resource).toString()
@@ -77,9 +77,9 @@ describe("discoverOAuthServerMetadata", () => {
     }
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
 
-    // #when
+    // when
     return discoverOAuthServerMetadata(resource).then((result) => {
-      // #then
+      // then
       expect(result).toEqual({
         authorizationEndpoint: "https://mcp.example.com/authorize",
         tokenEndpoint: "https://mcp.example.com/token",
@@ -91,7 +91,7 @@ describe("discoverOAuthServerMetadata", () => {
   })
 
   test("throws when both PRM and AS discovery return 404", () => {
-    // #given
+    // given
     const resource = "https://mcp.example.com"
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
     const asUrl = new URL("/.well-known/oauth-authorization-server", resource).toString()
@@ -104,15 +104,15 @@ describe("discoverOAuthServerMetadata", () => {
     }
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
 
-    // #when
+    // when
     const result = discoverOAuthServerMetadata(resource)
 
-    // #then
+    // then
     return expect(result).rejects.toThrow("OAuth authorization server metadata not found")
   })
 
   test("throws when AS metadata is malformed", () => {
-    // #given
+    // given
     const resource = "https://mcp.example.com"
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
     const authServer = "https://auth.example.com"
@@ -131,15 +131,15 @@ describe("discoverOAuthServerMetadata", () => {
     }
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
 
-    // #when
+    // when
     const result = discoverOAuthServerMetadata(resource)
 
-    // #then
+    // then
     return expect(result).rejects.toThrow("token_endpoint")
   })
 
   test("caches discovery results per resource URL", () => {
-    // #given
+    // given
     const resource = "https://mcp.example.com"
     const prmUrl = new URL("/.well-known/oauth-protected-resource", resource).toString()
     const authServer = "https://auth.example.com"
@@ -164,11 +164,11 @@ describe("discoverOAuthServerMetadata", () => {
     }
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, configurable: true })
 
-    // #when
+    // when
     return discoverOAuthServerMetadata(resource)
       .then(() => discoverOAuthServerMetadata(resource))
       .then(() => {
-        // #then
+        // then
         expect(calls).toEqual([prmUrl, asUrl])
       })
   })
