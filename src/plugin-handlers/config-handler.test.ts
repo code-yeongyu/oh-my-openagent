@@ -106,6 +106,45 @@ afterEach(() => {
 })
 
 describe("Plan agent demote behavior", () => {
+  test("orders core agents as sisyphus -> hephaestus -> prometheus -> atlas", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const keys = Object.keys(config.agent as Record<string, unknown>)
+    const coreAgents = ["sisyphus", "hephaestus", "prometheus", "atlas"]
+    const ordered = keys.filter((key) => coreAgents.includes(key))
+    expect(ordered).toEqual(coreAgents)
+  })
+
   test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {
@@ -170,6 +209,41 @@ describe("Plan agent demote behavior", () => {
     const agents = config.agent as Record<string, { mode?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.mode).toBe("all")
+  })
+})
+
+describe("Agent permission defaults", () => {
+  test("hephaestus should allow delegate_task", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.hephaestus).toBeDefined()
+    expect(agentConfig.hephaestus.permission?.delegate_task).toBe("allow")
   })
 })
 
