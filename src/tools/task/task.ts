@@ -27,6 +27,13 @@ import {
   listTaskFiles,
 } from "../../features/claude-tasks/storage"
 
+const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/
+
+function parseTaskId(id: string): string | null {
+  if (!TASK_ID_PATTERN.test(id)) return null
+  return id
+}
+
 export function createTask(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
   return tool({
     description: `Unified task management tool with create, list, get, update, delete actions.
@@ -87,6 +94,10 @@ async function handleCreate(
   const validatedArgs = TaskCreateInputSchema.parse(args)
   const taskDir = getTaskDir(config)
   const lock = acquireLock(taskDir)
+
+  if (!lock.acquired) {
+    return JSON.stringify({ error: "task_lock_unavailable" })
+  }
 
   try {
     const taskId = generateTaskId()
@@ -176,8 +187,12 @@ async function handleGet(
   config: Partial<OhMyOpenCodeConfig>
 ): Promise<string> {
   const validatedArgs = TaskGetInputSchema.parse(args)
+  const taskId = parseTaskId(validatedArgs.id)
+  if (!taskId) {
+    return JSON.stringify({ error: "invalid_task_id" })
+  }
   const taskDir = getTaskDir(config)
-  const taskPath = join(taskDir, `${validatedArgs.id}.json`)
+  const taskPath = join(taskDir, `${taskId}.json`)
 
   const task = readJsonSafe(taskPath, TaskObjectSchema)
 
@@ -189,11 +204,19 @@ async function handleUpdate(
   config: Partial<OhMyOpenCodeConfig>
 ): Promise<string> {
   const validatedArgs = TaskUpdateInputSchema.parse(args)
+  const taskId = parseTaskId(validatedArgs.id)
+  if (!taskId) {
+    return JSON.stringify({ error: "invalid_task_id" })
+  }
   const taskDir = getTaskDir(config)
   const lock = acquireLock(taskDir)
 
+  if (!lock.acquired) {
+    return JSON.stringify({ error: "task_lock_unavailable" })
+  }
+
   try {
-    const taskPath = join(taskDir, `${validatedArgs.id}.json`)
+    const taskPath = join(taskDir, `${taskId}.json`)
     const task = readJsonSafe(taskPath, TaskObjectSchema)
 
     if (!task) {
@@ -234,11 +257,19 @@ async function handleDelete(
   config: Partial<OhMyOpenCodeConfig>
 ): Promise<string> {
   const validatedArgs = TaskDeleteInputSchema.parse(args)
+  const taskId = parseTaskId(validatedArgs.id)
+  if (!taskId) {
+    return JSON.stringify({ error: "invalid_task_id" })
+  }
   const taskDir = getTaskDir(config)
   const lock = acquireLock(taskDir)
 
+  if (!lock.acquired) {
+    return JSON.stringify({ error: "task_lock_unavailable" })
+  }
+
   try {
-    const taskPath = join(taskDir, `${validatedArgs.id}.json`)
+    const taskPath = join(taskDir, `${taskId}.json`)
 
     if (!existsSync(taskPath)) {
       return JSON.stringify({ error: "task_not_found" })

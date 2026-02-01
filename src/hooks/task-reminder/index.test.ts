@@ -122,4 +122,29 @@ describe("TaskReminderHook", () => {
     expect(output1.output).toContain("task tools haven't been used")
     expect(output2.output).not.toContain("task tools haven't been used")
   })
+
+  test("cleans up counters on session.deleted", async () => {
+    //#given
+    const sessionID = "test-session"
+    const output = { output: "Result" }
+
+    //#when
+    for (let i = 0; i < 10; i++) {
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID, callID: `call-${i}` },
+        output
+      )
+    }
+    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
+    const outputAfterDelete = { output: "Result" }
+    for (let i = 0; i < 9; i++) {
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID, callID: `call-after-${i}` },
+        outputAfterDelete
+      )
+    }
+
+    //#then
+    expect(outputAfterDelete.output).not.toContain("task tools haven't been used")
+  })
 })
