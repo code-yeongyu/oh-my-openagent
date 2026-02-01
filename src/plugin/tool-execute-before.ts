@@ -45,7 +45,7 @@ export function createToolExecuteBeforeHandler(args: {
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
+        const rawArgs = rawCommand?.replace(/^\/?(?:ralph-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -54,15 +54,17 @@ export function createToolExecuteBeforeHandler(args: {
 
         const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
         const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
+        const strategyMatch = rawArgs.match(/--strategy=(reset|continue)/i)
 
         hooks.ralphLoop.startLoop(sessionID, prompt, {
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
+          strategy: strategyMatch?.[1] as "reset" | "continue" | undefined,
         })
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
       } else if (command === "ulw-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
+        const rawArgs = rawCommand?.replace(/^\/?(?:ulw-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -71,11 +73,13 @@ export function createToolExecuteBeforeHandler(args: {
 
         const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
         const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
+        const strategyMatch = rawArgs.match(/--strategy=(reset|continue)/i)
 
         hooks.ralphLoop.startLoop(sessionID, prompt, {
           ultrawork: true,
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
+          strategy: strategyMatch?.[1] as "reset" | "continue" | undefined,
         })
       }
     }

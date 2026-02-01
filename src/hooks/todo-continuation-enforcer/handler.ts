@@ -14,6 +14,8 @@ export function createTodoContinuationHandler(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  directory?: string
+  ralphLoopStateDir?: string
 }): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
   const {
     ctx,
@@ -21,6 +23,8 @@ export function createTodoContinuationHandler(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    directory,
+    ralphLoopStateDir,
   } = args
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -52,6 +56,8 @@ export function createTodoContinuationHandler(args: {
         backgroundManager,
         skipAgents,
         isContinuationStopped,
+        directory,
+        ralphLoopStateDir,
       })
       return
     }

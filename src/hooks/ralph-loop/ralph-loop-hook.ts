@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ContextStrategy } from "../../config"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
 import { createLoopSessionRecovery } from "./loop-session-recovery"
@@ -10,7 +11,7 @@ export interface RalphLoopHook {
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
+    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean; strategy?: ContextStrategy }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null

@@ -1,7 +1,9 @@
 import type { RalphLoopOptions, RalphLoopState } from "./types"
+import type { ContextStrategy } from "../../config"
 import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
+	DEFAULT_STRATEGY,
 	HOOK_NAME,
 } from "./constants"
 import { clearState, incrementIteration, readState, writeState } from "./storage"
@@ -24,6 +26,7 @@ export function createLoopStateController(options: {
 				maxIterations?: number
 				completionPromise?: string
 				ultrawork?: boolean
+				strategy?: ContextStrategy
 			},
 		): boolean {
 			const state: RalphLoopState = {
@@ -37,6 +40,7 @@ export function createLoopStateController(options: {
 					loopOptions?.completionPromise ??
 					DEFAULT_COMPLETION_PROMISE,
 				ultrawork: loopOptions?.ultrawork,
+				strategy: loopOptions?.strategy ?? config?.default_strategy ?? DEFAULT_STRATEGY,
 				started_at: new Date().toISOString(),
 				prompt,
 				session_id: sessionID,
@@ -48,6 +52,7 @@ export function createLoopStateController(options: {
 					sessionID,
 					maxIterations: state.max_iterations,
 					completionPromise: state.completion_promise,
+					strategy: state.strategy,
 				})
 			}
 			return success

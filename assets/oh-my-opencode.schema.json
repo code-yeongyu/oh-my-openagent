@@ -2898,7 +2898,7 @@
         "state_dir": {
           "type": "string"
         },
-        "context_strategy": {
+        "default_strategy": {
           "type": "string",
           "enum": [
             "reset",

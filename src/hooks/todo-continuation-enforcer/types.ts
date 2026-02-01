@@ -5,6 +5,8 @@ export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  directory?: string
+  ralphLoopStateDir?: string
 }
 
 export interface TodoContinuationEnforcer {

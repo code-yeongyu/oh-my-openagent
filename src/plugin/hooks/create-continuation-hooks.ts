@@ -65,6 +65,8 @@ export function createContinuationHooks(args: {
         createTodoContinuationEnforcer(ctx, {
           backgroundManager,
           isContinuationStopped: stopContinuationGuard?.isStopped,
+          directory: ctx.directory,
+          ralphLoopStateDir: pluginConfig.ralph_loop?.state_dir,
         }))
     : null
 

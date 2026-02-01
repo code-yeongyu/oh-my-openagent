@@ -6,6 +6,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
+import { readState as readRalphLoopState } from "../ralph-loop"
 import {
   ABORT_WINDOW_MS,
   DEFAULT_SKIP_AGENTS,
@@ -24,6 +25,8 @@ export async function handleSessionIdle(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  directory?: string
+  ralphLoopStateDir?: string
 }): Promise<void> {
   const {
     ctx,
@@ -32,6 +35,8 @@ export async function handleSessionIdle(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    directory,
+    ralphLoopStateDir,
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
@@ -145,6 +150,14 @@ export async function handleSessionIdle(args: {
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
     return
+  }
+
+  if (directory) {
+    const ralphLoopState = readRalphLoopState(directory, ralphLoopStateDir)
+    if (ralphLoopState?.active) {
+      log(`[${HOOK_NAME}] Skipped: ralph-loop is active`, { sessionID, ralphLoopSessionID: ralphLoopState.session_id })
+      return
+    }
   }
 
   startCountdown({

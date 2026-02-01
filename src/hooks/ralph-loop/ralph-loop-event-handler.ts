@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
-import { HOOK_NAME, DEFAULT_CONTEXT_STRATEGY } from "./constants"
+import { HOOK_NAME, DEFAULT_STRATEGY } from "./constants"
 import { writeState } from "./storage"
 import {
 	detectCompletionInSessionMessages,
@@ -117,10 +117,10 @@ export function createRalphLoopEventHandler(
 				max: newState.max_iterations,
 			})
 
-			const contextStrategy = options.config?.context_strategy ?? DEFAULT_CONTEXT_STRATEGY
+			const strategy = newState.strategy ?? options.config?.default_strategy ?? DEFAULT_STRATEGY
 			let targetSessionID = sessionID
 
-			if (contextStrategy === "reset") {
+			if (strategy === "reset") {
 				try {
 					log(`[${HOOK_NAME}] Creating new session for fresh context`, { sessionID })
 					const createResp = await ctx.client.session.create({

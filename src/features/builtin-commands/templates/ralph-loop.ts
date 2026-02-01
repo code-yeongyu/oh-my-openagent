@@ -24,9 +24,11 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 ## Your Task
 
 Parse the arguments below and begin working on the task. The format is:
-\`"task description" [--completion-promise=TEXT] [--max-iterations=N]\`
+\`"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]\`
 
-Default completion promise is "DONE" and default max iterations is 100.`
+Default completion promise is "DONE", default max iterations is 100, default strategy is "reset".
+- **reset**: Create a new session with fresh context for each iteration (recommended for long tasks)
+- **continue**: Keep same session and accumulate context across iterations`
 
 export const CANCEL_RALPH_TEMPLATE = `Cancel the currently active Ralph Loop.
 

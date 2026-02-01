@@ -10,11 +10,12 @@ export const RalphLoopConfigSchema = z.object({
   /** Custom state file directory relative to project root (default: .opencode/) */
   state_dir: z.string().optional(),
   /**
-   * Context management strategy between loop iterations (default: "reset")
+   * Default context management strategy between loop iterations (default: "reset")
+   * Can be overridden per-loop with --strategy flag
    * - "reset": Create a new session with fresh context for each iteration (recommended)
    * - "continue": Keep same session and accumulate context across iterations
    */
-  context_strategy: ContextStrategySchema.optional(),
+  default_strategy: ContextStrategySchema.optional(),
 })
 
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
