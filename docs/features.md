@@ -243,13 +243,21 @@ project/
 
 **Purpose**: Self-referential development loop that runs until task completion
 
-**Named after**: Anthropic's Ralph Wiggum plugin
+**Named after**: [The Ralph Wiggum Loop](https://ghuntley.com/ralph/) - a technique for keeping LLMs in the "smart zone" by using fresh context per iteration
 
 **Usage**:
 ```
 /ralph-loop "Build a REST API with authentication"
 /ralph-loop "Refactor the payment module" --max-iterations=50
+/ralph-loop "Add test coverage" --strategy=continue
 ```
+
+**Flags**:
+| Flag | Description |
+|------|-------------|
+| `--max-iterations=N` | Maximum loop iterations (default: 100) |
+| `--completion-promise=TEXT` | Custom completion tag (default: "DONE") |
+| `--strategy=reset\|continue` | Override default strategy for this loop |
 
 **Behavior**:
 - Agent works continuously toward the goal
@@ -263,24 +271,30 @@ project/
   "ralph_loop": {
     "enabled": true,
     "default_max_iterations": 100,
-    "context_strategy": "reset"
+    "default_strategy": "reset"
   }
 }
 ```
 
-**Context Strategy Options**:
+**Strategy Options**:
 | Strategy | Description |
 |----------|-------------|
-| `"reset"` | Create a fresh session with clean context for each iteration (default) |
-| `"continue"` | Keep full context between iterations (accumulates context) |
+| `"reset"` (default) | Create a fresh session with clean context for each iteration - keeps LLM in "smart zone" |
+| `"continue"` | Keep same session, accumulates context - may enter "dumb zone" on long loops |
 
-Use `"reset"` (default) to prevent context overflow on long-running loops. Use `"continue"` when you need full conversation history preserved.
+Use `"reset"` (default) to prevent context overflow on long-running loops. This matches how the original bash-loop Ralph works where each iteration gets a fresh context window. Use `"continue"` only for short tasks where you need conversation history preserved.
 
 ### Command: /ulw-loop
 
 **Purpose**: Same as ralph-loop but with ultrawork mode active
 
-Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+**Usage**:
+```
+/ulw-loop "Build complex feature"
+/ulw-loop "Major refactor" --strategy=reset --max-iterations=50
+```
+
+Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration. Supports the same flags as `/ralph-loop`.
 
 ### Command: /refactor
 
