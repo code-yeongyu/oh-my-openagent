@@ -4,10 +4,10 @@ import { randomUUID } from "crypto"
 import type { z } from "zod"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 
-export function getTaskDir(teamName: string, config: Partial<OhMyOpenCodeConfig> = {}): string {
+export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
   const tasksConfig = config.sisyphus?.tasks
   const storagePath = tasksConfig?.storage_path ?? ".sisyphus/tasks"
-  return join(process.cwd(), storagePath, teamName)
+  return join(process.cwd(), storagePath)
 }
 
 export function ensureDir(dirPath: string): void {
@@ -63,8 +63,8 @@ export function generateTaskId(): string {
   return `T-${randomUUID()}`
 }
 
-export function listTaskFiles(teamName: string, config: Partial<OhMyOpenCodeConfig> = {}): string[] {
-  const dir = getTaskDir(teamName, config)
+export function listTaskFiles(config: Partial<OhMyOpenCodeConfig> = {}): string[] {
+  const dir = getTaskDir(config)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter((f) => f.endsWith('.json') && f.startsWith('T-'))

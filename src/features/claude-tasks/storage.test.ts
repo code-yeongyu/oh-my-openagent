@@ -12,13 +12,12 @@ describe("getTaskDir", () => {
   test("returns correct path for default config", () => {
     //#given
     const config: Partial<OhMyOpenCodeConfig> = {}
-    const teamName = "test-team"
 
     //#when
-    const result = getTaskDir(teamName, config)
+    const result = getTaskDir(config)
 
     //#then
-    expect(result).toBe(join(process.cwd(), ".sisyphus/tasks", teamName))
+    expect(result).toBe(join(process.cwd(), ".sisyphus/tasks"))
   })
 
   test("returns correct path with custom storage_path", () => {
@@ -32,24 +31,20 @@ describe("getTaskDir", () => {
         },
       },
     }
-    const teamName = "test-team"
 
     //#when
-    const result = getTaskDir(teamName, config)
+    const result = getTaskDir(config)
 
     //#then
-    expect(result).toBe(join(process.cwd(), ".custom/tasks", teamName))
+    expect(result).toBe(join(process.cwd(), ".custom/tasks"))
   })
 
   test("returns correct path with default config parameter", () => {
-    //#given
-    const teamName = "default-team"
-
     //#when
-    const result = getTaskDir(teamName)
+    const result = getTaskDir()
 
     //#then
-    expect(result).toBe(join(process.cwd(), ".sisyphus/tasks", teamName))
+    expect(result).toBe(join(process.cwd(), ".sisyphus/tasks"))
   })
 })
 
@@ -73,9 +68,6 @@ describe("generateTaskId", () => {
 })
 
 describe("listTaskFiles", () => {
-  const TEAM_NAME = "test-team"
-  const TEAM_DIR = join(TEST_DIR_ABS, TEAM_NAME)
-
   beforeEach(() => {
     if (existsSync(TEST_DIR_ABS)) {
       rmSync(TEST_DIR_ABS, { recursive: true, force: true })
@@ -95,7 +87,7 @@ describe("listTaskFiles", () => {
     }
 
     //#when
-    const result = listTaskFiles(TEAM_NAME, config)
+    const result = listTaskFiles(config)
 
     //#then
     expect(result).toEqual([])
@@ -106,11 +98,11 @@ describe("listTaskFiles", () => {
     const config: Partial<OhMyOpenCodeConfig> = {
       sisyphus: { tasks: { enabled: false, storage_path: TEST_DIR, claude_code_compat: false } }
     }
-    mkdirSync(TEAM_DIR, { recursive: true })
-    writeFileSync(join(TEAM_DIR, "other.json"), "{}", "utf-8")
+    mkdirSync(TEST_DIR_ABS, { recursive: true })
+    writeFileSync(join(TEST_DIR_ABS, "other.json"), "{}", "utf-8")
 
     //#when
-    const result = listTaskFiles(TEAM_NAME, config)
+    const result = listTaskFiles(config)
 
     //#then
     expect(result).toEqual([])
@@ -121,14 +113,14 @@ describe("listTaskFiles", () => {
     const config: Partial<OhMyOpenCodeConfig> = {
       sisyphus: { tasks: { enabled: false, storage_path: TEST_DIR, claude_code_compat: false } }
     }
-    mkdirSync(TEAM_DIR, { recursive: true })
-    writeFileSync(join(TEAM_DIR, "T-abc123.json"), "{}", "utf-8")
-    writeFileSync(join(TEAM_DIR, "T-def456.json"), "{}", "utf-8")
-    writeFileSync(join(TEAM_DIR, "other.json"), "{}", "utf-8")
-    writeFileSync(join(TEAM_DIR, "notes.md"), "# notes", "utf-8")
+    mkdirSync(TEST_DIR_ABS, { recursive: true })
+    writeFileSync(join(TEST_DIR_ABS, "T-abc123.json"), "{}", "utf-8")
+    writeFileSync(join(TEST_DIR_ABS, "T-def456.json"), "{}", "utf-8")
+    writeFileSync(join(TEST_DIR_ABS, "other.json"), "{}", "utf-8")
+    writeFileSync(join(TEST_DIR_ABS, "notes.md"), "# notes", "utf-8")
 
     //#when
-    const result = listTaskFiles(TEAM_NAME, config)
+    const result = listTaskFiles(config)
 
     //#then
     expect(result).toHaveLength(2)
@@ -141,11 +133,11 @@ describe("listTaskFiles", () => {
     const config: Partial<OhMyOpenCodeConfig> = {
       sisyphus: { tasks: { enabled: false, storage_path: TEST_DIR, claude_code_compat: false } }
     }
-    mkdirSync(TEAM_DIR, { recursive: true })
-    writeFileSync(join(TEAM_DIR, "T-test-id.json"), "{}", "utf-8")
+    mkdirSync(TEST_DIR_ABS, { recursive: true })
+    writeFileSync(join(TEST_DIR_ABS, "T-test-id.json"), "{}", "utf-8")
 
     //#when
-    const result = listTaskFiles(TEAM_NAME, config)
+    const result = listTaskFiles(config)
 
     //#then
     expect(result[0]).toBe("T-test-id")
