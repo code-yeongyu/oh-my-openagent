@@ -117,6 +117,8 @@ function createFakeTimers(): FakeTimers {
   return { advanceBy, restore }
 }
 
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
 describe("todo-continuation-enforcer", () => {
   let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
   let toastCalls: Array<{ title: string; message: string }>
@@ -187,6 +189,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
+    fakeTimers.restore()
     // given - main session with incomplete todos
     const sessionID = "main-123"
     setMainSession(sessionID)
@@ -201,15 +204,15 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // then - countdown toast shown
-    await fakeTimers.advanceBy(100)
+    await wait(50)
     expect(toastCalls.length).toBeGreaterThanOrEqual(1)
     expect(toastCalls[0].title).toBe("Todo Continuation")
 
     // then - after countdown, continuation injected
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].text).toContain("TODO CONTINUATION")
-  })
+  }, { timeout: 15000 })
 
   test("should not inject when all todos are complete", async () => {
     // given - session with all todos complete
@@ -273,6 +276,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject for background task session (subagent)", async () => {
+    fakeTimers.restore()
     // given - main session set, background task session registered
     setMainSession("main-session")
     const bgTaskSession = "bg-task-session"
@@ -286,10 +290,10 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // then - continuation injected for background task session
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].sessionID).toBe(bgTaskSession)
-  })
+  }, { timeout: 15000 })
 
 
 
@@ -320,6 +324,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should ignore user message within grace period", async () => {
+    fakeTimers.restore()
     // given - session starting countdown
     const sessionID = "main-grace"
     setMainSession(sessionID)
@@ -341,9 +346,9 @@ describe("todo-continuation-enforcer", () => {
 
      // then - countdown should continue (message was ignored)
     // wait past 2s countdown and verify injection happens
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
     expect(promptCalls).toHaveLength(1)
-  })
+  }, { timeout: 15000 })
 
   test("should cancel countdown on assistant activity", async () => {
     // given - session starting countdown
@@ -418,6 +423,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject after recovery complete", async () => {
+    fakeTimers.restore()
     // given - session was in recovery, now complete
     const sessionID = "main-recovery-done"
     setMainSession(sessionID)
@@ -433,11 +439,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(3000)
 
     // then - continuation injected
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
   test("should cleanup on session deleted", async () => {
     // given - session starting countdown
@@ -483,6 +489,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should show countdown toast updates", async () => {
+    fakeTimers.restore()
     // given - session with incomplete todos
     const sessionID = "main-toast"
     setMainSession(sessionID)
@@ -495,10 +502,10 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // then - multiple toast updates during countdown (2s countdown = 2 toasts: "2s" and "1s")
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
     expect(toastCalls.length).toBeGreaterThanOrEqual(2)
     expect(toastCalls[0].message).toContain("2s")
-  })
+  }, { timeout: 15000 })
 
   test("should not have 10s throttle between injections", async () => {
     // given - new hook instance (no prior state)
@@ -533,6 +540,7 @@ describe("todo-continuation-enforcer", () => {
 
 
   test("should NOT skip for non-abort errors even if immediately before idle", async () => {
+    fakeTimers.restore()
     // given - session with incomplete todos
     const sessionID = "main-noabort-error"
     setMainSession(sessionID)
@@ -555,11 +563,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
 
     // then - continuation injected (non-abort errors don't block)
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
 
 
@@ -595,6 +603,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject when last assistant message has no error", async () => {
+    fakeTimers.restore()
     // given - session where last assistant message completed normally
     const sessionID = "main-api-no-error"
     setMainSession(sessionID)
@@ -611,13 +620,14 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (no abort)
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
   test("should inject when last message is from user (not assistant)", async () => {
+    fakeTimers.restore()
     // given - session where last message is from user
     const sessionID = "main-api-user-last"
     setMainSession(sessionID)
@@ -634,11 +644,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (last message is user, not aborted assistant)
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
   test("should skip when last assistant message has any abort-like error", async () => {
     // given - session where last assistant message has AbortError (DOMException style)
@@ -724,6 +734,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject when abort flag is stale (>3s old)", async () => {
+    fakeTimers.restore()
     // given - session with incomplete todos and old abort timestamp
     const sessionID = "main-stale-abort"
     setMainSession(sessionID)
@@ -743,19 +754,20 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // when - wait >3s then idle fires
-    await fakeTimers.advanceBy(3100, true)
+    await wait(3100)
 
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(3000)
 
     // then - continuation injected (abort flag is stale)
     expect(promptCalls.length).toBeGreaterThan(0)
-  }, 10000)
+  }, { timeout: 15000 })
 
   test("should clear abort flag on user message activity", async () => {
+    fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-user"
     setMainSession(sessionID)
@@ -775,7 +787,7 @@ describe("todo-continuation-enforcer", () => {
     })
 
     // when - user sends new message (clears abort flag)
-    await fakeTimers.advanceBy(600)
+    await wait(600)
     await hook.handler({
       event: {
         type: "message.updated",
@@ -788,13 +800,14 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (abort flag was cleared by user activity)
     expect(promptCalls.length).toBeGreaterThan(0)
-  })
+  }, { timeout: 15000 })
 
   test("should clear abort flag on assistant message activity", async () => {
+    fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-assistant"
     setMainSession(sessionID)
@@ -826,13 +839,14 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (abort flag was cleared by assistant activity)
     expect(promptCalls.length).toBeGreaterThan(0)
-  })
+  }, { timeout: 15000 })
 
   test("should clear abort flag on tool execution", async () => {
+    fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-tool"
     setMainSession(sessionID)
@@ -864,11 +878,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (abort flag was cleared by tool execution)
     expect(promptCalls.length).toBeGreaterThan(0)
-  })
+  }, { timeout: 15000 })
 
   test("should use event-based detection even when API indicates no abort (event wins)", async () => {
     // given - session with abort event but API shows no error
@@ -923,6 +937,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should pass model property in prompt call (undefined when no message context)", async () => {
+    fakeTimers.restore()
     // given - session with incomplete todos, no prior message context available
     const sessionID = "main-model-preserve"
     setMainSession(sessionID)
@@ -936,13 +951,13 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(2500)
+    await wait(2500)
 
     // then - prompt call made, model is undefined when no context (expected behavior)
     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].text).toContain("TODO CONTINUATION")
     expect("model" in promptCalls[0]).toBe(true)
-  })
+  }, { timeout: 15000 })
 
   test("should extract model from assistant message with flat modelID/providerID", async () => {
     // given - session with assistant message that has flat modelID/providerID (OpenCode API format)
@@ -1133,6 +1148,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject when agent info is undefined but skipAgents is empty", async () => {
+    fakeTimers.restore()
     // given - session with no agent info but skipAgents is empty
     const sessionID = "main-no-agent-no-skip"
     setMainSession(sessionID)
@@ -1173,11 +1189,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (no agents to skip)
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
   test("should not inject when isContinuationStopped returns true", async () => {
     // given - session with continuation stopped
@@ -1200,6 +1216,7 @@ describe("todo-continuation-enforcer", () => {
   })
 
   test("should inject when isContinuationStopped returns false", async () => {
+    fakeTimers.restore()
     // given - session with continuation not stopped
     const sessionID = "main-not-stopped"
     setMainSession(sessionID)
@@ -1213,11 +1230,11 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await fakeTimers.advanceBy(3000)
+    await wait(2500)
 
     // then - continuation injected (stopped flag is false)
     expect(promptCalls.length).toBe(1)
-  })
+  }, { timeout: 15000 })
 
   test("should cancel all countdowns via cancelAllCountdowns", async () => {
     // given - multiple sessions with running countdowns
