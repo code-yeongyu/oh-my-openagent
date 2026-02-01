@@ -89,6 +89,7 @@ jobs:
           timeout_minutes: 5
           max_attempts: 5
           retry_wait_seconds: 10
+          shell: bash
           command: |
             PLATFORM="${{ matrix.platform }}"
             case "$PLATFORM" in
