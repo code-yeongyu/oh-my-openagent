@@ -35,6 +35,7 @@ import {
   createSubagentQuestionBlockerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
+  createUnstableAgentBabysitterHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -290,6 +291,35 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
+  const unstableAgentBabysitter =
+    isHookEnabled("unstable-agent-babysitter") && pluginConfig.babysitting?.enabled === true
+      ? createUnstableAgentBabysitterHook(
+          {
+            directory: ctx.directory,
+            client: {
+              session: {
+                messages: async (args) => {
+                  const result = await ctx.client.session.messages(args)
+                  if (Array.isArray(result)) return result
+                  if (typeof result === "object" && result !== null && "data" in result) {
+                    const record = result as Record<string, unknown>
+                    return { data: record.data }
+                  }
+                  return []
+                },
+                prompt: async (args) => {
+                  await ctx.client.session.prompt(args)
+                },
+              },
+            },
+          },
+          {
+            backgroundManager,
+            config: pluginConfig.babysitting,
+          }
+        )
+      : null;
+
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
     sessionRecovery.setOnRecoveryCompleteCallback(
@@ -520,6 +550,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await backgroundNotificationHook?.event(input);
       await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
+      await unstableAgentBabysitter?.event(input);
       await contextWindowMonitor?.event(input);
       await directoryAgentsInjector?.event(input);
       await directoryReadmeInjector?.event(input);
