@@ -2977,6 +2977,18 @@
         }
       }
     },
+    "websearch": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "exa",
+            "tavily"
+          ]
+        }
+      }
+    },
     "tmux": {
       "type": "object",
       "properties": {
