@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir, homedir } from "node:os"
+import { randomUUID } from "node:crypto"
 import { createStartWorkHook } from "./index"
 import {
   writeBoulderState,
@@ -11,30 +12,32 @@ import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 
 describe("start-work hook", () => {
-  const TEST_DIR = join(tmpdir(), "start-work-test-" + Date.now())
-  const SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
+  let testDir: string
+  let sisyphusDir: string
 
   function createMockPluginInput() {
     return {
-      directory: TEST_DIR,
+      directory: testDir,
       client: {},
     } as Parameters<typeof createStartWorkHook>[0]
   }
 
   beforeEach(() => {
-    if (!existsSync(TEST_DIR)) {
-      mkdirSync(TEST_DIR, { recursive: true })
+    testDir = join(tmpdir(), `start-work-test-${randomUUID()}`)
+    sisyphusDir = join(testDir, ".sisyphus")
+    if (!existsSync(testDir)) {
+      mkdirSync(testDir, { recursive: true })
     }
-    if (!existsSync(SISYPHUS_DIR)) {
-      mkdirSync(SISYPHUS_DIR, { recursive: true })
+    if (!existsSync(sisyphusDir)) {
+      mkdirSync(sisyphusDir, { recursive: true })
     }
-    clearBoulderState(TEST_DIR)
+    clearBoulderState(testDir)
   })
 
   afterEach(() => {
-    clearBoulderState(TEST_DIR)
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
+    clearBoulderState(testDir)
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true })
     }
   })
 
@@ -80,7 +83,7 @@ describe("start-work hook", () => {
 
     test("should inject resume info when existing boulder state found", async () => {
       // given - existing boulder state with incomplete plan
-      const planPath = join(TEST_DIR, "test-plan.md")
+      const planPath = join(testDir, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
 
       const state: BoulderState = {
@@ -89,7 +92,7 @@ describe("start-work hook", () => {
         session_ids: ["session-1"],
         plan_name: "test-plan",
       }
-      writeBoulderState(TEST_DIR, state)
+      writeBoulderState(testDir, state)
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
@@ -155,7 +158,7 @@ describe("start-work hook", () => {
 
     test("should auto-select when only one incomplete plan among multiple plans", async () => {
       // given - multiple plans but only one incomplete
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       // Plan 1: complete (all checked)
@@ -185,7 +188,7 @@ describe("start-work hook", () => {
 
     test("should wrap multiple plans message in system-reminder tag", async () => {
       // given - multiple incomplete plans
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       const plan1Path = join(plansDir, "plan-a.md")
@@ -213,7 +216,7 @@ describe("start-work hook", () => {
 
     test("should use 'ask user' prompt style for multiple plans", async () => {
       // given - multiple incomplete plans
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       const plan1Path = join(plansDir, "plan-x.md")
@@ -240,7 +243,7 @@ describe("start-work hook", () => {
 
     test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
       // given - existing boulder state pointing to old plan
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       // Old plan (in boulder state)
@@ -258,7 +261,7 @@ describe("start-work hook", () => {
         session_ids: ["old-session"],
         plan_name: "old-plan",
       }
-      writeBoulderState(TEST_DIR, staleState)
+      writeBoulderState(testDir, staleState)
 
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
@@ -286,7 +289,7 @@ describe("start-work hook", () => {
 
     test("should strip ultrawork/ulw keywords from plan name argument", async () => {
       // given - plan with ultrawork keyword in user-request
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       const planPath = join(plansDir, "my-feature-plan.md")
@@ -317,7 +320,7 @@ describe("start-work hook", () => {
 
     test("should strip ulw keyword from plan name argument", async () => {
       // given - plan with ulw keyword in user-request
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       const planPath = join(plansDir, "api-refactor.md")
@@ -348,7 +351,7 @@ describe("start-work hook", () => {
 
     test("should match plan by partial name", async () => {
       // given - user specifies partial plan name
-      const plansDir = join(TEST_DIR, ".sisyphus", "plans")
+      const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
       const planPath = join(plansDir, "2026-01-15-feature-implementation.md")
