@@ -2,11 +2,17 @@ import { describe, test, expect } from "bun:test"
 import { session_list, session_read, session_search, session_info } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
+const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+
 const mockContext: ToolContext = {
   sessionID: "test-session",
   messageID: "test-message",
   agent: "test-agent",
+  directory: projectDir,
+  worktree: projectDir,
   abort: new AbortController().signal,
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("session-manager tools", () => {
