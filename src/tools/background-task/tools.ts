@@ -1,4 +1,4 @@
-import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
@@ -9,7 +9,50 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { consumeNewMessages } from "../../shared/session-cursor"
 
-type OpencodeClient = PluginInput["client"]
+type BackgroundOutputMessage = {
+  info?: { role?: string; time?: string | { created?: number }; agent?: string }
+  parts?: Array<{
+    type?: string
+    text?: string
+    content?: string | Array<{ type: string; text?: string }>
+    name?: string
+  }>
+}
+
+type BackgroundOutputMessagesResult =
+  | { data?: BackgroundOutputMessage[]; error?: unknown }
+  | BackgroundOutputMessage[]
+
+export type BackgroundOutputClient = {
+  session: {
+    messages: (args: { path: { id: string } }) => Promise<BackgroundOutputMessagesResult>
+  }
+}
+
+export type BackgroundCancelClient = {
+  session: {
+    abort: (args: { path: { id: string } }) => Promise<unknown>
+  }
+}
+
+export type BackgroundOutputManager = Pick<BackgroundManager, "getTask">
+
+const MAX_MESSAGE_LIMIT = 100
+const THINKING_MAX_CHARS = 2000
+
+type FullSessionMessagePart = {
+  type?: string
+  text?: string
+  thinking?: string
+  content?: string | Array<{ type?: string; text?: string }>
+  output?: string
+}
+
+type FullSessionMessage = {
+  id?: string
+  info?: { role?: string; time?: string; agent?: string }
+  parts?: FullSessionMessagePart[]
+}
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -197,30 +240,50 @@ ${promptPreview}
 \`\`\`${lastMessageSection}`
 }
 
-async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
+function getErrorMessage(value: BackgroundOutputMessagesResult): string | null {
+  if (Array.isArray(value)) return null
+  if (value.error === undefined || value.error === null) return null
+  if (typeof value.error === "string" && value.error.length > 0) return value.error
+  return String(value.error)
+}
+
+function isSessionMessage(value: unknown): value is {
+  info?: { role?: string; time?: string }
+  parts?: Array<{
+    type?: string
+    text?: string
+    content?: string | Array<{ type: string; text?: string }>
+    name?: string
+  }>
+} {
+  return typeof value === "object" && value !== null
+}
+
+function extractMessages(value: BackgroundOutputMessagesResult): BackgroundOutputMessage[] {
+  if (Array.isArray(value)) {
+    return value.filter(isSessionMessage)
+  }
+  if (Array.isArray(value.data)) {
+    return value.data.filter(isSessionMessage)
+  }
+  return []
+}
+
+async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
   if (!task.sessionID) {
     return `Error: Task has no sessionID`
   }
   
-  const messagesResult = await client.session.messages({
+  const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
     path: { id: task.sessionID },
   })
 
-  if (messagesResult.error) {
-    return `Error fetching messages: ${messagesResult.error}`
+  const errorMessage = getErrorMessage(messagesResult)
+  if (errorMessage) {
+    return `Error fetching messages: ${errorMessage}`
   }
 
-  // Handle both SDK response structures: direct array or wrapped in .data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages = ((messagesResult as any).data ?? messagesResult) as Array<{
-    info?: { role?: string; time?: string }
-    parts?: Array<{ 
-      type?: string
-      text?: string
-      content?: string | Array<{ type: string; text?: string }>
-      name?: string
-    }>
-  }>
+  const messages = extractMessages(messagesResult)
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return `Task Result
@@ -321,19 +384,176 @@ Session ID: ${task.sessionID}
 ${textContent || "(No text output)"}`
 }
 
-export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient): ToolDefinition {
+function extractToolResultText(part: FullSessionMessagePart): string[] {
+  if (typeof part.content === "string" && part.content.length > 0) {
+    return [part.content]
+  }
+
+  if (Array.isArray(part.content)) {
+    const blocks = part.content
+      .filter((block) => (block.type === "text" || block.type === "reasoning") && block.text)
+      .map((block) => block.text as string)
+    if (blocks.length > 0) return blocks
+  }
+
+  if (part.output && part.output.length > 0) {
+    return [part.output]
+  }
+
+  return []
+}
+
+async function formatFullSession(
+  task: BackgroundTask,
+  client: BackgroundOutputClient,
+  options: {
+    includeThinking: boolean
+    messageLimit?: number
+    sinceMessageId?: string
+    includeToolResults: boolean
+    thinkingMaxChars?: number
+  }
+): Promise<string> {
+  if (!task.sessionID) {
+    return formatTaskStatus(task)
+  }
+
+  const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
+    path: { id: task.sessionID },
+  })
+
+  const errorMessage = getErrorMessage(messagesResult)
+  if (errorMessage) {
+    return `Error fetching messages: ${errorMessage}`
+  }
+
+  const rawMessages = extractMessages(messagesResult)
+  if (!Array.isArray(rawMessages)) {
+    return "Error fetching messages: invalid response"
+  }
+
+  const sortedMessages = [...(rawMessages as FullSessionMessage[])].sort((a, b) => {
+    const timeA = String(a.info?.time ?? "")
+    const timeB = String(b.info?.time ?? "")
+    return timeA.localeCompare(timeB)
+  })
+
+  let filteredMessages = sortedMessages
+
+  if (options.sinceMessageId) {
+    const index = filteredMessages.findIndex((message) => message.id === options.sinceMessageId)
+    if (index === -1) {
+      return `Error: since_message_id not found: ${options.sinceMessageId}`
+    }
+    filteredMessages = filteredMessages.slice(index + 1)
+  }
+
+  const includeThinking = options.includeThinking
+  const includeToolResults = options.includeToolResults
+  const thinkingMaxChars = options.thinkingMaxChars ?? THINKING_MAX_CHARS
+
+  const normalizedMessages: FullSessionMessage[] = []
+  for (const message of filteredMessages) {
+    const parts = (message.parts ?? []).filter((part) => {
+      if (part.type === "thinking" || part.type === "reasoning") {
+        return includeThinking
+      }
+      if (part.type === "tool_result") {
+        return includeToolResults
+      }
+      return part.type === "text"
+    })
+
+    if (parts.length === 0) {
+      continue
+    }
+
+    normalizedMessages.push({ ...message, parts })
+  }
+
+  const limit = typeof options.messageLimit === "number"
+    ? Math.min(options.messageLimit, MAX_MESSAGE_LIMIT)
+    : undefined
+  const hasMore = limit !== undefined && normalizedMessages.length > limit
+  const visibleMessages = limit !== undefined
+    ? normalizedMessages.slice(0, limit)
+    : normalizedMessages
+
+  const lines: string[] = []
+  lines.push("# Full Session Output")
+  lines.push("")
+  lines.push(`Task ID: ${task.id}`)
+  lines.push(`Description: ${task.description}`)
+  lines.push(`Status: ${task.status}`)
+  lines.push(`Session ID: ${task.sessionID}`)
+  lines.push(`Total messages: ${normalizedMessages.length}`)
+  lines.push(`Returned: ${visibleMessages.length}`)
+  lines.push(`Has more: ${hasMore ? "true" : "false"}`)
+  lines.push("")
+  lines.push("## Messages")
+
+  if (visibleMessages.length === 0) {
+    lines.push("")
+    lines.push("(No messages found)")
+    return lines.join("\n")
+  }
+
+  for (const message of visibleMessages) {
+    const role = message.info?.role ?? "unknown"
+    const agent = message.info?.agent ? ` (${message.info.agent})` : ""
+    const time = formatMessageTime(message.info?.time)
+    const idLabel = message.id ? ` id=${message.id}` : ""
+    lines.push("")
+    lines.push(`[${role}${agent}] ${time}${idLabel}`)
+
+    for (const part of message.parts ?? []) {
+      if (part.type === "text" && part.text) {
+        lines.push(part.text.trim())
+      } else if (part.type === "thinking" && part.thinking) {
+        lines.push(`[thinking] ${truncateText(part.thinking, thinkingMaxChars)}`)
+      } else if (part.type === "reasoning" && part.text) {
+        lines.push(`[thinking] ${truncateText(part.text, thinkingMaxChars)}`)
+      } else if (part.type === "tool_result") {
+        const toolTexts = extractToolResultText(part)
+        for (const toolText of toolTexts) {
+          lines.push(`[tool result] ${toolText}`)
+        }
+      }
+    }
+  }
+
+  return lines.join("\n")
+}
+
+export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
       task_id: tool.schema.string().describe("Task ID to get output from"),
       block: tool.schema.boolean().optional().describe("Wait for completion (default: false). System notifies when done, so blocking is rarely needed."),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
+      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: false)"),
+      include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
+      message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 100)"),
+      since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
+      include_tool_results: tool.schema.boolean().optional().describe("Include tool results in full_session output (default: false)"),
+      thinking_max_chars: tool.schema.number().optional().describe("Max characters for thinking content (default: 2000)"),
     },
     async execute(args: BackgroundOutputArgs) {
       try {
         const task = manager.getTask(args.task_id)
         if (!task) {
           return `Task not found: ${args.task_id}`
+        }
+
+        if (args.full_session === true) {
+          return await formatFullSession(task, client, {
+            includeThinking: args.include_thinking === true,
+            messageLimit: args.message_limit,
+            sinceMessageId: args.since_message_id,
+            includeToolResults: args.include_tool_results === true,
+            thinkingMaxChars: args.thinking_max_chars,
+          })
         }
 
         const shouldBlock = args.block === true
@@ -387,7 +607,7 @@ export function createBackgroundOutput(manager: BackgroundManager, client: Openc
   })
 }
 
-export function createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient): ToolDefinition {
+export function createBackgroundCancel(manager: BackgroundManager, client: BackgroundCancelClient): ToolDefinition {
   return tool({
     description: BACKGROUND_CANCEL_DESCRIPTION,
     args: {
@@ -514,4 +734,19 @@ Status: ${task.status}`
       }
     },
   })
+}
+function formatMessageTime(value: unknown): string {
+  if (typeof value === "string") {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : date.toISOString()
+  }
+  if (typeof value === "object" && value !== null) {
+    if ("created" in value) {
+      const created = (value as { created?: number }).created
+      if (typeof created === "number") {
+        return new Date(created).toISOString()
+      }
+    }
+  }
+  return "Unknown time"
 }
