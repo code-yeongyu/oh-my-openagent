@@ -145,6 +145,47 @@ describe("ralph-loop", () => {
       expect(readResult?.ultrawork).toBe(true)
     })
 
+    test("should handle strategy field with explicit value", () => {
+      // #given - a state object with explicit strategy
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build a REST API",
+        session_id: "test-session-123",
+        strategy: "continue",
+      }
+
+      // #when - write and read state
+      writeState(TEST_DIR, state)
+      const readResult = readState(TEST_DIR)
+
+      // #then - strategy field should be preserved
+      expect(readResult?.strategy).toBe("continue")
+    })
+
+    test("should default strategy to 'reset' when undefined", () => {
+      // #given - a state object without strategy field
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build a REST API",
+        session_id: "test-session-123",
+      }
+
+      // #when - write and read state
+      writeState(TEST_DIR, state)
+      const readResult = readState(TEST_DIR)
+
+      // #then - strategy should default to "reset"
+      expect(readResult?.strategy).toBe("reset")
+    })
+
     test("should return null for non-existent state", () => {
       // #given - no state file exists
       // #when - read state
@@ -624,9 +665,11 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(2)
     })
 
-    test("should include prompt and promise in continuation message", async () => {
-      // #given - loop with specific prompt and promise
-      const hook = createRalphLoopHook(createMockPluginInput())
+    test("should include prompt and promise in continuation message (continue strategy)", async () => {
+      // #given - loop with specific prompt and promise using continue strategy
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "continue" },
+      })
       hook.startLoop("session-123", "Create a calculator app", {
         completionPromise: "CALCULATOR_DONE",
         maxIterations: 10,
@@ -637,7 +680,7 @@ describe("ralph-loop", () => {
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
       })
 
-      // #then - continuation includes original task and promise
+      // #then - continuation includes original task and promise (replaced for continue strategy)
       expect(promptCalls[0].text).toContain("Create a calculator app")
       expect(promptCalls[0].text).toContain("<promise>CALCULATOR_DONE</promise>")
     })
@@ -1114,6 +1157,47 @@ Original task: Build something`
       // #then - no create called because strategy was overridden to continue
       expect(createCalls.length).toBe(0)
       expect(promptCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("reset strategy should send full command template (not continuation)", async () => {
+      // #given - hook with reset strategy
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "reset" },
+      })
+      hook.startLoop("session-123", "Build a REST API")
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - prompt should use full command template format (same as iteration 1)
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).not.toContain("previous attempt")
+      expect(promptCalls[0].text).toContain("<command-instruction>")
+      expect(promptCalls[0].text).toContain("</command-instruction>")
+      expect(promptCalls[0].text).toContain("<user-task>")
+      expect(promptCalls[0].text).toContain("Build a REST API")
+      expect(promptCalls[0].text).toContain("</user-task>")
+    })
+
+    test("continue strategy should send continuation prompt referencing prior work", async () => {
+      // #given - hook with continue strategy
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        config: { enabled: true, default_max_iterations: 10, default_strategy: "continue" },
+      })
+      hook.startLoop("session-123", "Build a REST API")
+
+      // #when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // #then - prompt SHOULD reference "previous attempt" (same session has context)
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("previous attempt")
+      expect(promptCalls[0].text).toContain("Continue from where you left off")
+      expect(promptCalls[0].text).toContain("Build a REST API")
     })
   })
 })

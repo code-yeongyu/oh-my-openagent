@@ -6,7 +6,7 @@ import {
   resolveAgentVariant,
   resolveVariantForModel,
 } from "../shared/agent-variant"
-import { hasConnectedProvidersCache } from "../shared"
+import { hasConnectedProvidersCache, log } from "../shared"
 import {
   setSessionAgent,
 } from "../features/claude-code-session-state"
@@ -114,25 +114,46 @@ export function createChatMessageHandler(args: {
       )
 
       if (isRalphLoopTemplate) {
-        const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
-        const rawTask = taskMatch?.[1]?.trim() || ""
-        const quotedMatch = rawTask.match(/^["'](.+?)["']/)
-        const prompt =
-          quotedMatch?.[1] ||
-          rawTask.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const existingState = hooks.ralphLoop.getState()
+        if (existingState?.active) {
+          log("[ralph-loop] Loop already active, skipping re-initialization", {
+            sessionID: input.sessionID,
+            currentIteration: existingState.iteration,
+          })
+        } else {
+          const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
+          const rawTask = taskMatch?.[1]?.trim() || ""
 
-        const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawTask.match(
-          /--completion-promise=["']?([^"'\s]+)["']?/i,
-        )
-        const strategyMatch = rawTask.match(/--strategy=(reset|continue)/i)
+          const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
+          const promiseMatch = rawTask.match(
+            /--completion-promise=["']?([^"'\s]+)["']?/i,
+          )
+          const strategyMatch = rawTask.match(/--strategy=(reset|continue)/i)
 
-        hooks.ralphLoop.startLoop(input.sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
-          strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
-        })
+          log("[ralph-loop] Starting loop from chat.message", {
+            sessionID: input.sessionID,
+            prompt: rawTask,
+          })
+          const started = hooks.ralphLoop.startLoop(input.sessionID, rawTask, {
+            maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
+            completionPromise: promiseMatch?.[1],
+            strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
+          })
+
+          if (started && input.sessionID) {
+            ctx.client.session
+              .update({
+                path: { id: input.sessionID },
+                body: { title: "Ralph Loop - Iteration 1" },
+                query: { directory: ctx.directory },
+              })
+              .catch((err: unknown) => {
+                log("[ralph-loop] Failed to rename initial session", {
+                  error: String(err),
+                })
+              })
+          }
+        }
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }

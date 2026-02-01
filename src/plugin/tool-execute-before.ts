@@ -45,18 +45,14 @@ export function createToolExecuteBeforeHandler(args: {
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(?:ralph-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const rawArgs =
+          rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
 
         const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
         const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
         const strategyMatch = rawArgs.match(/--strategy=(reset|continue)/i)
 
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
+        hooks.ralphLoop.startLoop(sessionID, rawArgs, {
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
           strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
@@ -65,17 +61,12 @@ export function createToolExecuteBeforeHandler(args: {
         hooks.ralphLoop.cancelLoop(sessionID)
       } else if (command === "ulw-loop" && sessionID) {
         const rawArgs = rawCommand?.replace(/^\/?(?:ulw-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
 
         const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
         const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
         const strategyMatch = rawArgs.match(/--strategy=(reset|continue)/i)
 
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
+        hooks.ralphLoop.startLoop(sessionID, rawArgs, {
           ultrawork: true,
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],

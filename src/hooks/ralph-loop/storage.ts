@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "
 import { dirname, join } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import type { RalphLoopState } from "./types"
-import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
+import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS, DEFAULT_STRATEGY } from "./constants"
 import type { ContextStrategy } from "../../config"
 
 export function getStateFilePath(directory: string, customPath?: string): string {
@@ -77,14 +77,14 @@ export function writeState(
 
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
-    const strategyLine = state.strategy ? `strategy: "${state.strategy}"\n` : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
+strategy: "${state.strategy ?? DEFAULT_STRATEGY}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}${strategyLine}---
+${sessionIdLine}${ultraworkLine}---
 ${state.prompt}
 `
 
