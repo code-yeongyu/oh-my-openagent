@@ -2,30 +2,49 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync } from "fs"
 import { join } from "path"
 import type { TaskObject } from "./types"
+import { createTask } from "./task"
 
 const TEST_STORAGE = ".test-task-tool"
 const TEST_DIR = join(process.cwd(), TEST_STORAGE)
-
-// Mock tool factory - will be replaced with actual implementation
-function createTaskTool() {
-  return {
-    execute: async (args: Record<string, unknown>): Promise<string> => {
-      // Placeholder - tests will fail until implementation
-      return JSON.stringify({ error: "not_implemented" })
+const TEST_CONFIG = {
+  sisyphus: {
+    tasks: {
+      enabled: true,
+      storage_path: TEST_STORAGE,
+      claude_code_compat: true,
     },
-  }
+  },
+}
+const TEST_SESSION_ID = "test-session-123"
+const TEST_ABORT_CONTROLLER = new AbortController()
+const TEST_CONTEXT = {
+  sessionID: TEST_SESSION_ID,
+  messageID: "test-message-123",
+  agent: "test-agent",
+  abort: TEST_ABORT_CONTROLLER.signal,
 }
 
 describe("task_tool", () => {
-  let taskTool: ReturnType<typeof createTaskTool>
+  let taskTool: ReturnType<typeof createTask>
 
   beforeEach(() => {
     if (existsSync(TEST_STORAGE)) {
       rmSync(TEST_STORAGE, { recursive: true, force: true })
     }
     mkdirSync(TEST_DIR, { recursive: true })
-    taskTool = createTaskTool()
+    taskTool = createTask(TEST_CONFIG)
   })
+
+  async function createTestTask(title: string, overrides: Partial<Parameters<typeof taskTool.execute>[0]> = {}): Promise<string> {
+    const args = {
+      action: "create" as const,
+      title,
+      ...overrides,
+    }
+    const resultStr = await taskTool.execute(args, TEST_CONTEXT)
+    const result = JSON.parse(resultStr)
+    return (result as { task: TaskObject }).task.id
+  }
 
   afterEach(() => {
     if (existsSync(TEST_STORAGE)) {
@@ -41,12 +60,12 @@ describe("task_tool", () => {
     test("creates task with required title field", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Implement authentication",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -59,12 +78,12 @@ describe("task_tool", () => {
     test("auto-generates T-{uuid} format ID", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -74,12 +93,12 @@ describe("task_tool", () => {
     test("auto-records threadID from session context", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -90,12 +109,12 @@ describe("task_tool", () => {
     test("sets status to open by default", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -105,13 +124,13 @@ describe("task_tool", () => {
     test("stores optional description field", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
         description: "Detailed description of the task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -121,13 +140,13 @@ describe("task_tool", () => {
     test("stores dependsOn array", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
         dependsOn: ["T-dep1", "T-dep2"],
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -137,13 +156,13 @@ describe("task_tool", () => {
     test("stores parentID when provided", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Subtask",
         parentID: "T-parent123",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -153,13 +172,13 @@ describe("task_tool", () => {
     test("stores repoURL when provided", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
         repoURL: "https://github.com/code-yeongyu/oh-my-opencode",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -169,12 +188,12 @@ describe("task_tool", () => {
     test("returns result as JSON string with task property", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
 
       //#then
       expect(typeof resultStr).toBe("string")
@@ -185,12 +204,12 @@ describe("task_tool", () => {
     test("initializes dependsOn as empty array when not provided", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -206,11 +225,11 @@ describe("task_tool", () => {
     test("returns all non-completed tasks by default", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -221,11 +240,11 @@ describe("task_tool", () => {
     test("excludes completed tasks from list", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -236,12 +255,12 @@ describe("task_tool", () => {
     test("applies ready filter when requested", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
         ready: true,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -252,12 +271,12 @@ describe("task_tool", () => {
     test("respects limit parameter", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
         limit: 5,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -267,11 +286,11 @@ describe("task_tool", () => {
     test("returns result as JSON string with tasks array", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
 
       //#then
       expect(typeof resultStr).toBe("string")
@@ -282,12 +301,12 @@ describe("task_tool", () => {
     test("filters by status when provided", async () => {
       //#given
       const args = {
-        action: "list",
-        status: "in_progress",
+        action: "list" as const,
+        status: "in_progress" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -303,13 +322,14 @@ describe("task_tool", () => {
   describe("get action", () => {
     test("returns task by ID", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "get",
-        id: "T-test123",
+        action: "get" as const,
+        id: testId,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -319,12 +339,12 @@ describe("task_tool", () => {
     test("returns null for non-existent task", async () => {
       //#given
       const args = {
-        action: "get",
+        action: "get" as const,
         id: "T-nonexistent",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -333,13 +353,14 @@ describe("task_tool", () => {
 
     test("returns result as JSON string with task property", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "get",
-        id: "T-test123",
+        action: "get" as const,
+        id: testId,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
 
       //#then
       expect(typeof resultStr).toBe("string")
@@ -350,12 +371,12 @@ describe("task_tool", () => {
     test("returns complete task object with all fields", async () => {
       //#given
       const args = {
-        action: "get",
+        action: "get" as const,
         id: "T-test123",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -375,14 +396,15 @@ describe("task_tool", () => {
   describe("update action", () => {
     test("updates task title", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "update",
-        id: "T-test123",
+        action: "update" as const,
+        id: testId,
         title: "Updated title",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -392,14 +414,15 @@ describe("task_tool", () => {
 
     test("updates task description", async () => {
       //#given
+      const testId = await createTestTask("Test task", { description: "Initial description" })
       const args = {
-        action: "update",
-        id: "T-test123",
+        action: "update" as const,
+        id: testId,
         description: "Updated description",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -408,14 +431,15 @@ describe("task_tool", () => {
 
     test("updates task status", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "update",
-        id: "T-test123",
-        status: "in_progress",
+        action: "update" as const,
+        id: testId,
+        status: "in_progress" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -424,14 +448,15 @@ describe("task_tool", () => {
 
     test("updates dependsOn array", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "update",
-        id: "T-test123",
+        action: "update" as const,
+        id: testId,
         dependsOn: ["T-dep1", "T-dep2", "T-dep3"],
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -441,13 +466,13 @@ describe("task_tool", () => {
     test("returns error for non-existent task", async () => {
       //#given
       const args = {
-        action: "update",
+        action: "update" as const,
         id: "T-nonexistent",
         title: "New title",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -457,14 +482,15 @@ describe("task_tool", () => {
 
     test("returns result as JSON string with task property", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "update",
-        id: "T-test123",
+        action: "update" as const,
+        id: testId,
         title: "Updated",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
 
       //#then
       expect(typeof resultStr).toBe("string")
@@ -474,16 +500,17 @@ describe("task_tool", () => {
 
     test("updates multiple fields at once", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "update",
-        id: "T-test123",
+        action: "update" as const,
+        id: testId,
         title: "New title",
         description: "New description",
-        status: "completed",
+        status: "completed" as const,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -500,13 +527,14 @@ describe("task_tool", () => {
   describe("delete action", () => {
     test("removes task file physically", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "delete",
-        id: "T-test123",
+        action: "delete" as const,
+        id: testId,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -516,13 +544,14 @@ describe("task_tool", () => {
 
     test("returns success true on successful deletion", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "delete",
-        id: "T-test123",
+        action: "delete" as const,
+        id: testId,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -532,12 +561,12 @@ describe("task_tool", () => {
     test("returns error for non-existent task", async () => {
       //#given
       const args = {
-        action: "delete",
+        action: "delete" as const,
         id: "T-nonexistent",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -547,13 +576,14 @@ describe("task_tool", () => {
 
     test("returns result as JSON string", async () => {
       //#given
+      const testId = await createTestTask("Test task")
       const args = {
-        action: "delete",
-        id: "T-test123",
+        action: "delete" as const,
+        id: testId,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
 
       //#then
       expect(typeof resultStr).toBe("string")
@@ -570,13 +600,13 @@ describe("task_tool", () => {
     test("detects circular dependency (A depends on B, B depends on A)", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Task A",
         dependsOn: ["T-taskB"],
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -587,13 +617,13 @@ describe("task_tool", () => {
     test("handles task depending on non-existent ID", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Task with missing dependency",
         dependsOn: ["T-nonexistent"],
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -604,12 +634,12 @@ describe("task_tool", () => {
     test("ready filter returns true for empty dependsOn", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
         ready: true,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -620,12 +650,12 @@ describe("task_tool", () => {
     test("ready filter includes tasks with all completed dependencies", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
         ready: true,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -635,12 +665,12 @@ describe("task_tool", () => {
     test("ready filter excludes tasks with incomplete dependencies", async () => {
       //#given
       const args = {
-        action: "list",
+        action: "list" as const,
         ready: true,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -650,12 +680,12 @@ describe("task_tool", () => {
     test("handles empty title gracefully", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -667,12 +697,12 @@ describe("task_tool", () => {
       //#given
       const longTitle = "A".repeat(1000)
       const args = {
-        action: "create",
+        action: "create" as const,
         title: longTitle,
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -682,12 +712,12 @@ describe("task_tool", () => {
     test("handles special characters in title", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Task with special chars: !@#$%^&*()",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -697,12 +727,12 @@ describe("task_tool", () => {
     test("handles unicode characters in title", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "任務 🚀 Tâche",
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
@@ -712,7 +742,7 @@ describe("task_tool", () => {
     test("preserves all TaskObject fields in round-trip", async () => {
       //#given
       const args = {
-        action: "create",
+        action: "create" as const,
         title: "Test task",
         description: "Test description",
         dependsOn: ["T-dep1"],
@@ -721,7 +751,7 @@ describe("task_tool", () => {
       }
 
       //#when
-      const resultStr = await taskTool.execute(args)
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
