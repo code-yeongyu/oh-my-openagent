@@ -11,6 +11,7 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
   let cacheSpy: ReturnType<typeof spyOn>
+  let providerModelsSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     __resetModelCache()
@@ -25,11 +26,21 @@ describe("sisyphus-task", () => {
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
+    providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {
+        anthropic: ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"],
+        google: ["gemini-3-pro", "gemini-3-flash"],
+        openai: ["gpt-5.2", "gpt-5.2-codex"],
+      },
+      connected: ["anthropic", "google", "openai"],
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    })
   })
 
   afterEach(() => {
     __resetTimingConfig()
     cacheSpy?.mockRestore()
+    providerModelsSpy?.mockRestore()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -200,14 +211,17 @@ describe("sisyphus-task", () => {
       // given a mock client with no model in config
       const { createDelegateTask } = require("./tools")
       
-      const mockManager = { launch: async () => ({ id: "task-123" }) }
+      const mockManager = { launch: async () => ({ id: "task-123", status: "pending", description: "Test task", agent: "sisyphus-junior", sessionID: "test-session" }) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) }, // No model configured
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.2-codex" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
         },
       }
       
@@ -330,6 +344,46 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).toBeNull()
+    })
+
+    test("bypasses requiresModel when explicit user config provided", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-5"])
+      const userCategories = {
+        deep: { model: "anthropic/claude-opus-4-5" },
+      }
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+        userCategories,
+      })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-5")
+    })
+
+    test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>()
+      const userCategories = {
+        deep: { model: "anthropic/claude-opus-4-5" },
+      }
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+        userCategories,
+      })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-5")
     })
 
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
@@ -559,7 +613,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-5" }] },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -610,7 +664,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-5" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_default_variant" } }),
@@ -1159,7 +1213,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -1394,13 +1448,6 @@ describe("sisyphus-task", () => {
     test("artistry category (gemini) with run_in_background=false should force background but wait for result", async () => {
       // given - artistry also uses gemini model
       const { createDelegateTask } = require("./tools")
-      const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-        connected: ["anthropic", "google", "openai"],
-        updatedAt: new Date().toISOString(),
-        models: {
-          google: ["gemini-3-pro", "gemini-3-flash"],
-        },
-      })
       let launchCalled = false
       
       const mockManager = {
@@ -1419,7 +1466,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -1461,7 +1508,6 @@ describe("sisyphus-task", () => {
       expect(launchCalled).toBe(true)
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Artistry result here")
-      providerModelsSpy.mockRestore()
     }, { timeout: 20000 })
 
     test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
@@ -1485,7 +1531,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-flash" }] },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-flash" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_writing_gemini" } }),

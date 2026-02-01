@@ -23,20 +23,25 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("high")
   })
 
-  test("sisyphus has valid fallbackChain with claude-opus-4-5 as primary", () => {
-    // given - sisyphus agent requirement
+  test("sisyphus has valid fallbackChain with claude-opus-4-5 as primary and requiresAnyModel", () => {
+    // #given - sisyphus agent requirement
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
-    // when - accessing Sisyphus requirement
-    // then - fallbackChain exists with claude-opus-4-5 as first entry
+    // #when - accessing Sisyphus requirement
+    // #then - fallbackChain exists with claude-opus-4-5 as first entry, glm-4.7-free as last
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain.length).toBeGreaterThan(0)
+    expect(sisyphus.fallbackChain).toHaveLength(5)
+    expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
     expect(primary.providers[0]).toBe("anthropic")
     expect(primary.model).toBe("claude-opus-4-5")
     expect(primary.variant).toBe("max")
+
+    const last = sisyphus.fallbackChain[4]
+    expect(last.providers[0]).toBe("opencode")
+    expect(last.model).toBe("glm-4.7-free")
   })
 
   test("librarian has valid fallbackChain with glm-4.7 as primary", () => {
@@ -156,10 +161,21 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("kimi-for-coding")
   })
 
-  test("all 9 builtin agents have valid fallbackChain arrays", () => {
-    // given - list of 9 agent names
+  test("hephaestus requires gpt-5.2-codex", () => {
+    // #given - hephaestus agent requirement
+    const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
+
+    // #when - accessing hephaestus requirement
+    // #then - requiresModel is set to gpt-5.2-codex
+    expect(hephaestus).toBeDefined()
+    expect(hephaestus.requiresModel).toBe("gpt-5.2-codex")
+  })
+
+  test("all 10 builtin agents have valid fallbackChain arrays", () => {
+    // #given - list of 10 agent names
     const expectedAgents = [
       "sisyphus",
+      "hephaestus",
       "oracle",
       "librarian",
       "explore",
@@ -173,8 +189,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - checking AGENT_MODEL_REQUIREMENTS
     const definedAgents = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
-    // then - all agents present with valid fallbackChain
-    expect(definedAgents).toHaveLength(9)
+    // #then - all agents present with valid fallbackChain
+    expect(definedAgents).toHaveLength(10)
     for (const agent of expectedAgents) {
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
       expect(requirement).toBeDefined()

@@ -48,6 +48,28 @@ export function resolveCategoryConfig(
   return userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName];
 }
 
+const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const;
+
+function reorderAgentsByPriority(agents: Record<string, unknown>): Record<string, unknown> {
+  const ordered: Record<string, unknown> = {};
+  const seen = new Set<string>();
+
+  for (const key of CORE_AGENT_ORDER) {
+    if (Object.prototype.hasOwnProperty.call(agents, key)) {
+      ordered[key] = agents[key];
+      seen.add(key);
+    }
+  }
+
+  for (const [key, value] of Object.entries(agents)) {
+    if (!seen.has(key)) {
+      ordered[key] = value;
+    }
+  }
+
+  return ordered;
+}
+
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState } = deps;
 
@@ -287,7 +309,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
-          color: (configAgent?.plan?.color as string) ?? "#FF6347",
+          color: (configAgent?.plan?.color as string) ?? "#9D4EDD", // Amethyst Purple - wisdom/foresight
           ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
           ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
           ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
@@ -369,6 +391,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       };
     }
 
+    if (config.agent) {
+      config.agent = reorderAgentsByPriority(config.agent as Record<string, unknown>);
+    }
+
     const agentResult = config.agent as AgentConfig;
 
     config.tools = {
@@ -395,6 +421,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult.sisyphus) {
       const agent = agentResult.sisyphus as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+    }
+    if (agentResult.hephaestus) {
+      const agent = agentResult.hephaestus as AgentWithPermission;
       agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
     }
     if (agentResult["prometheus"]) {

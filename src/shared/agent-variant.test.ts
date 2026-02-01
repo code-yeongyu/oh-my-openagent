@@ -95,22 +95,22 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns correct variant for openai provider", () => {
-    // given
+  test("returns correct variant for openai provider (hephaestus agent)", () => {
+    // #given hephaestus has openai/gpt-5.2-codex with variant "medium" in its chain
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.2" }
+    const model = { providerID: "openai", modelID: "gpt-5.2-codex" }
 
-    // when
-    const variant = resolveVariantForModel(config, "sisyphus", model)
+    // #when
+    const variant = resolveVariantForModel(config, "hephaestus", model)
 
     // then
     expect(variant).toBe("medium")
   })
 
-  test("returns undefined for provider with no variant in chain", () => {
-    // given
+  test("returns undefined for provider not in sisyphus chain", () => {
+    // #given openai is not in sisyphus fallback chain anymore
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "google", modelID: "gemini-3-pro" }
+    const model = { providerID: "openai", modelID: "gpt-5.2" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
