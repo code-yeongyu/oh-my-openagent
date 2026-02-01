@@ -131,7 +131,7 @@ export function createChatMessageHandler(args: {
         hooks.ralphLoop.startLoop(input.sessionID, prompt, {
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
-          strategy: strategyMatch?.[1] as "reset" | "continue" | undefined,
+          strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
         })
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)

@@ -59,7 +59,7 @@ export function createToolExecuteBeforeHandler(args: {
         hooks.ralphLoop.startLoop(sessionID, prompt, {
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
-          strategy: strategyMatch?.[1] as "reset" | "continue" | undefined,
+          strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
         })
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
@@ -79,7 +79,7 @@ export function createToolExecuteBeforeHandler(args: {
           ultrawork: true,
           maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
           completionPromise: promiseMatch?.[1],
-          strategy: strategyMatch?.[1] as "reset" | "continue" | undefined,
+          strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
         })
       }
     }
