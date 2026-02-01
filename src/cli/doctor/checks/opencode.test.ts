@@ -1,4 +1,6 @@
 import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
+import { join } from "node:path"
+import { homedir } from "node:os"
 import * as opencode from "./opencode"
 import { MIN_OPENCODE_VERSION } from "../constants"
 
@@ -222,6 +224,81 @@ describe("opencode check", () => {
       expect(def.category).toBe("installation")
       expect(def.critical).toBe(true)
       expect(typeof def.check).toBe("function")
+    })
+  })
+
+  describe("getDesktopAppPaths", () => {
+    it("returns macOS desktop app paths for darwin platform", () => {
+      // given darwin platform
+      const platform: NodeJS.Platform = "darwin"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include macOS app bundle paths
+      expect(paths).toContain("/Applications/OpenCode.app/Contents/MacOS/opencode")
+      expect(paths.some((p) => p.includes("Applications/OpenCode.app"))).toBe(true)
+    })
+
+    it("returns Windows desktop app paths for win32 platform", () => {
+      // given win32 platform
+      const platform: NodeJS.Platform = "win32"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include Windows program paths
+      expect(paths.some((p) => p.includes("Program Files"))).toBe(true)
+      expect(paths.some((p) => p.endsWith("opencode.exe"))).toBe(true)
+    })
+
+    it("returns Linux desktop app paths for linux platform", () => {
+      // given linux platform
+      const platform: NodeJS.Platform = "linux"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include Linux installation paths
+      expect(paths.some((p) => p.includes("/opt/opencode"))).toBe(true)
+      expect(paths.some((p) => p.includes("/snap/bin"))).toBe(true)
+    })
+
+    it("returns empty array for unsupported platforms", () => {
+      // given unsupported platform
+      const platform = "freebsd" as NodeJS.Platform
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should return empty array
+      expect(paths).toEqual([])
+    })
+  })
+
+  describe("findOpenCodeBinary with desktop fallback", () => {
+    it("falls back to desktop paths when PATH binary not found", async () => {
+      // given no binary in PATH but desktop app exists
+      const existsSyncMock = (p: string) =>
+        p === "/Applications/OpenCode.app/Contents/MacOS/opencode"
+
+      // when finding binary with mocked filesystem
+      const result = await opencode.findDesktopBinary("darwin", existsSyncMock)
+
+      // then should find desktop app
+      expect(result).not.toBeNull()
+      expect(result?.path).toBe("/Applications/OpenCode.app/Contents/MacOS/opencode")
+    })
+
+    it("returns null when no desktop binary found", async () => {
+      // given no binary exists
+      const existsSyncMock = () => false
+
+      // when finding binary
+      const result = await opencode.findDesktopBinary("darwin", existsSyncMock)
+
+      // then should return null
+      expect(result).toBeNull()
     })
   })
 })

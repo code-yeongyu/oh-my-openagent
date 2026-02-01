@@ -1,7 +1,35 @@
+import { existsSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
 import type { CheckResult, CheckDefinition, OpenCodeInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, MIN_OPENCODE_VERSION, OPENCODE_BINARIES } from "../constants"
 
 const WINDOWS_EXECUTABLE_EXTS = [".exe", ".cmd", ".bat", ".ps1"]
+
+export function getDesktopAppPaths(platform: NodeJS.Platform): string[] {
+  const home = homedir()
+
+  switch (platform) {
+    case "darwin":
+      return [
+        "/Applications/OpenCode.app/Contents/MacOS/opencode",
+        join(home, "Applications/OpenCode.app/Contents/MacOS/opencode"),
+      ]
+    case "win32":
+      return [
+        "C:\\Program Files\\OpenCode\\opencode.exe",
+        join(process.env.LOCALAPPDATA ?? "", "Programs\\OpenCode\\opencode.exe"),
+      ]
+    case "linux":
+      return [
+        "/opt/opencode/bin/opencode",
+        "/snap/bin/opencode",
+        join(home, ".local/bin/opencode"),
+      ]
+    default:
+      return []
+  }
+}
 
 export function getBinaryLookupCommand(platform: NodeJS.Platform): "which" | "where" {
   return platform === "win32" ? "where" : "which"
@@ -52,6 +80,19 @@ export function buildVersionCommand(
   return [binaryPath, "--version"]
 }
 
+export function findDesktopBinary(
+  platform: NodeJS.Platform = process.platform,
+  checkExists: (path: string) => boolean = existsSync
+): { binary: string; path: string } | null {
+  const desktopPaths = getDesktopAppPaths(platform)
+  for (const desktopPath of desktopPaths) {
+    if (checkExists(desktopPath)) {
+      return { binary: "opencode", path: desktopPath }
+    }
+  }
+  return null
+}
+
 export async function findOpenCodeBinary(): Promise<{ binary: string; path: string } | null> {
   for (const binary of OPENCODE_BINARIES) {
     try {
@@ -63,6 +104,12 @@ export async function findOpenCodeBinary(): Promise<{ binary: string; path: stri
       continue
     }
   }
+
+  const desktopResult = findDesktopBinary()
+  if (desktopResult) {
+    return desktopResult
+  }
+
   return null
 }
 
