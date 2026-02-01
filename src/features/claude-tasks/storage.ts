@@ -73,37 +73,69 @@ export function listTaskFiles(config: Partial<OhMyOpenCodeConfig> = {}): string[
 
 export function acquireLock(dirPath: string): { acquired: boolean; release: () => void } {
   const lockPath = join(dirPath, ".lock")
-  const now = Date.now()
+  const lockId = randomUUID()
 
-  if (existsSync(lockPath)) {
+  const createLock = (timestamp: number) => {
+    writeFileSync(lockPath, JSON.stringify({ id: lockId, timestamp }), {
+      encoding: "utf-8",
+      flag: "wx",
+    })
+  }
+
+  const isStale = () => {
     try {
       const lockContent = readFileSync(lockPath, "utf-8")
       const lockData = JSON.parse(lockContent)
-      const lockAge = now - lockData.timestamp
-
-      if (lockAge <= STALE_LOCK_THRESHOLD_MS) {
-        return {
-          acquired: false,
-          release: () => {
-            // No-op release for failed acquisition
-          },
-        }
-      }
+      const lockAge = Date.now() - lockData.timestamp
+      return lockAge > STALE_LOCK_THRESHOLD_MS
     } catch {
-      // If lock file is corrupted, treat as stale and override
+      return true
+    }
+  }
+
+  const tryAcquire = () => {
+    const now = Date.now()
+    try {
+      createLock(now)
+      return true
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {
+        return false
+      }
+      throw error
     }
   }
 
   ensureDir(dirPath)
-  writeFileSync(lockPath, JSON.stringify({ timestamp: now }), "utf-8")
+
+  let acquired = tryAcquire()
+  if (!acquired && isStale()) {
+    try {
+      unlinkSync(lockPath)
+    } catch {
+      // Ignore cleanup errors
+    }
+    acquired = tryAcquire()
+  }
+
+  if (!acquired) {
+    return {
+      acquired: false,
+      release: () => {
+        // No-op release for failed acquisition
+      },
+    }
+  }
 
   return {
     acquired: true,
     release: () => {
       try {
-        if (existsSync(lockPath)) {
-          unlinkSync(lockPath)
-        }
+        if (!existsSync(lockPath)) return
+        const lockContent = readFileSync(lockPath, "utf-8")
+        const lockData = JSON.parse(lockContent)
+        if (lockData.id !== lockId) return
+        unlinkSync(lockPath)
       } catch {
         // Ignore cleanup errors
       }
