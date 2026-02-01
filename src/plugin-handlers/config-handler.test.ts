@@ -395,6 +395,43 @@ describe("Prometheus direct override priority over category", () => {
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.temperature).toBe(0.1)
   })
+
+  test("prometheus prompt_append is appended to base prompt", async () => {
+    // #given - prometheus override with prompt_append
+    const customInstructions = "## Custom Project Rules\nUse max 2 commits."
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+      agents: {
+        prometheus: {
+          prompt_append: customInstructions,
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - prompt_append is appended to base prompt, not overwriting it
+    const agents = config.agent as Record<string, { prompt?: string }>
+    expect(agents.prometheus).toBeDefined()
+    expect(agents.prometheus.prompt).toContain("Prometheus")
+    expect(agents.prometheus.prompt).toContain(customInstructions)
+    expect(agents.prometheus.prompt!.endsWith(customInstructions)).toBe(true)
+  })
 })
 
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
