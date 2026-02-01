@@ -76,7 +76,7 @@ describe("unstable-agent-babysitter hook", () => {
     const backgroundManager = createBackgroundManager([createTask()])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
-      config: { enabled: true, timeout_ms: 120000 },
+      config: { timeout_ms: 120000 },
     })
 
     // #when
@@ -111,7 +111,7 @@ describe("unstable-agent-babysitter hook", () => {
     ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
-      config: { enabled: true, timeout_ms: 120000 },
+      config: { timeout_ms: 120000 },
     })
 
     // #when
@@ -139,7 +139,7 @@ describe("unstable-agent-babysitter hook", () => {
     ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
-      config: { enabled: true, timeout_ms: 120000 },
+      config: { timeout_ms: 120000 },
     })
 
     // #when
@@ -160,7 +160,7 @@ describe("unstable-agent-babysitter hook", () => {
     const backgroundManager = createBackgroundManager([createTask()])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
-      config: { enabled: true, timeout_ms: 120000 },
+      config: { timeout_ms: 120000 },
     })
     const now = Date.now()
     const originalNow = Date.now
