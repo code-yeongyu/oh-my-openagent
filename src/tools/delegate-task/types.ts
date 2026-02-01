@@ -1,3 +1,9 @@
+import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../../features/background-agent"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+
+export type OpencodeClient = PluginInput["client"]
+
 export interface DelegateTaskArgs {
   description: string
   prompt: string
@@ -7,4 +13,35 @@ export interface DelegateTaskArgs {
   session_id?: string
   command?: string
   load_skills: string[]
+}
+
+export interface ToolContextWithMetadata {
+  sessionID: string
+  messageID: string
+  agent: string
+  abort: AbortSignal
+  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
+}
+
+export interface SyncSessionCreatedEvent {
+  sessionID: string
+  parentID: string
+  title: string
+}
+
+export interface DelegateTaskToolOptions {
+  manager: BackgroundManager
+  client: OpencodeClient
+  directory: string
+  userCategories?: CategoriesConfig
+  gitMasterConfig?: GitMasterConfig
+  sisyphusJuniorModel?: string
+  browserProvider?: BrowserAutomationProvider
+  onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
+}
+
+export interface BuildSystemContentInput {
+  skillContent?: string
+  categoryPromptAppend?: string
+  agentName?: string
 }

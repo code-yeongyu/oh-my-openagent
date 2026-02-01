@@ -30,21 +30,21 @@ function createMockSkill(name: string, description = ""): LoadedSkill {
 
 describe("slashcommand tool - synchronous description", () => {
   it("includes available_skills immediately when commands and skills are pre-provided", () => {
-    // #given
+    // given
     const commands = [createMockCommand("commit", "Create a git commit")]
     const skills = [createMockSkill("playwright", "Browser automation via Playwright MCP")]
 
-    // #when
+    // when
     const tool = createSlashcommandTool({ commands, skills })
 
-    // #then
+    // then
     expect(tool.description).toContain("<available_skills>")
     expect(tool.description).toContain("commit")
     expect(tool.description).toContain("playwright")
   })
 
   it("includes all pre-provided commands and skills in description immediately", () => {
-    // #given
+    // given
     const commands = [
       createMockCommand("commit", "Git commit"),
       createMockCommand("plan", "Create plan"),
@@ -55,10 +55,10 @@ describe("slashcommand tool - synchronous description", () => {
       createMockSkill("git-master", "Git operations"),
     ]
 
-    // #when
+    // when
     const tool = createSlashcommandTool({ commands, skills })
 
-    // #then
+    // then
     expect(tool.description).toContain("commit")
     expect(tool.description).toContain("plan")
     expect(tool.description).toContain("playwright")
@@ -67,10 +67,23 @@ describe("slashcommand tool - synchronous description", () => {
   })
 
   it("shows prefix-only description when both commands and skills are empty", () => {
-    // #given / #when
+    // given / #when
     const tool = createSlashcommandTool({ commands: [], skills: [] })
 
-    // #then - even with no items, description should be built synchronously (not just prefix)
+    // then - even with no items, description should be built synchronously (not just prefix)
     expect(tool.description).toContain("Load a skill")
+  })
+
+  it("includes user_message parameter documentation in description", () => {
+    // given
+    const commands = [createMockCommand("publish", "Publish package")]
+    const skills: LoadedSkill[] = []
+
+    // when
+    const tool = createSlashcommandTool({ commands, skills })
+
+    // then
+    expect(tool.description).toContain("user_message")
+    expect(tool.description).toContain("command='publish' user_message='patch'")
   })
 })
