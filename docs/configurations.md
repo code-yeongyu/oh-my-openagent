@@ -1017,9 +1017,9 @@ Configure notification behavior for background task completion.
 | -------------- | ------- | ---------------------------------------------------------------------------------------------- |
 | `force_enable` | `false` | Force enable session-notification even if external notification plugins are detected. Default: `false`. |
 
-## Sisyphus Tasks & Swarm
+## Sisyphus Tasks
 
-Configure Sisyphus Tasks and Swarm systems for advanced task management and multi-agent orchestration.
+Configure Sisyphus Tasks system for advanced task management.
 
 ```json
 {
@@ -1028,11 +1028,6 @@ Configure Sisyphus Tasks and Swarm systems for advanced task management and mult
       "enabled": false,
       "storage_path": ".sisyphus/tasks",
       "claude_code_compat": false
-    },
-    "swarm": {
-      "enabled": false,
-      "storage_path": ".sisyphus/teams",
-      "ui_mode": "toast"
     }
   }
 }
@@ -1045,14 +1040,6 @@ Configure Sisyphus Tasks and Swarm systems for advanced task management and mult
 | `enabled`            | `false`            | Enable Sisyphus Tasks system                                               |
 | `storage_path`       | `.sisyphus/tasks`  | Storage path for tasks (relative to project root)                           |
 | `claude_code_compat` | `false`            | Enable Claude Code path compatibility mode                                   |
-
-### Swarm Configuration
-
-| Option         | Default            | Description                                                    |
-| -------------- | ------------------ | -------------------------------------------------------------- |
-| `enabled`      | `false`            | Enable Sisyphus Swarm system for multi-agent orchestration        |
-| `storage_path` | `.sisyphus/teams`  | Storage path for teams (relative to project root)                |
-| `ui_mode`      | `toast`            | UI mode: `toast` (notifications), `tmux` (panes), or `both`     |
 
 ## MCPs
 
