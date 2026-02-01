@@ -51,6 +51,7 @@ export interface AgentResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -59,6 +60,7 @@ export interface CategoryResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -69,8 +71,8 @@ export interface ModelResolutionInfo {
 }
 
 interface OmoConfig {
-  agents?: Record<string, { model?: string }>
-  categories?: Record<string, { model?: string }>
+  agents?: Record<string, { model?: string; variant?: string }>
+  categories?: Record<string, { model?: string; variant?: string }>
 }
 
 function loadConfig(): OmoConfig | null {
@@ -152,10 +154,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.agents?.[name]?.model
+      const userVariant = config.agents?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
@@ -165,10 +169,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.categories?.[name]?.model
+      const userVariant = config.categories?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
@@ -182,7 +188,10 @@ function formatModelWithVariant(model: string, variant?: string): string {
   return variant ? `${model} (${variant})` : model
 }
 
-function getEffectiveVariant(requirement: ModelRequirement): string | undefined {
+function getEffectiveVariant(requirement: ModelRequirement, userVariant?: string): string | undefined {
+  if (userVariant) {
+    return userVariant
+  }
   const firstEntry = requirement.fallbackChain[0]
   return firstEntry?.variant ?? requirement.variant
 }
@@ -215,14 +224,14 @@ function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModels
   details.push("Agents:")
   for (const agent of info.agents) {
     const marker = agent.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.requirement))
+    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.requirement, agent.userVariant))
     details.push(`  ${marker} ${agent.name}: ${display}`)
   }
   details.push("")
   details.push("Categories:")
   for (const category of info.categories) {
     const marker = category.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(category.effectiveModel, getEffectiveVariant(category.requirement))
+    const display = formatModelWithVariant(category.effectiveModel, getEffectiveVariant(category.requirement, category.userVariant))
     details.push(`  ${marker} ${category.name}: ${display}`)
   }
   details.push("")
