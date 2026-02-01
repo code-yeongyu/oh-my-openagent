@@ -1261,6 +1261,75 @@ describe("sisyphus-task", () => {
       expect(result).toContain("task-normal-bg")
     })
 
+    test("minimax model with run_in_background=false should force background but wait for result", async () => {
+      // given - custom category using minimax model with run_in_background=false
+      const { createDelegateTask } = require("./tools")
+      let launchCalled = false
+
+      const mockManager = {
+        launch: async () => {
+          launchCalled = true
+          return {
+            id: "task-unstable-minimax",
+            sessionID: "ses_unstable_minimax",
+            description: "Unstable minimax task",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_unstable_minimax" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Minimax task completed successfully" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_unstable_minimax": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "minimax-cat": {
+            model: "minimax/abab-5",
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using minimax category with run_in_background=false
+      const result = await tool.execute(
+        {
+          description: "Test minimax forced background",
+          prompt: "Do something with minimax",
+          category: "minimax-cat",
+          run_in_background: false,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - should launch as background BUT wait for and return actual result
+      expect(launchCalled).toBe(true)
+      expect(result).toContain("SUPERVISED TASK COMPLETED")
+      expect(result).toContain("Minimax task completed successfully")
+    }, { timeout: 20000 })
+
     test("non-gemini model with run_in_background=false should run sync (not forced to background)", async () => {
       // given - category using non-gemini model with run_in_background=false
       const { createDelegateTask } = require("./tools")
