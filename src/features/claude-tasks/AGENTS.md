@@ -40,9 +40,9 @@ interface Task {
 
 ## STORAGE UTILITIES
 
-### getTaskDir(teamName, config)
+### getTaskDir(config)
 
-Returns: `.sisyphus/tasks/{teamName}` (or custom path from config)
+Returns: `.sisyphus/tasks` (or custom path from config)
 
 ### readJsonSafe(filePath, schema)
 
@@ -80,7 +80,7 @@ Returns: `.sisyphus/tasks/{teamName}` (or custom path from config)
 ```typescript
 import { TaskSchema, getTaskDir, readJsonSafe, writeJsonAtomic, acquireLock } from "./features/claude-tasks"
 
-const taskDir = getTaskDir("my-team", config)
+const taskDir = getTaskDir(config)
 const lock = acquireLock(taskDir)
 
 try {

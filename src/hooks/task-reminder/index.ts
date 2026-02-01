@@ -1,10 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-const TASK_TOOLS = new Set(["task"])
+const TASK_TOOLS = new Set([
+  "task",
+  "task_create",
+  "task_list",
+  "task_get",
+  "task_update",
+  "task_delete",
+])
 const TURN_THRESHOLD = 10
 const REMINDER_MESSAGE = `
 
-The task tools haven't been used recently. If you're working on tasks that would benefit from tracking progress, consider using TaskCreate to add new tasks and TaskUpdate to update task status (set to in_progress when starting, completed when done).`
+The task tools haven't been used recently. If you're tracking work, use task with action=create/update (or task_create/task_update) to record progress.`
 
 interface ToolExecuteInput {
   tool: string
@@ -41,5 +48,12 @@ export function createTaskReminderHook(_ctx: PluginInput) {
 
   return {
     "tool.execute.after": toolExecuteAfter,
+    event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
+      if (event.type !== "session.deleted") return
+      const props = event.properties as { info?: { id?: string } } | undefined
+      const sessionId = props?.info?.id
+      if (!sessionId) return
+      sessionCounters.delete(sessionId)
+    },
   }
 }

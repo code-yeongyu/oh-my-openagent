@@ -113,13 +113,18 @@ export function loadPluginConfig(
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? { new_task_system_enabled: false };
+    loadConfigFromPath(userConfigPath, ctx) ?? {};
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);
   }
+
+  config = {
+    ...config,
+    new_task_system_enabled: config.new_task_system_enabled ?? false,
+  };
 
   log("Final merged config", {
     agents: config.agents,

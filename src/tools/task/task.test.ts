@@ -351,6 +351,22 @@ describe("task_tool", () => {
       expect(result.task).toBeNull()
     })
 
+    test("rejects invalid task id", async () => {
+      //#given
+      const args = {
+        action: "get" as const,
+        id: "../package",
+      }
+
+      //#when
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result).toHaveProperty("error")
+      expect(result.error).toBe("invalid_task_id")
+    })
+
     test("returns result as JSON string with task property", async () => {
       //#given
       const testId = await createTestTask("Test task")
@@ -480,6 +496,41 @@ describe("task_tool", () => {
       expect(result.error).toBe("task_not_found")
     })
 
+    test("rejects invalid task id", async () => {
+      //#given
+      const args = {
+        action: "update" as const,
+        id: "../package",
+        title: "New title",
+      }
+
+      //#when
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result).toHaveProperty("error")
+      expect(result.error).toBe("invalid_task_id")
+    })
+
+    test("returns lock unavailable when lock is held", async () => {
+      //#given
+      writeFileSync(join(TEST_DIR, ".lock"), JSON.stringify({ id: "test", timestamp: Date.now() }))
+      const args = {
+        action: "update" as const,
+        id: "T-nonexistent",
+        title: "New title",
+      }
+
+      //#when
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result).toHaveProperty("error")
+      expect(result.error).toBe("task_lock_unavailable")
+    })
+
     test("returns result as JSON string with task property", async () => {
       //#given
       const testId = await createTestTask("Test task")
@@ -572,6 +623,22 @@ describe("task_tool", () => {
       //#then
       expect(result).toHaveProperty("error")
       expect(result.error).toBe("task_not_found")
+    })
+
+    test("rejects invalid task id", async () => {
+      //#given
+      const args = {
+        action: "delete" as const,
+        id: "../package",
+      }
+
+      //#when
+      const resultStr = await taskTool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result).toHaveProperty("error")
+      expect(result.error).toBe("invalid_task_id")
     })
 
     test("returns result as JSON string", async () => {
