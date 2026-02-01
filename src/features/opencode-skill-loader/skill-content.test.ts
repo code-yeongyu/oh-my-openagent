@@ -127,18 +127,19 @@ describe("resolveMultipleSkills", () => {
 })
 
 describe("resolveSkillContentAsync", () => {
-	it("should return template for builtin skill", async () => {
+	it("should return template for builtin skill async", async () => {
 		// given: builtin skill 'frontend-ui-ux'
 		// when: resolving content async
-		const result = await resolveSkillContentAsync("frontend-ui-ux")
+		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
+		const result = await resolveSkillContentAsync("git-master", options)
 
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Role: Designer-Turned-Developer")
+		expect(result).toContain("Git Master Agent")
 	})
 
-	it("should return null for disabled skill", async () => {
+	it("should return null for disabled skill async", async () => {
 		// given: frontend-ui-ux disabled
 		const options = { disabledSkills: new Set(["frontend-ui-ux"]) }
 
@@ -151,9 +152,9 @@ describe("resolveSkillContentAsync", () => {
 })
 
 describe("resolveMultipleSkillsAsync", () => {
-	it("should resolve builtin skills", async () => {
+	it("should resolve builtin skills async", async () => {
 		// given: builtin skill names
-		const skillNames = ["playwright", "frontend-ui-ux"]
+		const skillNames = ["playwright", "git-master"]
 
 		// when: resolving multiple skills async
 		const result = await resolveMultipleSkillsAsync(skillNames)
@@ -162,10 +163,10 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
-		expect(result.resolved.get("frontend-ui-ux")).toContain("Designer-Turned-Developer")
+		expect(result.resolved.get("git-master")).toContain("Git Master Agent")
 	})
 
-	it("should handle partial success with non-existent skills", async () => {
+	it("should handle partial success with non-existent skills async", async () => {
 		// given: mix of existing and non-existing skills
 		const skillNames = ["playwright", "nonexistent-skill-12345"]
 
