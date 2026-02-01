@@ -5,8 +5,6 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
-import { TaskStateManager } from "./state"
-import { tryCompleteTask as tryCompleteTaskFn } from "./result-handler"
 
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -183,33 +181,17 @@ function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
 }
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
-  return (manager as unknown as { state: { tasks: Map<string, BackgroundTask> } }).state.tasks
-}
-
-function getManagerInternals(manager: BackgroundManager): {
-  client: unknown
-  concurrencyManager: ConcurrencyManager
-  state: TaskStateManager
-} {
-  return manager as unknown as {
-    client: unknown
-    concurrencyManager: ConcurrencyManager
-    state: TaskStateManager
-  }
+  return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
 }
 
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
-  const internals = getManagerInternals(manager)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return tryCompleteTaskFn(task, "test", {
-    client: internals.client as any,
-    concurrencyManager: internals.concurrencyManager,
-    state: internals.state,
-  })
+  return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> })
+    .tryCompleteTask(task, "test")
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function stubNotifyParentSession(_manager: BackgroundManager): void {}
+function stubNotifyParentSession(manager: BackgroundManager): void {
+  ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {}
+}
 
 function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
   const signals: Array<NodeJS.Signals | "beforeExit" | "exit"> = ["SIGINT", "SIGTERM", "beforeExit", "exit"]
@@ -993,6 +975,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
           abortedSessionIDs.push(args.path.id)
           return {}
         },
+        messages: async () => ({ data: [] }),
       },
     }
     manager.shutdown()
@@ -1758,7 +1741,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1790,7 +1773,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1805,6 +1788,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-3",
@@ -1822,7 +1806,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1840,6 +1824,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 60_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-4",
@@ -1857,7 +1842,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1873,6 +1858,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-5",
@@ -1891,7 +1877,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       concurrencyKey: "test-agent",
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1907,6 +1893,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task1: BackgroundTask = {
       id: "task-6",
@@ -1940,8 +1927,8 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task1.id, task1)
-    manager["state"].tasks.set(task2.id, task2)
+    getTaskMap(manager).set(task1.id, task1)
+    getTaskMap(manager).set(task2.id, task2)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1957,6 +1944,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-8",
@@ -1974,7 +1962,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["state"].tasks.set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -2143,7 +2131,7 @@ describe("BackgroundManager.shutdown session abort", () => {
 
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
   function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
-    return (manager as unknown as { state: { completionTimers: Map<string, ReturnType<typeof setTimeout>> } }).state.completionTimers
+    return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
   }
 
   function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
