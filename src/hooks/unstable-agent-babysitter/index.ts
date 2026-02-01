@@ -99,7 +99,7 @@ function extractMessages(value: unknown): unknown[] {
 function isUnstableTask(task: BackgroundTask): boolean {
   if (task.isUnstableAgent === true) return true
   const modelId = task.model?.modelID?.toLowerCase()
-  return modelId ? modelId.includes("gemini") : false
+  return modelId ? modelId.includes("gemini") || modelId.includes("minimax") : false
 }
 
 async function resolveMainSessionTarget(

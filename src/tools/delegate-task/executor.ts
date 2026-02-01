@@ -873,7 +873,8 @@ Available categories: ${categoryNames.join(", ")}`,
     }
   }
 
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || (actualModel?.toLowerCase().includes("gemini") ?? false)
+  const unstableModel = actualModel?.toLowerCase()
+  const isUnstableAgent = resolved.config.is_unstable_agent === true || (unstableModel ? unstableModel.includes("gemini") || unstableModel.includes("minimax") : false)
 
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,
