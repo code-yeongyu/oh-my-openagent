@@ -301,9 +301,19 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             : {}),
         };
 
-        agentConfig["prometheus"] = prometheusOverride
-          ? { ...prometheusBase, ...prometheusOverride }
-          : prometheusBase;
+        // Properly handle prompt_append for Prometheus
+        // Extract prompt_append and append it to prompt instead of shallow spread
+        // Fixes: https://github.com/code-yeongyu/oh-my-opencode/issues/723
+        if (prometheusOverride) {
+          const { prompt_append, ...restOverride } = prometheusOverride as Record<string, unknown> & { prompt_append?: string };
+          const merged = { ...prometheusBase, ...restOverride };
+          if (prompt_append && merged.prompt) {
+            merged.prompt = merged.prompt + "\n" + prompt_append;
+          }
+          agentConfig["prometheus"] = merged;
+        } else {
+          agentConfig["prometheus"] = prometheusBase;
+        }
       }
 
     const filteredConfigAgents = configAgent
