@@ -91,14 +91,16 @@ describe("createBuiltinMcps", () => {
     const disabledMcps = ["websearch"]
     const config = { websearch: { provider: "tavily" as const } }
 
-    // when
-    const createMcps = () => createBuiltinMcps(disabledMcps, config)
+    try {
+      // when
+      const createMcps = () => createBuiltinMcps(disabledMcps, config)
 
-    // then
-    expect(createMcps).not.toThrow()
-    const result = createMcps()
-    expect(result).not.toHaveProperty("websearch")
-
-    if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
+      // then
+      expect(createMcps).not.toThrow()
+      const result = createMcps()
+      expect(result).not.toHaveProperty("websearch")
+    } finally {
+      if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
+    }
   })
 })
