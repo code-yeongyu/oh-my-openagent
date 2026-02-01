@@ -152,12 +152,13 @@ ${librarianSection}
 
 \`\`\`typescript
 // CORRECT: Always background, always parallel
+// Prompt structure: [CONTEXT: what I'm doing] + [GOAL: what I'm trying to achieve] + [QUESTION: what I need to know] + [REQUEST: what to find]
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking

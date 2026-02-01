@@ -359,8 +359,9 @@ delegate_task(..., run_in_background=true)  // task_id_3
 
 1. **GATHER CONTEXT** (parallel background agents):
    \`\`\`
-   delegate_task(subagent_type="explore", run_in_background=true, prompt="...")
-   delegate_task(subagent_type="librarian", run_in_background=true, prompt="...")
+   // Prompt structure: CONTEXT (what I'm doing) + GOAL (what I'm trying to achieve) + QUESTION (what I need to know) + REQUEST (what to find)
+   delegate_task(subagent_type="explore", run_in_background=true, prompt="I'm working on [task] and need to understand the codebase context. Find [specific patterns, files, implementations] related to this work.")
+   delegate_task(subagent_type="librarian", run_in_background=true, prompt="I'm implementing [feature] and need external references. Find [official docs, best practices, OSS examples] for guidance.")
    \`\`\`
 
 2. **INVOKE PLAN AGENT** (MANDATORY for non-trivial tasks):
