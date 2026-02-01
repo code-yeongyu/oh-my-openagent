@@ -1,7 +1,10 @@
 # CLAUDE CODE HOOKS COMPATIBILITY
 
 ## OVERVIEW
-Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands defined in Claude Code configuration.
+
+Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands.
+
+**Config Sources** (priority): `.claude/settings.json` (project) > `~/.claude/settings.json` (global)
 
 ## STRUCTURE
 ```
