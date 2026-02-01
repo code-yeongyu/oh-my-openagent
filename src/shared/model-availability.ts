@@ -259,6 +259,26 @@ export async function fetchAvailableModels(
 	return modelSet
 }
 
+export function isAnyFallbackModelAvailable(
+	fallbackChain: Array<{ providers: string[]; model: string }>,
+	availableModels: Set<string>,
+): boolean {
+	if (availableModels.size === 0) {
+		return false
+	}
+
+	for (const entry of fallbackChain) {
+		const hasAvailableProvider = entry.providers.some((provider) => {
+			return fuzzyMatchModel(entry.model, availableModels, [provider]) !== null
+		})
+		if (hasAvailableProvider) {
+			return true
+		}
+	}
+	log("[isAnyFallbackModelAvailable] no model available in chain", { chainLength: fallbackChain.length })
+	return false
+}
+
 export function __resetModelCache(): void {}
 
 export function isModelCacheAvailable(): boolean {

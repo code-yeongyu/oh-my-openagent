@@ -224,4 +224,108 @@ describe("opencode check", () => {
       expect(typeof def.check).toBe("function")
     })
   })
+
+  describe("getDesktopAppPaths", () => {
+    it("returns macOS desktop app paths for darwin platform", () => {
+      // given darwin platform
+      const platform: NodeJS.Platform = "darwin"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include macOS app bundle paths with correct binary name
+      expect(paths).toContain("/Applications/OpenCode.app/Contents/MacOS/OpenCode")
+      expect(paths.some((p) => p.includes("Applications/OpenCode.app"))).toBe(true)
+    })
+
+    it("returns Windows desktop app paths for win32 platform when env vars set", () => {
+      // given win32 platform with env vars set
+      const platform: NodeJS.Platform = "win32"
+      const originalProgramFiles = process.env.ProgramFiles
+      const originalLocalAppData = process.env.LOCALAPPDATA
+      process.env.ProgramFiles = "C:\\Program Files"
+      process.env.LOCALAPPDATA = "C:\\Users\\Test\\AppData\\Local"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include Windows program paths with correct binary name
+      expect(paths.some((p) => p.includes("Program Files"))).toBe(true)
+      expect(paths.some((p) => p.endsWith("OpenCode.exe"))).toBe(true)
+      expect(paths.every((p) => p.startsWith("C:\\"))).toBe(true)
+
+      // cleanup
+      process.env.ProgramFiles = originalProgramFiles
+      process.env.LOCALAPPDATA = originalLocalAppData
+    })
+
+    it("returns empty array for win32 when all env vars undefined", () => {
+      // given win32 platform with no env vars
+      const platform: NodeJS.Platform = "win32"
+      const originalProgramFiles = process.env.ProgramFiles
+      const originalLocalAppData = process.env.LOCALAPPDATA
+      delete process.env.ProgramFiles
+      delete process.env.LOCALAPPDATA
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should return empty array (no relative paths)
+      expect(paths).toEqual([])
+
+      // cleanup
+      process.env.ProgramFiles = originalProgramFiles
+      process.env.LOCALAPPDATA = originalLocalAppData
+    })
+
+    it("returns Linux desktop app paths for linux platform", () => {
+      // given linux platform
+      const platform: NodeJS.Platform = "linux"
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should include verified Linux installation paths
+      expect(paths).toContain("/usr/bin/opencode")
+      expect(paths).toContain("/usr/lib/opencode/opencode")
+      expect(paths.some((p) => p.includes("AppImage"))).toBe(true)
+    })
+
+    it("returns empty array for unsupported platforms", () => {
+      // given unsupported platform
+      const platform = "freebsd" as NodeJS.Platform
+
+      // when getting desktop paths
+      const paths = opencode.getDesktopAppPaths(platform)
+
+      // then should return empty array
+      expect(paths).toEqual([])
+    })
+  })
+
+  describe("findOpenCodeBinary with desktop fallback", () => {
+    it("falls back to desktop paths when PATH binary not found", async () => {
+      // given no binary in PATH but desktop app exists
+      const existsSyncMock = (p: string) =>
+        p === "/Applications/OpenCode.app/Contents/MacOS/OpenCode"
+
+      // when finding binary with mocked filesystem
+      const result = await opencode.findDesktopBinary("darwin", existsSyncMock)
+
+      // then should find desktop app
+      expect(result).not.toBeNull()
+      expect(result?.path).toBe("/Applications/OpenCode.app/Contents/MacOS/OpenCode")
+    })
+
+    it("returns null when no desktop binary found", async () => {
+      // given no binary exists
+      const existsSyncMock = () => false
+
+      // when finding binary
+      const result = await opencode.findDesktopBinary("darwin", existsSyncMock)
+
+      // then should return null
+      expect(result).toBeNull()
+    })
+  })
 })

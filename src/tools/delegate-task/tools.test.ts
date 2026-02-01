@@ -11,6 +11,7 @@ const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
 describe("sisyphus-task", () => {
   let cacheSpy: ReturnType<typeof spyOn>
+  let providerModelsSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     __resetModelCache()
@@ -25,11 +26,21 @@ describe("sisyphus-task", () => {
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
+    providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: {
+        anthropic: ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"],
+        google: ["gemini-3-pro", "gemini-3-flash"],
+        openai: ["gpt-5.2", "gpt-5.2-codex"],
+      },
+      connected: ["anthropic", "google", "openai"],
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    })
   })
 
   afterEach(() => {
     __resetTimingConfig()
     cacheSpy?.mockRestore()
+    providerModelsSpy?.mockRestore()
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -200,14 +211,17 @@ describe("sisyphus-task", () => {
       // given a mock client with no model in config
       const { createDelegateTask } = require("./tools")
       
-      const mockManager = { launch: async () => ({ id: "task-123" }) }
+      const mockManager = { launch: async () => ({ id: "task-123", status: "pending", description: "Test task", agent: "sisyphus-junior", sessionID: "test-session" }) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) }, // No model configured
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.2-codex" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
         },
       }
       
@@ -237,7 +251,7 @@ describe("sisyphus-task", () => {
       
       // then proceeds without error - uses fallback chain
       expect(result).not.toContain("oh-my-opencode requires a default model")
-    })
+    }, { timeout: 10000 })
 
     test("returns clear error when no model can be resolved", async () => {
       // given - custom category with no model, no systemDefaultModel, no available models
@@ -330,6 +344,46 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).toBeNull()
+    })
+
+    test("bypasses requiresModel when explicit user config provided", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-5"])
+      const userCategories = {
+        deep: { model: "anthropic/claude-opus-4-5" },
+      }
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+        userCategories,
+      })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-5")
+    })
+
+    test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
+      // #given
+      const categoryName = "deep"
+      const availableModels = new Set<string>()
+      const userCategories = {
+        deep: { model: "anthropic/claude-opus-4-5" },
+      }
+
+      // #when
+      const result = resolveCategoryConfig(categoryName, {
+        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
+        availableModels,
+        userCategories,
+      })
+
+      // #then
+      expect(result).not.toBeNull()
+      expect(result!.config.model).toBe("anthropic/claude-opus-4-5")
     })
 
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
@@ -559,7 +613,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-5" }] },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -610,7 +664,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "anthropic/claude-opus-4-5" }] },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-opus-4-5" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_default_variant" } }),
@@ -1159,7 +1213,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -1394,13 +1448,6 @@ describe("sisyphus-task", () => {
     test("artistry category (gemini) with run_in_background=false should force background but wait for result", async () => {
       // given - artistry also uses gemini model
       const { createDelegateTask } = require("./tools")
-      const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-        connected: ["anthropic", "google", "openai"],
-        updatedAt: new Date().toISOString(),
-        models: {
-          google: ["gemini-3-pro", "gemini-3-flash"],
-        },
-      })
       let launchCalled = false
       
       const mockManager = {
@@ -1419,7 +1466,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => ({ data: [{ provider: "google", id: "gemini-3-pro" }] }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -1461,7 +1508,6 @@ describe("sisyphus-task", () => {
       expect(launchCalled).toBe(true)
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Artistry result here")
-      providerModelsSpy.mockRestore()
     }, { timeout: 20000 })
 
     test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
@@ -1485,7 +1531,7 @@ describe("sisyphus-task", () => {
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        model: { list: async () => [{ id: "google/gemini-3-flash" }] },
+        model: { list: async () => [{ provider: "google", id: "gemini-3-flash" }] },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_writing_gemini" } }),
@@ -2516,5 +2562,163 @@ describe("sisyphus-task", () => {
       // then - oracle should NOT have delegate_task permission
       expect(promptBody.tools.delegate_task).toBe(false)
     }, { timeout: 20000 })
+  })
+
+  describe("session title and metadata format (OpenCode compatibility)", () => {
+    test("sync session title follows OpenCode format: '{description} (@{agent} subagent)'", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let createBody: any
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async (input: any) => {
+            createBody = input.body
+            return { data: { id: "ses_title_test" } }
+          },
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
+          }),
+          status: async () => ({ data: { "ses_title_test": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - sync task with category
+      await tool.execute(
+        {
+          description: "Implement feature X",
+          prompt: "Build the feature",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - title should follow OpenCode format
+      expect(createBody.title).toBe("Implement feature X (@sisyphus-junior subagent)")
+    }, { timeout: 10000 })
+
+    test("sync task output includes <task_metadata> block with session_id", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = { launch: async () => ({}) }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_metadata_test" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Task completed" }] }]
+          }),
+          status: async () => ({ data: { "ses_metadata_test": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Test metadata format",
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - output should contain <task_metadata> block
+      expect(result).toContain("<task_metadata>")
+      expect(result).toContain("session_id: ses_metadata_test")
+      expect(result).toContain("</task_metadata>")
+    }, { timeout: 10000 })
+
+    test("background task output includes <task_metadata> block with session_id", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "bg_meta_test",
+          sessionID: "ses_bg_metadata",
+          description: "Background metadata test",
+          agent: "sisyphus-junior",
+          status: "running",
+        }),
+      }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
+        session: {
+          create: async () => ({ data: { id: "ses_bg_metadata" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Background metadata test",
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - output should contain <task_metadata> block
+      expect(result).toContain("<task_metadata>")
+      expect(result).toContain("session_id: ses_bg_metadata")
+      expect(result).toContain("</task_metadata>")
+    }, { timeout: 10000 })
   })
 })

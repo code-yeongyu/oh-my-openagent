@@ -18,6 +18,7 @@ const AgentPermissionSchema = z.object({
 
 export const BuiltinAgentNameSchema = z.enum([
   "sisyphus",
+  "hephaestus",
   "prometheus",
   "oracle",
   "librarian",
@@ -39,6 +40,7 @@ export const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
   "sisyphus",
+  "hephaestus",
   "sisyphus-junior",
   "OpenCode-Builder",
   "prometheus",
@@ -137,6 +139,7 @@ export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
   sisyphus: AgentOverrideConfigSchema.optional(),
+  hephaestus: AgentOverrideConfigSchema.optional(),
   "sisyphus-junior": AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
   prometheus: AgentOverrideConfigSchema.optional(),
@@ -310,7 +313,6 @@ export const NotificationConfigSchema = z.object({
 })
 
 export const BabysittingConfigSchema = z.object({
-  enabled: z.boolean().default(false),
   timeout_ms: z.number().default(120000),
 })
 

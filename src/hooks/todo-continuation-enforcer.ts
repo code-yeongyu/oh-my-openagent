@@ -231,7 +231,16 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const prompt = `${CONTINUATION_PROMPT}\n\n[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]`
+    const incompleteTodos = todos.filter(t => t.status !== "completed" && t.status !== "cancelled")
+    const todoList = incompleteTodos
+      .map(t => `- [${t.status}] ${t.content}`)
+      .join("\n")
+    const prompt = `${CONTINUATION_PROMPT}
+
+[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]
+
+Remaining tasks:
+${todoList}`
 
     try {
       log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })

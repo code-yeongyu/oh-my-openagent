@@ -3,28 +3,8 @@ import { spawn } from "bun"
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {
-  const isWindows = process.platform === "win32"
-  const cmd = isWindows ? "where" : "which"
-
   try {
-    const proc = spawn([cmd, commandName], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-
-    const exitCode = await proc.exited
-    if (exitCode !== 0) {
-      return null
-    }
-
-    const stdout = await new Response(proc.stdout).text()
-    const path = stdout.trim().split("\n")[0]
-
-    if (!path) {
-      return null
-    }
-
-    return path
+    return Bun.which(commandName)
   } catch {
     return null
   }

@@ -9,8 +9,9 @@ import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "
 import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
+import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -21,6 +22,7 @@ type AgentSource = AgentFactory | AgentConfig
 
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
   sisyphus: createSisyphusAgent,
+  hephaestus: createHephaestusAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
@@ -260,10 +262,14 @@ export async function createBuiltinAgents(
 
   const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
 
+  // Collect general agents first (for availableAgents), but don't add to result yet
+  const pendingAgentConfigs: Map<string, AgentConfig> = new Map()
+
    for (const [name, source] of Object.entries(agentSources)) {
      const agentName = name as BuiltinAgentName
 
      if (agentName === "sisyphus") continue
+     if (agentName === "hephaestus") continue
      if (agentName === "atlas") continue
      if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 
@@ -309,7 +315,8 @@ export async function createBuiltinAgents(
 
     config = applyOverrides(config, override, mergedCategories)
 
-    result[name] = config
+    // Store for later - will be added after sisyphus and hephaestus
+    pendingAgentConfigs.set(name, config)
 
     const metadata = agentMetadata[agentName]
     if (metadata) {
@@ -321,10 +328,15 @@ export async function createBuiltinAgents(
     }
   }
 
-   if (!disabledAgents.includes("sisyphus")) {
-     const sisyphusOverride = agentOverrides["sisyphus"]
-     const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
-    
+   const sisyphusOverride = agentOverrides["sisyphus"]
+   const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
+   const hasSisyphusExplicitConfig = sisyphusOverride !== undefined
+   const meetsSisyphusAnyModelRequirement =
+     !sisyphusRequirement?.requiresAnyModel ||
+     hasSisyphusExplicitConfig ||
+     isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
+
+   if (!disabledAgents.includes("sisyphus") && meetsSisyphusAnyModelRequirement) {
     const sisyphusResolution = applyModelResolution({
       uiSelectedModel,
       userModel: sisyphusOverride?.model,
@@ -353,6 +365,61 @@ export async function createBuiltinAgents(
 
       result["sisyphus"] = sisyphusConfig
     }
+   }
+
+  if (!disabledAgents.includes("hephaestus")) {
+    const hephaestusOverride = agentOverrides["hephaestus"]
+    const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
+    const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
+
+    const hasRequiredModel =
+      !hephaestusRequirement?.requiresModel ||
+      hasHephaestusExplicitConfig ||
+      (availableModels.size > 0 && isModelAvailable(hephaestusRequirement.requiresModel, availableModels))
+
+    if (hasRequiredModel) {
+      const hephaestusResolution = applyModelResolution({
+        userModel: hephaestusOverride?.model,
+        requirement: hephaestusRequirement,
+        availableModels,
+        systemDefaultModel,
+      })
+
+      if (hephaestusResolution) {
+        const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
+
+        let hephaestusConfig = createHephaestusAgent(
+          hephaestusModel,
+          availableAgents,
+          undefined,
+          availableSkills,
+          availableCategories
+        )
+        
+        hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
+
+        const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
+        if (hepOverrideCategory) {
+          hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
+        }
+
+        if (directory && hephaestusConfig.prompt) {
+          const envContext = createEnvContext()
+          hephaestusConfig = { ...hephaestusConfig, prompt: hephaestusConfig.prompt + envContext }
+        }
+
+        if (hephaestusOverride) {
+          hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride)
+        }
+
+        result["hephaestus"] = hephaestusConfig
+      }
+    }
+   }
+
+   // Add pending agents after sisyphus and hephaestus to maintain order
+   for (const [name, config] of pendingAgentConfigs) {
+     result[name] = config
    }
 
    if (!disabledAgents.includes("atlas")) {

@@ -65,6 +65,7 @@ export class SkillMcpManager {
   private authProviders: Map<string, McpOAuthProvider> = new Map()
   private cleanupRegistered = false
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
+  private cleanupHandlers: Array<{ signal: NodeJS.Signals; listener: () => void }> = []
   private readonly IDLE_TIMEOUT = 5 * 60 * 1000
 
   private getClientKey(info: SkillMcpClientInfo): string {
@@ -119,11 +120,26 @@ export class SkillMcpManager {
     // Don't call process.exit() here - let the background-agent manager handle the final process exit.
     // Use void + catch to trigger async cleanup without awaiting it in the signal handler.
 
-    process.on("SIGINT", () => void cleanup().catch(() => {}))
-    process.on("SIGTERM", () => void cleanup().catch(() => {}))
-    if (process.platform === "win32") {
-      process.on("SIGBREAK", () => void cleanup().catch(() => {}))
+    const register = (signal: NodeJS.Signals) => {
+      const listener = () => void cleanup().catch(() => {})
+      this.cleanupHandlers.push({ signal, listener })
+      process.on(signal, listener)
     }
+
+    register("SIGINT")
+    register("SIGTERM")
+    if (process.platform === "win32") {
+      register("SIGBREAK")
+    }
+  }
+
+  private unregisterProcessCleanup(): void {
+    if (!this.cleanupRegistered) return
+    for (const { signal, listener } of this.cleanupHandlers) {
+      process.off(signal, listener)
+    }
+    this.cleanupHandlers = []
+    this.cleanupRegistered = false
   }
 
   async getOrCreateClient(
@@ -376,12 +392,23 @@ export class SkillMcpManager {
         }
       }
     }
+
+    for (const key of keysToRemove) {
+      this.pendingConnections.delete(key)
+    }
+
+    if (this.clients.size === 0) {
+      this.stopCleanupTimer()
+    }
   }
 
   async disconnectAll(): Promise<void> {
     this.stopCleanupTimer()
+    this.unregisterProcessCleanup()
     const clients = Array.from(this.clients.values())
     this.clients.clear()
+    this.pendingConnections.clear()
+    this.authProviders.clear()
     for (const managed of clients) {
       try {
         await managed.client.close()
@@ -419,6 +446,10 @@ export class SkillMcpManager {
           await managed.transport.close()
         } catch { /* transport may already be terminated */ }
       }
+    }
+
+    if (this.clients.size === 0) {
+      this.stopCleanupTimer()
     }
   }
 
