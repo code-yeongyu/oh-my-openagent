@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Claude Code compatible task schema and storage. Foundation for TaskCreate, TaskGet, TaskUpdate, TaskList tools.
+Claude Code compatible task schema and storage. Provides core task management utilities used by task-related tools and features.
 
 ## STRUCTURE
 

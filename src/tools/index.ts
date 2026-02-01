@@ -74,7 +74,4 @@ export const builtinTools: Record<string, ToolDefinition> = {
   session_info,
 }
 
-export { createTaskCreate } from "./claude-tasks/task-create"
-export { createTaskGet } from "./claude-tasks/task-get"
-export { createTaskUpdate } from "./claude-tasks/task-update"
-export { createTaskList } from "./claude-tasks/task-list"
+export { createTask } from "./task"
