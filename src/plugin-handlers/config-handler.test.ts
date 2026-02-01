@@ -107,7 +107,7 @@ afterEach(() => {
 
 describe("Plan agent demote behavior", () => {
   test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
-    // #given
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -133,10 +133,10 @@ describe("Plan agent demote behavior", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then
+    // then
     const agents = config.agent as Record<string, { mode?: string; name?: string }>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
@@ -144,7 +144,7 @@ describe("Plan agent demote behavior", () => {
   })
 
   test("prometheus should have mode 'all' to be callable via delegate_task", async () => {
-    // #given
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -163,10 +163,10 @@ describe("Plan agent demote behavior", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then
+    // then
     const agents = config.agent as Record<string, { mode?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.mode).toBe("all")
@@ -175,32 +175,32 @@ describe("Plan agent demote behavior", () => {
 
 describe("Prometheus category config resolution", () => {
   test("resolves ultrabrain category config", () => {
-    // #given
+    // given
     const categoryName = "ultrabrain"
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("openai/gpt-5.2-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
   test("resolves visual-engineering category config", () => {
-    // #given
+    // given
     const categoryName = "visual-engineering"
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("google/gemini-3-pro")
   })
 
   test("user categories override default categories", () => {
-    // #given
+    // given
     const categoryName = "ultrabrain"
     const userCategories: Record<string, CategoryConfig> = {
       ultrabrain: {
@@ -209,28 +209,28 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("google/antigravity-claude-opus-4-5-thinking")
     expect(config?.temperature).toBe(0.1)
   })
 
   test("returns undefined for unknown category", () => {
-    // #given
+    // given
     const categoryName = "nonexistent-category"
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // then
     expect(config).toBeUndefined()
   })
 
   test("falls back to default when user category has no entry", () => {
-    // #given
+    // given
     const categoryName = "ultrabrain"
     const userCategories: Record<string, CategoryConfig> = {
       "visual-engineering": {
@@ -238,17 +238,17 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then - falls back to DEFAULT_CATEGORIES
+    // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
     expect(config?.model).toBe("openai/gpt-5.2-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
   test("preserves all category properties (temperature, top_p, tools, etc.)", () => {
-    // #given
+    // given
     const categoryName = "custom-category"
     const userCategories: Record<string, CategoryConfig> = {
       "custom-category": {
@@ -260,10 +260,10 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("test/model")
     expect(config?.temperature).toBe(0.5)
@@ -275,7 +275,7 @@ describe("Prometheus category config resolution", () => {
 
 describe("Prometheus direct override priority over category", () => {
   test("direct reasoningEffort takes priority over category reasoningEffort", async () => {
-    // #given - category has reasoningEffort=xhigh, direct override says "low"
+    // given - category has reasoningEffort=xhigh, direct override says "low"
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -306,17 +306,17 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - direct override's reasoningEffort wins
+    // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.reasoningEffort).toBe("low")
   })
 
   test("category reasoningEffort applied when no direct override", async () => {
-    // #given - category has reasoningEffort but no direct override
+    // given - category has reasoningEffort but no direct override
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -346,17 +346,17 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - category's reasoningEffort is applied
+    // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.reasoningEffort).toBe("high")
   })
 
   test("direct temperature takes priority over category temperature", async () => {
-    // #given
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -387,10 +387,10 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - direct temperature wins over category
+    // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.temperature).toBe(0.1)
@@ -399,7 +399,7 @@ describe("Prometheus direct override priority over category", () => {
 
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
   test("fetchAvailableModels should be called with undefined client to prevent deadlock during plugin init", async () => {
-    // #given - This test ensures we don't regress on issue #1301
+    // given - This test ensures we don't regress on issue #1301
     // Passing client to fetchAvailableModels during config handler causes deadlock:
     // - Plugin init waits for server response (client.provider.list())
     // - Server waits for plugin init to complete before handling requests
@@ -427,10 +427,10 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - fetchAvailableModels must be called with undefined as first argument (no client)
+    // then - fetchAvailableModels must be called with undefined as first argument (no client)
     // This prevents the deadlock described in issue #1301
     expect(fetchSpy).toHaveBeenCalled()
     const firstCallArgs = fetchSpy.mock.calls[0]

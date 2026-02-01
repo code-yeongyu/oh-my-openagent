@@ -17,7 +17,7 @@ describe("install CLI - binary check behavior", () => {
   let getOpenCodeVersionSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    // #given temporary config directory
+    // given temporary config directory
     tempDir = join(tmpdir(), `omo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tempDir, { recursive: true })
 
@@ -49,7 +49,7 @@ describe("install CLI - binary check behavior", () => {
   })
 
   test("non-TUI mode: should show warning but continue when OpenCode binary not found", async () => {
-    // #given OpenCode binary is NOT installed
+    // given OpenCode binary is NOT installed
     isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(false)
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
 
@@ -63,24 +63,24 @@ describe("install CLI - binary check behavior", () => {
       zaiCodingPlan: "no",
     }
 
-    // #when running install
+    // when running install
     const exitCode = await install(args)
 
-    // #then should return success (0), not failure (1)
+    // then should return success (0), not failure (1)
     expect(exitCode).toBe(0)
 
-    // #then should have printed a warning (not error)
+    // then should have printed a warning (not error)
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
     expect(allCalls).toContain("[!]") // warning symbol
     expect(allCalls).toContain("OpenCode")
   })
 
   test("non-TUI mode: should create opencode.json with plugin even when binary not found", async () => {
-    // #given OpenCode binary is NOT installed
+    // given OpenCode binary is NOT installed
     isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(false)
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
 
-    // #given mock npm fetch
+    // given mock npm fetch
     globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: true,
@@ -98,28 +98,28 @@ describe("install CLI - binary check behavior", () => {
       zaiCodingPlan: "no",
     }
 
-    // #when running install
+    // when running install
     const exitCode = await install(args)
 
-    // #then should create opencode.json
+    // then should create opencode.json
     const configPath = join(tempDir, "opencode.json")
     expect(existsSync(configPath)).toBe(true)
 
-    // #then opencode.json should have plugin entry
+    // then opencode.json should have plugin entry
     const config = JSON.parse(readFileSync(configPath, "utf-8"))
     expect(config.plugin).toBeDefined()
     expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(true)
 
-    // #then exit code should be 0 (success)
+    // then exit code should be 0 (success)
     expect(exitCode).toBe(0)
   })
 
   test("non-TUI mode: should still succeed and complete all steps when binary exists", async () => {
-    // #given OpenCode binary IS installed
+    // given OpenCode binary IS installed
     isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200")
 
-    // #given mock npm fetch
+    // given mock npm fetch
     globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: true,
@@ -137,13 +137,13 @@ describe("install CLI - binary check behavior", () => {
       zaiCodingPlan: "no",
     }
 
-    // #when running install
+    // when running install
     const exitCode = await install(args)
 
-    // #then should return success
+    // then should return success
     expect(exitCode).toBe(0)
 
-    // #then should have printed success (OK symbol)
+    // then should have printed success (OK symbol)
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
     expect(allCalls).toContain("[OK]")
     expect(allCalls).toContain("OpenCode 1.0.200")

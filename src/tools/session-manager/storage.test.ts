@@ -50,60 +50,60 @@ describe("session-manager storage", () => {
   })
 
   test("getAllSessions returns empty array when no sessions exist", async () => {
-    // #when
+    // when
     const sessions = await getAllSessions()
 
-    // #then
+    // then
     expect(Array.isArray(sessions)).toBe(true)
     expect(sessions).toEqual([])
   })
 
   test("getMessageDir finds session in direct path", () => {
-    // #given
+    // given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001", role: "user" }))
 
-    // #when
+    // when
     const result = getMessageDir(sessionID)
 
-    // #then
+    // then
     expect(result).toBe(sessionPath)
   })
 
   test("sessionExists returns false for non-existent session", () => {
-    // #when
+    // when
     const exists = sessionExists("ses_nonexistent")
 
-    // #then
+    // then
     expect(exists).toBe(false)
   })
 
   test("sessionExists returns true for existing session", () => {
-    // #given
+    // given
     const sessionID = "ses_exists"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001" }))
 
-    // #when
+    // when
     const exists = sessionExists(sessionID)
 
-    // #then
+    // then
     expect(exists).toBe(true)
   })
 
   test("readSessionMessages returns empty array for non-existent session", async () => {
-    // #when
+    // when
     const messages = await readSessionMessages("ses_nonexistent")
 
-    // #then
+    // then
     expect(messages).toEqual([])
   })
 
   test("readSessionMessages sorts messages by timestamp", async () => {
-    // #given
+    // given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
@@ -117,33 +117,33 @@ describe("session-manager storage", () => {
       JSON.stringify({ id: "msg_001", role: "user", time: { created: 1000 } })
     )
 
-    // #when
+    // when
     const messages = await readSessionMessages(sessionID)
 
-    // #then
+    // then
     expect(messages.length).toBe(2)
     expect(messages[0].id).toBe("msg_001")
     expect(messages[1].id).toBe("msg_002")
   })
 
   test("readSessionTodos returns empty array when no todos exist", async () => {
-    // #when
+    // when
     const todos = await readSessionTodos("ses_nonexistent")
 
-    // #then
+    // then
     expect(todos).toEqual([])
   })
 
   test("getSessionInfo returns null for non-existent session", async () => {
-    // #when
+    // when
     const info = await getSessionInfo("ses_nonexistent")
 
-    // #then
+    // then
     expect(info).toBeNull()
   })
 
   test("getSessionInfo aggregates session metadata correctly", async () => {
-    // #given
+    // given
     const sessionID = "ses_test123"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
@@ -168,10 +168,10 @@ describe("session-manager storage", () => {
       })
     )
 
-    // #when
+    // when
     const info = await getSessionInfo(sessionID)
 
-    // #then
+    // then
     expect(info).not.toBeNull()
     expect(info?.id).toBe(sessionID)
     expect(info?.message_count).toBe(2)
@@ -228,7 +228,7 @@ describe("session-manager storage - getMainSessions", () => {
   }
 
   test("getMainSessions returns only sessions without parentID", async () => {
-    // #given
+    // given
     const projectID = "proj_abc123"
     const now = Date.now()
 
@@ -240,16 +240,16 @@ describe("session-manager storage - getMainSessions", () => {
     createMessageForSession("ses_main2", "msg_001", now - 1000)
     createMessageForSession("ses_child1", "msg_001", now)
 
-    // #when
+    // when
     const sessions = await storage.getMainSessions({ directory: "/test/path" })
 
-    // #then
+    // then
     expect(sessions.length).toBe(2)
     expect(sessions.map((s) => s.id)).not.toContain("ses_child1")
   })
 
   test("getMainSessions sorts by time.updated descending (most recent first)", async () => {
-    // #given
+    // given
     const projectID = "proj_abc123"
     const now = Date.now()
 
@@ -261,10 +261,10 @@ describe("session-manager storage - getMainSessions", () => {
     createMessageForSession("ses_mid", "msg_001", now - 2000)
     createMessageForSession("ses_new", "msg_001", now)
 
-    // #when
+    // when
     const sessions = await storage.getMainSessions({ directory: "/test/path" })
 
-    // #then
+    // then
     expect(sessions.length).toBe(3)
     expect(sessions[0].id).toBe("ses_new")
     expect(sessions[1].id).toBe("ses_mid")
@@ -272,7 +272,7 @@ describe("session-manager storage - getMainSessions", () => {
   })
 
   test("getMainSessions filters by directory (project path)", async () => {
-    // #given
+    // given
     const projectA = "proj_aaa"
     const projectB = "proj_bbb"
     const now = Date.now()
@@ -283,11 +283,11 @@ describe("session-manager storage - getMainSessions", () => {
     createMessageForSession("ses_projA", "msg_001", now)
     createMessageForSession("ses_projB", "msg_001", now)
 
-    // #when
+    // when
     const sessionsA = await storage.getMainSessions({ directory: "/path/to/projectA" })
     const sessionsB = await storage.getMainSessions({ directory: "/path/to/projectB" })
 
-    // #then
+    // then
     expect(sessionsA.length).toBe(1)
     expect(sessionsA[0].id).toBe("ses_projA")
     expect(sessionsB.length).toBe(1)
@@ -295,7 +295,7 @@ describe("session-manager storage - getMainSessions", () => {
   })
 
   test("getMainSessions returns all main sessions when directory is not specified", async () => {
-    // #given
+    // given
     const projectA = "proj_aaa"
     const projectB = "proj_bbb"
     const now = Date.now()
@@ -306,10 +306,10 @@ describe("session-manager storage - getMainSessions", () => {
     createMessageForSession("ses_projA", "msg_001", now)
     createMessageForSession("ses_projB", "msg_001", now - 1000)
 
-    // #when
+    // when
     const sessions = await storage.getMainSessions({})
 
-    // #then
+    // then
     expect(sessions.length).toBe(2)
   })
 })

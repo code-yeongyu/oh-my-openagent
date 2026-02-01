@@ -10,9 +10,9 @@ import {
 } from "./types"
 
 describe("MailboxMessageSchema", () => {
-  //#given a valid mailbox message
-  //#when parsing
-  //#then it should succeed
+  // given a valid mailbox message
+  // when parsing
+  // then it should succeed
   it("parses valid message", () => {
     const msg = {
       from: "agent-001",
@@ -23,9 +23,9 @@ describe("MailboxMessageSchema", () => {
     expect(MailboxMessageSchema.safeParse(msg).success).toBe(true)
   })
 
-  //#given a message with optional color
-  //#when parsing
-  //#then it should succeed
+  // given a message with optional color
+  // when parsing
+  // then it should succeed
   it("parses message with color", () => {
     const msg = {
       from: "agent-001",
@@ -39,9 +39,9 @@ describe("MailboxMessageSchema", () => {
 })
 
 describe("ProtocolMessageSchema", () => {
-  //#given permission_request message
-  //#when parsing
-  //#then it should succeed
+  // given permission_request message
+  // when parsing
+  // then it should succeed
   it("parses permission_request", () => {
     const msg = {
       type: "permission_request",
@@ -54,9 +54,9 @@ describe("ProtocolMessageSchema", () => {
     expect(PermissionRequestSchema.safeParse(msg).success).toBe(true)
   })
 
-  //#given permission_response message
-  //#when parsing
-  //#then it should succeed
+  // given permission_response message
+  // when parsing
+  // then it should succeed
   it("parses permission_response", () => {
     const approved = {
       type: "permission_response",
@@ -75,17 +75,17 @@ describe("ProtocolMessageSchema", () => {
     expect(PermissionResponseSchema.safeParse(rejected).success).toBe(true)
   })
 
-  //#given shutdown_request message
-  //#when parsing
-  //#then it should succeed
+  // given shutdown_request message
+  // when parsing
+  // then it should succeed
   it("parses shutdown messages", () => {
     const request = { type: "shutdown_request" }
     expect(ShutdownRequestSchema.safeParse(request).success).toBe(true)
   })
 
-  //#given task_assignment message
-  //#when parsing
-  //#then it should succeed
+  // given task_assignment message
+  // when parsing
+  // then it should succeed
   it("parses task_assignment", () => {
     const msg = {
       type: "task_assignment",
@@ -98,9 +98,9 @@ describe("ProtocolMessageSchema", () => {
     expect(TaskAssignmentSchema.safeParse(msg).success).toBe(true)
   })
 
-  //#given join_request message
-  //#when parsing
-  //#then it should succeed
+  // given join_request message
+  // when parsing
+  // then it should succeed
   it("parses join_request", () => {
     const msg = {
       type: "join_request",

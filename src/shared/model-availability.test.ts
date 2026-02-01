@@ -153,9 +153,9 @@ describe("fetchAvailableModels", () => {
 })
 
 describe("fuzzyMatchModel", () => {
-	// #given available models from multiple providers
-	// #when searching for a substring match
-	// #then return the matching model
+	// given available models from multiple providers
+	// when searching for a substring match
+	// then return the matching model
 	it("should match substring in model name", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -166,9 +166,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given available model with preview suffix
-	// #when searching with provider-prefixed base model
-	// #then return preview model
+	// given available model with preview suffix
+	// when searching with provider-prefixed base model
+	// then return preview model
 	it("should match preview suffix for gemini-3-flash", () => {
 		const available = new Set(["google/gemini-3-flash-preview"])
 		const result = fuzzyMatchModel(
@@ -179,9 +179,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("google/gemini-3-flash-preview")
 	})
 
-	// #given available models with partial matches
-	// #when searching for a substring
-	// #then return exact match if it exists
+	// given available models with partial matches
+	// when searching for a substring
+	// then return exact match if it exists
 	it("should prefer exact match over substring match", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -192,9 +192,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given available models with multiple substring matches
-	// #when searching for a substring
-	// #then return the shorter model name (more specific)
+	// given available models with multiple substring matches
+	// when searching for a substring
+	// then return the shorter model name (more specific)
 	it("should prefer shorter model name when multiple matches exist", () => {
 		const available = new Set([
 			"openai/gpt-5.2-ultra",
@@ -204,9 +204,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2-ultra")
 	})
 
-	// #given available models with claude variants
-	// #when searching for claude-opus
-	// #then return matching claude-opus model
+	// given available models with claude variants
+	// when searching for claude-opus
+	// then return matching claude-opus model
 	it("should match claude-opus to claude-opus-4-5", () => {
 		const available = new Set([
 			"anthropic/claude-opus-4-5",
@@ -216,9 +216,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-5")
 	})
 
-	// #given available models from multiple providers
-	// #when providers filter is specified
-	// #then only search models from specified providers
+	// given available models from multiple providers
+	// when providers filter is specified
+	// then only search models from specified providers
 	it("should filter by provider when providers array is given", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -229,9 +229,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given available models from multiple providers
-	// #when providers filter excludes matching models
-	// #then return null
+	// given available models from multiple providers
+	// when providers filter excludes matching models
+	// then return null
 	it("should return null when provider filter excludes all matches", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -241,9 +241,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBeNull()
 	})
 
-	// #given available models
-	// #when no substring match exists
-	// #then return null
+	// given available models
+	// when no substring match exists
+	// then return null
 	it("should return null when no match found", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -253,9 +253,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBeNull()
 	})
 
-	// #given available models with different cases
-	// #when searching with different case
-	// #then match case-insensitively
+	// given available models with different cases
+	// when searching with different case
+	// then match case-insensitively
 	it("should match case-insensitively", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -265,9 +265,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given available models with exact match and longer variants
-	// #when searching for exact match
-	// #then return exact match first
+	// given available models with exact match and longer variants
+	// when searching for exact match
+	// then return exact match first
 	it("should prioritize exact match over longer variants", () => {
 		const available = new Set([
 			"anthropic/claude-opus-4-5",
@@ -277,9 +277,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-5")
 	})
 
-	// #given available models with multiple providers
-	// #when multiple providers are specified
-	// #then search all specified providers
+	// given available models with multiple providers
+	// when multiple providers are specified
+	// then search all specified providers
 	it("should search all specified providers", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -290,9 +290,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given available models with provider prefix
-	// #when searching with provider filter
-	// #then only match models with correct provider prefix
+	// given available models with provider prefix
+	// when searching with provider filter
+	// then only match models with correct provider prefix
 	it("should only match models with correct provider prefix", () => {
 		const available = new Set([
 			"openai/gpt-5.2",
@@ -302,9 +302,9 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("openai/gpt-5.2")
 	})
 
-	// #given empty available set
-	// #when searching
-	// #then return null
+	// given empty available set
+	// when searching
+	// then return null
 	it("should return null for empty available set", () => {
 		const available = new Set<string>()
 		const result = fuzzyMatchModel("gpt", available)
@@ -313,9 +313,9 @@ describe("fuzzyMatchModel", () => {
 })
 
 describe("getConnectedProviders", () => {
-	//#given SDK client with connected providers
-	//#when provider.list returns data
-	//#then returns connected array
+	// given SDK client with connected providers
+	// when provider.list returns data
+	// then returns connected array
 	it("should return connected providers from SDK", async () => {
 		const mockClient = {
 			provider: {
@@ -330,9 +330,9 @@ describe("getConnectedProviders", () => {
 		expect(result).toEqual(["anthropic", "opencode", "google"])
 	})
 
-	//#given SDK client
-	//#when provider.list throws error
-	//#then returns empty array
+	// given SDK client
+	// when provider.list throws error
+	// then returns empty array
 	it("should return empty array on SDK error", async () => {
 		const mockClient = {
 			provider: {
@@ -345,9 +345,9 @@ describe("getConnectedProviders", () => {
 		expect(result).toEqual([])
 	})
 
-	//#given SDK client with empty connected array
-	//#when provider.list returns empty
-	//#then returns empty array
+	// given SDK client with empty connected array
+	// when provider.list returns empty
+	// then returns empty array
 	it("should return empty array when no providers connected", async () => {
 		const mockClient = {
 			provider: {
@@ -360,9 +360,9 @@ describe("getConnectedProviders", () => {
 		expect(result).toEqual([])
 	})
 
-	//#given SDK client without provider.list method
-	//#when getConnectedProviders called
-	//#then returns empty array
+	// given SDK client without provider.list method
+	// when getConnectedProviders called
+	// then returns empty array
 	it("should return empty array when client.provider.list not available", async () => {
 		const mockClient = {}
 
@@ -371,18 +371,18 @@ describe("getConnectedProviders", () => {
 		expect(result).toEqual([])
 	})
 
-	//#given null client
-	//#when getConnectedProviders called
-	//#then returns empty array
+	// given null client
+	// when getConnectedProviders called
+	// then returns empty array
 	it("should return empty array for null client", async () => {
 		const result = await getConnectedProviders(null)
 
 		expect(result).toEqual([])
 	})
 
-	//#given SDK client with missing data.connected
-	//#when provider.list returns without connected field
-	//#then returns empty array
+	// given SDK client with missing data.connected
+	// when provider.list returns without connected field
+	// then returns empty array
 	it("should return empty array when data.connected is undefined", async () => {
 		const mockClient = {
 			provider: {
@@ -422,9 +422,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 
-	//#given cache with multiple providers
-	//#when connectedProviders specifies one provider
-	//#then only returns models from that provider
+	// given cache with multiple providers
+	// when connectedProviders specifies one provider
+	// then only returns models from that provider
 	it("should filter models by connected providers", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -442,9 +442,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.has("google/gemini-3-pro")).toBe(false)
 	})
 
-	//#given cache with multiple providers
-	//#when connectedProviders specifies multiple providers
-	//#then returns models from all specified providers
+	// given cache with multiple providers
+	// when connectedProviders specifies multiple providers
+	// then returns models from all specified providers
 	it("should filter models by multiple connected providers", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -462,9 +462,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.has("openai/gpt-5.2")).toBe(false)
 	})
 
-	//#given cache with models
-	//#when connectedProviders is empty array
-	//#then returns empty set
+	// given cache with models
+	// when connectedProviders is empty array
+	// then returns empty set
 	it("should return empty set when connectedProviders is empty", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -478,9 +478,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.size).toBe(0)
 	})
 
-	//#given cache with models
-	//#when connectedProviders is undefined (no options)
-	//#then returns empty set (triggers fallback in resolver)
+	// given cache with models
+	// when connectedProviders is undefined (no options)
+	// then returns empty set (triggers fallback in resolver)
 	it("should return empty set when connectedProviders not specified", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -492,9 +492,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.size).toBe(0)
 	})
 
-	//#given cache with models
-	//#when connectedProviders contains provider not in cache
-	//#then returns empty set for that provider
+	// given cache with models
+	// when connectedProviders contains provider not in cache
+	// then returns empty set for that provider
 	it("should handle provider not in cache gracefully", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -507,9 +507,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.size).toBe(0)
 	})
 
-	//#given cache with models and mixed connected providers
-	//#when some providers exist in cache and some don't
-	//#then returns models only from matching providers
+	// given cache with models and mixed connected providers
+	// when some providers exist in cache and some don't
+	// then returns models only from matching providers
 	it("should return models from providers that exist in both cache and connected list", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -524,9 +524,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result.has("anthropic/claude-opus-4-5")).toBe(true)
 	})
 
-	//#given filtered fetch
-	//#when called twice with different filters
-	//#then does NOT use cache (dynamic per-session)
+	// given filtered fetch
+	// when called twice with different filters
+	// then does NOT use cache (dynamic per-session)
 	it("should not cache filtered results", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -547,9 +547,9 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 		expect(result2.has("openai/gpt-5.2")).toBe(true)
 	})
 
-	//#given connectedProviders unknown
-	//#when called twice without connectedProviders
-	//#then always returns empty set (triggers fallback)
+	// given connectedProviders unknown
+	// when called twice without connectedProviders
+	// then always returns empty set (triggers fallback)
 	it("should return empty set when connectedProviders unknown", async () => {
 		writeModelsCache({
 			openai: { models: { "gpt-5.2": { id: "gpt-5.2" } } },
@@ -598,9 +598,9 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 
-	//#given provider-models cache exists (whitelist-filtered)
-	//#when fetchAvailableModels called
-	//#then uses provider-models cache instead of models.json
+	// given provider-models cache exists (whitelist-filtered)
+	// when fetchAvailableModels called
+	// then uses provider-models cache instead of models.json
 	it("should prefer provider-models cache over models.json", async () => {
 		writeProviderModelsCache({
 			models: {
@@ -626,9 +626,9 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(result.has("anthropic/claude-sonnet-4-5")).toBe(false)
 	})
 
-	//#given provider-models cache exists but has no models (API failure)
-	//#when fetchAvailableModels called
-	//#then falls back to models.json so fuzzy matching can still work
+	// given provider-models cache exists but has no models (API failure)
+	// when fetchAvailableModels called
+	// then falls back to models.json so fuzzy matching can still work
 	it("should fall back to models.json when provider-models cache is empty", async () => {
 		writeProviderModelsCache({
 			models: {
@@ -647,9 +647,9 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(match).toBe("google/gemini-3-flash-preview")
 	})
 
-	//#given only models.json exists (no provider-models cache)
-	//#when fetchAvailableModels called
-	//#then falls back to models.json (no whitelist filtering)
+	// given only models.json exists (no provider-models cache)
+	// when fetchAvailableModels called
+	// then falls back to models.json (no whitelist filtering)
 	it("should fallback to models.json when provider-models cache not found", async () => {
 		writeModelsCache({
 			opencode: { models: { "glm-4.7-free": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
@@ -665,9 +665,9 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(result.has("opencode/gpt-5.2")).toBe(true)
 	})
 
-	//#given provider-models cache with whitelist
-	//#when connectedProviders filters to subset
-	//#then only returns models from connected providers
+	// given provider-models cache with whitelist
+	// when connectedProviders filters to subset
+	// then only returns models from connected providers
 	it("should filter by connectedProviders even with provider-models cache", async () => {
 		writeProviderModelsCache({
 			models: {
@@ -691,35 +691,35 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 
 describe("isModelAvailable", () => {
 	it("returns true when model exists via fuzzy match", () => {
-		// #given
+		// given
 		const available = new Set(["openai/gpt-5.2-codex", "anthropic/claude-opus-4-5"])
 
-		// #when
+		// when
 		const result = isModelAvailable("gpt-5.2-codex", available)
 
-		// #then
+		// then
 		expect(result).toBe(true)
 	})
 
 	it("returns false when model not found", () => {
-		// #given
+		// given
 		const available = new Set(["anthropic/claude-opus-4-5"])
 
-		// #when
+		// when
 		const result = isModelAvailable("gpt-5.2-codex", available)
 
-		// #then
+		// then
 		expect(result).toBe(false)
 	})
 
 	it("returns false for empty available set", () => {
-		// #given
+		// given
 		const available = new Set<string>()
 
-		// #when
+		// when
 		const result = isModelAvailable("gpt-5.2-codex", available)
 
-		// #then
+		// then
 		expect(result).toBe(false)
 	})
 })
