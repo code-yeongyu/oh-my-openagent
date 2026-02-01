@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ShellType } from "../../shared"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { isNonInteractive } from "./detector"
 import { log, buildEnvPrefix } from "../../shared"
 
 export * from "./constants"
@@ -47,9 +46,12 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      if (!isNonInteractive()) {
-        return
-      }
+      // NOTE: We intentionally removed the isNonInteractive() check here.
+      // Even when OpenCode runs in a TTY, the agent cannot interact with
+      // spawned bash processes. Git commands like `git rebase --continue`
+      // would open editors (vim/nvim) that hang forever.
+      // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
+      // for git commands to prevent interactive prompts.
 
       // The bash tool always runs in a Unix-like shell (bash/sh), even on Windows
       // (via Git Bash, WSL, etc.), so we always use unix export syntax.
