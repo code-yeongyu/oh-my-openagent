@@ -200,6 +200,11 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
+          // Release concurrency slot if startTask failed and didn't release it itself
+          // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
+          if (!item.task.concurrencyKey) {
+            this.concurrencyManager.release(key)
+          }
         }
 
         queue.shift()
@@ -240,14 +245,14 @@ export class BackgroundManager {
       query: {
         directory: parentDirectory,
       },
-    }).catch((error) => {
-      this.concurrencyManager.release(concurrencyKey)
-      throw error
     })
 
     if (createResult.error) {
-      this.concurrencyManager.release(concurrencyKey)
       throw new Error(`Failed to create background session: ${createResult.error}`)
+    }
+
+    if (!createResult.data?.id) {
+      throw new Error("Failed to create background session: API returned no session ID")
     }
 
     const sessionID = createResult.data.id
