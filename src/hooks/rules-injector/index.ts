@@ -16,6 +16,7 @@ import {
   saveInjectedRules,
 } from "./storage";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { getRuleInjectionFilePath } from "./output-path";
 
 interface ToolExecuteInput {
   tool: string;
@@ -71,6 +72,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     if (path.startsWith("/")) return path;
     return resolve(ctx.directory, path);
   }
+
 
   async function processFilePathForInjection(
     filePath: string,
@@ -144,7 +146,9 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     const toolName = input.tool.toLowerCase();
 
     if (TRACKED_TOOLS.includes(toolName)) {
-      await processFilePathForInjection(output.title, input.sessionID, output);
+      const filePath = getRuleInjectionFilePath(output);
+      if (!filePath) return;
+      await processFilePathForInjection(filePath, input.sessionID, output);
       return;
     }
   };
