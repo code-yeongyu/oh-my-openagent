@@ -97,19 +97,27 @@ function resolveModelFromChain(
   return null
 }
 
-function getSisyphusFallbackChain(isMaxPlan: boolean): FallbackEntry[] {
-  // Sisyphus uses opus when isMaxPlan, sonnet otherwise
-  if (isMaxPlan) {
-    return AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
-  }
-  // For non-max plan, use sonnet instead of opus
-  return [
-    { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
-    { providers: ["kimi-for-coding"], model: "k2p5" },
-    { providers: ["opencode"], model: "kimi-k2.5-free" },
-    { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
-    { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
-  ]
+function getSisyphusFallbackChain(): FallbackEntry[] {
+  return AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
+}
+
+function isAnyFallbackEntryAvailable(
+  fallbackChain: FallbackEntry[],
+  avail: ProviderAvailability
+): boolean {
+  return fallbackChain.some((entry) =>
+    entry.providers.some((provider) => isProviderAvailable(provider, avail))
+  )
+}
+
+function isRequiredModelAvailable(
+  requiresModel: string,
+  fallbackChain: FallbackEntry[],
+  avail: ProviderAvailability
+): boolean {
+  const matchingEntry = fallbackChain.find((entry) => entry.model === requiresModel)
+  if (!matchingEntry) return false
+  return matchingEntry.providers.some((provider) => isProviderAvailable(provider, avail))
 }
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
@@ -127,7 +135,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     return {
       $schema: SCHEMA_URL,
       agents: Object.fromEntries(
-        Object.keys(AGENT_MODEL_REQUIREMENTS).map((role) => [role, { model: ULTIMATE_FALLBACK }])
+        Object.entries(AGENT_MODEL_REQUIREMENTS)
+          .filter(([role, req]) => !(role === "sisyphus" && req.requiresAnyModel))
+          .map(([role]) => [role, { model: ULTIMATE_FALLBACK }])
       ),
       categories: Object.fromEntries(
         Object.keys(CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
@@ -139,13 +149,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const categories: Record<string, CategoryConfig> = {}
 
   for (const [role, req] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
-    // Special case: librarian always uses ZAI first if available
     if (role === "librarian" && avail.zai) {
       agents[role] = { model: ZAI_MODEL }
       continue
     }
 
-    // Special case: explore uses Claude haiku → GitHub Copilot gpt-5-mini → OpenCode gpt-5-nano
     if (role === "explore") {
       if (avail.native.claude) {
         agents[role] = { model: "anthropic/claude-haiku-4-5" }
@@ -159,11 +167,24 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       continue
     }
 
-    // Special case: Sisyphus uses different fallbackChain based on isMaxPlan
-    const fallbackChain =
-      role === "sisyphus" ? getSisyphusFallbackChain(avail.isMaxPlan) : req.fallbackChain
+    if (role === "sisyphus") {
+      const fallbackChain = getSisyphusFallbackChain()
+      if (req.requiresAnyModel && !isAnyFallbackEntryAvailable(fallbackChain, avail)) {
+        continue
+      }
+      const resolved = resolveModelFromChain(fallbackChain, avail)
+      if (resolved) {
+        const variant = resolved.variant ?? req.variant
+        agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      }
+      continue
+    }
 
-    const resolved = resolveModelFromChain(fallbackChain, avail)
+    if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
+      continue
+    }
+
+    const resolved = resolveModelFromChain(req.fallbackChain, avail)
     if (resolved) {
       const variant = resolved.variant ?? req.variant
       agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
@@ -178,6 +199,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       cat === "unspecified-high" && !avail.isMaxPlan
         ? CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
         : req.fallbackChain
+
+    if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
+      continue
+    }
 
     const resolved = resolveModelFromChain(fallbackChain, avail)
     if (resolved) {

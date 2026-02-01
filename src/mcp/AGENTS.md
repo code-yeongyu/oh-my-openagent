@@ -2,7 +2,12 @@
 
 ## OVERVIEW
 
-3 remote MCP servers: web search, documentation, code search. HTTP/SSE transport. Part of three-tier MCP system.
+Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
+
+**Three-Tier System**:
+1. **Built-in** (this directory): websearch, context7, grep_app
+2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
+3. **Skill-embedded**: YAML frontmatter in skills
 
 ## STRUCTURE
 
