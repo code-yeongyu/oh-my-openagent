@@ -173,6 +173,17 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
     return false
   }
 
+  // Send Ctrl+C to trigger graceful exit of opencode attach process
+  log("[closeTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
+  const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  await ctrlCProc.exited
+
+  // Brief delay for graceful shutdown
+  await new Promise((r) => setTimeout(r, 250))
+
   log("[closeTmuxPane] killing pane", { paneId })
   
   const proc = spawn([tmux, "kill-pane", "-t", paneId], {
@@ -213,6 +224,18 @@ export async function replaceTmuxPane(
   if (!tmux) {
     return { success: false }
   }
+
+  // Send Ctrl+C to trigger graceful exit of existing opencode attach process
+  // Note: No delay here - respawn-pane -k will handle any remaining process.
+  // We send Ctrl+C first to give the process a chance to exit gracefully,
+  // then immediately respawn. This prevents orphaned processes while avoiding
+  // the race condition where the pane closes before respawn-pane runs.
+  log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
+  const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  await ctrlCProc.exited
 
   const opencodeCmd = `opencode attach ${serverUrl} --session ${sessionId}`
 
