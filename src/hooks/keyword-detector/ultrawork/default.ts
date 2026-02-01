@@ -44,12 +44,12 @@ export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
 
 **WHEN IN DOUBT:**
 \`\`\`
-delegate_task(agent="explore", prompt="Find [X] patterns in codebase", background=true)
-delegate_task(agent="librarian", prompt="Find docs/examples for [Y]", background=true)
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find [X] patterns in codebase", run_in_background=true)
+delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs/examples for [Y]", run_in_background=true)
 
 // Hard problem? DON'T struggle alone:
-delegate_task(agent="oracle", prompt="...")         // conventional: architecture, debugging
-delegate_task(category="artistry", prompt="...")    // non-conventional: needs different approach
+delegate_task(subagent_type="oracle", load_skills=[], prompt="...")         // conventional: architecture, debugging
+delegate_task(category="artistry", load_skills=[], prompt="...")    // non-conventional: needs different approach
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**

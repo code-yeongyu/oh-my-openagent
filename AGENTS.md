@@ -128,11 +128,11 @@ bun test               # 100 test files
 | File | Lines | Description |
 |------|-------|-------------|
 | `src/features/builtin-skills/skills.ts` | 1729 | Skill definitions |
-| `src/features/background-agent/manager.ts` | 1418 | Task lifecycle, concurrency |
+| `src/features/background-agent/manager.ts` | 1440 | Task lifecycle, concurrency |
 | `src/agents/prometheus-prompt.ts` | 1283 | Planning agent prompt |
 | `src/tools/delegate-task/tools.ts` | 1135 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 757 | Orchestrator hook |
-| `src/index.ts` | 740 | Main plugin entry |
+| `src/index.ts` | 788 | Main plugin entry |
 | `src/cli/config-manager.ts` | 667 | JSONC config parsing |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
 

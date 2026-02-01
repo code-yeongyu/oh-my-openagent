@@ -5,10 +5,10 @@
 11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
 
 **Primary Agents** (respect UI model selection):
-- Sisyphus, Hephaestus, Atlas, Prometheus
+- Sisyphus, Atlas, Prometheus
 
 **Subagents** (use own fallback chains):
-- Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Sisyphus-Junior
+- Hephaestus, Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Sisyphus-Junior
 
 ## STRUCTURE
 ```
@@ -34,7 +34,7 @@ agents/
 | Agent | Model | Temp | Purpose |
 |-------|-------|------|---------|
 | Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7 → gpt-5.2-codex → gemini-3-pro) |
-| Hephaestus | openai/gpt-5.2-codex | 0.1 | Autonomous deep worker, "The Legitimate Craftsman" (fallback: kimi-k2.5 → glm-4.7 → gemini-3-pro) |
+| Hephaestus | openai/gpt-5.2-codex | 0.1 | Autonomous deep worker, "The Legitimate Craftsman" (fallback: claude-opus-4-5 → gemini-3-pro) |
 | Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
 | librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
