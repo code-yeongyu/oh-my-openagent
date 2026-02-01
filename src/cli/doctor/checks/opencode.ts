@@ -12,19 +12,28 @@ export function getDesktopAppPaths(platform: NodeJS.Platform): string[] {
   switch (platform) {
     case "darwin":
       return [
-        "/Applications/OpenCode.app/Contents/MacOS/opencode",
-        join(home, "Applications/OpenCode.app/Contents/MacOS/opencode"),
+        "/Applications/OpenCode.app/Contents/MacOS/OpenCode",
+        join(home, "Applications", "OpenCode.app", "Contents", "MacOS", "OpenCode"),
       ]
-    case "win32":
-      return [
-        "C:\\Program Files\\OpenCode\\opencode.exe",
-        join(process.env.LOCALAPPDATA ?? "", "Programs\\OpenCode\\opencode.exe"),
-      ]
+    case "win32": {
+      const programFiles = process.env.ProgramFiles
+      const localAppData = process.env.LOCALAPPDATA
+
+      const paths: string[] = []
+      if (programFiles) {
+        paths.push(join(programFiles, "OpenCode", "OpenCode.exe"))
+      }
+      if (localAppData) {
+        paths.push(join(localAppData, "OpenCode", "OpenCode.exe"))
+      }
+      return paths
+    }
     case "linux":
       return [
-        "/opt/opencode/bin/opencode",
-        "/snap/bin/opencode",
-        join(home, ".local/bin/opencode"),
+        "/usr/bin/opencode",
+        "/usr/lib/opencode/opencode",
+        join(home, "Applications", "opencode-desktop-linux-x86_64.AppImage"),
+        join(home, "Applications", "opencode-desktop-linux-aarch64.AppImage"),
       ]
     default:
       return []
