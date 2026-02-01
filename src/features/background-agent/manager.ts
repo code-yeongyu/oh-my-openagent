@@ -112,6 +112,7 @@ export class BackgroundManager {
     })
 
     if (!input.agent || input.agent.trim() === "") {
+      log("[background-agent] Error: Agent parameter is missing")
       throw new Error("Agent parameter is required")
     }
 
@@ -202,6 +203,11 @@ export class BackgroundManager {
 
   private async startTask(item: QueueItem): Promise<void> {
     const { task, input } = item
+
+    if (!input.agent) {
+      log(`[background-agent] Error: Agent config not found for: ${input.agent}`)
+      throw new Error(`Agent not found: ${input.agent}`)
+    }
 
     log("[background-agent] Starting task:", {
       taskId: task.id,
@@ -560,7 +566,13 @@ export class BackgroundManager {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "error"
       const errorMessage = error instanceof Error ? error.message : String(error)
-      existingTask.error = errorMessage
+      
+      if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        existingTask.error = `Agent "${existingTask.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+      } else {
+        existingTask.error = errorMessage
+      }
+      
       existingTask.completedAt = new Date()
 
       // Release concurrency on error to prevent slot leaks

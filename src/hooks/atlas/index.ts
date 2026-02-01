@@ -848,8 +848,23 @@ export function createAtlasHook(
           log(`[${HOOK_NAME}] Failed to check for blocked response`, { sessionID, error: String(err) })
         }
 
-        state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
+        
+        // CRITICAL FIX: If all checkboxes are complete (remaining = 0), do NOT inject continuation
+        // This prevents infinite loop when isComplete is false due to Phase status not being marked
+        // but all actual tasks (checkboxes) are done
+        if (remaining === 0) {
+          log(`[${HOOK_NAME}] All checkboxes complete (0 remaining), skipping continuation`, { 
+            sessionID, 
+            plan: boulderState.plan_name,
+            total: progress.total,
+            completed: progress.completed,
+            isComplete: progress.isComplete // May be false due to Phase status, but we stop anyway
+          })
+          return
+        }
+        
+        state.lastContinuationInjectedAt = now
         injectContinuation(sessionID, boulderState.plan_name, boulderState.active_plan, remaining, progress.total)
         return
       }

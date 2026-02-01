@@ -847,9 +847,9 @@ describe("atlas hook", () => {
        }
        writeBoulderState(TEST_DIR, state)
 
-       // #given - last agent is NOT Atlas
+       // #given - last agent is NOT Atlas (use a non-orchestrator agent like "oracle")
        cleanupMessageStorage(MAIN_SESSION_ID)
-       setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
+       setupMessageStorage(MAIN_SESSION_ID, "oracle")
 
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput)

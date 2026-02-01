@@ -710,6 +710,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await mdselReminder?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
+      
+      // Check if any hook blocked the operation
+      if ((output as { blocked?: boolean }).blocked) {
+        const blockMessage = (output as { message?: string }).message || "Operation blocked by hook";
+        throw new Error(blockMessage);
+      }
+      
       await instinctTrigger?.["tool.execute.before"]?.(input, output);
       await planUpdateReminder?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
