@@ -8,7 +8,6 @@ const COOLDOWN_MS = 5 * 60 * 1000
 const THINKING_SUMMARY_MAX_CHARS = 500
 
 type BabysittingConfig = {
-  enabled?: boolean
   timeout_ms?: number
 }
 
@@ -187,7 +186,6 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     if (event.type !== "session.idle") return
-    if (options.config?.enabled !== true) return
 
     const props = event.properties as Record<string, unknown> | undefined
     const sessionID = props?.sessionID as string | undefined
