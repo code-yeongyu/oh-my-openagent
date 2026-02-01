@@ -43,28 +43,28 @@ describe("skill_mcp tool", () => {
 
   describe("parameter validation", () => {
     it("throws when no operation specified", async () => {
-      // #given
+      // given
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => loadedSkills,
         getSessionID: () => sessionID,
       })
 
-      // #when / #then
+      // when / #then
       await expect(
         tool.execute({ mcp_name: "test-server" }, mockContext)
       ).rejects.toThrow(/Missing operation/)
     })
 
     it("throws when multiple operations specified", async () => {
-      // #given
+      // given
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => loadedSkills,
         getSessionID: () => sessionID,
       })
 
-      // #when / #then
+      // when / #then
       await expect(
         tool.execute({
           mcp_name: "test-server",
@@ -75,7 +75,7 @@ describe("skill_mcp tool", () => {
     })
 
     it("throws when mcp_name not found in any skill", async () => {
-      // #given
+      // given
       loadedSkills = [
         createMockSkillWithMcp("test-skill", {
           "known-server": { command: "echo", args: ["test"] },
@@ -87,14 +87,14 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // #when / #then
+      // when / #then
       await expect(
         tool.execute({ mcp_name: "unknown-server", tool_name: "some-tool" }, mockContext)
       ).rejects.toThrow(/not found/)
     })
 
     it("includes available MCP servers in error message", async () => {
-      // #given
+      // given
       loadedSkills = [
         createMockSkillWithMcp("db-skill", {
           sqlite: { command: "uvx", args: ["mcp-server-sqlite"] },
@@ -109,14 +109,14 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // #when / #then
+      // when / #then
       await expect(
         tool.execute({ mcp_name: "missing", tool_name: "test" }, mockContext)
       ).rejects.toThrow(/sqlite.*db-skill|rest-api.*api-skill/s)
     })
 
     it("throws on invalid JSON arguments", async () => {
-      // #given
+      // given
       loadedSkills = [
         createMockSkillWithMcp("test-skill", {
           "test-server": { command: "echo" },
@@ -128,7 +128,7 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // #when / #then
+      // when / #then
       await expect(
         tool.execute({
           mcp_name: "test-server",
@@ -141,27 +141,27 @@ describe("skill_mcp tool", () => {
 
   describe("tool description", () => {
     it("has concise description", () => {
-      // #given / #when
+      // given / #when
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => [],
         getSessionID: () => "session",
       })
 
-      // #then
+      // then
       expect(tool.description.length).toBeLessThan(200)
       expect(tool.description).toContain("mcp_name")
     })
 
     it("includes grep parameter in schema", () => {
-      // #given / #when
+      // given / #when
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => [],
         getSessionID: () => "session",
       })
 
-      // #then
+      // then
       expect(tool.description).toBeDefined()
     })
   })
@@ -169,16 +169,16 @@ describe("skill_mcp tool", () => {
 
 describe("applyGrepFilter", () => {
   it("filters lines matching pattern", () => {
-    // #given
+    // given
     const output = `line1: hello world
 line2: foo bar
 line3: hello again
 line4: baz qux`
 
-    // #when
+    // when
     const result = applyGrepFilter(output, "hello")
 
-    // #then
+    // then
     expect(result).toContain("line1: hello world")
     expect(result).toContain("line3: hello again")
     expect(result).not.toContain("foo bar")
@@ -186,35 +186,35 @@ line4: baz qux`
   })
 
   it("returns original output when pattern is undefined", () => {
-    // #given
+    // given
     const output = "some output"
 
-    // #when
+    // when
     const result = applyGrepFilter(output, undefined)
 
-    // #then
+    // then
     expect(result).toBe(output)
   })
 
   it("returns message when no lines match", () => {
-    // #given
+    // given
     const output = "line1\nline2\nline3"
 
-    // #when
+    // when
     const result = applyGrepFilter(output, "xyz")
 
-    // #then
+    // then
     expect(result).toContain("[grep] No lines matched pattern")
   })
 
   it("handles invalid regex gracefully", () => {
-    // #given
+    // given
     const output = "some output"
 
-    // #when
+    // when
     const result = applyGrepFilter(output, "[invalid")
 
-    // #then
+    // then
     expect(result).toBe(output)
   })
 })

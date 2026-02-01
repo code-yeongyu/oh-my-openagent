@@ -34,3 +34,4 @@ export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
+export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
