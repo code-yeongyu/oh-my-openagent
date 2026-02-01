@@ -34,6 +34,7 @@ import {
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
   createStopContinuationGuardHook,
+  createCompactionContextInjector,
 } from "./hooks";
 import {
   contextCollector,
@@ -276,6 +277,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
     ? createStopContinuationGuardHook(ctx)
+    : null;
+
+  const compactionContextInjector = isHookEnabled("compaction-context-injector")
+    ? createCompactionContextInjector()
     : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -717,6 +722,19 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);
         await atlasHook?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
+    },
+
+    "experimental.session.compacting": async (input: { sessionID: string }) => {
+      if (!compactionContextInjector) {
+        return;
+      }
+      await compactionContextInjector({
+        sessionID: input.sessionID,
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        usageRatio: 0.8,
+        directory: ctx.directory,
+      });
     },
   };
 };

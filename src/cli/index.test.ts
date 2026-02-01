@@ -3,13 +3,13 @@ import packageJson from "../../package.json" with { type: "json" }
 
 describe("CLI version", () => {
   it("reads version from package.json as valid semver", () => {
-    //#given
+    // given
     const semverRegex = /^\d+\.\d+\.\d+(-[\w.]+)?$/
 
-    //#when
+    // when
     const version = packageJson.version
 
-    //#then
+    // then
     expect(version).toMatch(semverRegex)
     expect(typeof version).toBe("string")
     expect(version.length).toBeGreaterThan(0)

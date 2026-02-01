@@ -36,15 +36,15 @@ describe("boulder-state", () => {
 
   describe("readBoulderState", () => {
     test("should return null when no boulder.json exists", () => {
-      // #given - no boulder.json file
-      // #when
+      // given - no boulder.json file
+      // when
       const result = readBoulderState(TEST_DIR)
-      // #then
+      // then
       expect(result).toBeNull()
     })
 
     test("should read valid boulder state", () => {
-      // #given - valid boulder.json
+      // given - valid boulder.json
       const state: BoulderState = {
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-02T10:00:00Z",
@@ -53,10 +53,10 @@ describe("boulder-state", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      // #when
+      // when
       const result = readBoulderState(TEST_DIR)
 
-      // #then
+      // then
       expect(result).not.toBeNull()
       expect(result?.active_plan).toBe("/path/to/plan.md")
       expect(result?.session_ids).toEqual(["session-1", "session-2"])
@@ -66,7 +66,7 @@ describe("boulder-state", () => {
 
   describe("writeBoulderState", () => {
     test("should write state and create .sisyphus directory if needed", () => {
-      // #given - state to write
+      // given - state to write
       const state: BoulderState = {
         active_plan: "/test/plan.md",
         started_at: "2026-01-02T12:00:00Z",
@@ -74,11 +74,11 @@ describe("boulder-state", () => {
         plan_name: "test-plan",
       }
 
-      // #when
+      // when
       const success = writeBoulderState(TEST_DIR, state)
       const readBack = readBoulderState(TEST_DIR)
 
-      // #then
+      // then
       expect(success).toBe(true)
       expect(readBack).not.toBeNull()
       expect(readBack?.active_plan).toBe("/test/plan.md")
@@ -87,7 +87,7 @@ describe("boulder-state", () => {
 
   describe("appendSessionId", () => {
     test("should append new session id to existing state", () => {
-      // #given - existing state with one session
+      // given - existing state with one session
       const state: BoulderState = {
         active_plan: "/plan.md",
         started_at: "2026-01-02T10:00:00Z",
@@ -96,16 +96,16 @@ describe("boulder-state", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      // #when
+      // when
       const result = appendSessionId(TEST_DIR, "session-2")
 
-      // #then
+      // then
       expect(result).not.toBeNull()
       expect(result?.session_ids).toEqual(["session-1", "session-2"])
     })
 
     test("should not duplicate existing session id", () => {
-      // #given - state with session-1 already
+      // given - state with session-1 already
       const state: BoulderState = {
         active_plan: "/plan.md",
         started_at: "2026-01-02T10:00:00Z",
@@ -114,26 +114,26 @@ describe("boulder-state", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      // #when
+      // when
       appendSessionId(TEST_DIR, "session-1")
       const result = readBoulderState(TEST_DIR)
 
-      // #then
+      // then
       expect(result?.session_ids).toEqual(["session-1"])
     })
 
     test("should return null when no state exists", () => {
-      // #given - no boulder.json
-      // #when
+      // given - no boulder.json
+      // when
       const result = appendSessionId(TEST_DIR, "new-session")
-      // #then
+      // then
       expect(result).toBeNull()
     })
   })
 
   describe("clearBoulderState", () => {
     test("should remove boulder.json", () => {
-      // #given - existing state
+      // given - existing state
       const state: BoulderState = {
         active_plan: "/plan.md",
         started_at: "2026-01-02T10:00:00Z",
@@ -142,27 +142,27 @@ describe("boulder-state", () => {
       }
       writeBoulderState(TEST_DIR, state)
 
-      // #when
+      // when
       const success = clearBoulderState(TEST_DIR)
       const result = readBoulderState(TEST_DIR)
 
-      // #then
+      // then
       expect(success).toBe(true)
       expect(result).toBeNull()
     })
 
     test("should succeed even when no file exists", () => {
-      // #given - no boulder.json
-      // #when
+      // given - no boulder.json
+      // when
       const success = clearBoulderState(TEST_DIR)
-      // #then
+      // then
       expect(success).toBe(true)
     })
   })
 
   describe("getPlanProgress", () => {
     test("should count completed and uncompleted checkboxes", () => {
-      // #given - plan file with checkboxes
+      // given - plan file with checkboxes
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, `# Plan
 - [ ] Task 1
@@ -171,50 +171,50 @@ describe("boulder-state", () => {
 - [X] Task 4
 `)
 
-      // #when
+      // when
       const progress = getPlanProgress(planPath)
 
-      // #then
+      // then
       expect(progress.total).toBe(4)
       expect(progress.completed).toBe(2)
       expect(progress.isComplete).toBe(false)
     })
 
     test("should return isComplete true when all checked", () => {
-      // #given - all tasks completed
+      // given - all tasks completed
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, `# Plan
 - [x] Task 1
 - [X] Task 2
 `)
 
-      // #when
+      // when
       const progress = getPlanProgress(planPath)
 
-      // #then
+      // then
       expect(progress.total).toBe(2)
       expect(progress.completed).toBe(2)
       expect(progress.isComplete).toBe(true)
     })
 
     test("should return isComplete true for empty plan", () => {
-      // #given - plan with no checkboxes
+      // given - plan with no checkboxes
       const planPath = join(TEST_DIR, "empty-plan.md")
       writeFileSync(planPath, "# Plan\nNo tasks here")
 
-      // #when
+      // when
       const progress = getPlanProgress(planPath)
 
-      // #then
+      // then
       expect(progress.total).toBe(0)
       expect(progress.isComplete).toBe(true)
     })
 
     test("should handle non-existent file", () => {
-      // #given - non-existent file
-      // #when
+      // given - non-existent file
+      // when
       const progress = getPlanProgress("/non/existent/file.md")
-      // #then
+      // then
       expect(progress.total).toBe(0)
       expect(progress.isComplete).toBe(true)
     })
@@ -222,25 +222,25 @@ describe("boulder-state", () => {
 
   describe("getPlanName", () => {
     test("should extract plan name from path", () => {
-      // #given
+      // given
       const path = "/home/user/.sisyphus/plans/project/my-feature.md"
-      // #when
+      // when
       const name = getPlanName(path)
-      // #then
+      // then
       expect(name).toBe("my-feature")
     })
   })
 
   describe("createBoulderState", () => {
     test("should create state with correct fields", () => {
-      // #given
+      // given
       const planPath = "/path/to/auth-refactor.md"
       const sessionId = "ses-abc123"
 
-      // #when
+      // when
       const state = createBoulderState(planPath, sessionId)
 
-      // #then
+      // then
       expect(state.active_plan).toBe(planPath)
       expect(state.session_ids).toEqual([sessionId])
       expect(state.plan_name).toBe("auth-refactor")
