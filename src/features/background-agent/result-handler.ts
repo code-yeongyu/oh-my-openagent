@@ -189,10 +189,14 @@ ${completedTasks || `- \`${task.id}\`: ${task.description}`}
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
   } else {
+    const agentInfo = task.category 
+      ? `${task.agent} (${task.category})`
+      : task.agent
     notification = `<system-reminder>
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
+**Agent:** ${agentInfo}
 **Duration:** ${duration}${errorInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
