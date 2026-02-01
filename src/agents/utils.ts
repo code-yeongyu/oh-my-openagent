@@ -57,7 +57,8 @@ export function buildAgent(
   model: string,
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
-  browserProvider?: BrowserAutomationProvider
+  browserProvider?: BrowserAutomationProvider,
+  disabledSkills?: Set<string>
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -81,7 +82,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider })
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider, disabledSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -311,7 +312,7 @@ export async function createBuiltinAgents(
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
     
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
