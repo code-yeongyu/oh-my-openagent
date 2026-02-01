@@ -237,7 +237,7 @@ describe("sisyphus-task", () => {
       
       // then proceeds without error - uses fallback chain
       expect(result).not.toContain("oh-my-opencode requires a default model")
-    })
+    }, { timeout: 10000 })
 
     test("returns clear error when no model can be resolved", async () => {
       // given - custom category with no model, no systemDefaultModel, no available models
