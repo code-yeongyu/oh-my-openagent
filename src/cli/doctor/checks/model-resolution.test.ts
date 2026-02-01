@@ -90,6 +90,46 @@ describe("model-resolution check", () => {
       expect(sisyphus!.effectiveResolution).toContain("Provider fallback:")
       expect(sisyphus!.effectiveResolution).toContain("anthropic")
     })
+
+    it("captures user variant for agent when configured", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      //#given User has model with variant override for oracle agent
+      const mockConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2", variant: "xhigh" },
+        },
+      }
+
+      //#when getting resolution info with config
+      const info = getModelResolutionInfoWithOverrides(mockConfig)
+
+      //#then Oracle should have userVariant set
+      const oracle = info.agents.find((a) => a.name === "oracle")
+      expect(oracle).toBeDefined()
+      expect(oracle!.userOverride).toBe("openai/gpt-5.2")
+      expect(oracle!.userVariant).toBe("xhigh")
+    })
+
+    it("captures user variant for category when configured", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      //#given User has model with variant override for visual-engineering category
+      const mockConfig = {
+        categories: {
+          "visual-engineering": { model: "google/gemini-3-flash-preview", variant: "high" },
+        },
+      }
+
+      //#when getting resolution info with config
+      const info = getModelResolutionInfoWithOverrides(mockConfig)
+
+      //#then visual-engineering should have userVariant set
+      const visual = info.categories.find((c) => c.name === "visual-engineering")
+      expect(visual).toBeDefined()
+      expect(visual!.userOverride).toBe("google/gemini-3-flash-preview")
+      expect(visual!.userVariant).toBe("high")
+    })
   })
 
   describe("checkModelResolution", () => {

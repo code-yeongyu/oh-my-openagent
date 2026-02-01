@@ -51,6 +51,7 @@ export interface AgentResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -59,6 +60,7 @@ export interface CategoryResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -152,10 +154,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.agents?.[name]?.model
+      const userVariant = config.agents?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
@@ -165,10 +169,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.categories?.[name]?.model
+      const userVariant = config.categories?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
