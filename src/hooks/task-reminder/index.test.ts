@@ -58,7 +58,7 @@ describe("TaskReminderHook", () => {
       )
     }
     await hook["tool.execute.after"]?.(
-      { tool: "task_create", sessionID, callID: "call-task" },
+      { tool: "task", sessionID, callID: "call-task" },
       output
     )
     for (let i = 0; i < 9; i++) {

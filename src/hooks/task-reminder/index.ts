@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-const TASK_TOOLS = new Set(["task_create", "task_get", "task_update", "task_list"])
+const TASK_TOOLS = new Set(["task"])
 const TURN_THRESHOLD = 10
 const REMINDER_MESSAGE = `
 
