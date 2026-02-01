@@ -84,28 +84,33 @@ jobs:
 
       - name: Build binary
         if: steps.check.outputs.skip != 'true'
-        run: |
-          PLATFORM="${{ matrix.platform }}"
-          case "$PLATFORM" in
-            darwin-arm64) TARGET="bun-darwin-arm64" ;;
-            darwin-x64) TARGET="bun-darwin-x64" ;;
-            linux-x64) TARGET="bun-linux-x64" ;;
-            linux-arm64) TARGET="bun-linux-arm64" ;;
-            linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
-            linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
-            windows-x64) TARGET="bun-windows-x64" ;;
-          esac
-          
-          if [ "$PLATFORM" = "windows-x64" ]; then
-            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
-          else
-            OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
-          fi
-          
-          bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
-          
-          echo "Built binary:"
-          ls -lh "$OUTPUT"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          retry_wait_seconds: 10
+          command: |
+            PLATFORM="${{ matrix.platform }}"
+            case "$PLATFORM" in
+              darwin-arm64) TARGET="bun-darwin-arm64" ;;
+              darwin-x64) TARGET="bun-darwin-x64" ;;
+              linux-x64) TARGET="bun-linux-x64" ;;
+              linux-arm64) TARGET="bun-linux-arm64" ;;
+              linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
+              linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
+              windows-x64) TARGET="bun-windows-x64" ;;
+            esac
+            
+            if [ "$PLATFORM" = "windows-x64" ]; then
+              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+            else
+              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+            fi
+            
+            bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
+            
+            echo "Built binary:"
+            ls -lh "$OUTPUT"
 
       - name: Compress binary
         if: steps.check.outputs.skip != 'true'

@@ -81,6 +81,7 @@
           "sisyphus-junior-notepad",
           "start-work",
           "atlas",
+          "unstable-agent-babysitter",
           "stop-continuation-guard"
         ]
       }
@@ -2745,6 +2746,19 @@
       "properties": {
         "force_enable": {
           "type": "boolean"
+        }
+      }
+    },
+    "babysitting": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "timeout_ms": {
+          "default": 120000,
+          "type": "number"
         }
       }
     },
