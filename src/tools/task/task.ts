@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { existsSync, readdirSync, unlinkSync } from "fs"
 import { join } from "path"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
@@ -27,7 +27,7 @@ import {
   listTaskFiles,
 } from "../../features/claude-tasks/storage"
 
-export function createTask(config: Partial<OhMyOpenCodeConfig>) {
+export function createTask(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
   return tool({
     description: `Unified task management tool with create, list, get, update, delete actions.
 
