@@ -8,6 +8,7 @@ export type ModelRequirement = {
   fallbackChain: FallbackEntry[]
   variant?: string // Default variant (used when entry doesn't specify one)
   requiresModel?: string // If set, only activates when this model is available (fuzzy match)
+  requiresAnyModel?: boolean // If true, requires at least ONE model in fallbackChain to be available (or empty availability treated as unavailable)
 }
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
@@ -17,9 +18,15 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["zai-coding-plan"], model: "glm-4.7" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
-      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+      { providers: ["opencode"], model: "glm-4.7-free" },
     ],
+    requiresAnyModel: true,
+  },
+  hephaestus: {
+    fallbackChain: [
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
+    ],
+    requiresModel: "gpt-5.2-codex",
   },
   oracle: {
     fallbackChain: [

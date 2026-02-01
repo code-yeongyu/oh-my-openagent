@@ -1,14 +1,22 @@
 # HOOKS KNOWLEDGE BASE
 
 ## OVERVIEW
-32 lifecycle hooks intercepting/modifying agent behavior. Events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, onSummarize.
+
+34 lifecycle hooks intercepting/modifying agent behavior across 5 events.
+
+**Event Types**:
+- `UserPromptSubmit` (`chat.message`) - Can block
+- `PreToolUse` (`tool.execute.before`) - Can block
+- `PostToolUse` (`tool.execute.after`) - Cannot block
+- `Stop` (`event: session.stop`) - Cannot block
+- `onSummarize` (Compaction) - Cannot block
 
 ## STRUCTURE
 ```
 hooks/
-├── atlas/                      # Main orchestration (752 lines)
+├── atlas/                      # Main orchestration (757 lines)
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion (16k lines)
+├── todo-continuation-enforcer.ts # Force TODO completion
 ├── ralph-loop/                 # Self-referential dev loop
 ├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
 ├── comment-checker/            # Prevents AI slop
@@ -37,6 +45,8 @@ hooks/
 ├── category-skill-reminder/    # Reminds of category skills
 ├── empty-task-response-detector.ts # Detects empty responses
 ├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
+├── stop-continuation-guard/    # Guards stop continuation
+├── subagent-question-blocker/  # Blocks subagent questions
 └── index.ts                    # Hook aggregation + registration
 ```
 
@@ -51,7 +61,7 @@ hooks/
 
 ## EXECUTION ORDER
 - **UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
-- **PreToolUse**: questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → atlasHook
+- **PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → atlasHook
 - **PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo
 
 ## HOW TO ADD
