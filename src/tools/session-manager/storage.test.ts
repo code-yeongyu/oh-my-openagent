@@ -2,8 +2,9 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { randomUUID } from "node:crypto"
 
-const TEST_DIR = join(tmpdir(), "omo-test-session-manager")
+const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
 const TEST_PART_STORAGE = join(TEST_DIR, "part")
 const TEST_SESSION_STORAGE = join(TEST_DIR, "session")

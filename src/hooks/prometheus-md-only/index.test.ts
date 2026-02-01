@@ -1,10 +1,23 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { createPrometheusMdOnlyHook } from "./index"
-import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
-import { SYSTEM_DIRECTIVE_PREFIX, createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
+import { tmpdir } from "node:os"
+import { randomUUID } from "node:crypto"
+import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
+
+const TEST_STORAGE_ROOT = join(tmpdir(), `prometheus-md-only-${randomUUID()}`)
+const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
+const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
+
+mock.module("../../features/hook-message-injector/constants", () => ({
+  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
+  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
+  PART_STORAGE: TEST_PART_STORAGE,
+}))
+
+const { createPrometheusMdOnlyHook } = await import("./index")
+const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("prometheus-md-only", () => {
   const TEST_SESSION_ID = "test-session-prometheus"
@@ -39,6 +52,7 @@ describe("prometheus-md-only", () => {
         // ignore
       }
     }
+    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
   })
 
    describe("with Prometheus agent in message storage", () => {
@@ -342,7 +356,7 @@ describe("prometheus-md-only", () => {
 
   describe("cross-platform path validation", () => {
     beforeEach(() => {
-      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Planner)")
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
     })
 
      test("should allow Windows-style backslash paths under .sisyphus/", async () => {
