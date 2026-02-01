@@ -447,7 +447,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       : { servers: {} };
 
     config.mcp = {
-      ...createBuiltinMcps(pluginConfig.disabled_mcps),
+      ...createBuiltinMcps(pluginConfig.disabled_mcps, pluginConfig),
       ...(config.mcp as Record<string, unknown>),
       ...mcpResult.servers,
       ...pluginComponents.mcpServers,
