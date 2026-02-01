@@ -5,106 +5,106 @@ import { MIN_OPENCODE_VERSION } from "../constants"
 describe("opencode check", () => {
   describe("compareVersions", () => {
     it("returns true when current >= minimum", () => {
-      // #given versions where current is greater
-      // #when comparing
-      // #then should return true
+      // given versions where current is greater
+      // when comparing
+      // then should return true
       expect(opencode.compareVersions("1.0.200", "1.0.150")).toBe(true)
       expect(opencode.compareVersions("1.1.0", "1.0.150")).toBe(true)
       expect(opencode.compareVersions("2.0.0", "1.0.150")).toBe(true)
     })
 
     it("returns true when versions are equal", () => {
-      // #given equal versions
-      // #when comparing
-      // #then should return true
+      // given equal versions
+      // when comparing
+      // then should return true
       expect(opencode.compareVersions("1.0.150", "1.0.150")).toBe(true)
     })
 
     it("returns false when current < minimum", () => {
-      // #given version below minimum
-      // #when comparing
-      // #then should return false
+      // given version below minimum
+      // when comparing
+      // then should return false
       expect(opencode.compareVersions("1.0.100", "1.0.150")).toBe(false)
       expect(opencode.compareVersions("0.9.0", "1.0.150")).toBe(false)
     })
 
     it("handles version prefixes", () => {
-      // #given version with v prefix
-      // #when comparing
-      // #then should strip prefix and compare correctly
+      // given version with v prefix
+      // when comparing
+      // then should strip prefix and compare correctly
       expect(opencode.compareVersions("v1.0.200", "1.0.150")).toBe(true)
     })
 
     it("handles prerelease versions", () => {
-      // #given prerelease version
-      // #when comparing
-      // #then should use base version
+      // given prerelease version
+      // when comparing
+      // then should use base version
       expect(opencode.compareVersions("1.0.200-beta.1", "1.0.150")).toBe(true)
     })
   })
 
   describe("command helpers", () => {
     it("selects where on Windows", () => {
-      // #given win32 platform
-      // #when selecting lookup command
-      // #then should use where
+      // given win32 platform
+      // when selecting lookup command
+      // then should use where
       expect(opencode.getBinaryLookupCommand("win32")).toBe("where")
     })
 
     it("selects which on non-Windows", () => {
-      // #given linux platform
-      // #when selecting lookup command
-      // #then should use which
+      // given linux platform
+      // when selecting lookup command
+      // then should use which
       expect(opencode.getBinaryLookupCommand("linux")).toBe("which")
       expect(opencode.getBinaryLookupCommand("darwin")).toBe("which")
     })
 
     it("parses command output into paths", () => {
-      // #given raw output with multiple lines and spaces
+      // given raw output with multiple lines and spaces
       const output = "C:\\\\bin\\\\opencode.ps1\r\nC:\\\\bin\\\\opencode.exe\n\n"
 
-      // #when parsing
+      // when parsing
       const paths = opencode.parseBinaryPaths(output)
 
-      // #then should return trimmed, non-empty paths
+      // then should return trimmed, non-empty paths
       expect(paths).toEqual(["C:\\\\bin\\\\opencode.ps1", "C:\\\\bin\\\\opencode.exe"])
     })
 
     it("prefers exe/cmd/bat over ps1 on Windows", () => {
-      // #given windows paths
+      // given windows paths
       const paths = [
         "C:\\\\bin\\\\opencode.ps1",
         "C:\\\\bin\\\\opencode.cmd",
         "C:\\\\bin\\\\opencode.exe",
       ]
 
-      // #when selecting binary
+      // when selecting binary
       const selected = opencode.selectBinaryPath(paths, "win32")
 
-      // #then should prefer exe
+      // then should prefer exe
       expect(selected).toBe("C:\\\\bin\\\\opencode.exe")
     })
 
     it("falls back to ps1 when it is the only Windows candidate", () => {
-      // #given only ps1 path
+      // given only ps1 path
       const paths = ["C:\\\\bin\\\\opencode.ps1"]
 
-      // #when selecting binary
+      // when selecting binary
       const selected = opencode.selectBinaryPath(paths, "win32")
 
-      // #then should return ps1 path
+      // then should return ps1 path
       expect(selected).toBe("C:\\\\bin\\\\opencode.ps1")
     })
 
     it("builds PowerShell command for ps1 on Windows", () => {
-      // #given a ps1 path on Windows
+      // given a ps1 path on Windows
       const command = opencode.buildVersionCommand(
         "C:\\\\bin\\\\opencode.ps1",
         "win32"
       )
 
-      // #when building command
-      // #then should use PowerShell
+      // when building command
+      // then should use PowerShell
       expect(command).toEqual([
         "powershell",
         "-NoProfile",
@@ -117,15 +117,15 @@ describe("opencode check", () => {
     })
 
     it("builds direct command for non-ps1 binaries", () => {
-      // #given an exe on Windows and a binary on linux
+      // given an exe on Windows and a binary on linux
       const winCommand = opencode.buildVersionCommand(
         "C:\\\\bin\\\\opencode.exe",
         "win32"
       )
       const linuxCommand = opencode.buildVersionCommand("opencode", "linux")
 
-      // #when building commands
-      // #then should execute directly
+      // when building commands
+      // then should execute directly
       expect(winCommand).toEqual(["C:\\\\bin\\\\opencode.exe", "--version"])
       expect(linuxCommand).toEqual(["opencode", "--version"])
     })
@@ -133,13 +133,13 @@ describe("opencode check", () => {
 
   describe("getOpenCodeInfo", () => {
     it("returns installed: false when binary not found", async () => {
-      // #given no opencode binary
+      // given no opencode binary
       const spy = spyOn(opencode, "findOpenCodeBinary").mockResolvedValue(null)
 
-      // #when getting info
+      // when getting info
       const info = await opencode.getOpenCodeInfo()
 
-      // #then should indicate not installed
+      // then should indicate not installed
       expect(info.installed).toBe(false)
       expect(info.version).toBeNull()
       expect(info.path).toBeNull()
@@ -157,7 +157,7 @@ describe("opencode check", () => {
     })
 
     it("returns fail when not installed", async () => {
-      // #given opencode not installed
+      // given opencode not installed
       getInfoSpy = spyOn(opencode, "getOpenCodeInfo").mockResolvedValue({
         installed: false,
         version: null,
@@ -165,10 +165,10 @@ describe("opencode check", () => {
         binary: null,
       })
 
-      // #when checking installation
+      // when checking installation
       const result = await opencode.checkOpenCodeInstallation()
 
-      // #then should fail with installation hint
+      // then should fail with installation hint
       expect(result.status).toBe("fail")
       expect(result.message).toContain("not installed")
       expect(result.details).toBeDefined()
@@ -176,7 +176,7 @@ describe("opencode check", () => {
     })
 
     it("returns warn when version below minimum", async () => {
-      // #given old version installed
+      // given old version installed
       getInfoSpy = spyOn(opencode, "getOpenCodeInfo").mockResolvedValue({
         installed: true,
         version: "1.0.100",
@@ -184,17 +184,17 @@ describe("opencode check", () => {
         binary: "opencode",
       })
 
-      // #when checking installation
+      // when checking installation
       const result = await opencode.checkOpenCodeInstallation()
 
-      // #then should warn about old version
+      // then should warn about old version
       expect(result.status).toBe("warn")
       expect(result.message).toContain("below minimum")
       expect(result.details?.some((d) => d.includes(MIN_OPENCODE_VERSION))).toBe(true)
     })
 
     it("returns pass when properly installed", async () => {
-      // #given current version installed
+      // given current version installed
       getInfoSpy = spyOn(opencode, "getOpenCodeInfo").mockResolvedValue({
         installed: true,
         version: "1.0.200",
@@ -202,10 +202,10 @@ describe("opencode check", () => {
         binary: "opencode",
       })
 
-      // #when checking installation
+      // when checking installation
       const result = await opencode.checkOpenCodeInstallation()
 
-      // #then should pass
+      // then should pass
       expect(result.status).toBe("pass")
       expect(result.message).toContain("1.0.200")
     })
@@ -213,11 +213,11 @@ describe("opencode check", () => {
 
   describe("getOpenCodeCheckDefinition", () => {
     it("returns valid check definition", () => {
-      // #given
-      // #when getting definition
+      // given
+      // when getting definition
       const def = opencode.getOpenCodeCheckDefinition()
 
-      // #then should have required properties
+      // then should have required properties
       expect(def.id).toBe("opencode-installation")
       expect(def.category).toBe("installation")
       expect(def.critical).toBe(true)

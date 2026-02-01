@@ -83,7 +83,7 @@ describe("executeCompact lock management", () => {
   const msg = { providerID: "anthropic", modelID: "claude-opus-4-5" }
 
   beforeEach(() => {
-    // #given: Fresh state for each test
+    // given: Fresh state for each test
     autoCompactState = {
       pendingCompact: new Set<string>(),
       errorDataBySession: new Map(),
@@ -113,22 +113,22 @@ describe("executeCompact lock management", () => {
   })
 
   test("clears lock on successful summarize completion", async () => {
-    // #given: Valid session with providerID/modelID
+    // given: Valid session with providerID/modelID
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 100000,
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction successfully
+    // when: Execute compaction successfully
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Lock should be cleared
+    // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("clears lock when summarize throws exception", async () => {
-    // #given: Summarize will fail
+    // given: Summarize will fail
     mockClient.session.summarize = mock(() =>
       Promise.reject(new Error("Network timeout")),
     )
@@ -138,21 +138,21 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Lock should still be cleared despite exception
+    // then: Lock should still be cleared despite exception
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("shows toast when lock already held", async () => {
-    // #given: Lock already held
+    // given: Lock already held
     autoCompactState.compactionInProgress.add(sessionID)
 
-    // #when: Try to execute compaction
+    // when: Try to execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Toast should be shown with warning message
+    // then: Toast should be shown with warning message
     expect(mockClient.tui.showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
@@ -163,12 +163,12 @@ describe("executeCompact lock management", () => {
       }),
     )
 
-    // #then: compactionInProgress should still have the lock
+    // then: compactionInProgress should still have the lock
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(true)
   })
 
   test("clears lock when fixEmptyMessages path executes", async () => {
-    // #given: Empty content error scenario
+    // given: Empty content error scenario
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "non-empty content required",
       messageIndex: 0,
@@ -176,15 +176,15 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction (fixEmptyMessages will be called)
+    // when: Execute compaction (fixEmptyMessages will be called)
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Lock should be cleared
+    // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("clears lock when truncation is sufficient", async () => {
-    // #given: Aggressive truncation scenario with sufficient truncation
+    // given: Aggressive truncation scenario with sufficient truncation
     // This test verifies the early return path in aggressive truncation
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
@@ -197,7 +197,7 @@ describe("executeCompact lock management", () => {
       aggressive_truncation: true,
     }
 
-    // #when: Execute compaction with experimental flag
+    // when: Execute compaction with experimental flag
     await executeCompact(
       sessionID,
       msg,
@@ -207,30 +207,30 @@ describe("executeCompact lock management", () => {
       experimental,
     )
 
-    // #then: Lock should be cleared even on early return
+    // then: Lock should be cleared even on early return
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("prevents concurrent compaction attempts", async () => {
-    // #given: Lock already held (simpler test)
+    // given: Lock already held (simpler test)
     autoCompactState.compactionInProgress.add(sessionID)
 
-    // #when: Try to execute compaction while lock is held
+    // when: Try to execute compaction while lock is held
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Toast should be shown
+    // then: Toast should be shown
     const toastCalls = (mockClient.tui.showToast as any).mock.calls
     const blockedToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Compact In Progress",
     )
     expect(blockedToast).toBeDefined()
 
-    // #then: Lock should still be held (not cleared by blocked attempt)
+    // then: Lock should still be held (not cleared by blocked attempt)
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(true)
   })
 
   test("clears lock after max recovery attempts exhausted", async () => {
-    // #given: All retry/revert attempts exhausted
+    // given: All retry/revert attempts exhausted
     mockClient.session.messages = mock(() => Promise.resolve({ data: [] }))
 
     // Max out all attempts
@@ -247,22 +247,22 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Should show failure toast
+    // then: Should show failure toast
     const toastCalls = (mockClient.tui.showToast as any).mock.calls
     const failureToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Auto Compact Failed",
     )
     expect(failureToast).toBeDefined()
 
-    // #then: Lock should still be cleared
+    // then: Lock should still be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("clears lock when client.tui.showToast throws", async () => {
-    // #given: Toast will fail (this should never happen but testing robustness)
+    // given: Toast will fail (this should never happen but testing robustness)
     mockClient.tui.showToast = mock(() =>
       Promise.reject(new Error("Toast failed")),
     )
@@ -272,15 +272,15 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Lock should be cleared even if toast fails
+    // then: Lock should be cleared even if toast fails
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("clears lock when prompt_async in continuation throws", async () => {
-    // #given: prompt_async will fail during continuation
+    // given: prompt_async will fail during continuation
     mockClient.session.prompt_async = mock(() =>
       Promise.reject(new Error("Prompt failed")),
     )
@@ -290,19 +290,19 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)
 
-    // #then: Lock should be cleared
+    // then: Lock should be cleared
     // The continuation happens in setTimeout, but lock is cleared in finally before that
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
   test("falls through to summarize when truncation is insufficient", async () => {
-    // #given: Over token limit with truncation returning insufficient
+    // given: Over token limit with truncation returning insufficient
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -322,13 +322,13 @@ describe("executeCompact lock management", () => {
       ],
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // #then: Truncation was attempted
+    // then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
 
-    // #then: Summarize should be called (fall through from insufficient truncation)
+    // then: Summarize should be called (fall through from insufficient truncation)
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
@@ -336,14 +336,14 @@ describe("executeCompact lock management", () => {
       }),
     )
 
-    // #then: Lock should be cleared
+    // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
 
     truncateSpy.mockRestore()
   })
 
   test("does NOT call summarize when truncation is sufficient", async () => {
-    // #given: Over token limit with truncation returning sufficient
+    // given: Over token limit with truncation returning sufficient
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -362,22 +362,22 @@ describe("executeCompact lock management", () => {
       ],
     })
 
-    // #when: Execute compaction
+    // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
     // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)
 
-    // #then: Truncation was attempted
+    // then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
 
-    // #then: Summarize should NOT be called (early return from sufficient truncation)
+    // then: Summarize should NOT be called (early return from sufficient truncation)
     expect(mockClient.session.summarize).not.toHaveBeenCalled()
 
-    // #then: prompt_async should be called (Continue after successful truncation)
+    // then: prompt_async should be called (Continue after successful truncation)
     expect(mockClient.session.prompt_async).toHaveBeenCalled()
 
-    // #then: Lock should be cleared
+    // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
 
     truncateSpy.mockRestore()

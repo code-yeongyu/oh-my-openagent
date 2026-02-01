@@ -40,24 +40,24 @@ describe("start-work hook", () => {
 
   describe("chat.message handler", () => {
     test("should ignore non-start-work commands", async () => {
-      // #given - hook and non-start-work message
+      // given - hook and non-start-work message
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [{ type: "text", text: "Just a regular message" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - output should be unchanged
+      // then - output should be unchanged
       expect(output.parts[0].text).toBe("Just a regular message")
     })
 
     test("should detect start-work command via session-context tag", async () => {
-      // #given - hook and start-work message
+      // given - hook and start-work message
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [
@@ -68,18 +68,18 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - output should be modified with context info
+      // then - output should be modified with context info
       expect(output.parts[0].text).toContain("---")
     })
 
     test("should inject resume info when existing boulder state found", async () => {
-      // #given - existing boulder state with incomplete plan
+      // given - existing boulder state with incomplete plan
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
 
@@ -96,19 +96,19 @@ describe("start-work hook", () => {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should show resuming status
+      // then - should show resuming status
       expect(output.parts[0].text).toContain("RESUMING")
       expect(output.parts[0].text).toContain("test-plan")
     })
 
     test("should replace $SESSION_ID placeholder", async () => {
-      // #given - hook and message with placeholder
+      // given - hook and message with placeholder
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [
@@ -119,19 +119,19 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "ses-abc123" },
         output
       )
 
-      // #then - placeholder should be replaced
+      // then - placeholder should be replaced
       expect(output.parts[0].text).toContain("ses-abc123")
       expect(output.parts[0].text).not.toContain("$SESSION_ID")
     })
 
     test("should replace $TIMESTAMP placeholder", async () => {
-      // #given - hook and message with placeholder
+      // given - hook and message with placeholder
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [
@@ -142,19 +142,19 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - placeholder should be replaced with ISO timestamp
+      // then - placeholder should be replaced with ISO timestamp
       expect(output.parts[0].text).not.toContain("$TIMESTAMP")
       expect(output.parts[0].text).toMatch(/\d{4}-\d{2}-\d{2}T/)
     })
 
     test("should auto-select when only one incomplete plan among multiple plans", async () => {
-      // #given - multiple plans but only one incomplete
+      // given - multiple plans but only one incomplete
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -171,20 +171,20 @@ describe("start-work hook", () => {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should auto-select the incomplete plan, not ask user
+      // then - should auto-select the incomplete plan, not ask user
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
       expect(output.parts[0].text).toContain("plan-incomplete")
       expect(output.parts[0].text).not.toContain("Multiple Plans Found")
     })
 
     test("should wrap multiple plans message in system-reminder tag", async () => {
-      // #given - multiple incomplete plans
+      // given - multiple incomplete plans
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -199,20 +199,20 @@ describe("start-work hook", () => {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should use system-reminder tag format
+      // then - should use system-reminder tag format
       expect(output.parts[0].text).toContain("<system-reminder>")
       expect(output.parts[0].text).toContain("</system-reminder>")
       expect(output.parts[0].text).toContain("Multiple Plans Found")
     })
 
     test("should use 'ask user' prompt style for multiple plans", async () => {
-      // #given - multiple incomplete plans
+      // given - multiple incomplete plans
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -227,19 +227,19 @@ describe("start-work hook", () => {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should prompt agent to ask user, not ask directly
+      // then - should prompt agent to ask user, not ask directly
       expect(output.parts[0].text).toContain("Ask the user")
       expect(output.parts[0].text).not.toContain("Which plan would you like to work on?")
     })
 
     test("should select explicitly specified plan name from user-request, ignoring existing boulder state", async () => {
-      // #given - existing boulder state pointing to old plan
+      // given - existing boulder state pointing to old plan
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -272,20 +272,20 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when - user explicitly specifies new-plan
+      // when - user explicitly specifies new-plan
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should select new-plan, NOT resume old-plan
+      // then - should select new-plan, NOT resume old-plan
       expect(output.parts[0].text).toContain("new-plan")
       expect(output.parts[0].text).not.toContain("RESUMING")
       expect(output.parts[0].text).not.toContain("old-plan")
     })
 
     test("should strip ultrawork/ulw keywords from plan name argument", async () => {
-      // #given - plan with ultrawork keyword in user-request
+      // given - plan with ultrawork keyword in user-request
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -304,19 +304,19 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when - user specifies plan with ultrawork keyword
+      // when - user specifies plan with ultrawork keyword
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should find plan without ultrawork suffix
+      // then - should find plan without ultrawork suffix
       expect(output.parts[0].text).toContain("my-feature-plan")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
     })
 
     test("should strip ulw keyword from plan name argument", async () => {
-      // #given - plan with ulw keyword in user-request
+      // given - plan with ulw keyword in user-request
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -335,19 +335,19 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should find plan without ulw suffix
+      // then - should find plan without ulw suffix
       expect(output.parts[0].text).toContain("api-refactor")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
     })
 
     test("should match plan by partial name", async () => {
-      // #given - user specifies partial plan name
+      // given - user specifies partial plan name
       const plansDir = join(TEST_DIR, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
 
@@ -366,13 +366,13 @@ describe("start-work hook", () => {
         ],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "session-123" },
         output
       )
 
-      // #then - should find plan by partial match
+      // then - should find plan by partial match
       expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
     })
@@ -380,7 +380,7 @@ describe("start-work hook", () => {
 
   describe("session agent management", () => {
     test("should update session agent to Atlas when start-work command is triggered", async () => {
-      // #given
+      // given
       const updateSpy = spyOn(sessionState, "updateSessionAgent")
       
       const hook = createStartWorkHook(createMockPluginInput())
@@ -388,13 +388,13 @@ describe("start-work hook", () => {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
 
-      // #when
+      // when
       await hook["chat.message"](
         { sessionID: "ses-prometheus-to-sisyphus" },
         output
       )
 
-      // #then
+      // then
       expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
     })

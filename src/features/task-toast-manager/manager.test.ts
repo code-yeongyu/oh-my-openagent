@@ -26,7 +26,7 @@ describe("TaskToastManager", () => {
 
   describe("skills in toast message", () => {
     test("should display skills when provided", () => {
-      // #given - a task with skills
+      // given - a task with skills
       const task = {
         id: "task_1",
         description: "Test task",
@@ -35,10 +35,10 @@ describe("TaskToastManager", () => {
         skills: ["playwright", "git-master"],
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast message should include skills
+      // then - toast message should include skills
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("playwright")
@@ -46,7 +46,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should not display skills section when no skills provided", () => {
-      // #given - a task without skills
+      // given - a task without skills
       const task = {
         id: "task_2",
         description: "Test task without skills",
@@ -54,10 +54,10 @@ describe("TaskToastManager", () => {
         isBackground: true,
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast message should not include skills prefix
+      // then - toast message should not include skills prefix
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("Skills:")
@@ -66,7 +66,7 @@ describe("TaskToastManager", () => {
 
   describe("concurrency info in toast message", () => {
     test("should display concurrency status in toast", () => {
-      // #given - multiple running tasks
+      // given - multiple running tasks
       toastManager.addTask({
         id: "task_1",
         description: "First task",
@@ -80,7 +80,7 @@ describe("TaskToastManager", () => {
         isBackground: true,
       })
 
-      // #when - third task is added
+      // when - third task is added
       toastManager.addTask({
         id: "task_3",
         description: "Third task",
@@ -88,7 +88,7 @@ describe("TaskToastManager", () => {
         isBackground: true,
       })
 
-      // #then - toast should show concurrency info
+      // then - toast should show concurrency info
       expect(mockClient.tui.showToast).toHaveBeenCalledTimes(3)
       const lastCall = mockClient.tui.showToast.mock.calls[2][0]
       // Should show "Running (3):" header
@@ -96,7 +96,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should display concurrency limit info when available", () => {
-      // #given - a concurrency manager with known limit
+      // given - a concurrency manager with known limit
       const mockConcurrencyWithCounts = {
         getConcurrencyLimit: mock(() => 5),
         getRunningCount: mock(() => 2),
@@ -106,7 +106,7 @@ describe("TaskToastManager", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const managerWithConcurrency = new TaskToastManager(mockClient as any, mockConcurrencyWithCounts)
 
-      // #when - a task is added
+      // when - a task is added
       managerWithConcurrency.addTask({
         id: "task_1",
         description: "Test task",
@@ -114,7 +114,7 @@ describe("TaskToastManager", () => {
         isBackground: true,
       })
 
-      // #then - toast should show concurrency status like "2/5 slots"
+      // then - toast should show concurrency status like "2/5 slots"
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toMatch(/\d+\/\d+/)
@@ -123,7 +123,7 @@ describe("TaskToastManager", () => {
 
   describe("combined skills and concurrency display", () => {
     test("should display both skills and concurrency info together", () => {
-      // #given - a task with skills and concurrency manager
+      // given - a task with skills and concurrency manager
       const task = {
         id: "task_1",
         description: "Full info task",
@@ -132,10 +132,10 @@ describe("TaskToastManager", () => {
         skills: ["frontend-ui-ux"],
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should include both skills and task count
+      // then - toast should include both skills and task count
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("frontend-ui-ux")
@@ -145,7 +145,7 @@ describe("TaskToastManager", () => {
 
   describe("model fallback info in toast message", () => {
     test("should NOT display warning when model is category-default (normal behavior)", () => {
-      // #given - category-default is the intended behavior, not a fallback
+      // given - category-default is the intended behavior, not a fallback
       const task = {
         id: "task_1",
         description: "Task with category default model",
@@ -154,10 +154,10 @@ describe("TaskToastManager", () => {
         modelInfo: { model: "google/gemini-3-pro", type: "category-default" as const },
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should NOT show warning - category default is expected
+      // then - toast should NOT show warning - category default is expected
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK]")
@@ -165,7 +165,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should display warning when model falls back to system-default", () => {
-      // #given - system-default is a fallback (no category default, no user config)
+      // given - system-default is a fallback (no category default, no user config)
       const task = {
         id: "task_1b",
         description: "Task with system default model",
@@ -174,10 +174,10 @@ describe("TaskToastManager", () => {
         modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should show fallback warning
+      // then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
@@ -186,7 +186,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should display warning when model is inherited from parent", () => {
-      // #given - inherited is a fallback (custom category without model definition)
+      // given - inherited is a fallback (custom category without model definition)
       const task = {
         id: "task_2",
         description: "Task with inherited model",
@@ -195,10 +195,10 @@ describe("TaskToastManager", () => {
         modelInfo: { model: "cliproxy/claude-opus-4-5", type: "inherited" as const },
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should show fallback warning
+      // then - toast should show fallback warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
@@ -207,7 +207,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should not display model info when user-defined", () => {
-      // #given - a task with user-defined model
+      // given - a task with user-defined model
       const task = {
         id: "task_3",
         description: "Task with user model",
@@ -216,10 +216,10 @@ describe("TaskToastManager", () => {
         modelInfo: { model: "my-provider/my-model", type: "user-defined" as const },
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should NOT show model warning
+      // then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK] Model:")
@@ -229,7 +229,7 @@ describe("TaskToastManager", () => {
     })
 
     test("should not display model info when not provided", () => {
-      // #given - a task without model info
+      // given - a task without model info
       const task = {
         id: "task_4",
         description: "Task without model info",
@@ -237,10 +237,10 @@ describe("TaskToastManager", () => {
         isBackground: true,
       }
 
-      // #when - addTask is called
+      // when - addTask is called
       toastManager.addTask(task)
 
-      // #then - toast should NOT show model warning
+      // then - toast should NOT show model warning
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK] Model:")
