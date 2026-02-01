@@ -420,8 +420,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     modelCacheState,
   });
 
-  const sisyphusTasksEnabled = pluginConfig.sisyphus?.tasks?.enabled ?? false;
-  const taskTool = sisyphusTasksEnabled ? createTask(pluginConfig) : null;
+  const newTaskSystemEnabled = pluginConfig.new_task_system_enabled ?? false;
+  const taskTool = newTaskSystemEnabled ? createTask(pluginConfig) : null;
 
   return {
     tool: {

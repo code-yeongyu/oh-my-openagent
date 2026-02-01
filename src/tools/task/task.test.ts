@@ -7,9 +7,9 @@ import { createTask } from "./task"
 const TEST_STORAGE = ".test-task-tool"
 const TEST_DIR = join(process.cwd(), TEST_STORAGE)
 const TEST_CONFIG = {
+  new_task_system_enabled: true,
   sisyphus: {
     tasks: {
-      enabled: true,
       storage_path: TEST_STORAGE,
       claude_code_compat: true,
     },
