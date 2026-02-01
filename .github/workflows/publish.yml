@@ -51,7 +51,6 @@ jobs:
           # Run them in separate processes to prevent cross-file contamination
           bun test src/plugin-handlers
           bun test src/hooks/atlas
-          bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
 
       - name: Run remaining tests
