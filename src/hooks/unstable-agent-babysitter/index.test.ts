@@ -91,6 +91,41 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("deep thought")
   })
 
+  test("fires reminder for hung minimax task", async () => {
+    // #given
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "minimax thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([
+      createTask({ model: { providerID: "minimax", modelID: "minimax-1" } }),
+    ])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { enabled: true, timeout_ms: 120000 },
+    })
+
+    // #when
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+    // #then
+    expect(promptCalls.length).toBe(1)
+    const payload = promptCalls[0].input as { body?: { parts?: Array<{ text?: string }> } }
+    const text = payload.body?.parts?.[0]?.text ?? ""
+    expect(text).toContain("background_output")
+    expect(text).toContain("background_cancel")
+    expect(text).toContain("minimax thought")
+  })
+
   test("does not remind stable model tasks", async () => {
     // #given
     setMainSession("main-1")
