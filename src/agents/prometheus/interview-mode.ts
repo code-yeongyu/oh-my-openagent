@@ -65,8 +65,9 @@ Or should I just note down this single fix?"
 
 **Research First:**
 \`\`\`typescript
-delegate_task(subagent_type="explore", prompt="Find all usages of [target] using lsp_find_references pattern...", run_in_background=true)
-delegate_task(subagent_type="explore", prompt="Find test coverage for [affected code]...", run_in_background=true)
+// Prompt structure: CONTEXT (what I'm doing) + GOAL (what I'm trying to achieve) + QUESTION (what I need to know) + REQUEST (what to find)
+delegate_task(subagent_type="explore", prompt="I'm refactoring [target] and need to understand its impact scope before making changes. Find all usages via lsp_find_references - show calling code, patterns of use, and potential breaking points.", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm about to modify [affected code] and need to ensure behavior preservation. Find existing test coverage - which tests exercise this code, what assertions exist, and any gaps in coverage.", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -89,9 +90,10 @@ delegate_task(subagent_type="explore", prompt="Find test coverage for [affected 
 **Pre-Interview Research (MANDATORY):**
 \`\`\`typescript
 // Launch BEFORE asking user questions
-delegate_task(subagent_type="explore", prompt="Find similar implementations in codebase...", run_in_background=true)
-delegate_task(subagent_type="explore", prompt="Find project patterns for [feature type]...", run_in_background=true)
-delegate_task(subagent_type="librarian", prompt="Find best practices for [technology]...", run_in_background=true)
+// Prompt structure: CONTEXT + GOAL + QUESTION + REQUEST
+delegate_task(subagent_type="explore", prompt="I'm building a new [feature] and want to maintain codebase consistency. Find similar implementations in this project - their structure, patterns used, and conventions to follow.", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm adding [feature type] to the project and need to understand existing conventions. Find how similar features are organized - file structure, naming patterns, and architectural approach.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm implementing [technology] and want to follow established best practices. Find official documentation and community recommendations - setup patterns, common pitfalls, and production-ready examples.", run_in_background=true)
 \`\`\`
 
 **Interview Focus** (AFTER research):
@@ -130,7 +132,7 @@ Based on your stack, I'd recommend NextAuth.js - it integrates well with Next.js
 
 Run this check:
 \`\`\`typescript
-delegate_task(subagent_type="explore", prompt="Find test infrastructure: package.json test scripts, test config files (jest.config, vitest.config, pytest.ini, etc.), existing test files (*.test.*, *.spec.*, test_*). Report: 1) Does test infra exist? 2) What framework? 3) Example test file patterns.", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm assessing this project's test setup before planning work that may require TDD. I need to understand what testing capabilities exist. Find test infrastructure: package.json test scripts, config files (jest.config, vitest.config, pytest.ini), and existing test files. Report: 1) Does test infra exist? 2) What framework? 3) Example test patterns.", run_in_background=true)
 \`\`\`
 
 #### Step 2: Ask the Test Question (MANDATORY)
@@ -219,8 +221,8 @@ Add to draft immediately:
 
 **Research First:**
 \`\`\`typescript
-delegate_task(subagent_type="explore", prompt="Find current system architecture and patterns...", run_in_background=true)
-delegate_task(subagent_type="librarian", prompt="Find architectural best practices for [domain]...", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm planning architectural changes and need to understand the current system design. Find existing architecture: module boundaries, dependency patterns, data flow, and key abstractions used.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm designing architecture for [domain] and want to make informed decisions. Find architectural best practices - proven patterns, trade-offs, and lessons learned from similar systems.", run_in_background=true)
 \`\`\`
 
 **Oracle Consultation** (recommend when stakes are high):
@@ -242,9 +244,9 @@ delegate_task(subagent_type="oracle", prompt="Architecture consultation needed: 
 
 **Parallel Investigation:**
 \`\`\`typescript
-delegate_task(subagent_type="explore", prompt="Find how X is currently handled...", run_in_background=true)
-delegate_task(subagent_type="librarian", prompt="Find official docs for Y...", run_in_background=true)
-delegate_task(subagent_type="librarian", prompt="Find OSS implementations of Z...", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm researching how to implement [feature] and need to understand current approach. Find how X is currently handled in this codebase - implementation details, edge cases covered, and any known limitations.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm implementing Y and need authoritative guidance. Find official documentation - API reference, configuration options, and recommended usage patterns.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm looking for battle-tested implementations of Z. Find open source projects that solve this - focus on production-quality code, how they handle edge cases, and any gotchas documented.", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -270,17 +272,17 @@ delegate_task(subagent_type="librarian", prompt="Find OSS implementations of Z..
 
 **For Understanding Codebase:**
 \`\`\`typescript
-delegate_task(subagent_type="explore", prompt="Find all files related to [topic]. Show patterns, conventions, and structure.", run_in_background=true)
+delegate_task(subagent_type="explore", prompt="I'm working on [topic] and need to understand how it's organized in this project. Find all related files - show the structure, patterns used, and conventions I should follow.", run_in_background=true)
 \`\`\`
 
 **For External Knowledge:**
 \`\`\`typescript
-delegate_task(subagent_type="librarian", prompt="Find official documentation for [library]. Focus on [specific feature] and best practices.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm integrating [library] and need to understand [specific feature]. Find official documentation - API details, configuration options, and recommended best practices.", run_in_background=true)
 \`\`\`
 
 **For Implementation Examples:**
 \`\`\`typescript
-delegate_task(subagent_type="librarian", prompt="Find open source implementations of [feature]. Look for production-quality examples.", run_in_background=true)
+delegate_task(subagent_type="librarian", prompt="I'm implementing [feature] and want to learn from existing solutions. Find open source implementations - focus on production-quality code, architecture decisions, and common patterns.", run_in_background=true)
 \`\`\`
 
 ## Interview Mode Anti-Patterns
