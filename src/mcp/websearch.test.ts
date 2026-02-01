@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { createWebsearchConfig } from "./websearch"
 
 describe("websearch MCP provider configuration", () => {
   const originalEnv = { ...process.env }
@@ -13,28 +14,27 @@ describe("websearch MCP provider configuration", () => {
   })
 
   test("returns Exa config when no config provided", () => {
-    //#given
-    const provider = undefined
-    const exaKey = undefined
-    const tavilyKey = undefined
+    //#given - no config
 
     //#when
-    process.env.EXA_API_KEY = exaKey
-    process.env.TAVILY_API_KEY = tavilyKey
+    const result = createWebsearchConfig()
 
     //#then
-    expect(provider).toBeUndefined()
+    expect(result.url).toContain("mcp.exa.ai")
+    expect(result.type).toBe("remote")
+    expect(result.enabled).toBe(true)
   })
 
   test("returns Exa config when provider is 'exa'", () => {
     //#given
-    const provider = "exa"
+    const config = { provider: "exa" as const }
 
     //#when
-    const selectedProvider = provider
+    const result = createWebsearchConfig(config)
 
     //#then
-    expect(selectedProvider).toBe("exa")
+    expect(result.url).toContain("mcp.exa.ai")
+    expect(result.type).toBe("remote")
   })
 
   test("includes x-api-key header when EXA_API_KEY is set", () => {
@@ -43,91 +43,74 @@ describe("websearch MCP provider configuration", () => {
     process.env.EXA_API_KEY = apiKey
 
     //#when
-    const headers = process.env.EXA_API_KEY
-      ? { "x-api-key": process.env.EXA_API_KEY }
-      : undefined
+    const result = createWebsearchConfig()
 
     //#then
-    expect(headers).toEqual({ "x-api-key": "test-exa-key-12345" })
-    expect(headers?.["x-api-key"]).toBe(apiKey)
+    expect(result.headers).toEqual({ "x-api-key": apiKey })
   })
 
   test("returns Tavily config when provider is 'tavily' and TAVILY_API_KEY set", () => {
     //#given
-    const provider = "tavily"
     const tavilyKey = "test-tavily-key-67890"
     process.env.TAVILY_API_KEY = tavilyKey
+    const config = { provider: "tavily" as const }
 
     //#when
-    const headers = process.env.TAVILY_API_KEY
-      ? { Authorization: `Bearer ${process.env.TAVILY_API_KEY}` }
-      : undefined
+    const result = createWebsearchConfig(config)
 
     //#then
-    expect(provider).toBe("tavily")
-    expect(headers).toEqual({ Authorization: "Bearer test-tavily-key-67890" })
-    expect(headers?.Authorization).toContain("Bearer")
+    expect(result.url).toContain("mcp.tavily.com")
+    expect(result.headers).toEqual({ Authorization: `Bearer ${tavilyKey}` })
   })
 
   test("throws error when provider is 'tavily' but TAVILY_API_KEY missing", () => {
     //#given
-    const provider = "tavily"
     delete process.env.TAVILY_API_KEY
+    const config = { provider: "tavily" as const }
 
     //#when
-    const createTavilyConfig = () => {
-      if (provider === "tavily" && !process.env.TAVILY_API_KEY) {
-        throw new Error("TAVILY_API_KEY environment variable is required for Tavily provider")
-      }
-    }
+    const createTavilyConfig = () => createWebsearchConfig(config)
 
     //#then
     expect(createTavilyConfig).toThrow("TAVILY_API_KEY environment variable is required")
   })
 
-  test("returns Exa when both keys present but no explicit provider (conflict resolution)", () => {
+  test("returns Exa when both keys present but no explicit provider", () => {
     //#given
-    const exaKey = "test-exa-key"
-    const tavilyKey = "test-tavily-key"
-    const provider = undefined
-    process.env.EXA_API_KEY = exaKey
-    process.env.TAVILY_API_KEY = tavilyKey
+    process.env.EXA_API_KEY = "test-exa-key"
+    process.env.TAVILY_API_KEY = "test-tavily-key"
 
     //#when
-    const selectedProvider = provider || "exa"
+    const result = createWebsearchConfig()
 
     //#then
-    expect(selectedProvider).toBe("exa")
-    expect(process.env.EXA_API_KEY).toBe(exaKey)
-    expect(process.env.TAVILY_API_KEY).toBe(tavilyKey)
+    expect(result.url).toContain("mcp.exa.ai")
+    expect(result.headers).toEqual({ "x-api-key": "test-exa-key" })
   })
 
-  test("Tavily config uses Authorization Bearer header", () => {
+  test("Tavily config uses Authorization Bearer header format", () => {
     //#given
     const tavilyKey = "tavily-secret-key-xyz"
     process.env.TAVILY_API_KEY = tavilyKey
+    const config = { provider: "tavily" as const }
 
     //#when
-    const headers = {
-      Authorization: `Bearer ${process.env.TAVILY_API_KEY}`,
-    }
+    const result = createWebsearchConfig(config)
 
     //#then
-    expect(headers.Authorization).toMatch(/^Bearer /)
-    expect(headers.Authorization).toBe(`Bearer ${tavilyKey}`)
-    expect(headers.Authorization).not.toContain("x-api-key")
+    expect(result.headers?.Authorization).toMatch(/^Bearer /)
+    expect(result.headers?.Authorization).toBe(`Bearer ${tavilyKey}`)
   })
 
-  test("Tavily config points to mcp.tavily.com", () => {
+  test("Exa config has no headers when EXA_API_KEY not set", () => {
     //#given
-    const tavilyUrl = "https://mcp.tavily.com/mcp/"
+    delete process.env.EXA_API_KEY
 
     //#when
-    const url = tavilyUrl
+    const result = createWebsearchConfig()
 
     //#then
-    expect(url).toContain("mcp.tavily.com")
-    expect(url).toMatch(/^https:\/\//)
-    expect(url).toEndWith("/")
+    expect(result.url).toContain("mcp.exa.ai")
+    expect(result.headers).toBeUndefined()
   })
 })
