@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrideConfig } from "../../config/schema"
 
 export type OpencodeClient = PluginInput["client"]
 
@@ -41,6 +41,7 @@ export interface DelegateTaskToolOptions {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  agentOverrides?: Record<string, AgentOverrideConfig>
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
 }
 

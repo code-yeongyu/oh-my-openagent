@@ -15,7 +15,7 @@ import { subagentSessions, getSessionAgent } from "../../features/claude-code-se
 import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { CATEGORY_MODEL_REQUIREMENTS, AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
@@ -27,6 +27,7 @@ export interface ExecutorContext {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  agentOverrides?: Record<string, { model?: string; variant?: string }>
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 }
 
@@ -897,7 +898,7 @@ export async function resolveSubagentExecution(
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string } | undefined; error?: string }> {
+): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; error?: string }> {
   const { client } = executorCtx
 
   if (!args.subagent_type?.trim()) {
@@ -927,7 +928,7 @@ Create the work plan directly - that's your job as the planning agent.`,
   }
 
   let agentToUse = agentName
-  let categoryModel: { providerID: string; modelID: string } | undefined
+  let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -963,12 +964,40 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
 
     agentToUse = matchedAgent.name
-
-    if (matchedAgent.model) {
-      categoryModel = matchedAgent.model
-    }
   } catch {
     // Proceed anyway - session.prompt will fail with clearer error if agent doesn't exist
+  }
+
+  const { agentOverrides } = executorCtx
+  const agentNameLower = agentToUse.toLowerCase()
+  const agentOverride = agentOverrides?.[agentNameLower] 
+    ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentNameLower)?.[1]
+  
+  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower as keyof typeof AGENT_MODEL_REQUIREMENTS]
+  const connectedProviders = readConnectedProvidersCache()
+  const availableModels = await fetchAvailableModels(undefined, {
+    connectedProviders: connectedProviders ?? undefined
+  })
+
+  const resolution = resolveModelPipeline({
+    intent: {
+      userModel: agentOverride?.model,
+    },
+    constraints: {
+      availableModels,
+    },
+    policy: {
+      fallbackChain: agentRequirement?.fallbackChain,
+      systemDefaultModel: undefined,
+    },
+  })
+
+  if (resolution) {
+    const parsed = parseModelString(resolution.model)
+    if (parsed) {
+      const variantToUse = agentOverride?.variant ?? resolution.variant
+      categoryModel = variantToUse ? { ...parsed, variant: variantToUse } : parsed
+    }
   }
 
   return { agentToUse, categoryModel }
