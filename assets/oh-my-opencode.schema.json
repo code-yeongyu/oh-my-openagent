@@ -11,6 +11,9 @@
     "new_task_system_enabled": {
       "type": "boolean"
     },
+    "default_run_agent": {
+      "type": "string"
+    },
     "disabled_mcps": {
       "type": "array",
       "items": {
