@@ -1,2 +1,6 @@
 export { createTask } from "./task"
+export { createTaskCreateTool } from "./task-create"
+export { createTaskUpdateTool } from "./task-update"
+export { syncTaskToTodo, syncAllTasksToTodos } from "./todo-sync"
 export type { TaskObject, TaskStatus, TaskCreateInput, TaskListInput, TaskGetInput, TaskUpdateInput, TaskDeleteInput } from "./types"
+export type { TodoInfo } from "./todo-sync"
