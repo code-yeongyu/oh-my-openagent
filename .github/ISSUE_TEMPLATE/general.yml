@@ -18,7 +18,7 @@ body:
           required: true
         - label: I have searched existing issues and discussions
           required: true
-        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme)
+        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
           required: true
         - label: This is a question (not a bug report or feature request)
           required: true
