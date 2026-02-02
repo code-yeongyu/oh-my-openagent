@@ -60,12 +60,12 @@ Extract from user request:
 
 **Philosophy**: Use the cheapest agent that can do the job. Expensive agents = waste unless necessary.
 
-### Default Ratio: `unspecified-low:8, quick:1, writing:1`
+### Default Ratio: `unspecified-low:7, quick:2, writing:1`
 
 | Category | Ratio | Use For | Cost |
 |----------|-------|---------|------|
-| `unspecified-low` | 80% | Standard issue analysis - read issue, fetch comments, categorize | $ |
-| `quick` | 10% | Trivial issues - obvious duplicates, spam, clearly resolved | ¢ |
+| `unspecified-low` | 70% | Standard issue analysis - read issue, fetch comments, categorize | $ |
+| `quick` | 20% | Trivial issues - obvious duplicates, spam, clearly resolved | ¢ |
 | `writing` | 10% | Report generation, response drafting, summary synthesis | $$ |
 
 ### When to Override Default Ratio
@@ -132,6 +132,32 @@ function assignAgentCategory(issues: Issue[], ratio: Record<string, number>): Ma
 
 **YOU WILL FETCH EVERY. SINGLE. ISSUE. NO EXCEPTIONS.**
 
+## USE THE BUNDLED SCRIPT (MANDATORY)
+
+**Use the bundled `scripts/gh_fetch.py` script for exhaustive pagination:**
+
+```bash
+# Fetch all issues (no time filter)
+./scripts/gh_fetch.py issues --state all --output json
+
+# Fetch issues from last 48 hours
+./scripts/gh_fetch.py issues --hours 48 --output json
+
+# Fetch from specific repo
+./scripts/gh_fetch.py issues --repo owner/repo --hours 48 --output json
+```
+
+The script:
+- Handles pagination automatically (fetches ALL pages until empty)
+- Outputs JSON that you can parse for agent distribution
+- Filters by time range if `--hours` is specified
+
+---
+
+## FALLBACK: Manual Bash Pagination
+
+If the Python script is unavailable, follow this manual approach:
+
 ## THE GOLDEN RULE
 
 ```
@@ -140,7 +166,7 @@ NEVER stop at first result. ALWAYS verify you got everything.
 NEVER assume "that's probably all". ALWAYS check if more exist.
 ```
 
-## MANDATORY PAGINATION LOOP (COPY-PASTE THIS EXACTLY)
+## MANUAL PAGINATION LOOP (ONLY IF PYTHON SCRIPT UNAVAILABLE)
 
 You MUST execute this EXACT pagination loop. DO NOT simplify. DO NOT skip iterations.
 
@@ -282,8 +308,8 @@ gh pr list --repo $REPO --state all --limit 500 --json number,title,state,create
 ```
 Total issues: N
 Agent categories based on ratio:
-- unspecified-low: floor(N * 0.8)
-- quick: floor(N * 0.1)  
+- unspecified-low: floor(N * 0.7)
+- quick: floor(N * 0.2)  
 - writing: ceil(N * 0.1)  # For report generation
 ```
 
