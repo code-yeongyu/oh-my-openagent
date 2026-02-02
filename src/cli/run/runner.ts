@@ -77,6 +77,10 @@ export const resolveRunAgent = (
 }
 
 export async function run(options: RunOptions): Promise<number> {
+  // Set CLI run mode environment variable before any config loading
+  // This signals to config-handler to deny Question tool (no TUI to answer)
+  process.env.OPENCODE_CLI_RUN_MODE = "true"
+
   const {
     message,
     directory = process.cwd(),
