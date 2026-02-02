@@ -57,6 +57,14 @@ import {
   createInstinctLearnerHook,
   createPatternExtractionHook,
   createObservationWriteGuardHook,
+  createSecretScannerHook,
+  createSkillAutoInjectorHook,
+  createBehaviorAnchorHook,
+  createVerbosityControllerHook,
+  createPhaseRulesInjectorHook,
+  createKnowledgeInjectionHook,
+  createProjectContextInjectorHook,
+  createPrContextInjectorHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -331,6 +339,38 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createPatternExtractionHook()
     : null;
 
+  const secretScanner = isHookEnabled("secret-scanner")
+    ? createSecretScannerHook({ cwd: ctx.directory })
+    : null;
+
+  const skillAutoInjector = isHookEnabled("skill-auto-injector")
+    ? createSkillAutoInjectorHook({ cwd: ctx.directory })
+    : null;
+
+  const behaviorAnchor = isHookEnabled("behavior-anchor")
+    ? createBehaviorAnchorHook()
+    : null;
+
+  const verbosityController = isHookEnabled("verbosity-controller")
+    ? createVerbosityControllerHook()
+    : null;
+
+  const phaseRulesInjector = isHookEnabled("phase-rules-injector")
+    ? createPhaseRulesInjectorHook()
+    : null;
+
+  const knowledgeInjection = isHookEnabled("knowledge-injection")
+    ? createKnowledgeInjectionHook()
+    : null;
+
+  const projectContextInjector = isHookEnabled("project-context-injector")
+    ? createProjectContextInjectorHook({ directory: ctx.directory, client: ctx.client })
+    : null;
+
+  const prContextInjector = isHookEnabled("pr-context-injector")
+    ? createPrContextInjectorHook({ directory: ctx.directory })
+    : null;
+
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
@@ -536,6 +576,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+      await skillAutoInjector?.["chat.message"]?.(input, output);
+      await phaseRulesInjector?.["chat.message"]?.(input, output);
+      await projectContextInjector?.["chat.message"]?.(input, output);
+      await prContextInjector?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
         const parts = (
@@ -629,6 +673,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await observerDetector?.event(input as any);
       await instinctLearner?.event(input as any);
       await patternExtraction?.event(input as any);
+      await skillAutoInjector?.event(input as any);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -716,6 +761,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
       await observationWriteGuard?.["tool.execute.before"]?.(input, output);
+      await secretScanner?.["tool.execute.before"]?.(input, output);
       
       // Check if any hook blocked the operation
       if ((output as { blocked?: boolean }).blocked) {
@@ -725,6 +771,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       
       await instinctTrigger?.["tool.execute.before"]?.(input, output);
       await planUpdateReminder?.["tool.execute.before"]?.(input, output);
+      await knowledgeInjection?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
@@ -820,6 +867,8 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
       await observationRecorder?.["tool.execute.after"]?.(input, output);
       await observerDetector?.["tool.execute.after"]?.(input, output);
       await instinctLearner?.["tool.execute.after"]?.(input, output);
+      await behaviorAnchor?.["tool.execute.after"]?.(input, output);
+      await verbosityController?.["tool.execute.after"]?.(input, output);
     },
   };
 };

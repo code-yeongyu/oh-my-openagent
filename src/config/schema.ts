@@ -124,6 +124,14 @@ export const HookNameSchema = z.enum([
   "instinct-learner",
   "pattern-extraction",
   "observation-write-guard",
+  "secret-scanner",
+  "skill-auto-injector",
+  "behavior-anchor",
+  "verbosity-controller",
+  "phase-rules-injector",
+  "knowledge-injection",
+  "project-context-injector",
+  "pr-context-injector",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
