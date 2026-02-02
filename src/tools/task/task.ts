@@ -38,27 +38,27 @@ export function createTask(config: Partial<OhMyOpenCodeConfig>): ToolDefinition 
   return tool({
     description: `Unified task management tool with create, list, get, update, delete actions.
 
-**CREATE**: Create a new task. Auto-generates T-{uuid} ID, records threadID, sets status to "open".
-**LIST**: List tasks. Excludes completed by default. Supports ready filter (all dependencies completed) and limit.
-**GET**: Retrieve a task by ID.
-**UPDATE**: Update task fields. Requires task ID.
-**DELETE**: Physically remove task file.
+CREATE: Create a new task. Auto-generates T-{uuid} ID, records threadID, sets status to "pending".
+LIST: List tasks. Excludes completed by default. Supports ready filter (all dependencies completed) and limit.
+GET: Retrieve a task by ID.
+UPDATE: Update task fields. Requires task ID.
+DELETE: Physically remove task file.
 
 All actions return JSON strings.`,
     args: {
       action: tool.schema
         .enum(["create", "list", "get", "update", "delete"])
         .describe("Action to perform: create, list, get, update, delete"),
-      title: tool.schema.string().optional().describe("Task title (required for create)"),
+      subject: tool.schema.string().optional().describe("Task subject (required for create)"),
       description: tool.schema.string().optional().describe("Task description"),
       status: tool.schema
-        .enum(["open", "in_progress", "completed"])
+        .enum(["pending", "in_progress", "completed", "deleted"])
         .optional()
         .describe("Task status"),
-      dependsOn: tool.schema
+      blockedBy: tool.schema
         .array(tool.schema.string())
         .optional()
-        .describe("Task IDs this task depends on"),
+        .describe("Task IDs this task is blocked by"),
       repoURL: tool.schema.string().optional().describe("Repository URL"),
       parentID: tool.schema.string().optional().describe("Parent task ID"),
       id: tool.schema.string().optional().describe("Task ID (required for get, update, delete)"),
@@ -99,18 +99,19 @@ async function handleCreate(
     return JSON.stringify({ error: "task_lock_unavailable" })
   }
 
-  try {
-    const taskId = generateTaskId()
-    const task: TaskObject = {
-      id: taskId,
-      title: validatedArgs.title,
-      description: validatedArgs.description,
-      status: "open",
-      dependsOn: validatedArgs.dependsOn ?? [],
-      repoURL: validatedArgs.repoURL,
-      parentID: validatedArgs.parentID,
-      threadID: context.sessionID,
-    }
+   try {
+     const taskId = generateTaskId()
+     const task: TaskObject = {
+       id: taskId,
+       subject: validatedArgs.subject,
+        description: validatedArgs.description ?? "",
+       status: "pending",
+       blocks: validatedArgs.blocks ?? [],
+       blockedBy: validatedArgs.blockedBy ?? [],
+       repoURL: validatedArgs.repoURL,
+       parentID: validatedArgs.parentID,
+       threadID: context.sessionID,
+     }
 
     const validatedTask = TaskObjectSchema.parse(task)
     writeJsonAtomic(join(taskDir, `${taskId}.json`), validatedTask)
@@ -158,20 +159,20 @@ async function handleList(
     tasks = tasks.filter((task) => task.parentID === validatedArgs.parentID)
   }
 
-  // Apply ready filter if requested
-  if (args.ready) {
-    tasks = tasks.filter((task) => {
-      if (task.dependsOn.length === 0) {
-        return true
-      }
+   // Apply ready filter if requested
+   if (args.ready) {
+     tasks = tasks.filter((task) => {
+       if (task.blockedBy.length === 0) {
+         return true
+       }
 
-      // All dependencies must be completed
-      return task.dependsOn.every((depId) => {
-        const depTask = allTasks.find((t) => t.id === depId)
-        return depTask?.status === "completed"
-      })
-    })
-  }
+       // All blocking tasks must be completed
+       return task.blockedBy.every((depId: string) => {
+         const depTask = allTasks.find((t) => t.id === depId)
+         return depTask?.status === "completed"
+       })
+     })
+   }
 
   // Apply limit if provided
   const limit = args.limit as number | undefined
@@ -223,25 +224,25 @@ async function handleUpdate(
       return JSON.stringify({ error: "task_not_found" })
     }
 
-    // Update fields if provided
-    if (validatedArgs.title !== undefined) {
-      task.title = validatedArgs.title
-    }
-    if (validatedArgs.description !== undefined) {
-      task.description = validatedArgs.description
-    }
-    if (validatedArgs.status !== undefined) {
-      task.status = validatedArgs.status
-    }
-    if (validatedArgs.dependsOn !== undefined) {
-      task.dependsOn = validatedArgs.dependsOn
-    }
-    if (validatedArgs.repoURL !== undefined) {
-      task.repoURL = validatedArgs.repoURL
-    }
-    if (validatedArgs.parentID !== undefined) {
-      task.parentID = validatedArgs.parentID
-    }
+     // Update fields if provided
+     if (validatedArgs.subject !== undefined) {
+       task.subject = validatedArgs.subject
+     }
+     if (validatedArgs.description !== undefined) {
+       task.description = validatedArgs.description
+     }
+     if (validatedArgs.status !== undefined) {
+       task.status = validatedArgs.status
+     }
+     if (validatedArgs.addBlockedBy !== undefined) {
+       task.blockedBy = [...task.blockedBy, ...validatedArgs.addBlockedBy]
+     }
+     if (validatedArgs.repoURL !== undefined) {
+       task.repoURL = validatedArgs.repoURL
+     }
+     if (validatedArgs.parentID !== undefined) {
+       task.parentID = validatedArgs.parentID
+     }
 
     const validatedTask = TaskObjectSchema.parse(task)
     writeJsonAtomic(taskPath, validatedTask)
