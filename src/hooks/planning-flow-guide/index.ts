@@ -28,7 +28,7 @@ function detectPlanningPhase(agentName: string): PlanningPhase | null {
 /**
  * Creates the planning flow guide hook.
  *
- * This hook monitors sisyphus_task calls targeting planning agents (Metis, Prometheus, Momus)
+ * This hook monitors delegate_task calls targeting planning agents (Metis, Prometheus, Momus)
  * and provides guidance when the flow order is non-standard. It does NOT block execution,
  * only warns and guides.
  */
@@ -56,8 +56,8 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
       // Adapt to new interface - tool name is now input.tool, args is input.args
       const toolName = input.tool
       const toolInput = input.args ?? {}
-      // Only monitor sisyphus_task calls
-      if (toolName !== "sisyphus_task") {
+      // Only monitor delegate_task and sisyphus_task calls
+      if (toolName !== "delegate_task" && toolName !== "sisyphus_task") {
         return
       }
 
@@ -149,7 +149,7 @@ export function createPlanningFlowGuideHook(ctx: PluginInput) {
 **REQUIRED ACTION**: Return to Prometheus with the rejection feedback.
 
 \`\`\`typescript
-sisyphus_task(
+delegate_task(
   subagent_type="prometheus",
   prompt="""
   REVISION REQUIRED: Momus rejected the previous plan.

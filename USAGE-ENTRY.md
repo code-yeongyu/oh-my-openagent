@@ -163,26 +163,26 @@
 
 ### 子任务并行执行
 
-使用 `sisyphus_task` 工具：
+使用 `delegate_task` 工具：
 
 ```typescript
 // 使用 category（推荐）
-sisyphus_task({
+delegate_task({
   category: "visual",
   prompt: "创建仪表盘 UI",
   run_in_background: true
 })
 
 // 直接指定 agent
-sisyphus_task({
-  agent: "oracle",
+delegate_task({
+  subagent_type: "oracle",
   prompt: "审查架构设计",
   run_in_background: true
 })
 
 // 恢复之前的 session
-sisyphus_task({
-  resume: "session_id_here",
+delegate_task({
+  session_id: "session_id_here",
   prompt: "继续之前的任务"
 })
 ```

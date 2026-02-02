@@ -36,8 +36,8 @@ for wave in waves:
 ```typescript
 // 并行启动所有 Waves
 const wavePromises = waves.map(wave => 
-  sisyphus_task({
-    agent: "implementer",
+  delegate_task({
+    category: "ultrabrain",
     background: true,
     prompt: `
 ## Wave ${wave.id} Execution

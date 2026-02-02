@@ -476,8 +476,8 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 When dispatching to Implementer agent, use this structured format:
 
 \`\`\`
-sisyphus_task(
-  agent="implementer",
+delegate_task(
+  category="ultrabrain",
   prompt="""
   ## ImplementerTaskContext
   

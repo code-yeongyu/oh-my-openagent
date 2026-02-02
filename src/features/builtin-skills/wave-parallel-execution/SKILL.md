@@ -109,7 +109,7 @@ For each Wave:
 |----------|---------------------|-------|--------|
 | **文档** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
 | **视觉/UI** | `.tsx`, `.jsx`, `.vue`, `.css` + 样式关键词 | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
-| **代码** | `.ts`, `.js`, `.py` 等 (逻辑, API, 后端) | `implementer` | [\"test-driven-development\", \"collaborating-with-codex\"] |
+| **代码** | `.ts`, `.js`, `.py` 等 (逻辑, API, 后端) | `category: "ultrabrain"` | [\"test-driven-development\", \"collaborating-with-codex\"] |
 
 **分类决策树:**
 
@@ -118,7 +118,7 @@ For each Wave:
   是 → document-writer
   否 → 任务是关于视觉/样式变更吗?
          是 → frontend-ui-ux-engineer
-         否 → implementer (默认)
+         否 → category: "ultrabrain" (默认)
 ```
 
 **Wave 内混合任务类型:**
@@ -133,13 +133,13 @@ const codeTasks = wave.tasks.filter(t => !isDocTask(t) && !isVisualTask(t))
 
 // 并行调度不同类型
 if (docTasks.length > 0) {
-  sisyphus_task({ subagent_type: "document-writer", ... })
+  delegate_task({ subagent_type: "document-writer", ... })
 }
 if (visualTasks.length > 0) {
-  sisyphus_task({ subagent_type: "frontend-ui-ux-engineer", ... })
+  delegate_task({ subagent_type: "frontend-ui-ux-engineer", ... })
 }
 if (codeTasks.length > 0) {
-  sisyphus_task({ subagent_type: "implementer", ... })
+  delegate_task({ category: "ultrabrain", ... })
 }
 ```
 
@@ -160,9 +160,9 @@ For each Wave (并行 dispatch):
 
    ```typescript
    // 并行启动所有 Waves
-   for (const wave of waves) {
-     sisyphus_task({
-       subagent_type: "implementer",
+    for (const wave of waves) {
+      delegate_task({
+        category: "ultrabrain",
        description: `Execute Wave ${wave.id} tasks`,
         skills: ["test-driven-development", "collaborating-with-codex"],
        run_in_background: true,

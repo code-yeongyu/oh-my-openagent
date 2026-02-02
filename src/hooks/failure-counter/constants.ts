@@ -2,7 +2,7 @@
  * Failure Counter Hook Constants
  *
  * Configuration defaults and failure detection patterns for
- * tracking consecutive sisyphus_task failures.
+ * tracking consecutive delegate_task failures.
  */
 
 import type { FailureCounterConfig } from "./types"
@@ -23,7 +23,8 @@ export const DEFAULT_FAILURE_COUNTER_CONFIG: FailureCounterConfig = {
  * Tools that are monitored for failure detection
  */
 export const MONITORED_TOOLS = [
-  "sisyphus_task",
+  "delegate_task",
+  "sisyphus_task",  // backward compat alias
   "task",
 ]
 
@@ -65,7 +66,7 @@ export const SYSTEMATIC_DEBUGGING_SKILL = "systematic-debugging"
 export const FAILURE_MESSAGES = {
   skill_injection: `⚠️ **第 1 次失败检测**
 
-您的 sisyphus_task 调用失败了。已自动加载 \`systematic-debugging\` skill。
+您的 delegate_task 调用失败了。已自动加载 \`systematic-debugging\` skill。
 
 **请遵循系统化调试流程：**
 1. 停止随机修复，先调查根本原因
@@ -83,11 +84,11 @@ export const FAILURE_MESSAGES = {
 - 提供架构级建议
 - 识别潜在的根本原因
 
-如果第 3 次失败，sisyphus_task 将被阻止，需要用户介入。`,
+如果第 3 次失败，delegate_task 将被阻止，需要用户介入。`,
 
-  block: `🛑 **连续 3 次失败 - sisyphus_task 已阻止**
+  block: `🛑 **连续 3 次失败 - delegate_task 已阻止**
 
-您已连续失败 3 次。为防止进一步的无效尝试，sisyphus_task 调用已被暂时阻止。
+您已连续失败 3 次。为防止进一步的无效尝试，delegate_task 调用已被暂时阻止。
 
 **请执行以下操作之一：**
 1. 使用 \`/reset-failures\` 命令重置计数器

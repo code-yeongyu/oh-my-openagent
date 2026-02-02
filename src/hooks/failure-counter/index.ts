@@ -1,11 +1,11 @@
 /**
  * Failure Counter Hook
  *
- * Tracks consecutive failures for sisyphus_task calls and triggers
+ * Tracks consecutive failures for delegate_task calls and triggers
  * automatic responses at each failure threshold:
  * - 1st failure: Inject systematic-debugging skill
  * - 2nd failure: Dispatch Oracle for consultation
- * - 3rd failure: Block sisyphus_task and require user intervention
+ * - 3rd failure: Block delegate_task and require user intervention
  *
  * Per docs/SUBAGENTS-COMPARISON.md Task 9.2
  */
@@ -71,7 +71,7 @@ function determineResponse(
     // Already blocked, continue blocking
     return {
       type: "block",
-      message: `🛑 sisyphus_task 仍处于阻止状态 (${consecutiveFailures} 次连续失败)。使用 \`/reset-failures\` 重置。`,
+      message: `🛑 delegate_task 仍处于阻止状态 (${consecutiveFailures} 次连续失败)。使用 \`/reset-failures\` 重置。`,
     }
   }
 
@@ -123,7 +123,7 @@ export function createFailureCounterHook(
 
   return {
     /**
-     * PreToolUse: Block sisyphus_task if session is blocked
+     * PreToolUse: Block delegate_task if session is blocked
      */
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -148,7 +148,7 @@ export function createFailureCounterHook(
       // Check if session is blocked
       if (state.blockedSessions.has(input.sessionID)) {
         output.blocked = true
-        output.message = `🛑 sisyphus_task 已被阻止，因为检测到连续 3 次失败。
+        output.message = `🛑 delegate_task 已被阻止，因为检测到连续 3 次失败。
 
 **要解除阻止，请执行以下操作之一：**
 1. 使用 \`/reset-failures\` 命令重置计数器
@@ -264,7 +264,7 @@ ${response.message}
 
 **建议操作：**
 \`\`\`
-sisyphus_task(
+delegate_task(
   agent="oracle",
   prompt="我在执行任务时遇到了连续失败。请分析以下错误并提供解决策略：\\n\\n${tracker.lastError?.replace(/"/g, '\\"').slice(0, 200)}..."
 )
@@ -317,10 +317,10 @@ ${response.message}`,
           role: "system",
           content: `✅ **失败计数器已重置**
 
-${wasBlocked ? "🔓 sisyphus_task 阻止已解除。" : ""}
+${wasBlocked ? "🔓 delegate_task 阻止已解除。" : ""}
 ${previousCount > 0 ? `之前的连续失败次数: ${previousCount}` : "没有记录的失败。"}
 
-您现在可以继续使用 sisyphus_task。请确保在继续之前：
+您现在可以继续使用 delegate_task。请确保在继续之前：
 1. 分析了之前失败的原因
 2. 制定了新的解决策略
 3. 准备好了更具体的任务描述`,

@@ -8,7 +8,7 @@
 
 **调用路径**：
 ```
-用户/技能 → sisyphus_task({ category: "visual", ... })
+用户/技能 → delegate_task({ category: "visual", ... })
   ↓
 Sisyphus 创建
   → Agent: Sisyphus-Junior-visual
@@ -17,7 +17,7 @@ Sisyphus 创建
 ```
 
 **什么时候调用**：
-- ✅ 使用 `sisyphus_task({ category: "xxx", ... })` 时
+- ✅ 使用 `delegate_task({ category: "xxx", ... })` 时
 - ✅ category-based 委派（executing-plans, wave-parallel-execution, 直接调用）
 - ❌ 使用 `subagent_type` 参数时不调用 Junior（直接调用指定 agent）
 
@@ -27,23 +27,23 @@ Sisyphus 创建
 
 | 调用方式 | Category 示例 | 创建的 Agent | 模型来源 |
 |---------|---------------|--------------|----------|
-| `sisyphus_task({ category: "visual", ... })` | visual, ultrabrain, writing, most-capable, general | `Sisyphus-Junior-{category}` | categories.{category} |
-| `sisyphus_task({ category: "ultrabrain", ... })` | ultrabrain | `Sisyphus-Junior-ultrabrain` | categories.ultrabrain |
-| `sisyphus_task({ category: "writing", ... })` | writing | `Sisyphus-Junior-writing` | categories.writing |
-| `sisyphus_task({ category: "general", ... })` | general | `Sisyphus-Junior-general` | categories.general |
+| `delegate_task({ category: "visual", ... })` | visual, ultrabrain, writing, most-capable, general | `Sisyphus-Junior-{category}` | categories.{category} |
+| `delegate_task({ category: "ultrabrain", ... })` | ultrabrain | `Sisyphus-Junior-ultrabrain` | categories.ultrabrain |
+| `delegate_task({ category: "writing", ... })` | writing | `Sisyphus-Junior-writing` | categories.writing |
+| `delegate_task({ category: "general", ... })` | general | `Sisyphus-Junior-general` | categories.general |
 
 **典型使用场景**：
 
 1. **executing-plans skill**（自动选择）：
    ```typescript
    // 视觉任务
-   sisyphus_task({ category: "visual", skills: ["frontend-ui-ux"], ... })
+   delegate_task({ category: "visual", skills: ["frontend-ui-ux"], ... })
    
    // 代码任务
-   sisyphus_task({ category: "ultrabrain", skills: ["test-driven-development"], ... })
+   delegate_task({ category: "ultrabrain", skills: ["test-driven-development"], ... })
    
    // 文档任务
-   sisyphus_task({ category: "writing", ... })
+   delegate_task({ category: "writing", ... })
    ```
 
 2. **wave-parallel-execution skill**（自动选择）：
@@ -52,9 +52,9 @@ Sisyphus 创建
    - 代码 → `category: "ultrabrain"`
    - 文档 → `category: "writing"`
 
-3. **直接使用 sisyphus_task**：
+3. **直接使用 delegate_task**：
    ```typescript
-   sisyphus_task({ category: "visual", prompt: "设计仪表盘" })
+   delegate_task({ category: "visual", prompt: "设计仪表盘" })
    ```
 
 ---

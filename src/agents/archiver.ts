@@ -65,7 +65,7 @@ Return results with commands run, outputs, and any follow-up needed.
 
 <Constraints>
 - Codex is disabled for Archiver
-- No delegation (task/background_task/sisyphus_task/call_omo_agent are forbidden)
+- No delegation (task/background_task/delegate_task/call_omo_agent are forbidden)
 - No webfetch/websearch; rely on provided context
 - Use Bun for build/test commands
 - Always run lsp_diagnostics before completion
@@ -97,7 +97,8 @@ export function createArchiverAgent(model: string = DEFAULT_MODEL): AgentConfig 
   const restrictions = createAgentToolRestrictions([
     "task",
     "background_task",
-    "sisyphus_task",
+    "delegate_task",
+    "sisyphus_task",  // backward compat
     "call_omo_agent",
     "webfetch",
     "websearch_web_search_exa",

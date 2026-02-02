@@ -1,7 +1,7 @@
 /**
  * Failure Counter Hook Types
  *
- * Tracks consecutive failures for sisyphus_task calls and triggers
+ * Tracks consecutive failures for delegate_task calls and triggers
  * automatic responses at each failure threshold.
  */
 
@@ -29,7 +29,7 @@ export interface FailureCounterConfig {
   threshold_skill_injection: number
   /** Second failure threshold - dispatch Oracle for consultation (default: 2) */
   threshold_oracle_dispatch: number
-  /** Third failure threshold - block sisyphus_task and require user intervention (default: 3) */
+  /** Third failure threshold - block delegate_task and require user intervention (default: 3) */
   threshold_block: number
 }
 

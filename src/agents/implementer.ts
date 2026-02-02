@@ -92,7 +92,7 @@ Create an atomic commit and report back with summary, files, and commit SHA.
 </Workflow>
 
 <Constraints>
-- No delegation (task/background_task/sisyphus_task/call_omo_agent are forbidden)
+- No delegation (task/background_task/delegate_task/call_omo_agent are forbidden)
 - No webfetch/websearch; use context7 when needed
 - Use Bun for tests and scripts
 - Never suppress type errors (no \`as any\`, \`@ts-ignore\`, \`@ts-expect-error\`)
@@ -126,7 +126,8 @@ export function createImplementerAgent(model: string = DEFAULT_MODEL): AgentConf
   const restrictions = createAgentToolRestrictions([
     "task",
     "background_task",
-    "sisyphus_task",
+    "delegate_task",
+    "sisyphus_task",  // backward compat
     "call_omo_agent",
     "webfetch",
     "websearch_web_search_exa",

@@ -60,7 +60,7 @@ Before dispatching each task, classify the task type and select the appropriate 
 |-----------|---------------------------|-------|--------|
 | **Documentation** | `.md`, `.rst`, `.txt`, `.adoc`, README, docs/, CHANGELOG | `document-writer` | [] |
 | **Visual/UI** | `.tsx`, `.jsx`, `.vue`, `.css` with styling keywords | `frontend-ui-ux-engineer` | ["frontend-ui-ux"] |
-| **Code** | `.ts`, `.js`, `.py`, etc. (logic, API, backend) | `implementer` | [\"test-driven-development\", \"collaborating-with-codex\"] |
+| **Code** | `.ts`, `.js`, `.py`, etc. (logic, API, backend) | `category: "ultrabrain"` | [\"test-driven-development\", \"collaborating-with-codex\"] |
 
 **Classification Decision Tree:**
 
@@ -69,14 +69,14 @@ Is task about documentation files (.md, .rst, docs/)?
   YES → document-writer
   NO  → Is task about visual/styling changes?
           YES → frontend-ui-ux-engineer
-          NO  → implementer (default)
+          NO  → category: "ultrabrain" (default)
 ```
 
 For each task, dispatch to the appropriate agent:
 
 ```typescript
-sisyphus_task({
-  subagent_type: "implementer",
+delegate_task({
+  category: "ultrabrain",
   description: `Implement Task ${taskId}: ${taskName}`,
   skills: [\"test-driven-development\", \"collaborating-with-codex\"],
   run_in_background: false,
@@ -194,7 +194,7 @@ Step 4: Codex Phase 3 - Review
 Step 5: Commit + Report (COMPLETED/BLOCKED)
 ```
 
-See `implementer.ts` for full agent definition.
+The executor uses the `ultrabrain` category with IMPLEMENTER_DISCIPLINE_PROMPT.
 
 ## When to Stop and Ask for Help
  

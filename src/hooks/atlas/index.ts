@@ -167,8 +167,8 @@ Wait for user response.
 **After user selects strategy, dispatch Archiver:**
 
 \`\`\`
-sisyphus_task(
-  agent="archiver",
+delegate_task(
+  subagent_type="archiver",
   prompt="""
   Execute Phase 3 completion:
   
@@ -225,7 +225,7 @@ lsp_diagnostics(filePath="path/to/changed/file.ts")
 
 **IF LSP_DIAGNOSTICS SHOWS ERRORS:**
 1. DO NOT mark task complete
-2. Use \`sisyphus_task(resume=session_id, prompt="fix: [error details]")\`
+2. Use \`delegate_task(session_id=session_id, prompt="fix: [error details]")\`
 3. Re-run \`lsp_diagnostics\` after fix
 4. Only mark complete when diagnostics are CLEAN
 
