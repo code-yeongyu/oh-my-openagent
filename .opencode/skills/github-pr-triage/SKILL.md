@@ -13,6 +13,52 @@ You are a GitHub Pull Request triage automation agent. Your job is to:
 
 ---
 
+# CRITICAL: INITIALIZATION - TODO REGISTRATION (MANDATORY FIRST STEP)
+
+**BEFORE DOING ANYTHING ELSE, YOU MUST CREATE AND TRACK TODOS.**
+
+## Step 0: Create Initial Todo List
+
+```typescript
+// Create todos immediately upon invocation
+todowrite([
+  {
+    id: "1",
+    content: "Phase 1: Fetch all open PRs with exhaustive pagination",
+    status: "in_progress",
+    priority: "high"
+  },
+  {
+    id: "2",
+    content: "Phase 2: Launch parallel background agents (1 per PR)",
+    status: "pending",
+    priority: "high"
+  },
+  {
+    id: "3",
+    content: "Phase 3: Collect all agent analysis results",
+    status: "pending",
+    priority: "high"
+  },
+  {
+    id: "4",
+    content: "Phase 4: Execute conservative auto-close for eligible PRs",
+    status: "pending",
+    priority: "high"
+  },
+  {
+    id: "5",
+    content: "Phase 5: Generate comprehensive triage report",
+    status: "pending",
+    priority: "high"
+  }
+])
+```
+
+**DO NOT PROCEED TO PHASE 1 UNTIL TODOS ARE CREATED.**
+
+---
+
 # CRITICAL: EXHAUSTIVE PAGINATION IS MANDATORY
 
 **THIS IS THE MOST IMPORTANT RULE. VIOLATION = COMPLETE FAILURE.**
@@ -188,6 +234,17 @@ CHECKLIST:
 
 **If you did NOT see "EXHAUSTIVE PR PAGINATION COMPLETE", you did it WRONG. Start over.**
 
+**AFTER Phase 1 Complete - Update Todo:**
+```typescript
+todowrite([
+  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
+  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "in_progress", priority: "high" },
+  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "pending", priority: "high" },
+  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "pending", priority: "high" },
+  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "pending", priority: "high" }
+])
+```
+
 ---
 
 ## PHASE 2: Parallel PR Analysis (1 PR = 1 Agent)
@@ -205,7 +262,7 @@ For each PR, launch:
 ```typescript
 delegate_task(
   category="unspecified-low",
-  load_skills=[],
+  load_skils=[],
   run_in_background=true,
   prompt=`
 ## TASK
@@ -312,6 +369,17 @@ for (const taskId of taskIds) {
 }
 ```
 
+**AFTER Phase 2 Complete - Update Todo:**
+```typescript
+todowrite([
+  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
+  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
+  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "in_progress", priority: "high" },
+  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "pending", priority: "high" },
+  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "pending", priority: "high" }
+])
+```
+
 ---
 
 ## PHASE 3: Auto-Close Execution (CONSERVATIVE)
@@ -380,6 +448,17 @@ If you'd like to pick this up again, feel free to:
 2. Open a new PR with the updated changes
 
 We'd be happy to review it when you're ready. Thanks for your interest in contributing!
+```
+
+**AFTER Phase 3 Complete - Update Todo:**
+```typescript
+todowrite([
+  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
+  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
+  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "completed", priority: "high" },
+  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "completed", priority: "high" },
+  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "in_progress", priority: "high" }
+])
 ```
 
 ---
@@ -489,6 +568,17 @@ These PRs were closed during this triage session:
 4. **Consider closing:** [list abandoned PRs not auto-closed due to uncertainty]
 ```
 
+**AFTER Phase 4 Complete - Final Todo Update:**
+```typescript
+todowrite([
+  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
+  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
+  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "completed", priority: "high" },
+  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "completed", priority: "high" },
+  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "completed", priority: "high" }
+])
+```
+
 ---
 
 ## ANTI-PATTERNS (BLOCKING VIOLATIONS)
@@ -531,13 +621,19 @@ These PRs were closed during this triage session:
 
 ## EXECUTION CHECKLIST
 
+- [ ] Created initial todo list before starting work
 - [ ] Fetched ALL pages of open PRs (pagination complete)
+- [ ] Updated todo after Phase 1 completion
 - [ ] Launched 1 agent per PR (not batched)
+- [ ] Updated todo after Phase 2 completion
 - [ ] All agents ran in background (parallel)
 - [ ] Collected all results before taking action
+- [ ] Updated todo after Phase 3 completion
 - [ ] Only closed PRs meeting CONSERVATIVE criteria
 - [ ] Posted friendly, detailed close messages
+- [ ] Updated todo after Phase 4 completion
 - [ ] Generated comprehensive report
+- [ ] Final todo update - all phases completed
 
 ---
 
@@ -545,9 +641,15 @@ These PRs were closed during this triage session:
 
 When invoked, immediately:
 
-1. `gh repo view --json nameWithOwner -q .nameWithOwner` (get current repo)
-2. Exhaustive pagination for ALL open PRs
-3. Launch N background agents (1 per PR)
-4. Collect all results
-5. Auto-close PRs meeting CONSERVATIVE criteria with friendly messages
-6. Generate categorized report with action items
+1. **CREATE TODOS FIRST** - Use todowrite() to register all 5 phases
+2. `gh repo view --json nameWithOwner -q .nameWithOwner` (get current repo)
+3. Exhaustive pagination for ALL open PRs
+4. Update todo - Phase 1 complete
+5. Launch N background agents (1 per PR)
+6. Update todo - Phase 2 complete
+7. Collect all results
+8. Update todo - Phase 3 complete
+9. Auto-close PRs meeting CONSERVATIVE criteria with friendly messages
+10. Update todo - Phase 4 complete
+11. Generate categorized report with action items
+12. Final todo update - all phases completed
