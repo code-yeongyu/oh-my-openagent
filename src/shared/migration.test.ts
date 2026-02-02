@@ -280,10 +280,9 @@ describe("migrateHookNames", () => {
 
     // then: Removed hooks should be filtered out
     expect(changed).toBe(true)
-    expect(migrated).toEqual(["comment-checker"])
-    expect(removed).toContain("preemptive-compaction")
+    expect(migrated).toEqual(["preemptive-compaction", "comment-checker"])
     expect(removed).toContain("empty-message-sanitizer")
-    expect(removed).toHaveLength(2)
+    expect(removed).toHaveLength(1)
   })
 
   test("handles mixed migration and removal", () => {
@@ -297,8 +296,8 @@ describe("migrateHookNames", () => {
     expect(changed).toBe(true)
     expect(migrated).toContain("anthropic-context-window-limit-recovery")
     expect(migrated).toContain("atlas")
-    expect(migrated).not.toContain("preemptive-compaction")
-    expect(removed).toEqual(["preemptive-compaction"])
+    expect(migrated).toContain("preemptive-compaction")
+    expect(removed).toEqual([])
   })
 })
 
