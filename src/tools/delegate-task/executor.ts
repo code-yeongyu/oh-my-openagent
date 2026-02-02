@@ -37,9 +37,54 @@ export interface ParentContext {
   model?: { providerID: string; modelID: string; variant?: string }
 }
 
+interface SessionMessagePart {
+  type?: string
+  text?: string
+  content?: string | Array<{ type: string; text?: string }>
+  output?: string
+}
+
 interface SessionMessage {
   info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-  parts?: Array<{ type?: string; text?: string }>
+  parts?: SessionMessagePart[]
+}
+
+function isTextOrReasoningPart(part: { type?: string; text?: string }): boolean {
+  return (part.type === "text" || part.type === "reasoning") && !!part.text
+}
+
+function extractToolResultContent(part: SessionMessagePart): string[] {
+  const results: string[] = []
+
+  if (typeof part.content === "string" && part.content) {
+    results.push(part.content)
+  } else if (Array.isArray(part.content)) {
+    for (const block of part.content) {
+      if (isTextOrReasoningPart(block)) {
+        results.push(block.text!)
+      }
+    }
+  }
+
+  if (part.output && part.output.length > 0) {
+    results.push(part.output)
+  }
+
+  return results
+}
+
+function extractMessageContent(message: SessionMessage): string {
+  const extractedContent: string[] = []
+
+  for (const part of message.parts ?? []) {
+    if (isTextOrReasoningPart(part)) {
+      extractedContent.push(part.text!)
+    } else if (part.type === "tool_result") {
+      extractedContent.push(...extractToolResultContent(part))
+    }
+  }
+
+  return extractedContent.filter(text => text.length > 0).join("\n\n")
 }
 
 export async function resolveSkillContent(
@@ -274,8 +319,7 @@ export async function executeSyncContinuation(
     return `No assistant response found.\n\nSession ID: ${args.session_id}`
   }
 
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+  const textContent = extractMessageContent(lastMessage)
   const duration = formatDuration(startTime)
 
   return `Task continued and completed in ${duration}.
@@ -400,8 +444,7 @@ export async function executeUnstableAgentTask(
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
-    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    const textContent = extractMessageContent(lastMessage)
     const duration = formatDuration(startTime)
 
     return `SUPERVISED TASK COMPLETED SUCCESSFULLY
@@ -707,8 +750,7 @@ export async function executeSyncTask(
       return `No assistant response found.\n\nSession ID: ${sessionID}`
     }
 
-    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    const textContent = extractMessageContent(lastMessage)
 
     const duration = formatDuration(startTime)
 

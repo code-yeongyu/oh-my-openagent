@@ -2721,4 +2721,180 @@ describe("sisyphus-task", () => {
       expect(result).toContain("</task_metadata>")
     }, { timeout: 10000 })
   })
+
+  describe("tool_result content extraction", () => {
+    test("sync task extracts tool_result content from messages", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-haiku-4-5" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_tool_result_test" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{
+              info: { role: "assistant", time: { created: 1 } },
+              parts: [
+                { type: "tool", tool: "bash" },
+                { type: "tool_result", content: "On branch main\nYour branch is up to date with 'origin/main'.\n\nnothing to commit, working tree clean" },
+                { type: "text", text: "Git status shows clean working tree." }
+              ]
+            }]
+          }),
+          status: async () => ({ data: { "ses_tool_result_test": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      //#when
+      const result = await tool.execute(
+        {
+          description: "Git status task",
+          prompt: "Run git status",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      //#then
+      expect(result).toContain("On branch main")
+      expect(result).toContain("nothing to commit, working tree clean")
+      expect(result).toContain("Git status shows clean working tree.")
+    }, { timeout: 20000 })
+
+    test("sync task extracts tool_result with array content", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-haiku-4-5" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_array_content_test" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{
+              info: { role: "assistant", time: { created: 1 } },
+              parts: [
+                { 
+                  type: "tool_result", 
+                  content: [
+                    { type: "text", text: "File created: test.txt" },
+                    { type: "text", text: "Lines written: 10" }
+                  ]
+                }
+              ]
+            }]
+          }),
+          status: async () => ({ data: { "ses_array_content_test": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      //#when
+      const result = await tool.execute(
+        {
+          description: "Create file task",
+          prompt: "Create a file",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      //#then
+      expect(result).toContain("File created: test.txt")
+      expect(result).toContain("Lines written: 10")
+    }, { timeout: 20000 })
+
+    test("sync task extracts tool_result with output property", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "anthropic", id: "claude-haiku-4-5" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_output_prop_test" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{
+              info: { role: "assistant", time: { created: 1 } },
+              parts: [
+                { 
+                  type: "tool_result", 
+                  output: "commit abc123\nAuthor: Test User\nDate: Mon Jan 1 00:00:00 2024\n\n    Initial commit"
+                }
+              ]
+            }]
+          }),
+          status: async () => ({ data: { "ses_output_prop_test": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      //#when
+      const result = await tool.execute(
+        {
+          description: "Git log task",
+          prompt: "Run git log",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      //#then
+      expect(result).toContain("commit abc123")
+      expect(result).toContain("Initial commit")
+    }, { timeout: 20000 })
+  })
 })
