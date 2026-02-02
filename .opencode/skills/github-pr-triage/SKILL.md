@@ -1,272 +1,190 @@
 ---
 name: github-pr-triage
-description: "Triage GitHub Pull Requests with parallel analysis. 1 PR = 1 background agent. Exhaustive pagination. Analyzes: merge readiness, project alignment, staleness, auto-close eligibility. Conservative auto-close with friendly messages. Triggers: 'triage PRs', 'analyze PRs', 'PR cleanup'."
+description: "Triage GitHub Pull Requests with streaming analysis. CRITICAL: 1 PR = 1 background task. Processes each PR as independent background task with immediate real-time streaming results. Conservative auto-close. Triggers: 'triage PRs', 'analyze PRs', 'PR cleanup'."
 ---
 
-# GitHub PR Triage Specialist
+# GitHub PR Triage Specialist (Streaming Architecture)
 
 You are a GitHub Pull Request triage automation agent. Your job is to:
 1. Fetch **EVERY SINGLE OPEN PR** using **EXHAUSTIVE PAGINATION**
-2. Launch ONE background agent PER PR for parallel analysis
-3. **CONSERVATIVELY** auto-close PRs that are clearly closeable
-4. Generate a comprehensive triage report
+2. **LAUNCH 1 BACKGROUND TASK PER PR** - Each PR gets its own dedicated agent
+3. **STREAM RESULTS IN REAL-TIME** - As each background task completes, immediately report results
+4. **CONSERVATIVELY** auto-close PRs that are clearly closeable
+5. Generate a **FINAL COMPREHENSIVE REPORT** at the end
+
+---
+
+# CRITICAL ARCHITECTURE: 1 PR = 1 BACKGROUND TASK
+
+## THIS IS NON-NEGOTIABLE
+
+**EACH PR MUST BE PROCESSED AS A SEPARATE BACKGROUND TASK**
+
+| Aspect | Rule |
+|--------|------|
+| **Task Granularity** | 1 PR = Exactly 1 `delegate_task()` call |
+| **Execution Mode** | `run_in_background=true` (Each PR runs independently) |
+| **Result Handling** | `background_output()` to collect results as they complete |
+| **Reporting** | IMMEDIATE streaming when each task finishes |
+
+### WHY 1 PR = 1 BACKGROUND TASK MATTERS
+
+- **ISOLATION**: Each PR analysis is independent - failures don't cascade
+- **PARALLELISM**: Multiple PRs analyzed concurrently for speed
+- **GRANULARITY**: Fine-grained control and monitoring per PR
+- **RESILIENCE**: If one PR analysis fails, others continue
+- **STREAMING**: Results flow in as soon as each task completes
+
+---
+
+# CRITICAL: STREAMING ARCHITECTURE
+
+**PROCESS PRs WITH REAL-TIME STREAMING - NOT BATCHED**
+
+| WRONG | CORRECT |
+|----------|------------|
+| Fetch all → Wait for all agents → Report all at once | Fetch all → Launch 1 task per PR (background) → Stream results as each completes → Next |
+| "Processing 50 PRs... (wait 5 min) ...here are all results" | "PR #123 analysis complete... [RESULT] PR #124 analysis complete... [RESULT] ..." |
+| User sees nothing during processing | User sees live progress as each background task finishes |
+| `run_in_background=false` (sequential blocking) | `run_in_background=true` with `background_output()` streaming |
+
+### STREAMING LOOP PATTERN
+
+```typescript
+// CORRECT: Launch all as background tasks, stream results
+const taskIds = []
+
+// Category ratio: unspecified-low : writing : quick = 1:2:1
+// Every 4 PRs: 1 unspecified-low, 2 writing, 1 quick
+function getCategory(index) {
+  const position = index % 4
+  if (position === 0) return "unspecified-low"  // 25%
+  if (position === 1 || position === 2) return "writing"  // 50%
+  return "quick"  // 25%
+}
+
+// PHASE 1: Launch 1 background task per PR
+for (let i = 0; i < allPRs.length; i++) {
+  const pr = allPRs[i]
+  const category = getCategory(i)
+  
+  const taskId = await delegate_task(
+    category=category,
+    load_skills=[],
+    run_in_background=true,  // ← CRITICAL: Each PR is independent background task
+    prompt=`Analyze PR #${pr.number}...`
+  )
+  taskIds.push({ pr: pr.number, taskId, category })
+  console.log(`🚀 Launched background task for PR #${pr.number} (${category})`)
+}
+
+// PHASE 2: Stream results as they complete
+console.log(`\n📊 Streaming results for ${taskIds.length} PRs...`)
+
+const completed = new Set()
+while (completed.size < taskIds.length) {
+  for (const { pr, taskId } of taskIds) {
+    if (completed.has(pr)) continue
+    
+    // Check if this specific PR's task is done
+    const result = await background_output(taskId=taskId, block=false)
+    
+    if (result && result.output) {
+      // STREAMING: Report immediately as each task completes
+      const analysis = parseAnalysis(result.output)
+      reportRealtime(analysis)
+      completed.add(pr)
+      
+      console.log(`\n✅ PR #${pr} analysis complete (${completed.size}/${taskIds.length})`)
+    }
+  }
+  
+  // Small delay to prevent hammering
+  if (completed.size < taskIds.length) {
+    await new Promise(r => setTimeout(r, 1000))
+  }
+}
+```
+
+### WHY STREAMING MATTERS
+
+- **User sees progress immediately** - no 5-minute silence
+- **Early decisions visible** - maintainer can act on urgent PRs while others process
+- **Transparent** - user knows what's happening in real-time
+- **Fail-fast** - if something breaks, we already have partial results
 
 ---
 
 # CRITICAL: INITIALIZATION - TODO REGISTRATION (MANDATORY FIRST STEP)
 
-**BEFORE DOING ANYTHING ELSE, YOU MUST CREATE AND TRACK TODOS.**
-
-## Step 0: Create Initial Todo List
+**BEFORE DOING ANYTHING ELSE, CREATE TODOS.**
 
 ```typescript
-// Create todos immediately upon invocation
+// Create todos immediately
 todowrite([
-  {
-    id: "1",
-    content: "Phase 1: Fetch all open PRs with exhaustive pagination",
-    status: "in_progress",
-    priority: "high"
-  },
-  {
-    id: "2",
-    content: "Phase 2: Launch parallel background agents (1 per PR)",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "3",
-    content: "Phase 3: Collect all agent analysis results",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "4",
-    content: "Phase 4: Execute conservative auto-close for eligible PRs",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "5",
-    content: "Phase 5: Generate comprehensive triage report",
-    status: "pending",
-    priority: "high"
-  }
+  { id: "1", content: "Fetch all open PRs with exhaustive pagination", status: "in_progress", priority: "high" },
+  { id: "2", content: "Launch 1 background task per PR (1 PR = 1 task)", status: "pending", priority: "high" },
+  { id: "3", content: "Stream-process results as each task completes", status: "pending", priority: "high" },
+  { id: "4", content: "Execute conservative auto-close for eligible PRs", status: "pending", priority: "high" },
+  { id: "5", content: "Generate final comprehensive report", status: "pending", priority: "high" }
 ])
 ```
 
-**DO NOT PROCEED TO PHASE 1 UNTIL TODOS ARE CREATED.**
-
 ---
 
-# CRITICAL: EXHAUSTIVE PAGINATION IS MANDATORY
+# PHASE 1: PR Collection (EXHAUSTIVE Pagination)
 
-**THIS IS THE MOST IMPORTANT RULE. VIOLATION = COMPLETE FAILURE.**
-
-## YOU MUST FETCH ALL PRs. PERIOD.
-
-| WRONG | CORRECT |
-|----------|------------|
-| `gh pr list --limit 100` and stop | Paginate until ZERO results returned |
-| "I found 16 PRs" (first page only) | "I found 61 PRs after 5 pages" |
-| Assuming first page is enough | Using `--limit 500` and verifying count |
-| Stopping when you "feel" you have enough | Stopping ONLY when API returns empty |
-
-### WHY THIS MATTERS
-
-- GitHub API returns **max 100 PRs per request** by default
-- A busy repo can have **50-100+ open PRs**
-- **MISSING PRs = MISSING CONTRIBUTOR WORK = BAD COMMUNITY EXPERIENCE**
-- The user asked for triage, not "sample triage"
-
-### THE ONLY ACCEPTABLE APPROACH
+### 1.1 Use Bundled Script (MANDATORY)
 
 ```bash
-# ALWAYS use --limit 500 (maximum allowed)
-# ALWAYS check if more pages exist
-# ALWAYS continue until empty result
-
-gh pr list --repo $REPO --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,body
-```
-
-**If the result count equals your limit, THERE ARE MORE PRs. KEEP FETCHING.**
-
----
-
-## PHASE 1: PR Collection (EXHAUSTIVE Pagination)
-
-### 1.1 Determine Repository
-
-Extract from user request:
-- `REPO`: Repository in `owner/repo` format (default: current repo via `gh repo view --json nameWithOwner -q .nameWithOwner`)
-
-### 1.2 Exhaustive Pagination Loop
-
-# STOP. READ THIS BEFORE EXECUTING.
-
-**YOU WILL FETCH EVERY. SINGLE. OPEN PR. NO EXCEPTIONS.**
-
-## USE THE BUNDLED SCRIPT (MANDATORY)
-
-**Use the bundled `scripts/gh_fetch.py` script for exhaustive pagination:**
-
-```bash
-# Fetch all open PRs (default)
 ./scripts/gh_fetch.py prs --output json
-
-# Fetch PRs from last 48 hours
-./scripts/gh_fetch.py prs --hours 48 --output json
-
-# Fetch from specific repo
-./scripts/gh_fetch.py prs --repo owner/repo --state open --output json
 ```
 
-The script:
-- Handles pagination automatically (fetches ALL pages until empty)
-- Outputs JSON that you can parse for agent distribution
-- Filters by time range if `--hours` is specified
-
----
-
-## FALLBACK: Manual Bash Pagination
-
-If the Python script is unavailable, follow this manual approach:
-
-## THE GOLDEN RULE
-
-```
-NEVER use --limit 100. ALWAYS use --limit 500.
-NEVER stop at first result. ALWAYS verify you got everything.
-NEVER assume "that's probably all". ALWAYS check if more exist.
-```
-
-## MANUAL PAGINATION LOOP (ONLY IF PYTHON SCRIPT UNAVAILABLE)
-
-You MUST execute this EXACT pagination loop. DO NOT simplify. DO NOT skip iterations.
+### 1.2 Fallback: Manual Pagination
 
 ```bash
-#!/bin/bash
-# MANDATORY PAGINATION - Execute this EXACTLY as written
-
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-
-echo "=== EXHAUSTIVE PR PAGINATION START ==="
-echo "Repository: $REPO"
-echo ""
-
-# STEP 1: First fetch with --limit 500
-echo "[Page 1] Fetching open PRs..."
-FIRST_FETCH=$(gh pr list --repo $REPO --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,body)
-FIRST_COUNT=$(echo "$FIRST_FETCH" | jq 'length')
-echo "[Page 1] Count: $FIRST_COUNT"
-
-ALL_PRS="$FIRST_FETCH"
-
-# STEP 2: CHECK IF MORE PAGES NEEDED
-# If we got exactly 500, there are MORE PRs!
-if [ "$FIRST_COUNT" -eq 500 ]; then
-  echo ""
-  echo "WARNING: Got exactly 500 results. MORE PAGES EXIST!"
-  echo "Continuing pagination..."
-  
-  PAGE=2
-  
-  # Keep fetching until we get less than 500
-  while true; do
-    echo ""
-    echo "[Page $PAGE] Fetching more PRs..."
-    
-    # Use search API with pagination for more results
-    LAST_CREATED=$(echo "$ALL_PRS" | jq -r '.[-1].createdAt')
-    NEXT_FETCH=$(gh pr list --repo $REPO --state open --limit 500 \
-      --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,body \
-      --search "created:<$LAST_CREATED")
-    
-    NEXT_COUNT=$(echo "$NEXT_FETCH" | jq 'length')
-    echo "[Page $PAGE] Count: $NEXT_COUNT"
-    
-    if [ "$NEXT_COUNT" -eq 0 ]; then
-      echo "[Page $PAGE] No more results. Pagination complete."
-      break
-    fi
-    
-    # Merge results
-    ALL_PRS=$(echo "$ALL_PRS $NEXT_FETCH" | jq -s 'add | unique_by(.number)')
-    
-    CURRENT_TOTAL=$(echo "$ALL_PRS" | jq 'length')
-    echo "[Page $PAGE] Running total: $CURRENT_TOTAL PRs"
-    
-    if [ "$NEXT_COUNT" -lt 500 ]; then
-      echo "[Page $PAGE] Less than 500 results. Pagination complete."
-      break
-    fi
-    
-    PAGE=$((PAGE + 1))
-    
-    # Safety limit
-    if [ $PAGE -gt 20 ]; then
-      echo "SAFETY LIMIT: Stopped at page 20"
-      break
-    fi
-  done
-fi
-
-# STEP 3: FINAL COUNT
-FINAL_COUNT=$(echo "$ALL_PRS" | jq 'length')
-echo ""
-echo "=== EXHAUSTIVE PR PAGINATION COMPLETE ==="
-echo "Total open PRs found: $FINAL_COUNT"
-echo ""
+gh pr list --repo $REPO --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,body
+# Continue pagination if 500 returned...
 ```
 
-## VERIFICATION CHECKLIST (MANDATORY)
-
-BEFORE proceeding to Phase 2, you MUST verify:
-
-```
-CHECKLIST:
-[ ] Executed the FULL pagination loop above (not just --limit 500 once)
-[ ] Saw "EXHAUSTIVE PR PAGINATION COMPLETE" in output
-[ ] Counted total PRs: _____ (fill this in)
-[ ] If first fetch returned 500, continued to page 2+
-[ ] Used --state open
-```
-
-**If you did NOT see "EXHAUSTIVE PR PAGINATION COMPLETE", you did it WRONG. Start over.**
-
-**AFTER Phase 1 Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "in_progress", priority: "high" },
-  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "pending", priority: "high" },
-  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "pending", priority: "high" },
-  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "pending", priority: "high" }
-])
-```
+**AFTER Phase 1:** Update todo status to completed, mark Phase 2 as in_progress.
 
 ---
 
-## PHASE 2: Parallel PR Analysis (1 PR = 1 Agent)
+# PHASE 2: LAUNCH 1 BACKGROUND TASK PER PR
 
-### 2.1 Agent Assignment
+## THE 1-PR-1-TASK PATTERN (MANDATORY)
 
-**ALL PRs use `unspecified-low` category.** No ratio distribution needed.
-
-### 2.2 Launch Background Agents
-
-**MANDATORY: Each PR gets its own dedicated background agent.**
-
-For each PR, launch:
+**CRITICAL: DO NOT BATCH MULTIPLE PRs INTO ONE TASK**
 
 ```typescript
-delegate_task(
-  category="unspecified-low",
-  load_skils=[],
-  run_in_background=true,
-  prompt=`
+// Collection for tracking
+const taskMap = new Map()  // prNumber -> taskId
+
+// Category ratio: unspecified-low : writing : quick = 1:2:1
+// Every 4 PRs: 1 unspecified-low, 2 writing, 1 quick
+function getCategory(index) {
+  const position = index % 4
+  if (position === 0) return "unspecified-low"  // 25%
+  if (position === 1 || position === 2) return "writing"  // 50%
+  return "quick"  // 25%
+}
+
+// Launch 1 background task per PR
+for (let i = 0; i < allPRs.length; i++) {
+  const pr = allPRs[i]
+  const category = getCategory(i)
+  
+  console.log(`🚀 Launching background task for PR #${pr.number} (${category})...`)
+  
+  const taskId = await delegate_task(
+    category=category,
+    load_skills=[],
+    run_in_background=true,  // ← BACKGROUND TASK: Each PR runs independently
+    prompt=`
 ## TASK
-Analyze GitHub PR #${pr.number} for ${REPO} to determine if it can be closed or merged.
+Analyze GitHub PR #${pr.number} for ${REPO}.
 
 ## PR DATA
 - Number: #${pr.number}
@@ -292,348 +210,259 @@ ${pr.body}
 5. Check base branch for similar changes: Search if the changes were already implemented
 
 ## ANALYSIS CHECKLIST
-1. **MERGE_READY**: Can this PR be merged?
-   - Has approvals
-   - CI passed
-   - No conflicts
-   - Not draft
+1. **MERGE_READY**: Can this PR be merged? (approvals, CI passed, no conflicts, not draft)
 2. **PROJECT_ALIGNED**: Does this PR align with current project direction?
-   - YES: Fits project goals and architecture
-   - NO: Contradicts current direction or outdated approach
-   - UNCLEAR: Needs maintainer decision
-3. **CLOSE_ELIGIBILITY** (CONSERVATIVE - only these cases):
-   - ALREADY_IMPLEMENTED: The feature/fix already exists in main branch (search codebase to verify)
-   - ALREADY_FIXED: A different PR already addressed this issue
-   - OUTDATED_DIRECTION: Project direction has fundamentally changed, this approach is no longer valid
-   - STALE_ABANDONED: No activity for 6+ months, author unresponsive
-4. **STALENESS**:
-   - ACTIVE: Updated within 30 days
-   - STALE: No updates for 30-180 days
-   - ABANDONED: No updates for 180+ days
+3. **CLOSE_ELIGIBILITY**: ALREADY_IMPLEMENTED | ALREADY_FIXED | OUTDATED_DIRECTION | STALE_ABANDONED
+4. **STALENESS**: ACTIVE (<30d) | STALE (30-180d) | ABANDONED (180d+)
 
 ## CONSERVATIVE CLOSE CRITERIA
-**YOU MAY ONLY RECOMMEND CLOSING IF ONE OF THESE IS CLEARLY TRUE:**
-- The exact same change already exists in the main branch
-- A merged PR already solved the same problem differently
-- The project explicitly deprecated or removed the feature this PR adds
-- Author has been unresponsive for 6+ months despite requests
+MAY CLOSE ONLY IF:
+- Exact same change already exists in main
+- A merged PR already solved this differently
+- Project explicitly deprecated the feature
+- Author unresponsive for 6+ months despite requests
 
-**DO NOT CLOSE FOR:**
-- "Could be done better" - that's a review comment, not a close reason
-- "Needs rebasing" - contributor can fix this
-- "Missing tests" - contributor can add these
-- "I prefer a different approach" - discuss, don't close
-
-## IF CLOSING IS RECOMMENDED
-Provide a friendly, detailed English message explaining:
-1. Why the PR is being closed
-2. What happened (already implemented, etc.)
-3. Thank the contributor for their effort
-4. Offer guidance for future contributions
-
-## RETURN FORMAT
+## RETURN FORMAT (STRICT)
 \`\`\`
-#${pr.number}: ${pr.title}
-MERGE_READY: [YES|NO|NEEDS_WORK] - [reason]
-ALIGNED: [YES|NO|UNCLEAR] - [reason]
-CLOSE_ELIGIBLE: [YES|NO] - [reason if YES: ALREADY_IMPLEMENTED|ALREADY_FIXED|OUTDATED_DIRECTION|STALE_ABANDONED]
+PR: #${pr.number}
+TITLE: ${pr.title}
+MERGE_READY: [YES|NO|NEEDS_WORK]
+ALIGNED: [YES|NO|UNCLEAR]
+CLOSE_ELIGIBLE: [YES|NO]
+CLOSE_REASON: [ALREADY_IMPLEMENTED|ALREADY_FIXED|OUTDATED_DIRECTION|STALE_ABANDONED|N/A]
 STALENESS: [ACTIVE|STALE|ABANDONED]
 RECOMMENDATION: [MERGE|CLOSE|REVIEW|WAIT]
-CLOSE_MESSAGE: [If CLOSE_ELIGIBLE=YES, provide the friendly closing message. Otherwise "N/A"]
-SUMMARY: [1-2 sentence summary of PR status]
-ACTION: [Recommended maintainer action]
+CLOSE_MESSAGE: [Friendly message if CLOSE_ELIGIBLE=YES, else "N/A"]
+ACTION_NEEDED: [Specific action for maintainer]
 \`\`\`
 `
-)
-```
-
-### 2.3 Collect All Results
-
-Wait for all background agents to complete, then collect:
-
-```typescript
-// Store all task IDs
-const taskIds: string[] = []
-
-// Launch all agents
-for (const pr of prs) {
-  const result = await delegate_task(...)
-  taskIds.push(result.task_id)
+  )
+  
+  // Store task ID for this PR
+  taskMap.set(pr.number, taskId)
 }
 
-// Collect results
+console.log(`\n✅ Launched ${taskMap.size} background tasks (1 per PR)`)
+```
+
+**AFTER Phase 2:** Update todo, mark Phase 3 as in_progress.
+
+---
+
+# PHASE 3: STREAM RESULTS AS EACH TASK COMPLETES
+
+## REAL-TIME STREAMING COLLECTION
+
+```typescript
 const results = []
-for (const taskId of taskIds) {
-  const output = await background_output(task_id=taskId)
-  results.push(output)
+const autoCloseable = []
+const readyToMerge = []
+const needsReview = []
+const needsWork = []
+const stale = []
+const drafts = []
+
+const completedPRs = new Set()
+const totalPRs = taskMap.size
+
+console.log(`\n📊 Streaming results for ${totalPRs} PRs...`)
+
+// Stream results as each background task completes
+while (completedPRs.size < totalPRs) {
+  let newCompletions = 0
+  
+  for (const [prNumber, taskId] of taskMap) {
+    if (completedPRs.has(prNumber)) continue
+    
+    // Non-blocking check for this specific task
+    const output = await background_output(task_id=taskId, block=false)
+    
+    if (output && output.length > 0) {
+      // Parse the completed analysis
+      const analysis = parseAnalysis(output)
+      results.push(analysis)
+      completedPRs.add(prNumber)
+      newCompletions++
+      
+      // REAL-TIME STREAMING REPORT
+      console.log(`\n🔄 PR #${prNumber}: ${analysis.TITLE.substring(0, 60)}...`)
+      
+      // Immediate categorization & reporting
+      if (analysis.CLOSE_ELIGIBLE === 'YES') {
+        autoCloseable.push(analysis)
+        console.log(`   ⚠️  AUTO-CLOSE CANDIDATE: ${analysis.CLOSE_REASON}`)
+      } else if (analysis.MERGE_READY === 'YES') {
+        readyToMerge.push(analysis)
+        console.log(`   ✅ READY TO MERGE`)
+      } else if (analysis.RECOMMENDATION === 'REVIEW') {
+        needsReview.push(analysis)
+        console.log(`   👀 NEEDS REVIEW`)
+      } else if (analysis.RECOMMENDATION === 'WAIT') {
+        needsWork.push(analysis)
+        console.log(`   ⏳ WAITING FOR AUTHOR`)
+      } else if (analysis.STALENESS === 'STALE' || analysis.STALENESS === 'ABANDONED') {
+        stale.push(analysis)
+        console.log(`   💤 ${analysis.STALENESS}`)
+      } else {
+        drafts.push(analysis)
+        console.log(`   📝 DRAFT`)
+      }
+      
+      console.log(`   📊 Action: ${analysis.ACTION_NEEDED}`)
+      
+      // Progress update every 5 completions
+      if (completedPRs.size % 5 === 0) {
+        console.log(`\n📈 PROGRESS: ${completedPRs.size}/${totalPRs} PRs analyzed`)
+        console.log(`   Ready: ${readyToMerge.length} | Review: ${needsReview.length} | Wait: ${needsWork.length} | Stale: ${stale.length} | Draft: ${drafts.length} | Close-Candidate: ${autoCloseable.length}`)
+      }
+    }
+  }
+  
+  // If no new completions, wait briefly before checking again
+  if (newCompletions === 0 && completedPRs.size < totalPRs) {
+    await new Promise(r => setTimeout(r, 2000))
+  }
+}
+
+console.log(`\n✅ All ${totalPRs} PRs analyzed`)
+```
+
+---
+
+# PHASE 4: Auto-Close Execution (CONSERVATIVE)
+
+### 4.1 Confirm and Close
+
+**Ask for confirmation before closing (unless user explicitly said auto-close is OK)**
+
+```typescript
+if (autoCloseable.length > 0) {
+  console.log(`\n🚨 FOUND ${autoCloseable.length} PR(s) ELIGIBLE FOR AUTO-CLOSE:`)
+  
+  for (const pr of autoCloseable) {
+    console.log(`   #${pr.PR}: ${pr.TITLE} (${pr.CLOSE_REASON})`)
+  }
+  
+  // Close them one by one with progress
+  for (const pr of autoCloseable) {
+    console.log(`\n   Closing #${pr.PR}...`)
+    
+    await bash({
+      command: `gh pr close ${pr.PR} --repo ${REPO} --comment "${pr.CLOSE_MESSAGE}"`,
+      description: `Close PR #${pr.PR} with friendly message`
+    })
+    
+    console.log(`   ✅ Closed #${pr.PR}`)
+  }
 }
 ```
 
-**AFTER Phase 2 Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "in_progress", priority: "high" },
-  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "pending", priority: "high" },
-  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "pending", priority: "high" }
-])
-```
-
 ---
 
-## PHASE 3: Auto-Close Execution (CONSERVATIVE)
+# PHASE 5: FINAL COMPREHENSIVE REPORT
 
-### 3.1 Identify Closeable PRs
-
-From the collected results, identify PRs where:
-- `CLOSE_ELIGIBLE: YES`
-- Clear reason: `ALREADY_IMPLEMENTED`, `ALREADY_FIXED`, `OUTDATED_DIRECTION`, or `STALE_ABANDONED`
-
-### 3.2 Close with Friendly Message
-
-For each closeable PR:
-
-```bash
-gh pr close ${pr.number} --repo ${REPO} --comment "${CLOSE_MESSAGE}"
-```
-
-**Example Friendly Close Messages:**
-
-**ALREADY_IMPLEMENTED:**
-```
-Hi @${author}, thank you for taking the time to contribute this PR!
-
-After reviewing, I found that this functionality was already implemented in PR #XXX (merged on YYYY-MM-DD). The changes you proposed are now part of the main branch.
-
-We really appreciate your effort and contribution to the project. Please don't let this discourage you - your willingness to improve the project is valuable!
-
-If you'd like to contribute in other areas, check out our "good first issue" label for ideas.
-
-Closing this as the changes are already in place. Thanks again!
-```
-
-**ALREADY_FIXED:**
-```
-Hi @${author}, thank you for this PR!
-
-It looks like this issue was addressed by a different approach in PR #YYY, which was merged on YYYY-MM-DD. The underlying problem this PR aimed to solve has been resolved.
-
-Thank you for your contribution and for caring about this issue. We appreciate contributors like you who take the initiative to fix problems!
-
-Closing this as the issue is now resolved. If you notice any remaining problems, please feel free to open a new issue.
-```
-
-**OUTDATED_DIRECTION:**
-```
-Hi @${author}, thank you for working on this PR!
-
-Since this PR was opened, the project direction has evolved. [Specific explanation of what changed - e.g., "We've moved away from X approach in favor of Y" or "This feature was superseded by Z"].
-
-We genuinely appreciate the time you invested in this contribution. The work you did helped inform our discussions about the right direction.
-
-Closing this due to the architectural changes. If you're interested in contributing to the new approach, we'd love to have you! Check out [relevant area] for opportunities.
-```
-
-**STALE_ABANDONED:**
-```
-Hi @${author}, thank you for opening this PR!
-
-This PR has been open for over 6 months without activity, and we haven't heard back despite our follow-up requests. We're closing it to keep our PR queue manageable.
-
-This doesn't mean your contribution wasn't valuable - life gets busy, and we totally understand!
-
-If you'd like to pick this up again, feel free to:
-1. Reopen this PR, or
-2. Open a new PR with the updated changes
-
-We'd be happy to review it when you're ready. Thanks for your interest in contributing!
-```
-
-**AFTER Phase 3 Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "completed", priority: "high" },
-  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "completed", priority: "high" },
-  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "in_progress", priority: "high" }
-])
-```
-
----
-
-## PHASE 4: Report Generation
-
-### 4.1 Categorize Results
-
-Group analyzed PRs by status:
-
-| Category | Criteria |
-|----------|----------|
-| **READY_TO_MERGE** | Approved, CI passed, no conflicts |
-| **AUTO_CLOSED** | Closed during this triage (with reasons) |
-| **NEEDS_REVIEW** | Awaiting maintainer review |
-| **NEEDS_WORK** | Requires changes from author |
-| **STALE** | No activity for 30+ days |
-| **DRAFT** | Still work in progress |
-
-### 4.2 Generate Report
+**GENERATE THIS AT THE VERY END - AFTER ALL PROCESSING**
 
 ```markdown
-# PR Triage Report
+# PR Triage Report - ${REPO}
 
-**Repository:** ${REPO}
 **Generated:** ${new Date().toISOString()}
-**Total Open PRs Analyzed:** ${prs.length}
-
-## Summary
-
-| Category | Count |
-|----------|-------|
-| Ready to Merge | N |
-| Auto-Closed | N |
-| Needs Review | N |
-| Needs Work | N |
-| Stale | N |
-| Draft | N |
+**Total PRs Analyzed:** ${results.length}
+**Processing Mode:** STREAMING (1 PR = 1 background task, real-time results)
 
 ---
 
-## 1. AUTO-CLOSED PRs (Action Taken)
+## 📊 Summary
 
-These PRs were closed during this triage session:
-
-| PR | Title | Reason | Message Posted |
-|----|-------|--------|----------------|
-| #123 | Feature X | ALREADY_IMPLEMENTED | Yes |
-
----
-
-## 2. Ready to Merge
-
-| PR | Title | Author | Approvals | CI | Last Updated |
-|----|-------|--------|-----------|-----|--------------|
-| #456 | Fix Y | user | 2 | Pass | 2d ago |
-
-**Action Required:** Review and merge these PRs.
+| Category | Count | Status |
+|----------|-------|--------|
+| ✅ Ready to Merge | ${readyToMerge.length} | Action: Merge immediately |
+| ⚠️ Auto-Closed | ${autoCloseable.length} | Already processed |
+| 👀 Needs Review | ${needsReview.length} | Action: Assign reviewers |
+| ⏳ Needs Work | ${needsWork.length} | Action: Comment guidance |
+| 💤 Stale | ${stale.length} | Action: Follow up |
+| 📝 Draft | ${drafts.length} | No action needed |
 
 ---
 
-## 3. Needs Review
+## ✅ Ready to Merge
 
-| PR | Title | Author | Created | Last Updated |
-|----|-------|--------|---------|--------------|
-| #789 | Add Z | user | 5d ago | 3d ago |
+${readyToMerge.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 50)}... |`).join('\n')}
 
-**Action Required:** Assign reviewers and provide feedback.
+**Action:** These PRs can be merged immediately.
 
 ---
 
-## 4. Needs Work
+## ⚠️ Auto-Closed (During This Triage)
 
-| PR | Title | Author | Issue |
-|----|-------|--------|-------|
-| #101 | Update A | user | Failing CI, needs rebase |
-
-**Action Required:** Comment with specific guidance.
+${autoCloseable.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 40)}... | ${pr.CLOSE_REASON} |`).join('\n')}
 
 ---
 
-## 5. Stale PRs
+## 👀 Needs Review
 
-| PR | Title | Author | Last Activity | Days Inactive |
-|----|-------|--------|---------------|---------------|
-| #112 | Old B | user | 2025-01-01 | 45 |
+${needsReview.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 50)}... |`).join('\n')}
 
-**Action Required:** Ping author or close if abandoned.
+**Action:** Assign maintainers for review.
 
 ---
 
-## 6. Draft PRs
+## ⏳ Needs Work
 
-| PR | Title | Author | Created |
-|----|-------|--------|---------|
-| #131 | WIP C | user | 10d ago |
-
-**No action required** - authors are still working on these.
+${needsWork.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 50)}... | ${pr.ACTION_NEEDED} |`).join('\n')}
 
 ---
 
-## Recommendations
+## 💤 Stale PRs
 
-1. **Merge immediately:** [list PRs ready]
-2. **Assign reviewers:** [list PRs awaiting review]
-3. **Follow up with authors:** [list stale PRs]
-4. **Consider closing:** [list abandoned PRs not auto-closed due to uncertainty]
-```
+${stale.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 40)}... | ${pr.STALENESS} |`).join('\n')}
 
-**AFTER Phase 4 Complete - Final Todo Update:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all open PRs with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 2: Launch parallel background agents (1 per PR)", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 3: Collect all agent analysis results", status: "completed", priority: "high" },
-  { id: "4", content: "Phase 4: Execute conservative auto-close for eligible PRs", status: "completed", priority: "high" },
-  { id: "5", content: "Phase 5: Generate comprehensive triage report", status: "completed", priority: "high" }
-])
+---
+
+## 📝 Draft PRs
+
+${drafts.map(pr => `| #${pr.PR} | ${pr.TITLE.substring(0, 50)}... |`).join('\n')}
+
+---
+
+## 🎯 Immediate Actions
+
+1. **Merge:** ${readyToMerge.length} PRs ready for immediate merge
+2. **Review:** ${needsReview.length} PRs awaiting maintainer attention
+3. **Follow Up:** ${stale.length} stale PRs need author ping
+
+---
+
+## Processing Log
+
+${results.map((r, i) => `${i+1}. #${r.PR}: ${r.RECOMMENDATION} (${r.MERGE_READY === 'YES' ? 'ready' : r.CLOSE_ELIGIBLE === 'YES' ? 'close' : 'needs attention'})`).join('\n')}
 ```
 
 ---
 
-## ANTI-PATTERNS (BLOCKING VIOLATIONS)
-
-## IF YOU DO ANY OF THESE, THE TRIAGE IS INVALID
+## CRITICAL ANTI-PATTERNS (BLOCKING VIOLATIONS)
 
 | Violation | Why It's Wrong | Severity |
 |-----------|----------------|----------|
-| **Using `--limit 100`** | Misses 80%+ of PRs in active repos | CRITICAL |
-| **Stopping at first fetch** | GitHub paginates - you only got page 1 | CRITICAL |
-| **Not counting results** | Can't verify completeness | CRITICAL |
-| **Closing PRs aggressively** | Hurts contributors, damages community | CRITICAL |
-| Batching PRs (7 per agent) | Loses detail, harder to track | HIGH |
-| Sequential agent calls | Slow, doesn't leverage parallelism | HIGH |
-| Closing for "could be better" | That's review feedback, not close reason | HIGH |
-| Generic close messages | Each closure needs specific, friendly explanation | MEDIUM |
-
----
-
-## CONSERVATIVE CLOSE POLICY (MANDATORY)
-
-**YOU ARE NOT THE MAINTAINER. YOU ARE A TRIAGE ASSISTANT.**
-
-### You MAY close when:
-- Evidence proves the change already exists in main
-- A merged PR already solved the same problem
-- Project explicitly deprecated/removed the relevant feature
-- Author unresponsive for 6+ months despite attempts
-
-### You MAY NOT close when:
-- You think a different approach is better
-- PR needs rebasing or has conflicts
-- PR is missing tests or documentation
-- You're unsure about project direction
-- Author is active but busy
-
-### When in doubt: DO NOT CLOSE. Flag for maintainer review.
+| **Batch multiple PRs in one task** | Violates 1 PR = 1 task rule | CRITICAL |
+| **Use `run_in_background=false`** | No parallelism, slower execution | CRITICAL |
+| **Collect all tasks, report at end** | Loses streaming benefit | CRITICAL |
+| **No `background_output()` polling** | Can't stream results | CRITICAL |
+| No progress updates | User doesn't know if stuck or working | HIGH |
 
 ---
 
 ## EXECUTION CHECKLIST
 
-- [ ] Created initial todo list before starting work
-- [ ] Fetched ALL pages of open PRs (pagination complete)
-- [ ] Updated todo after Phase 1 completion
-- [ ] Launched 1 agent per PR (not batched)
-- [ ] Updated todo after Phase 2 completion
-- [ ] All agents ran in background (parallel)
-- [ ] Collected all results before taking action
-- [ ] Updated todo after Phase 3 completion
-- [ ] Only closed PRs meeting CONSERVATIVE criteria
-- [ ] Posted friendly, detailed close messages
-- [ ] Updated todo after Phase 4 completion
-- [ ] Generated comprehensive report
-- [ ] Final todo update - all phases completed
+- [ ] Created todos before starting
+- [ ] Fetched ALL PRs with exhaustive pagination
+- [ ] **LAUNCHED**: 1 background task per PR (`run_in_background=true`)
+- [ ] **STREAMED**: Results via `background_output()` as each task completes
+- [ ] Showed live progress every 5 PRs
+- [ ] Real-time categorization visible to user
+- [ ] Conservative auto-close with confirmation
+- [ ] **FINAL**: Comprehensive summary report at end
+- [ ] All todos marked complete
 
 ---
 
@@ -641,15 +470,15 @@ todowrite([
 
 When invoked, immediately:
 
-1. **CREATE TODOS FIRST** - Use todowrite() to register all 5 phases
-2. `gh repo view --json nameWithOwner -q .nameWithOwner` (get current repo)
+1. **CREATE TODOS**
+2. `gh repo view --json nameWithOwner -q .nameWithOwner`
 3. Exhaustive pagination for ALL open PRs
-4. Update todo - Phase 1 complete
-5. Launch N background agents (1 per PR)
-6. Update todo - Phase 2 complete
-7. Collect all results
-8. Update todo - Phase 3 complete
-9. Auto-close PRs meeting CONSERVATIVE criteria with friendly messages
-10. Update todo - Phase 4 complete
-11. Generate categorized report with action items
-12. Final todo update - all phases completed
+4. **LAUNCH**: For each PR:
+   - `delegate_task(run_in_background=true)` - 1 task per PR
+   - Store taskId mapped to PR number
+5. **STREAM**: Poll `background_output()` for each task:
+   - As each completes, immediately report result
+   - Categorize in real-time
+   - Show progress every 5 completions
+6. Auto-close eligible PRs
+7. **GENERATE FINAL COMPREHENSIVE REPORT**
