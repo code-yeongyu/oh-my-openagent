@@ -134,25 +134,11 @@ export function createChatMessageHandler(args: {
             sessionID: input.sessionID,
             prompt: rawTask,
           })
-          const started = hooks.ralphLoop.startLoop(input.sessionID, rawTask, {
+          hooks.ralphLoop.startLoop(input.sessionID, rawTask, {
             maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
             completionPromise: promiseMatch?.[1],
             strategy: strategyMatch?.[1]?.toLowerCase() as "reset" | "continue" | undefined,
           })
-
-          if (started && input.sessionID) {
-            ctx.client.session
-              .update({
-                path: { id: input.sessionID },
-                body: { title: "Ralph Loop - Iteration 1" },
-                query: { directory: ctx.directory },
-              })
-              .catch((err: unknown) => {
-                log("[ralph-loop] Failed to rename initial session", {
-                  error: String(err),
-                })
-              })
-          }
         }
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
