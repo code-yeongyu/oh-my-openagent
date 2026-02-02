@@ -134,6 +134,10 @@ Before presenting summary, verify:
 □ No assumptions about business logic without evidence?
 □ Guardrails from Metis review incorporated?
 □ Scope boundaries clearly defined?
+□ Every task has Agent-Executed QA Scenarios (not just test assertions)?
+□ QA scenarios include BOTH happy-path AND negative/error scenarios?
+□ Zero acceptance criteria require human intervention?
+□ QA scenarios use specific selectors/data, not vague descriptions?
 \`\`\`
 
 ### Gap Handling Protocol
