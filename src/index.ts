@@ -35,6 +35,7 @@ import {
   createStopContinuationGuardHook,
   createCompactionContextInjector,
   createUnstableAgentBabysitterHook,
+  createPreemptiveCompactionHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -126,6 +127,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
     ? createContextWindowMonitorHook(ctx)
     : null;
+  const preemptiveCompaction =
+    isHookEnabled("preemptive-compaction") &&
+    pluginConfig.experimental?.preemptive_compaction
+      ? createPreemptiveCompactionHook(ctx)
+      : null;
   const sessionRecovery = isHookEnabled("session-recovery")
     ? createSessionRecoveryHook(ctx, {
         experimental: pluginConfig.experimental,
@@ -805,6 +811,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
       await claudeCodeHooks["tool.execute.after"](input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
+      await preemptiveCompaction?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);
       await commentChecker?.["tool.execute.after"](input, output);
       await directoryAgentsInjector?.["tool.execute.after"](input, output);

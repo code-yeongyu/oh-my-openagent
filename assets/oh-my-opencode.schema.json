@@ -68,6 +68,7 @@
           "empty-task-response-detector",
           "think-mode",
           "anthropic-context-window-limit-recovery",
+          "preemptive-compaction",
           "rules-injector",
           "background-notification",
           "auto-update-checker",
@@ -2656,6 +2657,9 @@
           "type": "boolean"
         },
         "auto_resume": {
+          "type": "boolean"
+        },
+        "preemptive_compaction": {
           "type": "boolean"
         },
         "truncate_all_tool_outputs": {

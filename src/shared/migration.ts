@@ -64,7 +64,6 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
   "sisyphus-orchestrator": "atlas",
 
   // Removed hooks (v3.0.0) - will be filtered out and user warned
-  "preemptive-compaction": null,
   "empty-message-sanitizer": null,
 }
 
