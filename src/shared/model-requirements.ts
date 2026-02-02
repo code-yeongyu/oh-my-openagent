@@ -44,8 +44,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
    },
   explore: {
     fallbackChain: [
+      { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
-      { providers: ["github-copilot"], model: "gpt-5-mini" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
