@@ -174,9 +174,11 @@ export async function notifyParentSession(
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
   
   let notification: string
+  let completedTasks: BackgroundTask[] = []
   if (allComplete) {
-    const completedTasks = Array.from(state.tasks.values())
+    completedTasks = Array.from(state.tasks.values())
       .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+    const completedTasksText = completedTasks
       .map(t => `- \`${t.id}\`: ${t.description}`)
       .join("\n")
 
@@ -184,7 +186,7 @@ export async function notifyParentSession(
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
-${completedTasks || `- \`${task.id}\`: ${task.description}`}
+${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
@@ -256,14 +258,19 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     log("[background-agent] Failed to send notification:", error)
   }
 
-  const taskId = task.id
-  const timer = setTimeout(() => {
-    state.completionTimers.delete(taskId)
-    if (state.tasks.has(taskId)) {
-      state.clearNotificationsForTask(taskId)
-      state.tasks.delete(taskId)
-      log("[background-agent] Removed completed task from memory:", taskId)
+  if (allComplete) {
+    for (const completedTask of completedTasks) {
+      const taskId = completedTask.id
+      state.clearCompletionTimer(taskId)
+      const timer = setTimeout(() => {
+        state.completionTimers.delete(taskId)
+        if (state.tasks.has(taskId)) {
+          state.clearNotificationsForTask(taskId)
+          state.tasks.delete(taskId)
+          log("[background-agent] Removed completed task from memory:", taskId)
+        }
+      }, TASK_CLEANUP_DELAY_MS)
+      state.setCompletionTimer(taskId, timer)
     }
-  }, TASK_CLEANUP_DELAY_MS)
-  state.setCompletionTimer(taskId, timer)
+  }
 }

@@ -2157,6 +2157,67 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
     manager.shutdown()
   })
 
+  test("should start cleanup timers only after all tasks complete", async () => {
+    // given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const taskA: BackgroundTask = {
+      id: "task-timer-a",
+      sessionID: "session-timer-a",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-a",
+      description: "Task A",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    const taskB: BackgroundTask = {
+      id: "task-timer-b",
+      sessionID: "session-timer-b",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-b",
+      description: "Task B",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(taskA.id, taskA)
+    getTaskMap(manager).set(taskB.id, taskB)
+    ;(manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent.set(
+      "parent-session",
+      new Set([taskA.id, taskB.id])
+    )
+
+    // when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(taskA)
+
+    // then
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(0)
+
+    // when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(taskB)
+
+    // then
+    expect(completionTimers.size).toBe(2)
+    expect(completionTimers.has(taskA.id)).toBe(true)
+    expect(completionTimers.has(taskB.id)).toBe(true)
+
+    manager.shutdown()
+  })
+
   test("should clear all completion timers on shutdown", () => {
     // given
     const manager = createBackgroundManager()
