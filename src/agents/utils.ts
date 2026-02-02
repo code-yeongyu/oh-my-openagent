@@ -167,6 +167,18 @@ function applyModelResolution(input: {
   })
 }
 
+function getFirstFallbackModel(requirement?: {
+  fallbackChain?: { providers: string[]; model: string; variant?: string }[]
+}) {
+  const entry = requirement?.fallbackChain?.[0]
+  if (!entry || entry.providers.length === 0) return undefined
+  return {
+    model: `${entry.providers[0]}/${entry.model}`,
+    provenance: "provider-fallback" as const,
+    variant: entry.variant,
+  }
+}
+
 function applyEnvironmentContext(config: AgentConfig, directory?: string): AgentConfig {
   if (!directory || !config.prompt) return config
   const envContext = createEnvContext()
@@ -230,6 +242,8 @@ export async function createBuiltinAgents(
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: connectedProviders ?? undefined,
   })
+  const isFirstRunNoCache =
+    availableModels.size === 0 && (!connectedProviders || connectedProviders.length === 0)
 
   const result: Record<string, AgentConfig> = {}
   const availableAgents: AvailableAgent[] = []
@@ -334,16 +348,21 @@ export async function createBuiltinAgents(
    const meetsSisyphusAnyModelRequirement =
      !sisyphusRequirement?.requiresAnyModel ||
      hasSisyphusExplicitConfig ||
+     isFirstRunNoCache ||
      isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
 
    if (!disabledAgents.includes("sisyphus") && meetsSisyphusAnyModelRequirement) {
-    const sisyphusResolution = applyModelResolution({
+    let sisyphusResolution = applyModelResolution({
       uiSelectedModel,
       userModel: sisyphusOverride?.model,
       requirement: sisyphusRequirement,
       availableModels,
       systemDefaultModel,
     })
+
+    if (isFirstRunNoCache && !sisyphusOverride?.model && !uiSelectedModel) {
+      sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
+    }
 
     if (sisyphusResolution) {
       const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
@@ -375,15 +394,20 @@ export async function createBuiltinAgents(
     const hasRequiredModel =
       !hephaestusRequirement?.requiresModel ||
       hasHephaestusExplicitConfig ||
+      isFirstRunNoCache ||
       (availableModels.size > 0 && isModelAvailable(hephaestusRequirement.requiresModel, availableModels))
 
     if (hasRequiredModel) {
-      const hephaestusResolution = applyModelResolution({
+      let hephaestusResolution = applyModelResolution({
         userModel: hephaestusOverride?.model,
         requirement: hephaestusRequirement,
         availableModels,
         systemDefaultModel,
       })
+
+      if (isFirstRunNoCache && !hephaestusOverride?.model) {
+        hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
+      }
 
       if (hephaestusResolution) {
         const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
