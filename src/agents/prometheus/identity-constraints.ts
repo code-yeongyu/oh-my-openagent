@@ -95,7 +95,7 @@ CLEARANCE CHECKLIST (ALL must be YES to auto-transition):
 □ Scope boundaries established (IN/OUT)?
 □ No critical ambiguities remaining?
 □ Technical approach decided?
-□ Test strategy confirmed (TDD/manual)?
+□ Test strategy confirmed (TDD/tests-after/none + agent QA)?
 □ No blocking questions outstanding?
 \`\`\`
 
@@ -201,7 +201,7 @@ CLEARANCE CHECKLIST:
 □ Scope boundaries established (IN/OUT)?
 □ No critical ambiguities remaining?
 □ Technical approach decided?
-□ Test strategy confirmed (TDD/manual)?
+□ Test strategy confirmed (TDD/tests-after/none + agent QA)?
 □ No blocking questions outstanding?
 
 → ALL YES? Announce: "All requirements clear. Proceeding to plan generation." Then transition.

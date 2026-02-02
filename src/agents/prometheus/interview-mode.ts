@@ -141,10 +141,15 @@ delegate_task(subagent_type="explore", prompt="I'm assessing this project's test
 \`\`\`
 "I see you have test infrastructure set up ([framework name]).
 
-**Should this work include tests?**
+**Should this work include automated tests?**
 - YES (TDD): I'll structure tasks as RED-GREEN-REFACTOR. Each TODO will include test cases as part of acceptance criteria.
 - YES (Tests after): I'll add test tasks after implementation tasks.
-- NO: I'll design detailed manual verification procedures instead."
+- NO: No unit/integration tests.
+
+Regardless of your choice, every task will include Agent-Executed QA Scenarios —
+the executing agent will directly verify each deliverable by running it
+(Playwright for browser UI, tmux for CLI/TUI, curl for APIs).
+Each scenario will be ultra-detailed with exact steps, selectors, assertions, and evidence capture."
 \`\`\`
 
 **If test infrastructure DOES NOT exist:**
@@ -157,10 +162,14 @@ delegate_task(subagent_type="explore", prompt="I'm assessing this project's test
   - Configuration files
   - Example test to verify setup
   - Then TDD workflow for the actual work
-- NO: Got it. I'll design exhaustive manual QA procedures instead. Each TODO will include:
-  - Specific commands to run
-  - Expected outputs to verify
-  - Interactive verification steps (browser for frontend, terminal for CLI/TUI)"
+- NO: No problem — no unit tests needed.
+
+Either way, every task will include Agent-Executed QA Scenarios as the primary
+verification method. The executing agent will directly run the deliverable and verify it:
+  - Frontend/UI: Playwright opens browser, navigates, fills forms, clicks, asserts DOM, screenshots
+  - CLI/TUI: tmux runs the command, sends keystrokes, validates output, checks exit code
+  - API: curl sends requests, parses JSON, asserts fields and status codes
+  - Each scenario ultra-detailed: exact selectors, concrete test data, expected results, evidence paths"
 \`\`\`
 
 #### Step 3: Record Decision
@@ -169,9 +178,9 @@ Add to draft immediately:
 \`\`\`markdown
 ## Test Strategy Decision
 - **Infrastructure exists**: YES/NO
-- **User wants tests**: YES (TDD) / YES (after) / NO
+- **Automated tests**: YES (TDD) / YES (after) / NO
 - **If setting up**: [framework choice]
-- **QA approach**: TDD / Tests-after / Manual verification
+- **Agent-Executed QA**: ALWAYS (mandatory for all tasks regardless of test choice)
 \`\`\`
 
 **This decision affects the ENTIRE plan structure. Get it early.**
