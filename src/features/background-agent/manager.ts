@@ -1013,9 +1013,11 @@ export class BackgroundManager {
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string
+    let completedTasks: BackgroundTask[] = []
     if (allComplete) {
-      const completedTasks = Array.from(this.tasks.values())
+      completedTasks = Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+      const completedTasksText = completedTasks
         .map(t => `- \`${t.id}\`: ${t.description}`)
         .join("\n")
 
@@ -1023,7 +1025,7 @@ export class BackgroundManager {
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
-${completedTasks || `- \`${task.id}\`: ${task.description}`}
+${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
@@ -1092,16 +1094,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log("[background-agent] Failed to send notification:", error)
     }
 
-    const taskId = task.id
-    const timer = setTimeout(() => {
-      this.completionTimers.delete(taskId)
-      if (this.tasks.has(taskId)) {
-        this.clearNotificationsForTask(taskId)
-        this.tasks.delete(taskId)
-        log("[background-agent] Removed completed task from memory:", taskId)
+    if (allComplete) {
+      for (const completedTask of completedTasks) {
+        const taskId = completedTask.id
+        const existingTimer = this.completionTimers.get(taskId)
+        if (existingTimer) {
+          clearTimeout(existingTimer)
+          this.completionTimers.delete(taskId)
+        }
+        const timer = setTimeout(() => {
+          this.completionTimers.delete(taskId)
+          if (this.tasks.has(taskId)) {
+            this.clearNotificationsForTask(taskId)
+            this.tasks.delete(taskId)
+            log("[background-agent] Removed completed task from memory:", taskId)
+          }
+        }, TASK_CLEANUP_DELAY_MS)
+        this.completionTimers.set(taskId, timer)
       }
-    }, TASK_CLEANUP_DELAY_MS)
-    this.completionTimers.set(taskId, timer)
+    }
   }
 
   private formatDuration(start: Date, end?: Date): string {

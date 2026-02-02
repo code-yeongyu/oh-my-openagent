@@ -70,12 +70,23 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 
 ## Verification Strategy (MANDATORY)
 
-> This section is determined during interview based on Test Infrastructure Assessment.
-> The choice here affects ALL TODO acceptance criteria.
+> **UNIVERSAL RULE: ZERO HUMAN INTERVENTION**
+>
+> ALL tasks in this plan MUST be verifiable WITHOUT any human action.
+> This is NOT conditional — it applies to EVERY task, regardless of test strategy.
+>
+> **FORBIDDEN** — acceptance criteria that require:
+> - "User manually tests..." / "사용자가 직접 테스트..."
+> - "User visually confirms..." / "사용자가 눈으로 확인..."
+> - "User interacts with..." / "사용자가 직접 조작..."
+> - "Ask user to verify..." / "사용자에게 확인 요청..."
+> - ANY step where a human must perform an action
+>
+> **ALL verification is executed by the agent** using tools (Playwright, interactive_bash, curl, etc.). No exceptions.
 
 ### Test Decision
 - **Infrastructure exists**: [YES/NO]
-- **User wants tests**: [TDD / Tests-after / Manual-only]
+- **Automated tests**: [TDD / Tests-after / None]
 - **Framework**: [bun test / vitest / jest / pytest / none]
 
 ### If TDD Enabled
@@ -102,37 +113,65 @@ Each TODO follows RED-GREEN-REFACTOR:
   - Example: Create \`src/__tests__/example.test.ts\`
   - Verify: \`bun test\` → 1 test passes
 
-### If Automated Verification Only (NO User Intervention)
+### Agent-Executed QA Scenarios (MANDATORY — ALL tasks)
 
-> **CRITICAL PRINCIPLE: ZERO USER INTERVENTION**
+> Whether TDD is enabled or not, EVERY task MUST include Agent-Executed QA Scenarios.
+> - **With TDD**: QA scenarios complement unit tests at integration/E2E level
+> - **Without TDD**: QA scenarios are the PRIMARY verification method
 >
-> **NEVER** create acceptance criteria that require:
-> - "User manually tests..." / "사용자가 직접 테스트..."
-> - "User visually confirms..." / "사용자가 눈으로 확인..."
-> - "User interacts with..." / "사용자가 직접 조작..."
-> - "Ask user to verify..." / "사용자에게 확인 요청..."
-> - ANY step that requires a human to perform an action
->
-> **ALL verification MUST be automated and executable by the agent.**
-> If a verification cannot be automated, find an automated alternative or explicitly note it as a known limitation.
+> These describe how the executing agent DIRECTLY verifies the deliverable
+> by running it — opening browsers, executing commands, sending API requests.
+> The agent performs what a human tester would do, but automated via tools.
 
-Each TODO includes EXECUTABLE verification procedures that agents can run directly:
+**Verification Tool by Deliverable Type:**
 
-**By Deliverable Type:**
+| Type | Tool | How Agent Verifies |
+|------|------|-------------------|
+| **Frontend/UI** | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
+| **TUI/CLI** | interactive_bash (tmux) | Run command, send keystrokes, validate output |
+| **API/Backend** | Bash (curl/httpie) | Send requests, parse responses, assert fields |
+| **Library/Module** | Bash (bun/node REPL) | Import, call functions, compare output |
+| **Config/Infra** | Bash (shell commands) | Apply config, run state checks, validate |
 
-| Type | Verification Tool | Automated Procedure |
-|------|------------------|---------------------|
-| **Frontend/UI** | Playwright browser via playwright skill | Agent navigates, clicks, screenshots, asserts DOM state |
-| **TUI/CLI** | interactive_bash (tmux) | Agent runs command, captures output, validates expected strings |
-| **API/Backend** | curl / httpie via Bash | Agent sends request, parses response, validates JSON fields |
-| **Library/Module** | Node/Python REPL via Bash | Agent imports, calls function, compares output |
-| **Config/Infra** | Shell commands via Bash | Agent applies config, runs state check, validates output |
+**Each Scenario MUST Follow This Format:**
 
-**Evidence Requirements (Agent-Executable):**
-- Command output captured and compared against expected patterns
-- Screenshots saved to .sisyphus/evidence/ for visual verification
-- JSON response fields validated with specific assertions
-- Exit codes checked (0 = success)
+\`\`\`
+Scenario: [Descriptive name — what user action/flow is being verified]
+  Tool: [Playwright / interactive_bash / Bash]
+  Preconditions: [What must be true before this scenario runs]
+  Steps:
+    1. [Exact action with specific selector/command/endpoint]
+    2. [Next action with expected intermediate state]
+    3. [Assertion with exact expected value]
+  Expected Result: [Concrete, observable outcome]
+  Failure Indicators: [What would indicate failure]
+  Evidence: [Screenshot path / output capture / response body path]
+\`\`\`
+
+**Scenario Detail Requirements:**
+- **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
+- **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
+- **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
+- **Timing**: Include wait conditions where relevant (\`Wait for .dashboard (timeout: 10s)\`)
+- **Negative Scenarios**: At least ONE failure/error scenario per feature
+- **Evidence Paths**: Specific file paths (\`.sisyphus/evidence/task-N-scenario-name.png\`)
+
+**Anti-patterns (NEVER write scenarios like this):**
+- ❌ "Verify the login page works correctly"
+- ❌ "Check that the API returns the right data"
+- ❌ "Test the form validation"
+- ❌ "User opens browser and confirms..."
+
+**Write scenarios like this instead:**
+- ✅ \`Navigate to /login → Fill input[name="email"] with "test@example.com" → Fill input[name="password"] with "Pass123!" → Click button[type="submit"] → Wait for /dashboard → Assert h1 contains "Welcome"\`
+- ✅ \`POST /api/users {"name":"Test","email":"new@test.com"} → Assert status 201 → Assert response.id is UUID → GET /api/users/{id} → Assert name equals "Test"\`
+- ✅ \`Run ./cli --config test.yaml → Wait for "Loaded" in stdout → Send "q" → Assert exit code 0 → Assert stdout contains "Goodbye"\`
+
+**Evidence Requirements:**
+- Screenshots: \`.sisyphus/evidence/\` for all UI verifications
+- Terminal output: Captured for CLI/TUI verifications
+- Response bodies: Saved for API verifications
+- All evidence referenced by specific file path in acceptance criteria
 
 ---
 
@@ -242,76 +281,115 @@ Parallel Speedup: ~40% faster than sequential
 
   **Acceptance Criteria**:
 
-  > **CRITICAL: AGENT-EXECUTABLE VERIFICATION ONLY**
-  >
-  > - Acceptance = EXECUTION by the agent, not "user checks if it works"
-  > - Every criterion MUST be verifiable by running a command or using a tool
-  > - NO steps like "user opens browser", "user clicks", "user confirms"
-  > - If you write "[placeholder]" - REPLACE IT with actual values based on task context
+  > **AGENT-EXECUTABLE VERIFICATION ONLY** — No human action permitted.
+  > Every criterion MUST be verifiable by running a command or using a tool.
+  > REPLACE all placeholders with actual values from task context.
 
   **If TDD (tests enabled):**
   - [ ] Test file created: src/auth/login.test.ts
   - [ ] Test covers: successful login returns JWT token
   - [ ] bun test src/auth/login.test.ts → PASS (3 tests, 0 failures)
 
-  **Automated Verification (ALWAYS include, choose by deliverable type):**
+  **Agent-Executed QA Scenarios (MANDATORY — per-scenario, ultra-detailed):**
 
-  **For Frontend/UI changes** (using playwright skill):
-  \\\`\\\`\\\`
-  # Agent executes via playwright browser automation:
-  1. Navigate to: http://localhost:3000/login
-  2. Fill: input[name="email"] with "test@example.com"
-  3. Fill: input[name="password"] with "password123"
-  4. Click: button[type="submit"]
-  5. Wait for: selector ".dashboard-welcome" to be visible
-  6. Assert: text "Welcome back" appears on page
-  7. Screenshot: .sisyphus/evidence/task-1-login-success.png
-  \\\`\\\`\\\`
+  > Write MULTIPLE named scenarios per task: happy path AND failure cases.
+  > Each scenario = exact tool + steps with real selectors/data + evidence path.
 
-  **For TUI/CLI changes** (using interactive_bash):
-  \\\`\\\`\\\`
-  # Agent executes via tmux session:
-  1. Command: ./my-cli --config test.yaml
-  2. Wait for: "Configuration loaded" in output
-  3. Send keys: "q" to quit
-  4. Assert: Exit code 0
-  5. Assert: Output contains "Goodbye"
-  \\\`\\\`\\\`
+  **Example — Frontend/UI (Playwright):**
 
-  **For API/Backend changes** (using Bash curl):
-  \\\`\\\`\\\`bash
-  # Agent runs:
-  curl -s -X POST http://localhost:8080/api/users \\
-    -H "Content-Type: application/json" \\
-    -d '{"email":"new@test.com","name":"Test User"}' \\
-    | jq '.id'
-  # Assert: Returns non-empty UUID
-  # Assert: HTTP status 201
   \\\`\\\`\\\`
+  Scenario: Successful login redirects to dashboard
+    Tool: Playwright (playwright skill)
+    Preconditions: Dev server running on localhost:3000, test user exists
+    Steps:
+      1. Navigate to: http://localhost:3000/login
+      2. Wait for: input[name="email"] visible (timeout: 5s)
+      3. Fill: input[name="email"] → "test@example.com"
+      4. Fill: input[name="password"] → "ValidPass123!"
+      5. Click: button[type="submit"]
+      6. Wait for: navigation to /dashboard (timeout: 10s)
+      7. Assert: h1 text contains "Welcome back"
+      8. Assert: cookie "session_token" exists
+      9. Screenshot: .sisyphus/evidence/task-1-login-success.png
+    Expected Result: Dashboard loads with welcome message
+    Evidence: .sisyphus/evidence/task-1-login-success.png
 
-  **For Library/Module changes** (using Bash node/bun):
-  \\\`\\\`\\\`bash
-  # Agent runs:
-  bun -e "import { validateEmail } from './src/utils/validate'; console.log(validateEmail('test@example.com'))"
-  # Assert: Output is "true"
-  
-  bun -e "import { validateEmail } from './src/utils/validate'; console.log(validateEmail('invalid'))"
-  # Assert: Output is "false"
+  Scenario: Login fails with invalid credentials
+    Tool: Playwright (playwright skill)
+    Preconditions: Dev server running, no valid user with these credentials
+    Steps:
+      1. Navigate to: http://localhost:3000/login
+      2. Fill: input[name="email"] → "wrong@example.com"
+      3. Fill: input[name="password"] → "WrongPass"
+      4. Click: button[type="submit"]
+      5. Wait for: .error-message visible (timeout: 5s)
+      6. Assert: .error-message text contains "Invalid credentials"
+      7. Assert: URL is still /login (no redirect)
+      8. Screenshot: .sisyphus/evidence/task-1-login-failure.png
+    Expected Result: Error message shown, stays on login page
+    Evidence: .sisyphus/evidence/task-1-login-failure.png
   \\\`\\\`\\\`
 
-  **For Config/Infra changes** (using Bash):
-  \\\`\\\`\\\`bash
-  # Agent runs:
-  docker compose up -d
-  # Wait 5s for containers
-  docker compose ps --format json | jq '.[].State'
-  # Assert: All states are "running"
+  **Example — API/Backend (curl):**
+
+  \\\`\\\`\\\`
+  Scenario: Create user returns 201 with UUID
+    Tool: Bash (curl)
+    Preconditions: Server running on localhost:8080
+    Steps:
+      1. curl -s -w "\\n%{http_code}" -X POST http://localhost:8080/api/users \\
+           -H "Content-Type: application/json" \\
+           -d '{"email":"new@test.com","name":"Test User"}'
+      2. Assert: HTTP status is 201
+      3. Assert: response.id matches UUID format
+      4. GET /api/users/{returned-id} → Assert name equals "Test User"
+    Expected Result: User created and retrievable
+    Evidence: Response bodies captured
+
+  Scenario: Duplicate email returns 409
+    Tool: Bash (curl)
+    Preconditions: User with email "new@test.com" already exists
+    Steps:
+      1. Repeat POST with same email
+      2. Assert: HTTP status is 409
+      3. Assert: response.error contains "already exists"
+    Expected Result: Conflict error returned
+    Evidence: Response body captured
+  \\\`\\\`\\\`
+
+  **Example — TUI/CLI (interactive_bash):**
+
+  \\\`\\\`\\\`
+  Scenario: CLI loads config and displays menu
+    Tool: interactive_bash (tmux)
+    Preconditions: Binary built, test config at ./test.yaml
+    Steps:
+      1. tmux new-session: ./my-cli --config test.yaml
+      2. Wait for: "Configuration loaded" in output (timeout: 5s)
+      3. Assert: Menu items visible ("1. Create", "2. List", "3. Exit")
+      4. Send keys: "3" then Enter
+      5. Assert: "Goodbye" in output
+      6. Assert: Process exited with code 0
+    Expected Result: CLI starts, shows menu, exits cleanly
+    Evidence: Terminal output captured
+
+  Scenario: CLI handles missing config gracefully
+    Tool: interactive_bash (tmux)
+    Preconditions: No config file at ./nonexistent.yaml
+    Steps:
+      1. tmux new-session: ./my-cli --config nonexistent.yaml
+      2. Wait for: output (timeout: 3s)
+      3. Assert: stderr contains "Config file not found"
+      4. Assert: Process exited with code 1
+    Expected Result: Meaningful error, non-zero exit
+    Evidence: Error output captured
   \\\`\\\`\\\`
 
   **Evidence to Capture:**
-  - [ ] Terminal output from verification commands (actual output, not expected)
-  - [ ] Screenshot files in .sisyphus/evidence/ for UI changes
-  - [ ] JSON response bodies for API changes
+  - [ ] Screenshots in .sisyphus/evidence/ for UI scenarios
+  - [ ] Terminal output for CLI/TUI scenarios
+  - [ ] Response bodies for API scenarios
+  - [ ] Each evidence file named: task-{N}-{scenario-slug}.{ext}
 
   **Commit**: YES | NO (groups with N)
   - Message: \`type(scope): desc\`

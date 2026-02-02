@@ -59,24 +59,24 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("glm-4.7")
   })
 
-  test("explore has valid fallbackChain with claude-haiku-4-5 as primary", () => {
+  test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
     // given - explore agent requirement
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain exists with claude-haiku-4-5 as first entry, gpt-5-mini as second, gpt-5-nano as third
+    // then - fallbackChain exists with grok-code-fast-1 as first entry, claude-haiku-4-5 as second
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
     expect(explore.fallbackChain).toHaveLength(3)
 
     const primary = explore.fallbackChain[0]
-    expect(primary.providers).toContain("anthropic")
-    expect(primary.providers).toContain("opencode")
-    expect(primary.model).toBe("claude-haiku-4-5")
+    expect(primary.providers).toContain("github-copilot")
+    expect(primary.model).toBe("grok-code-fast-1")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers).toContain("github-copilot")
-    expect(secondary.model).toBe("gpt-5-mini")
+    expect(secondary.providers).toContain("anthropic")
+    expect(secondary.providers).toContain("opencode")
+    expect(secondary.model).toBe("claude-haiku-4-5")
 
     const tertiary = explore.fallbackChain[2]
     expect(tertiary.providers).toContain("opencode")
