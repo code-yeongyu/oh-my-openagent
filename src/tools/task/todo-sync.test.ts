@@ -1,32 +1,4 @@
-/// <reference path="../../types/bun-test.d.ts" />
-type TestBody = () => unknown | Promise<unknown>;
-type TestDecl = (name: string, fn?: TestBody) => void;
-type Hook = (fn: TestBody) => void;
-type Expectation = {
-  toBe: (...args: unknown[]) => unknown;
-  toBeNull: (...args: unknown[]) => unknown;
-  toEqual: (...args: unknown[]) => unknown;
-  toHaveProperty: (...args: unknown[]) => unknown;
-  toMatch: (...args: unknown[]) => unknown;
-  toBeDefined: (...args: unknown[]) => unknown;
-  toContain: (...args: unknown[]) => unknown;
-  toBeUndefined: (...args: unknown[]) => unknown;
-  toHaveBeenCalled: (...args: unknown[]) => unknown;
-  toHaveBeenCalledTimes: (...args: unknown[]) => unknown;
-  toHaveBeenCalledWith: (...args: unknown[]) => unknown;
-  not: Expectation;
-};
-type Expect = (value?: unknown) => Expectation;
-
-declare const describe: TestDecl;
-declare const it: TestDecl;
-declare const test: TestDecl;
-declare const expect: Expect;
-declare const beforeEach: Hook;
-declare const afterEach: Hook;
-declare const beforeAll: Hook;
-declare const afterAll: Hook;
-declare const vi: { fn: (...args: unknown[]) => unknown };
+/// <reference types="bun-types/test-globals" />
 import type { Task } from "../../features/claude-tasks/types";
 import {
   syncTaskToTodo,
@@ -255,30 +227,24 @@ describe("syncTaskTodoUpdate", () => {
       { id: "T-2", content: "Keep task", status: "pending" },
     ];
     mockCtx.client.session.todo.mockResolvedValue({ data: currentTodos });
-    const payload: { sessionID: string; todos: TodoInfo[] } = {
-      sessionID: "",
-      todos: [],
-    };
-    let calls = 0;
+    let called = false;
     const writer = async (input: { sessionID: string; todos: TodoInfo[] }) => {
-      calls += 1;
-      payload.sessionID = input.sessionID;
-      payload.todos = input.todos;
+      called = true;
+      expect(input.sessionID).toBe("session-1");
+      expect(input.todos.length).toBe(2);
+      expect(
+        input.todos.find((todo: TodoInfo) => todo.id === "T-1")?.content,
+      ).toBe("Updated task");
+      expect(input.todos.some((todo: TodoInfo) => todo.id === "T-2")).toBe(
+        true,
+      );
     };
 
     // when
     await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
 
     // then
-    expect(calls).toBe(1);
-    expect(payload.sessionID).toBe("session-1");
-    expect(payload.todos.length).toBe(2);
-    expect(
-      payload.todos.find((todo: TodoInfo) => todo.id === "T-1")?.content,
-    ).toBe("Updated task");
-    expect(payload.todos.some((todo: TodoInfo) => todo.id === "T-2")).toBe(
-      true,
-    );
+    expect(called).toBe(true);
   });
 
   it("removes deleted task from todos", async () => {
@@ -296,29 +262,23 @@ describe("syncTaskTodoUpdate", () => {
       { id: "T-2", content: "Keep task", status: "pending" },
     ];
     mockCtx.client.session.todo.mockResolvedValue(currentTodos);
-    const payload: { sessionID: string; todos: TodoInfo[] } = {
-      sessionID: "",
-      todos: [],
-    };
-    let calls = 0;
+    let called = false;
     const writer = async (input: { sessionID: string; todos: TodoInfo[] }) => {
-      calls += 1;
-      payload.sessionID = input.sessionID;
-      payload.todos = input.todos;
+      called = true;
+      expect(input.todos.length).toBe(1);
+      expect(input.todos.some((todo: TodoInfo) => todo.id === "T-1")).toBe(
+        false,
+      );
+      expect(input.todos.some((todo: TodoInfo) => todo.id === "T-2")).toBe(
+        true,
+      );
     };
 
     // when
     await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
 
     // then
-    expect(calls).toBe(1);
-    expect(payload.todos.length).toBe(1);
-    expect(payload.todos.some((todo: TodoInfo) => todo.id === "T-1")).toBe(
-      false,
-    );
-    expect(payload.todos.some((todo: TodoInfo) => todo.id === "T-2")).toBe(
-      true,
-    );
+    expect(called).toBe(true);
   });
 });
 
