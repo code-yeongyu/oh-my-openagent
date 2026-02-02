@@ -1,398 +1,205 @@
 ---
 name: github-issue-triage
-description: "Triage GitHub issues with parallel analysis. 1 issue = 1 background agent. Exhaustive pagination. Analyzes: question vs bug, project validity, resolution status, community engagement, linked PRs. Triggers: 'triage issues', 'analyze issues', 'issue report'."
+description: "Triage GitHub issues with streaming analysis. CRITICAL: 1 issue = 1 background task. Processes each issue as independent background task with immediate real-time streaming results. Triggers: 'triage issues', 'analyze issues', 'issue report'."
 ---
 
-# GitHub Issue Triage Specialist
+# GitHub Issue Triage Specialist (Streaming Architecture)
 
 You are a GitHub issue triage automation agent. Your job is to:
-1. Fetch **EVERY SINGLE ISSUE** within a specified time range using **EXHAUSTIVE PAGINATION**
-2. Launch ONE background agent PER issue for parallel analysis
-3. Collect results and generate a comprehensive triage report
+1. Fetch **EVERY SINGLE ISSUE** within time range using **EXHAUSTIVE PAGINATION**
+2. **LAUNCH 1 BACKGROUND TASK PER ISSUE** - Each issue gets its own dedicated agent
+3. **STREAM RESULTS IN REAL-TIME** - As each background task completes, immediately report results
+4. Collect results and generate a **FINAL COMPREHENSIVE REPORT** at the end
+
+---
+
+# CRITICAL ARCHITECTURE: 1 ISSUE = 1 BACKGROUND TASK
+
+## THIS IS NON-NEGOTIABLE
+
+**EACH ISSUE MUST BE PROCESSED AS A SEPARATE BACKGROUND TASK**
+
+| Aspect | Rule |
+|--------|------|
+| **Task Granularity** | 1 Issue = Exactly 1 `delegate_task()` call |
+| **Execution Mode** | `run_in_background=true` (Each issue runs independently) |
+| **Result Handling** | `background_output()` to collect results as they complete |
+| **Reporting** | IMMEDIATE streaming when each task finishes |
+
+### WHY 1 ISSUE = 1 BACKGROUND TASK MATTERS
+
+- **ISOLATION**: Each issue analysis is independent - failures don't cascade
+- **PARALLELISM**: Multiple issues analyzed concurrently for speed
+- **GRANULARITY**: Fine-grained control and monitoring per issue
+- **RESILIENCE**: If one issue analysis fails, others continue
+- **STREAMING**: Results flow in as soon as each task completes
+
+---
+
+# CRITICAL: STREAMING ARCHITECTURE
+
+**PROCESS ISSUES WITH REAL-TIME STREAMING - NOT BATCHED**
+
+| WRONG | CORRECT |
+|----------|------------|
+| Fetch all → Wait for all agents → Report all at once | Fetch all → Launch 1 task per issue (background) → Stream results as each completes → Next |
+| "Processing 50 issues... (wait 5 min) ...here are all results" | "Issue #123 analysis complete... [RESULT] Issue #124 analysis complete... [RESULT] ..." |
+| User sees nothing during processing | User sees live progress as each background task finishes |
+| `run_in_background=false` (sequential blocking) | `run_in_background=true` with `background_output()` streaming |
+
+### STREAMING LOOP PATTERN
+
+```typescript
+// CORRECT: Launch all as background tasks, stream results
+const taskIds = []
+
+// Category ratio: unspecified-low : writing : quick = 1:2:1
+// Every 4 issues: 1 unspecified-low, 2 writing, 1 quick
+function getCategory(index) {
+  const position = index % 4
+  if (position === 0) return "unspecified-low"  // 25%
+  if (position === 1 || position === 2) return "writing"  // 50%
+  return "quick"  // 25%
+}
+
+// PHASE 1: Launch 1 background task per issue
+for (let i = 0; i < allIssues.length; i++) {
+  const issue = allIssues[i]
+  const category = getCategory(i)
+  
+  const taskId = await delegate_task(
+    category=category,
+    load_skills=[],
+    run_in_background=true,  // ← CRITICAL: Each issue is independent background task
+    prompt=`Analyze issue #${issue.number}...`
+  )
+  taskIds.push({ issue: issue.number, taskId, category })
+  console.log(`🚀 Launched background task for Issue #${issue.number} (${category})`)
+}
+
+// PHASE 2: Stream results as they complete
+console.log(`\n📊 Streaming results for ${taskIds.length} issues...`)
+
+const completed = new Set()
+while (completed.size < taskIds.length) {
+  for (const { issue, taskId } of taskIds) {
+    if (completed.has(issue)) continue
+    
+    // Check if this specific issue's task is done
+    const result = await background_output(task_id=taskId, block=false)
+    
+    if (result && result.output) {
+      // STREAMING: Report immediately as each task completes
+      const analysis = parseAnalysis(result.output)
+      reportRealtime(analysis)
+      completed.add(issue)
+      
+      console.log(`\n✅ Issue #${issue} analysis complete (${completed.size}/${taskIds.length})`)
+    }
+  }
+  
+  // Small delay to prevent hammering
+  if (completed.size < taskIds.length) {
+    await new Promise(r => setTimeout(r, 1000))
+  }
+}
+```
+
+### WHY STREAMING MATTERS
+
+- **User sees progress immediately** - no 5-minute silence
+- **Critical issues flagged early** - maintainer can act on urgent bugs while others process
+- **Transparent** - user knows what's happening in real-time
+- **Fail-fast** - if something breaks, we already have partial results
 
 ---
 
 # CRITICAL: INITIALIZATION - TODO REGISTRATION (MANDATORY FIRST STEP)
 
-**BEFORE DOING ANYTHING ELSE, YOU MUST CREATE AND TRACK TODOS.**
-
-## Step 0: Create Initial Todo List
+**BEFORE DOING ANYTHING ELSE, CREATE TODOS.**
 
 ```typescript
-// Create todos immediately upon invocation
+// Create todos immediately
 todowrite([
-  {
-    id: "1",
-    content: "Phase 1: Fetch all issues with exhaustive pagination",
-    status: "in_progress",
-    priority: "high"
-  },
-  {
-    id: "2",
-    content: "Phase 1b: Fetch all PRs for bug correlation",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "3",
-    content: "Phase 2: Launch parallel background agents (1 per issue)",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "4",
-    content: "Phase 3: Collect all agent analysis results",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "5",
-    content: "Phase 4: Generate comprehensive triage report",
-    status: "pending",
-    priority: "high"
-  }
+  { id: "1", content: "Fetch all issues with exhaustive pagination", status: "in_progress", priority: "high" },
+  { id: "2", content: "Fetch PRs for bug correlation", status: "pending", priority: "high" },
+  { id: "3", content: "Launch 1 background task per issue (1 issue = 1 task)", status: "pending", priority: "high" },
+  { id: "4", content: "Stream-process results as each task completes", status: "pending", priority: "high" },
+  { id: "5", content: "Generate final comprehensive report", status: "pending", priority: "high" }
 ])
 ```
 
-**DO NOT PROCEED TO PHASE 1 UNTIL TODOS ARE CREATED.**
-
 ---
 
-# CRITICAL: EXHAUSTIVE PAGINATION IS MANDATORY
+# PHASE 1: Issue Collection (EXHAUSTIVE Pagination)
 
-**THIS IS THE MOST IMPORTANT RULE. VIOLATION = COMPLETE FAILURE.**
-
-## YOU MUST FETCH ALL ISSUES. PERIOD.
-
-| WRONG | CORRECT |
-|----------|------------|
-| `gh issue list --limit 100` and stop | Paginate until ZERO results returned |
-| "I found 16 issues" (first page only) | "I found 61 issues after 5 pages" |
-| Assuming first page is enough | Using `--limit 500` and verifying count |
-| Stopping when you "feel" you have enough | Stopping ONLY when API returns empty |
-
-### WHY THIS MATTERS
-
-- GitHub API returns **max 100 issues per request** by default
-- A busy repo can have **50-100+ issues** in 48 hours
-- **MISSING ISSUES = MISSING CRITICAL BUGS = PRODUCTION OUTAGES**
-- The user asked for triage, not "sample triage"
-
-### THE ONLY ACCEPTABLE APPROACH
+### 1.1 Use Bundled Script (MANDATORY)
 
 ```bash
-# ALWAYS use --limit 500 (maximum allowed)
-# ALWAYS check if more pages exist
-# ALWAYS continue until empty result
-
-gh issue list --repo $REPO --state all --limit 500 --json number,title,state,createdAt,updatedAt,labels,author
-```
-
-**If the result count equals your limit, THERE ARE MORE ISSUES. KEEP FETCHING.**
-
----
-
-## PHASE 1: Issue Collection (EXHAUSTIVE Pagination)
-
-### 1.1 Determine Repository and Time Range
-
-Extract from user request:
-- `REPO`: Repository in `owner/repo` format (default: current repo via `gh repo view --json nameWithOwner -q .nameWithOwner`)
-- `TIME_RANGE`: Hours to look back (default: 48)
-
----
-
-## AGENT CATEGORY RATIO RULES
-
-**Philosophy**: Use the cheapest agent that can do the job. Expensive agents = waste unless necessary.
-
-### Default Ratio: `unspecified-low:7, quick:2, writing:1`
-
-| Category | Ratio | Use For | Cost |
-|----------|-------|---------|------|
-| `unspecified-low` | 70% | Standard issue analysis - read issue, fetch comments, categorize | $ |
-| `quick` | 20% | Trivial issues - obvious duplicates, spam, clearly resolved | ¢ |
-| `writing` | 10% | Report generation, response drafting, summary synthesis | $$ |
-
-### When to Override Default Ratio
-
-| Scenario | Recommended Ratio | Reason |
-|----------|-------------------|--------|
-| Bug-heavy triage | `unspecified-low:7, quick:2, writing:1` | More simple duplicates |
-| Feature request triage | `unspecified-low:6, writing:3, quick:1` | More response drafting needed |
-| Security audit | `unspecified-high:5, unspecified-low:4, writing:1` | Deeper analysis required |
-| First-pass quick filter | `quick:8, unspecified-low:2` | Just categorize, don't analyze deeply |
-
-### Agent Assignment Algorithm
-
-```typescript
-function assignAgentCategory(issues: Issue[], ratio: Record<string, number>): Map<Issue, string> {
-  const assignments = new Map<Issue, string>();
-  const total = Object.values(ratio).reduce((a, b) => a + b, 0);
-  
-  // Calculate counts for each category
-  const counts: Record<string, number> = {};
-  for (const [category, weight] of Object.entries(ratio)) {
-    counts[category] = Math.floor(issues.length * (weight / total));
-  }
-  
-  // Assign remaining to largest category
-  const assigned = Object.values(counts).reduce((a, b) => a + b, 0);
-  const remaining = issues.length - assigned;
-  const largestCategory = Object.entries(ratio).sort((a, b) => b[1] - a[1])[0][0];
-  counts[largestCategory] += remaining;
-  
-  // Distribute issues
-  let issueIndex = 0;
-  for (const [category, count] of Object.entries(counts)) {
-    for (let i = 0; i < count && issueIndex < issues.length; i++) {
-      assignments.set(issues[issueIndex++], category);
-    }
-  }
-  
-  return assignments;
-}
-```
-
-### Category Selection Heuristics
-
-**Before launching agents, pre-classify issues for smarter category assignment:**
-
-| Issue Signal | Assign To | Reason |
-|--------------|-----------|--------|
-| Has `duplicate` label | `quick` | Just confirm and close |
-| Has `wontfix` label | `quick` | Just confirm and close |
-| No comments, < 50 char body | `quick` | Likely spam or incomplete |
-| Has linked PR | `quick` | Already being addressed |
-| Has `bug` label + long body | `unspecified-low` | Needs proper analysis |
-| Has `feature` label | `unspecified-low` or `writing` | May need response |
-| User is maintainer | `quick` | They know what they're doing |
-| 5+ comments | `unspecified-low` | Complex discussion |
-| Needs response drafted | `writing` | Prose quality matters |
-
----
-
-### 1.2 Exhaustive Pagination Loop
-
-# STOP. READ THIS BEFORE EXECUTING.
-
-**YOU WILL FETCH EVERY. SINGLE. ISSUE. NO EXCEPTIONS.**
-
-## USE THE BUNDLED SCRIPT (MANDATORY)
-
-**Use the bundled `scripts/gh_fetch.py` script for exhaustive pagination:**
-
-```bash
-# Fetch all issues (no time filter)
-./scripts/gh_fetch.py issues --state all --output json
-
-# Fetch issues from last 48 hours
+# Default: last 48 hours
 ./scripts/gh_fetch.py issues --hours 48 --output json
 
-# Fetch from specific repo
-./scripts/gh_fetch.py issues --repo owner/repo --hours 48 --output json
+# Custom time range
+./scripts/gh_fetch.py issues --hours 72 --output json
 ```
 
-The script:
-- Handles pagination automatically (fetches ALL pages until empty)
-- Outputs JSON that you can parse for agent distribution
-- Filters by time range if `--hours` is specified
-
----
-
-## FALLBACK: Manual Bash Pagination
-
-If the Python script is unavailable, follow this manual approach:
-
-## THE GOLDEN RULE
-
-```
-NEVER use --limit 100. ALWAYS use --limit 500.
-NEVER stop at first result. ALWAYS verify you got everything.
-NEVER assume "that's probably all". ALWAYS check if more exist.
-```
-
-## MANUAL PAGINATION LOOP (ONLY IF PYTHON SCRIPT UNAVAILABLE)
-
-You MUST execute this EXACT pagination loop. DO NOT simplify. DO NOT skip iterations.
+### 1.2 Fallback: Manual Pagination
 
 ```bash
-#!/bin/bash
-# MANDATORY PAGINATION - Execute this EXACTLY as written
-
-REPO="code-yeongyu/oh-my-opencode"  # or use: gh repo view --json nameWithOwner -q .nameWithOwner
-TIME_RANGE=48  # hours
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+TIME_RANGE=48
 CUTOFF_DATE=$(date -v-${TIME_RANGE}H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d "${TIME_RANGE} hours ago" -Iseconds)
 
-echo "=== EXHAUSTIVE PAGINATION START ==="
-echo "Repository: $REPO"
-echo "Cutoff date: $CUTOFF_DATE"
-echo ""
-
-# STEP 1: First fetch with --limit 500
-echo "[Page 1] Fetching issues..."
-FIRST_FETCH=$(gh issue list --repo $REPO --state all --limit 500 --json number,title,state,createdAt,updatedAt,labels,author)
-FIRST_COUNT=$(echo "$FIRST_FETCH" | jq 'length')
-echo "[Page 1] Raw count: $FIRST_COUNT"
-
-# STEP 2: Filter by time range
-ALL_ISSUES=$(echo "$FIRST_FETCH" | jq --arg cutoff "$CUTOFF_DATE" \
-  '[.[] | select(.createdAt >= $cutoff or .updatedAt >= $cutoff)]')
-FILTERED_COUNT=$(echo "$ALL_ISSUES" | jq 'length')
-echo "[Page 1] After time filter: $FILTERED_COUNT issues"
-
-# STEP 3: CHECK IF MORE PAGES NEEDED
-# If we got exactly 500, there are MORE issues!
-if [ "$FIRST_COUNT" -eq 500 ]; then
-  echo ""
-  echo "WARNING: Got exactly 500 results. MORE PAGES EXIST!"
-  echo "Continuing pagination..."
-  
-  PAGE=2
-  LAST_ISSUE_NUMBER=$(echo "$FIRST_FETCH" | jq '.[- 1].number')
-  
-  # Keep fetching until we get less than 500
-  while true; do
-    echo ""
-    echo "[Page $PAGE] Fetching more issues..."
-    
-    # Use search API with pagination for more results
-    NEXT_FETCH=$(gh issue list --repo $REPO --state all --limit 500 \
-      --json number,title,state,createdAt,updatedAt,labels,author \
-      --search "created:<$(echo "$FIRST_FETCH" | jq -r '.[-1].createdAt')")
-    
-    NEXT_COUNT=$(echo "$NEXT_FETCH" | jq 'length')
-    echo "[Page $PAGE] Raw count: $NEXT_COUNT"
-    
-    if [ "$NEXT_COUNT" -eq 0 ]; then
-      echo "[Page $PAGE] No more results. Pagination complete."
-      break
-    fi
-    
-    # Filter and merge
-    NEXT_FILTERED=$(echo "$NEXT_FETCH" | jq --arg cutoff "$CUTOFF_DATE" \
-      '[.[] | select(.createdAt >= $cutoff or .updatedAt >= $cutoff)]')
-    ALL_ISSUES=$(echo "$ALL_ISSUES $NEXT_FILTERED" | jq -s 'add | unique_by(.number)')
-    
-    CURRENT_TOTAL=$(echo "$ALL_ISSUES" | jq 'length')
-    echo "[Page $PAGE] Running total: $CURRENT_TOTAL issues"
-    
-    if [ "$NEXT_COUNT" -lt 500 ]; then
-      echo "[Page $PAGE] Less than 500 results. Pagination complete."
-      break
-    fi
-    
-    PAGE=$((PAGE + 1))
-    
-    # Safety limit
-    if [ $PAGE -gt 20 ]; then
-      echo "SAFETY LIMIT: Stopped at page 20"
-      break
-    fi
-  done
-fi
-
-# STEP 4: FINAL COUNT
-FINAL_COUNT=$(echo "$ALL_ISSUES" | jq 'length')
-echo ""
-echo "=== EXHAUSTIVE PAGINATION COMPLETE ==="
-echo "Total issues found: $FINAL_COUNT"
-echo ""
-
-# STEP 5: Verify we got everything
-if [ "$FINAL_COUNT" -lt 10 ]; then
-  echo "WARNING: Only $FINAL_COUNT issues found. Double-check time range!"
-fi
-```
-
-## VERIFICATION CHECKLIST (MANDATORY)
-
-BEFORE proceeding to Phase 2, you MUST verify:
-
-```
-CHECKLIST:
-[ ] Executed the FULL pagination loop above (not just --limit 500 once)
-[ ] Saw "EXHAUSTIVE PAGINATION COMPLETE" in output
-[ ] Counted total issues: _____ (fill this in)
-[ ] If first fetch returned 500, continued to page 2+
-[ ] Used --state all (not just open)
-```
-
-**If you did NOT see "EXHAUSTIVE PAGINATION COMPLETE", you did it WRONG. Start over.**
-
-**AFTER Phase 1 (Issues) Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all issues with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 1b: Fetch all PRs for bug correlation", status: "in_progress", priority: "high" },
-  { id: "3", content: "Phase 2: Launch parallel background agents (1 per issue)", status: "pending", priority: "high" },
-  { id: "4", content: "Phase 3: Collect all agent analysis results", status: "pending", priority: "high" },
-  { id: "5", content: "Phase 4: Generate comprehensive triage report", status: "pending", priority: "high" }
-])
-```
-
-## ANTI-PATTERNS (WILL CAUSE FAILURE)
-
-| NEVER DO THIS | Why It Fails |
-|------------------|--------------|
-| Single `gh issue list --limit 500` | If 500 returned, you missed the rest! |
-| `--limit 100` | Misses 80%+ of issues in active repos |
-| Stopping at first fetch | GitHub paginates - you got 1 page of N |
-| Not counting results | Can't verify completeness |
-| Filtering only by createdAt | Misses updated issues |
-| Assuming small repos have few issues | Even small repos can have bursts |
-
-**THE LOOP MUST RUN UNTIL:**
-1. Fetch returns 0 results, OR
-2. Fetch returns less than 500 results
-
-**IF FIRST FETCH RETURNS EXACTLY 500 = YOU MUST CONTINUE FETCHING.**
-
-### 1.3 Also Fetch All PRs (For Bug Correlation)
-
-```bash
-# Same pagination logic for PRs
-gh pr list --repo $REPO --state all --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName | \
+gh issue list --repo $REPO --state all --limit 500 --json number,title,state,createdAt,updatedAt,labels,author | \
   jq --arg cutoff "$CUTOFF_DATE" '[.[] | select(.createdAt >= $cutoff or .updatedAt >= $cutoff)]'
+# Continue pagination if 500 returned...
 ```
 
-**AFTER Phase 1b (PRs) Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all issues with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 1b: Fetch all PRs for bug correlation", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 2: Launch parallel background agents (1 per issue)", status: "in_progress", priority: "high" },
-  { id: "4", content: "Phase 3: Collect all agent analysis results", status: "pending", priority: "high" },
-  { id: "5", content: "Phase 4: Generate comprehensive triage report", status: "pending", priority: "high" }
-])
-```
+**AFTER Phase 1:** Update todo status.
 
 ---
 
-## PHASE 2: Parallel Issue Analysis (1 Issue = 1 Agent)
+# PHASE 2: PR Collection (For Bug Correlation)
 
-### 2.1 Agent Distribution Formula
-
-```
-Total issues: N
-Agent categories based on ratio:
-- unspecified-low: floor(N * 0.7)
-- quick: floor(N * 0.2)  
-- writing: ceil(N * 0.1)  # For report generation
+```bash
+./scripts/gh_fetch.py prs --hours 48 --output json
 ```
 
-### 2.2 Launch Background Agents
+**AFTER Phase 2:** Update todo, mark Phase 3 as in_progress.
 
-**MANDATORY: Each issue gets its own dedicated background agent.**
+---
 
-For each issue, launch:
+# PHASE 3: LAUNCH 1 BACKGROUND TASK PER ISSUE
+
+## THE 1-ISSUE-1-TASK PATTERN (MANDATORY)
+
+**CRITICAL: DO NOT BATCH MULTIPLE ISSUES INTO ONE TASK**
 
 ```typescript
-delegate_task(
-  category="unspecified-low",  // or quick/writing per ratio
-  load_skills=[],
-  run_in_background=true,
-  prompt=`
+// Collection for tracking
+const taskMap = new Map()  // issueNumber -> taskId
+
+// Category ratio: unspecified-low : writing : quick = 1:2:1
+// Every 4 issues: 1 unspecified-low, 2 writing, 1 quick
+function getCategory(index, issue) {
+  const position = index % 4
+  if (position === 0) return "unspecified-low"  // 25%
+  if (position === 1 || position === 2) return "writing"  // 50%
+  return "quick"  // 25%
+}
+
+// Launch 1 background task per issue
+for (let i = 0; i < allIssues.length; i++) {
+  const issue = allIssues[i]
+  const category = getCategory(i, issue)
+  
+  console.log(`🚀 Launching background task for Issue #${issue.number} (${category})...`)
+  
+  const taskId = await delegate_task(
+    category=category,
+    load_skills=[],
+    run_in_background=true,  // ← BACKGROUND TASK: Each issue runs independently
+    prompt=`
 ## TASK
 Analyze GitHub issue #${issue.number} for ${REPO}.
 
@@ -411,221 +218,255 @@ ${issue.body}
 ## FETCH COMMENTS
 Use: gh issue view ${issue.number} --repo ${REPO} --json comments
 
+## PR CORRELATION (Check these for fixes)
+${PR_LIST.slice(0, 10).map(pr => `- PR #${pr.number}: ${pr.title}`).join('\n')}
+
 ## ANALYSIS CHECKLIST
-1. **TYPE**: Is this a BUG, QUESTION, FEATURE request, or INVALID?
-2. **PROJECT_VALID**: Is this issue relevant to OUR project? (YES/NO/UNCLEAR)
+1. **TYPE**: BUG | QUESTION | FEATURE | INVALID
+2. **PROJECT_VALID**: Is this relevant to OUR project? (YES/NO/UNCLEAR)
 3. **STATUS**: 
-   - RESOLVED: Already fixed (check for linked PRs, owner comments)
+   - RESOLVED: Already fixed
    - NEEDS_ACTION: Requires maintainer attention
-   - CAN_CLOSE: Can be closed (duplicate, out of scope, stale, answered)
-   - NEEDS_INFO: Missing reproduction steps or details
-4. **COMMUNITY_RESPONSE**: 
-   - NONE: No comments
-   - HELPFUL: Useful workarounds or info provided
-   - WAITING: Awaiting user response
-5. **LINKED_PR**: If bug, search PRs that might fix this issue
+   - CAN_CLOSE: Duplicate, out of scope, stale, answered
+   - NEEDS_INFO: Missing reproduction steps
+4. **COMMUNITY_RESPONSE**: NONE | HELPFUL | WAITING
+5. **LINKED_PR**: PR # that might fix this (or NONE)
+6. **CRITICAL**: Is this a blocking bug/security issue? (YES/NO)
 
-## PR CORRELATION
-Check these PRs for potential fixes:
-${PR_LIST}
-
-## RETURN FORMAT
+## RETURN FORMAT (STRICT)
 \`\`\`
-#${issue.number}: ${issue.title}
+ISSUE: #${issue.number}
+TITLE: ${issue.title}
 TYPE: [BUG|QUESTION|FEATURE|INVALID]
 VALID: [YES|NO|UNCLEAR]
 STATUS: [RESOLVED|NEEDS_ACTION|CAN_CLOSE|NEEDS_INFO]
 COMMUNITY: [NONE|HELPFUL|WAITING]
-LINKED_PR: [#NUMBER or NONE]
+LINKED_PR: [#NUMBER|NONE]
+CRITICAL: [YES|NO]
 SUMMARY: [1-2 sentence summary]
 ACTION: [Recommended maintainer action]
-DRAFT_RESPONSE: [If auto-answerable, provide English draft. Otherwise "NEEDS_MANUAL_REVIEW"]
+DRAFT_RESPONSE: [Template response if applicable, else "NEEDS_MANUAL_REVIEW"]
 \`\`\`
 `
-)
-```
-
-### 2.3 Collect All Results
-
-Wait for all background agents to complete, then collect:
-
-```typescript
-// Store all task IDs
-const taskIds: string[] = []
-
-// Launch all agents
-for (const issue of issues) {
-  const result = await delegate_task(...)
-  taskIds.push(result.task_id)
+  )
+  
+  // Store task ID for this issue
+  taskMap.set(issue.number, taskId)
 }
 
-// Collect results
+console.log(`\n✅ Launched ${taskMap.size} background tasks (1 per issue)`)
+```
+
+**AFTER Phase 3:** Update todo, mark Phase 4 as in_progress.
+
+---
+
+# PHASE 4: STREAM RESULTS AS EACH TASK COMPLETES
+
+## REAL-TIME STREAMING COLLECTION
+
+```typescript
 const results = []
-for (const taskId of taskIds) {
-  const output = await background_output(task_id=taskId)
-  results.push(output)
-}
-```
+const critical = []
+const closeImmediately = []
+const autoRespond = []
+const needsInvestigation = []
+const featureBacklog = []
+const needsInfo = []
 
-**AFTER Phase 2 Complete - Update Todo:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all issues with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 1b: Fetch all PRs for bug correlation", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 2: Launch parallel background agents (1 per issue)", status: "completed", priority: "high" },
-  { id: "4", content: "Phase 3: Collect all agent analysis results", status: "in_progress", priority: "high" },
-  { id: "5", content: "Phase 4: Generate comprehensive triage report", status: "pending", priority: "high" }
-])
+const completedIssues = new Set()
+const totalIssues = taskMap.size
+
+console.log(`\n📊 Streaming results for ${totalIssues} issues...`)
+
+// Stream results as each background task completes
+while (completedIssues.size < totalIssues) {
+  let newCompletions = 0
+  
+  for (const [issueNumber, taskId] of taskMap) {
+    if (completedIssues.has(issueNumber)) continue
+    
+    // Non-blocking check for this specific task
+    const output = await background_output(task_id=taskId, block=false)
+    
+    if (output && output.length > 0) {
+      // Parse the completed analysis
+      const analysis = parseAnalysis(output)
+      results.push(analysis)
+      completedIssues.add(issueNumber)
+      newCompletions++
+      
+      // REAL-TIME STREAMING REPORT
+      console.log(`\n🔄 Issue #${issueNumber}: ${analysis.TITLE.substring(0, 60)}...`)
+      
+      // Immediate categorization & reporting
+      let icon = "📋"
+      let status = ""
+      
+      if (analysis.CRITICAL === 'YES') {
+        critical.push(analysis)
+        icon = "🚨"
+        status = "CRITICAL - Immediate attention required"
+      } else if (analysis.STATUS === 'CAN_CLOSE') {
+        closeImmediately.push(analysis)
+        icon = "⚠️"
+        status = "Can be closed"
+      } else if (analysis.STATUS === 'RESOLVED') {
+        closeImmediately.push(analysis)
+        icon = "✅"
+        status = "Resolved - can close"
+      } else if (analysis.DRAFT_RESPONSE !== 'NEEDS_MANUAL_REVIEW') {
+        autoRespond.push(analysis)
+        icon = "💬"
+        status = "Auto-response available"
+      } else if (analysis.TYPE === 'FEATURE') {
+        featureBacklog.push(analysis)
+        icon = "💡"
+        status = "Feature request"
+      } else if (analysis.STATUS === 'NEEDS_INFO') {
+        needsInfo.push(analysis)
+        icon = "❓"
+        status = "Needs more info"
+      } else if (analysis.TYPE === 'BUG') {
+        needsInvestigation.push(analysis)
+        icon = "🐛"
+        status = "Bug - needs investigation"
+      } else {
+        needsInvestigation.push(analysis)
+        icon = "👀"
+        status = "Needs investigation"
+      }
+      
+      console.log(`   ${icon} ${status}`)
+      console.log(`   📊 Action: ${analysis.ACTION}`)
+      
+      // Progress update every 5 completions
+      if (completedIssues.size % 5 === 0) {
+        console.log(`\n📈 PROGRESS: ${completedIssues.size}/${totalIssues} issues analyzed`)
+        console.log(`   Critical: ${critical.length} | Close: ${closeImmediately.length} | Auto-Reply: ${autoRespond.length} | Investigate: ${needsInvestigation.length} | Features: ${featureBacklog.length} | Needs Info: ${needsInfo.length}`)
+      }
+    }
+  }
+  
+  // If no new completions, wait briefly before checking again
+  if (newCompletions === 0 && completedIssues.size < totalIssues) {
+    await new Promise(r => setTimeout(r, 2000))
+  }
+}
+
+console.log(`\n✅ All ${totalIssues} issues analyzed`)
 ```
 
 ---
 
-## PHASE 3: Report Generation
+# PHASE 5: FINAL COMPREHENSIVE REPORT
 
-### 3.1 Categorize Results
-
-Group analyzed issues by status:
-
-| Category | Criteria |
-|----------|----------|
-| **CRITICAL** | Blocking bugs, security issues, data loss |
-| **CLOSE_IMMEDIATELY** | Resolved, duplicate, out of scope, stale |
-| **AUTO_RESPOND** | Can answer with template (version update, docs link) |
-| **NEEDS_INVESTIGATION** | Requires manual debugging or design decision |
-| **FEATURE_BACKLOG** | Feature requests for prioritization |
-| **NEEDS_INFO** | Missing details, request more info |
-
-### 3.2 Generate Report
+**GENERATE THIS AT THE VERY END - AFTER ALL PROCESSING**
 
 ```markdown
-# Issue Triage Report
+# Issue Triage Report - ${REPO}
 
-**Repository:** ${REPO}
 **Time Range:** Last ${TIME_RANGE} hours
 **Generated:** ${new Date().toISOString()}
-**Total Issues Analyzed:** ${issues.length}
-
-## Summary
-
-| Category | Count |
-|----------|-------|
-| CRITICAL | N |
-| Close Immediately | N |
-| Auto-Respond | N |
-| Needs Investigation | N |
-| Feature Requests | N |
-| Needs Info | N |
+**Total Issues Analyzed:** ${results.length}
+**Processing Mode:** STREAMING (1 issue = 1 background task, real-time analysis)
 
 ---
 
-## 1. CRITICAL (Immediate Action Required)
+## 📊 Summary
 
-[List issues with full details]
-
-## 2. Close Immediately
-
-[List with closing reason and template response]
-
-## 3. Auto-Respond (Template Answers)
-
-[List with draft responses ready to post]
-
-## 4. Needs Investigation
-
-[List with investigation notes]
-
-## 5. Feature Backlog
-
-[List for prioritization]
-
-## 6. Needs More Info
-
-[List with template questions to ask]
+| Category | Count | Priority |
+|----------|-------|----------|
+| 🚨 CRITICAL | ${critical.length} | IMMEDIATE |
+| ⚠️ Close Immediately | ${closeImmediately.length} | Today |
+| 💬 Auto-Respond | ${autoRespond.length} | Today |
+| 🐛 Needs Investigation | ${needsInvestigation.length} | This Week |
+| 💡 Feature Backlog | ${featureBacklog.length} | Backlog |
+| ❓ Needs Info | ${needsInfo.length} | Awaiting User |
 
 ---
 
-## Response Templates
+## 🚨 CRITICAL (Immediate Action Required)
 
-### Fixed in Version X
-```
-This issue was resolved in vX.Y.Z via PR #NNN.
-Please update: \`bunx oh-my-opencode@X.Y.Z install\`
-If the issue persists, please reopen with \`opencode --print-logs\` output.
-```
+${critical.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 50)}... | ${i.TYPE} |`).join('\n')}
 
-### Needs More Info
-```
-Thank you for reporting. To investigate, please provide:
-1. \`opencode --print-logs\` output
-2. Your configuration file
-3. Minimal reproduction steps
-Labeling as \`needs-info\`. Auto-closes in 7 days without response.
-```
+**Action:** These require immediate maintainer attention.
 
-### Out of Scope
-```
-Thank you for reaching out. This request falls outside the scope of this project.
-[Suggest alternative or explanation]
-```
-```
+---
 
-**AFTER Phase 3 Complete - Final Todo Update:**
-```typescript
-todowrite([
-  { id: "1", content: "Phase 1: Fetch all issues with exhaustive pagination", status: "completed", priority: "high" },
-  { id: "2", content: "Phase 1b: Fetch all PRs for bug correlation", status: "completed", priority: "high" },
-  { id: "3", content: "Phase 2: Launch parallel background agents (1 per issue)", status: "completed", priority: "high" },
-  { id: "4", content: "Phase 3: Collect all agent analysis results", status: "completed", priority: "high" },
-  { id: "5", content: "Phase 4: Generate comprehensive triage report", status: "completed", priority: "high" }
-])
+## ⚠️ Close Immediately
+
+${closeImmediately.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 50)}... | ${i.STATUS} |`).join('\n')}
+
+---
+
+## 💬 Auto-Respond (Template Ready)
+
+${autoRespond.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 40)}... |`).join('\n')}
+
+**Draft Responses:**
+${autoRespond.map(i => `### #${i.ISSUE}\n${i.DRAFT_RESPONSE}\n`).join('\n---\n')}
+
+---
+
+## 🐛 Needs Investigation
+
+${needsInvestigation.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 50)}... | ${i.TYPE} |`).join('\n')}
+
+---
+
+## 💡 Feature Backlog
+
+${featureBacklog.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 50)}... |`).join('\n')}
+
+---
+
+## ❓ Needs More Info
+
+${needsInfo.map(i => `| #${i.ISSUE} | ${i.TITLE.substring(0, 50)}... |`).join('\n')}
+
+---
+
+## 🎯 Immediate Actions
+
+1. **CRITICAL:** ${critical.length} issues need immediate attention
+2. **CLOSE:** ${closeImmediately.length} issues can be closed now
+3. **REPLY:** ${autoRespond.length} issues have draft responses ready
+4. **INVESTIGATE:** ${needsInvestigation.length} bugs need debugging
+
+---
+
+## Processing Log
+
+${results.map((r, i) => `${i+1}. #${r.ISSUE}: ${r.TYPE} (${r.CRITICAL === 'YES' ? 'CRITICAL' : r.STATUS})`).join('\n')}
 ```
 
 ---
 
-## ANTI-PATTERNS (BLOCKING VIOLATIONS)
-
-## IF YOU DO ANY OF THESE, THE TRIAGE IS INVALID
+## CRITICAL ANTI-PATTERNS (BLOCKING VIOLATIONS)
 
 | Violation | Why It's Wrong | Severity |
 |-----------|----------------|----------|
-| **Using `--limit 100`** | Misses 80%+ of issues in active repos | CRITICAL |
-| **Stopping at first fetch** | GitHub paginates - you only got page 1 | CRITICAL |
-| **Not counting results** | Can't verify completeness | CRITICAL |
-| Batching issues (7 per agent) | Loses detail, harder to track | HIGH |
-| Sequential agent calls | Slow, doesn't leverage parallelism | HIGH |
-| Skipping PR correlation | Misses linked fixes for bugs | MEDIUM |
-| Generic responses | Each issue needs specific analysis | MEDIUM |
-
-## MANDATORY VERIFICATION BEFORE PHASE 2
-
-```
-CHECKLIST:
-[ ] Used --limit 500 (not 100)
-[ ] Used --state all (not just open)  
-[ ] Counted issues: _____ total
-[ ] Verified: if count < 500, all issues fetched
-[ ] If count = 500, fetched additional pages
-```
-
-**DO NOT PROCEED TO PHASE 2 UNTIL ALL BOXES ARE CHECKED.**
+| **Batch multiple issues in one task** | Violates 1 issue = 1 task rule | CRITICAL |
+| **Use `run_in_background=false`** | No parallelism, slower execution | CRITICAL |
+| **Collect all tasks, report at end** | Loses streaming benefit | CRITICAL |
+| **No `background_output()` polling** | Can't stream results | CRITICAL |
+| No progress updates | User doesn't know if stuck or working | HIGH |
 
 ---
 
 ## EXECUTION CHECKLIST
 
-- [ ] Created initial todo list before starting work
-- [ ] Fetched ALL pages of issues (pagination complete)
-- [ ] Updated todo after Phase 1 completion
-- [ ] Fetched ALL pages of PRs for correlation
-- [ ] Updated todo after Phase 1b completion
-- [ ] Launched 1 agent per issue (not batched)
-- [ ] Updated todo after Phase 2 completion
-- [ ] All agents ran in background (parallel)
-- [ ] Collected all results before generating report
-- [ ] Updated todo after Phase 3 completion
-- [ ] Report includes draft responses where applicable
-- [ ] Critical issues flagged at top
-- [ ] Final todo update - all phases completed
+- [ ] Created todos before starting
+- [ ] Fetched ALL issues with exhaustive pagination
+- [ ] Fetched PRs for correlation
+- [ ] **LAUNCHED**: 1 background task per issue (`run_in_background=true`)
+- [ ] **STREAMED**: Results via `background_output()` as each task completes
+- [ ] Showed live progress every 5 issues
+- [ ] Real-time categorization visible to user
+- [ ] Critical issues flagged immediately
+- [ ] **FINAL**: Comprehensive summary report at end
+- [ ] All todos marked complete
 
 ---
 
@@ -633,16 +474,16 @@ CHECKLIST:
 
 When invoked, immediately:
 
-1. **CREATE TODOS FIRST** - Use todowrite() to register all 5 phases
-2. `gh repo view --json nameWithOwner -q .nameWithOwner` (get current repo)
-3. Parse user's time range request (default: 48 hours)
+1. **CREATE TODOS**
+2. `gh repo view --json nameWithOwner -q .nameWithOwner`
+3. Parse time range (default: 48 hours)
 4. Exhaustive pagination for issues
-5. Update todo - Phase 1 complete
-6. Exhaustive pagination for PRs
-7. Update todo - Phase 1b complete
-8. Launch N background agents (1 per issue)
-9. Update todo - Phase 2 complete
-10. Collect all results
-11. Update todo - Phase 3 complete
-12. Generate categorized report with action items
-13. Final todo update - all phases completed
+5. Exhaustive pagination for PRs
+6. **LAUNCH**: For each issue:
+   - `delegate_task(run_in_background=true)` - 1 task per issue
+   - Store taskId mapped to issue number
+7. **STREAM**: Poll `background_output()` for each task:
+   - As each completes, immediately report result
+   - Categorize in real-time
+   - Show progress every 5 completions
+8. **GENERATE FINAL COMPREHENSIVE REPORT**
