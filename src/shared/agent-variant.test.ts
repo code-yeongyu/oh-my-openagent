@@ -83,6 +83,22 @@ describe("applyAgentVariant", () => {
 })
 
 describe("resolveVariantForModel", () => {
+  test("returns agent override variant when configured", () => {
+    // given
+    const config = {
+      agents: {
+        sisyphus: { variant: "high" },
+      },
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "github-copilot", modelID: "gpt-5.2" }
+
+    // when
+    const variant = resolveVariantForModel(config, "sisyphus", model)
+
+    // then
+    expect(variant).toBe("high")
+  })
+
   test("returns correct variant for anthropic provider", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
