@@ -20,7 +20,7 @@ body:
           required: true
         - label: I am using the latest version of oh-my-opencode
           required: true
-        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme)
+        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
           required: true
 
   - type: textarea
