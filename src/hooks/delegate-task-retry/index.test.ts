@@ -7,8 +7,8 @@ import {
 
 describe("sisyphus-task-retry", () => {
   describe("DELEGATE_TASK_ERROR_PATTERNS", () => {
-    // #given error patterns are defined
-    // #then should include all known delegate_task error types
+    // given error patterns are defined
+    // then should include all known delegate_task error types
     it("should contain all known error patterns", () => {
       expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
       
@@ -22,9 +22,9 @@ describe("sisyphus-task-retry", () => {
   })
 
   describe("detectDelegateTaskError", () => {
-    // #given tool output with run_in_background error
-    // #when detecting error
-    // #then should return matching error info
+    // given tool output with run_in_background error
+    // when detecting error
+    // then should return matching error info
     it("should detect run_in_background missing error", () => {
       const output = "[ERROR] Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation."
       
@@ -80,9 +80,9 @@ describe("sisyphus-task-retry", () => {
   })
 
   describe("buildRetryGuidance", () => {
-    // #given detected error
-    // #when building retry guidance
-    // #then should return actionable fix instructions
+    // given detected error
+    // when building retry guidance
+    // then should return actionable fix instructions
     it("should provide fix for missing run_in_background", () => {
       const errorInfo = { errorType: "missing_run_in_background", originalOutput: "" }
       

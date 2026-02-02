@@ -8,6 +8,9 @@
     "$schema": {
       "type": "string"
     },
+    "new_task_system_enabled": {
+      "type": "boolean"
+    },
     "disabled_mcps": {
       "type": "array",
       "items": {
@@ -21,6 +24,7 @@
         "type": "string",
         "enum": [
           "sisyphus",
+          "hephaestus",
           "prometheus",
           "oracle",
           "librarian",
@@ -80,7 +84,10 @@
           "prometheus-md-only",
           "sisyphus-junior-notepad",
           "start-work",
-          "atlas"
+          "atlas",
+          "unstable-agent-babysitter",
+          "stop-continuation-guard",
+          "tasks-todowrite-disabler"
         ]
       }
     },
@@ -92,6 +99,12 @@
           "init-deep",
           "start-work"
         ]
+      }
+    },
+    "disabled_tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
       }
     },
     "agents": {
@@ -440,6 +453,177 @@
           }
         },
         "sisyphus": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "prompt_append": {
+              "type": "string"
+            },
+            "tools": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "disable": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "subagent",
+                "primary",
+                "all"
+              ]
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "permission": {
+              "type": "object",
+              "properties": {
+                "edit": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "bash": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "ask",
+                          "allow",
+                          "deny"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "webfetch": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "doom_loop": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                "external_directory": {
+                  "type": "string",
+                  "enum": [
+                    "ask",
+                    "allow",
+                    "deny"
+                  ]
+                }
+              }
+            },
+            "maxTokens": {
+              "type": "number"
+            },
+            "thinking": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "enabled",
+                    "disabled"
+                  ]
+                },
+                "budgetTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "reasoningEffort": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            "textVerbosity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "providerOptions": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "hephaestus": {
           "type": "object",
           "properties": {
             "model": {
@@ -2747,6 +2931,15 @@
         }
       }
     },
+    "babysitting": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "default": 120000,
+          "type": "number"
+        }
+      }
+    },
     "git_master": {
       "type": "object",
       "properties": {
@@ -2816,10 +3009,6 @@
         "tasks": {
           "type": "object",
           "properties": {
-            "enabled": {
-              "default": false,
-              "type": "boolean"
-            },
             "storage_path": {
               "default": ".sisyphus/tasks",
               "type": "string"
@@ -2827,28 +3016,6 @@
             "claude_code_compat": {
               "default": false,
               "type": "boolean"
-            }
-          }
-        },
-        "swarm": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "default": false,
-              "type": "boolean"
-            },
-            "storage_path": {
-              "default": ".sisyphus/teams",
-              "type": "string"
-            },
-            "ui_mode": {
-              "default": "toast",
-              "type": "string",
-              "enum": [
-                "toast",
-                "tmux",
-                "both"
-              ]
             }
           }
         }

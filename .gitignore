@@ -33,4 +33,4 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
-.188e87dbff6e7fd9-00000000.bun-build
+*.bun-build

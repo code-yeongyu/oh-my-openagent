@@ -71,10 +71,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      const currentAgent = getSessionAgent(input.sessionID)
-      if (!currentAgent) {
-        updateSessionAgent(input.sessionID, "atlas")
-      }
+      updateSessionAgent(input.sessionID, "atlas") // Always switch: fixes #1298
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID

@@ -139,10 +139,22 @@ export async function spawnTmuxPane(
   }
 
   const title = `omo-subagent-${description.slice(0, 20)}`
-  spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
+  const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
-    stderr: "ignore",
+    stderr: "pipe",
   })
+  // Drain stderr immediately to avoid backpressure
+  const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
+  const titleExitCode = await titleProc.exited
+  if (titleExitCode !== 0) {
+    const titleStderr = await stderrPromise
+    log("[spawnTmuxPane] WARNING: failed to set pane title", {
+      paneId,
+      title,
+      exitCode: titleExitCode,
+      stderr: titleStderr.trim(),
+    })
+  }
 
   return { success: true, paneId }
 }
@@ -160,6 +172,17 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
     log("[closeTmuxPane] SKIP: tmux not found")
     return false
   }
+
+  // Send Ctrl+C to trigger graceful exit of opencode attach process
+  log("[closeTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
+  const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  await ctrlCProc.exited
+
+  // Brief delay for graceful shutdown
+  await new Promise((r) => setTimeout(r, 250))
 
   log("[closeTmuxPane] killing pane", { paneId })
   
@@ -202,6 +225,18 @@ export async function replaceTmuxPane(
     return { success: false }
   }
 
+  // Send Ctrl+C to trigger graceful exit of existing opencode attach process
+  // Note: No delay here - respawn-pane -k will handle any remaining process.
+  // We send Ctrl+C first to give the process a chance to exit gracefully,
+  // then immediately respawn. This prevents orphaned processes while avoiding
+  // the race condition where the pane closes before respawn-pane runs.
+  log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
+  const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  await ctrlCProc.exited
+
   const opencodeCmd = `opencode attach ${serverUrl} --session ${sessionId}`
 
   const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
@@ -217,10 +252,21 @@ export async function replaceTmuxPane(
   }
 
   const title = `omo-subagent-${description.slice(0, 20)}`
-  spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
+  const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
     stdout: "ignore",
-    stderr: "ignore",
+    stderr: "pipe",
   })
+  // Drain stderr immediately to avoid backpressure
+  const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
+  const titleExitCode = await titleProc.exited
+  if (titleExitCode !== 0) {
+    const titleStderr = await stderrPromise
+    log("[replaceTmuxPane] WARNING: failed to set pane title", {
+      paneId,
+      exitCode: titleExitCode,
+      stderr: titleStderr.trim(),
+    })
+  }
 
   log("[replaceTmuxPane] SUCCESS", { paneId, sessionId })
   return { success: true, paneId }

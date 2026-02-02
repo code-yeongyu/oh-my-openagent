@@ -3,11 +3,9 @@ import { CHECK_IDS, CHECK_NAMES } from "../constants"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const proc = Bun.spawn(["which", binary], { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    if (proc.exitCode === 0) {
-      return { exists: true, path: output.trim() }
+    const path = Bun.which(binary)
+    if (path) {
+      return { exists: true, path }
     }
   } catch {
     // intentionally empty - binary not found

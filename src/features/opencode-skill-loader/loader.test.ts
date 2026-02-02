@@ -28,7 +28,7 @@ describe("skill loader MCP parsing", () => {
 
   describe("parseSkillMcpConfig", () => {
     it("parses skill with nested MCP config", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: test-skill
 description: A test skill with MCP
@@ -47,7 +47,7 @@ This is the skill body.
 `
       createTestSkill("test-mcp-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -56,7 +56,7 @@ This is the skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "test-skill")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.mcpConfig).toBeDefined()
         expect(skill?.mcpConfig?.sqlite).toBeDefined()
@@ -74,7 +74,7 @@ This is the skill body.
     })
 
     it("returns undefined mcpConfig for skill without MCP", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: simple-skill
 description: A simple skill without MCP
@@ -83,7 +83,7 @@ This is a simple skill.
 `
       createTestSkill("simple-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -92,7 +92,7 @@ This is a simple skill.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "simple-skill")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.mcpConfig).toBeUndefined()
       } finally {
@@ -101,7 +101,7 @@ This is a simple skill.
     })
 
     it("preserves env var placeholders without expansion", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: env-skill
 mcp:
@@ -116,7 +116,7 @@ Skill with env vars.
 `
       createTestSkill("env-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -125,7 +125,7 @@ Skill with env vars.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "env-skill")
 
-        // #then
+        // then
         expect(skill?.mcpConfig?.["api-server"]?.env?.API_KEY).toBe("${API_KEY}")
         expect(skill?.mcpConfig?.["api-server"]?.env?.DB_PATH).toBe("${HOME}/data.db")
       } finally {
@@ -134,7 +134,7 @@ Skill with env vars.
     })
 
     it("handles malformed YAML gracefully", async () => {
-      // #given - malformed YAML causes entire frontmatter to fail parsing
+      // given - malformed YAML causes entire frontmatter to fail parsing
       const skillContent = `---
 name: bad-yaml
 mcp: [this is not valid yaml for mcp
@@ -143,14 +143,14 @@ Skill body.
 `
       createTestSkill("bad-yaml-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        // #then - when YAML fails, skill uses directory name as fallback
+        // then - when YAML fails, skill uses directory name as fallback
         const skill = skills.find(s => s.name === "bad-yaml-skill")
 
         expect(skill).toBeDefined()
@@ -163,7 +163,7 @@ Skill body.
 
   describe("mcp.json file loading (AmpCode compat)", () => {
     it("loads MCP config from mcp.json with mcpServers format", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: ampcode-skill
 description: Skill with mcp.json
@@ -180,7 +180,7 @@ Skill body.
       }
       createTestSkill("ampcode-skill", skillContent, mcpJson)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -189,7 +189,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "ampcode-skill")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.mcpConfig).toBeDefined()
         expect(skill?.mcpConfig?.playwright).toBeDefined()
@@ -201,7 +201,7 @@ Skill body.
     })
 
     it("mcp.json takes priority over YAML frontmatter", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: priority-skill
 mcp:
@@ -221,7 +221,7 @@ Skill body.
       }
       createTestSkill("priority-skill", skillContent, mcpJson)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -230,7 +230,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "priority-skill")
 
-        // #then - mcp.json should take priority
+        // then - mcp.json should take priority
         expect(skill?.mcpConfig?.["from-json"]).toBeDefined()
         expect(skill?.mcpConfig?.["from-yaml"]).toBeUndefined()
       } finally {
@@ -239,7 +239,7 @@ Skill body.
     })
 
     it("supports direct format without mcpServers wrapper", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: direct-format
 ---
@@ -253,7 +253,7 @@ Skill body.
       }
       createTestSkill("direct-format", skillContent, mcpJson)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -262,7 +262,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "direct-format")
 
-        // #then
+        // then
         expect(skill?.mcpConfig?.sqlite).toBeDefined()
         expect(skill?.mcpConfig?.sqlite?.command).toBe("uvx")
       } finally {
@@ -273,7 +273,7 @@ Skill body.
 
   describe("allowed-tools parsing", () => {
     it("parses space-separated allowed-tools string", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: space-separated-tools
 description: Skill with space-separated allowed-tools
@@ -283,7 +283,7 @@ Skill body.
 `
       createTestSkill("space-separated-tools", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -292,7 +292,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "space-separated-tools")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
       } finally {
@@ -301,7 +301,7 @@ Skill body.
     })
 
     it("parses YAML inline array allowed-tools", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: yaml-inline-array
 description: Skill with YAML inline array allowed-tools
@@ -311,7 +311,7 @@ Skill body.
 `
       createTestSkill("yaml-inline-array", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -320,7 +320,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "yaml-inline-array")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
       } finally {
@@ -329,7 +329,7 @@ Skill body.
     })
 
     it("parses YAML multi-line array allowed-tools", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: yaml-multiline-array
 description: Skill with YAML multi-line array allowed-tools
@@ -343,7 +343,7 @@ Skill body.
 `
       createTestSkill("yaml-multiline-array", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -352,7 +352,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "yaml-multiline-array")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.allowedTools).toEqual(["Read", "Write", "Edit", "Bash"])
       } finally {
@@ -361,7 +361,7 @@ Skill body.
     })
 
     it("returns undefined for skill without allowed-tools", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: no-allowed-tools
 description: Skill without allowed-tools field
@@ -370,7 +370,7 @@ Skill body.
 `
       createTestSkill("no-allowed-tools", skillContent)
 
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
@@ -379,7 +379,7 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
         const skill = skills.find(s => s.name === "no-allowed-tools")
 
-        // #then
+        // then
         expect(skill).toBeDefined()
         expect(skill?.allowedTools).toBeUndefined()
       } finally {

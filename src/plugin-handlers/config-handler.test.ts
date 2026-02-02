@@ -106,8 +106,47 @@ afterEach(() => {
 })
 
 describe("Plan agent demote behavior", () => {
-  test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
+  test("orders core agents as sisyphus -> hephaestus -> prometheus -> atlas", async () => {
     // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const keys = Object.keys(config.agent as Record<string, unknown>)
+    const coreAgents = ["sisyphus", "hephaestus", "prometheus", "atlas"]
+    const ordered = keys.filter((key) => coreAgents.includes(key))
+    expect(ordered).toEqual(coreAgents)
+  })
+
+  test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -133,10 +172,10 @@ describe("Plan agent demote behavior", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then
+    // then
     const agents = config.agent as Record<string, { mode?: string; name?: string }>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
@@ -144,7 +183,7 @@ describe("Plan agent demote behavior", () => {
   })
 
   test("prometheus should have mode 'all' to be callable via delegate_task", async () => {
-    // #given
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -163,44 +202,79 @@ describe("Plan agent demote behavior", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then
+    // then
     const agents = config.agent as Record<string, { mode?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.mode).toBe("all")
   })
 })
 
-describe("Prometheus category config resolution", () => {
-  test("resolves ultrabrain category config", () => {
+describe("Agent permission defaults", () => {
+  test("hephaestus should allow delegate_task", async () => {
     // #given
-    const categoryName = "ultrabrain"
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
 
     // #when
-    const config = resolveCategoryConfig(categoryName)
+    await handler(config)
 
     // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.hephaestus).toBeDefined()
+    expect(agentConfig.hephaestus.permission?.delegate_task).toBe("allow")
+  })
+})
+
+describe("Prometheus category config resolution", () => {
+  test("resolves ultrabrain category config", () => {
+    // given
+    const categoryName = "ultrabrain"
+
+    // when
+    const config = resolveCategoryConfig(categoryName)
+
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("openai/gpt-5.2-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
   test("resolves visual-engineering category config", () => {
-    // #given
+    // given
     const categoryName = "visual-engineering"
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("google/gemini-3-pro")
   })
 
   test("user categories override default categories", () => {
-    // #given
+    // given
     const categoryName = "ultrabrain"
     const userCategories: Record<string, CategoryConfig> = {
       ultrabrain: {
@@ -209,28 +283,28 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("google/antigravity-claude-opus-4-5-thinking")
     expect(config?.temperature).toBe(0.1)
   })
 
   test("returns undefined for unknown category", () => {
-    // #given
+    // given
     const categoryName = "nonexistent-category"
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName)
 
-    // #then
+    // then
     expect(config).toBeUndefined()
   })
 
   test("falls back to default when user category has no entry", () => {
-    // #given
+    // given
     const categoryName = "ultrabrain"
     const userCategories: Record<string, CategoryConfig> = {
       "visual-engineering": {
@@ -238,17 +312,17 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then - falls back to DEFAULT_CATEGORIES
+    // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
     expect(config?.model).toBe("openai/gpt-5.2-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
   test("preserves all category properties (temperature, top_p, tools, etc.)", () => {
-    // #given
+    // given
     const categoryName = "custom-category"
     const userCategories: Record<string, CategoryConfig> = {
       "custom-category": {
@@ -260,10 +334,10 @@ describe("Prometheus category config resolution", () => {
       },
     }
 
-    // #when
+    // when
     const config = resolveCategoryConfig(categoryName, userCategories)
 
-    // #then
+    // then
     expect(config).toBeDefined()
     expect(config?.model).toBe("test/model")
     expect(config?.temperature).toBe(0.5)
@@ -275,7 +349,7 @@ describe("Prometheus category config resolution", () => {
 
 describe("Prometheus direct override priority over category", () => {
   test("direct reasoningEffort takes priority over category reasoningEffort", async () => {
-    // #given - category has reasoningEffort=xhigh, direct override says "low"
+    // given - category has reasoningEffort=xhigh, direct override says "low"
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -306,17 +380,17 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - direct override's reasoningEffort wins
+    // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.reasoningEffort).toBe("low")
   })
 
   test("category reasoningEffort applied when no direct override", async () => {
-    // #given - category has reasoningEffort but no direct override
+    // given - category has reasoningEffort but no direct override
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -346,17 +420,17 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - category's reasoningEffort is applied
+    // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.reasoningEffort).toBe("high")
   })
 
   test("direct temperature takes priority over category temperature", async () => {
-    // #given
+    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -387,12 +461,92 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
 
-    // #when
+    // when
     await handler(config)
 
-    // #then - direct temperature wins over category
+    // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
     expect(agents.prometheus).toBeDefined()
     expect(agents.prometheus.temperature).toBe(0.1)
+  })
+
+  test("prometheus prompt_append is appended to base prompt", async () => {
+    // #given - prometheus override with prompt_append
+    const customInstructions = "## Custom Project Rules\nUse max 2 commits."
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+      agents: {
+        prometheus: {
+          prompt_append: customInstructions,
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - prompt_append is appended to base prompt, not overwriting it
+    const agents = config.agent as Record<string, { prompt?: string }>
+    expect(agents.prometheus).toBeDefined()
+    expect(agents.prometheus.prompt).toContain("Prometheus")
+    expect(agents.prometheus.prompt).toContain(customInstructions)
+    expect(agents.prometheus.prompt!.endsWith(customInstructions)).toBe(true)
+  })
+})
+
+describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
+  test("fetchAvailableModels should be called with undefined client to prevent deadlock during plugin init", async () => {
+    // given - This test ensures we don't regress on issue #1301
+    // Passing client to fetchAvailableModels during config handler causes deadlock:
+    // - Plugin init waits for server response (client.provider.list())
+    // - Server waits for plugin init to complete before handling requests
+    const fetchSpy = spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set<string>())
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {},
+    }
+    const mockClient = {
+      provider: { list: () => Promise.resolve({ data: { connected: [] } }) },
+      model: { list: () => Promise.resolve({ data: [] }) },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp", client: mockClient },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then - fetchAvailableModels must be called with undefined as first argument (no client)
+    // This prevents the deadlock described in issue #1301
+    expect(fetchSpy).toHaveBeenCalled()
+    const firstCallArgs = fetchSpy.mock.calls[0]
+    expect(firstCallArgs[0]).toBeUndefined()
+
+    fetchSpy.mockRestore?.()
   })
 })

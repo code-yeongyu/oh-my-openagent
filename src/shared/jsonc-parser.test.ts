@@ -5,46 +5,46 @@ import { join } from "node:path"
 
 describe("parseJsonc", () => {
   test("parses plain JSON", () => {
-    //#given
+    // given
     const json = `{"key": "value"}`
 
-    //#when
+    // when
     const result = parseJsonc<{ key: string }>(json)
 
-    //#then
+    // then
     expect(result.key).toBe("value")
   })
 
   test("parses JSONC with line comments", () => {
-    //#given
+    // given
     const jsonc = `{
       // This is a comment
       "key": "value"
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ key: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.key).toBe("value")
   })
 
   test("parses JSONC with block comments", () => {
-    //#given
+    // given
     const jsonc = `{
       /* Block comment */
       "key": "value"
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ key: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.key).toBe("value")
   })
 
   test("parses JSONC with multi-line block comments", () => {
-    //#given
+    // given
     const jsonc = `{
       /* Multi-line
          comment
@@ -52,56 +52,56 @@ describe("parseJsonc", () => {
       "key": "value"
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ key: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.key).toBe("value")
   })
 
   test("parses JSONC with trailing commas", () => {
-    //#given
+    // given
     const jsonc = `{
       "key1": "value1",
       "key2": "value2",
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ key1: string; key2: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.key1).toBe("value1")
     expect(result.key2).toBe("value2")
   })
 
   test("parses JSONC with trailing comma in array", () => {
-    //#given
+    // given
     const jsonc = `{
       "arr": [1, 2, 3,]
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ arr: number[] }>(jsonc)
 
-    //#then
+    // then
     expect(result.arr).toEqual([1, 2, 3])
   })
 
   test("preserves URLs with // in strings", () => {
-    //#given
+    // given
     const jsonc = `{
       "url": "https://example.com"
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{ url: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.url).toBe("https://example.com")
   })
 
   test("parses complex JSONC config", () => {
-    //#given
+    // given
     const jsonc = `{
       // This is an example config
       "agents": {
@@ -111,58 +111,58 @@ describe("parseJsonc", () => {
       "disabled_agents": [],
     }`
 
-    //#when
+    // when
     const result = parseJsonc<{
       agents: { oracle: { model: string } }
       disabled_agents: string[]
     }>(jsonc)
 
-    //#then
+    // then
     expect(result.agents.oracle.model).toBe("openai/gpt-5.2")
     expect(result.disabled_agents).toEqual([])
   })
 
   test("throws on invalid JSON", () => {
-    //#given
+    // given
     const invalid = `{ "key": invalid }`
 
-    //#when
-    //#then
+    // when
+    // then
     expect(() => parseJsonc(invalid)).toThrow()
   })
 
   test("throws on unclosed string", () => {
-    //#given
+    // given
     const invalid = `{ "key": "unclosed }`
 
-    //#when
-    //#then
+    // when
+    // then
     expect(() => parseJsonc(invalid)).toThrow()
   })
 })
 
 describe("parseJsoncSafe", () => {
   test("returns data on valid JSONC", () => {
-    //#given
+    // given
     const jsonc = `{ "key": "value" }`
 
-    //#when
+    // when
     const result = parseJsoncSafe<{ key: string }>(jsonc)
 
-    //#then
+    // then
     expect(result.data).not.toBeNull()
     expect(result.data?.key).toBe("value")
     expect(result.errors).toHaveLength(0)
   })
 
   test("returns errors on invalid JSONC", () => {
-    //#given
+    // given
     const invalid = `{ "key": invalid }`
 
-    //#when
+    // when
     const result = parseJsoncSafe(invalid)
 
-    //#then
+    // then
     expect(result.data).toBeNull()
     expect(result.errors.length).toBeGreaterThan(0)
   })
@@ -173,7 +173,7 @@ describe("readJsoncFile", () => {
   const testFile = join(testDir, "config.jsonc")
 
   test("reads and parses valid JSONC file", () => {
-    //#given
+    // given
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     const content = `{
       // Comment
@@ -181,10 +181,10 @@ describe("readJsoncFile", () => {
     }`
     writeFileSync(testFile, content)
 
-    //#when
+    // when
     const result = readJsoncFile<{ test: string }>(testFile)
 
-    //#then
+    // then
     expect(result).not.toBeNull()
     expect(result?.test).toBe("value")
 
@@ -192,25 +192,25 @@ describe("readJsoncFile", () => {
   })
 
   test("returns null for non-existent file", () => {
-    //#given
+    // given
     const nonExistent = join(testDir, "does-not-exist.jsonc")
 
-    //#when
+    // when
     const result = readJsoncFile(nonExistent)
 
-    //#then
+    // then
     expect(result).toBeNull()
   })
 
   test("returns null for malformed JSON", () => {
-    //#given
+    // given
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     writeFileSync(testFile, "{ invalid }")
 
-    //#when
+    // when
     const result = readJsoncFile(testFile)
 
-    //#then
+    // then
     expect(result).toBeNull()
 
     rmSync(testDir, { recursive: true, force: true })
@@ -221,16 +221,16 @@ describe("detectConfigFile", () => {
   const testDir = join(__dirname, ".test-detect")
 
   test("prefers .jsonc over .json", () => {
-    //#given
+    // given
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     const basePath = join(testDir, "config")
     writeFileSync(`${basePath}.json`, "{}")
     writeFileSync(`${basePath}.jsonc`, "{}")
 
-    //#when
+    // when
     const result = detectConfigFile(basePath)
 
-    //#then
+    // then
     expect(result.format).toBe("jsonc")
     expect(result.path).toBe(`${basePath}.jsonc`)
 
@@ -238,15 +238,15 @@ describe("detectConfigFile", () => {
   })
 
   test("detects .json when .jsonc doesn't exist", () => {
-    //#given
+    // given
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     const basePath = join(testDir, "config")
     writeFileSync(`${basePath}.json`, "{}")
 
-    //#when
+    // when
     const result = detectConfigFile(basePath)
 
-    //#then
+    // then
     expect(result.format).toBe("json")
     expect(result.path).toBe(`${basePath}.json`)
 
@@ -254,13 +254,13 @@ describe("detectConfigFile", () => {
   })
 
   test("returns none when neither exists", () => {
-    //#given
+    // given
     const basePath = join(testDir, "nonexistent")
 
-    //#when
+    // when
     const result = detectConfigFile(basePath)
 
-    //#then
+    // then
     expect(result.format).toBe("none")
   })
 })

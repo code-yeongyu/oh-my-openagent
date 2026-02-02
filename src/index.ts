@@ -12,8 +12,6 @@ import {
   createThinkModeHook,
   createClaudeCodeHooksHook,
   createAnthropicContextWindowLimitRecoveryHook,
-
-  createCompactionContextInjector,
   createRulesInjectorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
@@ -35,6 +33,9 @@ import {
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
+  createStopContinuationGuardHook,
+  createCompactionContextInjector,
+  createUnstableAgentBabysitterHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -72,15 +73,17 @@ import {
   interactive_bash,
   startTmuxCheck,
   lspManager,
+  createTask,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
+import { clearBoulderState } from "./features/boulder-state";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, includesCaseInsensitive, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
-import { createModelCacheState, getModelLimit } from "./plugin-state";
+import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -118,7 +121,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     
     if (externalNotifier.detected && !forceEnable) {
       // External notification plugin detected - skip our notification to avoid conflicts
-      console.warn(getNotificationConflictWarning(externalNotifier.pluginName!));
+      log(getNotificationConflictWarning(externalNotifier.pluginName!));
       log("session-notification disabled due to external notifier conflict", {
         detected: externalNotifier.pluginName,
         allPlugins: externalNotifier.allPlugins,
@@ -174,9 +177,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         experimental: pluginConfig.experimental,
       })
     : null;
-  const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? createCompactionContextInjector()
-    : undefined;
   const rulesInjector = isHookEnabled("rules-injector")
     ? createRulesInjectorHook(ctx)
     : null;
@@ -277,9 +277,48 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   initTaskToastManager(ctx.client);
 
-  const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? createTodoContinuationEnforcer(ctx, { backgroundManager })
+  const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
+    ? createStopContinuationGuardHook(ctx)
     : null;
+
+  const compactionContextInjector = isHookEnabled("compaction-context-injector")
+    ? createCompactionContextInjector()
+    : null;
+
+  const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
+    ? createTodoContinuationEnforcer(ctx, {
+        backgroundManager,
+        isContinuationStopped: stopContinuationGuard?.isStopped,
+      })
+    : null;
+
+  const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
+    ? createUnstableAgentBabysitterHook(
+          {
+            directory: ctx.directory,
+            client: {
+              session: {
+                messages: async (args) => {
+                  const result = await ctx.client.session.messages(args)
+                  if (Array.isArray(result)) return result
+                  if (typeof result === "object" && result !== null && "data" in result) {
+                    const record = result as Record<string, unknown>
+                    return { data: record.data }
+                  }
+                  return []
+                },
+                prompt: async (args) => {
+                  await ctx.client.session.prompt(args)
+                },
+              },
+            },
+          },
+          {
+            backgroundManager,
+            config: pluginConfig.babysitting,
+          }
+        )
+      : null;
 
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
@@ -294,9 +333,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
-  const isMultimodalLookerEnabled = !includesCaseInsensitive(
-    pluginConfig.disabled_agents ?? [],
-    "multimodal-looker"
+  const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
+    (agent) => agent.toLowerCase() === "multimodal-looker"
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
   const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
@@ -382,6 +420,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     modelCacheState,
   });
 
+  const newTaskSystemEnabled = pluginConfig.new_task_system_enabled ?? false;
+  const taskTool = newTaskSystemEnabled ? createTask(pluginConfig) : null;
+
   return {
     tool: {
       ...builtinTools,
@@ -393,6 +434,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,
       interactive_bash,
+      ...(taskTool ? { task: taskTool } : {}),
     },
 
     "chat.message": async (input, output) => {
@@ -420,6 +462,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       }
 
+      await stopContinuationGuard?.["chat.message"]?.(input);
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
@@ -511,6 +554,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await backgroundNotificationHook?.event(input);
       await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
+      await unstableAgentBabysitter?.event(input);
       await contextWindowMonitor?.event(input);
       await directoryAgentsInjector?.event(input);
       await directoryReadmeInjector?.event(input);
@@ -521,6 +565,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await stopContinuationGuard?.event(input);
       await atlasHook?.handler(input);
 
       const { event } = input;
@@ -581,7 +626,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           const recovered =
             await sessionRecovery.handleSessionRecovery(messageInfo);
 
-          if (recovered && sessionID && sessionID === getMainSessionID()) {
+          if (
+            recovered &&
+            sessionID &&
+            sessionID === getMainSessionID() &&
+            !stopContinuationGuard?.isStopped(sessionID)
+          ) {
             await ctx.client.session
               .prompt({
                 path: { id: sessionID },
@@ -610,9 +660,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
         const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = includesCaseInsensitive(
-          ["explore", "librarian"],
-          subagentType ?? ""
+        const isExploreOrLibrarian = ["explore", "librarian"].some(
+          (name) => name.toLowerCase() === (subagentType ?? "").toLowerCase()
         );
 
         args.tools = {
@@ -664,13 +713,27 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
            );
 
            ralphLoop.startLoop(sessionID, prompt, {
-             ultrawork: true,
-             maxIterations: maxIterMatch
-               ? parseInt(maxIterMatch[1], 10)
-               : undefined,
-             completionPromise: promiseMatch?.[1],
-           });
+              ultrawork: true,
+              maxIterations: maxIterMatch
+                ? parseInt(maxIterMatch[1], 10)
+                : undefined,
+              completionPromise: promiseMatch?.[1],
+            });
          }
+      }
+
+      if (input.tool === "slashcommand") {
+        const args = output.args as { command?: string } | undefined;
+        const command = args?.command?.replace(/^\//, "").toLowerCase();
+        const sessionID = input.sessionID || getMainSessionID();
+
+        if (command === "stop-continuation" && sessionID) {
+          stopContinuationGuard?.stop(sessionID);
+          todoContinuationEnforcer?.cancelAllCountdowns();
+          ralphLoop?.cancelLoop(sessionID);
+          clearBoulderState(ctx.directory);
+          log("[stop-continuation] All continuation mechanisms stopped", { sessionID });
+        }
       }
     },
 
@@ -694,6 +757,19 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);
         await atlasHook?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
+    },
+
+    "experimental.session.compacting": async (input: { sessionID: string }) => {
+      if (!compactionContextInjector) {
+        return;
+      }
+      await compactionContextInjector({
+        sessionID: input.sessionID,
+        providerID: "anthropic",
+        modelID: "claude-opus-4-5",
+        usageRatio: 0.8,
+        directory: ctx.directory,
+      });
     },
   };
 };
