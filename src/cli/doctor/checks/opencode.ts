@@ -1,7 +1,44 @@
+import { existsSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
 import type { CheckResult, CheckDefinition, OpenCodeInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, MIN_OPENCODE_VERSION, OPENCODE_BINARIES } from "../constants"
 
 const WINDOWS_EXECUTABLE_EXTS = [".exe", ".cmd", ".bat", ".ps1"]
+
+export function getDesktopAppPaths(platform: NodeJS.Platform): string[] {
+  const home = homedir()
+
+  switch (platform) {
+    case "darwin":
+      return [
+        "/Applications/OpenCode.app/Contents/MacOS/OpenCode",
+        join(home, "Applications", "OpenCode.app", "Contents", "MacOS", "OpenCode"),
+      ]
+    case "win32": {
+      const programFiles = process.env.ProgramFiles
+      const localAppData = process.env.LOCALAPPDATA
+
+      const paths: string[] = []
+      if (programFiles) {
+        paths.push(join(programFiles, "OpenCode", "OpenCode.exe"))
+      }
+      if (localAppData) {
+        paths.push(join(localAppData, "OpenCode", "OpenCode.exe"))
+      }
+      return paths
+    }
+    case "linux":
+      return [
+        "/usr/bin/opencode",
+        "/usr/lib/opencode/opencode",
+        join(home, "Applications", "opencode-desktop-linux-x86_64.AppImage"),
+        join(home, "Applications", "opencode-desktop-linux-aarch64.AppImage"),
+      ]
+    default:
+      return []
+  }
+}
 
 export function getBinaryLookupCommand(platform: NodeJS.Platform): "which" | "where" {
   return platform === "win32" ? "where" : "which"
@@ -52,24 +89,36 @@ export function buildVersionCommand(
   return [binaryPath, "--version"]
 }
 
+export function findDesktopBinary(
+  platform: NodeJS.Platform = process.platform,
+  checkExists: (path: string) => boolean = existsSync
+): { binary: string; path: string } | null {
+  const desktopPaths = getDesktopAppPaths(platform)
+  for (const desktopPath of desktopPaths) {
+    if (checkExists(desktopPath)) {
+      return { binary: "opencode", path: desktopPath }
+    }
+  }
+  return null
+}
+
 export async function findOpenCodeBinary(): Promise<{ binary: string; path: string } | null> {
   for (const binary of OPENCODE_BINARIES) {
     try {
-      const lookupCommand = getBinaryLookupCommand(process.platform)
-      const proc = Bun.spawn([lookupCommand, binary], { stdout: "pipe", stderr: "pipe" })
-      const output = await new Response(proc.stdout).text()
-      await proc.exited
-      if (proc.exitCode === 0) {
-        const paths = parseBinaryPaths(output)
-        const selectedPath = selectBinaryPath(paths, process.platform)
-        if (selectedPath) {
-          return { binary, path: selectedPath }
-        }
+      const path = Bun.which(binary)
+      if (path) {
+        return { binary, path }
       }
     } catch {
       continue
     }
   }
+
+  const desktopResult = findDesktopBinary()
+  if (desktopResult) {
+    return desktopResult
+  }
+
   return null
 }
 

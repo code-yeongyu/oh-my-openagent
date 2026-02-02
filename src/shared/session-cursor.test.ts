@@ -13,54 +13,54 @@ describe("consumeNewMessages", () => {
   })
 
   it("returns all messages on first read and none on repeat", () => {
-    // #given
+    // given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
 
-    // #when
+    // when
     const first = consumeNewMessages(sessionID, messages)
     const second = consumeNewMessages(sessionID, messages)
 
-    // #then
+    // then
     expect(first).toEqual(messages)
     expect(second).toEqual([])
   })
 
   it("returns only new messages after cursor advances", () => {
-    // #given
+    // given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
     consumeNewMessages(sessionID, messages)
     const extended = [...messages, buildMessage("m3", 3)]
 
-    // #when
+    // when
     const next = consumeNewMessages(sessionID, extended)
 
-    // #then
+    // then
     expect(next).toEqual([extended[2]])
   })
 
   it("resets when message history shrinks", () => {
-    // #given
+    // given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
     consumeNewMessages(sessionID, messages)
     const shorter = [buildMessage("n1", 1)]
 
-    // #when
+    // when
     const next = consumeNewMessages(sessionID, shorter)
 
-    // #then
+    // then
     expect(next).toEqual(shorter)
   })
 
   it("returns all messages when last key is missing", () => {
-    // #given
+    // given
     const messages = [buildMessage("m1", 1), buildMessage("m2", 2)]
     consumeNewMessages(sessionID, messages)
     const replaced = [buildMessage("n1", 1), buildMessage("n2", 2)]
 
-    // #when
+    // when
     const next = consumeNewMessages(sessionID, replaced)
 
-    // #then
+    // then
     expect(next).toEqual(replaced)
   })
 })

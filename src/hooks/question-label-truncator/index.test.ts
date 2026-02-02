@@ -6,7 +6,7 @@ describe("createQuestionLabelTruncatorHook", () => {
 
   describe("tool.execute.before", () => {
     it("truncates labels exceeding 30 characters with ellipsis", async () => {
-      // #given
+      // given
       const longLabel = "This is a very long label that exceeds thirty characters";
       const input = { tool: "AskUserQuestion" };
       const output = {
@@ -22,10 +22,10 @@ describe("createQuestionLabelTruncatorHook", () => {
         },
       };
 
-      // #when
+      // when
       await hook["tool.execute.before"]?.(input as any, output as any);
 
-      // #then
+      // then
       const truncatedLabel = (output.args as any).questions[0].options[0].label;
       expect(truncatedLabel.length).toBeLessThanOrEqual(30);
       expect(truncatedLabel).toBe("This is a very long label t...");
@@ -33,7 +33,7 @@ describe("createQuestionLabelTruncatorHook", () => {
     });
 
     it("preserves labels within 30 characters", async () => {
-      // #given
+      // given
       const shortLabel = "Short label";
       const input = { tool: "AskUserQuestion" };
       const output = {
@@ -49,16 +49,16 @@ describe("createQuestionLabelTruncatorHook", () => {
         },
       };
 
-      // #when
+      // when
       await hook["tool.execute.before"]?.(input as any, output as any);
 
-      // #then
+      // then
       const resultLabel = (output.args as any).questions[0].options[0].label;
       expect(resultLabel).toBe(shortLabel);
     });
 
     it("handles exactly 30 character labels without truncation", async () => {
-      // #given
+      // given
       const exactLabel = "Exactly thirty chars here!!!!!"; // 30 chars
       expect(exactLabel.length).toBe(30);
       const input = { tool: "ask_user_question" };
@@ -73,31 +73,31 @@ describe("createQuestionLabelTruncatorHook", () => {
         },
       };
 
-      // #when
+      // when
       await hook["tool.execute.before"]?.(input as any, output as any);
 
-      // #then
+      // then
       const resultLabel = (output.args as any).questions[0].options[0].label;
       expect(resultLabel).toBe(exactLabel);
     });
 
     it("ignores non-AskUserQuestion tools", async () => {
-      // #given
+      // given
       const input = { tool: "Bash" };
       const output = {
         args: { command: "echo hello" },
       };
       const originalArgs = { ...output.args };
 
-      // #when
+      // when
       await hook["tool.execute.before"]?.(input as any, output as any);
 
-      // #then
+      // then
       expect(output.args).toEqual(originalArgs);
     });
 
     it("handles multiple questions with multiple options", async () => {
-      // #given
+      // given
       const input = { tool: "AskUserQuestion" };
       const output = {
         args: {
@@ -119,10 +119,10 @@ describe("createQuestionLabelTruncatorHook", () => {
         },
       };
 
-      // #when
+      // when
       await hook["tool.execute.before"]?.(input as any, output as any);
 
-      // #then
+      // then
       const q1opts = (output.args as any).questions[0].options;
       const q2opts = (output.args as any).questions[1].options;
       

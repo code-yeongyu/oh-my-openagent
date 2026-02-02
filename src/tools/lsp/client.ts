@@ -11,6 +11,38 @@ import {
 } from "vscode-jsonrpc/node"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
+import { log } from "../../shared/logger"
+
+/**
+ * Check if the current Bun version is affected by Windows LSP crash bug.
+ * Bun v1.3.5 and earlier have a known segmentation fault issue on Windows
+ * when spawning LSP servers. This was fixed in Bun v1.3.6.
+ * See: https://github.com/oven-sh/bun/issues/25798
+ */
+function checkWindowsBunVersion(): { isAffected: boolean; message: string } | null {
+  if (process.platform !== "win32") return null
+
+  const version = Bun.version
+  const [major, minor, patch] = version.split(".").map((v) => parseInt(v.split("-")[0], 10))
+
+  // Bun v1.3.5 and earlier are affected
+  if (major < 1 || (major === 1 && minor < 3) || (major === 1 && minor === 3 && patch < 6)) {
+    return {
+      isAffected: true,
+      message:
+        `⚠️  Windows + Bun v${version} detected: Known segmentation fault bug with LSP.\n` +
+        `   This causes crashes when using LSP tools (lsp_diagnostics, lsp_goto_definition, etc.).\n` +
+        `   \n` +
+        `   SOLUTION: Upgrade to Bun v1.3.6 or later:\n` +
+        `   powershell -c "irm bun.sh/install.ps1|iex"\n` +
+        `   \n` +
+        `   WORKAROUND: Use WSL instead of native Windows.\n` +
+        `   See: https://github.com/oven-sh/bun/issues/25798`,
+    }
+  }
+
+  return null
+}
 
 interface ManagedClient {
   client: LSPClient
@@ -32,10 +64,12 @@ class LSPServerManager {
   }
 
   private registerProcessCleanup(): void {
-    const cleanup = () => {
+    // Synchronous cleanup for 'exit' event (cannot await)
+    const syncCleanup = () => {
       for (const [, managed] of this.clients) {
         try {
-          managed.client.stop()
+          // Fire-and-forget during sync exit - process is terminating
+          void managed.client.stop().catch(() => {})
         } catch {}
       }
       this.clients.clear()
@@ -45,23 +79,30 @@ class LSPServerManager {
       }
     }
 
-    process.on("exit", cleanup)
+    // Async cleanup for signal handlers - properly await all stops
+    const asyncCleanup = async () => {
+      const stopPromises: Promise<void>[] = []
+      for (const [, managed] of this.clients) {
+        stopPromises.push(managed.client.stop().catch(() => {}))
+      }
+      await Promise.allSettled(stopPromises)
+      this.clients.clear()
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval)
+        this.cleanupInterval = null
+      }
+    }
 
-    process.on("SIGINT", () => {
-      cleanup()
-      process.exit(0)
-    })
+    process.on("exit", syncCleanup)
 
-    process.on("SIGTERM", () => {
-      cleanup()
-      process.exit(0)
-    })
+    // Don't call process.exit() here - let other handlers complete their cleanup first
+    // The background-agent manager handles the final exit call
+    // Use async handlers to properly await LSP subprocess cleanup
+    process.on("SIGINT", () => void asyncCleanup().catch(() => {}))
+    process.on("SIGTERM", () => void asyncCleanup().catch(() => {}))
 
     if (process.platform === "win32") {
-      process.on("SIGBREAK", () => {
-        cleanup()
-        process.exit(0)
-      })
+      process.on("SIGBREAK", () => void asyncCleanup().catch(() => {}))
     }
   }
 
@@ -225,6 +266,13 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
+    const windowsCheck = checkWindowsBunVersion()
+    if (windowsCheck?.isAffected) {
+      throw new Error(
+        `LSP server cannot be started safely.\n\n${windowsCheck.message}`
+      )
+    }
+
     this.proc = spawn(this.server.command, {
       stdin: "pipe",
       stdout: "pipe",
@@ -306,7 +354,7 @@ export class LSPClient {
     })
 
     this.connection.onError((error) => {
-      console.error("LSP connection error:", error)
+      log("LSP connection error:", error)
     })
 
     this.connection.listen()
@@ -531,8 +579,34 @@ export class LSPClient {
       this.connection.dispose()
       this.connection = null
     }
-    this.proc?.kill()
-    this.proc = null
+    const proc = this.proc
+    if (proc) {
+      this.proc = null
+      let exitedBeforeTimeout = false
+      try {
+        proc.kill()
+        // Wait for exit with timeout to prevent indefinite hang
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
+        const timeoutPromise = new Promise<void>((resolve) => {
+          timeoutId = setTimeout(resolve, 5000)
+        })
+        await Promise.race([
+          proc.exited.then(() => { exitedBeforeTimeout = true }).finally(() => timeoutId && clearTimeout(timeoutId)),
+          timeoutPromise,
+        ])
+        if (!exitedBeforeTimeout) {
+          log("[LSPClient] Process did not exit within timeout, escalating to SIGKILL")
+          try {
+            proc.kill("SIGKILL")
+            // Wait briefly for SIGKILL to take effect
+            await Promise.race([
+              proc.exited,
+              new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+            ])
+          } catch {}
+        }
+      } catch {}
+    }
     this.processExited = true
     this.diagnosticsStore.clear()
   }

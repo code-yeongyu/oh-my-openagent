@@ -1,19 +1,27 @@
 # AGENTS KNOWLEDGE BASE
 
 ## OVERVIEW
-10 AI agents for multi-model orchestration. Sisyphus (primary), Atlas (orchestrator), oracle, librarian, explore, multimodal-looker, Prometheus, Metis, Momus, Sisyphus-Junior.
+
+11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
+
+**Primary Agents** (respect UI model selection):
+- Sisyphus, Atlas, Prometheus
+
+**Subagents** (use own fallback chains):
+- Hephaestus, Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Sisyphus-Junior
 
 ## STRUCTURE
 ```
 agents/
 ├── atlas.ts                    # Master Orchestrator (holds todo list)
 ├── sisyphus.ts                 # Main prompt (SF Bay Area engineer identity)
+├── hephaestus.ts               # Autonomous Deep Worker (GPT 5.2 Codex, "The Legitimate Craftsman")
 ├── sisyphus-junior.ts          # Delegated task executor (category-spawned)
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
 ├── librarian.ts                # Multi-repo research (GitHub CLI, Context7)
-├── explore.ts                  # Fast contextual grep (Grok Code)
+├── explore.ts                  # Fast contextual grep (Claude Haiku)
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1196 lines)
+├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1283 lines)
 ├── metis.ts                    # Pre-planning analysis (Gap detection)
 ├── momus.ts                    # Plan reviewer (Ruthless fault-finding)
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
@@ -25,15 +33,16 @@ agents/
 ## AGENT MODELS
 | Agent | Model | Temp | Purpose |
 |-------|-------|------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator |
-| Atlas | anthropic/claude-opus-4-5 | 0.1 | Master orchestrator |
+| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7 → gpt-5.2-codex → gemini-3-pro) |
+| Hephaestus | openai/gpt-5.2-codex | 0.1 | Autonomous deep worker, "The Legitimate Craftsman" (requires gpt-5.2-codex, no fallback) |
+| Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
-| librarian | opencode/big-pickle | 0.1 | Docs, GitHub search |
-| explore | opencode/gpt-5-nano | 0.1 | Fast contextual grep |
+| librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
+| explore | anthropic/claude-haiku-4-5 | 0.1 | Fast contextual grep (fallback: gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
-| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning |
-| Metis | anthropic/claude-sonnet-4-5 | 0.3 | Pre-planning analysis |
-| Momus | anthropic/claude-sonnet-4-5 | 0.1 | Plan validation |
+| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
+| Metis | anthropic/claude-opus-4-5 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
+| Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-5) |
 | Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
 
 ## HOW TO ADD

@@ -14,8 +14,14 @@ Design-first mindset:
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
 </Category_Context>`
 
-export const STRATEGIC_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on BUSINESS LOGIC / ARCHITECTURE tasks.
+export const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on DEEP LOGICAL REASONING / COMPLEX ARCHITECTURE tasks.
+
+**CRITICAL - CODE STYLE REQUIREMENTS (NON-NEGOTIABLE)**:
+1. BEFORE writing ANY code, SEARCH the existing codebase to find similar patterns/styles
+2. Your code MUST match the project's existing conventions - blend in seamlessly
+3. Write READABLE code that humans can easily understand - no clever tricks
+4. If unsure about style, explore more files until you find the pattern
 
 Strategic advisor mindset:
 - Bias toward simplicity: least complex solution that fulfills requirements
@@ -153,11 +159,43 @@ Approach:
 - Documentation, READMEs, articles, technical writing
 </Category_Context>`
 
+export const DEEP_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on GOAL-ORIENTED AUTONOMOUS tasks.
+
+**CRITICAL - AUTONOMOUS EXECUTION MINDSET (NON-NEGOTIABLE)**:
+You are NOT an interactive assistant. You are an autonomous problem-solver.
+
+**BEFORE making ANY changes**:
+1. SILENTLY explore the codebase extensively (5-15 minutes of reading is normal)
+2. Read related files, trace dependencies, understand the full context
+3. Build a complete mental model of the problem space
+4. DO NOT ask clarifying questions - the goal is already defined
+
+**Autonomous executor mindset**:
+- You receive a GOAL, not step-by-step instructions
+- Figure out HOW to achieve the goal yourself
+- Thorough research before any action
+- Fix hairy problems that require deep understanding
+- Work independently without frequent check-ins
+
+**Approach**:
+- Explore extensively, understand deeply, then act decisively
+- Prefer comprehensive solutions over quick patches
+- If the goal is unclear, make reasonable assumptions and proceed
+- Document your reasoning in code comments only when non-obvious
+
+**Response format**:
+- Minimal status updates (user trusts your autonomy)
+- Focus on results, not play-by-play progress
+- Report completion with summary of changes made
+</Category_Context>`
+
 
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3-pro" },
   ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
+  deep: { model: "openai/gpt-5.2-codex", variant: "medium" },
   artistry: { model: "google/gemini-3-pro", variant: "max" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
@@ -167,7 +205,8 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
-  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND,
+  ultrabrain: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
+  deep: DEEP_CATEGORY_PROMPT_APPEND,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
   "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
@@ -177,8 +216,9 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
-  ultrabrain: "Deep logical reasoning, complex architecture decisions requiring extensive analysis",
-  artistry: "Highly creative/artistic tasks, novel ideas",
+  ultrabrain: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
+  deep: "Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
+  artistry: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
   quick: "Trivial tasks - single file changes, typo fixes, simple modifications",
   "unspecified-low": "Tasks that don't fit other categories, low effort required",
   "unspecified-high": "Tasks that don't fit other categories, high effort required",

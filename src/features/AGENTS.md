@@ -2,18 +2,20 @@
 
 ## OVERVIEW
 
-Core feature modules + Claude Code compatibility layer. Orchestrates background agents, skill MCPs, builtin skills/commands, and 16 feature modules.
+20 feature modules: background agents, skill MCPs, builtin skills/commands, Claude Code compatibility layer.
+
+**Feature Types**: Task orchestration, Skill definitions, Command templates, Claude Code loaders, Supporting utilities
 
 ## STRUCTURE
 
 ```
 features/
-├── background-agent/           # Task lifecycle (1377 lines)
+├── background-agent/           # Task lifecycle (1418 lines)
 │   ├── manager.ts              # Launch → poll → complete
 │   └── concurrency.ts          # Per-provider limits
 ├── builtin-skills/             # Core skills (1729 lines)
-│   └── skills.ts               # agent-browser, dev-browser, frontend-ui-ux, git-master, typescript-programmer
-├── builtin-commands/           # ralph-loop, refactor, ulw-loop, init-deep, start-work, cancel-ralph
+│   └── skills.ts               # playwright, dev-browser, frontend-ui-ux, git-master, typescript-programmer
+├── builtin-commands/           # ralph-loop, refactor, ulw-loop, init-deep, start-work, cancel-ralph, stop-continuation
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # .mcp.json with ${VAR} expansion
@@ -24,9 +26,11 @@ features/
 ├── boulder-state/              # Todo state persistence
 ├── hook-message-injector/      # Message injection
 ├── task-toast-manager/         # Background task notifications
-├── skill-mcp-manager/          # MCP client lifecycle (520 lines)
+├── skill-mcp-manager/          # MCP client lifecycle (617 lines)
 ├── tmux-subagent/              # Tmux session management
-└── ... (16 modules total)
+├── mcp-oauth/                  # MCP OAuth handling
+├── sisyphus-swarm/             # Swarm coordination
+└── sisyphus-tasks/             # Task tracking
 ```
 
 ## LOADER PRIORITY
