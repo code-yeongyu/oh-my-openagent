@@ -87,7 +87,8 @@
           "atlas",
           "unstable-agent-babysitter",
           "stop-continuation-guard",
-          "tasks-todowrite-disabler"
+          "tasks-todowrite-disabler",
+          "kimi-auto-review"
         ]
       }
     },
@@ -3018,6 +3019,49 @@
               "type": "boolean"
             }
           }
+        }
+      }
+    },
+    "kimi_review": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "model": {
+          "default": "moonshot/kimi-k2.5",
+          "type": "string"
+        },
+        "blockOnCritical": {
+          "default": true,
+          "type": "boolean"
+        },
+        "reviewThreshold": {
+          "default": "code-only",
+          "type": "string",
+          "enum": [
+            "all",
+            "code-only"
+          ]
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignorePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeoutMs": {
+          "default": 30000,
+          "type": "number",
+          "minimum": 5000,
+          "maximum": 120000
         }
       }
     }

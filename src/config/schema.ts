@@ -93,6 +93,7 @@ export const HookNameSchema = z.enum([
   "unstable-agent-babysitter",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
+  "kimi-auto-review",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -300,6 +301,23 @@ export const RalphLoopConfigSchema = z.object({
   state_dir: z.string().optional(),
 })
 
+export const KimiReviewConfigSchema = z.object({
+  /** Enable Kimi auto-review (default: true) */
+  enabled: z.boolean().default(true),
+  /** Model to use for review (default: moonshot/kimi-k2.5) */
+  model: z.string().default("moonshot/kimi-k2.5"),
+  /** Block execution on critical issues (default: true) */
+  blockOnCritical: z.boolean().default(true),
+  /** Review threshold: 'all' or 'code-only' (default: code-only) */
+  reviewThreshold: z.enum(["all", "code-only"]).default("code-only"),
+  /** File extensions to review (default: common code extensions) */
+  extensions: z.array(z.string()).optional(),
+  /** Glob patterns to ignore (default: test files) */
+  ignorePatterns: z.array(z.string()).optional(),
+  /** Timeout in milliseconds (default: 30000) */
+  timeoutMs: z.number().min(5000).max(120000).default(30000),
+})
+
 export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
@@ -389,6 +407,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  kimi_review: KimiReviewConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -418,5 +437,6 @@ export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
+export type KimiReviewConfig = z.infer<typeof KimiReviewConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

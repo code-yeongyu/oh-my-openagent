@@ -36,6 +36,7 @@ import {
   createStopContinuationGuardHook,
   createCompactionContextInjector,
   createUnstableAgentBabysitterHook,
+  createKimiAutoReviewHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -319,6 +320,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           }
         )
       : null;
+
+  const kimiAutoReview = isHookEnabled("kimi-auto-review")
+    ? createKimiAutoReviewHook(ctx, { config: pluginConfig.kimi_review })
+    : null;
 
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
@@ -757,6 +762,16 @@ await editErrorRecovery?.["tool.execute.after"](input, output);
         await delegateTaskRetry?.["tool.execute.after"](input, output);
         await atlasHook?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo["tool.execute.after"](input, output);
+      const kimiResult = await kimiAutoReview?.["tool.execute.after"]?.(input, output);
+      if (kimiResult?.block && kimiResult.reason) {
+        ctx.client.session
+          .prompt({
+            path: { id: input.sessionID },
+            body: { parts: [{ type: "text", text: kimiResult.reason }] },
+            query: { directory: ctx.directory },
+          })
+          .catch((err: unknown) => log("[kimi-auto-review] Failed to inject block prompt", err));
+      }
     },
 
     "experimental.session.compacting": async (input: { sessionID: string }) => {

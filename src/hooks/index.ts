@@ -36,3 +36,5 @@ export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
 export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
+export { createKimiAutoReviewHook, parseReviewResponse } from "./kimi-auto-review";
+export type { KimiReviewConfig, KimiReviewOptions, KimiReviewResult } from "./kimi-auto-review/types";
