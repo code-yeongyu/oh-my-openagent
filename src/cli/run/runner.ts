@@ -143,6 +143,14 @@ export async function run(options: RunOptions): Promise<number> {
           process.exit(1)
         }
 
+        // Guard against premature completion: don't check completion until the
+        // session has produced meaningful work (text output, tool call, or tool result).
+        // Without this, a session that goes busy->idle before the LLM responds
+        // would exit immediately because 0 todos + 0 children = "complete".
+        if (!eventState.hasReceivedMeaningfulWork) {
+          continue
+        }
+
         const shouldExit = await checkCompletionConditions(ctx)
         if (shouldExit) {
           console.log(pc.green("\n\nAll tasks completed."))

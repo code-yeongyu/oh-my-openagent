@@ -4,33 +4,33 @@ import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
 
-    // #when
+    // when
     const variant = resolveAgentVariant(config)
 
-    // #then
+    // then
     expect(variant).toBeUndefined()
   })
 
   test("returns agent override variant", () => {
-    // #given
+    // given
     const config = {
       agents: {
         sisyphus: { variant: "low" },
       },
     } as OhMyOpenCodeConfig
 
-    // #when
+    // when
     const variant = resolveAgentVariant(config, "sisyphus")
 
-    // #then
+    // then
     expect(variant).toBe("low")
   })
 
   test("returns category variant when agent uses category", () => {
-    // #given
+    // given
     const config = {
       agents: {
         sisyphus: { category: "ultrabrain" },
@@ -40,17 +40,17 @@ describe("resolveAgentVariant", () => {
       },
     } as OhMyOpenCodeConfig
 
-    // #when
+    // when
     const variant = resolveAgentVariant(config, "sisyphus")
 
-    // #then
+    // then
     expect(variant).toBe("xhigh")
   })
 })
 
 describe("applyAgentVariant", () => {
   test("sets variant when message is undefined", () => {
-    // #given
+    // given
     const config = {
       agents: {
         sisyphus: { variant: "low" },
@@ -58,15 +58,15 @@ describe("applyAgentVariant", () => {
     } as OhMyOpenCodeConfig
     const message: { variant?: string } = {}
 
-    // #when
+    // when
     applyAgentVariant(config, "sisyphus", message)
 
-    // #then
+    // then
     expect(message.variant).toBe("low")
   })
 
   test("does not override existing variant", () => {
-    // #given
+    // given
     const config = {
       agents: {
         sisyphus: { variant: "low" },
@@ -74,89 +74,89 @@ describe("applyAgentVariant", () => {
     } as OhMyOpenCodeConfig
     const message = { variant: "max" }
 
-    // #when
+    // when
     applyAgentVariant(config, "sisyphus", message)
 
-    // #then
+    // then
     expect(message.variant).toBe("max")
   })
 })
 
 describe("resolveVariantForModel", () => {
   test("returns correct variant for anthropic provider", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
-    // #then
+    // then
     expect(variant).toBe("max")
   })
 
-  test("returns correct variant for openai provider", () => {
-    // #given
+  test("returns correct variant for openai provider (hephaestus agent)", () => {
+    // #given hephaestus has openai/gpt-5.2-codex with variant "medium" in its chain
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.2" }
+    const model = { providerID: "openai", modelID: "gpt-5.2-codex" }
 
     // #when
-    const variant = resolveVariantForModel(config, "sisyphus", model)
+    const variant = resolveVariantForModel(config, "hephaestus", model)
 
-    // #then
+    // then
     expect(variant).toBe("medium")
   })
 
-  test("returns undefined for provider with no variant in chain", () => {
-    // #given
+  test("returns undefined for provider not in sisyphus chain", () => {
+    // #given openai is not in sisyphus fallback chain anymore
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "google", modelID: "gemini-3-pro" }
+    const model = { providerID: "openai", modelID: "gpt-5.2" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
-    // #then
+    // then
     expect(variant).toBeUndefined()
   })
 
   test("returns undefined for provider not in chain", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "unknown-provider", modelID: "some-model" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
-    // #then
+    // then
     expect(variant).toBeUndefined()
   })
 
   test("returns undefined for unknown agent", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "nonexistent-agent", model)
 
-    // #then
+    // then
     expect(variant).toBeUndefined()
   })
 
   test("returns variant for zai-coding-plan provider without variant", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "zai-coding-plan", modelID: "glm-4.7" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
-    // #then
+    // then
     expect(variant).toBeUndefined()
   })
 
   test("falls back to category chain when agent has no requirement", () => {
-    // #given
+    // given
     const config = {
       agents: {
         "custom-agent": { category: "ultrabrain" },
@@ -164,34 +164,34 @@ describe("resolveVariantForModel", () => {
     } as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.2-codex" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "custom-agent", model)
 
-    // #then
+    // then
     expect(variant).toBe("xhigh")
   })
 
   test("returns correct variant for oracle agent with openai", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.2" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "oracle", model)
 
-    // #then
+    // then
     expect(variant).toBe("high")
   })
 
   test("returns correct variant for oracle agent with anthropic", () => {
-    // #given
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "oracle", model)
 
-    // #then
+    // then
     expect(variant).toBe("max")
   })
 })

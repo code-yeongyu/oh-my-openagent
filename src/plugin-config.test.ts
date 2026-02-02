@@ -4,9 +4,9 @@ import type { OhMyOpenCodeConfig } from "./config";
 
 describe("mergeConfigs", () => {
   describe("categories merging", () => {
-    // #given base config has categories, override has different categories
-    // #when merging configs
-    // #then should deep merge categories, not override completely
+    // given base config has categories, override has different categories
+    // when merging configs
+    // then should deep merge categories, not override completely
 
     it("should deep merge categories from base and override", () => {
       const base = {
@@ -34,13 +34,13 @@ describe("mergeConfigs", () => {
 
       const result = mergeConfigs(base, override);
 
-      // #then general.model should be preserved from base
+      // then general.model should be preserved from base
       expect(result.categories?.general?.model).toBe("openai/gpt-5.2");
-      // #then general.temperature should be overridden
+      // then general.temperature should be overridden
       expect(result.categories?.general?.temperature).toBe(0.3);
-      // #then quick should be preserved from base
+      // then quick should be preserved from base
       expect(result.categories?.quick?.model).toBe("anthropic/claude-haiku-4-5");
-      // #then visual should be added from override
+      // then visual should be added from override
       expect(result.categories?.visual?.model).toBe("google/gemini-3-pro");
     });
 

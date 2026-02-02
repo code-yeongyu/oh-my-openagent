@@ -1,4 +1,4 @@
-const TARGET_TOOLS = ["task", "Task", "call_omo_agent", "delegate_task"]
+const TARGET_TOOLS = ["task", "Task", "task_tool", "call_omo_agent", "delegate_task"]
 
 const SESSION_ID_PATTERNS = [
   /Session ID: (ses_[a-zA-Z0-9_-]+)/,

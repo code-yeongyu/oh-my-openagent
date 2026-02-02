@@ -165,7 +165,7 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
   debugLog("running comment-checker with input:", jsonInput.substring(0, 200))
 
   try {
-    const args = [binaryPath]
+    const args = [binaryPath, "check"]
     if (customPrompt) {
       args.push("--prompt", customPrompt)
     }

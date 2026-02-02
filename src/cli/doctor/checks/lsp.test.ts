@@ -5,11 +5,11 @@ import type { LspServerInfo } from "../types"
 describe("lsp check", () => {
   describe("getLspServersInfo", () => {
     it("returns array of server info", async () => {
-      // #given
-      // #when getting servers info
+      // given
+      // when getting servers info
       const servers = await lsp.getLspServersInfo()
 
-      // #then should return array with expected structure
+      // then should return array with expected structure
       expect(Array.isArray(servers)).toBe(true)
       servers.forEach((s) => {
         expect(s.id).toBeDefined()
@@ -19,14 +19,14 @@ describe("lsp check", () => {
     })
 
     it("does not spawn 'which' command (windows compatibility)", async () => {
-      // #given
+      // given
       const spawnSpy = spyOn(Bun, "spawn")
 
       try {
-        // #when getting servers info
+        // when getting servers info
         await lsp.getLspServersInfo()
 
-        // #then should not spawn which
+        // then should not spawn which
         const calls = spawnSpy.mock.calls
         const whichCalls = calls.filter((c) => Array.isArray(c) && Array.isArray(c[0]) && c[0][0] === "which")
         expect(whichCalls.length).toBe(0)
@@ -38,29 +38,29 @@ describe("lsp check", () => {
 
   describe("getLspServerStats", () => {
     it("counts installed servers correctly", () => {
-      // #given servers with mixed installation status
+      // given servers with mixed installation status
       const servers = [
         { id: "ts", installed: true, extensions: [".ts"], source: "builtin" as const },
         { id: "py", installed: false, extensions: [".py"], source: "builtin" as const },
         { id: "go", installed: true, extensions: [".go"], source: "builtin" as const },
       ]
 
-      // #when getting stats
+      // when getting stats
       const stats = lsp.getLspServerStats(servers)
 
-      // #then should count correctly
+      // then should count correctly
       expect(stats.installed).toBe(2)
       expect(stats.total).toBe(3)
     })
 
     it("handles empty array", () => {
-      // #given no servers
+      // given no servers
       const servers: LspServerInfo[] = []
 
-      // #when getting stats
+      // when getting stats
       const stats = lsp.getLspServerStats(servers)
 
-      // #then should return zeros
+      // then should return zeros
       expect(stats.installed).toBe(0)
       expect(stats.total).toBe(0)
     })
@@ -74,46 +74,46 @@ describe("lsp check", () => {
     })
 
     it("returns warn when no servers installed", async () => {
-      // #given no servers installed
+      // given no servers installed
       getServersSpy = spyOn(lsp, "getLspServersInfo").mockResolvedValue([
         { id: "typescript-language-server", installed: false, extensions: [".ts"], source: "builtin" },
         { id: "pyright", installed: false, extensions: [".py"], source: "builtin" },
       ])
 
-      // #when checking
+      // when checking
       const result = await lsp.checkLspServers()
 
-      // #then should warn
+      // then should warn
       expect(result.status).toBe("warn")
       expect(result.message).toContain("No LSP servers")
     })
 
     it("returns pass when servers installed", async () => {
-      // #given some servers installed
+      // given some servers installed
       getServersSpy = spyOn(lsp, "getLspServersInfo").mockResolvedValue([
         { id: "typescript-language-server", installed: true, extensions: [".ts"], source: "builtin" },
         { id: "pyright", installed: false, extensions: [".py"], source: "builtin" },
       ])
 
-      // #when checking
+      // when checking
       const result = await lsp.checkLspServers()
 
-      // #then should pass with count
+      // then should pass with count
       expect(result.status).toBe("pass")
       expect(result.message).toContain("1/2")
     })
 
     it("lists installed and missing servers in details", async () => {
-      // #given mixed installation
+      // given mixed installation
       getServersSpy = spyOn(lsp, "getLspServersInfo").mockResolvedValue([
         { id: "typescript-language-server", installed: true, extensions: [".ts"], source: "builtin" },
         { id: "pyright", installed: false, extensions: [".py"], source: "builtin" },
       ])
 
-      // #when checking
+      // when checking
       const result = await lsp.checkLspServers()
 
-      // #then should list both
+      // then should list both
       expect(result.details?.some((d) => d.includes("Installed"))).toBe(true)
       expect(result.details?.some((d) => d.includes("Not found"))).toBe(true)
     })
@@ -121,11 +121,11 @@ describe("lsp check", () => {
 
   describe("getLspCheckDefinition", () => {
     it("returns valid check definition", () => {
-      // #given
-      // #when getting definition
+      // given
+      // when getting definition
       const def = lsp.getLspCheckDefinition()
 
-      // #then should have required properties
+      // then should have required properties
       expect(def.id).toBe("lsp-servers")
       expect(def.category).toBe("tools")
       expect(def.critical).toBe(false)

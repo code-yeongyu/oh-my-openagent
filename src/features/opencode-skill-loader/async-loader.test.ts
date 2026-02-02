@@ -36,19 +36,19 @@ describe("async-loader", () => {
 
   describe("discoverSkillsInDirAsync", () => {
     it("returns empty array for non-existent directory", async () => {
-      // #given - non-existent directory
+      // given - non-existent directory
       const nonExistentDir = join(TEST_DIR, "does-not-exist")
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(nonExistentDir)
 
-      // #then - should return empty array, not throw
+      // then - should return empty array, not throw
       expect(skills).toEqual([])
     })
 
     it("discovers skills from SKILL.md in directory", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: test-skill
 description: A test skill
@@ -57,18 +57,18 @@ This is the skill body.
 `
       createTestSkill("test-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(skills).toHaveLength(1)
       expect(skills[0].name).toBe("test-skill")
       expect(skills[0].definition.description).toContain("A test skill")
     })
 
     it("discovers skills from {name}.md pattern in directory", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: named-skill
 description: Named pattern skill
@@ -79,17 +79,17 @@ Skill body.
       mkdirSync(skillDir, { recursive: true })
       writeFileSync(join(skillDir, "named-skill.md"), skillContent)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(skills).toHaveLength(1)
       expect(skills[0].name).toBe("named-skill")
     })
 
     it("discovers direct .md files", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: direct-skill
 description: Direct markdown file
@@ -98,17 +98,17 @@ Direct skill.
 `
       createDirectSkill("direct-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(skills).toHaveLength(1)
       expect(skills[0].name).toBe("direct-skill")
     })
 
     it("skips entries starting with dot", async () => {
-      // #given
+      // given
       const validContent = `---
 name: valid-skill
 ---
@@ -122,17 +122,17 @@ Hidden.
       createTestSkill("valid-skill", validContent)
       createTestSkill(".hidden-skill", hiddenContent)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then - only valid-skill should be discovered
+      // then - only valid-skill should be discovered
       expect(skills).toHaveLength(1)
       expect(skills[0]?.name).toBe("valid-skill")
     })
 
     it("skips invalid files and continues with valid ones", async () => {
-      // #given - one valid, one invalid (unreadable)
+      // given - one valid, one invalid (unreadable)
       const validContent = `---
 name: valid-skill
 ---
@@ -152,11 +152,11 @@ Invalid skill.
         chmodSync(invalidFile, 0o000)
       }
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then - should skip invalid and return only valid
+      // then - should skip invalid and return only valid
       expect(skills.length).toBeGreaterThanOrEqual(1)
       expect(skills.some((s: LoadedSkill) => s.name === "valid-skill")).toBe(true)
 
@@ -167,7 +167,7 @@ Invalid skill.
     })
 
     it("discovers multiple skills correctly", async () => {
-      // #given
+      // given
       const skill1 = `---
 name: skill-one
 description: First skill
@@ -183,11 +183,11 @@ Skill two.
       createTestSkill("skill-one", skill1)
       createTestSkill("skill-two", skill2)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const asyncSkills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(asyncSkills.length).toBe(2)
       expect(asyncSkills.map((s: LoadedSkill) => s.name).sort()).toEqual(["skill-one", "skill-two"])
       
@@ -196,7 +196,7 @@ Skill two.
     })
 
     it("loads MCP config from frontmatter", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: mcp-skill
 description: Skill with MCP
@@ -209,11 +209,11 @@ MCP skill.
 `
       createTestSkill("mcp-skill", skillContent)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       const skill = skills.find((s: LoadedSkill) => s.name === "mcp-skill")
       expect(skill?.mcpConfig).toBeDefined()
       expect(skill?.mcpConfig?.sqlite).toBeDefined()
@@ -221,7 +221,7 @@ MCP skill.
     })
 
     it("loads MCP config from mcp.json file", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: json-mcp-skill
 description: Skill with mcp.json
@@ -238,18 +238,18 @@ Skill body.
       }
       createTestSkill("json-mcp-skill", skillContent, mcpJson)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       const skill = skills.find((s: LoadedSkill) => s.name === "json-mcp-skill")
       expect(skill?.mcpConfig?.playwright).toBeDefined()
       expect(skill?.mcpConfig?.playwright?.command).toBe("npx")
     })
 
     it("prioritizes mcp.json over frontmatter MCP", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: priority-test
 mcp:
@@ -267,11 +267,11 @@ Skill.
       }
       createTestSkill("priority-test", skillContent, mcpJson)
 
-      // #when
+      // when
       const { discoverSkillsInDirAsync } = await import("./async-loader")
       const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
 
-      // #then - mcp.json should take priority
+      // then - mcp.json should take priority
       const skill = skills.find((s: LoadedSkill) => s.name === "priority-test")
       expect(skill?.mcpConfig?.["from-json"]).toBeDefined()
       expect(skill?.mcpConfig?.["from-yaml"]).toBeUndefined()
@@ -280,7 +280,7 @@ Skill.
 
   describe("mapWithConcurrency", () => {
     it("processes items with concurrency limit", async () => {
-      // #given
+      // given
       const { mapWithConcurrency } = await import("./async-loader")
       const items = Array.from({ length: 50 }, (_, i) => i)
       let maxConcurrent = 0
@@ -294,41 +294,41 @@ Skill.
         return item * 2
       }
 
-      // #when
+      // when
       const results = await mapWithConcurrency(items, mapper, 16)
 
-      // #then
+      // then
       expect(results).toEqual(items.map(i => i * 2))
       expect(maxConcurrent).toBeLessThanOrEqual(16)
       expect(maxConcurrent).toBeGreaterThan(1) // Should actually run concurrently
     })
 
     it("handles empty array", async () => {
-      // #given
+      // given
       const { mapWithConcurrency } = await import("./async-loader")
 
-      // #when
+      // when
       const results = await mapWithConcurrency([], async (x: number) => x * 2, 16)
 
-      // #then
+      // then
       expect(results).toEqual([])
     })
 
     it("handles single item", async () => {
-      // #given
+      // given
       const { mapWithConcurrency } = await import("./async-loader")
 
-      // #when
+      // when
       const results = await mapWithConcurrency([42], async (x: number) => x * 2, 16)
 
-      // #then
+      // then
       expect(results).toEqual([84])
     })
   })
 
   describe("loadSkillFromPathAsync", () => {
     it("loads skill from valid path", async () => {
-      // #given
+      // given
       const skillContent = `---
 name: path-skill
 description: Loaded from path
@@ -338,47 +338,47 @@ Path skill.
       const skillDir = createTestSkill("path-skill", skillContent)
       const skillPath = join(skillDir, "SKILL.md")
 
-      // #when
+      // when
       const { loadSkillFromPathAsync } = await import("./async-loader")
       const skill = await loadSkillFromPathAsync(skillPath, skillDir, "path-skill", "opencode-project")
 
-      // #then
+      // then
       expect(skill).not.toBeNull()
       expect(skill?.name).toBe("path-skill")
       expect(skill?.scope).toBe("opencode-project")
     })
 
     it("returns null for invalid path", async () => {
-      // #given
+      // given
       const invalidPath = join(TEST_DIR, "nonexistent.md")
 
-      // #when
+      // when
       const { loadSkillFromPathAsync } = await import("./async-loader")
       const skill = await loadSkillFromPathAsync(invalidPath, TEST_DIR, "invalid", "opencode")
 
-      // #then
+      // then
       expect(skill).toBeNull()
     })
 
     it("returns null for malformed skill file", async () => {
-      // #given
+      // given
       const malformedContent = "This is not valid frontmatter content\nNo YAML here!"
       mkdirSync(SKILLS_DIR, { recursive: true })
       const malformedPath = join(SKILLS_DIR, "malformed.md")
       writeFileSync(malformedPath, malformedContent)
 
-      // #when
+      // when
       const { loadSkillFromPathAsync } = await import("./async-loader")
       const skill = await loadSkillFromPathAsync(malformedPath, SKILLS_DIR, "malformed", "user")
 
-      // #then
+      // then
       expect(skill).not.toBeNull() // parseFrontmatter handles missing frontmatter gracefully
     })
   })
 
   describe("loadMcpJsonFromDirAsync", () => {
     it("loads mcp.json with mcpServers format", async () => {
-      // #given
+      // given
       mkdirSync(SKILLS_DIR, { recursive: true })
       const mcpJson = {
         mcpServers: {
@@ -390,43 +390,43 @@ Path skill.
       }
       writeFileSync(join(SKILLS_DIR, "mcp.json"), JSON.stringify(mcpJson))
 
-      // #when
+      // when
       const { loadMcpJsonFromDirAsync } = await import("./async-loader")
       const config = await loadMcpJsonFromDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(config).toBeDefined()
       expect(config?.test).toBeDefined()
       expect(config?.test?.command).toBe("test-cmd")
     })
 
     it("returns undefined for non-existent mcp.json", async () => {
-      // #given
+      // given
       mkdirSync(SKILLS_DIR, { recursive: true })
 
-      // #when
+      // when
       const { loadMcpJsonFromDirAsync } = await import("./async-loader")
       const config = await loadMcpJsonFromDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(config).toBeUndefined()
     })
 
     it("returns undefined for invalid JSON", async () => {
-      // #given
+      // given
       mkdirSync(SKILLS_DIR, { recursive: true })
       writeFileSync(join(SKILLS_DIR, "mcp.json"), "{ invalid json }")
 
-      // #when
+      // when
       const { loadMcpJsonFromDirAsync } = await import("./async-loader")
       const config = await loadMcpJsonFromDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(config).toBeUndefined()
     })
 
     it("supports direct format without mcpServers", async () => {
-      // #given
+      // given
       mkdirSync(SKILLS_DIR, { recursive: true })
       const mcpJson = {
         direct: {
@@ -436,11 +436,11 @@ Path skill.
       }
       writeFileSync(join(SKILLS_DIR, "mcp.json"), JSON.stringify(mcpJson))
 
-      // #when
+      // when
       const { loadMcpJsonFromDirAsync } = await import("./async-loader")
       const config = await loadMcpJsonFromDirAsync(SKILLS_DIR)
 
-      // #then
+      // then
       expect(config?.direct).toBeDefined()
       expect(config?.direct?.command).toBe("direct-cmd")
     })

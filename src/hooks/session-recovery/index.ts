@@ -16,6 +16,7 @@ import {
   stripThinkingParts,
 } from "./storage"
 import type { MessageData, ResumeConfig } from "./types"
+import { log } from "../../shared/logger"
 
 export interface SessionRecoveryOptions {
   experimental?: ExperimentalConfig
@@ -414,7 +415,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
       return success
   } catch (err) {
-    console.error("[session-recovery] Recovery failed:", err)
+    log("[session-recovery] Recovery failed:", err)
     return false
   } finally {
     processingErrors.delete(assistantMsgID)

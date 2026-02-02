@@ -1,8 +1,8 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-01-26T14:50:00+09:00
-**Commit:** 9d66b807
-**Branch:** dev
+**Generated:** 2026-02-01T17:25:00+09:00
+**Commit:** ab54e6cc
+**Branch:** feat/hephaestus-agent
 
 ---
 
@@ -18,24 +18,24 @@
 
 ## OVERVIEW
 
-OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash, Grok Code). 32 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 10 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
+OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # 10 AI agents - see src/agents/AGENTS.md
-│   ├── hooks/         # 32 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── agents/        # 11 AI agents - see src/agents/AGENTS.md
+│   ├── hooks/         # 34 lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # 20+ tools - see src/tools/AGENTS.md
 │   ├── features/      # Background agents, Claude Code compat - see src/features/AGENTS.md
 │   ├── shared/        # 55 cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (672 lines)
+│   └── index.ts       # Main plugin entry (740 lines)
 ├── script/            # build-schema.ts, build-binaries.ts
-├── packages/          # 7 platform-specific binaries
+├── packages/          # 11 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
 ```
 
@@ -50,8 +50,8 @@ oh-my-opencode/
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
-| Background agents | `src/features/background-agent/` | manager.ts (1377 lines) |
-| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (752 lines) |
+| Background agents | `src/features/background-agent/` | manager.ts (1418 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (757 lines) |
 
 ## TDD (Test-Driven Development)
 
@@ -98,13 +98,14 @@ oh-my-opencode/
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator |
-| Atlas | anthropic/claude-opus-4-5 | Master orchestrator |
+| Sisyphus | anthropic/claude-opus-4-5 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7 → gpt-5.2-codex → gemini-3-pro) |
+| Hephaestus | openai/gpt-5.2-codex | Autonomous deep worker, "The Legitimate Craftsman" (requires gpt-5.2-codex, no fallback) |
+| Atlas | anthropic/claude-sonnet-4-5 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | Consultation, debugging |
-| librarian | opencode/big-pickle | Docs, GitHub search |
-| explore | opencode/gpt-5-nano | Fast codebase grep |
+| librarian | zai-coding-plan/glm-4.7 | Docs, GitHub search (fallback: glm-4.7-free) |
+| explore | anthropic/claude-haiku-4-5 | Fast codebase grep (fallback: gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
-| Prometheus | anthropic/claude-opus-4-5 | Strategic planning |
+| Prometheus | anthropic/claude-opus-4-5 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 
 ## COMMANDS
 
@@ -127,12 +128,12 @@ bun test               # 100 test files
 | File | Lines | Description |
 |------|-------|-------------|
 | `src/features/builtin-skills/skills.ts` | 1729 | Skill definitions |
-| `src/features/background-agent/manager.ts` | 1377 | Task lifecycle, concurrency |
-| `src/agents/prometheus-prompt.ts` | 1196 | Planning agent |
-| `src/tools/delegate-task/tools.ts` | 1070 | Category-based delegation |
-| `src/hooks/atlas/index.ts` | 752 | Orchestrator hook |
-| `src/cli/config-manager.ts` | 664 | JSONC config parsing |
-| `src/index.ts` | 672 | Main plugin entry |
+| `src/features/background-agent/manager.ts` | 1440 | Task lifecycle, concurrency |
+| `src/agents/prometheus-prompt.ts` | 1283 | Planning agent prompt |
+| `src/tools/delegate-task/tools.ts` | 1135 | Category-based delegation |
+| `src/hooks/atlas/index.ts` | 757 | Orchestrator hook |
+| `src/index.ts` | 788 | Main plugin entry |
+| `src/cli/config-manager.ts` | 667 | JSONC config parsing |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
 
 ## MCP ARCHITECTURE

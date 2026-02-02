@@ -3,30 +3,30 @@ import { createFirstMessageVariantGate } from "./first-message-variant"
 
 describe("createFirstMessageVariantGate", () => {
   test("marks new sessions and clears after apply", () => {
-    // #given
+    // given
     const gate = createFirstMessageVariantGate()
 
-    // #when
+    // when
     gate.markSessionCreated({ id: "session-1" })
 
-    // #then
+    // then
     expect(gate.shouldOverride("session-1")).toBe(true)
 
-    // #when
+    // when
     gate.markApplied("session-1")
 
-    // #then
+    // then
     expect(gate.shouldOverride("session-1")).toBe(false)
   })
 
   test("ignores forked sessions", () => {
-    // #given
+    // given
     const gate = createFirstMessageVariantGate()
 
-    // #when
+    // when
     gate.markSessionCreated({ id: "session-2", parentID: "session-parent" })
 
-    // #then
+    // then
     expect(gate.shouldOverride("session-2")).toBe(false)
   })
 })

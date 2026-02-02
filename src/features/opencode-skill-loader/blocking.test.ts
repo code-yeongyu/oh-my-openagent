@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe("discoverAllSkillsBlocking", () => {
   it("returns skills synchronously from valid directories", () => {
-    // #given valid skill directory
+    // given valid skill directory
     const skillDir = join(TEST_DIR, "skills")
     mkdirSync(skillDir, { recursive: true })
 
@@ -34,10 +34,10 @@ This is test skill content.`
     const dirs = [skillDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then returns skills synchronously
+    // then returns skills synchronously
     expect(skills).toBeArray()
     expect(skills.length).toBe(1)
     expect(skills[0].name).toBe("test-skill")
@@ -45,38 +45,38 @@ This is test skill content.`
   })
 
   it("returns empty array for empty directories", () => {
-    // #given empty directory
+    // given empty directory
     const emptyDir = join(TEST_DIR, "empty")
     mkdirSync(emptyDir, { recursive: true })
 
     const dirs = [emptyDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then returns empty array
+    // then returns empty array
     expect(skills).toBeArray()
     expect(skills.length).toBe(0)
   })
 
   it("returns empty array for non-existent directories", () => {
-    // #given non-existent directory
+    // given non-existent directory
     const nonExistentDir = join(TEST_DIR, "does-not-exist")
 
     const dirs = [nonExistentDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then returns empty array (no throw)
+    // then returns empty array (no throw)
     expect(skills).toBeArray()
     expect(skills.length).toBe(0)
   })
 
   it("handles multiple directories with mixed content", () => {
-    // #given multiple directories with valid and invalid skills
+    // given multiple directories with valid and invalid skills
     const dir1 = join(TEST_DIR, "dir1")
     const dir2 = join(TEST_DIR, "dir2")
     mkdirSync(dir1, { recursive: true })
@@ -103,10 +103,10 @@ Skill 2 content.`
     const dirs = [dir1, dir2]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then returns all valid skills
+    // then returns all valid skills
     expect(skills).toBeArray()
     expect(skills.length).toBe(2)
     
@@ -115,7 +115,7 @@ Skill 2 content.`
   })
 
   it("skips invalid YAML files", () => {
-    // #given directory with invalid YAML
+    // given directory with invalid YAML
     const skillDir = join(TEST_DIR, "skills")
     mkdirSync(skillDir, { recursive: true })
 
@@ -142,17 +142,17 @@ Invalid content.`
     const dirs = [skillDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then skips invalid, returns valid
+    // then skips invalid, returns valid
     expect(skills).toBeArray()
     expect(skills.length).toBe(1)
     expect(skills[0].name).toBe("valid-skill")
   })
 
   it("handles directory-based skills with SKILL.md", () => {
-    // #given directory-based skill structure
+    // given directory-based skill structure
     const skillsDir = join(TEST_DIR, "skills")
     const mySkillDir = join(skillsDir, "my-skill")
     mkdirSync(mySkillDir, { recursive: true })
@@ -170,17 +170,17 @@ This is a directory-based skill.`
     const dirs = [skillsDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then returns skill from SKILL.md
+    // then returns skill from SKILL.md
     expect(skills).toBeArray()
     expect(skills.length).toBe(1)
     expect(skills[0].name).toBe("my-skill")
   })
 
   it("processes large skill sets without timeout", () => {
-    // #given directory with many skills (20+)
+    // given directory with many skills (20+)
     const skillDir = join(TEST_DIR, "many-skills")
     mkdirSync(skillDir, { recursive: true })
 
@@ -200,10 +200,10 @@ Content for skill ${i}.`
     const dirs = [skillDir]
     const scopes: SkillScope[] = ["opencode-project"]
 
-    // #when discoverAllSkillsBlocking called
+    // when discoverAllSkillsBlocking called
     const skills = discoverAllSkillsBlocking(dirs, scopes)
 
-    // #then completes without timeout
+    // then completes without timeout
     expect(skills).toBeArray()
     expect(skills.length).toBe(skillCount)
   })

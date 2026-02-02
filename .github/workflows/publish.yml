@@ -51,7 +51,6 @@ jobs:
           # Run them in separate processes to prevent cross-file contamination
           bun test src/plugin-handlers
           bun test src/hooks/atlas
-          bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
 
       - name: Run remaining tests
@@ -246,9 +245,88 @@ jobs:
           
           echo "Comparing v${PREV_TAG}..v${VERSION}"
           
-          NOTES=$(git log "v${PREV_TAG}..v${VERSION}" --oneline --format="- %h %s" 2>/dev/null | grep -vE "^- \w+ (ignore:|test:|chore:|ci:|release:)" || echo "No notable changes")
+          # Get all commits between tags
+          COMMITS=$(git log "v${PREV_TAG}..v${VERSION}" --format="%s" 2>/dev/null || echo "")
           
-          echo "$NOTES" > /tmp/changelog.md
+          # Initialize sections
+          FEATURES=""
+          FIXES=""
+          REFACTOR=""
+          DOCS=""
+          OTHER=""
+          
+          while IFS= read -r commit; do
+            [ -z "$commit" ] && continue
+            # Skip chore, ci, release, test commits
+            [[ "$commit" =~ ^(chore|ci|release|test|ignore) ]] && continue
+            
+            if [[ "$commit" =~ ^feat ]]; then
+              # Extract scope and message: feat(scope): message -> **scope**: message
+              if [[ "$commit" =~ ^feat\(([^)]+)\):\ (.+)$ ]]; then
+                FEATURES="${FEATURES}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
+              else
+                MSG="${commit#feat: }"
+                FEATURES="${FEATURES}\n- ${MSG}"
+              fi
+            elif [[ "$commit" =~ ^fix ]]; then
+              if [[ "$commit" =~ ^fix\(([^)]+)\):\ (.+)$ ]]; then
+                FIXES="${FIXES}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
+              else
+                MSG="${commit#fix: }"
+                FIXES="${FIXES}\n- ${MSG}"
+              fi
+            elif [[ "$commit" =~ ^refactor ]]; then
+              if [[ "$commit" =~ ^refactor\(([^)]+)\):\ (.+)$ ]]; then
+                REFACTOR="${REFACTOR}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
+              else
+                MSG="${commit#refactor: }"
+                REFACTOR="${REFACTOR}\n- ${MSG}"
+              fi
+            elif [[ "$commit" =~ ^docs ]]; then
+              if [[ "$commit" =~ ^docs\(([^)]+)\):\ (.+)$ ]]; then
+                DOCS="${DOCS}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
+              else
+                MSG="${commit#docs: }"
+                DOCS="${DOCS}\n- ${MSG}"
+              fi
+            else
+              OTHER="${OTHER}\n- ${commit}"
+            fi
+          done <<< "$COMMITS"
+          
+          # Build release notes
+          {
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$FEATURES" ]; then
+              echo "### Features"
+              echo -e "$FEATURES"
+              echo ""
+            fi
+            if [ -n "$FIXES" ]; then
+              echo "### Bug Fixes"
+              echo -e "$FIXES"
+              echo ""
+            fi
+            if [ -n "$REFACTOR" ]; then
+              echo "### Refactoring"
+              echo -e "$REFACTOR"
+              echo ""
+            fi
+            if [ -n "$DOCS" ]; then
+              echo "### Documentation"
+              echo -e "$DOCS"
+              echo ""
+            fi
+            if [ -n "$OTHER" ]; then
+              echo "### Other Changes"
+              echo -e "$OTHER"
+              echo ""
+            fi
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v${PREV_TAG}...v${VERSION}"
+          } > /tmp/changelog.md
+          
+          cat /tmp/changelog.md
 
       - name: Create GitHub release
         run: |
