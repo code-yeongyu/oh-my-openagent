@@ -22,10 +22,14 @@ export const TaskObjectSchema = z
 
 export type TaskObject = z.infer<typeof TaskObjectSchema>
 
+// Claude Code style aliases
+export const TaskSchema = TaskObjectSchema
+export type Task = TaskObject
+
 // Action input schemas
 export const TaskCreateInputSchema = z.object({
   subject: z.string(),
-  description: z.string(),
+  description: z.string().optional(),
   activeForm: z.string().optional(),
   blocks: z.array(z.string()).optional(),
   blockedBy: z.array(z.string()).optional(),
