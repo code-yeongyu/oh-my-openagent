@@ -1,4 +1,4 @@
-import type { Plugin } from "@opencode-ai/plugin";
+import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -73,7 +73,10 @@ import {
   interactive_bash,
   startTmuxCheck,
   lspManager,
-  createTask,
+  createTaskCreateTool,
+  createTaskGetTool,
+  createTaskList,
+  createTaskUpdateTool,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
@@ -421,7 +424,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
 
   const newTaskSystemEnabled = pluginConfig.new_task_system_enabled ?? false;
-  const taskTool = newTaskSystemEnabled ? createTask(pluginConfig) : null;
+  const taskToolsRecord: Record<string, ToolDefinition> = newTaskSystemEnabled ? {
+    task_create: createTaskCreateTool(pluginConfig),
+    task_get: createTaskGetTool(pluginConfig),
+    task_list: createTaskList(pluginConfig),
+    task_update: createTaskUpdateTool(pluginConfig),
+  } : {};
 
   return {
     tool: {
@@ -434,7 +442,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       skill_mcp: skillMcpTool,
       slashcommand: slashcommandTool,
       interactive_bash,
-      ...(taskTool ? { task: taskTool } : {}),
+      ...taskToolsRecord,
     },
 
     "chat.message": async (input, output) => {
