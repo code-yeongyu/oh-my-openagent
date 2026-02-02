@@ -9,12 +9,14 @@ describe("non-interactive-env hook", () => {
 
   beforeEach(() => {
     originalPlatform = process.platform
-    originalEnv = {
-      SHELL: process.env.SHELL,
-      PSModulePath: process.env.PSModulePath,
-      CI: process.env.CI,
-      OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
-    }
+    const envKeys = [
+      "SHELL",
+      "PSModulePath",
+      "CI",
+      "OPENCODE_NON_INTERACTIVE",
+      ...Object.keys(NON_INTERACTIVE_ENV),
+    ]
+    originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]))
     // given clean Unix-like environment for all tests
     // This prevents CI environments (which may have PSModulePath set) from
     // triggering PowerShell detection in tests that expect Unix behavior
@@ -35,7 +37,7 @@ describe("non-interactive-env hook", () => {
   })
 
   describe("git command modification", () => {
-    test("#given git command #when hook executes #then prepends export statement", async () => {
+    test("#given git command #when hook executes #then sets env without prefix", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git commit -m 'test'" },
@@ -47,14 +49,24 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("GIT_EDITOR=:")
-      expect(cmd).toContain("EDITOR=:")
-      expect(cmd).toContain("PAGER=cat")
-      expect(cmd).toContain("; git commit -m 'test'")
+      expect(cmd).toBe("git commit -m 'test'")
+      expect(process.env.GIT_EDITOR).toBe(":")
+      expect(process.env.EDITOR).toBe(":")
+      expect(process.env.PAGER).toBe("cat")
+      expect(process.env.VISUAL).toBe("")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(originalEnv.GIT_EDITOR)
+      expect(process.env.EDITOR).toBe(originalEnv.EDITOR)
+      expect(process.env.PAGER).toBe(originalEnv.PAGER)
+      expect(process.env.VISUAL).toBe(originalEnv.VISUAL)
     })
 
-    test("#given chained git commands #when hook executes #then export applies to all", async () => {
+    test("#given chained git commands #when hook executes #then command unchanged", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git add file && git rebase --continue" },
@@ -66,8 +78,14 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git add file && git rebase --continue")
+      expect(cmd).toBe("git add file && git rebase --continue")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(originalEnv.GIT_EDITOR)
     })
 
     test("#given non-git bash command #when hook executes #then command unchanged", async () => {
@@ -82,6 +100,13 @@ describe("non-interactive-env hook", () => {
       )
 
       expect(output.args.command).toBe("ls -la")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(originalEnv.GIT_EDITOR)
     })
 
     test("#given non-bash tool #when hook executes #then command unchanged", async () => {
@@ -96,6 +121,11 @@ describe("non-interactive-env hook", () => {
       )
 
       expect(output.args.command).toBe("git status")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "Read", sessionID: "test", callID: "1" },
+        { title: "read", output: "", metadata: {} }
+      )
     })
 
     test("#given empty command #when hook executes #then no error", async () => {
@@ -110,11 +140,18 @@ describe("non-interactive-env hook", () => {
       )
 
       expect(output.args.command).toBeUndefined()
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(originalEnv.GIT_EDITOR)
     })
   })
 
   describe("shell escaping", () => {
-    test("#given git command #when building prefix #then VISUAL properly escaped", async () => {
+    test("#given git command #when setting env #then VISUAL is empty string", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git status" },
@@ -125,11 +162,17 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toContain("VISUAL=''")
+      expect(process.env.VISUAL).toBe("")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(originalEnv.GIT_EDITOR)
     })
 
-    test("#given git command #when building prefix #then all NON_INTERACTIVE_ENV vars included", async () => {
+    test("#given git command #when setting env #then all NON_INTERACTIVE_ENV vars included", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git log" },
@@ -140,10 +183,77 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
       for (const key of Object.keys(NON_INTERACTIVE_ENV)) {
-        expect(cmd).toContain(`${key}=`)
+        expect(process.env[key]).toBe(NON_INTERACTIVE_ENV[key])
       }
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+    })
+  })
+
+  describe("env restoration", () => {
+    test("#given git command #when hook completes #then restores previous env", async () => {
+      process.env.GIT_EDITOR = "nano"
+      delete process.env.GIT_PAGER
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "restore-1" },
+        output
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(":")
+      expect(process.env.GIT_PAGER).toBe("cat")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "restore-1" },
+        { title: "bash", output: "", metadata: {} }
+      )
+
+      expect(process.env.GIT_EDITOR).toBe("nano")
+      expect(process.env.GIT_PAGER).toBeUndefined()
+    })
+
+    test("#given parallel git commands #when hooks overlap #then env restores once", async () => {
+      process.env.GIT_EDITOR = "nano"
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const outputA: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+      const outputB: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git log" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "a" },
+        outputA
+      )
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "b" },
+        outputB
+      )
+
+      expect(process.env.GIT_EDITOR).toBe(":")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "a" },
+        { title: "bash", output: "", metadata: {} }
+      )
+      expect(process.env.GIT_EDITOR).toBe(":")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "b" },
+        { title: "bash", output: "", metadata: {} }
+      )
+      expect(process.env.GIT_EDITOR).toBe("nano")
     })
   })
 
@@ -188,7 +298,7 @@ describe("non-interactive-env hook", () => {
       process.env.SHELL = "/bin/zsh"
       Object.defineProperty(process, "platform", { value: "darwin" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git status" },
       }
@@ -203,6 +313,11 @@ describe("non-interactive-env hook", () => {
       expect(cmd).toContain(";")
       expect(cmd).not.toContain("$env:")
       expect(cmd).not.toContain("set ")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
 
     test("#given Linux platform #when git command executes #then uses unix export syntax", async () => {
@@ -210,7 +325,7 @@ describe("non-interactive-env hook", () => {
       process.env.SHELL = "/bin/bash"
       Object.defineProperty(process, "platform", { value: "linux" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git commit -m 'test'" },
       }
@@ -223,6 +338,11 @@ describe("non-interactive-env hook", () => {
       const cmd = output.args.command as string
       expect(cmd).toStartWith("export ")
       expect(cmd).toContain("; git commit")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
 
     test("#given Windows with PowerShell env #when bash tool git command executes #then still uses unix export syntax", async () => {
@@ -231,7 +351,7 @@ describe("non-interactive-env hook", () => {
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "win32" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git status" },
       }
@@ -247,6 +367,11 @@ describe("non-interactive-env hook", () => {
       expect(cmd).toContain("; git status")
       expect(cmd).not.toContain("$env:")
       expect(cmd).not.toContain("set ")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
 
     test("#given Windows without SHELL env #when bash tool git command executes #then still uses unix export syntax", async () => {
@@ -256,7 +381,7 @@ describe("non-interactive-env hook", () => {
       delete process.env.SHELL
       Object.defineProperty(process, "platform", { value: "win32" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git log" },
       }
@@ -273,6 +398,11 @@ describe("non-interactive-env hook", () => {
       expect(cmd).not.toContain("set ")
       expect(cmd).not.toContain("&&")
       expect(cmd).not.toContain("$env:")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
 
     test("#given Windows Git Bash environment #when git command executes #then uses unix export syntax", async () => {
@@ -281,7 +411,7 @@ describe("non-interactive-env hook", () => {
       process.env.SHELL = "/usr/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git status" },
       }
@@ -294,6 +424,11 @@ describe("non-interactive-env hook", () => {
       const cmd = output.args.command as string
       expect(cmd).toStartWith("export ")
       expect(cmd).toContain("; git status")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
 
     test("#given any platform #when chained git commands via bash tool #then uses unix export syntax", async () => {
@@ -302,7 +437,7 @@ describe("non-interactive-env hook", () => {
       delete process.env.SHELL
       Object.defineProperty(process, "platform", { value: "win32" })
 
-      const hook = createNonInteractiveEnvHook(mockCtx)
+      const hook = createNonInteractiveEnvHook(mockCtx, { show_export_prefix: true })
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git add file && git commit -m 'test'" },
       }
@@ -315,6 +450,11 @@ describe("non-interactive-env hook", () => {
       const cmd = output.args.command as string
       expect(cmd).toStartWith("export ")
       expect(cmd).toContain("; git add file && git commit")
+
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID: "test", callID: "1" },
+        { title: "bash", output: "", metadata: {} }
+      )
     })
   })
 })

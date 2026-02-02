@@ -362,6 +362,13 @@ export const SisyphusTasksConfigSchema = z.object({
 export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
 })
+
+export const NonInteractiveEnvConfigSchema = z.object({
+  /** Disable non-interactive env injection for git commands (default: false) */
+  disabled: z.boolean().optional(),
+  /** Show export prefix in displayed command (default: false) */
+  show_export_prefix: z.boolean().optional(),
+})
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   /** Enable new task system (default: false) */
@@ -389,6 +396,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  non_interactive_env: NonInteractiveEnvConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -418,5 +426,6 @@ export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
+export type NonInteractiveEnvConfig = z.infer<typeof NonInteractiveEnvConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

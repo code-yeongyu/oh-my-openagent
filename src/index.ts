@@ -196,7 +196,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createAgentUsageReminderHook(ctx)
     : null;
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
-    ? createNonInteractiveEnvHook(ctx)
+    ? createNonInteractiveEnvHook(ctx, pluginConfig.non_interactive_env)
     : null;
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
     ? createInteractiveBashSessionHook(ctx)

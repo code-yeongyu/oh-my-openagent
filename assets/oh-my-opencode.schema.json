@@ -3020,6 +3020,17 @@
           }
         }
       }
+    },
+    "non_interactive_env": {
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "show_export_prefix": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

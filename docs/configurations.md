@@ -1228,3 +1228,21 @@ Tools that should never be pruned (default):
 | Variable              | Description                                                                                                                                     |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override the OpenCode configuration directory. Useful for profile isolation with tools like [OCX](https://github.com/kdcokenny/ocx) ghost mode. |
+
+## Non-interactive Env
+
+Configure how the non-interactive environment hook behaves:
+
+```json
+{
+  "non_interactive_env": {
+    "disabled": false,
+    "show_export_prefix": false
+  }
+}
+```
+
+| Option               | Default | Description |
+| -------------------- | ------- | ----------- |
+| `disabled`           | `false` | Disable non-interactive env injection for git commands. |
+| `show_export_prefix` | `false` | Show the `export ...;` prefix in the displayed command. When `false`, env vars are applied without rewriting the command. |
