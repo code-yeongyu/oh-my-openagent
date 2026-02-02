@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 /**
  * Metis - Plan Consultant Agent
@@ -80,9 +82,10 @@ Confirm:
 **Pre-Analysis Actions** (YOU should do before questioning):
 \`\`\`
 // Launch these explore agents FIRST
-call_omo_agent(subagent_type="explore", prompt="Find similar implementations...")
-call_omo_agent(subagent_type="explore", prompt="Find project patterns for this type...")
-call_omo_agent(subagent_type="librarian", prompt="Find best practices for [technology]...")
+// Prompt structure: CONTEXT + GOAL + QUESTION + REQUEST
+call_omo_agent(subagent_type="explore", prompt="I'm analyzing a new feature request and need to understand existing patterns before asking clarifying questions. Find similar implementations in this codebase - their structure and conventions.")
+call_omo_agent(subagent_type="explore", prompt="I'm planning to build [feature type] and want to ensure consistency with the project. Find how similar features are organized - file structure, naming patterns, and architectural approach.")
+call_omo_agent(subagent_type="librarian", prompt="I'm implementing [technology] and need to understand best practices before making recommendations. Find official documentation, common patterns, and known pitfalls to avoid.")
 \`\`\`
 
 **Questions to Ask** (AFTER exploration):
@@ -194,10 +197,10 @@ Task(
 
 **Investigation Structure**:
 \`\`\`
-// Parallel probes
-call_omo_agent(subagent_type="explore", prompt="Find how X is currently handled...")
-call_omo_agent(subagent_type="librarian", prompt="Find official docs for Y...")
-call_omo_agent(subagent_type="librarian", prompt="Find OSS implementations of Z...")
+// Parallel probes - Prompt structure: CONTEXT + GOAL + QUESTION + REQUEST
+call_omo_agent(subagent_type="explore", prompt="I'm researching how to implement [feature] and need to understand the current approach. Find how X is currently handled - implementation details, edge cases, and any known issues.")
+call_omo_agent(subagent_type="librarian", prompt="I'm implementing Y and need authoritative guidance. Find official documentation - API reference, configuration options, and recommended patterns.")
+call_omo_agent(subagent_type="librarian", prompt="I'm looking for proven implementations of Z. Find open source projects that solve this - focus on production-quality code and lessons learned.")
 \`\`\`
 
 **Directives for Prometheus**:
@@ -311,7 +314,7 @@ export function createMetisAgent(model: string): AgentConfig {
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
-    mode: "subagent" as const,
+    mode: MODE,
     model,
     temperature: 0.3,
     ...metisRestrictions,
@@ -319,7 +322,7 @@ export function createMetisAgent(model: string): AgentConfig {
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
-
+createMetisAgent.mode = MODE
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",

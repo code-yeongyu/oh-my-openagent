@@ -3,13 +3,13 @@ import { createBuiltinMcps } from "./index"
 
 describe("createBuiltinMcps", () => {
   test("should return all MCPs when disabled_mcps is empty", () => {
-    //#given
+    // given
     const disabledMcps: string[] = []
 
-    //#when
+    // when
     const result = createBuiltinMcps(disabledMcps)
 
-    //#then
+    // then
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
@@ -17,13 +17,13 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should filter out disabled built-in MCPs", () => {
-    //#given
+    // given
     const disabledMcps = ["context7"]
 
-    //#when
+    // when
     const result = createBuiltinMcps(disabledMcps)
 
-    //#then
+    // then
     expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
@@ -31,13 +31,13 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should filter out all built-in MCPs when all disabled", () => {
-    //#given
+    // given
     const disabledMcps = ["websearch", "context7", "grep_app"]
 
-    //#when
+    // when
     const result = createBuiltinMcps(disabledMcps)
 
-    //#then
+    // then
     expect(result).not.toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).not.toHaveProperty("grep_app")
@@ -45,13 +45,13 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should ignore custom MCP names in disabled_mcps", () => {
-    //#given
+    // given
     const disabledMcps = ["context7", "playwright", "custom"]
 
-    //#when
+    // when
     const result = createBuiltinMcps(disabledMcps)
 
-    //#then
+    // then
     expect(result).toHaveProperty("websearch")
     expect(result).not.toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
@@ -59,11 +59,11 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should handle empty disabled_mcps by default", () => {
-    //#given
-    //#when
+    // given
+    // when
     const result = createBuiltinMcps()
 
-    //#then
+    // then
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")
@@ -71,13 +71,13 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should only filter built-in MCPs, ignoring unknown names", () => {
-    //#given
+    // given
     const disabledMcps = ["playwright", "sqlite", "unknown-mcp"]
 
-    //#when
+    // when
     const result = createBuiltinMcps(disabledMcps)
 
-    //#then
+    // then
     expect(result).toHaveProperty("websearch")
     expect(result).toHaveProperty("context7")
     expect(result).toHaveProperty("grep_app")

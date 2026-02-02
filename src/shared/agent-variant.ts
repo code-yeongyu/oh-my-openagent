@@ -1,5 +1,4 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import { findCaseInsensitive } from "./case-insensitive"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 export function resolveAgentVariant(
@@ -13,7 +12,10 @@ export function resolveAgentVariant(
   const agentOverrides = config.agents as
     | Record<string, { variant?: string; category?: string }>
     | undefined
-  const agentOverride = agentOverrides ? findCaseInsensitive(agentOverrides, agentName) : undefined
+  const agentOverride = agentOverrides
+    ? agentOverrides[agentName]
+      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    : undefined
   if (!agentOverride) {
     return undefined
   }
@@ -43,7 +45,10 @@ export function resolveVariantForModel(
   const agentOverrides = config.agents as
     | Record<string, { category?: string }>
     | undefined
-  const agentOverride = agentOverrides ? findCaseInsensitive(agentOverrides, agentName) : undefined
+  const agentOverride = agentOverrides
+    ? agentOverrides[agentName]
+      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    : undefined
   const categoryName = agentOverride?.category
   if (categoryName) {
     const categoryRequirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]

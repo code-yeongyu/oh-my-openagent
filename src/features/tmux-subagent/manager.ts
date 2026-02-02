@@ -2,8 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
 import {
-  isInsideTmux,
-  getCurrentPaneId,
+  isInsideTmux as defaultIsInsideTmux,
+  getCurrentPaneId as defaultGetCurrentPaneId,
   POLL_INTERVAL_BACKGROUND_MS,
   SESSION_MISSING_GRACE_MS,
   SESSION_READY_POLL_INTERVAL_MS,
@@ -21,7 +21,22 @@ interface SessionCreatedEvent {
   properties?: { info?: { id?: string; parentID?: string; title?: string } }
 }
 
+export interface TmuxUtilDeps {
+  isInsideTmux: () => boolean
+  getCurrentPaneId: () => string | undefined
+}
+
+const defaultTmuxDeps: TmuxUtilDeps = {
+  isInsideTmux: defaultIsInsideTmux,
+  getCurrentPaneId: defaultGetCurrentPaneId,
+}
+
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
+
+// Stability detection constants (prevents premature closure - see issue #1330)
+// Mirrors the proven pattern from background-agent/manager.ts
+const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
+const STABLE_POLLS_REQUIRED = 3          // 3 consecutive idle polls (~6s with 2s poll interval)
 
 /**
  * State-first Tmux Session Manager
@@ -43,13 +58,15 @@ export class TmuxSessionManager {
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
   private pollInterval?: ReturnType<typeof setInterval>
+  private deps: TmuxUtilDeps
 
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig) {
+  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
+    this.deps = deps
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
-    this.sourcePaneId = getCurrentPaneId()
+    this.sourcePaneId = deps.getCurrentPaneId()
 
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
@@ -60,7 +77,7 @@ export class TmuxSessionManager {
   }
 
   private isEnabled(): boolean {
-    return this.tmuxConfig.enabled && isInsideTmux()
+    return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
 
   private getCapacityConfig(): CapacityConfig {
@@ -113,7 +130,7 @@ export class TmuxSessionManager {
     log("[tmux-session-manager] onSessionCreated called", {
       enabled,
       tmuxConfigEnabled: this.tmuxConfig.enabled,
-      isInsideTmux: isInsideTmux(),
+      isInsideTmux: this.deps.isInsideTmux(),
       eventType: event.type,
       infoId: event.properties?.info?.id,
       infoParentID: event.properties?.info?.parentID,
@@ -312,18 +329,77 @@ export class TmuxSessionManager {
         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
         const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
         const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
+        const elapsedMs = now - tracked.createdAt.getTime()
+
+        // Stability detection: Don't close immediately on idle
+        // Wait for STABLE_POLLS_REQUIRED consecutive polls with same message count
+        let shouldCloseViaStability = false
+
+        if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
+          // Fetch message count to detect if agent is still producing output
+          try {
+            const messagesResult = await this.client.session.messages({ 
+              path: { id: sessionId } 
+            })
+            const currentMsgCount = Array.isArray(messagesResult.data) 
+              ? messagesResult.data.length 
+              : 0
+
+            if (tracked.lastMessageCount === currentMsgCount) {
+              // Message count unchanged - increment stable polls
+              tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
+              
+              if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
+                // Double-check status before closing
+                const recheckResult = await this.client.session.status({ path: undefined })
+                const recheckStatuses = (recheckResult.data ?? {}) as Record<string, { type: string }>
+                const recheckStatus = recheckStatuses[sessionId]
+                
+                if (recheckStatus?.type === "idle") {
+                  shouldCloseViaStability = true
+                } else {
+                  // Status changed - reset stability counter
+                  tracked.stableIdlePolls = 0
+                  log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
+                    sessionId,
+                    recheckStatus: recheckStatus?.type,
+                  })
+                }
+              }
+            } else {
+              // New messages - agent is still working, reset stability counter
+              tracked.stableIdlePolls = 0
+            }
+            
+            tracked.lastMessageCount = currentMsgCount
+          } catch (msgErr) {
+            log("[tmux-session-manager] failed to fetch messages for stability check", {
+              sessionId,
+              error: String(msgErr),
+            })
+            // On error, don't close - be conservative
+          }
+        } else if (!isIdle) {
+          // Not idle - reset stability counter
+          tracked.stableIdlePolls = 0
+        }
 
         log("[tmux-session-manager] session check", {
           sessionId,
           statusType: status?.type,
           isIdle,
+          elapsedMs,
+          stableIdlePolls: tracked.stableIdlePolls,
+          lastMessageCount: tracked.lastMessageCount,
           missingSince,
           missingTooLong,
           isTimedOut,
-          shouldClose: isIdle || missingTooLong || isTimedOut,
+          shouldCloseViaStability,
         })
 
-        if (isIdle || missingTooLong || isTimedOut) {
+        // Close if: stability detection confirmed OR missing too long OR timed out
+        // Note: We no longer close immediately on idle - stability detection handles that
+        if (shouldCloseViaStability || missingTooLong || isTimedOut) {
           sessionsToClose.push(sessionId)
         }
       }
