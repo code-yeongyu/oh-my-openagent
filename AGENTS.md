@@ -1,8 +1,8 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-01T17:25:00+09:00
-**Commit:** ab54e6cc
-**Branch:** feat/hephaestus-agent
+**Generated:** 2026-02-02T21:16:00+09:00
+**Commit:** d80adac3
+**Branch:** dev
 
 ---
 
@@ -18,7 +18,7 @@
 
 ## OVERVIEW
 
-OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
+O P E N C O D E plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for O P E N C O D E.
 
 ## STRUCTURE
 
@@ -33,7 +33,7 @@ oh-my-opencode/
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
-│   └── index.ts       # Main plugin entry (740 lines)
+│   └── index.ts       # Main plugin entry (788 lines)
 ├── script/            # build-schema.ts, build-binaries.ts
 ├── packages/          # 11 platform-specific binaries
 └── dist/              # Build output (ESM + .d.ts)
@@ -103,7 +103,7 @@ oh-my-opencode/
 | Atlas | anthropic/claude-sonnet-4-5 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | Consultation, debugging |
 | librarian | zai-coding-plan/glm-4.7 | Docs, GitHub search (fallback: glm-4.7-free) |
-| explore | anthropic/claude-haiku-4-5 | Fast codebase grep (fallback: gpt-5-mini → gpt-5-nano) |
+| explore | xai/grok-code-fast-1 | Fast codebase grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 | Prometheus | anthropic/claude-opus-4-5 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 
@@ -128,7 +128,7 @@ bun test               # 100 test files
 | File | Lines | Description |
 |------|-------|-------------|
 | `src/features/builtin-skills/skills.ts` | 1729 | Skill definitions |
-| `src/features/background-agent/manager.ts` | 1440 | Task lifecycle, concurrency |
+| `src/features/background-agent/manager.ts` | 1457 | Task lifecycle, concurrency |
 | `src/agents/prometheus-prompt.ts` | 1283 | Planning agent prompt |
 | `src/tools/delegate-task/tools.ts` | 1135 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 757 | Orchestrator hook |
@@ -151,6 +151,6 @@ Three-tier system:
 
 ## NOTES
 
-- **OpenCode**: Requires >= 1.0.150
+- **O P E N C O D E**: Requires >= 1.0.150
 - **Flaky tests**: ralph-loop (CI timeout), session-state (parallel pollution)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
