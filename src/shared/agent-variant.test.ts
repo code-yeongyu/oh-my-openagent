@@ -84,13 +84,14 @@ describe("applyAgentVariant", () => {
 
 describe("resolveVariantForModel", () => {
   test("returns agent override variant when configured", () => {
-    // given
+    // given - use a model in sisyphus chain (claude-opus-4-5 has default variant "max")
+    // to verify override takes precedence over fallback chain
     const config = {
       agents: {
         sisyphus: { variant: "high" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "github-copilot", modelID: "gpt-5.2" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
