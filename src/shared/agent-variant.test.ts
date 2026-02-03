@@ -211,4 +211,40 @@ describe("resolveVariantForModel", () => {
     // then
     expect(variant).toBe("max")
   })
+
+  test("returns thinking variant for github-copilot provider with claude-opus-4-5", () => {
+    // #given - github-copilot doesn't support "max" variant, only "standard" and "thinking"
+    const config = {} as OhMyOpenCodeConfig
+    const model = { providerID: "github-copilot", modelID: "claude-opus-4-5" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "sisyphus", model)
+
+    // #then - should return "thinking" instead of "max"
+    expect(variant).toBe("thinking")
+  })
+
+  test("returns thinking variant for github-copilot claude in oracle agent", () => {
+    // #given - oracle agent with github-copilot provider
+    const config = {} as OhMyOpenCodeConfig
+    const model = { providerID: "github-copilot", modelID: "claude-opus-4-5" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "oracle", model)
+
+    // #then - copilot claude gets "thinking" variant
+    expect(variant).toBe("thinking")
+  })
+
+  test("returns high variant for github-copilot gemini-3-pro in oracle agent", () => {
+    // #given - oracle agent with github-copilot provider and gemini model
+    const config = {} as OhMyOpenCodeConfig
+    const model = { providerID: "github-copilot", modelID: "gemini-3-pro" }
+
+    // #when
+    const variant = resolveVariantForModel(config, "oracle", model)
+
+    // #then - copilot gemini gets "high" variant (not "max")
+    expect(variant).toBe("high")
+  })
 })
