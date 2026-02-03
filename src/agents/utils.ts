@@ -10,6 +10,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createGitOwnerAgent, GIT_OWNER_PROMPT_METADATA } from "./git-owner"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
@@ -71,19 +72,37 @@ export function registerCustomAgent(
   }
 }
 
+const CUSTOM_AGENT_FACTORIES: Record<string, {
+  factory: (model: string, config?: CustomAgentConfig) => AgentConfig
+  metadata: AgentPromptMetadata
+}> = {
+  "git-owner": {
+    factory: createGitOwnerAgent,
+    metadata: GIT_OWNER_PROMPT_METADATA,
+  },
+}
+
 export function registerCustomAgentsFromConfig(
   customAgents: Record<string, CustomAgentConfig>
 ): void {
   for (const [name, config] of Object.entries(customAgents)) {
-    const agentConfig: AgentConfig = {
-      name,
-      model: config.model,
-      prompt: "",
-      description: config.metadata?.description ?? `Custom agent: ${name}`,
-      temperature: 0.1,
-    }
+    const knownFactory = CUSTOM_AGENT_FACTORIES[name]
 
-    customAgentSources[name] = agentConfig
+    if (knownFactory) {
+      const factoryFn = ((model: string) => knownFactory.factory(model, config)) as AgentFactory
+      factoryFn.mode = "subagent"
+      customAgentSources[name] = factoryFn
+      customAgentMetadataRegistry[name] = knownFactory.metadata
+    } else {
+      const agentConfig: AgentConfig = {
+        name,
+        model: config.model,
+        prompt: "",
+        description: config.metadata?.description ?? `Custom agent: ${name}`,
+        temperature: 0.1,
+      }
+      customAgentSources[name] = agentConfig
+    }
 
     if (config.metadata?.toolRestrictions) {
       registerCustomAgentRestrictions(name, config.metadata.toolRestrictions)
