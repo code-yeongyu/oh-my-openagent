@@ -147,45 +147,6 @@ describe("Plan agent demote behavior", () => {
 
   test("plan agent should be demoted to subagent without inheriting prometheus prompt", async () => {
     // #given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
-      mockResolvedValue: (value: Record<string, unknown>) => void
-    }
-    createBuiltinAgentsMock.mockResolvedValue({
-      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
-      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
-      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
-      atlas: { name: "atlas", prompt: "test", mode: "primary" },
-    })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
-        planner_enabled: true,
-      },
-    }
-    const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
-      agent: {},
-    }
-    const handler = createConfigHandler({
-      ctx: { directory: "/tmp" },
-      pluginConfig,
-      modelCacheState: {
-        anthropicContext1MEnabled: false,
-        modelContextLimitsCache: new Map(),
-      },
-    })
-
-    // #when
-    await handler(config)
-
-    // #then
-    const keys = Object.keys(config.agent as Record<string, unknown>)
-    const coreAgents = ["sisyphus", "hephaestus", "prometheus", "atlas"]
-    const ordered = keys.filter((key) => coreAgents.includes(key))
-    expect(ordered).toEqual(coreAgents)
-  })
-
-  test("plan agent should be demoted to subagent mode when replacePlan is true", async () => {
-    // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
         planner_enabled: true,
@@ -211,7 +172,7 @@ describe("Plan agent demote behavior", () => {
       },
     })
 
-    // when
+    // #when
     await handler(config)
 
     // #then - plan is demoted to subagent but does NOT inherit prometheus prompt

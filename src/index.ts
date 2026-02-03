@@ -367,45 +367,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       )
     : null;
 
-  const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? createCompactionContextInjector()
-    : null;
-
-  const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? createTodoContinuationEnforcer(ctx, {
-        backgroundManager,
-        isContinuationStopped: stopContinuationGuard?.isStopped,
-      })
-    : null;
-
-  const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
-    ? createUnstableAgentBabysitterHook(
-          {
-            directory: ctx.directory,
-            client: {
-              session: {
-                messages: async (args) => {
-                  const result = await ctx.client.session.messages(args)
-                  if (Array.isArray(result)) return result
-                  if (typeof result === "object" && result !== null && "data" in result) {
-                    const record = result as Record<string, unknown>
-                    return { data: record.data }
-                  }
-                  return []
-                },
-                prompt: async (args) => {
-                  await ctx.client.session.prompt(args)
-                },
-              },
-            },
-          },
-          {
-            backgroundManager,
-            config: pluginConfig.babysitting,
-          }
-        )
-      : null;
-
   if (sessionRecovery && todoContinuationEnforcer) {
     sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
     sessionRecovery.setOnRecoveryCompleteCallback(
@@ -803,6 +764,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           );
 
           ralphLoop.startLoop(sessionID, prompt, {
+            ultrawork: true,
             maxIterations: maxIterMatch
               ? parseInt(maxIterMatch[1], 10)
               : undefined,
@@ -847,20 +809,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           log("[stop-continuation] All continuation mechanisms stopped", {
             sessionID,
           });
-        }
-      }
-
-      if (input.tool === "slashcommand") {
-        const args = output.args as { command?: string } | undefined;
-        const command = args?.command?.replace(/^\//, "").toLowerCase();
-        const sessionID = input.sessionID || getMainSessionID();
-
-        if (command === "stop-continuation" && sessionID) {
-          stopContinuationGuard?.stop(sessionID);
-          todoContinuationEnforcer?.cancelAllCountdowns();
-          ralphLoop?.cancelLoop(sessionID);
-          clearBoulderState(ctx.directory);
-          log("[stop-continuation] All continuation mechanisms stopped", { sessionID });
         }
       }
     },
