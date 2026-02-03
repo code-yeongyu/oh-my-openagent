@@ -830,6 +830,72 @@ export class BackgroundManager {
     }
   }
 
+  async cancelTask(
+    taskId: string,
+    options?: { source?: string; reason?: string; abortSession?: boolean }
+  ): Promise<boolean> {
+    const task = this.tasks.get(taskId)
+    if (!task || (task.status !== "running" && task.status !== "pending")) {
+      return false
+    }
+
+    const source = options?.source ?? "cancel"
+    const abortSession = options?.abortSession !== false
+    const reason = options?.reason
+
+    if (task.status === "pending") {
+      const key = task.model
+        ? `${task.model.providerID}/${task.model.modelID}`
+        : task.agent
+      const queue = this.queuesByKey.get(key)
+      if (queue) {
+        const index = queue.findIndex(item => item.task.id === taskId)
+        if (index !== -1) {
+          queue.splice(index, 1)
+          if (queue.length === 0) {
+            this.queuesByKey.delete(key)
+          }
+        }
+      }
+      log("[background-agent] Cancelled pending task:", { taskId, key })
+    }
+
+    task.status = "cancelled"
+    task.completedAt = new Date()
+    if (reason) {
+      task.error = reason
+    }
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const existingTimer = this.completionTimers.get(task.id)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+      this.completionTimers.delete(task.id)
+    }
+
+    this.cleanupPendingByParent(task)
+    this.markForNotification(task)
+
+    if (abortSession && task.sessionID) {
+      this.client.session.abort({
+        path: { id: task.sessionID },
+      }).catch(() => {})
+    }
+
+    try {
+      await this.notifyParentSession(task)
+      log(`[background-agent] Task cancelled via ${source}:`, task.id)
+    } catch (err) {
+      log("[background-agent] Error in notifyParentSession for cancelled task:", { taskId: task.id, error: err })
+    }
+
+    return true
+  }
+
   /**
    * Cancels a pending task by removing it from queue and marking as cancelled.
    * Does NOT abort session (no session exists yet) or release concurrency slot (wasn't acquired).
@@ -840,29 +906,7 @@ export class BackgroundManager {
       return false
     }
 
-    // Find and remove from queue
-    const key = task.model 
-      ? `${task.model.providerID}/${task.model.modelID}`
-      : task.agent
-    const queue = this.queuesByKey.get(key)
-    if (queue) {
-      const index = queue.findIndex(item => item.task.id === taskId)
-      if (index !== -1) {
-        queue.splice(index, 1)
-        if (queue.length === 0) {
-          this.queuesByKey.delete(key)
-        }
-      }
-    }
-
-    // Mark as cancelled
-    task.status = "cancelled"
-    task.completedAt = new Date()
-
-    // Clean up pendingByParent
-    this.cleanupPendingByParent(task)
-
-    log("[background-agent] Cancelled pending task:", { taskId, key })
+    void this.cancelTask(taskId, { source: "cancelPendingTask", abortSession: false })
     return true
   }
 
