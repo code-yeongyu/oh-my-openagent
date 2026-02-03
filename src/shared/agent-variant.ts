@@ -1,10 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import { findCaseInsensitive } from "./case-insensitive"
 import { 
   AGENT_MODEL_REQUIREMENTS, 
   CATEGORY_MODEL_REQUIREMENTS, 
-  getEffectiveFallbackChain,
-  getEffectiveCategoryFallbackChain,
   type FallbackEntry 
 } from "./model-requirements"
 
@@ -79,38 +76,65 @@ export function resolveVariantForModel(
   const agentOverrides = config.agents as
     | Record<string, AgentOverrideWithFallback>
     | undefined
-  const agentOverride = agentOverrides ? findCaseInsensitive(agentOverrides, agentName) : undefined
+  const agentOverride = agentOverrides
+    ? agentOverrides[agentName]
+      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    : undefined
 
-  const userAgentFallback = agentOverride?.fallback_chain
-  const effectiveAgentChain = getEffectiveFallbackChain(agentName, userAgentFallback)
-  
-  if (effectiveAgentChain.length > 0) {
+  // 1. User-provided agent fallback chain takes absolute priority
+  if (agentOverride?.fallback_chain && agentOverride.fallback_chain.length > 0) {
     const chainVariant = findVariantInChain(
-      effectiveAgentChain,
+      agentOverride.fallback_chain,
       currentModel.providerID,
       currentModel.modelID
     )
     if (chainVariant) return chainVariant
   }
 
+  // 2. User-provided agent variant override
+  if (agentOverride?.variant) return agentOverride.variant
+
   const categoryName = agentOverride?.category
   if (categoryName) {
     const categoryConfig = config.categories?.[categoryName] as CategoryConfigWithFallback | undefined
-    const userCategoryFallback = categoryConfig?.fallback_chain
-    const effectiveCategoryChain = getEffectiveCategoryFallbackChain(categoryName, userCategoryFallback)
     
-    if (effectiveCategoryChain.length > 0) {
+    // 3. User-provided category fallback chain
+    if (categoryConfig?.fallback_chain && categoryConfig.fallback_chain.length > 0) {
       const chainVariant = findVariantInChain(
-        effectiveCategoryChain,
+        categoryConfig.fallback_chain,
         currentModel.providerID,
         currentModel.modelID
       )
       if (chainVariant) return chainVariant
     }
+
+    // 4. Category variant override
     if (categoryConfig?.variant) return categoryConfig.variant
   }
 
-  if (agentOverride?.variant) return agentOverride.variant
+  // 5. Default agent fallback chain
+  const defaultAgentChain = AGENT_MODEL_REQUIREMENTS[agentName]?.fallbackChain
+  if (defaultAgentChain) {
+    const chainVariant = findVariantInChain(
+      defaultAgentChain,
+      currentModel.providerID,
+      currentModel.modelID
+    )
+    if (chainVariant) return chainVariant
+  }
+
+  // 6. Default category fallback chain
+  if (categoryName) {
+    const defaultCategoryChain = CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain
+    if (defaultCategoryChain) {
+      const chainVariant = findVariantInChain(
+        defaultCategoryChain,
+        currentModel.providerID,
+        currentModel.modelID
+      )
+      if (chainVariant) return chainVariant
+    }
+  }
 
   return undefined
 }
