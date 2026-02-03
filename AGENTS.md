@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-02T21:16:00+09:00
-**Commit:** d80adac3
+**Generated:** 2026-02-03T16:10:30+09:00
+**Commit:** d7679e14
 **Branch:** dev
 
 ---
@@ -120,7 +120,7 @@ This is an **international open-source project**. To ensure accessibility and ma
 
 ## OVERVIEW
 
-O P E N C O D E plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for O P E N C O D E.
+OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
@@ -131,7 +131,7 @@ oh-my-opencode/
 │   ├── hooks/         # 34 lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # 20+ tools - see src/tools/AGENTS.md
 │   ├── features/      # Background agents, Claude Code compat - see src/features/AGENTS.md
-│   ├── shared/        # 55 cross-cutting utilities - see src/shared/AGENTS.md
+│   ├── shared/        # 66 cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/           # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/           # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/        # Zod schema, TypeScript types
@@ -189,12 +189,16 @@ oh-my-opencode/
 | Versioning | Local version bump - CI manages |
 | Type Safety | `as any`, `@ts-ignore`, `@ts-expect-error` |
 | Error Handling | Empty catch blocks |
-| Testing | Deleting failing tests |
+| Testing | Deleting failing tests, writing implementation before test |
 | Agent Calls | Sequential - use `delegate_task` parallel |
 | Hook Logic | Heavy PreToolUse - slows every call |
 | Commits | Giant (3+ files), separate test from impl |
 | Temperature | >0.3 for code agents |
 | Trust | Agent self-reports - ALWAYS verify |
+| Git | `git add -i`, `git rebase -i` (no interactive input) |
+| Git | Skip hooks (--no-verify), force push without request |
+| Bash | `sleep N` - use conditional waits |
+| Bash | `cd dir && cmd` - use workdir parameter |
 
 ## AGENT MODELS
 
@@ -230,7 +234,7 @@ bun test               # 100 test files
 | File | Lines | Description |
 |------|-------|-------------|
 | `src/features/builtin-skills/skills.ts` | 1729 | Skill definitions |
-| `src/features/background-agent/manager.ts` | 1457 | Task lifecycle, concurrency |
+| `src/features/background-agent/manager.ts` | 1418 | Task lifecycle, concurrency |
 | `src/agents/prometheus-prompt.ts` | 1283 | Planning agent prompt |
 | `src/tools/delegate-task/tools.ts` | 1135 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 757 | Orchestrator hook |
@@ -253,6 +257,6 @@ Three-tier system:
 
 ## NOTES
 
-- **O P E N C O D E**: Requires >= 1.0.150
+- **OpenCode**: Requires >= 1.0.150
 - **Flaky tests**: ralph-loop (CI timeout), session-state (parallel pollution)
 - **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
