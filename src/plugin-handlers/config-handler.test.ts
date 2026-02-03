@@ -176,10 +176,12 @@ describe("Plan agent demote behavior", () => {
     await handler(config)
 
     // then
-    const agents = config.agent as Record<string, { mode?: string; name?: string }>
+    const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
     expect(agents.plan.name).toBe("plan")
+    expect(agents.plan.prompt).toBe("original plan prompt")
+    expect(agents.plan.prompt).not.toBe(agents.prometheus?.prompt)
   })
 
   test("prometheus should have mode 'all' to be callable via delegate_task", async () => {
