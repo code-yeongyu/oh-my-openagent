@@ -543,7 +543,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should use github-copilot (second provider) since google not connected
-      expect(result!.model).toBe("github-copilot/gemini-3-pro")
+      expect(result!.model).toBe("github-copilot/gemini-3-pro-preview")
       expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
@@ -795,8 +795,8 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use categoryDefaultModel since google is connected
-      expect(result!.model).toBe("google/gemini-3-pro")
+      // then - should use transformed categoryDefaultModel since google is connected
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
       expect(result!.source).toBe("category-default")
       cacheSpy.mockRestore()
     })
