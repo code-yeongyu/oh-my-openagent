@@ -1,3 +1,4 @@
+import { createTextPart } from "../../shared/part-factory"
 import { ProjectDetector, type ProjectInfo } from "../../shared/project-detector"
 
 export interface ProjectContextInjectorContext {
@@ -30,7 +31,7 @@ export function createProjectContextInjectorHook(ctx: ProjectContextInjectorCont
 
   return {
     "chat.message": async (
-      input: { sessionID: string; agent?: string },
+      input: { sessionID: string; agent?: string; messageID?: string },
       output: { parts?: Array<{ type: string; text?: string }> }
     ): Promise<void> => {
       if (injectedSessions.has(input.sessionID)) {
@@ -46,10 +47,13 @@ export function createProjectContextInjectorHook(ctx: ProjectContextInjectorCont
         output.parts = []
       }
 
-      output.parts.push({
-        type: "text",
-        text: contextText,
-      })
+      output.parts.push(
+        createTextPart({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          text: contextText,
+        })
+      )
     },
   }
 }

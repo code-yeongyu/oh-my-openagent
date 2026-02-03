@@ -576,11 +576,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
-      // DISABLED - phaseRulesInjector causes crash due to incomplete Part schema
-      // await skillAutoInjector?.["chat.message"]?.(input, output);
-      // await phaseRulesInjector?.["chat.message"]?.(input, output);
-      // await projectContextInjector?.["chat.message"]?.(input, output);
-      // await prContextInjector?.["chat.message"]?.(input, output);
+      // Phase 3 hooks - fixed to use createTextPart for proper Part schema
+      await skillAutoInjector?.["chat.message"]?.(input, output);
+      await phaseRulesInjector?.["chat.message"]?.(input, output);
+      await projectContextInjector?.["chat.message"]?.(input, output);
+      await prContextInjector?.["chat.message"]?.(input, output);
 
       if (ralphLoop) {
         const parts = (
@@ -674,8 +674,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await observerDetector?.event(input as any);
       await instinctLearner?.event(input as any);
       await patternExtraction?.event(input as any);
-      // TEMPORARILY DISABLED FOR DEBUGGING - Phase 3 hook
-      // await skillAutoInjector?.event(input as any);
+      await skillAutoInjector?.event(input as any);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;

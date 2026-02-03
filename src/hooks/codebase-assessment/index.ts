@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import { createTextPart } from "../../shared/part-factory"
 import { HOOK_NAME } from "./constants"
 import { collectProjectConfig } from "./collector"
 
@@ -48,11 +49,18 @@ export function createCodebaseAssessmentHook(ctx: PluginInput) {
 
       injectedSessions.add(sessionID)
 
+      if (!output.parts) output.parts = []
+
       // Check cache
       const cached = assessmentCache.get(ctx.directory)
       if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         log(`[${HOOK_NAME}] Using cached assessment`, { sessionID })
-        output.parts?.push({ type: "text", text: cached.result })
+        output.parts.push(
+          createTextPart({
+            sessionID: input.sessionID,
+            text: cached.result,
+          })
+        )
         return
       }
 
@@ -86,7 +94,12 @@ export function createCodebaseAssessmentHook(ctx: PluginInput) {
           configCount: assessment.configFilesFound.length,
         })
         
-        output.parts?.push({ type: "text", text: assessmentText })
+        output.parts.push(
+          createTextPart({
+            sessionID: input.sessionID,
+            text: assessmentText,
+          })
+        )
       } catch (err) {
         log(`[${HOOK_NAME}] Assessment failed`, { sessionID, error: String(err) })
       }

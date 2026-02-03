@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process"
+import { createTextPart } from "../../shared/part-factory"
 
 export interface PrContextInjectorContext {
   directory: string
@@ -14,6 +15,7 @@ export function createPrContextInjectorHook(ctx: PrContextInjectorContext) {
       return execSync("git branch --show-current", {
         cwd: ctx.directory,
         encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       }).trim()
     } catch {
       return null
@@ -28,11 +30,11 @@ export function createPrContextInjectorHook(ctx: PrContextInjectorContext) {
 
   const getBaseBranch = (): string => {
     try {
-      execSync("git rev-parse --verify main", { cwd: ctx.directory })
+      execSync("git rev-parse --verify main", { cwd: ctx.directory, stdio: ["pipe", "pipe", "pipe"] })
       return "main"
     } catch {
       try {
-        execSync("git rev-parse --verify master", { cwd: ctx.directory })
+        execSync("git rev-parse --verify master", { cwd: ctx.directory, stdio: ["pipe", "pipe", "pipe"] })
         return "master"
       } catch {
         return "HEAD~10"
@@ -48,6 +50,7 @@ export function createPrContextInjectorHook(ctx: PrContextInjectorContext) {
       const diffStat = execSync(`git diff ${base}...HEAD --stat`, {
         cwd: ctx.directory,
         encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       }).trim()
 
       if (!diffStat) return null
@@ -72,7 +75,7 @@ export function createPrContextInjectorHook(ctx: PrContextInjectorContext) {
 
   return {
     "chat.message": async (
-      input: { sessionID: string },
+      input: { sessionID: string; messageID?: string },
       output: { parts?: Array<{ type: string; text?: string }> }
     ): Promise<void> => {
       if (injectedSessions.has(input.sessionID)) {
@@ -98,10 +101,13 @@ export function createPrContextInjectorHook(ctx: PrContextInjectorContext) {
         output.parts = []
       }
 
-      output.parts.push({
-        type: "text",
-        text: contextText,
-      })
+      output.parts.push(
+        createTextPart({
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          text: contextText,
+        })
+      )
     },
   }
 }

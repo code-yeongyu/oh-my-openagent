@@ -3,15 +3,16 @@ import {
   getRulesForPhase,
   type TaskPhase,
 } from "../../shared/phase-aware-rules"
+import { createTextPart } from "../../shared/part-factory"
 
 export function createPhaseRulesInjectorHook() {
   const injectedSessions = new Set<string>()
 
   return {
     "chat.message": async (
-      input: { sessionID: string },
+      input: { sessionID: string; messageID?: string },
       output: {
-        parts?: Array<{ type: string; text?: string }>
+        parts?: Array<any>
       }
     ): Promise<void> => {
       // Only inject once per session
@@ -41,7 +42,13 @@ export function createPhaseRulesInjectorHook() {
         if (!output.parts) {
           output.parts = []
         }
-        output.parts.push({ type: "text", text: injection })
+        output.parts.push(
+          createTextPart({
+            sessionID: input.sessionID,
+            messageID: input.messageID,
+            text: injection,
+          })
+        )
       }
     },
   }
