@@ -47,6 +47,7 @@ hooks/
 ├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
 ├── stop-continuation-guard/    # Guards stop continuation
 ├── subagent-question-blocker/  # Blocks subagent questions
+├── runtime-fallback/           # Auto-switch models on API errors
 └── index.ts                    # Hook aggregation + registration
 ```
 
