@@ -23,14 +23,18 @@ export function createTaskUpdateTool(
   config: Partial<OhMyOpenCodeConfig>,
   ctx?: PluginInput,
 ): ToolDefinition {
-  return tool({
-    description: `Update an existing task with new values.
+   return tool({
+     description: `Update an existing task with new values.
 
 Supports updating: subject, description, status, activeForm, owner, metadata.
 For blocks/blockedBy: use addBlocks/addBlockedBy to append (additive, not replacement).
 For metadata: merge with existing, set key to null to delete.
-Syncs to OpenCode Todo API after update.`,
-    args: {
+Syncs to OpenCode Todo API after update.
+
+**IMPORTANT - Dependency Management:**
+Use \`addBlockedBy\` to declare dependencies on other tasks.
+Properly managed dependencies enable maximum parallel execution.`,
+     args: {
       id: tool.schema.string().describe("Task ID (required)"),
       subject: tool.schema.string().optional().describe("Task subject"),
       description: tool.schema.string().optional().describe("Task description"),

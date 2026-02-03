@@ -405,7 +405,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       LspCodeActionResolve: false,
       "task_*": false,
       teammate: false,
-      ...(pluginConfig.new_task_system_enabled ? { todowrite: false, todoread: false } : {}),
+      ...(pluginConfig.experimental?.task_system ? { todowrite: false, todoread: false } : {}),
     };
 
     type AgentWithPermission = { permission?: Record<string, unknown> };

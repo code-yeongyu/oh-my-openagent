@@ -213,6 +213,13 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
   }
 
+  if (rawConfig.experimental && typeof rawConfig.experimental === "object") {
+    const exp = rawConfig.experimental as Record<string, unknown>
+    if ("task_system" in exp && exp.task_system !== undefined) {
+      needsWrite = true
+    }
+  }
+
   if (needsWrite) {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
