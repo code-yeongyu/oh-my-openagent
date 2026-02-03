@@ -4,9 +4,11 @@
 
 Paste this into your llm agent session:
 ```
-Install and configure oh-my-opencode by following the instructions here:
+Install and configure oh-my-opencode by following the instructions here but using curl:
 https://raw.githubusercontent.com/codewithkenzo/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
+
+> **Important**: Tell the agent to use `curl` to fetch the raw markdown content instead of WebFetch. WebFetch summarizes content and loses critical details like subscription flags (`--openai`, `--opencode-zen`, `--zai-coding-plan`, etc.).
 
 **Alternative, Not recommended, do this by yourself**
 
