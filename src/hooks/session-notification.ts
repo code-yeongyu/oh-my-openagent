@@ -29,6 +29,10 @@ interface SessionNotificationConfig {
   skipIfIncompleteTodos?: boolean
   /** Maximum number of sessions to track before cleanup (default: 100) */
   maxTrackedSessions?: number
+  /** Play sound when question tool awaits user input (default: true) */
+  playSoundOnQuestion?: boolean
+  /** Skip sound when idle is triggered by background task completion (default: true) */
+  skipSoundOnBackgroundCompletion?: boolean
 }
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
@@ -156,16 +160,17 @@ export function createSessionNotification(
     idleConfirmationDelay: 1500,
     skipIfIncompleteTodos: true,
     maxTrackedSessions: 100,
+    playSoundOnQuestion: true,
+    skipSoundOnBackgroundCompletion: true,
     ...config,
   }
 
   const notifiedSessions = new Set<string>()
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const sessionActivitySinceIdle = new Set<string>()
-  // Track notification execution version to handle race conditions
   const notificationVersions = new Map<string, number>()
-  // Track sessions currently executing notification (prevents duplicate execution)
   const executingNotifications = new Set<string>()
+  const backgroundCompletionTriggeredIdle = new Set<string>()
 
   function cleanupOldSessions() {
     const maxSessions = mergedConfig.maxTrackedSessions
@@ -184,6 +189,10 @@ export function createSessionNotification(
     if (executingNotifications.size > maxSessions) {
       const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
       sessionsToRemove.forEach(id => executingNotifications.delete(id))
+    }
+    if (backgroundCompletionTriggeredIdle.size > maxSessions) {
+      const sessionsToRemove = Array.from(backgroundCompletionTriggeredIdle).slice(0, backgroundCompletionTriggeredIdle.size - maxSessions)
+      sessionsToRemove.forEach(id => backgroundCompletionTriggeredIdle.delete(id))
     }
   }
 
@@ -250,7 +259,11 @@ export function createSessionNotification(
 
       await sendNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.message)
 
-      if (mergedConfig.playSound && mergedConfig.soundPath) {
+      const shouldSkipSound = mergedConfig.skipSoundOnBackgroundCompletion && 
+        backgroundCompletionTriggeredIdle.has(sessionID)
+      backgroundCompletionTriggeredIdle.delete(sessionID)
+
+      if (mergedConfig.playSound && mergedConfig.soundPath && !shouldSkipSound) {
         await playSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
     } finally {
@@ -315,7 +328,39 @@ export function createSessionNotification(
       return
     }
 
-    if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
+    if (event.type === "message.part.updated") {
+      const part = props?.part as Record<string, unknown> | undefined
+      const sessionID = part?.sessionID as string | undefined
+      const partType = part?.type as string | undefined
+      const text = part?.text as string | undefined
+      
+      if (sessionID && partType === "text" && text) {
+        if (text.includes("[BACKGROUND TASK") || text.includes("[ALL BACKGROUND TASKS COMPLETE]")) {
+          backgroundCompletionTriggeredIdle.add(sessionID)
+        }
+      }
+      return
+    }
+
+    if (event.type === "tool.execute.before") {
+      const sessionID = props?.sessionID as string | undefined
+      const toolName = (props?.tool as string | undefined)?.toLowerCase()
+      
+      if (sessionID) {
+        markSessionActivity(sessionID)
+        
+        if (mergedConfig.playSoundOnQuestion && 
+            mergedConfig.playSound && 
+            mergedConfig.soundPath &&
+            !subagentSessions.has(sessionID) &&
+            (toolName === "question" || toolName === "askuserquestion" || toolName === "ask_user_question")) {
+          playSound(ctx, currentPlatform, mergedConfig.soundPath).catch(() => {})
+        }
+      }
+      return
+    }
+
+    if (event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
         markSessionActivity(sessionID)
@@ -331,6 +376,7 @@ export function createSessionNotification(
         sessionActivitySinceIdle.delete(sessionInfo.id)
         notificationVersions.delete(sessionInfo.id)
         executingNotifications.delete(sessionInfo.id)
+        backgroundCompletionTriggeredIdle.delete(sessionInfo.id)
       }
     }
   }
