@@ -60,7 +60,7 @@ You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
 - Proceed without asking for permission
-- Mark each checkbox [x] in the plan file when done
+- Change \`- [ ]\` to \`- [x]\` in the plan file when done
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
@@ -206,7 +206,7 @@ ${buildVerificationReminder(sessionId)}
 RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
 
 Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
-- Change \`[ ]\` to \`[x]\` for the completed task
+- Change \`- [ ]\` to \`- [x]\` for the completed task
 - Use \`Edit\` tool to modify the checkbox
 
 **DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
@@ -218,7 +218,7 @@ Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
 
 **STEP 6: PROCEED TO NEXT TASK**
 
-- Read the plan file to identify the next \`[ ]\` task
+- Read the plan file to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
