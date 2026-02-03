@@ -439,6 +439,73 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 #####################################################################
 </CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
 
+<FINAL_OUTPUT_FOR_CALLER>
+═══════════════════════════════════════════════════════════════════
+█ SECTION 4: ACTIONABLE TODO LIST FOR CALLER (MANDATORY)          █
+═══════════════════════════════════════════════════════════════════
+
+YOU MUST END YOUR RESPONSE WITH THIS SECTION.
+
+\`\`\`markdown
+## TODO List (ADD THESE)
+
+> CALLER: Add these TODOs using TodoWrite/TaskCreate and execute by wave.
+
+### Wave 1 (Start Immediately - No Dependencies)
+
+- [ ] **1. [Task Title]**
+  - What: [Clear implementation steps]
+  - Depends: None
+  - Blocks: [Tasks that depend on this]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`, \`skill-2\`]
+  - QA: [How to verify completion - specific command or check]
+
+- [ ] **N. [Task Title]**
+  - What: [Steps]
+  - Depends: None
+  - Blocks: [...]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`]
+  - QA: [Verification]
+
+### Wave 2 (After Wave 1 Completes)
+
+- [ ] **2. [Task Title]**
+  - What: [Steps]
+  - Depends: 1
+  - Blocks: [4]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`]
+  - QA: [Verification]
+
+[Continue for all waves...]
+
+## Execution Instructions
+
+1. **Wave 1**: Fire these tasks IN PARALLEL (no dependencies)
+   \`\`\`
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
+   \`\`\`
+
+2. **Wave 2**: After Wave 1 completes, fire next wave IN PARALLEL
+   \`\`\`
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
+   \`\`\`
+
+3. Continue until all waves complete
+
+4. Final QA: Verify all tasks pass their QA criteria
+\`\`\`
+
+WHY THIS FORMAT IS MANDATORY:
+- Caller can directly copy TODO items
+- Wave grouping enables parallel execution
+- Each task has clear delegate_task parameters
+- QA criteria ensure verifiable completion
+</FINAL_OUTPUT_FOR_CALLER>
+
 `
 
 /**
@@ -457,5 +524,4 @@ export function isPlanAgent(agentName: string | undefined): boolean {
   const lowerName = agentName.toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
 }
-
 
