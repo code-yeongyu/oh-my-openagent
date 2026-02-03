@@ -195,7 +195,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const plannerEnabled =
       pluginConfig.sisyphus_agent?.planner_enabled ?? true;
     const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
-    const shouldReplacePlan = plannerEnabled && replacePlan;
+    const shouldDemotePlan = plannerEnabled && replacePlan;
 
     type AgentConfig = Record<
       string,
@@ -210,12 +210,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       sisyphus?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
-
-    const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
-      configAgent?.plan ?? {};
-    const planPrompt = (migrateAgentConfig(
-      planConfigWithoutName as Record<string, unknown>
-    ) as { prompt?: string }).prompt;
 
     if (isSisyphusEnabled && builtinAgents.sisyphus) {
       (config as { default_agent?: string }).default_agent = "sisyphus";
@@ -345,7 +339,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           Object.entries(configAgent)
             .filter(([key]) => {
               if (key === "build") return false;
-              if (key === "plan" && shouldReplacePlan) return false;
+              if (key === "plan" && shouldDemotePlan) return false;
               // Filter out agents that oh-my-opencode provides to prevent
               // OpenCode defaults from overwriting user config in oh-my-opencode.json
               // See: https://github.com/code-yeongyu/oh-my-opencode/issues/472
@@ -363,13 +357,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = shouldReplacePlan && agentConfig["prometheus"]
-        ? {
-            ...agentConfig["prometheus"],
-            name: "plan",
-            mode: "subagent" as const,
-            ...(typeof planPrompt === "string" ? { prompt: planPrompt } : {}),
-          }
+      const planDemoteConfig = shouldDemotePlan
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
