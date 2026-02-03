@@ -28,18 +28,25 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain exists with claude-opus-4-5 as first entry, glm-4.7-free as last
+    // #then - fallbackChain exists with claude-opus-4-5 (anthropic) as first entry, glm-4.7-free as last
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(5)
+    expect(sisyphus.fallbackChain).toHaveLength(6)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
+    // First entry: anthropic/opencode gets "max" variant
     const primary = sisyphus.fallbackChain[0]
     expect(primary.providers[0]).toBe("anthropic")
     expect(primary.model).toBe("claude-opus-4-5")
     expect(primary.variant).toBe("max")
 
-    const last = sisyphus.fallbackChain[4]
+    // Second entry: github-copilot gets "thinking" variant (copilot doesn't support "max")
+    const copilotEntry = sisyphus.fallbackChain[1]
+    expect(copilotEntry.providers[0]).toBe("github-copilot")
+    expect(copilotEntry.model).toBe("claude-opus-4-5")
+    expect(copilotEntry.variant).toBe("thinking")
+
+    const last = sisyphus.fallbackChain[5]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("glm-4.7-free")
   })
