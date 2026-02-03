@@ -195,6 +195,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const plannerEnabled =
       pluginConfig.sisyphus_agent?.planner_enabled ?? true;
     const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
+    const shouldReplacePlan = plannerEnabled && replacePlan;
 
     type AgentConfig = Record<
       string,
@@ -344,7 +345,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           Object.entries(configAgent)
             .filter(([key]) => {
               if (key === "build") return false;
-              if (key === "plan" && replacePlan) return false;
+              if (key === "plan" && shouldReplacePlan) return false;
               // Filter out agents that oh-my-opencode provides to prevent
               // OpenCode defaults from overwriting user config in oh-my-opencode.json
               // See: https://github.com/code-yeongyu/oh-my-opencode/issues/472
@@ -362,12 +363,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
+      const planDemoteConfig = shouldReplacePlan && agentConfig["prometheus"]
         ? {
             ...agentConfig["prometheus"],
             name: "plan",
             mode: "subagent" as const,
-            ...(planPrompt ? { prompt: planPrompt } : {}),
+            ...(typeof planPrompt === "string" ? { prompt: planPrompt } : {}),
           }
         : undefined;
 
