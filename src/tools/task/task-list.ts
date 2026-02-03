@@ -70,7 +70,10 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         }
       })
 
-      return JSON.stringify({ tasks: summaries })
+       return JSON.stringify({
+         tasks: summaries,
+         reminder: "1 task = 1 delegate_task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
+       })
     },
   })
 }
