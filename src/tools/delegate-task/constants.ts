@@ -14,13 +14,6 @@ You MUST follow this three-phase workflow for any code implementation task.
 
 Before writing any implementation code, consult Codex for a code prototype:
 
-1. Call skill("collaborating-with-codex")
-2. Follow the prototype workflow:
-   - Request a unified diff prototype (read-only)
-   - Use it as reference only
-   - Rewrite to production quality in your own words
-3. If Codex is unavailable, note it in your report and proceed with self-review
-
 \`\`\`
 codex_codex(
   PROMPT="Provide a unified diff patch prototype for: [task description]. Read-only reference only.",
@@ -41,11 +34,9 @@ codex_codex(
 | 3 | Strict test-first | Core logic, new features, bug fixes |
 
 **For Tier 2/3 tasks, follow RED-GREEN-REFACTOR:**
-
-1. Call skill("test-driven-development")
-2. **RED** - Write failing test first (test MUST fail)
-3. **GREEN** - Write MINIMAL code to pass (nothing more)
-4. **REFACTOR** - Clean up while tests stay GREEN
+1. **RED** - Write failing test first (test MUST fail)
+2. **GREEN** - Write MINIMAL code to pass (nothing more)
+3. **REFACTOR** - Clean up while tests stay GREEN
 
 ### Phase 3: Codex Review (AFTER Coding)
 
@@ -66,31 +57,6 @@ codex_codex(
 - Phase 1 and 3 are MANDATORY for all code changes
 - Phase 2 TDD tier is determined by the nature of the change
 - Skipping any phase = INCOMPLETE WORK
-
-### Error Escalation
-
-- After 2 failed attempts: call skill("systematic-debugging")
-- After 3 failed attempts: return BLOCKED with reason
-
-### Communication Format (MANDATORY)
-
-**On Completion:**
-COMPLETED:
-- Summary: [what was implemented]
-- Files: [list of modified files]
-- Commit: [SHA]
-- Notes: [any concerns]
-
-**On Questions:**
-QUESTIONS:
-1. [question 1]
-2. [question 2]
-
-**On Blocker:**
-BLOCKED:
-- Reason: [why blocked]
-- Tried: [what you attempted]
-- Need: [what you need to proceed]
 </Implementer_Discipline>
 `
 

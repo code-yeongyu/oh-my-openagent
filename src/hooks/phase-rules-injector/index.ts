@@ -5,13 +5,20 @@ import {
 } from "../../shared/phase-aware-rules"
 
 export function createPhaseRulesInjectorHook() {
+  const injectedSessions = new Set<string>()
+
   return {
     "chat.message": async (
-      _input: { sessionID: string },
+      input: { sessionID: string },
       output: {
         parts?: Array<{ type: string; text?: string }>
       }
     ): Promise<void> => {
+      // Only inject once per session
+      if (injectedSessions.has(input.sessionID)) {
+        return
+      }
+
       const promptText = output.parts
         ?.filter((p) => p.type === "text" && p.text)
         .map((p) => p.text)
@@ -22,6 +29,8 @@ export function createPhaseRulesInjectorHook() {
         return
       }
 
+      injectedSessions.add(input.sessionID)
+
       const phase: TaskPhase = detectPhaseFromContext(promptText)
       const rules = getRulesForPhase(phase)
 
@@ -29,7 +38,10 @@ export function createPhaseRulesInjectorHook() {
         const rulesText = rules.map((rule) => `- ${rule}`).join("\n")
         const injection = `\n\n[PHASE-AWARE RULES]\nDetected phase: ${phase}\n${rulesText}\n`
         
-        output.parts?.push({ type: "text", text: injection })
+        if (!output.parts) {
+          output.parts = []
+        }
+        output.parts.push({ type: "text", text: injection })
       }
     },
   }
