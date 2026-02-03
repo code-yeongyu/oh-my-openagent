@@ -825,7 +825,7 @@ export async function resolveCategoryExecution(
     
     const resolution = resolveModelPipeline({
       intent: {
-        userModel: explicitCategoryModel ?? overrideModel,
+        userModel: overrideModel ?? categoryConfig?.model,
         userFallbackModels: categoryFallbackModels,
         categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
       },
