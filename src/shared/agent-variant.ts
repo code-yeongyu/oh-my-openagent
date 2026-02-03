@@ -146,18 +146,13 @@ function findVariantInChain(
 ): string | undefined {
   for (const entry of fallbackChain) {
     if (entry.providers.includes(providerID)) {
-      if (modelID && entry.model) {
-        if (modelMatches(modelID, entry.model)) {
+      if (entry.model) {
+        if (modelID && modelMatches(modelID, entry.model)) {
           return entry.variant
         }
       } else {
         return entry.variant
       }
-    }
-  }
-  for (const entry of fallbackChain) {
-    if (entry.providers.includes(providerID)) {
-      return entry.variant
     }
   }
   return undefined
