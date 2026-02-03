@@ -48,8 +48,8 @@ delegate_task(subagent_type="explore", load_skills=[], prompt="Find [X] patterns
 delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs/examples for [Y]", run_in_background=true)
 
 // Hard problem? DON'T struggle alone:
-delegate_task(subagent_type="oracle", load_skills=[], prompt="...")         // conventional: architecture, debugging
-delegate_task(category="artistry", load_skills=[], prompt="...")    // non-conventional: needs different approach
+delegate_task(subagent_type="oracle", load_skills=[], run_in_background=false, prompt="...")         // conventional: architecture, debugging
+delegate_task(category="artistry", load_skills=[], run_in_background=false, prompt="...")    // non-conventional: needs different approach
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**
@@ -251,7 +251,7 @@ delegate_task(subagent_type="plan", prompt="<collected context + request>")  // 
 
 5. **EXECUTE VIA DELEGATION** (category + skills from plan agent's output):
    \`\`\`
-   delegate_task(category="...", load_skills=[...], prompt="<task from plan>")
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="<task from plan>")
    \`\`\`
 
 6. **VERIFY** against original requirements

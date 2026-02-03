@@ -235,7 +235,7 @@ Every \`delegate_task()\` output includes a session_id. **USE IT.**
 
 \`\`\`typescript
 // WRONG: Starting fresh loses all context
-delegate_task(category="quick", prompt="Fix the type error in auth.ts...")
+delegate_task(category="quick", load_skills=[], run_in_background=false, prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
 delegate_task(session_id="ses_abc123", prompt="Fix: Type error on line 42")

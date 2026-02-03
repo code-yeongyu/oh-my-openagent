@@ -117,7 +117,7 @@ Each TODO item MUST include:
 
 | Wave | Tasks | Dispatch Command |
 |------|-------|------------------|
-| 1 | 1, 4 | \`delegate_task(category="...", load_skills=[...], run_in_background=true)\` × 2 |
+| 1 | 1, 4 | \`delegate_task(category="...", load_skills=[...], run_in_background=false)\` × 2 |
 | 2 | 2, 3, 5 | \`delegate_task(...)\` × 3 after Wave 1 completes |
 | 3 | 6 | \`delegate_task(...)\` final integration |
 
