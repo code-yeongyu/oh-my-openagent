@@ -6,13 +6,81 @@
 
 ---
 
-## **IMPORTANT: PULL REQUEST TARGET BRANCH**
+## CRITICAL: PULL REQUEST TARGET BRANCH (NEVER DELETE THIS SECTION)
 
-> **ALL PULL REQUESTS MUST TARGET THE `dev` BRANCH.**
->
-> **DO NOT CREATE PULL REQUESTS TARGETING `master` BRANCH.**
->
-> PRs to `master` will be automatically rejected by CI.
+> **THIS SECTION MUST NEVER BE REMOVED OR MODIFIED**
+
+### Git Workflow
+
+```
+master (deployed/published)
+   ↑
+  dev (integration branch)
+   ↑
+feature branches (your work)
+```
+
+### Rules (MANDATORY)
+
+| Rule | Description |
+|------|-------------|
+| **ALL PRs → `dev`** | Every pull request MUST target the `dev` branch |
+| **NEVER PR → `master`** | PRs to `master` are **automatically rejected** by CI |
+| **"Create a PR" = target `dev`** | When asked to create a new PR, it ALWAYS means targeting `dev` |
+
+### Why This Matters
+
+- `master` = production/published npm package
+- `dev` = integration branch where features are merged and tested
+- Feature branches → `dev` → (after testing) → `master`
+
+**If you create a PR targeting `master`, it WILL be rejected. No exceptions.**
+
+---
+
+## CRITICAL: OPENCODE SOURCE CODE REFERENCE (NEVER DELETE THIS SECTION)
+
+> **THIS SECTION MUST NEVER BE REMOVED OR MODIFIED**
+
+### This is an OpenCode Plugin
+
+Oh-My-OpenCode is a **plugin for OpenCode**. You will frequently need to examine OpenCode's source code to:
+- Understand plugin APIs and hooks
+- Debug integration issues
+- Implement features that interact with OpenCode internals
+- Answer questions about how OpenCode works
+
+### How to Access OpenCode Source Code
+
+**When you need to examine OpenCode source:**
+
+1. **Clone to system temp directory:**
+   ```bash
+   git clone https://github.com/sst/opencode /tmp/opencode-source
+   ```
+
+2. **Explore the codebase** from there (do NOT clone into the project directory)
+
+3. **Clean up** when done (optional, temp dirs are ephemeral)
+
+### Librarian Agent: YOUR PRIMARY TOOL for Plugin Work
+
+**CRITICAL**: When working on plugin-related tasks or answering plugin questions:
+
+| Scenario | Action |
+|----------|--------|
+| Implementing new hooks | Fire `librarian` to search OpenCode hook implementations |
+| Adding new tools | Fire `librarian` to find OpenCode tool patterns |
+| Understanding SDK behavior | Fire `librarian` to examine OpenCode SDK source |
+| Debugging plugin issues | Fire `librarian` to find relevant OpenCode internals |
+| Answering "how does OpenCode do X?" | Fire `librarian` FIRST |
+
+**The `librarian` agent is specialized for:**
+- Searching remote codebases (GitHub)
+- Retrieving official documentation
+- Finding implementation examples in open source
+
+**DO NOT guess or hallucinate about OpenCode internals.** Always verify by examining actual source code via `librarian` or direct clone.
 
 ---
 
