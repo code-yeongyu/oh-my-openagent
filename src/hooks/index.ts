@@ -37,3 +37,4 @@ export { createStopContinuationGuardHook, type StopContinuationGuard } from "./s
 export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
+export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
