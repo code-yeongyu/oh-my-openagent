@@ -22,6 +22,7 @@ export type ModelResolutionResult = {
 export type ExtendedModelResolutionInput = {
 	uiSelectedModel?: string
 	userModel?: string
+	userFallbackModels?: string[]
 	categoryDefaultModel?: string
 	fallbackChain?: FallbackEntry[]
 	availableModels: Set<string>
@@ -44,9 +45,9 @@ export function resolveModel(input: ModelResolutionInput): string | undefined {
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
 ): ModelResolutionResult | undefined {
-	const { uiSelectedModel, userModel, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
+	const { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
 	const resolved = resolveModelPipeline({
-		intent: { uiSelectedModel, userModel, categoryDefaultModel },
+		intent: { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel },
 		constraints: { availableModels },
 		policy: { fallbackChain, systemDefaultModel },
 	})

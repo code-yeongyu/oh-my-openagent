@@ -5,6 +5,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
@@ -40,6 +41,10 @@ export async function executeSyncTask(
     const sessionID = createSessionResult.sessionID
     syncSessionID = sessionID
     subagentSessions.add(sessionID)
+
+    if (args.category) {
+      SessionCategoryRegistry.register(sessionID, args.category)
+    }
 
     if (onSyncSessionCreated) {
       log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
