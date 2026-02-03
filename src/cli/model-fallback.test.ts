@@ -97,6 +97,34 @@ describe("generateModelConfig", () => {
       // #then should use higher capability models
       expect(result).toMatchSnapshot()
     })
+
+    test("transforms gemini-3-flash to gemini-3-flash-preview for google provider", () => {
+      // #given only Gemini is available
+      const config = createConfig({ hasGemini: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then gemini-3-flash models should be transformed to gemini-3-flash-preview
+      // This is required because Google provider only has gemini-3-flash-preview, not gemini-3-flash
+      expect(result.categories?.quick?.model).toBe("google/gemini-3-flash-preview")
+      expect(result.categories?.writing?.model).toBe("google/gemini-3-flash-preview")
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("google/gemini-3-flash-preview")
+    })
+
+    test("transforms gemini-3-pro to gemini-3-pro-preview for google provider", () => {
+      // #given Gemini is available with Max 20 plan
+      const config = createConfig({ hasGemini: true, isMax20: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then gemini-3-pro models should be transformed to gemini-3-pro-preview
+      // This is required because Google provider only has gemini-3-pro-preview, not gemini-3-pro
+      expect(result.agents?.oracle?.model).toBe("google/gemini-3-pro-preview")
+      expect(result.agents?.prometheus?.model).toBe("google/gemini-3-pro-preview")
+      expect(result.categories?.["visual-engineering"]?.model).toBe("google/gemini-3-pro-preview")
+    })
   })
 
   describe("all native providers", () => {

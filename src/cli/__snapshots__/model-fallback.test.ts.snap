@@ -325,7 +325,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -334,47 +334,47 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "momus": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "prometheus": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "quick": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "unspecified-high": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "unspecified-low": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -385,7 +385,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -394,47 +394,47 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "momus": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "prometheus": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "quick": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "unspecified-high": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "unspecified-low": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -466,7 +466,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -483,7 +483,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "deep": {
@@ -504,10 +504,10 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -539,7 +539,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -556,7 +556,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "deep": {
@@ -578,10 +578,10 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -1221,10 +1221,10 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "prometheus": {
@@ -1238,14 +1238,14 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "unspecified-high": {
@@ -1255,10 +1255,10 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -1363,7 +1363,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -1380,7 +1380,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "deep": {
@@ -1401,10 +1401,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }
@@ -1436,7 +1436,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -1453,7 +1453,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
       "variant": "max",
     },
     "deep": {
@@ -1475,10 +1475,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-pro-preview",
     },
     "writing": {
-      "model": "google/gemini-3-flash",
+      "model": "google/gemini-3-flash-preview",
     },
   },
 }

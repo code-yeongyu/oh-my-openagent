@@ -78,6 +78,11 @@ function transformModelForProvider(provider: string, model: string): string {
       .replace("gemini-3-pro", "gemini-3-pro-preview")
       .replace("gemini-3-flash", "gemini-3-flash-preview")
   }
+  if (provider === "google") {
+    return model
+      .replace("gemini-3-pro", "gemini-3-pro-preview")
+      .replace("gemini-3-flash", "gemini-3-flash-preview")
+  }
   return model
 }
 
