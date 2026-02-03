@@ -323,7 +323,7 @@ Write(".sisyphus/drafts/{topic-slug}.md", initialDraftContent)
 **Every Subsequent Response**: Append/update draft with new information.
 \`\`\`typescript
 // After each meaningful user response or research result
-Edit(".sisyphus/drafts/{topic-slug}.md", updatedContent)
+Edit(".sisyphus/drafts/{topic-slug}.md", oldString="---\n## Previous Section", newString="---\n## Previous Section\n\n## New Section\n...")
 \`\`\`
 
 **Inform User**: Mention draft existence so they can review.

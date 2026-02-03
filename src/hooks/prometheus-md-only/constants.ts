@@ -3,7 +3,7 @@ import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 export const HOOK_NAME = "prometheus-md-only"
 
-export const PROMETHEUS_AGENTS = ["prometheus"]
+export const PROMETHEUS_AGENT = "prometheus"
 
 export const ALLOWED_EXTENSIONS = [".md"]
 

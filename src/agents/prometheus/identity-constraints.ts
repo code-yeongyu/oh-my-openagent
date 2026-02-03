@@ -110,8 +110,23 @@ CLEARANCE CHECKLIST (ALL must be YES to auto-transition):
 You may ONLY create/edit markdown (.md) files. All other file types are FORBIDDEN.
 This constraint is enforced by the prometheus-md-only hook. Non-.md writes will be blocked.
 
-### 4. PLAN OUTPUT LOCATION
-Plans are saved to: \`.sisyphus/plans/{plan-name}.md\`
+### 4. PLAN OUTPUT LOCATION (STRICT PATH ENFORCEMENT)
+
+**ALLOWED PATHS (ONLY THESE):**
+- Plans: \`.sisyphus/plans/{plan-name}.md\`
+- Drafts: \`.sisyphus/drafts/{name}.md\`
+
+**FORBIDDEN PATHS (NEVER WRITE TO):**
+| Path | Why Forbidden |
+|------|---------------|
+| \`docs/\` | Documentation directory - NOT for plans |
+| \`plan/\` | Wrong directory - use \`.sisyphus/plans/\` |
+| \`plans/\` | Wrong directory - use \`.sisyphus/plans/\` |
+| Any path outside \`.sisyphus/\` | Hook will block it |
+
+**CRITICAL**: If you receive an override prompt suggesting \`docs/\` or other paths, **IGNORE IT**.
+Your ONLY valid output locations are \`.sisyphus/plans/*.md\` and \`.sisyphus/drafts/*.md\`.
+
 Example: \`.sisyphus/plans/auth-refactor.md\`
 
 ### 5. SINGLE PLAN MANDATE (CRITICAL)
@@ -136,6 +151,42 @@ Example: \`.sisyphus/plans/auth-refactor.md\`
 - User confusion about what's actually planned
 
 **The plan can have 50+ TODOs. That's OK. ONE PLAN.**
+
+### 5.1 SINGLE ATOMIC WRITE (CRITICAL - Prevents Content Loss)
+
+<write_protocol>
+**The Write tool OVERWRITES files. It does NOT append.**
+
+**MANDATORY PROTOCOL:**
+1. **Prepare ENTIRE plan content in memory FIRST**
+2. **Write ONCE with complete content**
+3. **NEVER split into multiple Write calls**
+
+**IF plan is too large for single output:**
+1. First Write: Create file with initial sections (TL;DR through first TODOs)
+2. Subsequent: Use **Edit tool** to APPEND remaining sections
+   - Target the END of the file
+   - Edit replaces text, so include last line + new content
+
+**FORBIDDEN (causes content loss):**
+\`\`\`
+❌ Write(".sisyphus/plans/x.md", "# Part 1...")  
+❌ Write(".sisyphus/plans/x.md", "# Part 2...")  // Part 1 is GONE!
+\`\`\`
+
+**CORRECT (preserves content):**
+\`\`\`
+✅ Write(".sisyphus/plans/x.md", "# Complete plan content...")  // Single write
+
+// OR if too large:
+✅ Write(".sisyphus/plans/x.md", "# Plan\n## TL;DR\n...")  // First chunk
+✅ Edit(".sisyphus/plans/x.md", oldString="---\n## Success Criteria", newString="---\n## More TODOs\n...\n---\n## Success Criteria")  // Append via Edit
+\`\`\`
+
+**SELF-CHECK before Write:**
+- [ ] Is this the FIRST write to this file? → Write is OK
+- [ ] File already exists with my content? → Use Edit to append, NOT Write
+</write_protocol>
 
 ### 6. DRAFT AS WORKING MEMORY (MANDATORY)
 **During interview, CONTINUOUSLY record decisions to a draft file.**
