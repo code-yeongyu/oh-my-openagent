@@ -30,7 +30,8 @@ features/
 ├── tmux-subagent/              # Tmux session management
 ├── mcp-oauth/                  # MCP OAuth handling
 ├── sisyphus-swarm/             # Swarm coordination
-└── sisyphus-tasks/             # Task tracking
+├── sisyphus-tasks/             # Task tracking
+└── claude-tasks/               # Task schema/storage - see AGENTS.md
 ```
 
 ## LOADER PRIORITY

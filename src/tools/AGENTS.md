@@ -18,6 +18,7 @@ tools/
 ├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename (client.ts 540 lines)
 ├── ast-grep/         # 2 tools: search, replace (25 languages)
 ├── delegate-task/    # Category-based routing (1135 lines)
+├── task/             # 4 tools: create, get, list, update (Claude Code compatible)
 ├── session-manager/  # 4 tools: list, read, search, info
 ├── grep/             # Custom grep with timeout (60s, 10MB)
 ├── glob/             # 60s timeout, 100 file limit

@@ -328,6 +328,58 @@ describe("background_cancel", () => {
     expect(output).toContain("| `task-a` | running task | running | `ses-a` |")
     expect(output).toContain("| `task-b` | pending task | pending | (not started) |")
   })
+
+  test("passes skipNotification: true to cancelTask to prevent deadlock", async () => {
+    // #given
+    const task = createTask({ id: "task-1", status: "running" })
+    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const manager = {
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async (taskId: string, options?: unknown) => {
+        cancelOptions.push({ taskId, options })
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when - cancel all tasks
+    await tool.execute({ all: true }, mockContext)
+
+    // #then - skipNotification should be true to prevent self-deadlock
+    expect(cancelOptions).toHaveLength(1)
+    expect(cancelOptions[0].options).toEqual(
+      expect.objectContaining({ skipNotification: true })
+    )
+  })
+
+  test("passes skipNotification: true when cancelling single task", async () => {
+    // #given
+    const task = createTask({ id: "task-1", status: "running" })
+    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const manager = {
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async (taskId: string, options?: unknown) => {
+        cancelOptions.push({ taskId, options })
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when - cancel single task
+    await tool.execute({ taskId: task.id }, mockContext)
+
+    // #then - skipNotification should be true
+    expect(cancelOptions).toHaveLength(1)
+    expect(cancelOptions[0].options).toEqual(
+      expect.objectContaining({ skipNotification: true })
+    )
+  })
 })
 type BackgroundOutputMessage = {
   id?: string
