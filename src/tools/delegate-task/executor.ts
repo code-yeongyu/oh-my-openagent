@@ -16,6 +16,7 @@ import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSug
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
@@ -463,6 +464,11 @@ export async function executeBackgroundTask(
       category: args.category,
     })
 
+    //#when - register session category for runtime-fallback hook
+    if (args.category && task.sessionID) {
+      SessionCategoryRegistry.register(task.sessionID, args.category)
+    }
+
     ctx.metadata?.({
       title: args.description,
       metadata: {
@@ -540,6 +546,11 @@ export async function executeSyncTask(
     const sessionID = createResult.data.id
     syncSessionID = sessionID
     subagentSessions.add(sessionID)
+
+    //#when - register session category for runtime-fallback hook
+    if (args.category) {
+      SessionCategoryRegistry.register(sessionID, args.category)
+    }
 
     if (onSyncSessionCreated) {
       log("[delegate_task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
@@ -807,10 +818,16 @@ export async function resolveCategoryExecution(
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
+    const categoryConfig = args.category ? userCategories?.[args.category] : undefined
+    const categoryFallbackModels = categoryConfig?.fallback_models 
+      ? (Array.isArray(categoryConfig.fallback_models) ? categoryConfig.fallback_models : [categoryConfig.fallback_models])
+      : undefined
+    
     const resolution = resolveModelPipeline({
       intent: {
         userModel: explicitCategoryModel ?? overrideModel,
-        categoryDefaultModel: resolved.model,
+        userFallbackModels: categoryFallbackModels,
+        categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
       },
       constraints: { availableModels },
       policy: {

@@ -3,6 +3,7 @@ import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import type { FallbackState, FallbackResult, RuntimeFallbackHook } from "./types"
 import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS, HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createFallbackState(originalModel: string): FallbackState {
   return {
@@ -86,6 +87,15 @@ function getFallbackModelsForSession(
   pluginConfig: OhMyOpenCodeConfig | undefined
 ): string[] {
   if (!pluginConfig) return []
+
+  //#when - session has category from delegate_task, try category fallback_models first
+  const sessionCategory = SessionCategoryRegistry.get(sessionID)
+  if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
+    const categoryConfig = pluginConfig.categories[sessionCategory]
+    if (categoryConfig?.fallback_models) {
+      return normalizeFallbackModels(categoryConfig.fallback_models)
+    }
+  }
 
   const tryGetFallbackFromAgent = (agentName: string): string[] | undefined => {
     const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
