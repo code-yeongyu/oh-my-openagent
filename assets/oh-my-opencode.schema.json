@@ -2754,6 +2754,9 @@
               }
             }
           }
+        },
+        "task_system": {
+          "type": "boolean"
         }
       }
     },
