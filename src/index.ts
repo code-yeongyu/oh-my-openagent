@@ -270,9 +270,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createSisyphusJuniorNotepadHook(ctx)
     : null;
 
-  const tasksTodowriteDisabler = createTasksTodowriteDisablerHook({
-    experimental: pluginConfig.experimental,
-  });
+  const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
+    ? createTasksTodowriteDisablerHook({
+        experimental: pluginConfig.experimental,
+      })
+    : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();

@@ -21,7 +21,7 @@ export function createTasksTodowriteDisablerHook(
       }
 
       const toolName = input.tool as string;
-      if (BLOCKED_TOOLS.includes(toolName)) {
+      if (BLOCKED_TOOLS.some((blocked) => blocked.toLowerCase() === toolName.toLowerCase())) {
         throw new Error(REPLACEMENT_MESSAGE);
       }
     },
