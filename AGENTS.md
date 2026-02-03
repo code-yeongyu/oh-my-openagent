@@ -84,6 +84,40 @@ Oh-My-OpenCode is a **plugin for OpenCode**. You will frequently need to examine
 
 ---
 
+## CRITICAL: ENGLISH-ONLY POLICY (NEVER DELETE THIS SECTION)
+
+> **THIS SECTION MUST NEVER BE REMOVED OR MODIFIED**
+
+### All Project Communications MUST Be in English
+
+This is an **international open-source project**. To ensure accessibility and maintainability:
+
+| Context | Language Requirement |
+|---------|---------------------|
+| **GitHub Issues** | English ONLY |
+| **Pull Requests** | English ONLY (title, description, comments) |
+| **Commit Messages** | English ONLY |
+| **Code Comments** | English ONLY |
+| **Documentation** | English ONLY |
+| **AGENTS.md files** | English ONLY |
+
+### Why This Matters
+
+- **Global Collaboration**: Contributors from all countries can participate
+- **Searchability**: English keywords are universally searchable
+- **AI Agent Compatibility**: AI tools work best with English content
+- **Consistency**: Mixed languages create confusion and fragmentation
+
+### Enforcement
+
+- Issues/PRs with non-English content may be closed with a request to resubmit in English
+- Commit messages must be in English - CI may reject non-English commits
+- Translated READMEs exist (README.ko.md, README.ja.md, etc.) but the primary docs are English
+
+**If you're not comfortable writing in English, use translation tools. Broken English is fine - we'll help fix it. Non-English is not acceptable.**
+
+---
+
 ## OVERVIEW
 
 O P E N C O D E plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for O P E N C O D E.
