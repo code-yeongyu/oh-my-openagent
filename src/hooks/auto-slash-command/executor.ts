@@ -8,13 +8,14 @@ import {
   getClaudeConfigDir,
   getOpenCodeConfigDir,
 } from "../../shared"
+import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
 
 interface CommandScope {
-  type: "user" | "project" | "opencode" | "opencode-project" | "skill"
+  type: "user" | "project" | "opencode" | "opencode-project" | "skill" | "builtin"
 }
 
 interface CommandMetadata {
@@ -111,11 +112,25 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
+    name: cmd.name,
+    metadata: {
+      name: cmd.name,
+      description: cmd.description || "",
+      model: cmd.model,
+      agent: cmd.agent,
+      subtask: cmd.subtask,
+    },
+    content: cmd.template,
+    scope: "builtin",
+  }))
 
   const skills = options?.skills ?? await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)
 
   return [
+    ...builtinCommands,
     ...opencodeProjectCommands,
     ...projectCommands,
     ...opencodeGlobalCommands,
