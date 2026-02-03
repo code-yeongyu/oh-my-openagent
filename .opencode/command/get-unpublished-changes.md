@@ -54,95 +54,95 @@ For each commit, you MUST:
 ### feat
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### fix
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### refactor
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### docs
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### Breaking Changes
-None 또는 목록
+None or list
 
 ### Files Changed
 {diff-stat}
 
 ### Suggested Version Bump
 - **Recommendation**: patch|minor|major
-- **Reason**: 이유
+- **Reason**: Reason for recommendation
 </output-format>
 
 <oracle-safety-review>
-## Oracle 배포 안전성 검토 (사용자가 명시적으로 요청 시에만)
+## Oracle Deployment Safety Review (Only when user explicitly requests)
 
-**트리거 키워드**: "배포 가능", "배포해도 될까", "안전한지", "리뷰", "검토", "oracle", "오라클"
+**Trigger keywords**: "safe to deploy", "can I deploy", "is it safe", "review", "check", "oracle"
 
-사용자가 위 키워드 중 하나라도 포함하여 요청하면:
+When user includes any of the above keywords in their request:
 
-### 1. 사전 검증 실행
+### 1. Pre-validation
 ```bash
 bun run typecheck
 bun test
 ```
-- 실패 시 → Oracle 소환 없이 즉시 "❌ 배포 불가" 보고
+- On failure → Report "❌ Cannot deploy" immediately without invoking Oracle
 
-### 2. Oracle 소환 프롬프트
+### 2. Oracle Invocation Prompt
 
-다음 정보를 수집하여 Oracle에게 전달:
+Collect the following information and pass to Oracle:
 
 ```
-## 배포 안전성 검토 요청
+## Deployment Safety Review Request
 
-### 변경사항 요약
-{위에서 분석한 변경사항 테이블}
+### Changes Summary
+{Changes table analyzed above}
 
-### 주요 diff (기능별로 정리)
-{각 feat/fix/refactor의 핵심 코드 변경 - 전체 diff가 아닌 핵심만}
+### Key diffs (organized by feature)
+{Core code changes for each feat/fix/refactor - only key parts, not full diff}
 
-### 검증 결과
+### Validation Results
 - Typecheck: ✅/❌
 - Tests: {pass}/{total} (✅/❌)
 
-### 검토 요청사항
-1. **리그레션 위험**: 기존 기능에 영향을 줄 수 있는 변경이 있는가?
-2. **사이드이펙트**: 예상치 못한 부작용이 발생할 수 있는 부분은?
-3. **Breaking Changes**: 외부 사용자에게 영향을 주는 변경이 있는가?
-4. **Edge Cases**: 놓친 엣지 케이스가 있는가?
-5. **배포 권장 여부**: SAFE / CAUTION / UNSAFE
+### Review Items
+1. **Regression Risk**: Are there changes that could affect existing functionality?
+2. **Side Effects**: Are there areas where unexpected side effects could occur?
+3. **Breaking Changes**: Are there changes that affect external users?
+4. **Edge Cases**: Are there missed edge cases?
+5. **Deployment Recommendation**: SAFE / CAUTION / UNSAFE
 
-### 요청
-위 변경사항을 깊이 분석하고, 배포 안전성에 대해 판단해주세요.
-리스크가 있다면 구체적인 시나리오와 함께 설명해주세요.
-배포 후 모니터링해야 할 키워드가 있다면 제안해주세요.
+### Request
+Please analyze the above changes deeply and provide your judgment on deployment safety.
+If there are risks, explain with specific scenarios.
+Suggest keywords to monitor after deployment if any.
 ```
 
-### 3. Oracle 응답 후 출력 포맷
+### 3. Output Format After Oracle Response
 
-## 🔍 Oracle 배포 안전성 검토 결과
+## 🔍 Oracle Deployment Safety Review Result
 
-### 판정: ✅ SAFE / ⚠️ CAUTION / ❌ UNSAFE
+### Verdict: ✅ SAFE / ⚠️ CAUTION / ❌ UNSAFE
 
-### 리스크 분석
-| 영역 | 리스크 레벨 | 설명 |
-|------|-------------|------|
+### Risk Analysis
+| Area | Risk Level | Description |
+|------|------------|-------------|
 | ... | 🟢/🟡/🔴 | ... |
 
-### 권장 사항
+### Recommendations
 - ...
 
-### 배포 후 모니터링 키워드
+### Post-deployment Monitoring Keywords
 - ...
 
-### 결론
-{Oracle의 최종 판단}
+### Conclusion
+{Oracle's final judgment}
 </oracle-safety-review>
