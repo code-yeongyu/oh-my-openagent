@@ -305,4 +305,107 @@ describe("resolveVariantForModel", () => {
     // #then
     expect(variant).toBe("category-fallback-variant")
   })
+
+  // Edge case tests for PR #1307 fix
+  test("does not select variant when provider matches but model does not", () => {
+    // given
+    const config = {
+      agents: {
+        testAgent: {
+          fallback_chain: [
+            { providers: ["anthropic"], model: "claude-opus-4", variant: "max" }
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: "claude-sonnet-4" } // Different model
+
+    // when
+    const variant = resolveVariantForModel(config, "testAgent", model)
+
+    // then
+    expect(variant).toBeUndefined()
+  })
+
+  test("selects variant when provider matches and entry has no model", () => {
+    // given
+    const config = {
+      agents: {
+        testAgent: {
+          fallback_chain: [
+            { providers: ["anthropic"], variant: "high" } // No model specified
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: "any-model" }
+
+    // when
+    const variant = resolveVariantForModel(config, "testAgent", model)
+
+    // then
+    expect(variant).toBe("high")
+  })
+
+  test("does not match when modelID is undefined but entry requires model", () => {
+    // given
+    const config = {
+      agents: {
+        testAgent: {
+          fallback_chain: [
+            { providers: ["anthropic"], model: "claude-opus-4", variant: "max" }
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: undefined } as any // Forced undefined
+
+    // when
+    const variant = resolveVariantForModel(config, "testAgent", model)
+
+    // then
+    expect(variant).toBeUndefined()
+  })
+
+  test("skips mismatched entries and finds later matching entry", () => {
+    // given
+    const config = {
+      agents: {
+        testAgent: {
+          fallback_chain: [
+            { providers: ["anthropic"], model: "claude-opus-4", variant: "max" }, // Wrong model
+            { providers: ["anthropic"], model: "claude-sonnet-4", variant: "high" } // Correct
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    const model = { providerID: "anthropic", modelID: "claude-sonnet-4" }
+
+    // when
+    const variant = resolveVariantForModel(config, "testAgent", model)
+
+    // then
+    expect(variant).toBe("high")
+  })
+
+  test("respects model matching for entries with multiple providers", () => {
+    // given
+    const config = {
+      agents: {
+        testAgent: {
+          fallback_chain: [
+            { providers: ["anthropic", "openai"], model: "gpt-4", variant: "high" }
+          ]
+        }
+      }
+    } as OhMyOpenCodeConfig
+    // Provider matches (anthropic) but model (claude-opus-4) doesn't match gpt-4
+    const model = { providerID: "anthropic", modelID: "claude-opus-4" }
+
+    // when
+    const variant = resolveVariantForModel(config, "testAgent", model)
+
+    // then
+    expect(variant).toBeUndefined()
+  })
 })
