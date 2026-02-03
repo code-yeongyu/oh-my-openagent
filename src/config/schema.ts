@@ -36,7 +36,7 @@ export const BuiltinSkillNameSchema = z.enum([
   "git-master",
 ])
 
-export const OverridableAgentNameSchema = z.enum([
+export const BUILTIN_OVERRIDABLE_AGENT_NAMES = [
   "build",
   "plan",
   "sisyphus",
@@ -51,9 +51,11 @@ export const OverridableAgentNameSchema = z.enum([
   "explore",
   "multimodal-looker",
   "atlas",
-])
+] as const
 
-export const AgentNameSchema = BuiltinAgentNameSchema
+export const OverridableAgentNameSchema = z.string().min(1)
+
+export const AgentNameSchema = z.union([BuiltinAgentNameSchema, z.string().min(1)])
 
 export const HookNameSchema = z.enum([
   "todo-continuation-enforcer",
@@ -135,22 +137,7 @@ export const AgentOverrideConfigSchema = z.object({
   providerOptions: z.record(z.string(), z.unknown()).optional(),
 })
 
-export const AgentOverridesSchema = z.object({
-  build: AgentOverrideConfigSchema.optional(),
-  plan: AgentOverrideConfigSchema.optional(),
-  sisyphus: AgentOverrideConfigSchema.optional(),
-  hephaestus: AgentOverrideConfigSchema.optional(),
-  "sisyphus-junior": AgentOverrideConfigSchema.optional(),
-  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  prometheus: AgentOverrideConfigSchema.optional(),
-  metis: AgentOverrideConfigSchema.optional(),
-  momus: AgentOverrideConfigSchema.optional(),
-  oracle: AgentOverrideConfigSchema.optional(),
-  librarian: AgentOverrideConfigSchema.optional(),
-  explore: AgentOverrideConfigSchema.optional(),
-  "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  atlas: AgentOverrideConfigSchema.optional(),
-})
+export const AgentOverridesSchema = z.record(z.string(), AgentOverrideConfigSchema)
 
 export const ClaudeCodeConfigSchema = z.object({
   mcp: z.boolean().optional(),
@@ -373,10 +360,31 @@ export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
   swarm: SisyphusSwarmConfigSchema.optional(),
 })
+export const CustomAgentMetadataSchema = z.object({
+  description: z.string().optional(),
+  capabilities: z.array(z.string()).optional(),
+  toolRestrictions: z.record(z.string(), z.boolean()).optional(),
+  displayName: z.string().optional(),
+  role: z.string().optional(),
+  callable: z.boolean().optional(),
+  allowCallOmoAgent: z.boolean().optional(),
+  isPlanAgent: z.boolean().optional(),
+  isPrimaryAgent: z.boolean().optional(),
+  injectEnvContext: z.boolean().optional(),
+})
+
+export const CustomAgentConfigSchema = z.object({
+  model: z.string(),
+  promptPath: z.string().optional(),
+  constraintsPath: z.string().optional(),
+  decisionsPath: z.string().optional(),
+  metadata: CustomAgentMetadataSchema.optional(),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
-  disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
+  disabled_agents: z.array(z.string().min(1)).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
@@ -396,6 +404,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  customAgents: z.record(z.string(), CustomAgentConfigSchema).optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -426,5 +435,7 @@ export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusSwarmConfig = z.infer<typeof SisyphusSwarmConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
+export type CustomAgentConfig = z.infer<typeof CustomAgentConfigSchema>
+export type CustomAgentMetadata = z.infer<typeof CustomAgentMetadataSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

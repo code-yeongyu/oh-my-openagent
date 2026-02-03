@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { BuiltinAgentName, AgentOverrideConfig, AgentOverrides, AgentFactory, AgentPromptMetadata } from "./types"
-import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../config/schema"
+import type { CategoriesConfig, CategoryConfig, GitMasterConfig, CustomAgentConfig } from "../config/schema"
 import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
@@ -17,10 +17,16 @@ import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-c
 import { createBuiltinSkills } from "../features/builtin-skills"
 import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
 import type { BrowserAutomationProvider } from "../config/schema"
+import { registerCustomAgentRestrictions } from "../shared/agent-tool-restrictions"
+import { registerCustomAgentDisplayNames } from "../shared/agent-display-names"
+import { registerCustomAgentModelRequirements } from "../shared/model-requirements"
 
 type AgentSource = AgentFactory | AgentConfig
 
-const agentSources: Record<BuiltinAgentName, AgentSource> = {
+const BUILTIN_PRIMARY_AGENTS = new Set<string>(["sisyphus", "hephaestus", "atlas"])
+const BUILTIN_ENV_CONTEXT_AGENTS = new Set<string>(["librarian"])
+
+const builtinAgentSources: Record<string, AgentSource> = {
   sisyphus: createSisyphusAgent,
   hephaestus: createHephaestusAgent,
   oracle: createOracleAgent,
@@ -29,16 +35,16 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
-  // Note: Atlas is handled specially in createBuiltinAgents()
-  // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as unknown as AgentFactory,
 }
 
-/**
- * Metadata for each agent, used to build Sisyphus's dynamic prompt sections
- * (Delegation Table, Tool Selection, Key Triggers, etc.)
- */
-const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
+const customAgentSources: Record<string, AgentSource> = {}
+
+function getAgentSources(): Record<string, AgentSource> {
+  return { ...builtinAgentSources, ...customAgentSources }
+}
+
+const builtinAgentMetadata: Record<string, AgentPromptMetadata> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
@@ -46,6 +52,65 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+}
+
+const customAgentMetadataRegistry: Record<string, AgentPromptMetadata> = {}
+
+function getAgentMetadata(): Record<string, AgentPromptMetadata> {
+  return { ...builtinAgentMetadata, ...customAgentMetadataRegistry }
+}
+
+export function registerCustomAgent(
+  name: string,
+  source: AgentSource,
+  metadata?: AgentPromptMetadata
+): void {
+  customAgentSources[name] = source
+  if (metadata) {
+    customAgentMetadataRegistry[name] = metadata
+  }
+}
+
+export function registerCustomAgentsFromConfig(
+  customAgents: Record<string, CustomAgentConfig>
+): void {
+  for (const [name, config] of Object.entries(customAgents)) {
+    const agentConfig: AgentConfig = {
+      name,
+      model: config.model,
+      prompt: "",
+      description: config.metadata?.description ?? `Custom agent: ${name}`,
+      temperature: 0.1,
+    }
+
+    customAgentSources[name] = agentConfig
+
+    if (config.metadata?.toolRestrictions) {
+      registerCustomAgentRestrictions(name, config.metadata.toolRestrictions)
+    }
+
+    if (config.metadata?.displayName) {
+      registerCustomAgentDisplayNames({ [name]: config.metadata.displayName })
+    }
+
+    const modelRequirement = {
+      fallbackChain: [
+        {
+          providers: config.model.includes("/")
+            ? [config.model.split("/")[0]]
+            : ["opencode"],
+          model: config.model.includes("/")
+            ? config.model.split("/")[1]
+            : config.model,
+        },
+      ],
+    }
+    registerCustomAgentModelRequirements({ [name]: modelRequirement })
+  }
+}
+
+export function getRegisteredAgentNames(): string[] {
+  return Object.keys(getAgentSources())
 }
 
 function isFactory(source: AgentSource): source is AgentFactory {
@@ -219,10 +284,14 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  client?: any,
+  client?: unknown,
   browserProvider?: BrowserAutomationProvider,
-  uiSelectedModel?: string
+  uiSelectedModel?: string,
+  customAgents?: Record<string, CustomAgentConfig>
 ): Promise<Record<string, AgentConfig>> {
+  if (customAgents) {
+    registerCustomAgentsFromConfig(customAgents)
+  }
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
@@ -265,13 +334,13 @@ export async function createBuiltinAgents(
   // Collect general agents first (for availableAgents), but don't add to result yet
   const pendingAgentConfigs: Map<string, AgentConfig> = new Map()
 
-   for (const [name, source] of Object.entries(agentSources)) {
-     const agentName = name as BuiltinAgentName
+   const allAgentSources = getAgentSources()
 
-     if (agentName === "sisyphus") continue
-     if (agentName === "hephaestus") continue
-     if (agentName === "atlas") continue
-     if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
+   for (const [name, source] of Object.entries(allAgentSources)) {
+     const agentName = name
+
+     if (BUILTIN_PRIMARY_AGENTS.has(agentName)) continue
+     if (disabledAgents.some((disabled) => disabled.toLowerCase() === agentName.toLowerCase())) continue
 
      const override = agentOverrides[agentName]
        ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
@@ -309,7 +378,7 @@ export async function createBuiltinAgents(
       config = applyCategoryOverride(config, overrideCategory, mergedCategories)
     }
 
-    if (agentName === "librarian") {
+    if (BUILTIN_ENV_CONTEXT_AGENTS.has(agentName)) {
       config = applyEnvironmentContext(config, directory)
     }
 
@@ -318,7 +387,8 @@ export async function createBuiltinAgents(
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)
 
-    const metadata = agentMetadata[agentName]
+    const allMetadata = getAgentMetadata()
+    const metadata = allMetadata[agentName]
     if (metadata) {
       availableAgents.push({
         name: agentName,

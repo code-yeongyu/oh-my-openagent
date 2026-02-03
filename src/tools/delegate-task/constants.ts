@@ -441,21 +441,23 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 
 `
 
-/**
- * List of agent names that should be treated as plan agents.
- * Case-insensitive matching is used.
- */
-export const PLAN_AGENT_NAMES = ["plan", "prometheus", "planner"]
+const BUILTIN_PLAN_AGENT_NAMES = ["plan", "prometheus", "planner"]
 
-/**
- * Check if the given agent name is a plan agent.
- * @param agentName - The agent name to check
- * @returns true if the agent is a plan agent
- */
+const customPlanAgentNames: string[] = []
+
+export function registerPlanAgent(agentName: string): void {
+  if (!customPlanAgentNames.includes(agentName)) {
+    customPlanAgentNames.push(agentName)
+  }
+}
+
+export const PLAN_AGENT_NAMES = BUILTIN_PLAN_AGENT_NAMES
+
 export function isPlanAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase().trim()
-  return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
+  const allPlanNames = [...BUILTIN_PLAN_AGENT_NAMES, ...customPlanAgentNames]
+  return allPlanNames.some(name => lowerName === name || lowerName.includes(name))
 }
 
 

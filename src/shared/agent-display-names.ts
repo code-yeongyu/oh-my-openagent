@@ -1,9 +1,4 @@
-/**
- * Agent config keys to display names mapping.
- * Config keys are lowercase (e.g., "sisyphus", "atlas").
- * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
- */
-export const AGENT_DISPLAY_NAMES: Record<string, string> = {
+const BUILTIN_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus (Ultraworker)",
   atlas: "Atlas (Plan Execution Orchestrator)",
   prometheus: "Prometheus (Plan Builder)",
@@ -16,22 +11,23 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "multimodal-looker": "multimodal-looker",
 }
 
-/**
- * Get display name for an agent config key.
- * Uses case-insensitive lookup for backward compatibility.
- * Returns original key if not found.
- */
+const customDisplayNames: Record<string, string> = {}
+
+export function registerCustomAgentDisplayNames(names: Record<string, string>): void {
+  Object.assign(customDisplayNames, names)
+}
+
+export const AGENT_DISPLAY_NAMES: Record<string, string> = BUILTIN_DISPLAY_NAMES
+
 export function getAgentDisplayName(configKey: string): string {
-  // Try exact match first
-  const exactMatch = AGENT_DISPLAY_NAMES[configKey]
+  const exactMatch = customDisplayNames[configKey] ?? BUILTIN_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
   
-  // Fall back to case-insensitive search
   const lowerKey = configKey.toLowerCase()
-  for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
+  const allNames = { ...BUILTIN_DISPLAY_NAMES, ...customDisplayNames }
+  for (const [k, v] of Object.entries(allNames)) {
     if (k.toLowerCase() === lowerKey) return v
   }
   
-  // Unknown agent: return original key
   return configKey
 }

@@ -3,7 +3,21 @@ import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 export const HOOK_NAME = "prometheus-md-only"
 
-export const PROMETHEUS_AGENTS = ["prometheus"]
+const BUILTIN_PROMETHEUS_AGENTS = ["prometheus"]
+
+const customReadOnlyPlannerAgents: string[] = []
+
+export function registerReadOnlyPlannerAgent(agentName: string): void {
+  if (!customReadOnlyPlannerAgents.includes(agentName)) {
+    customReadOnlyPlannerAgents.push(agentName)
+  }
+}
+
+export function getPrometheusAgents(): string[] {
+  return [...BUILTIN_PROMETHEUS_AGENTS, ...customReadOnlyPlannerAgents]
+}
+
+export const PROMETHEUS_AGENTS = BUILTIN_PROMETHEUS_AGENTS
 
 export const ALLOWED_EXTENSIONS = [".md"]
 

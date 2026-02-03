@@ -80,7 +80,7 @@ import { initTaskToastManager } from "./features/task-toast-manager";
 import { TmuxSessionManager } from "./features/tmux-subagent";
 import { clearBoulderState } from "./features/boulder-state";
 import { type HookName } from "./config";
-import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION } from "./shared";
+import { log, detectExternalNotificationPlugin, getNotificationConflictWarning, resetMessageCursor, hasConnectedProvidersCache, getOpenCodeVersion, isOpenCodeVersionAtLeast, OPENCODE_NATIVE_AGENTS_INJECTION_VERSION, getAgentToolRestrictions } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
@@ -655,14 +655,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
         const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = ["explore", "librarian"].some(
-          (name) => name.toLowerCase() === (subagentType ?? "").toLowerCase()
-        );
+        const agentRestrictions = subagentType
+          ? getAgentToolRestrictions(subagentType)
+          : {};
 
         args.tools = {
           ...(args.tools as Record<string, boolean> | undefined),
           delegate_task: false,
-          ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
+          ...agentRestrictions,
         };
       }
 

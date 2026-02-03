@@ -84,12 +84,18 @@ export type BuiltinAgentName =
 export type OverridableAgentName =
   | "build"
   | BuiltinAgentName
+  | (string & {})
 
-export type AgentName = BuiltinAgentName
+/**
+ * AgentName includes both builtin agents and custom agents registered via config.
+ * The `(string & {})` intersection preserves autocomplete for known names while
+ * allowing arbitrary custom agent names at the type level.
+ */
+export type AgentName = BuiltinAgentName | (string & {})
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string
   variant?: string
 }
 
-export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>
+export type AgentOverrides = Record<string, AgentOverrideConfig | undefined>

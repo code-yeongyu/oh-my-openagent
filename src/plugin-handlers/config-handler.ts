@@ -167,7 +167,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       allDiscoveredSkills,
       ctx.client,
       browserProvider,
-      currentModel // uiSelectedModel - takes highest priority
+      currentModel, // uiSelectedModel - takes highest priority
+      pluginConfig.customAgents
     );
 
     // Claude Code agents: Do NOT apply permission migration

@@ -19,6 +19,24 @@ import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
+const BUILTIN_NON_CALLABLE_AGENTS = new Set([SISYPHUS_JUNIOR_AGENT])
+const customNonCallableAgents = new Set<string>()
+
+export function registerNonCallableAgent(agentName: string): void {
+  customNonCallableAgents.add(agentName)
+}
+
+function isNonCallableAgent(agentName: string): boolean {
+  const lowerName = agentName.toLowerCase()
+  for (const name of BUILTIN_NON_CALLABLE_AGENTS) {
+    if (name.toLowerCase() === lowerName) return true
+  }
+  for (const name of customNonCallableAgents) {
+    if (name.toLowerCase() === lowerName) return true
+  }
+  return false
+}
+
 export interface ExecutorContext {
   manager: BackgroundManager
   client: OpencodeClient
@@ -906,13 +924,13 @@ export async function resolveSubagentExecution(
 
   const agentName = args.subagent_type.trim()
 
-  if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (isNonCallableAgent(agentName)) {
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
+      error: `Cannot use subagent_type="${agentName}" directly. Use category parameter instead (e.g., ${categoryExamples}).
 
-Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
+This agent is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
     }
   }
 

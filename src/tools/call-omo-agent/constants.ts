@@ -1,4 +1,16 @@
-export const ALLOWED_AGENTS = ["explore", "librarian"] as const
+export const BUILTIN_ALLOWED_AGENTS = ["explore", "librarian"] as const
+
+const customAllowedAgents: string[] = []
+
+export function registerCallableAgent(agentName: string): void {
+  if (!customAllowedAgents.includes(agentName)) {
+    customAllowedAgents.push(agentName)
+  }
+}
+
+export function getAllowedAgents(): readonly string[] {
+  return [...BUILTIN_ALLOWED_AGENTS, ...customAllowedAgents]
+}
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Spawn explore/librarian agent. run_in_background REQUIRED (true=async with task_id, false=sync).
 

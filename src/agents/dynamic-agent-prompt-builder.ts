@@ -1,7 +1,7 @@
-import type { AgentPromptMetadata, BuiltinAgentName } from "./types"
+import type { AgentPromptMetadata } from "./types"
 
 export interface AvailableAgent {
-  name: BuiltinAgentName
+  name: string
   description: string
   metadata: AgentPromptMetadata
 }
