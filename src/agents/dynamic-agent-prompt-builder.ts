@@ -247,7 +247,7 @@ delegate_task(
 
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
-delegate_task(category="...", load_skills=[], prompt="...")  // Empty load_skills without justification
+delegate_task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
 \`\`\``
 }
 

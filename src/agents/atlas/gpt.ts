@@ -241,8 +241,8 @@ delegate_task(category="...", run_in_background=false, ...)
 
 **Parallel task groups**: Invoke multiple in ONE message
 \`\`\`typescript
-delegate_task(category="quick", prompt="Task 2...")
-delegate_task(category="quick", prompt="Task 3...")
+delegate_task(category="quick", load_skills=[], run_in_background=false, prompt="Task 2...")
+delegate_task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3...")
 \`\`\`
 
 **Background management**:
