@@ -6,8 +6,8 @@ import type { FallbackEntry } from "./model-requirements"
 function transformModelForProvider(provider: string, model: string): string {
   if (provider === "google" || provider === "github-copilot") {
     return model
-      .replace("gemini-3-pro", "gemini-3-pro-preview")
-      .replace("gemini-3-flash", "gemini-3-flash-preview")
+      .replace(/gemini-3-pro(?!-)/g, "gemini-3-pro-preview")
+      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
   }
   return model
 }
