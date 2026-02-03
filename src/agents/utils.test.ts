@@ -49,6 +49,36 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.thinking).toBeUndefined()
   })
 
+  test("Atlas uses uiSelectedModel when provided", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+    )
+    const uiSelectedModel = "openai/gpt-5.2"
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        uiSelectedModel
+      )
+
+      // #then
+      expect(agents.atlas).toBeDefined()
+      expect(agents.atlas.model).toBe("openai/gpt-5.2")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("Sisyphus is created on first run when no availableModels or cache exist", async () => {
     // #given
     const systemDefaultModel = "anthropic/claude-opus-4-5"
