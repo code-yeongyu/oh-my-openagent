@@ -832,7 +832,7 @@ export class BackgroundManager {
 
   async cancelTask(
     taskId: string,
-    options?: { source?: string; reason?: string; abortSession?: boolean }
+    options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
     if (!task || (task.status !== "running" && task.status !== "pending")) {
@@ -878,13 +878,19 @@ export class BackgroundManager {
     }
 
     this.cleanupPendingByParent(task)
-    this.markForNotification(task)
 
     if (abortSession && task.sessionID) {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
     }
+
+    if (options?.skipNotification) {
+      log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
+      return true
+    }
+
+    this.markForNotification(task)
 
     try {
       await this.notifyParentSession(task)

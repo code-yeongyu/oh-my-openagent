@@ -642,6 +642,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Backg
             const cancelled = await manager.cancelTask(task.id, {
               source: "background_cancel",
               abortSession: originalStatus === "running",
+              skipNotification: true,
             })
             if (!cancelled) continue
             cancelledInfo.push({
@@ -690,6 +691,7 @@ Only running or pending tasks can be cancelled.`
         const cancelled = await manager.cancelTask(task.id, {
           source: "background_cancel",
           abortSession: task.status === "running",
+          skipNotification: true,
         })
         if (!cancelled) {
           return `[ERROR] Failed to cancel task: ${task.id}`
