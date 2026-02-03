@@ -22,6 +22,7 @@ import {
   createThinkingBlockValidatorHook,
   createCategorySkillReminderHook,
   createRalphLoopHook,
+  createBoulderLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
@@ -32,6 +33,7 @@ import {
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
+  createBoulderQuestionAutoAnswerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
   createUnstableAgentBabysitterHook,
@@ -252,6 +254,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
+  const boulderLoop = isHookEnabled("boulder-loop")
+    ? createBoulderLoopHook(ctx, {
+        config: pluginConfig.boulder_loop,
+        checkSessionExists: async (sessionId) => sessionExists(sessionId),
+      })
+    : null;
+
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
     : null;
@@ -280,6 +289,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
+  const boulderQuestionAutoAnswer = createBoulderQuestionAutoAnswerHook(ctx.directory);
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
@@ -599,6 +609,67 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           ralphLoop.cancelLoop(input.sessionID);
         }
       }
+
+      if (boulderLoop) {
+        const parts = (
+          output as { parts?: Array<{ type: string; text?: string }> }
+        ).parts;
+        const promptText =
+          parts
+            ?.filter((p) => p.type === "text" && p.text)
+            .map((p) => p.text)
+            .join("\n")
+            .trim() || "";
+
+        const isBoulderLoopTemplate =
+          promptText.includes("You are starting a Boulder Loop") &&
+          promptText.includes("<user-task>");
+        const isCancelBoulderTemplate = promptText.includes(
+          "Cancel the currently active Boulder Loop",
+        );
+
+        if (isBoulderLoopTemplate) {
+          const taskMatch = promptText.match(
+            /<user-task>\s*([\s\S]*?)\s*<\/user-task>/i,
+          );
+          const rawTask = taskMatch?.[1]?.trim() || "";
+
+          const quotedMatch = rawTask.match(/^["'](.+?)["']/);
+          const prompt =
+            quotedMatch?.[1] ||
+            rawTask.split(/\s+--/)[0]?.trim() ||
+            "Work on improvements until deadline";
+
+          const untilMatch = rawTask.match(/--until=(\d{1,2}:\d{2})/i);
+          const hoursMatch = rawTask.match(/--hours=(\d+)/i);
+
+          let deadline: number;
+          if (untilMatch) {
+            const [hours, minutes] = untilMatch[1].split(":").map(Number);
+            const now = new Date();
+            const target = new Date(now);
+            target.setHours(hours, minutes, 0, 0);
+            if (target <= now) target.setDate(target.getDate() + 1);
+            deadline = target.getTime();
+          } else if (hoursMatch) {
+            deadline = Date.now() + parseInt(hoursMatch[1], 10) * 3600000;
+          } else {
+            deadline = Date.now() + 4 * 3600000;
+          }
+
+          log("[boulder-loop] Starting loop from chat.message", {
+            sessionID: input.sessionID,
+            prompt,
+            deadline: new Date(deadline).toISOString(),
+          });
+          boulderLoop.startLoop(input.sessionID, prompt, { deadline });
+        } else if (isCancelBoulderTemplate) {
+          log("[boulder-loop] Cancelling loop from chat.message", {
+            sessionID: input.sessionID,
+          });
+          boulderLoop.cancelLoop(input.sessionID);
+        }
+      }
     },
 
     "experimental.chat.messages.transform": async (
@@ -634,6 +705,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await boulderLoop?.event(input);
       await stopContinuationGuard?.event(input);
       await atlasHook?.handler(input);
 
@@ -720,6 +792,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.before": async (input, output) => {
       await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
+      await boulderQuestionAutoAnswer["tool.execute.before"]?.(input, output);
       await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
@@ -810,6 +883,51 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           log("[stop-continuation] All continuation mechanisms stopped", {
             sessionID,
           });
+        }
+      }
+
+      if (boulderLoop && input.tool === "slashcommand") {
+        const args = output.args as { command?: string } | undefined;
+        const command = args?.command?.replace(/^\//, "").toLowerCase();
+        const sessionID = input.sessionID || getMainSessionID();
+
+        if (command === "boulder" && sessionID) {
+          const rawArgs =
+            args?.command?.replace(/^\/?boulder\s*/i, "") || "";
+          const taskMatch = rawArgs.match(/^["'](.+?)["']/);
+          const prompt =
+            taskMatch?.[1] ||
+            rawArgs.split(/\s+--/)[0]?.trim() ||
+            "Work on improvements until deadline";
+
+          const untilMatch = rawArgs.match(/--until=(\d{1,2}:\d{2})/i);
+          const hoursMatch = rawArgs.match(/--hours=(\d+)/i);
+
+          let deadline: number;
+          if (untilMatch) {
+            const [hours, minutes] = untilMatch[1].split(":").map(Number);
+            const now = new Date();
+            const target = new Date(now);
+            target.setHours(hours, minutes, 0, 0);
+            if (target <= now) target.setDate(target.getDate() + 1);
+            deadline = target.getTime();
+          } else if (hoursMatch) {
+            deadline = Date.now() + parseInt(hoursMatch[1], 10) * 3600000;
+          } else {
+            deadline = Date.now() + 4 * 3600000;
+          }
+
+          log("[boulder-loop] Starting loop from slashcommand", {
+            sessionID,
+            prompt,
+            deadline: new Date(deadline).toISOString(),
+          });
+          boulderLoop.startLoop(sessionID, prompt, { deadline });
+        } else if (command === "cancel-boulder" && sessionID) {
+          log("[boulder-loop] Cancelling loop from slashcommand", {
+            sessionID,
+          });
+          boulderLoop.cancelLoop(sessionID);
         }
       }
     },

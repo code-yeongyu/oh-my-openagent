@@ -80,6 +80,7 @@ export const HookNameSchema = z.enum([
 
   "thinking-block-validator",
   "ralph-loop",
+  "boulder-loop",
   "category-skill-reminder",
 
   "compaction-context-injector",
@@ -304,6 +305,15 @@ export const RalphLoopConfigSchema = z.object({
   state_dir: z.string().optional(),
 })
 
+export const BoulderLoopConfigSchema = z.object({
+  /** Enable boulder loop functionality (default: true) */
+  enabled: z.boolean().default(true),
+  /** Default hours if not specified in command (default: 4) */
+  default_hours: z.number().min(1).max(24).default(4),
+  /** Custom state file directory relative to project root */
+  state_dir: z.string().optional(),
+})
+
 export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
@@ -401,6 +411,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
+  boulder_loop: BoulderLoopConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
@@ -426,6 +437,7 @@ export type DynamicContextPruningConfig = z.infer<typeof DynamicContextPruningCo
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
+export type BoulderLoopConfig = z.infer<typeof BoulderLoopConfigSchema>
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
 export type BabysittingConfig = z.infer<typeof BabysittingConfigSchema>
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
