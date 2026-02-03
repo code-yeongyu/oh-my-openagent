@@ -37,6 +37,7 @@ import {
   createUnstableAgentBabysitterHook,
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
+  createRuntimeFallbackHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -329,6 +330,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
     ? createCompactionContextInjector()
     : null;
+  const runtimeFallback = isHookEnabled("runtime-fallback")
+    ? createRuntimeFallbackHook(ctx, { config: pluginConfig.runtime_fallback })
+    : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, {
@@ -528,6 +532,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       await stopContinuationGuard?.["chat.message"]?.(input);
+      await runtimeFallback?.["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
@@ -630,6 +635,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicContextWindowLimitRecovery?.event(input);
+      await runtimeFallback?.event(input);
       await agentUsageReminder?.event(input);
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);

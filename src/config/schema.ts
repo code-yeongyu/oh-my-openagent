@@ -94,6 +94,7 @@ export const HookNameSchema = z.enum([
   "unstable-agent-babysitter",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
+  "runtime-fallback",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
@@ -101,9 +102,17 @@ export const BuiltinCommandNameSchema = z.enum([
   "start-work",
 ])
 
+/** Fallback models schema - supports single string or array of strings */
+export const FallbackModelsSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+])
+
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
+  /** Fallback models to use when primary model fails (rate limit, overload, etc.) */
+  fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
@@ -175,6 +184,7 @@ export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in delegate_task prompt. */
   description: z.string().optional(),
   model: z.string().optional(),
+  fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
@@ -379,6 +389,20 @@ export const SisyphusTasksConfigSchema = z.object({
 export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
 })
+
+export const RuntimeFallbackConfigSchema = z.object({
+  /** Enable runtime fallback (default: true) */
+  enabled: z.boolean().default(true),
+  /** HTTP status codes that trigger fallback (default: [429, 503, 529]) */
+  retry_on_errors: z.array(z.number()).default([429, 503, 529]),
+  /** Maximum fallback attempts per session (default: 3, max: 10) */
+  max_fallback_attempts: z.number().min(1).max(10).default(3),
+  /** Cooldown before retrying failed model in seconds (default: 60) */
+  cooldown_seconds: z.number().min(0).default(60),
+  /** Show toast notification when switching models (default: true) */
+  notify_on_fallback: z.boolean().default(true),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   /** Enable new task system (default: false) */
@@ -409,6 +433,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  runtime_fallback: RuntimeFallbackConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -440,5 +465,7 @@ export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
+export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>
+export type FallbackModels = z.infer<typeof FallbackModelsSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"
