@@ -184,6 +184,10 @@ function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
   return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
 }
 
+function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>> {
+  return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
+}
+
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
   return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> })
     .tryCompleteTask(task, "test")
@@ -1451,6 +1455,44 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // then - verify task3 is still pending (task1 still running)
       const task3BeforeRelease = manager.getTask(task3.id)
       expect(task3BeforeRelease?.status).toBe("pending")
+    })
+  })
+
+  describe("cancelTask", () => {
+    test("should cancel running task and release concurrency", async () => {
+      // given
+      const manager = createBackgroundManager()
+      stubNotifyParentSession(manager)
+
+      const concurrencyManager = getConcurrencyManager(manager)
+      const concurrencyKey = "test-provider/test-model"
+      await concurrencyManager.acquire(concurrencyKey)
+
+      const task = createMockTask({
+        id: "task-cancel-running",
+        sessionID: "session-cancel-running",
+        parentSessionID: "parent-cancel",
+        status: "running",
+        concurrencyKey,
+      })
+
+      getTaskMap(manager).set(task.id, task)
+      const pendingByParent = getPendingByParent(manager)
+      pendingByParent.set(task.parentSessionID, new Set([task.id]))
+
+      // when
+      const cancelled = await manager.cancelTask(task.id, { source: "test" })
+
+      // then
+      const updatedTask = manager.getTask(task.id)
+      expect(cancelled).toBe(true)
+      expect(updatedTask?.status).toBe("cancelled")
+      expect(updatedTask?.completedAt).toBeInstanceOf(Date)
+      expect(updatedTask?.concurrencyKey).toBeUndefined()
+      expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+
+      const pendingSet = pendingByParent.get(task.parentSessionID)
+      expect(pendingSet?.has(task.id) ?? false).toBe(false)
     })
   })
 
