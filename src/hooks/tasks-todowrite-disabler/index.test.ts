@@ -19,7 +19,7 @@ describe("tasks-todowrite-disabler", () => {
       // when / then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead/TodoWrite are disabled")
+      ).rejects.toThrow("TodoRead/TodoWrite are DISABLED")
     })
 
     test("should block TodoRead tool", async () => {
@@ -37,7 +37,7 @@ describe("tasks-todowrite-disabler", () => {
       // when / then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead/TodoWrite are disabled")
+      ).rejects.toThrow("TodoRead/TodoWrite are DISABLED")
     })
 
     test("should not block other tools", async () => {
