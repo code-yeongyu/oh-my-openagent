@@ -830,6 +830,72 @@ export class BackgroundManager {
     }
   }
 
+  async cancelTask(
+    taskId: string,
+    options?: { source?: string; reason?: string; abortSession?: boolean }
+  ): Promise<boolean> {
+    const task = this.tasks.get(taskId)
+    if (!task || (task.status !== "running" && task.status !== "pending")) {
+      return false
+    }
+
+    const source = options?.source ?? "cancel"
+    const abortSession = options?.abortSession !== false
+    const reason = options?.reason
+
+    if (task.status === "pending") {
+      const key = task.model
+        ? `${task.model.providerID}/${task.model.modelID}`
+        : task.agent
+      const queue = this.queuesByKey.get(key)
+      if (queue) {
+        const index = queue.findIndex(item => item.task.id === taskId)
+        if (index !== -1) {
+          queue.splice(index, 1)
+          if (queue.length === 0) {
+            this.queuesByKey.delete(key)
+          }
+        }
+      }
+      log("[background-agent] Cancelled pending task:", { taskId, key })
+    }
+
+    task.status = "cancelled"
+    task.completedAt = new Date()
+    if (reason) {
+      task.error = reason
+    }
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const existingTimer = this.completionTimers.get(task.id)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+      this.completionTimers.delete(task.id)
+    }
+
+    this.cleanupPendingByParent(task)
+    this.markForNotification(task)
+
+    if (abortSession && task.sessionID) {
+      this.client.session.abort({
+        path: { id: task.sessionID },
+      }).catch(() => {})
+    }
+
+    try {
+      await this.notifyParentSession(task)
+      log(`[background-agent] Task cancelled via ${source}:`, task.id)
+    } catch (err) {
+      log("[background-agent] Error in notifyParentSession for cancelled task:", { taskId: task.id, error: err })
+    }
+
+    return true
+  }
+
   /**
    * Cancels a pending task by removing it from queue and marking as cancelled.
    * Does NOT abort session (no session exists yet) or release concurrency slot (wasn't acquired).
@@ -840,29 +906,7 @@ export class BackgroundManager {
       return false
     }
 
-    // Find and remove from queue
-    const key = task.model 
-      ? `${task.model.providerID}/${task.model.modelID}`
-      : task.agent
-    const queue = this.queuesByKey.get(key)
-    if (queue) {
-      const index = queue.findIndex(item => item.task.id === taskId)
-      if (index !== -1) {
-        queue.splice(index, 1)
-        if (queue.length === 0) {
-          this.queuesByKey.delete(key)
-        }
-      }
-    }
-
-    // Mark as cancelled
-    task.status = "cancelled"
-    task.completedAt = new Date()
-
-    // Clean up pendingByParent
-    this.cleanupPendingByParent(task)
-
-    log("[background-agent] Cancelled pending task:", { taskId, key })
+    void this.cancelTask(taskId, { source: "cancelPendingTask", abortSession: false })
     return true
   }
 
@@ -1013,9 +1057,11 @@ export class BackgroundManager {
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string
+    let completedTasks: BackgroundTask[] = []
     if (allComplete) {
-      const completedTasks = Array.from(this.tasks.values())
+      completedTasks = Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+      const completedTasksText = completedTasks
         .map(t => `- \`${t.id}\`: ${t.description}`)
         .join("\n")
 
@@ -1023,7 +1069,7 @@ export class BackgroundManager {
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
-${completedTasks || `- \`${task.id}\`: ${task.description}`}
+${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
@@ -1092,16 +1138,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log("[background-agent] Failed to send notification:", error)
     }
 
-    const taskId = task.id
-    const timer = setTimeout(() => {
-      this.completionTimers.delete(taskId)
-      if (this.tasks.has(taskId)) {
-        this.clearNotificationsForTask(taskId)
-        this.tasks.delete(taskId)
-        log("[background-agent] Removed completed task from memory:", taskId)
+    if (allComplete) {
+      for (const completedTask of completedTasks) {
+        const taskId = completedTask.id
+        const existingTimer = this.completionTimers.get(taskId)
+        if (existingTimer) {
+          clearTimeout(existingTimer)
+          this.completionTimers.delete(taskId)
+        }
+        const timer = setTimeout(() => {
+          this.completionTimers.delete(taskId)
+          if (this.tasks.has(taskId)) {
+            this.clearNotificationsForTask(taskId)
+            this.tasks.delete(taskId)
+            log("[background-agent] Removed completed task from memory:", taskId)
+          }
+        }, TASK_CLEANUP_DELAY_MS)
+        this.completionTimers.set(taskId, timer)
       }
-    }, TASK_CLEANUP_DELAY_MS)
-    this.completionTimers.set(taskId, timer)
+    }
   }
 
   private formatDuration(start: Date, end?: Date): string {

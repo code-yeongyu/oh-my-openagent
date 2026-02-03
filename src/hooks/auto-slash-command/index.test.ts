@@ -2,6 +2,8 @@ import { describe, expect, it, beforeEach, mock, spyOn } from "bun:test"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
+  CommandExecuteBeforeInput,
+  CommandExecuteBeforeOutput,
 } from "./types"
 
 // Import real shared module to avoid mock leaking to other test files
@@ -249,6 +251,82 @@ describe("createAutoSlashCommandHook", () => {
 
       // then should not modify (command not found = feature inactive)
       expect(output.parts[0].text).toBe(originalText)
+    })
+  })
+
+  describe("command.execute.before hook", () => {
+    function createCommandInput(command: string, args: string = ""): CommandExecuteBeforeInput {
+      return {
+        command,
+        sessionID: `test-session-cmd-${Date.now()}-${Math.random()}`,
+        arguments: args,
+      }
+    }
+
+    function createCommandOutput(text?: string): CommandExecuteBeforeOutput {
+      return {
+        parts: text ? [{ type: "text", text }] : [],
+      }
+    }
+
+    it("should not modify output for unknown command", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("nonexistent-command-xyz")
+      const output = createCommandOutput("original text")
+      const originalText = output.parts[0].text
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toBe(originalText)
+    })
+
+    it("should add text part when parts array is empty and command is unknown", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("nonexistent-command-abc")
+      const output = createCommandOutput()
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts.length).toBe(0)
+    })
+
+    it("should inject template for known builtin commands like ralph-loop", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ralph-loop")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/ralph-loop Command")
+    })
+
+    it("should pass command arguments correctly", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("some-command", "arg1 arg2 arg3")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(logMock).toHaveBeenCalledWith(
+        "[auto-slash-command] command.execute.before received",
+        expect.objectContaining({
+          command: "some-command",
+          arguments: "arg1 arg2 arg3",
+        })
+      )
     })
   })
 })

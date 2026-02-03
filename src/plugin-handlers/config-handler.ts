@@ -195,6 +195,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const plannerEnabled =
       pluginConfig.sisyphus_agent?.planner_enabled ?? true;
     const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
+    const shouldDemotePlan = plannerEnabled && replacePlan;
 
     type AgentConfig = Record<
       string,
@@ -241,11 +242,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
 
       if (plannerEnabled) {
-        const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
-          configAgent?.plan ?? {};
-        const migratedPlanConfig = migrateAgentConfig(
-          planConfigWithoutName as Record<string, unknown>
-        );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & {
@@ -343,7 +339,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           Object.entries(configAgent)
             .filter(([key]) => {
               if (key === "build") return false;
-              if (key === "plan" && replacePlan) return false;
+              if (key === "plan" && shouldDemotePlan) return false;
               // Filter out agents that oh-my-opencode provides to prevent
               // OpenCode defaults from overwriting user config in oh-my-opencode.json
               // See: https://github.com/code-yeongyu/oh-my-opencode/issues/472
@@ -361,12 +357,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { 
-            ...agentConfig["prometheus"],
-            name: "plan", 
-            mode: "subagent" as const 
-          }
+      const planDemoteConfig = shouldDemotePlan
+        ? { mode: "subagent" as const }
         : undefined;
 
       config.agent = {
@@ -405,10 +397,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       LspCodeActionResolve: false,
       "task_*": false,
       teammate: false,
-      ...(pluginConfig.new_task_system_enabled ? { todowrite: false, todoread: false } : {}),
+      ...(pluginConfig.experimental?.task_system ? { todowrite: false, todoread: false } : {}),
     };
 
     type AgentWithPermission = { permission?: Record<string, unknown> };
+
+    // In CLI run mode, deny Question tool for all agents (no TUI to answer questions)
+    const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
+    const questionPermission = isCliRunMode ? "deny" : "allow";
     
     if (agentResult.librarian) {
       const agent = agentResult.librarian as AgentWithPermission;
@@ -424,15 +420,15 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult.sisyphus) {
       const agent = agentResult.sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow", "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
     }
     if (agentResult.hephaestus) {
       const agent = agentResult.hephaestus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission };
     }
     if (agentResult["prometheus"]) {
       const agent = agentResult["prometheus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow", "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
     }
     if (agentResult["sisyphus-junior"]) {
       const agent = agentResult["sisyphus-junior"] as AgentWithPermission;

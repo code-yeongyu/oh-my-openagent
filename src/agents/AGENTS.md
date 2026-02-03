@@ -19,7 +19,7 @@ agents/
 ├── sisyphus-junior.ts          # Delegated task executor (category-spawned)
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
 ├── librarian.ts                # Multi-repo research (GitHub CLI, Context7)
-├── explore.ts                  # Fast contextual grep (Claude Haiku)
+├── explore.ts                  # Fast contextual grep (Grok Code Fast)
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
 ├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1283 lines)
 ├── metis.ts                    # Pre-planning analysis (Gap detection)
@@ -38,7 +38,7 @@ agents/
 | Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
 | oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
 | librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
-| explore | anthropic/claude-haiku-4-5 | 0.1 | Fast contextual grep (fallback: gpt-5-mini → gpt-5-nano) |
+| explore | xai/grok-code-fast-1 | 0.1 | Fast contextual grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
 | Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 | Metis | anthropic/claude-opus-4-5 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |

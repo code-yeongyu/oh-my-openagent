@@ -4,13 +4,12 @@
  * Key characteristics (from GPT 5.2 Prompting Guide):
  * - "Stronger instruction adherence" - follows instructions more literally
  * - "Conservative grounding bias" - prefers correctness over speed
- * - "More deliberate scaffolding" - builds clearer plans by default
- * - Explicit decision criteria needed (model won't infer)
+ * - "Parallelize independent reads to reduce latency" - official guidance
  *
  * Design principles:
- * - Provide explicit complexity-based decision criteria
- * - Use conditional logic, not absolute commands
- * - Enable autonomous judgment with clear guidelines
+ * - Two-track parallel context gathering (Direct tools + Background agents)
+ * - Fire background agents, then use direct tools while waiting
+ * - Explicit complexity-based decision criteria
  */
 
 export const ULTRAWORK_GPT_MESSAGE = `<ultrawork-mode>
@@ -81,41 +80,47 @@ Use these when they provide clear value based on the decision framework above:
 | delegate_task category | Specialized work matching a category | \`delegate_task(category="...", load_skills=[...])\` |
 
 <tool_usage_rules>
-- Prefer tools over internal knowledge for fresh/user-specific data
-- Parallelize independent reads (explore, librarian) when gathering context
-- After any write/update, briefly restate: What changed, Where, Any follow-up needed
+- Prefer tools over internal knowledge for fresh or user-specific data
+- Parallelize independent reads (read_file, grep, explore, librarian) to reduce latency
+- After any write/update, briefly restate: What changed, Where (path), Follow-up needed
 </tool_usage_rules>
 
-## EXECUTION APPROACH
+## EXECUTION PATTERN
 
-### Step 1: Assess Complexity
-Before starting, classify the task using the decision framework above.
+**Context gathering uses TWO parallel tracks:**
 
-### Step 2: Gather Context (if needed)
-For non-trivial tasks, fire explore/librarian in parallel as background:
+| Track | Tools | Speed | Purpose |
+|-------|-------|-------|---------|
+| **Direct** | Grep, Read, LSP, AST-grep | Instant | Quick wins, known locations |
+| **Background** | explore, librarian agents | Async | Deep search, external docs |
+
+**ALWAYS run both tracks in parallel:**
 \`\`\`
-delegate_task(subagent_type="explore", run_in_background=true, prompt="Find patterns for X...")
-delegate_task(subagent_type="librarian", run_in_background=true, prompt="Find docs for Y...")
-// Continue working - collect results when needed with background_output()
+// Fire background agents for deep exploration
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find X patterns...", run_in_background=true)
+delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs for Y...", run_in_background=true)
+
+// WHILE THEY RUN - use direct tools for immediate context
+grep(pattern="relevant_pattern", path="src/")
+read_file(filePath="known/important/file.ts")
+
+// Collect background results when ready
+deep_context = background_output(task_id=...)
+
+// Merge ALL findings for comprehensive understanding
 \`\`\`
 
-### Step 3: Plan (for complex tasks only)
-Only invoke plan agent if task has 5+ interdependent steps:
-\`\`\`
-// Collect context first
-context = background_output(task_id=task_id)
-// Then plan with context
-delegate_task(subagent_type="plan", prompt="<context> + <request>")
-\`\`\`
+**Plan agent (complex tasks only):**
+- Only if 5+ interdependent steps
+- Invoke AFTER gathering context from both tracks
 
-### Step 4: Execute
-- If doing yourself: make surgical, minimal changes matching existing patterns
+**Execute:**
+- Surgical, minimal changes matching existing patterns
 - If delegating: provide exhaustive context and success criteria
 
-### Step 5: Verify
-- Run \`lsp_diagnostics\` on modified files
+**Verify:**
+- \`lsp_diagnostics\` on modified files
 - Run tests if available
-- Confirm all success criteria met
 
 ## QUALITY STANDARDS
 

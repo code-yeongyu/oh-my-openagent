@@ -47,6 +47,12 @@ type OpencodeClient = PluginInput["client"]
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
+export {
+  createTaskCreateTool,
+  createTaskGetTool,
+  createTaskList,
+  createTaskUpdateTool,
+} from "./task"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

@@ -66,7 +66,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
 program
   .command("run <message>")
   .description("Run opencode with todo/background task completion enforcement")
-  .option("-a, --agent <name>", "Agent to use (default: Sisyphus)")
+  .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
   .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
   .addHelpText("after", `
@@ -74,6 +74,15 @@ Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
   $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
+
+Agent resolution order:
+  1) --agent flag
+  2) OPENCODE_DEFAULT_AGENT
+  3) oh-my-opencode.json "default_run_agent"
+  4) Sisyphus (fallback)
+
+Available core agents:
+  Sisyphus, Hephaestus, Prometheus, Atlas
 
 Unlike 'opencode run', this command waits until:
   - All todos are completed or cancelled
