@@ -36,6 +36,7 @@ import {
   createCompactionContextInjector,
   createUnstableAgentBabysitterHook,
   createPreemptiveCompactionHook,
+  createTasksTodowriteDisablerHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -308,6 +309,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createSisyphusJuniorNotepadHook(ctx)
     : null;
 
+  const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
+    ? createTasksTodowriteDisablerHook({
+        experimental: pluginConfig.experimental,
+      })
+    : null;
+
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
 
@@ -503,8 +510,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     modelCacheState,
   });
 
-  const newTaskSystemEnabled = pluginConfig.new_task_system_enabled ?? false;
-  const taskToolsRecord: Record<string, ToolDefinition> = newTaskSystemEnabled
+  const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false;
+  const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
         task_get: createTaskGetTool(pluginConfig),
@@ -753,10 +760,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
-      await commentChecker?.["tool.execute.before"](input, output);
+      await commentChecker?.["tool.execute.before"]?.(input, output);
       await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
+      await tasksTodowriteDisabler?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);

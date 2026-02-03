@@ -240,7 +240,7 @@ Launch writing tasks for each location:
 
 \`\`\`
 for loc in AGENTS_LOCATIONS (except root):
-  delegate_task(category="writing", prompt=\\\`
+  delegate_task(category="writing", load_skills=[], run_in_background=false, prompt=\\\`
     Generate AGENTS.md for: \${loc.path}
     - Reason: \${loc.reason}
     - 30-80 lines max

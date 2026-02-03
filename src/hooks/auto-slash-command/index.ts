@@ -1,6 +1,7 @@
 import {
   detectSlashCommand,
   extractPromptText,
+  findSlashCommandPartIndex,
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
@@ -11,6 +12,8 @@ import {
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
+  CommandExecuteBeforeInput,
+  CommandExecuteBeforeOutput,
 } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
@@ -20,6 +23,7 @@ export * from "./constants"
 export * from "./types"
 
 const sessionProcessedCommands = new Set<string>()
+const sessionProcessedCommandExecutions = new Set<string>()
 
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
@@ -36,6 +40,14 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       output: AutoSlashCommandHookOutput
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
+
+      // Debug logging to diagnose slash command issues
+      if (promptText.startsWith("/")) {
+        log(`[auto-slash-command] chat.message hook received slash command`, {
+          sessionID: input.sessionID,
+          promptText: promptText.slice(0, 100),
+        })
+      }
 
       if (
         promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN) ||
@@ -63,7 +75,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const result = await executeSlashCommand(parsed, executorOptions)
 
-      const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
+      const idx = findSlashCommandPartIndex(output.parts)
       if (idx < 0) {
         return
       }
@@ -83,6 +95,55 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       log(`[auto-slash-command] Replaced message with command template`, {
         sessionID: input.sessionID,
         command: parsed.command,
+      })
+    },
+
+    "command.execute.before": async (
+      input: CommandExecuteBeforeInput,
+      output: CommandExecuteBeforeOutput
+    ): Promise<void> => {
+      const commandKey = `${input.sessionID}:${input.command}:${Date.now()}`
+      if (sessionProcessedCommandExecutions.has(commandKey)) {
+        return
+      }
+      
+      log(`[auto-slash-command] command.execute.before received`, {
+        sessionID: input.sessionID,
+        command: input.command,
+        arguments: input.arguments,
+      })
+
+      const parsed = {
+        command: input.command,
+        args: input.arguments || "",
+        raw: `/${input.command}${input.arguments ? " " + input.arguments : ""}`,
+      }
+
+      const result = await executeSlashCommand(parsed, executorOptions)
+
+      if (!result.success || !result.replacementText) {
+        log(`[auto-slash-command] command.execute.before - command not found in our executor`, {
+          sessionID: input.sessionID,
+          command: input.command,
+          error: result.error,
+        })
+        return
+      }
+
+      sessionProcessedCommandExecutions.add(commandKey)
+
+      const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
+      
+      const idx = findSlashCommandPartIndex(output.parts)
+      if (idx >= 0) {
+        output.parts[idx].text = taggedContent
+      } else {
+        output.parts.unshift({ type: "text", text: taggedContent })
+      }
+
+      log(`[auto-slash-command] command.execute.before - injected template`, {
+        sessionID: input.sessionID,
+        command: input.command,
       })
     },
   }

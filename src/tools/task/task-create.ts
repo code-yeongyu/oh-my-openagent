@@ -16,12 +16,19 @@ export function createTaskCreateTool(
   config: Partial<OhMyOpenCodeConfig>,
   ctx?: PluginInput,
 ): ToolDefinition {
-  return tool({
-    description: `Create a new task with auto-generated ID and threadID recording.
+   return tool({
+     description: `Create a new task with auto-generated ID and threadID recording.
 
 Auto-generates T-{uuid} ID, records threadID from context, sets status to "pending".
-Returns minimal response with task ID and subject.`,
-    args: {
+Returns minimal response with task ID and subject.
+
+**IMPORTANT - Dependency Planning for Parallel Execution:**
+Use \`blockedBy\` to specify task IDs that must complete before this task can start.
+Calculate dependencies carefully to maximize parallel execution:
+- Tasks with no dependencies can run simultaneously
+- Only block a task if it truly depends on another's output
+- Minimize dependency chains to reduce sequential bottlenecks`,
+     args: {
       subject: tool.schema.string().describe("Task subject (required)"),
       description: tool.schema.string().optional().describe("Task description"),
       activeForm: tool.schema

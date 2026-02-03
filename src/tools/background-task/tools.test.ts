@@ -1,7 +1,7 @@
-import { createBackgroundOutput } from "./tools"
-import type { BackgroundTask } from "../../features/background-agent"
+import { createBackgroundCancel, createBackgroundOutput } from "./tools"
+import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import type { BackgroundOutputManager, BackgroundOutputClient } from "./tools"
+import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
@@ -251,6 +251,134 @@ describe("background_output full_session", () => {
     // #then
     expect(output).toContain("[thinking] " + "y".repeat(2000) + "...")
     expect(output).not.toContain("y".repeat(2100))
+  })
+})
+
+describe("background_cancel", () => {
+  test("cancels a running task via manager", async () => {
+    // #given
+    const task = createTask({ status: "running" })
+    const cancelled: string[] = []
+    const manager = {
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async (taskId: string) => {
+        cancelled.push(taskId)
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when
+    const output = await tool.execute({ taskId: task.id }, mockContext)
+
+    // #then
+    expect(cancelled).toEqual([task.id])
+    expect(output).toContain("Task cancelled successfully")
+  })
+
+  test("cancels all running or pending tasks", async () => {
+    // #given
+    const taskA = createTask({ id: "task-a", status: "running" })
+    const taskB = createTask({ id: "task-b", status: "pending" })
+    const cancelled: string[] = []
+    const manager = {
+      getTask: () => undefined,
+      getAllDescendantTasks: () => [taskA, taskB],
+      cancelTask: async (taskId: string) => {
+        cancelled.push(taskId)
+        const task = taskId === taskA.id ? taskA : taskB
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when
+    const output = await tool.execute({ all: true }, mockContext)
+
+    // #then
+    expect(cancelled).toEqual([taskA.id, taskB.id])
+    expect(output).toContain("Cancelled 2 background task(s)")
+  })
+
+  test("preserves original status in cancellation table", async () => {
+    // #given
+    const taskA = createTask({ id: "task-a", status: "running", sessionID: "ses-a", description: "running task" })
+    const taskB = createTask({ id: "task-b", status: "pending", sessionID: undefined, description: "pending task" })
+    const manager = {
+      getTask: () => undefined,
+      getAllDescendantTasks: () => [taskA, taskB],
+      cancelTask: async (taskId: string) => {
+        const task = taskId === taskA.id ? taskA : taskB
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when
+    const output = await tool.execute({ all: true }, mockContext)
+
+    // #then
+    expect(output).toContain("| `task-a` | running task | running | `ses-a` |")
+    expect(output).toContain("| `task-b` | pending task | pending | (not started) |")
+  })
+
+  test("passes skipNotification: true to cancelTask to prevent deadlock", async () => {
+    // #given
+    const task = createTask({ id: "task-1", status: "running" })
+    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const manager = {
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async (taskId: string, options?: unknown) => {
+        cancelOptions.push({ taskId, options })
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when - cancel all tasks
+    await tool.execute({ all: true }, mockContext)
+
+    // #then - skipNotification should be true to prevent self-deadlock
+    expect(cancelOptions).toHaveLength(1)
+    expect(cancelOptions[0].options).toEqual(
+      expect.objectContaining({ skipNotification: true })
+    )
+  })
+
+  test("passes skipNotification: true when cancelling single task", async () => {
+    // #given
+    const task = createTask({ id: "task-1", status: "running" })
+    const cancelOptions: Array<{ taskId: string; options: unknown }> = []
+    const manager = {
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async (taskId: string, options?: unknown) => {
+        cancelOptions.push({ taskId, options })
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when - cancel single task
+    await tool.execute({ taskId: task.id }, mockContext)
+
+    // #then - skipNotification should be true
+    expect(cancelOptions).toHaveLength(1)
+    expect(cancelOptions[0].options).toEqual(
+      expect.objectContaining({ skipNotification: true })
+    )
   })
 })
 type BackgroundOutputMessage = {

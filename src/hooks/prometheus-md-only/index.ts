@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
-import { HOOK_NAME, PROMETHEUS_AGENTS, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import { HOOK_NAME, PROMETHEUS_AGENT, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
@@ -82,7 +82,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
     ): Promise<void> => {
       const agentName = getAgentFromSession(input.sessionID)
 
-      if (!agentName || !PROMETHEUS_AGENTS.includes(agentName)) {
+      if (agentName !== PROMETHEUS_AGENT) {
         return
       }
 

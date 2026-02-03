@@ -1711,6 +1711,65 @@ describe("sisyphus-task", () => {
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
+
+    test("sisyphus-junior model override takes precedence over category model", async () => {
+      // given - sisyphus-junior override model differs from category default
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-override",
+            sessionID: "ses_override_test",
+            description: "Override precedence test",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using ultrabrain category (default model is openai/gpt-5.2-codex)
+      await tool.execute(
+        {
+          description: "Override precedence test",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - override model should be used instead of category model
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+    })
   })
 
   describe("browserProvider propagation", () => {
