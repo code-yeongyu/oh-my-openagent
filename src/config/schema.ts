@@ -101,6 +101,13 @@ export const BuiltinCommandNameSchema = z.enum([
   "start-work",
 ])
 
+export const FallbackChainEntrySchema = z.object({
+  providers: z.array(z.string()),
+  model: z.string(),
+  variant: z.string().optional(),
+})
+export const FallbackChainSchema = z.array(FallbackChainEntrySchema)
+
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
@@ -136,11 +143,7 @@ export const AgentOverrideConfigSchema = z.object({
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
   /** Custom fallback chain for model resolution. Overrides built-in agent fallback chains. */
-  fallback_chain: z.array(z.object({
-    providers: z.array(z.string()),
-    model: z.string(),
-    variant: z.string().optional(),
-  })).optional(),
+  fallback_chain: FallbackChainSchema.optional(),
 })
 
 export const AgentOverridesSchema = z.object({
@@ -196,11 +199,7 @@ export const CategoryConfigSchema = z.object({
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini/minimax models. */
   is_unstable_agent: z.boolean().optional(),
   /** Custom fallback chain for model resolution. Each entry specifies providers, model, and optional variant. */
-  fallback_chain: z.array(z.object({
-    providers: z.array(z.string()),
-    model: z.string(),
-    variant: z.string().optional(),
-  })).optional(),
+  fallback_chain: FallbackChainSchema.optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([
