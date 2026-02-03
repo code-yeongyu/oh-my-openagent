@@ -184,6 +184,117 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan.prompt).not.toBe(agents.prometheus?.prompt)
   })
 
+  test("plan agent should not be demoted when replacePlan is false", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: false,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {
+        plan: {
+          name: "plan",
+          mode: "primary",
+          prompt: "original plan prompt",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
+    expect(agents.plan).toBeDefined()
+    expect(agents.plan.mode).toBe("primary")
+    expect(agents.plan.name).toBe("plan")
+    expect(agents.plan.prompt).toBe("original plan prompt")
+  })
+
+  test("plan agent should not be demoted when planner is disabled", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: false,
+        replace_plan: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {
+        plan: {
+          name: "plan",
+          mode: "primary",
+          prompt: "original plan prompt",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
+    expect(agents.prometheus).toBeUndefined()
+    expect(agents.plan).toBeDefined()
+    expect(agents.plan.mode).toBe("primary")
+  })
+
+  test("preserves empty plan prompt when demoting", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+      agent: {
+        plan: {
+          name: "plan",
+          mode: "primary",
+          prompt: "",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    const agents = config.agent as Record<string, { prompt?: string }>
+    expect(agents.plan).toBeDefined()
+    expect(agents.plan.prompt).toBe("")
+  })
+
   test("prometheus should have mode 'all' to be callable via delegate_task", async () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {
