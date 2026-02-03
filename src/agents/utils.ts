@@ -446,17 +446,17 @@ export async function createBuiltinAgents(
      result[name] = config
    }
 
-   if (!disabledAgents.includes("atlas")) {
-     const orchestratorOverride = agentOverrides["atlas"]
-     const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
-    
-    const atlasResolution = applyModelResolution({
-      // NOTE: Atlas does NOT use uiSelectedModel - respects its own fallbackChain (k2p5 primary)
-      userModel: orchestratorOverride?.model,
-      requirement: atlasRequirement,
-      availableModels,
-      systemDefaultModel,
-    })
+    if (!disabledAgents.includes("atlas")) {
+      const orchestratorOverride = agentOverrides["atlas"]
+      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
+
+      const atlasResolution = applyModelResolution({
+        uiSelectedModel,
+        userModel: orchestratorOverride?.model,
+        requirement: atlasRequirement,
+        availableModels,
+        systemDefaultModel,
+      })
     
     if (atlasResolution) {
       const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
