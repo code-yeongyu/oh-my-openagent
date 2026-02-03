@@ -210,6 +210,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
+    const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
+      configAgent?.plan ?? {};
+    const planPrompt = (migrateAgentConfig(
+      planConfigWithoutName as Record<string, unknown>
+    ) as { prompt?: string }).prompt;
+
     if (isSisyphusEnabled && builtinAgents.sisyphus) {
       (config as { default_agent?: string }).default_agent = "sisyphus";
 
@@ -241,11 +247,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
 
       if (plannerEnabled) {
-        const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
-          configAgent?.plan ?? {};
-        const migratedPlanConfig = migrateAgentConfig(
-          planConfigWithoutName as Record<string, unknown>
-        );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & {
@@ -362,10 +363,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { 
+        ? {
             ...agentConfig["prometheus"],
-            name: "plan", 
-            mode: "subagent" as const 
+            name: "plan",
+            mode: "subagent" as const,
+            ...(planPrompt ? { prompt: planPrompt } : {}),
           }
         : undefined;
 
