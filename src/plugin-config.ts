@@ -123,7 +123,6 @@ export function loadPluginConfig(
 
   config = {
     ...config,
-    new_task_system_enabled: config.new_task_system_enabled ?? false,
   };
 
   log("Final merged config", {
