@@ -638,15 +638,16 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Backg
           }> = []
 
           for (const task of cancellableTasks) {
+            const originalStatus = task.status
             const cancelled = await manager.cancelTask(task.id, {
               source: "background_cancel",
-              abortSession: task.status === "running",
+              abortSession: originalStatus === "running",
             })
             if (!cancelled) continue
             cancelledInfo.push({
               id: task.id,
               description: task.description,
-              status: task.status === "pending" ? "pending" : "running",
+              status: originalStatus === "pending" ? "pending" : "running",
               sessionID: task.sessionID,
             })
           }
@@ -668,7 +669,7 @@ Continuable sessions:
 ${resumableTasks.map(t => `- \`${t.sessionID}\` (${t.description})`).join("\n")}`
              : ""
 
-          return `Cancelled ${cancellableTasks.length} background task(s):
+          return `Cancelled ${cancelledInfo.length} background task(s):
 
 | Task ID | Description | Status | Session ID |
 |---------|-------------|--------|------------|

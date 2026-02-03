@@ -304,6 +304,30 @@ describe("background_cancel", () => {
     expect(cancelled).toEqual([taskA.id, taskB.id])
     expect(output).toContain("Cancelled 2 background task(s)")
   })
+
+  test("preserves original status in cancellation table", async () => {
+    // #given
+    const taskA = createTask({ id: "task-a", status: "running", sessionID: "ses-a", description: "running task" })
+    const taskB = createTask({ id: "task-b", status: "pending", sessionID: undefined, description: "pending task" })
+    const manager = {
+      getTask: () => undefined,
+      getAllDescendantTasks: () => [taskA, taskB],
+      cancelTask: async (taskId: string) => {
+        const task = taskId === taskA.id ? taskA : taskB
+        task.status = "cancelled"
+        return true
+      },
+    } as unknown as BackgroundManager
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when
+    const output = await tool.execute({ all: true }, mockContext)
+
+    // #then
+    expect(output).toContain("| `task-a` | running task | running | `ses-a` |")
+    expect(output).toContain("| `task-b` | pending task | pending | (not started) |")
+  })
 })
 type BackgroundOutputMessage = {
   id?: string
