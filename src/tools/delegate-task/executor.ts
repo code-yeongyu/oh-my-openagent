@@ -793,16 +793,20 @@ export async function resolveCategoryExecution(
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
+  const overrideModel = sisyphusJuniorModel
+
   if (!requirement) {
-    actualModel = resolved.model
+    actualModel = overrideModel ?? resolved.model
     if (actualModel) {
-      modelInfo = { model: actualModel, type: "system-default", source: "system-default" }
+      modelInfo = overrideModel
+        ? { model: actualModel, type: "user-defined", source: "override" }
+        : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
     const resolution = resolveModelPipeline({
       intent: {
-        userModel: userCategories?.[args.category!]?.model,
-        categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
+        userModel: overrideModel ?? userCategories?.[args.category!]?.model,
+        categoryDefaultModel: resolved.model,
       },
       constraints: { availableModels },
       policy: {
