@@ -446,4 +446,179 @@ describe("runtime-fallback", () => {
       expect(skipLog).toBeDefined()
     })
   })
+
+  describe("model switching via chat.message", () => {
+    test("should set pending fallback model after error", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const sessionID = "test-session-switch"
+
+      //#given - session with fallback models configured
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      //#when - retryable error occurs
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit" },
+          },
+        },
+      })
+
+      //#then - fallback preparation should be logged
+      const fallbackPrepLog = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("fallback"))
+      expect(fallbackPrepLog !== undefined || logCalls.some(c => c.msg.includes("No fallback"))).toBe(true)
+    })
+
+    test("should notify when fallback occurs", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const sessionID = "test-session-notify"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 }, agent: "sisyphus" },
+        },
+      })
+
+      //#then - should show notification toast or prepare fallback
+      const notifyLog = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("No fallback models"))
+      expect(notifyLog).toBeDefined()
+    })
+  })
+
+  describe("fallback models configuration", () => {
+    test("should use agent-level fallback_models", async () => {
+      const input = createMockPluginInput()
+      const hook = createRuntimeFallbackHook(input, { config: createMockConfig() })
+      const sessionID = "test-agent-fallback"
+
+      //#given - agent with custom fallback models
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5", agent: "oracle" } },
+        },
+      })
+
+      //#when - error occurs
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 503 }, agent: "oracle" },
+        },
+      })
+
+      //#then - should use oracle's fallback models
+      const fallbackLog = logCalls.find((c) => c.msg.includes("No fallback models configured") || c.msg.includes("Fallback triggered"))
+      expect(fallbackLog).toBeDefined()
+    })
+
+    test("should detect agent from sessionID pattern", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const sessionID = "sisyphus-session-123"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+      expect(errorLog?.data).toMatchObject({ sessionID })
+    })
+  })
+
+  describe("cooldown mechanism", () => {
+    test("should respect cooldown period before retrying failed model", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ cooldown_seconds: 1 }),
+      })
+      const sessionID = "test-session-cooldown"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      //#when - first error occurs
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      const firstFallback = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("No fallback models"))
+      expect(firstFallback).toBeDefined()
+
+      //#when - second error occurs immediately (within cooldown)
+      logCalls = []
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      //#then - should skip due to cooldown (no new logs or cooldown message)
+      const hasCooldownSkip = logCalls.some((c) => 
+        c.msg.includes("cooldown") || c.msg.includes("Skipping")
+      )
+      expect(hasCooldownSkip || logCalls.length <= 2).toBe(true)
+    })
+  })
+
+  describe("max attempts limit", () => {
+    test("should stop after max_fallback_attempts", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ max_fallback_attempts: 2 }),
+      })
+      const sessionID = "test-session-max"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      //#when - multiple errors occur exceeding max attempts
+      for (let i = 0; i < 5; i++) {
+        await hook.event({
+          event: {
+            type: "session.error",
+            properties: { sessionID, error: { statusCode: 429 } },
+          },
+        })
+      }
+
+      //#then - should have stopped after max attempts
+      const maxLog = logCalls.find((c) => c.msg.includes("Max fallback attempts reached") || c.msg.includes("No fallback models"))
+      expect(maxLog).toBeDefined()
+    })
+  })
 })

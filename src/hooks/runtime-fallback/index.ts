@@ -87,22 +87,35 @@ function getFallbackModelsForSession(
 ): string[] {
   if (!pluginConfig) return []
 
-  if (agent && pluginConfig.agents?.[agent as keyof typeof pluginConfig.agents]) {
-    const agentConfig = pluginConfig.agents[agent as keyof typeof pluginConfig.agents]
+  const tryGetFallbackFromAgent = (agentName: string): string[] | undefined => {
+    const agentConfig = pluginConfig.agents?.[agentName as keyof typeof pluginConfig.agents]
+    if (!agentConfig) return undefined
+    
     if (agentConfig?.fallback_models) {
       return normalizeFallbackModels(agentConfig.fallback_models)
     }
-  }
-
-  const sessionAgentMatch = sessionID.match(/\b(sisyphus|oracle|librarian|explore|prometheus|atlas|metis|momus)\b/i)
-  if (sessionAgentMatch) {
-    const detectedAgent = sessionAgentMatch[1].toLowerCase()
-    if (pluginConfig.agents?.[detectedAgent as keyof typeof pluginConfig.agents]) {
-      const agentConfig = pluginConfig.agents[detectedAgent as keyof typeof pluginConfig.agents]
-      if (agentConfig?.fallback_models) {
-        return normalizeFallbackModels(agentConfig.fallback_models)
+    
+    const agentCategory = agentConfig?.category
+    if (agentCategory && pluginConfig.categories?.[agentCategory]) {
+      const categoryConfig = pluginConfig.categories[agentCategory]
+      if (categoryConfig?.fallback_models) {
+        return normalizeFallbackModels(categoryConfig.fallback_models)
       }
     }
+    
+    return undefined
+  }
+
+  if (agent) {
+    const result = tryGetFallbackFromAgent(agent)
+    if (result) return result
+  }
+
+  const sessionAgentMatch = sessionID.match(/\b(sisyphus|oracle|librarian|explore|prometheus|atlas|metis|momus|hephaestus|sisyphus-junior|build|plan|multimodal-looker)\b/i)
+  if (sessionAgentMatch) {
+    const detectedAgent = sessionAgentMatch[1].toLowerCase()
+    const result = tryGetFallbackFromAgent(detectedAgent)
+    if (result) return result
   }
 
   return []
