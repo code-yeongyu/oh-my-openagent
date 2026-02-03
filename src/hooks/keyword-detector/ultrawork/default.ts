@@ -44,9 +44,9 @@ export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
 
 **WHEN IN DOUBT:**
 \`\`\`
-delegate_task(agent="explore", prompt="Find [X] patterns in codebase", background=true)
-delegate_task(agent="librarian", prompt="Find docs/examples for [Y]", background=true)
-delegate_task(agent="oracle", prompt="Review my approach: [describe plan]")
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find [X] patterns in codebase", run_in_background=true)
+delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs/examples for [Y]", run_in_background=true)
+delegate_task(subagent_type="oracle", load_skills=[], prompt="Review my approach: [describe plan]", run_in_background=false)
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**

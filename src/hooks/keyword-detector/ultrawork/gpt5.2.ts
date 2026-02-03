@@ -97,12 +97,12 @@ Use these when they provide clear value based on the decision framework above:
 **ALWAYS run both tracks in parallel:**
 \`\`\`
 // Fire background agents for deep exploration
-delegate_task(agent="explore", prompt="Find X patterns...", background=true)
-delegate_task(agent="librarian", prompt="Find docs for Y...", background=true)
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find X patterns...", run_in_background=true)
+delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs for Y...", run_in_background=true)
 
 // WHILE THEY RUN - use direct tools for immediate context
-Grep(pattern="relevant_pattern", path="src/")
-Read(filePath="known/important/file.ts")
+grep(pattern="relevant_pattern", path="src/")
+read_file(filePath="known/important/file.ts")
 
 // Collect background results when ready
 deep_context = background_output(task_id=...)
