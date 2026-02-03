@@ -9,7 +9,35 @@ import {
 
 const MODE: AgentMode = "subagent"
 
-const SISYPHUS_JUNIOR_PROMPT = `<Role>
+function buildTodoDisciplineSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<Task_Discipline>
+TASK OBSESSION (NON-NEGOTIABLE):
+- 2+ steps → TaskCreate FIRST, atomic breakdown
+- TaskUpdate(status="in_progress") before starting (ONE at a time)
+- TaskUpdate(status="completed") IMMEDIATELY after each step
+- NEVER batch completions
+
+No tasks on multi-step work = INCOMPLETE WORK.
+</Task_Discipline>`
+  }
+
+  return `<Todo_Discipline>
+TODO OBSESSION (NON-NEGOTIABLE):
+- 2+ steps → todowrite FIRST, atomic breakdown
+- Mark in_progress before starting (ONE at a time)
+- Mark completed IMMEDIATELY after each step
+- NEVER batch completions
+
+No todos on multi-step work = INCOMPLETE WORK.
+</Todo_Discipline>`
+}
+
+function buildSisyphusJuniorPrompt(useTaskSystem: boolean, promptAppend?: string): string {
+  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem)
+  const verificationText = useTaskSystem ? "All tasks marked completed" : "All todos marked completed"
+
+  const prompt = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
 Execute tasks directly. NEVER delegate or spawn other agents.
 </Role>
@@ -23,21 +51,13 @@ ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
 You work ALONE for implementation. No delegation of implementation tasks.
 </Critical_Constraints>
 
-<Todo_Discipline>
-TODO OBSESSION (NON-NEGOTIABLE):
-- 2+ steps → todowrite FIRST, atomic breakdown
-- Mark in_progress before starting (ONE at a time)
-- Mark completed IMMEDIATELY after each step
-- NEVER batch completions
-
-No todos on multi-step work = INCOMPLETE WORK.
-</Todo_Discipline>
+${todoDiscipline}
 
 <Verification>
 Task NOT complete without:
 - lsp_diagnostics clean on changed files
 - Build passes (if applicable)
-- All todos marked completed
+- ${verificationText}
 </Verification>
 
 <Style>
@@ -46,9 +66,8 @@ Task NOT complete without:
 - Dense > verbose.
 </Style>`
 
-function buildSisyphusJuniorPrompt(promptAppend?: string): string {
-  if (!promptAppend) return SISYPHUS_JUNIOR_PROMPT
-  return SISYPHUS_JUNIOR_PROMPT + "\n\n" + promptAppend
+  if (!promptAppend) return prompt
+  return prompt + "\n\n" + promptAppend
 }
 
 // Core tools that Sisyphus-Junior must NEVER have access to
@@ -62,7 +81,8 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 
 export function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
-  systemDefaultModel?: string
+  systemDefaultModel?: string,
+  useTaskSystem = false
 ): AgentConfig {
   if (override?.disable) {
     override = undefined
@@ -72,7 +92,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append
-  const prompt = buildSisyphusJuniorPrompt(promptAppend)
+  const prompt = buildSisyphusJuniorPrompt(useTaskSystem, promptAppend)
 
   const baseRestrictions = createAgentToolRestrictions(BLOCKED_TOOLS)
 
