@@ -4,6 +4,7 @@ import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -46,6 +47,10 @@ export async function executeBackgroundTask(
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = manager.getTask(task.id)
       sessionId = updated?.sessionID
+    }
+
+    if (args.category && sessionId) {
+      SessionCategoryRegistry.register(sessionId, args.category)
     }
 
     const unstableMeta = {
