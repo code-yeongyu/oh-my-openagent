@@ -1,0 +1,93 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    # Run daily at 6:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/code-yeongyu/oh-my-opencode.git
+
+      - name: Fetch upstream
+        run: git fetch upstream dev
+
+      - name: Check for updates
+        id: check
+        run: |
+          UPSTREAM_COMMIT=$(git rev-parse upstream/dev)
+          FORK_BASE=$(git merge-base HEAD upstream/dev)
+          if [ "$UPSTREAM_COMMIT" != "$FORK_BASE" ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "New commits found in upstream"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "Fork is up to date"
+          fi
+
+      - name: Rebase on upstream
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git rebase upstream/dev || {
+            echo "Rebase failed - conflicts detected"
+            git rebase --abort
+            exit 1
+          }
+
+      - name: Setup Bun
+        if: steps.check.outputs.has_updates == 'true'
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        if: steps.check.outputs.has_updates == 'true'
+        run: bun install
+
+      - name: Build
+        if: steps.check.outputs.has_updates == 'true'
+        run: bun run build
+
+      - name: Push changes
+        if: steps.check.outputs.has_updates == 'true'
+        run: git push --force-with-lease origin dev
+
+      - name: Get version
+        if: steps.check.outputs.has_updates == 'true'
+        id: version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          BOULDER_VERSION="${VERSION}-boulder-$(date +%Y%m%d)"
+          echo "version=$BOULDER_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: steps.check.outputs.has_updates == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Boulder Loop v${{ steps.version.outputs.version }}
+          body: |
+            Synced with upstream oh-my-opencode.
+            
+            ## Installation
+            Download `oh-my-opencode-boulder.js` and place in `~/.config/opencode/plugins/`
+          files: |
+            dist/index.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
