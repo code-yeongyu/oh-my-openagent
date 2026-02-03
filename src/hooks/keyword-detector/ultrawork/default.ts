@@ -2,9 +2,9 @@
  * Default ultrawork message optimized for Claude series models.
  *
  * Key characteristics:
- * - Optimized for Claude's tendency to be "helpful" by forcing explicit delegation
- * - "DELEGATE. ALWAYS." instruction counters Claude's natural inclination to do everything
- * - Strong emphasis on parallel agent usage and category+skills delegation
+ * - Natural tool-like usage of explore/librarian agents (background=true)
+ * - Parallel execution emphasized - fire agents and continue working
+ * - Simple workflow: EXPLORES → GATHER → PLAN → DELEGATE
  */
 
 export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
@@ -46,10 +46,7 @@ export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
 \`\`\`
 delegate_task(subagent_type="explore", load_skills=[], prompt="Find [X] patterns in codebase", run_in_background=true)
 delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs/examples for [Y]", run_in_background=true)
-
-// Hard problem? DON'T struggle alone:
-delegate_task(subagent_type="oracle", load_skills=[], run_in_background=false, prompt="...")         // conventional: architecture, debugging
-delegate_task(category="artistry", load_skills=[], run_in_background=false, prompt="...")    // non-conventional: needs different approach
+delegate_task(subagent_type="oracle", load_skills=[], prompt="Review my approach: [describe plan]", run_in_background=false)
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**
@@ -178,83 +175,18 @@ delegate_task(category="quick", load_skills=["git-master"])
 
 ---
 
-## EXECUTION RULES (PARALLELIZATION)
+## EXECUTION RULES
+- **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
+- **PARALLEL**: Fire independent agent calls simultaneously via delegate_task(background=true) - NEVER wait sequentially.
+- **BACKGROUND FIRST**: Use delegate_task for exploration/research agents (10+ concurrent if needed).
+- **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
+- **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
 
-| Rule | Implementation |
-|------|----------------|
-| **PARALLEL FIRST** | Fire ALL **truly independent** agents simultaneously via delegate_task(run_in_background=true) |
-| **DATA DEPENDENCY CHECK** | If task B requires output FROM task A, B MUST wait for A to complete |
-| **10+ CONCURRENT** | Use 10+ background agents if needed for comprehensive exploration |
-| **COLLECT BEFORE DEPENDENT** | Collect results with background_output() BEFORE invoking dependent tasks |
-
-### DEPENDENCY EXCEPTIONS (OVERRIDES PARALLEL FIRST)
-
-| Agent | Dependency | Must Wait For |
-|-------|------------|---------------|
-| plan | explore/librarian results | Collect explore outputs FIRST |
-| execute | plan output | Finalized work plan |
-
-**CRITICAL: Plan agent REQUIRES explore results as input. This is a DATA DEPENDENCY, not parallelizable.**
-
-\`\`\`
-// WRONG: Launching plan without explore results
-delegate_task(subagent_type="explore", run_in_background=true, prompt="...")
-delegate_task(subagent_type="plan", prompt="...")  // BAD - no context yet!
-
-// CORRECT: Collect explore results BEFORE plan
-delegate_task(subagent_type="explore", run_in_background=true, prompt="...")  // task_id_1
-// ... wait or continue other work ...
-context = background_output(task_id="task_id_1")  // COLLECT FIRST
-delegate_task(subagent_type="plan", prompt="<collected context + request>")  // NOW plan has context
-\`\`\`
-
----
-
-## WORKFLOW (MANDATORY SEQUENCE - STEPS HAVE DATA DEPENDENCIES)
-
-**CRITICAL: Steps 1→2→3 have DATA DEPENDENCIES. Each step REQUIRES output from the previous step.**
-
-\`\`\`
-[Step 1: EXPLORE] → output: context
-      ↓ (data dependency)
-[Step 2: COLLECT] → input: task_ids, output: gathered_context  
-      ↓ (data dependency)
-[Step 3: PLAN] → input: gathered_context + request
-\`\`\`
-
-1. **GATHER CONTEXT** (parallel background agents):
-   \`\`\`
-   task_id_1 = delegate_task(subagent_type="explore", run_in_background=true, prompt="...")
-   task_id_2 = delegate_task(subagent_type="librarian", run_in_background=true, prompt="...")
-   \`\`\`
-
-2. **COLLECT EXPLORE RESULTS** (REQUIRED before step 3):
-   \`\`\`
-   // You MUST collect results before invoking plan agent
-   explore_result = background_output(task_id=task_id_1)
-   librarian_result = background_output(task_id=task_id_2)
-   gathered_context = explore_result + librarian_result
-   \`\`\`
-
-3. **INVOKE PLAN AGENT** (input: gathered_context from step 2):
-   \`\`\`
-   result = delegate_task(subagent_type="plan", prompt="<gathered_context from step 2> + <user request>")
-   // STORE the session_id for follow-ups!
-   plan_session_id = result.session_id
-   \`\`\`
-
-4. **ITERATE WITH PLAN AGENT** (if clarification needed):
-   \`\`\`
-   // Use session_id to continue the conversation
-   delegate_task(session_id=plan_session_id, prompt="<answer to plan agent's question>")
-   \`\`\`
-
-5. **EXECUTE VIA DELEGATION** (category + skills from plan agent's output):
-   \`\`\`
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="<task from plan>")
-   \`\`\`
-
-6. **VERIFY** against original requirements
+## WORKFLOW
+1. Analyze the request and identify required capabilities
+2. Spawn exploration/librarian agents via delegate_task(background=true) in PARALLEL (10+ if needed)
+3. Use Plan agent with gathered context to create detailed work breakdown
+4. Execute with continuous verification against original requirements
 
 ## VERIFICATION GUARANTEE (NON-NEGOTIABLE)
 
@@ -327,11 +259,9 @@ Write these criteria explicitly. Share with user if scope is non-trivial.
 
 THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
 
-1. EXPLORES + LIBRARIANS (background) → get task_ids
-2. COLLECT explore results via background_output() → gathered_context
-3. INVOKE PLAN with gathered_context: delegate_task(subagent_type="plan", prompt="<gathered_context + request>")
-4. ITERATE WITH PLAN AGENT (session_id resume) UNTIL PLAN IS FINALIZED
-5. WORK BY DELEGATING TO CATEGORY + SKILLS AGENTS (following plan agent's parallel task graph)
+1. EXPLORES + LIBRARIANS
+2. GATHER -> PLAN AGENT SPAWN
+3. WORK BY DELEGATING TO ANOTHER AGENTS
 
 NOW.
 
