@@ -47,7 +47,7 @@ Categories spawn \`Sisyphus-Junior-{category}\` with optimized settings:
 ${categoryRows.join("\n")}
 
 \`\`\`typescript
-delegate_task(category="[category-name]", load_skills=[...], prompt="...")
+delegate_task(category="[category-name]", load_skills=[...], run_in_background=false, prompt="...")
 \`\`\``
 }
 
@@ -78,7 +78,7 @@ Read each skill's description and ask: "Does this skill's domain overlap with my
 
 **Usage:**
 \`\`\`typescript
-delegate_task(category="[category]", load_skills=["skill-1", "skill-2"], prompt="...")
+delegate_task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_background=false, prompt="...")
 \`\`\`
 
 **IMPORTANT:**
