@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { CACHE_DIR, PACKAGE_NAME } from "./constants"
+import { PACKAGE_NAME, USER_CONFIG_DIR } from "./constants"
 import { log } from "../../shared/logger"
 
 interface BunLockfile {
@@ -17,7 +17,7 @@ function stripTrailingCommas(json: string): string {
 }
 
 function removeFromBunLock(packageName: string): boolean {
-  const lockPath = path.join(CACHE_DIR, "bun.lock")
+  const lockPath = path.join(USER_CONFIG_DIR, "bun.lock")
   if (!fs.existsSync(lockPath)) return false
 
   try {
@@ -48,8 +48,8 @@ function removeFromBunLock(packageName: string): boolean {
 
 export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   try {
-    const pkgDir = path.join(CACHE_DIR, "node_modules", packageName)
-    const pkgJsonPath = path.join(CACHE_DIR, "package.json")
+    const pkgDir = path.join(USER_CONFIG_DIR, "node_modules", packageName)
+    const pkgJsonPath = path.join(USER_CONFIG_DIR, "package.json")
 
     let packageRemoved = false
     let dependencyRemoved = false
