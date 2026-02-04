@@ -19,8 +19,13 @@ function clearSkillCache(): void {
 
 async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
 	const cacheKey = options?.browserProvider ?? "playwright"
-	const cached = cachedSkillsByProvider.get(cacheKey)
-	if (cached) return cached
+	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
+
+	// Skip cache if disabledSkills is provided (varies between calls)
+	if (!hasDisabledSkills) {
+		const cached = cachedSkillsByProvider.get(cacheKey)
+		if (cached) return cached
+	}
 
 	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
 		discoverSkills({ includeClaudeCodePaths: true }),
@@ -53,8 +58,15 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 	const discoveredNames = new Set(discoveredSkills.map((s) => s.name))
 	const uniqueBuiltins = builtinSkillsAsLoaded.filter((s) => !discoveredNames.has(s.name))
 
-	const allSkills = [...discoveredSkills, ...uniqueBuiltins]
-	cachedSkillsByProvider.set(cacheKey, allSkills)
+	let allSkills = [...discoveredSkills, ...uniqueBuiltins]
+
+	// Filter discovered skills by disabledSkills (builtin skills are already filtered by createBuiltinSkills)
+	if (hasDisabledSkills) {
+		allSkills = allSkills.filter((s) => !options!.disabledSkills!.has(s.name))
+	} else {
+		cachedSkillsByProvider.set(cacheKey, allSkills)
+	}
+
 	return allSkills
 }
 
