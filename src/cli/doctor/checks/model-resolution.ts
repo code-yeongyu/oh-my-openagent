@@ -69,8 +69,8 @@ export interface ModelResolutionInfo {
 }
 
 interface OmoConfig {
-  agents?: Record<string, { model?: string }>
-  categories?: Record<string, { model?: string }>
+  agents?: Record<string, { model?: string; variant?: string; category?: string }>
+  categories?: Record<string, { model?: string; variant?: string }>
 }
 
 function loadConfig(): OmoConfig | null {
@@ -182,7 +182,17 @@ function formatModelWithVariant(model: string, variant?: string): string {
   return variant ? `${model} (${variant})` : model
 }
 
-function getEffectiveVariant(requirement: ModelRequirement): string | undefined {
+function getEffectiveVariant(
+  name: string,
+  requirement: ModelRequirement,
+  config: OmoConfig,
+): string | undefined {
+  // Check user config first
+  const userVariant = config.agents?.[name]?.variant
+  if (userVariant) {
+    return userVariant
+  }
+  // Fall back to requirement's fallback chain
   const firstEntry = requirement.fallbackChain[0]
   return firstEntry?.variant ?? requirement.variant
 }
@@ -193,7 +203,7 @@ interface AvailableModelsInfo {
   cacheExists: boolean
 }
 
-function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo): string[] {
+function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo, config: OmoConfig): string[] {
   const details: string[] = []
 
   details.push("═══ Available Models (from cache) ═══")
@@ -215,14 +225,18 @@ function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModels
   details.push("Agents:")
   for (const agent of info.agents) {
     const marker = agent.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.requirement))
+    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.name, agent.requirement, config))
     details.push(`  ${marker} ${agent.name}: ${display}`)
   }
   details.push("")
   details.push("Categories:")
   for (const category of info.categories) {
     const marker = category.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(category.effectiveModel, getEffectiveVariant(category.requirement))
+    const categoryVariant = config.categories?.[category.name]?.variant
+    const display = formatModelWithVariant(
+      category.effectiveModel,
+      categoryVariant ?? getEffectiveVariant(category.name, category.requirement, config)
+    )
     details.push(`  ${marker} ${category.name}: ${display}`)
   }
   details.push("")
@@ -249,7 +263,7 @@ export async function checkModelResolution(): Promise<CheckResult> {
     name: CHECK_NAMES[CHECK_IDS.MODEL_RESOLUTION],
     status: available.cacheExists ? "pass" : "warn",
     message: `${agentCount} agents, ${categoryCount} categories${overrideNote}${cacheNote}`,
-    details: buildDetailsArray(info, available),
+    details: buildDetailsArray(info, available, config),
   }
 }
 
