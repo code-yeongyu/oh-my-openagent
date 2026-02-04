@@ -108,6 +108,21 @@ function extractKubectlCommand(command: string): KubectlMatch | null {
     }
   }
 
+  // Match helm command
+  const helmPattern = /^(?:.*[/\\])?helm(?:\.exe)?\s+(.*)$/i
+  const helmMatch = executablePart.match(helmPattern)
+
+  if (helmMatch) {
+    const args = helmMatch[1].trim()
+    const subcommandMatch = args.match(/^(\S+)/)
+    const subcommand = subcommandMatch ? subcommandMatch[1] : ""
+
+    return {
+      subcommand: `helm-${subcommand.toLowerCase()}`,
+      fullCommand: args,
+    }
+  }
+
   return null
 }
 
@@ -150,10 +165,23 @@ function detectContextSwitch(subcommand: string, fullCommand: string): string | 
   return null
 }
 
+function isDryRun(fullCommand: string): boolean {
+  if (/--dry-run=none\b/.test(fullCommand)) return false
+  return /--dry-run\b/.test(fullCommand)
+}
+
 function detectDangerousOperation(subcommand: string, fullCommand: string): string | null {
   // Dangerous operations: scale, delete, apply, create, patch, edit, rollout restart, drain, cordon, uncordon, exec, port-forward, proxy
 
   const dangerousPatterns: Array<[RegExp, string]> = [
+    // Helm dangerous operations (check first to avoid conflicts with kubectl patterns)
+    [/^helm-install\b/, "helm install"],
+    [/^helm-upgrade\b/, "helm upgrade"],
+    [/^helm-uninstall\b/, "helm uninstall"],
+    [/^helm-delete\b/, "helm delete"],
+    [/^helm-rollback\b/, "helm rollback"],
+    [/^helm-test\b/, "helm test"],
+
     // Resource scaling
     [/^scale\b/, "kubectl scale"],
 
@@ -177,8 +205,9 @@ function detectDangerousOperation(subcommand: string, fullCommand: string): stri
 
     // Potentially dangerous operations
     [/^exec\b/, "kubectl exec"],
-    [/^port-forward\b/, "kubectl port-forward"],
     [/^proxy\b/, "kubectl proxy"],
+    [/^cp\b/, "kubectl cp"],
+    [/^attach\b/, "kubectl attach"],
 
     // Config write operations (specific patterns first)
     [/^config\s+set-context\b/, "kubectl config set-context"],
@@ -217,7 +246,10 @@ function detectDangerousOperation(subcommand: string, fullCommand: string): stri
   ]
 
   for (const [pattern, name] of dangerousPatterns) {
-    if (pattern.test(fullCommand)) {
+    if (pattern.test(fullCommand) || pattern.test(subcommand)) {
+      if (isDryRun(fullCommand)) {
+        return null
+      }
       return name
     }
   }

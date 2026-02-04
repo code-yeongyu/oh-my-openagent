@@ -538,7 +538,7 @@ describe("kubectl-command-classifier", () => {
         expect(result.matchedPattern).toBe("kubectl exec")
       })
 
-      test("should detect 'kubectl port-forward'", () => {
+      test("should classify 'kubectl port-forward' as safe (not dangerous)", () => {
         // #given
         const command = "kubectl port-forward svc/my-service 8080:80"
 
@@ -546,8 +546,29 @@ describe("kubectl-command-classifier", () => {
         const result = classifyKubectlCommand(command)
 
         // #then
-        expect(result.isDangerous).toBe(true)
-        expect(result.matchedPattern).toBe("kubectl port-forward")
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'kubectl port-forward svc/loki-gateway' as safe", () => {
+        // #given
+        const command = "kubectl port-forward svc/loki-gateway 3100:80 -n loki"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'kubectl port-forward pod' as safe", () => {
+        // #given
+        const command = "kubectl port-forward pod/prometheus-0 9090:9090"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
       })
 
       test("should detect 'kubectl proxy'", () => {
@@ -1206,6 +1227,385 @@ describe("kubectl-command-classifier", () => {
       // #then
       expect(result.isKubectl).toBe(true)
       expect(result.isDangerous).toBe(false)
+    })
+  })
+
+  describe("--dry-run flag safety override", () => {
+    test("should classify 'kubectl apply --dry-run=client' as safe", () => {
+      // #given
+      const command = "kubectl apply -f file.yaml --dry-run=client"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+
+    test("should classify 'kubectl apply --dry-run=server' as safe", () => {
+      // #given
+      const command = "kubectl apply -f file.yaml --dry-run=server"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+
+    test("should classify bare '--dry-run' (no value) as safe", () => {
+      // #given
+      const command = "kubectl create namespace test --dry-run -o yaml"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+
+    test("should classify '--dry-run=none' as STILL DANGEROUS", () => {
+      // #given
+      const command = "kubectl apply -f file.yaml --dry-run=none"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+    })
+
+    test("should classify 'kubectl apply' (no --dry-run) as still dangerous", () => {
+      // #given
+      const command = "kubectl apply -f file.yaml"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+    })
+
+    test("should classify 'kubectl delete --dry-run=client' as safe", () => {
+      // #given
+      const command = "kubectl delete pod my-pod --dry-run=client"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+
+    test("should classify 'kubectl run --dry-run=client -o yaml' as safe", () => {
+      // #given
+      const command = "kubectl run nginx --image=nginx --dry-run=client -o yaml"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+
+    test("should classify 'kubectl scale --dry-run=client' as safe", () => {
+      // #given
+      const command = "kubectl scale deployment/my-app --replicas=3 --dry-run=client"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(false)
+    })
+  })
+
+  describe("kubectl cp and attach detection", () => {
+    test("should detect 'kubectl cp' as dangerous", () => {
+      // #given
+      const command = "kubectl cp local-file.txt pod-name:/path/file.txt"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isKubectl).toBe(true)
+      expect(result.isDangerous).toBe(true)
+      expect(result.matchedPattern).toBe("kubectl cp")
+    })
+
+    test("should detect 'kubectl cp' download as dangerous", () => {
+      // #given
+      const command = "kubectl cp pod-name:/path/file.txt local-file.txt"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+    })
+
+    test("should detect 'kubectl cp' with namespace as dangerous", () => {
+      // #given
+      const command = "kubectl cp -n dev-member pod:/etc/config ./config"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+    })
+
+    test("should detect 'kubectl attach' as dangerous", () => {
+      // #given
+      const command = "kubectl attach pod-name -c container-name"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+      expect(result.matchedPattern).toBe("kubectl attach")
+    })
+
+    test("should detect 'kubectl attach -it' as dangerous", () => {
+      // #given
+      const command = "kubectl attach -it pod-name"
+
+      // #when
+      const result = classifyKubectlCommand(command)
+
+      // #then
+      expect(result.isDangerous).toBe(true)
+    })
+  })
+
+  describe("helm command detection", () => {
+    describe("dangerous helm operations", () => {
+      test("should detect 'helm install' as dangerous", () => {
+        // #given
+        const command = "helm install my-release my-chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isKubectl).toBe(true)
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm install")
+      })
+
+      test("should detect 'helm upgrade' as dangerous", () => {
+        // #given
+        const command = "helm upgrade my-release my-chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isKubectl).toBe(true)
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm upgrade")
+      })
+
+      test("should detect 'helm upgrade --install' as dangerous", () => {
+        // #given
+        const command = "helm upgrade --install my-release my-chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm upgrade")
+      })
+
+      test("should detect 'helm uninstall' as dangerous", () => {
+        // #given
+        const command = "helm uninstall my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm uninstall")
+      })
+
+      test("should detect 'helm delete' as dangerous", () => {
+        // #given
+        const command = "helm delete my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm delete")
+      })
+
+      test("should detect 'helm rollback' as dangerous", () => {
+        // #given
+        const command = "helm rollback my-release 1"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm rollback")
+      })
+
+      test("should detect 'helm test' as dangerous", () => {
+        // #given
+        const command = "helm test my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(true)
+        expect(result.matchedPattern).toBe("helm test")
+      })
+    })
+
+    describe("safe helm operations", () => {
+      test("should classify 'helm list' as safe", () => {
+        // #given
+        const command = "helm list"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isKubectl).toBe(true)
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm status' as safe", () => {
+        // #given
+        const command = "helm status my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm template' as safe", () => {
+        // #given
+        const command = "helm template my-release my-chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm show' as safe", () => {
+        // #given
+        const command = "helm show chart my-chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm search' as safe", () => {
+        // #given
+        const command = "helm search repo nginx"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm get' as safe", () => {
+        // #given
+        const command = "helm get values my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm history' as safe", () => {
+        // #given
+        const command = "helm history my-release"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm repo list' as safe", () => {
+        // #given
+        const command = "helm repo list"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+
+      test("should classify 'helm version' as safe", () => {
+        // #given
+        const command = "helm version"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
+    })
+
+    describe("helm edge cases", () => {
+      test("should detect helm with full path", () => {
+        // #given
+        const command = "/usr/local/bin/helm install my-release chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isKubectl).toBe(true)
+        expect(result.isDangerous).toBe(true)
+      })
+
+      test("should detect helm with env vars", () => {
+        // #given
+        const command = "KUBECONFIG=/path/config helm install my-release chart/"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isKubectl).toBe(true)
+        expect(result.isDangerous).toBe(true)
+      })
+
+      test("should detect 'helm install --dry-run' as safe", () => {
+        // #given
+        const command = "helm install my-release my-chart/ --dry-run"
+
+        // #when
+        const result = classifyKubectlCommand(command)
+
+        // #then
+        expect(result.isDangerous).toBe(false)
+      })
     })
   })
 
