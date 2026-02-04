@@ -44,7 +44,7 @@ interface SessionMessage {
 
 export async function resolveSkillContent(
   skills: string[],
-  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider }
+  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider, disabledSkills?: Set<string> }
 ): Promise<{ content: string | undefined; error: string | null }> {
   if (skills.length === 0) {
     return { content: undefined, error: null }

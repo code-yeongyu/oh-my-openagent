@@ -28,4 +28,5 @@ export interface SkillLoadOptions {
   getSessionID?: () => string
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
+  disabledSkills?: Set<string>
 }
