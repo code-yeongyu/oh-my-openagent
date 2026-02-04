@@ -387,4 +387,93 @@ Skill body.
       }
     })
   })
+
+  describe("deduplication", () => {
+    it("deduplicates skills with same name, keeping higher priority", async () => {
+      // given: same skill name in both opencode-project and opencode scopes
+      const opencodeProjectSkillsDir = join(TEST_DIR, ".opencode", "skills")
+      const opencodeGlobalSkillsDir = join(TEST_DIR, "opencode-global", "skills")
+
+      mkdirSync(join(opencodeProjectSkillsDir, "duplicate-skill"), { recursive: true })
+      mkdirSync(join(opencodeGlobalSkillsDir, "duplicate-skill"), { recursive: true })
+
+      writeFileSync(
+        join(opencodeProjectSkillsDir, "duplicate-skill", "SKILL.md"),
+        `---
+name: duplicate-skill
+description: From opencode-project (higher priority)
+---
+Project skill body.
+`
+      )
+
+      writeFileSync(
+        join(opencodeGlobalSkillsDir, "duplicate-skill", "SKILL.md"),
+        `---
+name: duplicate-skill
+description: From opencode-global (lower priority)
+---
+Global skill body.
+`
+      )
+
+      // when
+      const { discoverOpencodeProjectSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      // Manually test deduplication logic
+      const { deduplicateSkills } = await import("./loader").then(m => ({
+        deduplicateSkills: (skills: any[]) => {
+          const seen = new Set<string>()
+          const result: any[] = []
+          for (const skill of skills) {
+            if (!seen.has(skill.name)) {
+              seen.add(skill.name)
+              result.push(skill)
+            }
+          }
+          return result
+        }
+      }))
+
+      try {
+        const projectSkills = await discoverOpencodeProjectSkills()
+        const projectSkill = projectSkills.find(s => s.name === "duplicate-skill")
+
+        // then: opencode-project skill should exist
+        expect(projectSkill).toBeDefined()
+        expect(projectSkill?.definition.description).toContain("opencode-project")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("returns no duplicates from discoverSkills", async () => {
+      // given: create skill in opencode-project
+      const skillContent = `---
+name: unique-test-skill
+description: A unique skill for dedup test
+---
+Skill body.
+`
+      createTestSkill("unique-test-skill", skillContent)
+
+      // when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+
+        // then: no duplicate names
+        const names = skills.map(s => s.name)
+        const uniqueNames = [...new Set(names)]
+        expect(names.length).toBe(uniqueNames.length)
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
 })

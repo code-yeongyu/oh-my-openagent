@@ -210,6 +210,22 @@ export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
 }
 
+/**
+ * Deduplicates skills by name, keeping the first occurrence (higher priority).
+ * Priority order: opencode-project > project > opencode > user
+ */
+function deduplicateSkills(skills: LoadedSkill[]): LoadedSkill[] {
+  const seen = new Set<string>()
+  const result: LoadedSkill[] = []
+  for (const skill of skills) {
+    if (!seen.has(skill.name)) {
+      seen.add(skill.name)
+      result.push(skill)
+    }
+  }
+  return result
+}
+
 export async function discoverAllSkills(): Promise<LoadedSkill[]> {
   const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills] = await Promise.all([
     discoverOpencodeProjectSkills(),
@@ -218,7 +234,8 @@ export async function discoverAllSkills(): Promise<LoadedSkill[]> {
     discoverUserClaudeSkills(),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  // Priority: opencode-project > project > opencode > user
+  return deduplicateSkills([...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills])
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
@@ -230,7 +247,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   ])
 
   if (!includeClaudeCodePaths) {
-    return [...opencodeProjectSkills, ...opencodeGlobalSkills]
+    // Priority: opencode-project > opencode
+    return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills])
   }
 
   const [projectSkills, userSkills] = await Promise.all([
@@ -238,7 +256,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverUserClaudeSkills(),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  // Priority: opencode-project > project > opencode > user
+  return deduplicateSkills([...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills])
 }
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
