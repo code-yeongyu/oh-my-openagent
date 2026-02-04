@@ -11,19 +11,50 @@ interface LookAtArgsWithAlias extends LookAtArgs {
 
 export function normalizeArgs(args: LookAtArgsWithAlias): LookAtArgs {
   return {
-    file_path: args.file_path ?? args.path ?? "",
+    file_path: args.file_path ?? args.path,
+    image_data: args.image_data,
     goal: args.goal ?? "",
   }
 }
 
 export function validateArgs(args: LookAtArgs): string | null {
-  if (!args.file_path) {
-    return `Error: Missing required parameter 'file_path'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
+  const hasFilePath = args.file_path && args.file_path.length > 0
+  const hasImageData = args.image_data && args.image_data.length > 0
+  
+  if (!hasFilePath && !hasImageData) {
+    return `Error: Must provide either 'file_path' or 'image_data'. Usage:
+- look_at(file_path="/path/to/file", goal="what to extract")
+- look_at(image_data="base64_encoded_data", goal="what to extract")`
+  }
+  if (hasFilePath && hasImageData) {
+    return `Error: Provide only one of 'file_path' or 'image_data', not both.`
   }
   if (!args.goal) {
     return `Error: Missing required parameter 'goal'. Usage: look_at(file_path="/path/to/file", goal="what to extract")`
   }
   return null
+}
+
+function inferMimeTypeFromBase64(base64Data: string): string {
+  if (base64Data.startsWith("data:")) {
+    const match = base64Data.match(/^data:([^;]+);/)
+    if (match) return match[1]
+  }
+  
+  try {
+    const cleanData = base64Data.replace(/^data:[^;]+;base64,/, "")
+    const header = atob(cleanData.slice(0, 16))
+    
+    if (header.startsWith("\x89PNG")) return "image/png"
+    if (header.startsWith("\xFF\xD8\xFF")) return "image/jpeg"
+    if (header.startsWith("GIF8")) return "image/gif"
+    if (header.startsWith("RIFF") && header.includes("WEBP")) return "image/webp"
+    if (header.startsWith("%PDF")) return "application/pdf"
+  } catch {
+    // Invalid base64 - fall through to default
+  }
+  
+  return "image/png"
 }
 
 function inferMimeType(filePath: string): string {
@@ -64,11 +95,22 @@ function inferMimeType(filePath: string): string {
   return mimeTypes[ext] || "application/octet-stream"
 }
 
+function extractBase64Data(imageData: string): string {
+  if (imageData.startsWith("data:")) {
+    const commaIndex = imageData.indexOf(",")
+    if (commaIndex !== -1) {
+      return imageData.slice(commaIndex + 1)
+    }
+  }
+  return imageData
+}
+
 export function createLookAt(ctx: PluginInput): ToolDefinition {
   return tool({
     description: LOOK_AT_DESCRIPTION,
     args: {
-      file_path: tool.schema.string().describe("Absolute path to the file to analyze"),
+      file_path: tool.schema.string().optional().describe("Absolute path to the file to analyze"),
+      image_data: tool.schema.string().optional().describe("Base64 encoded image data (for clipboard/pasted images)"),
       goal: tool.schema.string().describe("What specific information to extract from the file"),
     },
     async execute(rawArgs: LookAtArgs, toolContext) {
@@ -79,12 +121,34 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         return validationError
       }
 
-      log(`[look_at] Analyzing file: ${args.file_path}, goal: ${args.goal}`)
+      const isBase64Input = Boolean(args.image_data)
+      const sourceDescription = isBase64Input ? "clipboard/pasted image" : args.file_path
+      log(`[look_at] Analyzing ${sourceDescription}, goal: ${args.goal}`)
 
-      const mimeType = inferMimeType(args.file_path)
-      const filename = basename(args.file_path)
+      let mimeType: string
+      let filePart: { type: "file"; mime: string; url: string; filename: string }
 
-      const prompt = `Analyze this file and extract the requested information.
+      if (isBase64Input) {
+        mimeType = inferMimeTypeFromBase64(args.image_data!)
+        const base64Content = extractBase64Data(args.image_data!)
+        const dataUrl = `data:${mimeType};base64,${base64Content}`
+        filePart = {
+          type: "file",
+          mime: mimeType,
+          url: dataUrl,
+          filename: `clipboard-image.${mimeType.split("/")[1] || "png"}`,
+        }
+      } else {
+        mimeType = inferMimeType(args.file_path!)
+        filePart = {
+          type: "file",
+          mime: mimeType,
+          url: pathToFileURL(args.file_path!).href,
+          filename: basename(args.file_path!),
+        }
+      }
+
+      const prompt = `Analyze this ${isBase64Input ? "image" : "file"} and extract the requested information.
 
 Goal: ${args.goal}
 
@@ -157,7 +221,7 @@ Original error: ${createResult.error}`
         log("[look_at] Failed to resolve multimodal-looker model info", error)
       }
 
-      log(`[look_at] Sending prompt with file passthrough to session ${sessionID}`)
+      log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
         await promptWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
@@ -171,7 +235,7 @@ Original error: ${createResult.error}`
             },
             parts: [
               { type: "text", text: prompt },
-              { type: "file", mime: mimeType, url: pathToFileURL(args.file_path).href, filename },
+              filePart,
             ],
             ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
             ...(agentVariant ? { variant: agentVariant } : {}),
@@ -183,20 +247,20 @@ Original error: ${createResult.error}`
 
         const isJsonParseError = errorMessage.includes("JSON") && (errorMessage.includes("EOF") || errorMessage.includes("parse"))
         if (isJsonParseError) {
-          return `Error: Failed to analyze file - received malformed response from multimodal-looker agent.
+          return `Error: Failed to analyze ${isBase64Input ? "image" : "file"} - received malformed response from multimodal-looker agent.
 
 This typically occurs when:
 1. The multimodal-looker model is not available or not connected
-2. The model does not support this file type (${mimeType})
+2. The model does not support this ${isBase64Input ? "image format" : `file type (${mimeType})`}
 3. The API returned an empty or truncated response
 
-File: ${args.file_path}
+${isBase64Input ? "Source: clipboard/pasted image" : `File: ${args.file_path}`}
 MIME type: ${mimeType}
 
 Try:
 - Ensure a vision-capable model (e.g., gemini-3-flash, gpt-5.2) is available
 - Check provider connections in opencode settings
-- For text files like .md, .txt, use the Read tool instead
+${!isBase64Input ? "- For text files like .md, .txt, use the Read tool instead" : ""}
 
 Original error: ${errorMessage}`
         }
