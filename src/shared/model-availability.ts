@@ -72,14 +72,29 @@ export function fuzzyMatchModel(
 		return null
 	}
 
-	// Priority 1: Exact match (normalized)
+	// Priority 1: Exact match (normalized full model string)
 	const exactMatch = matches.find((model) => normalizeModelName(model) === targetNormalized)
 	if (exactMatch) {
 		log("[fuzzyMatchModel] exact match found", { exactMatch })
 		return exactMatch
 	}
 
-	// Priority 2: Shorter model name (more specific)
+	// Priority 2: Exact model ID match (part after provider/)
+	// This ensures "glm-4.7-free" matches "zai-coding-plan/glm-4.7-free" over "zai-coding-plan/glm-4.7"
+	// Use filter + shortest to handle multi-provider cases (e.g., openai/gpt-5.2 + opencode/gpt-5.2)
+	const exactModelIdMatches = matches.filter((model) => {
+		const modelId = model.split("/").slice(1).join("/")
+		return normalizeModelName(modelId) === targetNormalized
+	})
+	if (exactModelIdMatches.length > 0) {
+		const result = exactModelIdMatches.reduce((shortest, current) =>
+			current.length < shortest.length ? current : shortest,
+		)
+		log("[fuzzyMatchModel] exact model ID match found", { result, candidateCount: exactModelIdMatches.length })
+		return result
+	}
+
+	// Priority 3: Shorter model name (more specific, fallback for partial matches)
 	const result = matches.reduce((shortest, current) =>
 		current.length < shortest.length ? current : shortest,
 	)
