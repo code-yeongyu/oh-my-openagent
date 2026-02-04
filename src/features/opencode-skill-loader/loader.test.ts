@@ -516,5 +516,42 @@ Nested content.
         process.chdir(originalCwd)
       }
     })
+
+    it("prefers directory skill (SKILL.md) over file skill (*.md) on name collision", async () => {
+      // #given - both foo.md file AND foo/SKILL.md directory exist
+      // Directory skill should win (deterministic precedence: SKILL.md > {dir}.md > *.md)
+      const dirSkillDir = join(SKILLS_DIR, "collision-test")
+      mkdirSync(dirSkillDir, { recursive: true })
+      writeFileSync(join(dirSkillDir, "SKILL.md"), `---
+name: collision-test
+description: Directory-based skill (should win)
+---
+I am the directory skill.
+`)
+
+      // Also create a file with same base name at parent level
+      writeFileSync(join(SKILLS_DIR, "collision-test.md"), `---
+name: collision-test
+description: File-based skill (should lose)
+---
+I am the file skill.
+`)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+
+        // #then - only one skill should exist, and it should be the directory-based one
+        const matchingSkills = skills.filter(s => s.name === "collision-test")
+        expect(matchingSkills).toHaveLength(1)
+        expect(matchingSkills[0]?.definition.description).toContain("Directory-based skill")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
   })
 })
