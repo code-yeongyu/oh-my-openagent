@@ -54,7 +54,26 @@ The task system includes a sync layer (`todo-sync.ts`) that automatically mirror
 
 ### getTaskDir(config)
 
-Returns: `.sisyphus/tasks` (or custom path from config)
+Returns the task storage directory path.
+
+**Default behavior (no config override):**
+Returns `~/.config/opencode/tasks/<task-list-id>/` where:
+- Task list ID is resolved via `resolveTaskListId()`
+
+**With `storage_path` config:**
+- Absolute paths (starting with `/`) are returned as-is
+- Relative paths are joined with `process.cwd()`
+
+### resolveTaskListId(config)
+
+Resolves the task list ID for directory scoping.
+
+**Priority order:**
+1. `ULTRAWORK_TASK_LIST_ID` environment variable
+2. `config.sisyphus?.tasks?.task_list_id` config option
+3. Sanitized `basename(process.cwd())` as fallback
+
+**Sanitization:** Replaces non-alphanumeric characters (except `-` and `_`) with `-`
 
 ### readJsonSafe(filePath, schema)
 
