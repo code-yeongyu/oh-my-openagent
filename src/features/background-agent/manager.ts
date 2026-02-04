@@ -351,6 +351,11 @@ export class BackgroundManager {
           existingTask.concurrencyKey = undefined
         }
 
+        // Abort the session to prevent infinite polling hang
+        this.client.session.abort({
+          path: { id: sessionID },
+        }).catch(() => {})
+
         this.markForNotification(existingTask)
         this.notifyParentSession(existingTask).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
@@ -600,6 +605,14 @@ export class BackgroundManager {
         this.concurrencyManager.release(existingTask.concurrencyKey)
         existingTask.concurrencyKey = undefined
       }
+
+      // Abort the session to prevent infinite polling hang
+      if (existingTask.sessionID) {
+        this.client.session.abort({
+          path: { id: existingTask.sessionID },
+        }).catch(() => {})
+      }
+
       this.markForNotification(existingTask)
       this.notifyParentSession(existingTask).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
