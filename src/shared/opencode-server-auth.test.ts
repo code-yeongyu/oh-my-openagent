@@ -67,4 +67,29 @@ describe("opencode-server-auth", () => {
       },
     })
   })
+
+  test("#given server password #when client has no _client #then throws error", () => {
+    process.env.OPENCODE_SERVER_PASSWORD = "secret"
+    const client = {}
+
+    expect(() => injectServerAuthIntoClient(client)).toThrow(
+      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client structure is incompatible"
+    )
+  })
+
+  test("#given server password #when client._client has no setConfig #then throws error", () => {
+    process.env.OPENCODE_SERVER_PASSWORD = "secret"
+    const client = { _client: {} }
+
+    expect(() => injectServerAuthIntoClient(client)).toThrow(
+      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client._client.setConfig is not a function"
+    )
+  })
+
+  test("#given no server password #when client is invalid #then does not throw", () => {
+    delete process.env.OPENCODE_SERVER_PASSWORD
+    const client = {}
+
+    expect(() => injectServerAuthIntoClient(client)).not.toThrow()
+  })
 })

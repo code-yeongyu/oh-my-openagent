@@ -1,3 +1,8 @@
+/**
+ * Builds HTTP Basic Auth header from environment variables.
+ *
+ * @returns Basic Auth header string, or undefined if OPENCODE_SERVER_PASSWORD is not set
+ */
 export function getServerBasicAuthHeader(): string | undefined {
   const password = process.env.OPENCODE_SERVER_PASSWORD
   if (!password) {
@@ -10,16 +15,49 @@ export function getServerBasicAuthHeader(): string | undefined {
   return `Basic ${token}`
 }
 
+/**
+ * Injects HTTP Basic Auth header into the OpenCode SDK client.
+ *
+ * This function accesses the SDK's internal `_client.setConfig()` method.
+ * While `_client` has an underscore prefix (suggesting internal use), this is actually
+ * a stable public API from `@hey-api/openapi-ts` generated client:
+ * - `setConfig()` MERGES headers (does not replace existing ones)
+ * - This is the documented way to update client config at runtime
+ *
+ * @see https://github.com/sst/opencode/blob/main/packages/sdk/js/src/gen/client/client.gen.ts
+ * @throws {Error} If OPENCODE_SERVER_PASSWORD is set but client structure is incompatible
+ */
 export function injectServerAuthIntoClient(client: unknown): void {
   const auth = getServerBasicAuthHeader()
   if (!auth) {
     return
   }
 
-  const internal = (client as { _client?: { setConfig?: (config: { headers: Record<string, string> }) => void } })
-    ?._client
+  // Runtime type guard for SDK client structure
+  if (
+    typeof client !== "object" ||
+    client === null ||
+    !("_client" in client) ||
+    typeof (client as { _client: unknown })._client !== "object" ||
+    (client as { _client: unknown })._client === null
+  ) {
+    throw new Error(
+      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client structure is incompatible. " +
+        "This may indicate an OpenCode SDK version mismatch."
+    )
+  }
 
-  internal?.setConfig?.({
+  const internal = (client as { _client: { setConfig?: (config: { headers: Record<string, string> }) => void } })
+    ._client
+
+  if (typeof internal.setConfig !== "function") {
+    throw new Error(
+      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client._client.setConfig is not a function. " +
+        "This may indicate an OpenCode SDK version mismatch."
+    )
+  }
+
+  internal.setConfig({
     headers: {
       Authorization: auth,
     },
