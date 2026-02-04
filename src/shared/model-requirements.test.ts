@@ -313,7 +313,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     const primary = artistry.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-pro")
-    expect(primary.variant).toBe("max")
+    expect(primary.variant).toBe("high")
     expect(primary.providers[0]).toBe("google")
   })
 
