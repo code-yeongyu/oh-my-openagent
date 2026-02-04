@@ -754,6 +754,10 @@ session_id: ${sessionID}
       agent: agentToUse,
       category: args.category,
     })
+  } finally {
+    if (syncSessionID) {
+      SessionCategoryRegistry.remove(syncSessionID)
+    }
   }
 }
 
@@ -825,7 +829,7 @@ export async function resolveCategoryExecution(
     
     const resolution = resolveModelPipeline({
       intent: {
-        userModel: overrideModel ?? categoryConfig?.model,
+        userModel: explicitCategoryModel ?? overrideModel,
         userFallbackModels: categoryFallbackModels,
         categoryDefaultModel: resolved.model ?? sisyphusJuniorModel,
       },

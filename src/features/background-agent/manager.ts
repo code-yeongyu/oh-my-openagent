@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, SessionCategoryRegistry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -740,6 +740,7 @@ export class BackgroundManager {
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
       subagentSessions.delete(sessionID)
+      SessionCategoryRegistry.remove(sessionID)
     }
   }
 
@@ -896,6 +897,8 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     if (options?.skipNotification) {
@@ -1029,6 +1032,8 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     try {
@@ -1231,6 +1236,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
         }
       }
     }
