@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ShellType } from "../../shared"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
+import { log, buildEnvPrefix, detectShellType } from "../../shared"
 
 export * from "./constants"
 export * from "./detector"
@@ -53,10 +52,10 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      // The bash tool always runs in a Unix-like shell (bash/sh), even on Windows
-      // (via Git Bash, WSL, etc.), so we always use unix export syntax.
-      // This fixes GitHub issues #983 and #889.
-      const shellType: ShellType = "unix"
+      // Detect the shell type dynamically to support native Windows shells
+      // (cmd.exe, PowerShell) in addition to Unix-like shells (bash, zsh).
+      // Fixes Windows compatibility issues when running without Git Bash/WSL.
+      const shellType = detectShellType()
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       output.args.command = `${envPrefix} ${command}`
 
