@@ -11,7 +11,7 @@ export const ALLOWED_EXTENSIONS = [".md"]
 // Note: No trailing slash - the regex in index.ts handles path separators
 export const ALLOWED_PATH_PREFIXES = ["changes"]
 
-export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
+export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit", "bash"]
 
 export const PLANNING_CONSULT_WARNING = `
 

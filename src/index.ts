@@ -130,6 +130,7 @@ import {
   getOpenCodeVersion,
   isOpenCodeVersionAtLeast,
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+  injectServerAuthIntoClient,
 } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
@@ -139,6 +140,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   });
+  injectServerAuthIntoClient(ctx.client);
   // Start background tmux check immediately
   startTmuxCheck();
 
@@ -537,7 +539,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     (agent) => agent.toLowerCase() === "multimodal-looker",
   );
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
-  const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
+  const browserProvider =
+    pluginConfig.browser_automation_engine?.provider ?? "playwright";
+  const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
 
   const observerDetector = isHookEnabled("observer-detector")
     ? createObserverDetectorHook({
@@ -565,6 +569,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
     browserProvider,
+    disabledSkills,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
@@ -583,10 +588,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       });
     },
   });
-  const disabledSkills = new Set(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills({ browserProvider }).filter((skill: any) => {
-    if (disabledSkills.has(skill.name as never)) return false;
+  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills }).filter((skill) => {
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {
         if (systemMcpNames.has(mcpName)) return false;
@@ -617,6 +620,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     mcpManager: skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    disabledSkills
   });
   const skillMcpTool = createSkillMcpTool({
     manager: skillMcpManager,

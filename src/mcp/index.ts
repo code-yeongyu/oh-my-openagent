@@ -1,7 +1,8 @@
-import { websearch } from "./websearch"
+import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
 import type { McpName } from "./types"
+import type { OhMyOpenCodeConfig } from "../config/schema"
 import { log } from "../shared/logger"
 
 export { McpNameSchema, type McpName } from "./types"
@@ -12,12 +13,6 @@ type RemoteMcpConfig = {
   enabled: boolean
   headers?: Record<string, string>
   oauth?: false
-}
-
-const allBuiltinMcps: Record<McpName, RemoteMcpConfig> = {
-  websearch,
-  context7,
-  grep_app,
 }
 
 const DEFAULT_TOOL_COUNT_WARNING_THRESHOLD = 80
@@ -46,13 +41,19 @@ export function checkMcpToolCount(
   return { warned: false }
 }
 
-export function createBuiltinMcps(disabledMcps: string[] = []) {
+export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpenCodeConfig) {
   const mcps: Record<string, RemoteMcpConfig> = {}
 
-  for (const [name, config] of Object.entries(allBuiltinMcps)) {
-    if (!disabledMcps.includes(name)) {
-      mcps[name] = config
-    }
+  if (!disabledMcps.includes("websearch")) {
+    mcps.websearch = createWebsearchConfig(config?.websearch)
+  }
+
+  if (!disabledMcps.includes("context7")) {
+    mcps.context7 = context7
+  }
+
+  if (!disabledMcps.includes("grep_app")) {
+    mcps.grep_app = grep_app
   }
 
   return mcps

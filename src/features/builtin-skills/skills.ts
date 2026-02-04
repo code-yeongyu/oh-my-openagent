@@ -1993,14 +1993,15 @@ const continuousLearningSkill: BuiltinSkill = {
 
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
+  disabledSkills?: Set<string>
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const { browserProvider = "playwright" } = options
+  const { browserProvider = "playwright", disabledSkills } = options
 
   const browserSkill = browserProvider === "agent-browser" ? agentBrowserSkill : playwrightSkill
 
-  return [
+  const skills = [
     browserSkill,
     brainstormingSkill,
     creatingChangesSkill,
@@ -2032,4 +2033,10 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     backendPatternJavaSkill,
     backendPatternPythonSkill,
   ]
+
+  if (!disabledSkills) {
+    return skills
+  }
+
+  return skills.filter((skill) => !disabledSkills.has(skill.name))
 }

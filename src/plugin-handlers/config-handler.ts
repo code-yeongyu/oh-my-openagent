@@ -157,6 +157,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // config.model represents the currently active model in OpenCode (including UI selection)
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
+    const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -167,7 +168,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       allDiscoveredSkills,
       ctx.client,
       browserProvider,
-      currentModel // uiSelectedModel - takes highest priority
+      currentModel, // uiSelectedModel - takes highest priority
+      disabledSkills
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -305,7 +307,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
-          color: (configAgent?.plan?.color as string) ?? "#9D4EDD", // Amethyst Purple - wisdom/foresight
+          color: (configAgent?.plan?.color as string) ?? "#FF5722", // Deep Orange - Fire/Flame theme
           ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
           ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
           ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
@@ -358,7 +360,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = shouldDemotePlan
-        ? { mode: "subagent" as const }
+           ? { mode: "subagent" as const
+          }
         : undefined;
 
       config.agent = {
@@ -447,7 +450,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       : { servers: {} };
 
     config.mcp = {
-      ...createBuiltinMcps(pluginConfig.disabled_mcps),
+      ...createBuiltinMcps(pluginConfig.disabled_mcps, pluginConfig),
       ...(config.mcp as Record<string, unknown>),
       ...mcpResult.servers,
       ...pluginComponents.mcpServers,

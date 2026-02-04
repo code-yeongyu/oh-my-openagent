@@ -350,11 +350,11 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "metis": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "momus": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
@@ -364,7 +364,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "oracle": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "prometheus": {
       "model": "google/gemini-3-pro",
@@ -373,14 +373,14 @@ exports[`generateModelConfig single native provider uses Gemini models when only
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "quick": {
       "model": "google/gemini-3-flash",
     },
     "ultrabrain": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "unspecified-high": {
       "model": "google/gemini-3-flash",
@@ -413,11 +413,11 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "metis": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "momus": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash",
@@ -427,7 +427,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "oracle": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "prometheus": {
       "model": "google/gemini-3-pro",
@@ -436,14 +436,14 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "quick": {
       "model": "google/gemini-3-flash",
     },
     "ultrabrain": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "unspecified-high": {
       "model": "google/gemini-3-pro",
@@ -508,7 +508,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "openai/gpt-5.2-codex",
@@ -584,7 +584,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "openai/gpt-5.2-codex",
@@ -661,7 +661,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
   "categories": {
     "artistry": {
       "model": "opencode/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "opencode/gpt-5.2-codex",
@@ -737,7 +737,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
   "categories": {
     "artistry": {
       "model": "opencode/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "opencode/gpt-5.2-codex",
@@ -814,7 +814,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
   "categories": {
     "artistry": {
       "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "github-copilot/gpt-5.2-codex",
@@ -890,7 +890,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
   "categories": {
     "artistry": {
       "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "github-copilot/gpt-5.2-codex",
@@ -1083,7 +1083,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   "categories": {
     "artistry": {
       "model": "opencode/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "opencode/gpt-5.2-codex",
@@ -1159,7 +1159,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
   "categories": {
     "artistry": {
       "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "openai/gpt-5.2-codex",
@@ -1282,7 +1282,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     },
     "oracle": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "prometheus": {
       "model": "anthropic/claude-opus-4-5",
@@ -1296,14 +1296,14 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "unspecified-high": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -1368,7 +1368,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
   "categories": {
     "artistry": {
       "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "github-copilot/gpt-5.2-codex",
@@ -1444,7 +1444,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "openai/gpt-5.2-codex",
@@ -1520,7 +1520,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   "categories": {
     "artistry": {
       "model": "google/gemini-3-pro",
-      "variant": "max",
+      "variant": "high",
     },
     "deep": {
       "model": "openai/gpt-5.2-codex",

@@ -36,7 +36,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
-      let detectedKeywords = detectKeywordsWithType(removeCodeBlocks(cleanText), currentAgent, modelID)
+      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
 
       if (isPlannerAgent(currentAgent)) {
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")

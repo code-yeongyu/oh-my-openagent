@@ -1,13 +1,35 @@
-import { join, dirname } from "path"
+import { join, dirname, basename, isAbsolute } from "path"
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync } from "fs"
 import { randomUUID } from "crypto"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { z } from "zod"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 
 export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
   const tasksConfig = config.sisyphus?.tasks
-  const storagePath = tasksConfig?.storage_path ?? ".sisyphus/tasks"
-  return join(process.cwd(), storagePath)
+  const storagePath = tasksConfig?.storage_path
+
+  if (storagePath) {
+    return isAbsolute(storagePath) ? storagePath : join(process.cwd(), storagePath)
+  }
+
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const listId = resolveTaskListId(config)
+  return join(configDir, "tasks", listId)
+}
+
+export function sanitizePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-") || "default"
+}
+
+export function resolveTaskListId(config: Partial<OhMyOpenCodeConfig> = {}): string {
+  const envId = process.env.ULTRAWORK_TASK_LIST_ID?.trim()
+  if (envId) return sanitizePathSegment(envId)
+
+  const configId = config.sisyphus?.tasks?.task_list_id?.trim()
+  if (configId) return sanitizePathSegment(configId)
+
+  return sanitizePathSegment(basename(process.cwd()))
 }
 
 export function ensureDir(dirPath: string): void {
