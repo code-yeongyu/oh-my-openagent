@@ -568,4 +568,199 @@ describe("prometheus-md-only", () => {
        ).rejects.toThrow("can only write/edit .md files")
      })
   })
+
+  describe("plan file overwrite protection", () => {
+    beforeEach(() => {
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+    })
+
+    test("should allow first Write to a plan file", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: "/tmp/test/.sisyphus/plans/my-plan.md" },
+      }
+
+      // when / #then - first write should succeed
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should block second Write to same plan file and suggest Edit", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const planPath = "/tmp/test/.sisyphus/plans/my-plan.md"
+
+      // first write
+      const firstInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const firstOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+      await hook["tool.execute.before"](firstInput, firstOutput)
+
+      // second write to same file
+      const secondInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-2",
+      }
+      const secondOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+
+      // when / #then - second write should be blocked
+      await expect(
+        hook["tool.execute.before"](secondInput, secondOutput)
+      ).rejects.toThrow("use Edit tool to append")
+    })
+
+    test("should allow Write to different plan files", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+
+      // first write to plan-a
+      const firstInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const firstOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: "/tmp/test/.sisyphus/plans/plan-a.md" },
+      }
+      await hook["tool.execute.before"](firstInput, firstOutput)
+
+      // second write to different file plan-b
+      const secondInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-2",
+      }
+      const secondOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: "/tmp/test/.sisyphus/plans/plan-b.md" },
+      }
+
+      // when / #then - write to different file should succeed
+      await expect(
+        hook["tool.execute.before"](secondInput, secondOutput)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should allow Edit after Write to same plan file", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const planPath = "/tmp/test/.sisyphus/plans/my-plan.md"
+
+      // first write
+      const writeInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const writeOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+      await hook["tool.execute.before"](writeInput, writeOutput)
+
+      // Edit to same file should be allowed
+      const editInput = {
+        tool: "Edit",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-2",
+      }
+      const editOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+
+      // when / #then - Edit should succeed
+      await expect(
+        hook["tool.execute.before"](editInput, editOutput)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should track writes per session (different sessions are independent)", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const planPath = "/tmp/test/.sisyphus/plans/my-plan.md"
+      const otherSessionID = "other-session-prometheus"
+
+      // Setup second session
+      const otherMessageDir = join(MESSAGE_STORAGE, otherSessionID)
+      mkdirSync(otherMessageDir, { recursive: true })
+      writeFileSync(
+        join(otherMessageDir, "msg_001.json"),
+        JSON.stringify({ agent: "prometheus", model: { providerID: "test", modelID: "test-model" } })
+      )
+
+      // first session writes to plan
+      const firstSessionInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const firstSessionOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+      await hook["tool.execute.before"](firstSessionInput, firstSessionOutput)
+
+      // second session writes to same plan path (should succeed - different session)
+      const secondSessionInput = {
+        tool: "Write",
+        sessionID: otherSessionID,
+        callID: "call-2",
+      }
+      const secondSessionOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: planPath },
+      }
+
+      // when / #then - different session should be allowed
+      await expect(
+        hook["tool.execute.before"](secondSessionInput, secondSessionOutput)
+      ).resolves.toBeUndefined()
+
+      // cleanup
+      rmSync(otherMessageDir, { recursive: true, force: true })
+    })
+
+    test("should NOT apply overwrite protection to draft files", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const draftPath = "/tmp/test/.sisyphus/drafts/notes.md"
+
+      // first write to draft
+      const firstInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const firstOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: draftPath },
+      }
+      await hook["tool.execute.before"](firstInput, firstOutput)
+
+      // second write to same draft should succeed (drafts are working memory)
+      const secondInput = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-2",
+      }
+      const secondOutput: { args: Record<string, unknown>; message?: string } = {
+        args: { filePath: draftPath },
+      }
+
+      // when / #then - multiple writes to drafts should be allowed
+      await expect(
+        hook["tool.execute.before"](secondInput, secondOutput)
+      ).resolves.toBeUndefined()
+    })
+  })
 })

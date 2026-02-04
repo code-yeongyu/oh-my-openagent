@@ -74,7 +74,33 @@ function getAgentFromSession(sessionID: string): string | undefined {
   return getSessionAgent(sessionID) ?? getAgentFromMessageFiles(sessionID)
 }
 
+function isPlanFile(normalizedPath: string): boolean {
+  return normalizedPath.includes(".sisyphus/plans/") || normalizedPath.includes(".sisyphus\\plans\\")
+}
+
+function normalizeFilePath(filePath: string, workspaceRoot: string): string {
+  const resolved = resolve(workspaceRoot, filePath)
+  return resolved.toLowerCase().replace(/\\/g, "/")
+}
+
 export function createPrometheusMdOnlyHook(ctx: PluginInput) {
+  const writtenPlanFiles = new Map<string, Set<string>>()
+
+  function getWrittenFiles(sessionID: string): Set<string> {
+    if (!writtenPlanFiles.has(sessionID)) {
+      writtenPlanFiles.set(sessionID, new Set())
+    }
+    return writtenPlanFiles.get(sessionID)!
+  }
+
+  function markFileWritten(sessionID: string, normalizedPath: string): void {
+    getWrittenFiles(sessionID).add(normalizedPath)
+  }
+
+  function hasBeenWritten(sessionID: string, normalizedPath: string): boolean {
+    return getWrittenFiles(sessionID).has(normalizedPath)
+  }
+
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -140,8 +166,29 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
          )
        }
 
-      const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
-      if (normalizedPath.includes(".sisyphus/plans/") || normalizedPath.includes(".sisyphus\\plans\\")) {
+      const normalizedPath = normalizeFilePath(filePath, ctx.directory)
+      const isWriteTool = toolName.toLowerCase() === "write"
+      const isPlan = isPlanFile(normalizedPath)
+
+      if (isWriteTool && isPlan && hasBeenWritten(input.sessionID, normalizedPath)) {
+        log(`[${HOOK_NAME}] Blocked: Plan file already written, use Edit to append`, {
+          sessionID: input.sessionID,
+          tool: toolName,
+          filePath,
+          agent: agentName,
+        })
+        throw new Error(
+          `[${HOOK_NAME}] Plan file "${filePath}" has already been written in this session. ` +
+          `The Write tool OVERWRITES content. To add more sections, use Edit tool to append. ` +
+          `Example: Edit(filePath="${filePath}", oldString="## Success Criteria", newString="## More TODOs\\n...\\n## Success Criteria")`
+        )
+      }
+
+      if (isWriteTool && isPlan) {
+        markFileWritten(input.sessionID, normalizedPath)
+      }
+
+      if (isPlan) {
         log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
           sessionID: input.sessionID,
           tool: toolName,
@@ -157,6 +204,22 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         filePath,
         agent: agentName,
       })
+    },
+    "event": async ({ event }: { event: { type: string; properties?: unknown } }) => {
+      const props = event.properties as Record<string, unknown> | undefined
+      if (event.type === "session.deleted") {
+        const sessionInfo = props?.info as { id?: string } | undefined
+        if (sessionInfo?.id) {
+          writtenPlanFiles.delete(sessionInfo.id)
+        }
+      }
+      if (event.type === "session.compacted") {
+        const sessionID = (props?.sessionID ??
+          (props?.info as { id?: string } | undefined)?.id) as string | undefined
+        if (sessionID) {
+          writtenPlanFiles.delete(sessionID)
+        }
+      }
     },
   }
 }
