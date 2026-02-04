@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
-import type { FallbackState, FallbackResult, RuntimeFallbackHook } from "./types"
+import type { FallbackState, FallbackResult, RuntimeFallbackHook, RuntimeFallbackOptions } from "./types"
 import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS, HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -10,8 +10,7 @@ function createFallbackState(originalModel: string): FallbackState {
     originalModel,
     currentModel: originalModel,
     fallbackIndex: -1,
-    lastFallbackTime: 0,
-    failedModels: new Set<string>(),
+    failedModels: new Map<string, number>(),
     attemptCount: 0,
     pendingFallbackModel: undefined,
   }
@@ -132,12 +131,10 @@ function getFallbackModelsForSession(
 }
 
 function isModelInCooldown(model: string, state: FallbackState, cooldownSeconds: number): boolean {
-  if (!state.failedModels.has(model)) return false
-
+  const failedAt = state.failedModels.get(model)
+  if (failedAt === undefined) return false
   const cooldownMs = cooldownSeconds * 1000
-  const timeSinceLastFallback = Date.now() - state.lastFallbackTime
-
-  return timeSinceLastFallback < cooldownMs
+  return Date.now() - failedAt < cooldownMs
 }
 
 function findNextAvailableFallback(
@@ -180,9 +177,11 @@ function prepareFallback(
     attempt: state.attemptCount + 1,
   })
 
+  const failedModel = state.currentModel
+  const now = Date.now()
+
   state.fallbackIndex = fallbackModels.indexOf(nextModel)
-  state.failedModels.add(state.currentModel)
-  state.lastFallbackTime = Date.now()
+  state.failedModels.set(failedModel, now)
   state.attemptCount++
   state.currentModel = nextModel
   state.pendingFallbackModel = nextModel
@@ -194,7 +193,7 @@ export type { RuntimeFallbackHook, RuntimeFallbackOptions } from "./types"
 
 export function createRuntimeFallbackHook(
   ctx: PluginInput,
-  options?: { config?: RuntimeFallbackConfig }
+  options?: RuntimeFallbackOptions
 ): RuntimeFallbackHook {
   const config: Required<RuntimeFallbackConfig> = {
     enabled: options?.config?.enabled ?? DEFAULT_CONFIG.enabled,
@@ -207,11 +206,15 @@ export function createRuntimeFallbackHook(
   const sessionStates = new Map<string, FallbackState>()
 
   let pluginConfig: OhMyOpenCodeConfig | undefined
-  try {
-    const { loadPluginConfig } = require("../../plugin-config")
-    pluginConfig = loadPluginConfig(ctx.directory, ctx)
-  } catch {
-    log(`[${HOOK_NAME}] Plugin config not available`)
+  if (options?.pluginConfig) {
+    pluginConfig = options.pluginConfig
+  } else {
+    try {
+      const { loadPluginConfig } = require("../../plugin-config")
+      pluginConfig = loadPluginConfig(ctx.directory, ctx)
+    } catch {
+      log(`[${HOOK_NAME}] Plugin config not available`)
+    }
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -238,6 +241,7 @@ export function createRuntimeFallbackHook(
       if (sessionID) {
         log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
         sessionStates.delete(sessionID)
+        SessionCategoryRegistry.remove(sessionID)
       }
       return
     }

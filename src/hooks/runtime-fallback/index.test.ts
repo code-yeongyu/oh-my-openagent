@@ -1,7 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { createRuntimeFallbackHook, type RuntimeFallbackHook } from "./index"
-import type { RuntimeFallbackConfig } from "../../config"
+import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as sharedModule from "../../shared"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 describe("runtime-fallback", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -11,12 +12,14 @@ describe("runtime-fallback", () => {
   beforeEach(() => {
     logCalls = []
     toastCalls = []
+    SessionCategoryRegistry.clear()
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
 
   afterEach(() => {
+    SessionCategoryRegistry.clear()
     logSpy?.mockRestore()
   })
 
@@ -45,6 +48,16 @@ describe("runtime-fallback", () => {
       cooldown_seconds: 60,
       notify_on_fallback: true,
       ...overrides,
+    }
+  }
+
+  function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): OhMyOpenCodeConfig {
+    return {
+      categories: {
+        test: {
+          fallback_models: fallbackModels,
+        },
+      },
     }
   }
 
@@ -448,11 +461,15 @@ describe("runtime-fallback", () => {
   })
 
   describe("model switching via chat.message", () => {
-    test("should set pending fallback model after error", async () => {
-      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+    test("should apply fallback model on next chat.message after error", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2", "google/gemini-3-pro"]),
+      })
       const sessionID = "test-session-switch"
+      SessionCategoryRegistry.register(sessionID, "test")
 
-      //#given - session with fallback models configured
+      //#given
       await hook.event({
         event: {
           type: "session.created",
@@ -460,25 +477,30 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - retryable error occurs
+      //#when
       await hook.event({
         event: {
           type: "session.error",
-          properties: {
-            sessionID,
-            error: { statusCode: 429, message: "Rate limit" },
-          },
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
         },
       })
 
-      //#then - fallback preparation should be logged
-      const fallbackPrepLog = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("fallback"))
-      expect(fallbackPrepLog !== undefined || logCalls.some(c => c.msg.includes("No fallback"))).toBe(true)
+      const output = { message: {}, parts: [] }
+      await hook["chat.message"]?.(
+        { sessionID, model: { providerID: "anthropic", modelID: "claude-opus-4-5" } },
+        output
+      )
+
+      expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
     })
 
     test("should notify when fallback occurs", async () => {
-      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: true }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+      })
       const sessionID = "test-session-notify"
+      SessionCategoryRegistry.register(sessionID, "test")
 
       await hook.event({
         event: {
@@ -490,13 +512,12 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 }, agent: "sisyphus" },
+          properties: { sessionID, error: { statusCode: 429 } },
         },
       })
 
-      //#then - should show notification toast or prepare fallback
-      const notifyLog = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("No fallback models"))
-      expect(notifyLog).toBeDefined()
+      expect(toastCalls.length).toBe(1)
+      expect(toastCalls[0]?.message.includes("gpt-5.2")).toBe(true)
     })
   })
 
@@ -553,9 +574,14 @@ describe("runtime-fallback", () => {
   describe("cooldown mechanism", () => {
     test("should respect cooldown period before retrying failed model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
-        config: createMockConfig({ cooldown_seconds: 1 }),
+        config: createMockConfig({ cooldown_seconds: 60, notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback([
+          "openai/gpt-5.2",
+          "anthropic/claude-opus-4-5",
+        ]),
       })
       const sessionID = "test-session-cooldown"
+      SessionCategoryRegistry.register(sessionID, "test")
 
       await hook.event({
         event: {
@@ -564,7 +590,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - first error occurs
+      //#when - first error occurs, switches to openai
       await hook.event({
         event: {
           type: "session.error",
@@ -572,11 +598,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const firstFallback = logCalls.find((c) => c.msg.includes("Preparing fallback") || c.msg.includes("No fallback models"))
-      expect(firstFallback).toBeDefined()
-
-      //#when - second error occurs immediately (within cooldown)
-      logCalls = []
+      //#when - second error occurs immediately; tries to switch back to original model but should be in cooldown
       await hook.event({
         event: {
           type: "session.error",
@@ -584,11 +606,8 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#then - should skip due to cooldown (no new logs or cooldown message)
-      const hasCooldownSkip = logCalls.some((c) => 
-        c.msg.includes("cooldown") || c.msg.includes("Skipping")
-      )
-      expect(hasCooldownSkip || logCalls.length <= 2).toBe(true)
+      const cooldownSkipLog = logCalls.find((c) => c.msg.includes("Skipping fallback model in cooldown"))
+      expect(cooldownSkipLog).toBeDefined()
     })
   })
 
