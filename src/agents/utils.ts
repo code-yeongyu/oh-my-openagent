@@ -24,7 +24,9 @@ import { createBuiltinSkills } from "../features/builtin-skills"
 import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
 import type { BrowserAutomationProvider } from "../config/schema"
 
-type AgentSource = AgentFactory | AgentConfig
+// AgentSource can be either a full AgentFactory (with mode property) or a simple factory function
+type SimpleAgentFactory = (model?: string) => AgentConfig
+type AgentSource = AgentFactory | SimpleAgentFactory | AgentConfig
 
 const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   sisyphus: createSisyphusAgent,
@@ -63,7 +65,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   atlas: atlasPromptMetadata,
 }
 
-function isFactory(source: AgentSource): source is AgentFactory {
+function isFactory(source: AgentSource): source is AgentFactory | SimpleAgentFactory {
   return typeof source === "function"
 }
 
@@ -74,7 +76,7 @@ export function buildAgent(
   gitMasterConfig?: GitMasterConfig,
   browserProvider?: BrowserAutomationProvider
 ): AgentConfig {
-  const base = isFactory(source) ? source(model) : source
+  const base = isFactory(source) ? source(model) : source as AgentConfig
   const categoryConfigs: Record<string, CategoryConfig> = categories
     ? { ...DEFAULT_CATEGORIES, ...categories }
     : DEFAULT_CATEGORIES
@@ -313,7 +315,7 @@ export async function createBuiltinAgents(
        }
      }
      
-     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
+      const isPrimaryAgent = isFactory(source) && "mode" in source && source.mode === "primary"
      
     const resolution = applyModelResolution({
       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,

@@ -135,7 +135,7 @@ When you detect a pattern worth remembering, create an instinct by:
 4. Recording all evidence that led to the instinct
 `
 
-export function createObserverAgent(model: string): AgentConfig {
+export function createObserverAgent(model?: string): AgentConfig {
   return {
     name: "observer",
     description: "Background agent that analyzes session observations to detect patterns and create instincts",
