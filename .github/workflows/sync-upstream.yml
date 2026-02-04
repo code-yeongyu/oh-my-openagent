@@ -73,8 +73,12 @@ jobs:
         id: version
         run: |
           VERSION=$(jq -r .version package.json)
-          BOULDER_VERSION="${VERSION}-boulder-$(date +%Y%m%d)"
+          BOULDER_VERSION="${VERSION}-boulder-$(date +%Y%m%d-%H%M%S)"
           echo "version=$BOULDER_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Rename artifact
+        if: steps.check.outputs.has_updates == 'true'
+        run: cp dist/index.js dist/oh-my-opencode-boulder.js
 
       - name: Create Release
         if: steps.check.outputs.has_updates == 'true'
@@ -88,6 +92,6 @@ jobs:
             ## Installation
             Download `oh-my-opencode-boulder.js` and place in `~/.config/opencode/plugins/`
           files: |
-            dist/index.js
+            dist/oh-my-opencode-boulder.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

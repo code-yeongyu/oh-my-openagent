@@ -106,6 +106,23 @@ import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 
+function parseBoulderDeadline(rawInput: string): number {
+  const untilMatch = rawInput.match(/--until=(\d{1,2}:\d{2})/i);
+  const hoursMatch = rawInput.match(/--hours=(\d+)/i);
+
+  if (untilMatch) {
+    const [hours, minutes] = untilMatch[1].split(":").map(Number);
+    const now = new Date();
+    const target = new Date(now);
+    target.setHours(hours, minutes, 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    return target.getTime();
+  } else if (hoursMatch) {
+    return Date.now() + parseInt(hoursMatch[1], 10) * 3600000;
+  }
+  return Date.now() + 4 * 3600000;
+}
+
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
@@ -644,19 +661,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           const untilMatch = rawTask.match(/--until=(\d{1,2}:\d{2})/i);
           const hoursMatch = rawTask.match(/--hours=(\d+)/i);
 
-          let deadline: number;
-          if (untilMatch) {
-            const [hours, minutes] = untilMatch[1].split(":").map(Number);
-            const now = new Date();
-            const target = new Date(now);
-            target.setHours(hours, minutes, 0, 0);
-            if (target <= now) target.setDate(target.getDate() + 1);
-            deadline = target.getTime();
-          } else if (hoursMatch) {
-            deadline = Date.now() + parseInt(hoursMatch[1], 10) * 3600000;
-          } else {
-            deadline = Date.now() + 4 * 3600000;
-          }
+          const deadline = parseBoulderDeadline(rawTask);
 
           log("[boulder-loop] Starting loop from chat.message", {
             sessionID: input.sessionID,
@@ -904,19 +909,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           const untilMatch = rawArgs.match(/--until=(\d{1,2}:\d{2})/i);
           const hoursMatch = rawArgs.match(/--hours=(\d+)/i);
 
-          let deadline: number;
-          if (untilMatch) {
-            const [hours, minutes] = untilMatch[1].split(":").map(Number);
-            const now = new Date();
-            const target = new Date(now);
-            target.setHours(hours, minutes, 0, 0);
-            if (target <= now) target.setDate(target.getDate() + 1);
-            deadline = target.getTime();
-          } else if (hoursMatch) {
-            deadline = Date.now() + parseInt(hoursMatch[1], 10) * 3600000;
-          } else {
-            deadline = Date.now() + 4 * 3600000;
-          }
+          const deadline = parseBoulderDeadline(rawArgs);
 
           log("[boulder-loop] Starting loop from slashcommand", {
             sessionID,

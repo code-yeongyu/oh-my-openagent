@@ -23,7 +23,7 @@ function formatTimeRemaining(ms: number): string {
 
 function formatDeadlineTime(deadline: number): string {
   const date = new Date(deadline)
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 }
 
 const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - BOULDER LOOP {{ITERATION}} | {{TIME_REMAINING}} until {{DEADLINE_TIME}}]
@@ -203,7 +203,9 @@ export function createBoulderLoopHook(
             },
             query: { directory: ctx.directory },
           })
-        } catch {}
+        } catch (err) {
+          log(`[${HOOK_NAME}] Failed to send deadline message`, { error: String(err) })
+        }
 
         return
       }
