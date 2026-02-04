@@ -11,7 +11,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, migrateAgentConfig } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -57,7 +57,8 @@ export function buildAgent(
   model: string,
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
-  browserProvider?: BrowserAutomationProvider
+  browserProvider?: BrowserAutomationProvider,
+  disabledSkills?: Set<string>
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -81,7 +82,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider })
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider, disabledSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -207,7 +208,8 @@ function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
 ): AgentConfig {
-  const { prompt_append, ...rest } = override
+  const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
+  const { prompt_append, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
   if (prompt_append && merged.prompt) {
@@ -233,7 +235,8 @@ export async function createBuiltinAgents(
   discoveredSkills: LoadedSkill[] = [],
   client?: any,
   browserProvider?: BrowserAutomationProvider,
-  uiSelectedModel?: string
+  uiSelectedModel?: string,
+  disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
@@ -257,7 +260,7 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const builtinSkills = createBuiltinSkills({ browserProvider })
+  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills })
   const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({
@@ -290,16 +293,16 @@ export async function createBuiltinAgents(
      const override = agentOverrides[agentName]
        ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
      const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
-     
+
      // Check if agent requires a specific model
      if (requirement?.requiresModel && availableModels) {
        if (!isModelAvailable(requirement.requiresModel, availableModels)) {
          continue
        }
      }
-     
+
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
-     
+
     const resolution = applyModelResolution({
       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
       userModel: override?.model,
@@ -310,7 +313,7 @@ export async function createBuiltinAgents(
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
     
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
@@ -374,7 +377,7 @@ export async function createBuiltinAgents(
         availableSkills,
         availableCategories
       )
-      
+
       if (sisyphusResolvedVariant) {
         sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
       }
@@ -395,7 +398,7 @@ export async function createBuiltinAgents(
       !hephaestusRequirement?.requiresModel ||
       hasHephaestusExplicitConfig ||
       isFirstRunNoCache ||
-      (availableModels.size > 0 && isModelAvailable(hephaestusRequirement.requiresModel, availableModels))
+      isAnyFallbackModelAvailable(hephaestusRequirement.fallbackChain, availableModels)
 
     if (hasRequiredModel) {
       let hephaestusResolution = applyModelResolution({
@@ -419,7 +422,7 @@ export async function createBuiltinAgents(
           availableSkills,
           availableCategories
         )
-        
+
         hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
         const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
@@ -467,7 +470,7 @@ export async function createBuiltinAgents(
         availableSkills,
         userCategories: categories,
       })
-      
+
       if (atlasResolvedVariant) {
         orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
       }

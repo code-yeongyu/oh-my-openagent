@@ -340,6 +340,17 @@ export const BrowserAutomationConfigSchema = z.object({
   provider: BrowserAutomationProviderSchema.default("playwright"),
 })
 
+export const WebsearchProviderSchema = z.enum(["exa", "tavily"])
+
+export const WebsearchConfigSchema = z.object({
+  /**
+   * Websearch provider to use.
+   * - "exa": Uses Exa websearch (default, works without API key)
+   * - "tavily": Uses Tavily websearch (requires TAVILY_API_KEY)
+   */
+  provider: WebsearchProviderSchema.optional(),
+})
+
 export const TmuxLayoutSchema = z.enum([
   'main-horizontal',  // main pane top, agent panes bottom stack
   'main-vertical',    // main pane left, agent panes right stack (default)
@@ -357,8 +368,10 @@ export const TmuxConfigSchema = z.object({
 })
 
 export const SisyphusTasksConfigSchema = z.object({
-  /** Storage path for tasks (default: .sisyphus/tasks) */
-  storage_path: z.string().default(".sisyphus/tasks"),
+  /** Absolute or relative storage path override. When set, bypasses global config dir. */
+  storage_path: z.string().optional(),
+  /** Force task list ID (alternative to env ULTRAWORK_TASK_LIST_ID) */
+  task_list_id: z.string().optional(),
   /** Enable Claude Code path compatibility mode */
   claude_code_compat: z.boolean().default(false),
 })
@@ -393,6 +406,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
+  websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
 })
@@ -420,6 +434,8 @@ export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
 export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
 export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>
+export type WebsearchProvider = z.infer<typeof WebsearchProviderSchema>
+export type WebsearchConfig = z.infer<typeof WebsearchConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>

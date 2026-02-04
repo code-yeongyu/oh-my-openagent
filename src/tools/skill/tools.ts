@@ -133,7 +133,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (options.skills) return options.skills
     if (cachedSkills) return cachedSkills
-    cachedSkills = await getAllSkills()
+    cachedSkills = await getAllSkills({disabledSkills: options?.disabledSkills})
     return cachedSkills
   }
 

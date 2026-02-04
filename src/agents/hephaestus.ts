@@ -584,7 +584,7 @@ export function createHephaestusAgent(
     model,
     maxTokens: 32000,
     prompt,
-    color: "#FF4500", // Magma Orange - forge heat, distinct from Prometheus purple
+    color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
     permission: { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"],
     reasoningEffort: "medium",
   }
