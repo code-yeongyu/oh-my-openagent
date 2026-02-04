@@ -24,6 +24,20 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     delegate_task: false,
   },
 
+  metis: {
+    write: false,
+    edit: false,
+    task: false,
+    delegate_task: false,
+  },
+
+  momus: {
+    write: false,
+    edit: false,
+    task: false,
+    delegate_task: false,
+  },
+
   "multimodal-looker": {
     read: true,
   },
