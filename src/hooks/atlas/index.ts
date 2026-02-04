@@ -26,6 +26,13 @@ function isSisyphusPath(filePath: string): boolean {
 
 const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
 
+function getLastAgentFromSession(sessionID: string): string | null {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir) return null
+  const nearest = findNearestMessageWithFields(messageDir)
+  return nearest?.agent?.toLowerCase() ?? null
+}
+
 const DIRECT_WORK_REMINDER = `
 
 ---
@@ -549,8 +556,14 @@ export function createAtlasHook(
           return
         }
 
-        if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
+        const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
+        const lastAgent = getLastAgentFromSession(sessionID)
+        if (!lastAgent || lastAgent !== requiredAgent) {
+          log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
+            sessionID,
+            lastAgent: lastAgent ?? "unknown",
+            requiredAgent,
+          })
           return
         }
 
