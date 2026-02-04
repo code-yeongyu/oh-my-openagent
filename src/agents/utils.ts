@@ -11,6 +11,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createGitOwnerAgent, GIT_OWNER_PROMPT_METADATA } from "./git-owner"
+import { createK8sOwnerAgent, K8S_OWNER_PROMPT_METADATA } from "./k8s-owner"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
@@ -79,6 +80,10 @@ const CUSTOM_AGENT_FACTORIES: Record<string, {
   "git-owner": {
     factory: createGitOwnerAgent,
     metadata: GIT_OWNER_PROMPT_METADATA,
+  },
+  "k8s-owner": {
+    factory: createK8sOwnerAgent,
+    metadata: K8S_OWNER_PROMPT_METADATA,
   },
 }
 

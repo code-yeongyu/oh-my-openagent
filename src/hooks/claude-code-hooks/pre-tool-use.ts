@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG } from "./plugin-config"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import { enforceGitWriteRestriction } from "./git-write-enforcement"
+import { enforceKubectlWriteRestriction } from "./kubectl-write-enforcement"
 
 export interface PreToolUseContext {
   sessionId: string
@@ -61,6 +62,18 @@ export async function executePreToolUseHooks(
       reason: gitEnforcement.reason,
       elapsedMs: Date.now() - startTime,
       hookName: "git-write-enforcement",
+      toolName: ctx.toolName,
+      inputLines: buildInputLines(ctx.toolInput),
+    }
+  }
+
+  const kubectlEnforcement = enforceKubectlWriteRestriction(ctx, ohMyOpenCodeConfig)
+  if (kubectlEnforcement.blocked) {
+    return {
+      decision: "deny",
+      reason: kubectlEnforcement.reason,
+      elapsedMs: Date.now() - startTime,
+      hookName: "kubectl-write-enforcement",
       toolName: ctx.toolName,
       inputLines: buildInputLines(ctx.toolInput),
     }
