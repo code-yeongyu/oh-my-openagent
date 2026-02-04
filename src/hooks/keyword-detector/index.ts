@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywordsWithType, extractPromptText, removeCodeBlocks } from "./detector"
+import { detectKeywordsWithType, extractPromptText, removeCodeBlocks, cleanTitleFromPrompt } from "./detector"
 import { isPlannerAgent } from "./constants"
 import { log } from "../../shared"
 import { hasSystemReminder, isSystemDirective, removeSystemReminders } from "../../shared/system-directive"
@@ -70,6 +70,16 @@ export function createKeywordDetectorHook(ctx: PluginInput, collector?: ContextC
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
       if (hasUltrawork) {
         log(`[keyword-detector] Ultrawork mode activated`, { sessionID: input.sessionID })
+
+        // Proactively set session title to avoid "Ultrawork mode enabled!" issue (#1156)
+        const cleanedTitle = cleanTitleFromPrompt(promptText)
+        if (cleanedTitle && ctx.client.session?.update) {
+          void ctx.client.session.update({
+            path: { id: input.sessionID },
+            body: { title: cleanedTitle },
+            query: { directory: ctx.directory }
+          }).catch((err) => log("[keyword-detector] Failed to update session title", { error: err }))
+        }
 
         if (output.message.variant === undefined) {
           output.message.variant = "max"

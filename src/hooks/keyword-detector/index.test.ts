@@ -4,6 +4,7 @@ import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+import { cleanTitleFromPrompt } from "./detector"
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -23,6 +24,50 @@ describe("keyword-detector message transform", () => {
     getMainSessionSpy?.mockRestore()
     _resetForTesting()
   })
+
+describe("cleanTitleFromPrompt", () => {
+  test("should remove ultrawork keyword from start", () => {
+    // #given - prompt with ulw at start
+    // #when - cleanTitleFromPrompt is called
+    // #then - keyword is removed, text is trimmed
+    expect(cleanTitleFromPrompt("ulw fix the login bug")).toBe("fix the login bug")
+  })
+
+  test("should remove ultrawork keyword case-insensitively", () => {
+    expect(cleanTitleFromPrompt("ultrawork refactor auth")).toBe("refactor auth")
+  })
+
+  test("should remove keyword from middle of text", () => {
+    expect(cleanTitleFromPrompt("fix ULW bug")).toBe("fix bug")
+  })
+
+  test("should handle multiple keywords globally", () => {
+    expect(cleanTitleFromPrompt("ulw ultrawork test ulw")).toBe("test")
+  })
+
+  test("should return empty string when only keywords", () => {
+    expect(cleanTitleFromPrompt("   ulw   ")).toBe("")
+    expect(cleanTitleFromPrompt("ulw")).toBe("")
+  })
+
+  test("should return empty string for empty input", () => {
+    expect(cleanTitleFromPrompt("")).toBe("")
+  })
+
+  test("should NOT truncate 80-char string", () => {
+    const exactly80 = "a".repeat(80)
+    expect(cleanTitleFromPrompt(exactly80)).toBe(exactly80)
+    expect(cleanTitleFromPrompt(exactly80).length).toBe(80)
+  })
+
+  test("should truncate string over 80 chars to 77 + ellipsis", () => {
+    const chars81 = "a".repeat(81)
+    const result = cleanTitleFromPrompt(chars81)
+    expect(result.length).toBe(80)
+    expect(result).toBe("a".repeat(77) + "...")
+  })
+})
+
 
   function createMockPluginInput() {
     return {
@@ -724,5 +769,148 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("ultrawork plan this")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+  })
+})
+
+describe("session title update", () => {
+  let logCalls: Array<{ msg: string; data?: unknown }>
+  let logSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logCalls = []
+    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+      logCalls.push({ msg, data })
+    })
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+  })
+
+  function createMockPluginInputWithSession(options: {
+    sessionUpdateCalls?: Array<{ path: any; body: any; query: any }>
+    sessionUpdateError?: Error
+  } = {}) {
+    const sessionUpdateCalls = options.sessionUpdateCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async () => {},
+        },
+        session: {
+          update: async (opts: any) => {
+            if (options.sessionUpdateError) {
+              throw options.sessionUpdateError
+            }
+            sessionUpdateCalls.push(opts)
+          },
+        },
+      },
+      directory: "/test/dir",
+    } as any
+  }
+
+  test("should call session.update with cleaned title when ultrawork detected", async () => {
+    // #given - ultrawork prompt with meaningful content
+    const sessionUpdateCalls: Array<{ path: any; body: any; query: any }> = []
+    const ctx = createMockPluginInputWithSession({ sessionUpdateCalls })
+    const hook = createKeywordDetectorHook(ctx)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw fix the login bug" }],
+    }
+
+    // #when - hook processes ultrawork message
+    await hook["chat.message"]!({ sessionID: "test-session-123" }, output)
+
+    // #then - session.update called with cleaned title
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush microtasks
+    expect(sessionUpdateCalls.length).toBe(1)
+    expect(sessionUpdateCalls[0].body.title).toBe("fix the login bug")
+  })
+
+  test("should call session.update with input.sessionID as path.id", async () => {
+    // #given - ultrawork prompt with specific session ID
+    const sessionUpdateCalls: Array<{ path: any; body: any; query: any }> = []
+    const ctx = createMockPluginInputWithSession({ sessionUpdateCalls })
+    const hook = createKeywordDetectorHook(ctx)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw implement feature X" }],
+    }
+
+    // #when - hook processes ultrawork message
+    await hook["chat.message"]!({ sessionID: "test-session-456" }, output)
+
+    // #then - session.update called with correct session ID
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush microtasks
+    expect(sessionUpdateCalls.length).toBe(1)
+    expect(sessionUpdateCalls[0].path.id).toBe("test-session-456")
+    expect(sessionUpdateCalls[0].query.directory).toBe("/test/dir")
+  })
+
+  test("should not call session.update when cleaned title is empty", async () => {
+    // #given - ultrawork prompt with only keyword (no meaningful content)
+    const sessionUpdateCalls: Array<{ path: any; body: any; query: any }> = []
+    const ctx = createMockPluginInputWithSession({ sessionUpdateCalls })
+    const hook = createKeywordDetectorHook(ctx)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw" }],
+    }
+
+    // #when - hook processes ultrawork-only message
+    await hook["chat.message"]!({ sessionID: "test-session-789" }, output)
+
+    // #then - session.update NOT called
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush microtasks
+    expect(sessionUpdateCalls.length).toBe(0)
+  })
+
+  test("should log error and not crash when session.update fails", async () => {
+    // #given - session.update that throws error
+    const sessionUpdateCalls: Array<{ path: any; body: any; query: any }> = []
+    const ctx = createMockPluginInputWithSession({
+      sessionUpdateCalls,
+      sessionUpdateError: new Error("API error"),
+    })
+    const hook = createKeywordDetectorHook(ctx)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw add new feature" }],
+    }
+
+    // #when - hook processes ultrawork message
+    await hook["chat.message"]!({ sessionID: "test-session-error" }, output)
+
+    // #then - error logged, hook doesn't throw
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush microtasks
+    expect(logCalls.length).toBeGreaterThan(0)
+    const errorLog = logCalls.find((call) =>
+      call.msg?.includes("[keyword-detector] Failed to update session title"),
+    )
+    expect(errorLog).toBeDefined()
+    expect(errorLog?.data).toBeDefined()
+  })
+
+  test("should update title even in non-main session with ultrawork", async () => {
+    // #given - non-main session with ultrawork
+    const sessionUpdateCalls: Array<{ path: any; body: any; query: any }> = []
+    const ctx = createMockPluginInputWithSession({ sessionUpdateCalls })
+    const hook = createKeywordDetectorHook(ctx)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw refactor authentication" }],
+    }
+
+    // #when - hook processes ultrawork in non-main session
+    await hook["chat.message"]!({ sessionID: "non-main-session" }, output)
+
+    // #then - session.update still called (ultrawork passes through non-main filter)
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush microtasks
+    expect(sessionUpdateCalls.length).toBe(1)
+    expect(sessionUpdateCalls[0].body.title).toBe("refactor authentication")
+    expect(sessionUpdateCalls[0].path.id).toBe("non-main-session")
   })
 })

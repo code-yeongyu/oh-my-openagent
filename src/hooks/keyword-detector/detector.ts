@@ -51,3 +51,22 @@ export function extractPromptText(
     .map((p) => p.text || "")
     .join(" ")
 }
+
+export function cleanTitleFromPrompt(promptText: string): string {
+  const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/gi
+  let result = promptText.replace(ULTRAWORK_KEYWORD_PATTERN, "")
+  
+  result = result.replace(/\s+/g, " ")
+  
+  result = result.trim()
+  
+  if (!result) {
+    return ""
+  }
+  
+  if (result.length > 80) {
+    return result.slice(0, 77) + "..."
+  }
+  
+  return result
+}

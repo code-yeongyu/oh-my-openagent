@@ -14,6 +14,7 @@ packages/*/bin/oh-my-opencode.exe
 .vscode/
 *.swp
 *.swo
+.ace-tool/
 
 # OS
 .DS_Store
