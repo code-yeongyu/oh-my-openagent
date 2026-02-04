@@ -4,7 +4,7 @@
  * Types for managing runtime model fallback when API errors occur.
  */
 
-import type { RuntimeFallbackConfig } from "../../config"
+import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 
 /**
  * Tracks the state of fallback attempts for a session
@@ -13,8 +13,7 @@ export interface FallbackState {
   originalModel: string
   currentModel: string
   fallbackIndex: number
-  lastFallbackTime: number
-  failedModels: Set<string>
+  failedModels: Map<string, number>
   attemptCount: number
   pendingFallbackModel?: string
 }
@@ -57,6 +56,8 @@ export interface FallbackResult {
 export interface RuntimeFallbackOptions {
   /** Runtime fallback configuration */
   config?: RuntimeFallbackConfig
+  /** Optional plugin config override (primarily for testing) */
+  pluginConfig?: OhMyOpenCodeConfig
 }
 
 export interface RuntimeFallbackHook {
