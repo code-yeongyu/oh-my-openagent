@@ -277,6 +277,30 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-5")
 	})
 
+	// given available models with similar model IDs (e.g., glm-4.7 and glm-4.7-free)
+	// when searching for the longer variant (glm-4.7-free)
+	// then return exact model ID match, not the shorter one
+	it("should prefer exact model ID match over shorter substring match", () => {
+		const available = new Set([
+			"zai-coding-plan/glm-4.7",
+			"zai-coding-plan/glm-4.7-free",
+		])
+		const result = fuzzyMatchModel("glm-4.7-free", available)
+		expect(result).toBe("zai-coding-plan/glm-4.7-free")
+	})
+
+	// given available models with similar model IDs
+	// when searching for the shorter variant
+	// then return the shorter match (existing behavior preserved)
+	it("should still prefer shorter match when searching for shorter variant", () => {
+		const available = new Set([
+			"zai-coding-plan/glm-4.7",
+			"zai-coding-plan/glm-4.7-free",
+		])
+		const result = fuzzyMatchModel("glm-4.7", available)
+		expect(result).toBe("zai-coding-plan/glm-4.7")
+	})
+
 	// given available models with multiple providers
 	// when multiple providers are specified
 	// then search all specified providers
