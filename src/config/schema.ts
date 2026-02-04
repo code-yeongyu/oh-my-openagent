@@ -382,6 +382,12 @@ export const CustomAgentConfigSchema = z.object({
   metadata: CustomAgentMetadataSchema.optional(),
 })
 
+export const DomainRestrictionSchema = z.object({
+  domain: z.string(),
+  ownerAgent: z.string(),
+  restrictedTools: z.array(z.string()),
+})
+
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
@@ -406,6 +412,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   customAgents: z.record(z.string(), CustomAgentConfigSchema).optional(),
+  domainRestrictions: z.array(DomainRestrictionSchema).optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>

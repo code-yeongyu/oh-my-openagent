@@ -7,6 +7,8 @@ import type {
 import { findMatchingHooks, executeHookCommand, objectToSnakeCase, transformToolName, log } from "../../shared"
 import { DEFAULT_CONFIG } from "./plugin-config"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
+import type { OhMyOpenCodeConfig } from "../../config/schema"
+import { enforceGitWriteRestriction } from "./git-write-enforcement"
 
 export interface PreToolUseContext {
   sessionId: string
@@ -49,6 +51,21 @@ export async function executePreToolUseHooks(
   config: ClaudeHooksConfig | null,
   extendedConfig?: PluginExtendedConfig | null
 ): Promise<PreToolUseResult> {
+  const startTime = Date.now()
+
+  const ohMyOpenCodeConfig = (extendedConfig as OhMyOpenCodeConfig | undefined) ?? ({} as OhMyOpenCodeConfig)
+  const gitEnforcement = enforceGitWriteRestriction(ctx, ohMyOpenCodeConfig)
+  if (gitEnforcement.blocked) {
+    return {
+      decision: "deny",
+      reason: gitEnforcement.reason,
+      elapsedMs: Date.now() - startTime,
+      hookName: "git-write-enforcement",
+      toolName: ctx.toolName,
+      inputLines: buildInputLines(ctx.toolInput),
+    }
+  }
+
   if (!config) {
     return { decision: "allow" }
   }
@@ -72,7 +89,6 @@ export async function executePreToolUseHooks(
     agent: ctx.agent,
   }
 
-  const startTime = Date.now()
   let firstHookName: string | undefined
   const inputLines = buildInputLines(ctx.toolInput)
 
