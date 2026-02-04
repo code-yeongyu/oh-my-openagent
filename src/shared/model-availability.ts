@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
-import { readProviderModelsCache, hasProviderModelsCache } from "./connected-providers-cache"
+import { readProviderModelsCache, hasProviderModelsCache, readConnectedProvidersCache } from "./connected-providers-cache"
 
 /**
  * Fuzzy match a target model name against available models
@@ -278,19 +278,35 @@ export function isAnyFallbackModelAvailable(
 	fallbackChain: Array<{ providers: string[]; model: string }>,
 	availableModels: Set<string>,
 ): boolean {
-	if (availableModels.size === 0) {
-		return false
-	}
-
-	for (const entry of fallbackChain) {
-		const hasAvailableProvider = entry.providers.some((provider) => {
-			return fuzzyMatchModel(entry.model, availableModels, [provider]) !== null
-		})
-		if (hasAvailableProvider) {
-			return true
+	// If we have models, check them first
+	if (availableModels.size > 0) {
+		for (const entry of fallbackChain) {
+			const hasAvailableProvider = entry.providers.some((provider) => {
+				return fuzzyMatchModel(entry.model, availableModels, [provider]) !== null
+			})
+			if (hasAvailableProvider) {
+				return true
+			}
 		}
 	}
-	log("[isAnyFallbackModelAvailable] no model available in chain", { chainLength: fallbackChain.length })
+
+	// Fallback: check if any provider in the chain is connected
+	// This handles race conditions where availableModels is empty or incomplete
+	// but we know the provider is connected.
+	const connectedProviders = readConnectedProvidersCache()
+	if (connectedProviders) {
+		const connectedSet = new Set(connectedProviders)
+		for (const entry of fallbackChain) {
+			if (entry.providers.some((p) => connectedSet.has(p))) {
+				log("[isAnyFallbackModelAvailable] model not in available set, but provider is connected", {
+					model: entry.model,
+					availableCount: availableModels.size,
+				})
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
