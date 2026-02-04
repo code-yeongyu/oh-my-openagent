@@ -1,6 +1,5 @@
 ---
 description: Compare HEAD with the latest published npm version and list all unpublished changes
-model: anthropic/claude-haiku-4-5
 ---
 
 <command-instruction>
@@ -55,30 +54,95 @@ For each commit, you MUST:
 ### feat
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### fix
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### refactor
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### docs
 | Scope | What Changed |
 |-------|--------------|
-| X | 실제 변경 내용 설명 |
+| X | Description of actual changes |
 
 ### Breaking Changes
-None 또는 목록
+None or list
 
 ### Files Changed
 {diff-stat}
 
 ### Suggested Version Bump
 - **Recommendation**: patch|minor|major
-- **Reason**: 이유
+- **Reason**: Reason for recommendation
 </output-format>
+
+<oracle-safety-review>
+## Oracle Deployment Safety Review (Only when user explicitly requests)
+
+**Trigger keywords**: "safe to deploy", "can I deploy", "is it safe", "review", "check", "oracle"
+
+When user includes any of the above keywords in their request:
+
+### 1. Pre-validation
+```bash
+bun run typecheck
+bun test
+```
+- On failure → Report "❌ Cannot deploy" immediately without invoking Oracle
+
+### 2. Oracle Invocation Prompt
+
+Collect the following information and pass to Oracle:
+
+```
+## Deployment Safety Review Request
+
+### Changes Summary
+{Changes table analyzed above}
+
+### Key diffs (organized by feature)
+{Core code changes for each feat/fix/refactor - only key parts, not full diff}
+
+### Validation Results
+- Typecheck: ✅/❌
+- Tests: {pass}/{total} (✅/❌)
+
+### Review Items
+1. **Regression Risk**: Are there changes that could affect existing functionality?
+2. **Side Effects**: Are there areas where unexpected side effects could occur?
+3. **Breaking Changes**: Are there changes that affect external users?
+4. **Edge Cases**: Are there missed edge cases?
+5. **Deployment Recommendation**: SAFE / CAUTION / UNSAFE
+
+### Request
+Please analyze the above changes deeply and provide your judgment on deployment safety.
+If there are risks, explain with specific scenarios.
+Suggest keywords to monitor after deployment if any.
+```
+
+### 3. Output Format After Oracle Response
+
+## 🔍 Oracle Deployment Safety Review Result
+
+### Verdict: ✅ SAFE / ⚠️ CAUTION / ❌ UNSAFE
+
+### Risk Analysis
+| Area | Risk Level | Description |
+|------|------------|-------------|
+| ... | 🟢/🟡/🔴 | ... |
+
+### Recommendations
+- ...
+
+### Post-deployment Monitoring Keywords
+- ...
+
+### Conclusion
+{Oracle's final judgment}
+</oracle-safety-review>

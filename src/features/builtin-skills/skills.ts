@@ -1988,6 +1988,9 @@ const continuousLearningSkill: BuiltinSkill = {
   template: readBuiltinSkillTemplate("continuous-learning"),
 }
 
+// 注意: 上游使用模块化导入 (./skills/index)，但本地已有完整定义
+// 保留本地定义以维持缓存机制和所有本地独有 skills
+
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
 }

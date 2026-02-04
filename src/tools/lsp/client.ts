@@ -1,9 +1,48 @@
 import { spawn, type Subprocess } from "bun"
+import { Readable, Writable } from "node:stream"
 import { readFileSync } from "fs"
 import { extname, resolve } from "path"
 import { pathToFileURL } from "node:url"
+import {
+  createMessageConnection,
+  StreamMessageReader,
+  StreamMessageWriter,
+  type MessageConnection,
+} from "vscode-jsonrpc/node"
 import { getLanguageId } from "./config"
 import type { Diagnostic, ResolvedServer } from "./types"
+import { log } from "../../shared/logger"
+
+/**
+ * Check if the current Bun version is affected by Windows LSP crash bug.
+ * Bun v1.3.5 and earlier have a known segmentation fault issue on Windows
+ * when spawning LSP servers. This was fixed in Bun v1.3.6.
+ * See: https://github.com/oven-sh/bun/issues/25798
+ */
+function checkWindowsBunVersion(): { isAffected: boolean; message: string } | null {
+  if (process.platform !== "win32") return null
+
+  const version = Bun.version
+  const [major, minor, patch] = version.split(".").map((v) => parseInt(v.split("-")[0], 10))
+
+  // Bun v1.3.5 and earlier are affected
+  if (major < 1 || (major === 1 && minor < 3) || (major === 1 && minor === 3 && patch < 6)) {
+    return {
+      isAffected: true,
+      message:
+        `⚠️  Windows + Bun v${version} detected: Known segmentation fault bug with LSP.\n` +
+        `   This causes crashes when using LSP tools (lsp_diagnostics, lsp_goto_definition, etc.).\n` +
+        `   \n` +
+        `   SOLUTION: Upgrade to Bun v1.3.6 or later:\n` +
+        `   powershell -c "irm bun.sh/install.ps1|iex"\n` +
+        `   \n` +
+        `   WORKAROUND: Use WSL instead of native Windows.\n` +
+        `   See: https://github.com/oven-sh/bun/issues/25798`,
+    }
+  }
+
+  return null
+}
 
 interface ManagedClient {
   client: LSPClient
@@ -25,10 +64,12 @@ class LSPServerManager {
   }
 
   private registerProcessCleanup(): void {
-    const cleanup = () => {
+    // Synchronous cleanup for 'exit' event (cannot await)
+    const syncCleanup = () => {
       for (const [, managed] of this.clients) {
         try {
-          managed.client.stop()
+          // Fire-and-forget during sync exit - process is terminating
+          void managed.client.stop().catch(() => {})
         } catch {}
       }
       this.clients.clear()
@@ -38,27 +79,30 @@ class LSPServerManager {
       }
     }
 
-    // Works on all platforms
-    process.on("exit", cleanup)
+    // Async cleanup for signal handlers - properly await all stops
+    const asyncCleanup = async () => {
+      const stopPromises: Promise<void>[] = []
+      for (const [, managed] of this.clients) {
+        stopPromises.push(managed.client.stop().catch(() => {}))
+      }
+      await Promise.allSettled(stopPromises)
+      this.clients.clear()
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval)
+        this.cleanupInterval = null
+      }
+    }
 
-    // Ctrl+C - works on all platforms
-    process.on("SIGINT", () => {
-      cleanup()
-      process.exit(0)
-    })
+    process.on("exit", syncCleanup)
 
-    // Kill signal - Unix/macOS
-    process.on("SIGTERM", () => {
-      cleanup()
-      process.exit(0)
-    })
+    // Don't call process.exit() here - let other handlers complete their cleanup first
+    // The background-agent manager handles the final exit call
+    // Use async handlers to properly await LSP subprocess cleanup
+    process.on("SIGINT", () => void asyncCleanup().catch(() => {}))
+    process.on("SIGTERM", () => void asyncCleanup().catch(() => {}))
 
-    // Ctrl+Break - Windows specific
     if (process.platform === "win32") {
-      process.on("SIGBREAK", () => {
-        cleanup()
-        process.exit(0)
-      })
+      process.on("SIGBREAK", () => void asyncCleanup().catch(() => {}))
     }
   }
 
@@ -209,13 +253,12 @@ export const lspManager = LSPServerManager.getInstance()
 
 export class LSPClient {
   private proc: Subprocess<"pipe", "pipe", "pipe"> | null = null
-  private buffer: Uint8Array = new Uint8Array(0)
-  private pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
-  private requestIdCounter = 0
+  private connection: MessageConnection | null = null
   private openedFiles = new Set<string>()
   private stderrBuffer: string[] = []
   private processExited = false
   private diagnosticsStore = new Map<string, Diagnostic[]>()
+  private readonly REQUEST_TIMEOUT = 15000
 
   constructor(
     private root: string,
@@ -223,6 +266,13 @@ export class LSPClient {
   ) {}
 
   async start(): Promise<void> {
+    const windowsCheck = checkWindowsBunVersion()
+    if (windowsCheck?.isAffected) {
+      throw new Error(
+        `LSP server cannot be started safely.\n\n${windowsCheck.message}`
+      )
+    }
+
     this.proc = spawn(this.server.command, {
       stdin: "pipe",
       stdout: "pipe",
@@ -238,7 +288,6 @@ export class LSPClient {
       throw new Error(`Failed to spawn LSP server: ${this.server.command.join(" ")}`)
     }
 
-    this.startReading()
     this.startStderrReading()
 
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -249,33 +298,66 @@ export class LSPClient {
         `LSP server exited immediately with code ${this.proc.exitCode}` + (stderr ? `\nstderr: ${stderr}` : "")
       )
     }
-  }
 
-  private startReading(): void {
-    if (!this.proc) return
-
-    const reader = this.proc.stdout.getReader()
-    const read = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
+    const stdoutReader = this.proc.stdout.getReader()
+    const nodeReadable = new Readable({
+      async read() {
+        try {
+          const { done, value } = await stdoutReader.read()
           if (done) {
-            this.processExited = true
-            this.rejectAllPending("LSP server stdout closed")
-            break
+            this.push(null)
+          } else {
+            this.push(Buffer.from(value))
           }
-          const newBuf = new Uint8Array(this.buffer.length + value.length)
-          newBuf.set(this.buffer)
-          newBuf.set(value, this.buffer.length)
-          this.buffer = newBuf
-          this.processBuffer()
+        } catch {
+          this.push(null)
         }
-      } catch (err) {
-        this.processExited = true
-        this.rejectAllPending(`LSP stdout read error: ${err}`)
+      },
+    })
+
+    const stdin = this.proc.stdin
+    const nodeWritable = new Writable({
+      write(chunk, _encoding, callback) {
+        try {
+          stdin.write(chunk)
+          callback()
+        } catch (err) {
+          callback(err as Error)
+        }
+      },
+    })
+
+    this.connection = createMessageConnection(
+      new StreamMessageReader(nodeReadable),
+      new StreamMessageWriter(nodeWritable)
+    )
+
+    this.connection.onNotification("textDocument/publishDiagnostics", (params: { uri?: string; diagnostics?: Diagnostic[] }) => {
+      if (params.uri) {
+        this.diagnosticsStore.set(params.uri, params.diagnostics ?? [])
       }
-    }
-    read()
+    })
+
+    this.connection.onRequest("workspace/configuration", (params: { items?: Array<{ section?: string }> }) => {
+      const items = params?.items ?? []
+      return items.map((item) => {
+        if (item.section === "json") return { validate: { enable: true } }
+        return {}
+      })
+    })
+
+    this.connection.onRequest("client/registerCapability", () => null)
+    this.connection.onRequest("window/workDoneProgress/create", () => null)
+
+    this.connection.onClose(() => {
+      this.processExited = true
+    })
+
+    this.connection.onError((error) => {
+      log("LSP connection error:", error)
+    })
+
+    this.connection.listen()
   }
 
   private startStderrReading(): void {
@@ -294,142 +376,49 @@ export class LSPClient {
             this.stderrBuffer.shift()
           }
         }
-      } catch {
-      }
+      } catch {}
     }
     read()
   }
 
-  private rejectAllPending(reason: string): void {
-    for (const [id, handler] of this.pending) {
-      handler.reject(new Error(reason))
-      this.pending.delete(id)
-    }
-  }
+  private async sendRequest<T>(method: string, params?: unknown): Promise<T> {
+    if (!this.connection) throw new Error("LSP client not started")
 
-  private findSequence(haystack: Uint8Array, needle: number[]): number {
-    outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
-      for (let j = 0; j < needle.length; j++) {
-        if (haystack[i + j] !== needle[j]) continue outer
-      }
-      return i
-    }
-    return -1
-  }
-
-  private processBuffer(): void {
-    const decoder = new TextDecoder()
-    const CONTENT_LENGTH = [67, 111, 110, 116, 101, 110, 116, 45, 76, 101, 110, 103, 116, 104, 58]
-    const CRLF_CRLF = [13, 10, 13, 10]
-    const LF_LF = [10, 10]
-
-    while (true) {
-      const headerStart = this.findSequence(this.buffer, CONTENT_LENGTH)
-      if (headerStart === -1) break
-      if (headerStart > 0) this.buffer = this.buffer.slice(headerStart)
-
-      let headerEnd = this.findSequence(this.buffer, CRLF_CRLF)
-      let sepLen = 4
-      if (headerEnd === -1) {
-        headerEnd = this.findSequence(this.buffer, LF_LF)
-        sepLen = 2
-      }
-      if (headerEnd === -1) break
-
-      const header = decoder.decode(this.buffer.slice(0, headerEnd))
-      const match = header.match(/Content-Length:\s*(\d+)/i)
-      if (!match) break
-
-      const len = parseInt(match[1], 10)
-      const start = headerEnd + sepLen
-      const end = start + len
-      if (this.buffer.length < end) break
-
-      const content = decoder.decode(this.buffer.slice(start, end))
-      this.buffer = this.buffer.slice(end)
-
-      try {
-        const msg = JSON.parse(content)
-
-        if ("method" in msg && !("id" in msg)) {
-          if (msg.method === "textDocument/publishDiagnostics" && msg.params?.uri) {
-            this.diagnosticsStore.set(msg.params.uri, msg.params.diagnostics ?? [])
-          }
-        } else if ("id" in msg && "method" in msg) {
-          this.handleServerRequest(msg.id, msg.method, msg.params)
-        } else if ("id" in msg && this.pending.has(msg.id)) {
-          const handler = this.pending.get(msg.id)!
-          this.pending.delete(msg.id)
-          if ("error" in msg) {
-            handler.reject(new Error(msg.error.message))
-          } else {
-            handler.resolve(msg.result)
-          }
-        }
-      } catch {
-      }
-    }
-  }
-
-  private send(method: string, params?: unknown): Promise<unknown> {
-    if (!this.proc) throw new Error("LSP client not started")
-
-    if (this.processExited || this.proc.exitCode !== null) {
+    if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
       const stderr = this.stderrBuffer.slice(-10).join("\n")
-      throw new Error(`LSP server already exited (code: ${this.proc.exitCode})` + (stderr ? `\nstderr: ${stderr}` : ""))
+      throw new Error(`LSP server already exited (code: ${this.proc?.exitCode})` + (stderr ? `\nstderr: ${stderr}` : ""))
     }
 
-    const id = ++this.requestIdCounter
-    const msg = JSON.stringify({ jsonrpc: "2.0", id, method, params })
-    const header = `Content-Length: ${Buffer.byteLength(msg)}\r\n\r\n`
-    this.proc.stdin.write(header + msg)
-
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id)
-          const stderr = this.stderrBuffer.slice(-5).join("\n")
-          reject(new Error(`LSP request timeout (method: ${method})` + (stderr ? `\nrecent stderr: ${stderr}` : "")))
-        }
-      }, 15000)
+    let timeoutId: ReturnType<typeof setTimeout>
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const stderr = this.stderrBuffer.slice(-5).join("\n")
+        reject(new Error(`LSP request timeout (method: ${method})` + (stderr ? `\nrecent stderr: ${stderr}` : "")))
+      }, this.REQUEST_TIMEOUT)
     })
-  }
 
-  private notify(method: string, params?: unknown): void {
-    if (!this.proc) return
-    if (this.processExited || this.proc.exitCode !== null) return
+    const requestPromise = this.connection.sendRequest(method, params) as Promise<T>
 
-    const msg = JSON.stringify({ jsonrpc: "2.0", method, params })
-    this.proc.stdin.write(`Content-Length: ${Buffer.byteLength(msg)}\r\n\r\n${msg}`)
-  }
-
-  private respond(id: number | string, result: unknown): void {
-    if (!this.proc) return
-    if (this.processExited || this.proc.exitCode !== null) return
-
-    const msg = JSON.stringify({ jsonrpc: "2.0", id, result })
-    this.proc.stdin.write(`Content-Length: ${Buffer.byteLength(msg)}\r\n\r\n${msg}`)
-  }
-
-  private handleServerRequest(id: number | string, method: string, params?: unknown): void {
-    if (method === "workspace/configuration") {
-      const items = (params as { items?: Array<{ section?: string }> })?.items ?? []
-      const result = items.map((item) => {
-        if (item.section === "json") return { validate: { enable: true } }
-        return {}
-      })
-      this.respond(id, result)
-    } else if (method === "client/registerCapability") {
-      this.respond(id, null)
-    } else if (method === "window/workDoneProgress/create") {
-      this.respond(id, null)
+    try {
+      const result = await Promise.race([requestPromise, timeoutPromise])
+      clearTimeout(timeoutId!)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId!)
+      throw error
     }
+  }
+
+  private sendNotification(method: string, params?: unknown): void {
+    if (!this.connection) return
+    if (this.processExited || (this.proc && this.proc.exitCode !== null)) return
+
+    this.connection.sendNotification(method, params)
   }
 
   async initialize(): Promise<void> {
     const rootUri = pathToFileURL(this.root).href
-    await this.send("initialize", {
+    await this.sendRequest("initialize", {
       processId: process.pid,
       rootUri,
       rootPath: this.root,
@@ -481,8 +470,8 @@ export class LSPClient {
       },
       ...this.server.initialization,
     })
-    this.notify("initialized")
-    this.notify("workspace/didChangeConfiguration", {
+    this.sendNotification("initialized")
+    this.sendNotification("workspace/didChangeConfiguration", {
       settings: { json: { validate: { enable: true } } },
     })
     await new Promise((r) => setTimeout(r, 300))
@@ -496,7 +485,7 @@ export class LSPClient {
     const ext = extname(absPath)
     const languageId = getLanguageId(ext)
 
-    this.notify("textDocument/didOpen", {
+    this.sendNotification("textDocument/didOpen", {
       textDocument: {
         uri: pathToFileURL(absPath).href,
         languageId,
@@ -512,7 +501,7 @@ export class LSPClient {
   async definition(filePath: string, line: number, character: number): Promise<unknown> {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
-    return this.send("textDocument/definition", {
+    return this.sendRequest("textDocument/definition", {
       textDocument: { uri: pathToFileURL(absPath).href },
       position: { line: line - 1, character },
     })
@@ -521,7 +510,7 @@ export class LSPClient {
   async references(filePath: string, line: number, character: number, includeDeclaration = true): Promise<unknown> {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
-    return this.send("textDocument/references", {
+    return this.sendRequest("textDocument/references", {
       textDocument: { uri: pathToFileURL(absPath).href },
       position: { line: line - 1, character },
       context: { includeDeclaration },
@@ -531,13 +520,13 @@ export class LSPClient {
   async documentSymbols(filePath: string): Promise<unknown> {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
-    return this.send("textDocument/documentSymbol", {
+    return this.sendRequest("textDocument/documentSymbol", {
       textDocument: { uri: pathToFileURL(absPath).href },
     })
   }
 
   async workspaceSymbols(query: string): Promise<unknown> {
-    return this.send("workspace/symbol", { query })
+    return this.sendRequest("workspace/symbol", { query })
   }
 
   async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
@@ -547,14 +536,13 @@ export class LSPClient {
     await new Promise((r) => setTimeout(r, 500))
 
     try {
-      const result = await this.send("textDocument/diagnostic", {
+      const result = await this.sendRequest<{ items?: Diagnostic[] }>("textDocument/diagnostic", {
         textDocument: { uri },
       })
       if (result && typeof result === "object" && "items" in result) {
         return result as { items: Diagnostic[] }
       }
-    } catch {
-    }
+    } catch {}
 
     return { items: this.diagnosticsStore.get(uri) ?? [] }
   }
@@ -562,7 +550,7 @@ export class LSPClient {
   async prepareRename(filePath: string, line: number, character: number): Promise<unknown> {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
-    return this.send("textDocument/prepareRename", {
+    return this.sendRequest("textDocument/prepareRename", {
       textDocument: { uri: pathToFileURL(absPath).href },
       position: { line: line - 1, character },
     })
@@ -571,7 +559,7 @@ export class LSPClient {
   async rename(filePath: string, line: number, character: number, newName: string): Promise<unknown> {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
-    return this.send("textDocument/rename", {
+    return this.sendRequest("textDocument/rename", {
       textDocument: { uri: pathToFileURL(absPath).href },
       position: { line: line - 1, character },
       newName,
@@ -583,13 +571,42 @@ export class LSPClient {
   }
 
   async stop(): Promise<void> {
-    try {
-      this.notify("shutdown", {})
-      this.notify("exit")
-    } catch {
+    if (this.connection) {
+      try {
+        this.sendNotification("shutdown", {})
+        this.sendNotification("exit")
+      } catch {}
+      this.connection.dispose()
+      this.connection = null
     }
-    this.proc?.kill()
-    this.proc = null
+    const proc = this.proc
+    if (proc) {
+      this.proc = null
+      let exitedBeforeTimeout = false
+      try {
+        proc.kill()
+        // Wait for exit with timeout to prevent indefinite hang
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
+        const timeoutPromise = new Promise<void>((resolve) => {
+          timeoutId = setTimeout(resolve, 5000)
+        })
+        await Promise.race([
+          proc.exited.then(() => { exitedBeforeTimeout = true }).finally(() => timeoutId && clearTimeout(timeoutId)),
+          timeoutPromise,
+        ])
+        if (!exitedBeforeTimeout) {
+          log("[LSPClient] Process did not exit within timeout, escalating to SIGKILL")
+          try {
+            proc.kill("SIGKILL")
+            // Wait briefly for SIGKILL to take effect
+            await Promise.race([
+              proc.exited,
+              new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+            ])
+          } catch {}
+        }
+      } catch {}
+    }
     this.processExited = true
     this.diagnosticsStore.clear()
   }

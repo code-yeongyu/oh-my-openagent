@@ -16,27 +16,18 @@ export function loadConfigFromPath(
   ctx: unknown
 ): OhMyOpenCodeConfig | null {
   try {
-    console.error("[OhMyOpenCode DEBUG] Checking config path:", configPath);
-    const fileExists = fs.existsSync(configPath);
-    console.error("[OhMyOpenCode DEBUG] File exists:", fileExists);
-    
-    if (fileExists) {
+    if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
-      console.error("[OhMyOpenCode DEBUG] File content length:", content.length);
-      
       const rawConfig = parseJsonc<Record<string, unknown>>(content);
-      console.error("[OhMyOpenCode DEBUG] Parsed rawConfig keys:", Object.keys(rawConfig));
 
       migrateConfigFile(configPath, rawConfig);
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
-      console.error("[OhMyOpenCode DEBUG] Schema validation success:", result.success);
 
       if (!result.success) {
         const errorMsg = result.error.issues
           .map((i) => `${i.path.join(".")}: ${i.message}`)
           .join(", ");
-        console.error("[OhMyOpenCode DEBUG] Validation errors:", errorMsg);
         log(`Config validation error in ${configPath}:`, result.error.issues);
         addConfigLoadError({
           path: configPath,
@@ -45,13 +36,11 @@ export function loadConfigFromPath(
         return null;
       }
 
-      console.error("[OhMyOpenCode DEBUG] Config loaded successfully, agents:", Object.keys(result.data.agents || {}));
       log(`Config loaded from ${configPath}`, { agents: result.data.agents });
       return result.data;
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("[OhMyOpenCode DEBUG] Error loading config:", errorMsg);
     log(`Error loading config from ${configPath}:`, err);
     addConfigLoadError({ path: configPath, error: errorMsg });
   }
@@ -122,26 +111,19 @@ export function loadPluginConfig(
       ? projectDetected.path
       : projectBasePath + ".json";
 
-  // DEBUG: Log config paths
-  console.error("[OhMyOpenCode DEBUG] getOpenCodeConfigDir():", configDir);
-  console.error("[OhMyOpenCode DEBUG] userConfigPath:", userConfigPath);
-  console.error("[OhMyOpenCode DEBUG] projectConfigPath:", projectConfigPath);
-
   // Load user config first (base)
-  const userConfig = loadConfigFromPath(userConfigPath, ctx);
-  console.error("[OhMyOpenCode DEBUG] userConfig loaded:", userConfig ? "YES" : "NO");
-  console.error("[OhMyOpenCode DEBUG] userConfig.agents:", JSON.stringify(userConfig?.agents, null, 2));
-  
-  let config: OhMyOpenCodeConfig = userConfig ?? {};
+  let config: OhMyOpenCodeConfig =
+    loadConfigFromPath(userConfigPath, ctx) ?? {};
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
-  console.error("[OhMyOpenCode DEBUG] projectConfig loaded:", projectConfig ? "YES" : "NO");
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);
   }
 
-  console.error("[OhMyOpenCode DEBUG] Final config.agents:", JSON.stringify(config.agents, null, 2));
+  config = {
+    ...config,
+  };
 
   log("Final merged config", {
     agents: config.agents,

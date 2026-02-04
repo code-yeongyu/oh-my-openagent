@@ -2,16 +2,16 @@ import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:te
 
 describe("model-resolution check", () => {
   describe("getModelResolutionInfo", () => {
-    // #given: Model requirements are defined in model-requirements.ts
-    // #when: Getting model resolution info
-    // #then: Returns info for all agents and categories with their provider chains
+    // given: Model requirements are defined in model-requirements.ts
+    // when: Getting model resolution info
+    // then: Returns info for all agents and categories with their provider chains
 
     it("returns agent requirements with provider chains", async () => {
       const { getModelResolutionInfo } = await import("./model-resolution")
 
       const info = getModelResolutionInfo()
 
-      // #then: Should have agent entries
+      // then: Should have agent entries
       const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
       expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-5")
@@ -24,7 +24,7 @@ describe("model-resolution check", () => {
 
       const info = getModelResolutionInfo()
 
-      // #then: Should have category entries
+      // then: Should have category entries
       const visual = info.categories.find((c) => c.name === "visual-engineering")
       expect(visual).toBeDefined()
       expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3-pro")
@@ -33,14 +33,14 @@ describe("model-resolution check", () => {
   })
 
   describe("getModelResolutionInfoWithOverrides", () => {
-    // #given: User has overrides in oh-my-opencode.json
-    // #when: Getting resolution info with config
-    // #then: Shows user override in Step 1 position
+    // given: User has overrides in oh-my-opencode.json
+    // when: Getting resolution info with config
+    // then: Shows user override in Step 1 position
 
     it("shows user override for agent when configured", async () => {
       const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
-      // #given: User has override for oracle agent
+      // given: User has override for oracle agent
       const mockConfig = {
         agents: {
           oracle: { model: "anthropic/claude-opus-4-5" },
@@ -49,7 +49,7 @@ describe("model-resolution check", () => {
 
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
-      // #then: Oracle should show the override
+      // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
       expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-5")
@@ -59,7 +59,7 @@ describe("model-resolution check", () => {
     it("shows user override for category when configured", async () => {
       const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
-      // #given: User has override for visual-engineering category
+      // given: User has override for visual-engineering category
       const mockConfig = {
         categories: {
           "visual-engineering": { model: "openai/gpt-5.2" },
@@ -68,7 +68,7 @@ describe("model-resolution check", () => {
 
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
-      // #then: visual-engineering should show the override
+      // then: visual-engineering should show the override
       const visual = info.categories.find((c) => c.name === "visual-engineering")
       expect(visual).toBeDefined()
       expect(visual!.userOverride).toBe("openai/gpt-5.2")
@@ -78,12 +78,12 @@ describe("model-resolution check", () => {
     it("shows provider fallback when no override exists", async () => {
       const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
-      // #given: No overrides configured
+      // given: No overrides configured
       const mockConfig = {}
 
       const info = getModelResolutionInfoWithOverrides(mockConfig)
 
-      // #then: Should show provider fallback chain
+      // then: Should show provider fallback chain
       const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
       expect(sisyphus!.userOverride).toBeUndefined()
@@ -93,16 +93,16 @@ describe("model-resolution check", () => {
   })
 
   describe("checkModelResolution", () => {
-    // #given: Doctor check is executed
-    // #when: Running the model resolution check
-    // #then: Returns pass with details showing resolution flow
+    // given: Doctor check is executed
+    // when: Running the model resolution check
+    // then: Returns pass with details showing resolution flow
 
     it("returns pass or warn status with agent and category counts", async () => {
       const { checkModelResolution } = await import("./model-resolution")
 
       const result = await checkModelResolution()
 
-      // #then: Should pass (with cache) or warn (no cache) and show counts
+      // then: Should pass (with cache) or warn (no cache) and show counts
       // In CI without model cache, status is "warn"; locally with cache, status is "pass"
       expect(["pass", "warn"]).toContain(result.status)
       expect(result.message).toMatch(/\d+ agents?, \d+ categories?/)
@@ -113,7 +113,7 @@ describe("model-resolution check", () => {
 
       const result = await checkModelResolution()
 
-      // #then: Details should contain agent/category resolution info
+      // then: Details should contain agent/category resolution info
       expect(result.details).toBeDefined()
       expect(result.details!.length).toBeGreaterThan(0)
       // Should have Available Models and Configured Models headers

@@ -6,6 +6,7 @@ import {
 } from "./storage";
 import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
+import { subagentSessions } from "../../features/claude-code-session-state";
 
 interface ToolExecuteInput {
   tool: string;
@@ -146,7 +147,7 @@ function findSubcommand(tokens: string[]): string {
   return ""
 }
 
-export function createInteractiveBashSessionHook(_ctx: PluginInput) {
+export function createInteractiveBashSessionHook(ctx: PluginInput) {
   // Skip on Windows - tmux is not available
   if (process.platform === "win32") {
     return {
@@ -185,6 +186,10 @@ export function createInteractiveBashSessionHook(_ctx: PluginInput) {
         });
         await proc.exited;
       } catch {}
+    }
+
+    for (const sessionId of subagentSessions) {
+      ctx.client.session.abort({ path: { id: sessionId } }).catch(() => {})
     }
   }
 

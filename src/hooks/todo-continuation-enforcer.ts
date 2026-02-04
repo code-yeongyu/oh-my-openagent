@@ -1,10 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { existsSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { execSync } from "node:child_process"
 import type { BackgroundManager } from "../features/background-agent"
-// Boulder imports removed - Todo enforcer now only uses OpenCode Todo API
-// Boulder continuation is handled separately by atlas/index.ts
 import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
 import {
     findNearestMessageWithFields,
@@ -13,9 +10,6 @@ import {
 } from "../features/hook-message-injector"
 import { log } from "../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
-import { isBlockedResponse } from "../shared/blocked-task-detector"
-import { isInCompactionCooldown, getCompactionCooldownRemaining, clearCompactionState } from "./compaction-state"
-import { tryAcquireContinuationMutex, releaseContinuationMutex, getContinuationMutexHolder } from "./continuation-mutex"
 
 const HOOK_NAME = "todo-continuation-enforcer"
 
@@ -24,12 +18,14 @@ const DEFAULT_SKIP_AGENTS = ["prometheus", "compaction"]
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
+  isContinuationStopped?: (sessionID: string) => boolean
 }
 
 export interface TodoContinuationEnforcer {
   handler: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
   markRecovering: (sessionID: string) => void
   markRecoveryComplete: (sessionID: string) => void
+  cancelAllCountdowns: () => void
 }
 
 interface Todo {
@@ -45,17 +41,6 @@ interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
-  /** Last tool execution timestamp (to prevent interrupting active work) */
-  lastToolExecutionAt?: number
-  /** Checkbox enforcement state */
-  checkboxEnforcement?: {
-    /** Last git diff hash (to detect code changes) */
-    lastCodeDiffHash?: string
-    /** Last tasks.md mtime */
-    lastTasksMtime?: number
-    /** Consecutive reminder count */
-    reminderCount: number
-  }
 }
 
 const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
@@ -64,128 +49,11 @@ Incomplete tasks remain in your todo list. Continue working on the next pending 
 
 - Proceed without asking for permission
 - Mark each task complete when finished
-- Do not stop until all tasks are done
-
-[Status: {REMAINING} tasks remaining]`
+- Do not stop until all tasks are done`
 
 const COUNTDOWN_SECONDS = 2
 const TOAST_DURATION_MS = 900
 const COUNTDOWN_GRACE_PERIOD_MS = 500
-/** Cooldown after tool execution before triggering continuation (prevents interrupting active work) */
-const POST_TOOL_COOLDOWN_MS = 10000
-
-/**
- * Keywords that indicate user is making a git/publish decision.
- * When detected in the last user message, auto-continuation is suppressed.
- * This prevents the enforcer from interrupting git strategy selection flow.
- */
-const GIT_PUBLISH_KEYWORDS = [
-  // Git operations (English)
-  "merge", "pr", "pull request", "push", "commit", "keep", "discard",
-  "rebase", "squash", "cherry-pick", "checkout", "branch", "tag",
-  // Git operations (Chinese)
-  "合并", "推送", "提交", "保留", "丢弃", "放弃", "变基",
-  // Publish/Deploy (English)
-  "upload", "publish", "deploy", "release", "ship", "npm publish",
-  // Publish/Deploy (Chinese)
-  "上传", "发布", "部署", "发版", "发行",
-  // Options selection (when Phase 3 presents numbered choices)
-  "option 1", "option 2", "option 3", "option 4",
-  "选项1", "选项2", "选项3", "选项4",
-  "选择1", "选择2", "选择3", "选择4",
-]
-
-/**
- * Check if message content contains git/publish decision keywords.
- * Case-insensitive matching.
- */
-function containsGitPublishKeywords(content: string): boolean {
-  if (!content) return false
-  const lowerContent = content.toLowerCase()
-  return GIT_PUBLISH_KEYWORDS.some(keyword => lowerContent.includes(keyword.toLowerCase()))
-}
-
-/**
- * Semantic markers for distinguishing awaiting types.
- * - "decision": Critical choices requiring user judgment (git strategy, architecture)
- * - "continue": Simple continuation prompts that can be auto-answered
- */
-type AwaitingType = "decision" | "continue" | null
-
-/**
- * Regex patterns that indicate AI is asking user to continue.
- * Used as fallback when explicit semantic markers are not present.
- */
-const CONTINUE_PATTERNS: RegExp[] = [
-  // English question patterns
-  /\b(shall|should|would you like|want me to|ready to)\s+(i\s+)?(continue|proceed|go on|move forward)\b/i,
-  /\b(continue|proceed)\s*\?/i,
-  /\bcontinue\s+(with\s+)?(the\s+)?(next|remaining|rest|other)/i,
-  /\bshall\s+i\s+(go\s+ahead|move\s+on)/i,
-  /\bwould\s+you\s+like\s+me\s+to\s+(continue|proceed|go\s+ahead)/i,
-  // Chinese patterns
-  /继续(吗|么|执行|测试|进行|下去)?[？?]/,
-  /继续.{0,10}(吗|么)[？?]?/,  // 继续测试剩余的吗？
-  /(要|是否|需要|可以)(继续|接着|往下)/,
-  /接下来(要|继续|测试)?/,
-  // Japanese patterns
-  /続(け|行)(ます|しま)か/,
-  /続行しますか/,  // Explicit match for 続行しますか
-  /進(め|み)ますか/,
-]
-
-/**
- * Check for explicit semantic markers in content.
- * These markers take priority over regex pattern matching.
- * 
- * Usage in agent output:
- * - <awaiting_decision>Which git strategy?</awaiting_decision> → blocks continuation
- * - <awaiting_continue>Should I continue?</awaiting_continue> → allows continuation
- */
-export function getAwaitingType(content: string): AwaitingType {
-  if (!content) return null
-  if (/<awaiting_decision>/i.test(content)) return "decision"
-  if (/<awaiting_continue>/i.test(content)) return "continue"
-  return null
-}
-
-/**
- * Check if content matches continue prompt patterns using regex.
- */
-export function matchesContinuePattern(content: string): boolean {
-  if (!content) return false
-  return CONTINUE_PATTERNS.some(pattern => pattern.test(content))
-}
-
-/**
- * Determine if auto-continuation should be allowed despite awaiting_user state.
- * 
- * Two-layer detection:
- * 1. Explicit markers (highest priority): <awaiting_decision> blocks, <awaiting_continue> allows
- * 2. Regex pattern matching (fallback): detects "continue?", "继续吗？", etc.
- * 
- * @param lastAssistantContent - The text content of the last assistant message
- * @returns true if continuation should be allowed, false if blocked
- */
-export function shouldOverrideAwaitingUser(lastAssistantContent: string): boolean {
-  // Layer 1: Check explicit markers (highest priority)
-  const awaitingType = getAwaitingType(lastAssistantContent)
-  if (awaitingType === "decision") return false  // Strict block
-  if (awaitingType === "continue") return true   // Allow override
-  
-  // Layer 2: Regex pattern matching (fallback)
-  // Only allow if it looks like a simple "continue?" prompt
-  // AND does not contain git/publish decision keywords
-  if (matchesContinuePattern(lastAssistantContent)) {
-    // Double-check: don't override if git/publish keywords are present
-    if (containsGitPublishKeywords(lastAssistantContent)) {
-      return false
-    }
-    return true
-  }
-  
-  return false
-}
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -229,7 +97,7 @@ export function createTodoContinuationEnforcer(
   ctx: PluginInput,
   options: TodoContinuationEnforcerOptions = {}
 ): TodoContinuationEnforcer {
-  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS } = options
+  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS, isContinuationStopped } = options
   const sessions = new Map<string, SessionState>()
 
   function getState(sessionID: string): SessionState {
@@ -306,55 +174,27 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    // Check mutex - skip if boulder already acquired
-    const mutexHolder = getContinuationMutexHolder(sessionID)
-    if (mutexHolder === "boulder") {
-      log(`[${HOOK_NAME}] Skipped injection: boulder mutex held`, { sessionID })
-      return
-    }
-
-    // Try to acquire mutex for todo
-    if (!tryAcquireContinuationMutex(sessionID, "todo")) {
-      log(`[${HOOK_NAME}] Skipped injection: failed to acquire mutex`, { sessionID })
-      return
-    }
-
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
 
     if (hasRunningBgTasks) {
       log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
-      releaseContinuationMutex(sessionID)
       return
     }
 
-    // Todo enforcer now only uses OpenCode Todo API (Boulder removed)
-    let effectiveIncompleteCount = incompleteCount
-    let effectiveTotal = total
-
-    // If no incomplete count from caller, fetch fresh from Todo API
-    if (effectiveIncompleteCount === 0) {
-      let todos: Todo[] = []
-      try {
-        const response = await ctx.client.session.todo({ path: { id: sessionID } })
-        todos = (response.data ?? response) as Todo[]
-      } catch (err) {
-        log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(err) })
-        return
-      }
-
-      const freshIncompleteCount = getIncompleteCount(todos)
-      if (freshIncompleteCount === 0) {
-        log(`[${HOOK_NAME}] Skipped injection: no incomplete todos`, { sessionID })
-        return
-      }
-      effectiveIncompleteCount = freshIncompleteCount
-      effectiveTotal = todos.length
+    let todos: Todo[] = []
+    try {
+      const response = await ctx.client.session.todo({ path: { id: sessionID } })
+      todos = (response.data ?? response) as Todo[]
+    } catch (err) {
+      log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(err) })
+      return
     }
 
-    if (effectiveIncompleteCount === 0) {
-      log(`[${HOOK_NAME}] Skipped injection: all tasks complete`, { sessionID })
+    const freshIncompleteCount = getIncompleteCount(todos)
+    if (freshIncompleteCount === 0) {
+      log(`[${HOOK_NAME}] Skipped injection: no incomplete todos`, { sessionID })
       return
     }
 
@@ -367,7 +207,11 @@ export function createTodoContinuationEnforcer(
       const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
       agentName = agentName ?? prevMessage?.agent
       model = model ?? (prevMessage?.model?.providerID && prevMessage?.model?.modelID
-        ? { providerID: prevMessage.model.providerID, modelID: prevMessage.model.modelID }
+        ? { 
+            providerID: prevMessage.model.providerID, 
+            modelID: prevMessage.model.modelID,
+            ...(prevMessage.model.variant ? { variant: prevMessage.model.variant } : {})
+          }
         : undefined)
       tools = tools ?? prevMessage?.tools
     }
@@ -387,12 +231,19 @@ export function createTodoContinuationEnforcer(
       return
     }
 
-    const completed = effectiveTotal - effectiveIncompleteCount
-    const tasksPath = "tasks.md"
-    const prompt = `${CONTINUATION_PROMPT.replace(/{TASKS_PATH}/g, tasksPath)}\n\n[Status: ${completed}/${effectiveTotal} completed, ${effectiveIncompleteCount} remaining]`
+    const incompleteTodos = todos.filter(t => t.status !== "completed" && t.status !== "cancelled")
+    const todoList = incompleteTodos
+      .map(t => `- [${t.status}] ${t.content}`)
+      .join("\n")
+    const prompt = `${CONTINUATION_PROMPT}
+
+[Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]
+
+Remaining tasks:
+${todoList}`
 
     try {
-      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: effectiveIncompleteCount })
+      log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
@@ -445,23 +296,11 @@ export function createTodoContinuationEnforcer(
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const error = props?.error as { name?: string; message?: string } | undefined
+      const error = props?.error as { name?: string } | undefined
       if (error?.name === "MessageAbortedError" || error?.name === "AbortError") {
         const state = getState(sessionID)
         state.abortDetectedAt = Date.now()
         log(`[${HOOK_NAME}] Abort detected via session.error`, { sessionID, errorName: error.name })
-      }
-      
-      // Detect context limit errors which trigger compaction
-      // Note: This is a fallback - the main compaction detection is via onSummarize hook
-      // in compaction-context-injector which uses shared compaction-state
-      const errorStr = JSON.stringify(error ?? {}).toLowerCase()
-      if (errorStr.includes("prompt is too long") || 
-          errorStr.includes("context limit") || 
-          errorStr.includes("server-side context limit") ||
-          errorStr.includes("token") && errorStr.includes("limit")) {
-        cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] Context limit error detected`, { sessionID, errorStr: errorStr.slice(0, 200) })
       }
 
       cancelCountdown(sessionID)
@@ -503,26 +342,6 @@ export function createTodoContinuationEnforcer(
         state.abortDetectedAt = undefined
       }
 
-      // Check 1.5: Post-compact cooldown (1 minute after compact, don't remind)
-      // Uses shared state from compaction-context-injector via onSummarize hook
-      if (isInCompactionCooldown(sessionID)) {
-        log(`[${HOOK_NAME}] Skipped: post-compact cooldown active`, { sessionID, cooldownRemaining: getCompactionCooldownRemaining(sessionID) })
-        return
-      }
-
-      // Check 1.5.1: Post-tool execution cooldown (prevents interrupting active work)
-      // When agent is actively executing tools (e.g., batch edits), don't inject continuation
-      if (state.lastToolExecutionAt) {
-        const timeSinceToolExec = Date.now() - state.lastToolExecutionAt
-        if (timeSinceToolExec < POST_TOOL_COOLDOWN_MS) {
-          log(`[${HOOK_NAME}] Skipped: post-tool cooldown active (${timeSinceToolExec}ms < ${POST_TOOL_COOLDOWN_MS}ms)`, { sessionID })
-          return
-        }
-      }
-
-      // Note: Boulder state checks removed - Todo enforcer now only uses OpenCode Todo API
-      // Boulder continuation is handled separately by atlas/index.ts
-
       const hasRunningBgTasks = backgroundManager
         ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
         : false
@@ -533,44 +352,16 @@ export function createTodoContinuationEnforcer(
       }
 
       // Check 2: API-based abort detection (fallback, for cases where event was missed)
-      // Also check for git/publish keywords in last assistant message
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
           query: { directory: ctx.directory },
         })
-        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo; parts?: Array<{ type: string; text?: string }> }> }).data ?? []
+        const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
 
         if (isLastAssistantMessageAborted(messages)) {
           log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
           return
-        }
-
-        // Check 2.5: Git/publish keyword detection in last assistant message
-        // When AI presents git strategy options or asks about publish/deploy, stop auto-continuation
-        for (let i = messages.length - 1; i >= 0; i--) {
-          const msg = messages[i] as { info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }
-          if (msg.info?.role === "assistant" && msg.parts) {
-            const textParts = msg.parts.filter(p => p.type === "text" && p.text)
-            const assistantContent = textParts.map(p => p.text).join(" ")
-            if (containsGitPublishKeywords(assistantContent)) {
-              log(`[${HOOK_NAME}] Skipped: git/publish keywords detected in last assistant message`, { sessionID, preview: assistantContent.slice(0, 100) })
-              return
-            }
-            
-            // Check 2.6: Blocked task detection
-            // When AI reports task is blocked, log and continue (retry logic removed - was boulder-dependent)
-            if (isBlockedResponse(assistantContent)) {
-              log(`[${HOOK_NAME}] Blocked response detected`, { 
-                sessionID, 
-                preview: assistantContent.slice(0, 100) 
-              })
-              // Note: Retry tracking removed - was dependent on boulder state
-              // Todo enforcer now just logs and continues
-            }
-            
-            break // Only check the last assistant message
-          }
         }
       } catch (err) {
         log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(err) })
@@ -582,25 +373,19 @@ export function createTodoContinuationEnforcer(
         todos = (response.data ?? response) as Todo[]
       } catch (err) {
         log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(err) })
-        return // Can't continue without todos
-      }
-
-      // Calculate incomplete count from OpenCode Todo API only
-      const apiIncompleteCount = todos ? getIncompleteCount(todos) : 0
-      const hasIncomplete = apiIncompleteCount > 0
-
-      // Check if all tasks are complete
-      if (!hasIncomplete) {
-        log(`[${HOOK_NAME}] All todos complete`, {
-          sessionID,
-          total: todos?.length ?? 0,
-        })
         return
       }
 
-      // Use API-based counts only
-      const resolvedIncomplete = apiIncompleteCount
-      const resolvedTotal = todos?.length || resolvedIncomplete
+      if (!todos || todos.length === 0) {
+        log(`[${HOOK_NAME}] No todos`, { sessionID })
+        return
+      }
+
+      const incompleteCount = getIncompleteCount(todos)
+      if (incompleteCount === 0) {
+        log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
+        return
+      }
 
       let resolvedInfo: ResolvedMessageInfo | undefined
       let hasCompactionMessage = false
@@ -646,7 +431,12 @@ export function createTodoContinuationEnforcer(
         return
       }
 
-      startCountdown(sessionID, resolvedIncomplete, resolvedTotal, resolvedInfo)
+      if (isContinuationStopped?.(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
+        return
+      }
+
+      startCountdown(sessionID, incompleteCount, todos.length, resolvedInfo)
       return
     }
 
@@ -654,18 +444,8 @@ export function createTodoContinuationEnforcer(
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
       const role = info?.role as string | undefined
-      const agent = info?.agent as string | undefined
 
       if (!sessionID) return
-
-      // Detect compaction agent - trigger cooldown to prevent todo-reminder conflict
-      if (agent === "compaction") {
-        const { markCompaction } = await import("./compaction-state")
-        markCompaction(sessionID)
-        cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] Compaction agent detected, starting 1-minute cooldown`, { sessionID })
-        return
-      }
 
       if (role === "user") {
         const state = sessions.get(sessionID)
@@ -704,12 +484,8 @@ export function createTodoContinuationEnforcer(
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
       const sessionID = props?.sessionID as string | undefined
       if (sessionID) {
-        const state = getState(sessionID)
-        state.abortDetectedAt = undefined
-        // Track last tool execution to prevent interrupting active work
-        if (event.type === "tool.execute.after") {
-          state.lastToolExecutionAt = Date.now()
-        }
+        const state = sessions.get(sessionID)
+        if (state) state.abortDetectedAt = undefined
         cancelCountdown(sessionID)
       }
       return
@@ -723,14 +499,19 @@ export function createTodoContinuationEnforcer(
       }
       return
     }
+  }
 
-    // Note: Compaction is now tracked via shared compaction-state module
-    // which is updated by compaction-context-injector's onSummarize hook
+  const cancelAllCountdowns = (): void => {
+    for (const sessionID of sessions.keys()) {
+      cancelCountdown(sessionID)
+    }
+    log(`[${HOOK_NAME}] All countdowns cancelled`)
   }
 
   return {
     handler,
     markRecovering,
     markRecoveryComplete,
+    cancelAllCountdowns,
   }
 }

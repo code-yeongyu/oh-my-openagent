@@ -16,5 +16,11 @@
     "types": ["bun-types"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/features/builtin-skills/mdsel/cli-src"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/features/builtin-skills/mdsel/cli-src",
+    "**/*.test.ts",
+    "script"
+  ]
 }

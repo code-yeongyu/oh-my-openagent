@@ -4,6 +4,7 @@ import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
+import { createMcpOAuthCommand } from "./mcp-oauth"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -29,6 +30,7 @@ program
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
+  .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -36,13 +38,14 @@ Examples:
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.2 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
   Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
+  Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -53,6 +56,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
       copilot: options.copilot,
       opencodeZen: options.opencodeZen,
       zaiCodingPlan: options.zaiCodingPlan,
+      kimiForCoding: options.kimiForCoding,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
@@ -62,7 +66,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai):
 program
   .command("run <message>")
   .description("Run opencode with todo/background task completion enforcement")
-  .option("-a, --agent <name>", "Agent to use (default: Sisyphus)")
+  .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
   .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
   .addHelpText("after", `
@@ -70,6 +74,15 @@ Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
   $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
+
+Agent resolution order:
+  1) --agent flag
+  2) OPENCODE_DEFAULT_AGENT
+  3) oh-my-opencode.json "default_run_agent"
+  4) Sisyphus (fallback)
+
+Available core agents:
+  Sisyphus, Hephaestus, Prometheus, Atlas
 
 Unlike 'opencode run', this command waits until:
   - All todos are completed or cancelled
@@ -149,5 +162,7 @@ program
   .action(() => {
     console.log(`oh-my-opencode v${VERSION}`)
   })
+
+program.addCommand(createMcpOAuthCommand())
 
 program.parse()

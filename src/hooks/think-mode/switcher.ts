@@ -149,6 +149,18 @@ export const THINKING_CONFIGS = {
   openai: {
     reasoning_effort: "high",
   },
+  "zai-coding-plan": {
+    providerOptions: {
+      "zai-coding-plan": {
+        extra_body: {
+          thinking: {
+            type: "enabled",
+            clear_thinking: false,
+          },
+        },
+      },
+    },
+  },
 } as const satisfies Record<string, Record<string, unknown>>
 
 const THINKING_CAPABLE_MODELS = {
@@ -157,6 +169,7 @@ const THINKING_CAPABLE_MODELS = {
   google: ["gemini-2", "gemini-3"],
   "google-vertex": ["gemini-2", "gemini-3"],
   openai: ["gpt-5", "o1", "o3"],
+  "zai-coding-plan": ["glm"],
 } as const satisfies Record<string, readonly string[]>
 
 export function getHighVariant(modelID: string): string | null {

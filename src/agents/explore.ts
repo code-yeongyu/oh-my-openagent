@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -33,8 +35,8 @@ export function createExploreAgent(model: string): AgentConfig {
 
   return {
     description:
-      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis.',
-    mode: "subagent" as const,
+      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis. (Explore - OhMyOpenCode)',
+    mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
@@ -133,4 +135,4 @@ Use the right tool for the job:
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
   }
 }
-
+createExploreAgent.mode = MODE

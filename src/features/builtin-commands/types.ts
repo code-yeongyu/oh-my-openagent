@@ -7,14 +7,15 @@ export type BuiltinCommandName =
   | "ulw-loop"
   | "refactor"
   | "start-work"
-  | "status"
-  | "revert"
-  | "evolve"
-  | "instinct-import"
-  | "instinct-export"
-  | "instinct-status"
-  | "build-fix"
-  | "learn"
+  | "stop-continuation"  // 上游新增
+  | "status"             // 本地独有
+  | "revert"             // 本地独有
+  | "evolve"             // 本地独有
+  | "instinct-import"    // 本地独有
+  | "instinct-export"    // 本地独有
+  | "instinct-status"    // 本地独有
+  | "build-fix"          // 本地独有
+  | "learn"              // 本地独有
 
 export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]

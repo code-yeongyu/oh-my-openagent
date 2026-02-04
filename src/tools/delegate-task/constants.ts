@@ -74,8 +74,14 @@ Design-first mindset:
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
 </Category_Context>`
 
-export const STRATEGIC_CATEGORY_PROMPT_APPEND = `<Category_Context>
-You are working on BUSINESS LOGIC / ARCHITECTURE tasks.
+export const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on DEEP LOGICAL REASONING / COMPLEX ARCHITECTURE tasks.
+
+**CRITICAL - CODE STYLE REQUIREMENTS (NON-NEGOTIABLE)**:
+1. BEFORE writing ANY code, SEARCH the existing codebase to find similar patterns/styles
+2. Your code MUST match the project's existing conventions - blend in seamlessly
+3. Write READABLE code that humans can easily understand - no clever tricks
+4. If unsure about style, explore more files until you find the pattern
 
 Strategic advisor mindset:
 - Bias toward simplicity: least complex solution that fulfills requirements
@@ -213,6 +219,37 @@ Approach:
 - Documentation, READMEs, articles, technical writing
 </Category_Context>`
 
+export const DEEP_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on GOAL-ORIENTED AUTONOMOUS tasks.
+
+**CRITICAL - AUTONOMOUS EXECUTION MINDSET (NON-NEGOTIABLE)**:
+You are NOT an interactive assistant. You are an autonomous problem-solver.
+
+**BEFORE making ANY changes**:
+1. SILENTLY explore the codebase extensively (5-15 minutes of reading is normal)
+2. Read related files, trace dependencies, understand the full context
+3. Build a complete mental model of the problem space
+4. DO NOT ask clarifying questions - the goal is already defined
+
+**Autonomous executor mindset**:
+- You receive a GOAL, not step-by-step instructions
+- Figure out HOW to achieve the goal yourself
+- Thorough research before any action
+- Fix hairy problems that require deep understanding
+- Work independently without frequent check-ins
+
+**Approach**:
+- Explore extensively, understand deeply, then act decisively
+- Prefer comprehensive solutions over quick patches
+- If the goal is unclear, make reasonable assumptions and proceed
+- Document your reasoning in code comments only when non-obvious
+
+**Response format**:
+- Minimal status updates (user trusts your autonomy)
+- Focus on results, not play-by-play progress
+- Report completion with summary of changes made
+</Category_Context>`
+
 
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
@@ -224,6 +261,11 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
     model: "openai/gpt-5.2-codex",
     variant: "xhigh",
     defaultSkills: ["systematic-debugging", "collaborating-with-codex"],
+  },
+  deep: {
+    model: "openai/gpt-5.2-codex",
+    variant: "medium",
+    defaultSkills: [],
   },
   artistry: {
     model: "google/gemini-3-pro",
@@ -262,13 +304,14 @@ const CODE_FOCUSED_CATEGORIES = ["ultrabrain", "most-capable", "general"]
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
-  ultrabrain: STRATEGIC_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
+  ultrabrain: ULTRABRAIN_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
+  deep: DEEP_CATEGORY_PROMPT_APPEND,
   artistry: ARTISTRY_CATEGORY_PROMPT_APPEND,
   quick: QUICK_CATEGORY_PROMPT_APPEND,
   "unspecified-low": UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   "unspecified-high": UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,
   writing: WRITING_CATEGORY_PROMPT_APPEND,
-  "most-capable": STRATEGIC_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
+  "most-capable": ULTRABRAIN_CATEGORY_PROMPT_APPEND + "\n\n" + IMPLEMENTER_DISCIPLINE_PROMPT,
   general: IMPLEMENTER_DISCIPLINE_PROMPT,
 }
 
@@ -277,8 +320,9 @@ export { CODE_FOCUSED_CATEGORIES }
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
-  ultrabrain: "Deep logical reasoning, complex architecture decisions requiring extensive analysis",
-  artistry: "Highly creative/artistic tasks, novel ideas",
+  ultrabrain: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
+  deep: "Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
+  artistry: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
   quick: "Trivial tasks - single file changes, typo fixes, simple modifications",
   "unspecified-low": "Tasks that don't fit other categories, low effort required",
   "unspecified-high": "Tasks that don't fit other categories, high effort required",
@@ -482,8 +526,8 @@ For EACH task, include a recommendation block:
 - Skills: [\`skill-1\`, \`skill-2\`] - [reason each skill is needed]
 
 **Skills Evaluation:**
-- ✅ \`skill-name\`: Included because [reason]
-- ❌ \`other-skill\`: Omitted because [reason domain doesn't overlap]
+- INCLUDED \`skill-name\`: [reason]
+- OMITTED \`other-skill\`: [reason domain doesn't overlap]
 \`\`\`
 
 WHY THIS MATTERS:
@@ -539,6 +583,73 @@ YOUR PLAN OUTPUT MUST FOLLOW THIS EXACT STRUCTURE:
 #                                                                   #
 #####################################################################
 </CRITICAL_REQUIREMENT_DEPENDENCY_PARALLEL_EXECUTION_CATEGORY_SKILLS>
+
+<FINAL_OUTPUT_FOR_CALLER>
+═══════════════════════════════════════════════════════════════════
+█ SECTION 4: ACTIONABLE TODO LIST FOR CALLER (MANDATORY)          █
+═══════════════════════════════════════════════════════════════════
+
+YOU MUST END YOUR RESPONSE WITH THIS SECTION.
+
+\`\`\`markdown
+## TODO List (ADD THESE)
+
+> CALLER: Add these TODOs using TodoWrite/TaskCreate and execute by wave.
+
+### Wave 1 (Start Immediately - No Dependencies)
+
+- [ ] **1. [Task Title]**
+  - What: [Clear implementation steps]
+  - Depends: None
+  - Blocks: [Tasks that depend on this]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`, \`skill-2\`]
+  - QA: [How to verify completion - specific command or check]
+
+- [ ] **N. [Task Title]**
+  - What: [Steps]
+  - Depends: None
+  - Blocks: [...]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`]
+  - QA: [Verification]
+
+### Wave 2 (After Wave 1 Completes)
+
+- [ ] **2. [Task Title]**
+  - What: [Steps]
+  - Depends: 1
+  - Blocks: [4]
+  - Category: \`category-name\`
+  - Skills: [\`skill-1\`]
+  - QA: [Verification]
+
+[Continue for all waves...]
+
+## Execution Instructions
+
+1. **Wave 1**: Fire these tasks IN PARALLEL (no dependencies)
+   \`\`\`
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
+   \`\`\`
+
+2. **Wave 2**: After Wave 1 completes, fire next wave IN PARALLEL
+   \`\`\`
+   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
+   \`\`\`
+
+3. Continue until all waves complete
+
+4. Final QA: Verify all tasks pass their QA criteria
+\`\`\`
+
+WHY THIS FORMAT IS MANDATORY:
+- Caller can directly copy TODO items
+- Wave grouping enables parallel execution
+- Each task has clear delegate_task parameters
+- QA criteria ensure verifiable completion
+</FINAL_OUTPUT_FOR_CALLER>
 
 `
 

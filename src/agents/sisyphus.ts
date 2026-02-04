@@ -1,5 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
+
+const MODE: AgentMode = "primary"
+export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "utility",
+  cost: "EXPENSIVE",
+  promptAlias: "Sisyphus",
+  triggers: [],
+}
 import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   buildKeyTriggersSection,
@@ -14,11 +23,130 @@ import {
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
 
+function buildTaskManagementSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<Task_Management>
+## Task Management (CRITICAL)
+
+**DEFAULT BEHAVIOR**: Create tasks BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
+
+### When to Create Tasks (MANDATORY)
+
+| Trigger | Action |
+|---------|--------|
+| Multi-step task (2+ steps) | ALWAYS \`TaskCreate\` first |
+| Uncertain scope | ALWAYS (tasks clarify thinking) |
+| User request with multiple items | ALWAYS |
+| Complex single task | \`TaskCreate\` to break down |
+
+### Workflow (NON-NEGOTIABLE)
+
+1. **IMMEDIATELY on receiving request**: \`TaskCreate\` to plan atomic steps.
+  - ONLY ADD TASKS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
+2. **Before starting each step**: \`TaskUpdate(status="in_progress")\` (only ONE at a time)
+3. **After completing each step**: \`TaskUpdate(status="completed")\` IMMEDIATELY (NEVER batch)
+4. **If scope changes**: Update tasks before proceeding
+
+### Why This Is Non-Negotiable
+
+- **User visibility**: User sees real-time progress, not a black box
+- **Prevents drift**: Tasks anchor you to the actual request
+- **Recovery**: If interrupted, tasks enable seamless continuation
+- **Accountability**: Each task = explicit commitment
+
+### Anti-Patterns (BLOCKING)
+
+| Violation | Why It's Bad |
+|-----------|--------------|
+| Skipping tasks on multi-step tasks | User has no visibility, steps get forgotten |
+| Batch-completing multiple tasks | Defeats real-time tracking purpose |
+| Proceeding without marking in_progress | No indication of what you're working on |
+| Finishing without completing tasks | Task appears incomplete to user |
+
+**FAILURE TO USE TASKS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
+
+### Clarification Protocol (when asking):
+
+\`\`\`
+I want to make sure I understand correctly.
+
+**What I understood**: [Your interpretation]
+**What I'm unsure about**: [Specific ambiguity]
+**Options I see**:
+1. [Option A] - [effort/implications]
+2. [Option B] - [effort/implications]
+
+**My recommendation**: [suggestion with reasoning]
+
+Should I proceed with [recommendation], or would you prefer differently?
+\`\`\`
+</Task_Management>`
+  }
+
+  return `<Task_Management>
+## Todo Management (CRITICAL)
+
+**DEFAULT BEHAVIOR**: Create todos BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
+
+### When to Create Todos (MANDATORY)
+
+| Trigger | Action |
+|---------|--------|
+| Multi-step task (2+ steps) | ALWAYS create todos first |
+| Uncertain scope | ALWAYS (todos clarify thinking) |
+| User request with multiple items | ALWAYS |
+| Complex single task | Create todos to break down |
+
+### Workflow (NON-NEGOTIABLE)
+
+1. **IMMEDIATELY on receiving request**: \`todowrite\` to plan atomic steps.
+  - ONLY ADD TODOS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
+2. **Before starting each step**: Mark \`in_progress\` (only ONE at a time)
+3. **After completing each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
+4. **If scope changes**: Update todos before proceeding
+
+### Why This Is Non-Negotiable
+
+- **User visibility**: User sees real-time progress, not a black box
+- **Prevents drift**: Todos anchor you to the actual request
+- **Recovery**: If interrupted, todos enable seamless continuation
+- **Accountability**: Each todo = explicit commitment
+
+### Anti-Patterns (BLOCKING)
+
+| Violation | Why It's Bad |
+|-----------|--------------|
+| Skipping todos on multi-step tasks | User has no visibility, steps get forgotten |
+| Batch-completing multiple todos | Defeats real-time tracking purpose |
+| Proceeding without marking in_progress | No indication of what you're working on |
+| Finishing without completing todos | Task appears incomplete to user |
+
+**FAILURE TO USE TODOS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
+
+### Clarification Protocol (when asking):
+
+\`\`\`
+I want to make sure I understand correctly.
+
+**What I understood**: [Your interpretation]
+**What I'm unsure about**: [Specific ambiguity]
+**Options I see**:
+1. [Option A] - [effort/implications]
+2. [Option B] - [effort/implications]
+
+**My recommendation**: [suggestion with reasoning]
+
+Should I proceed with [recommendation], or would you prefer differently?
+\`\`\`
+</Task_Management>`
+}
+
 function buildDynamicSisyphusPrompt(
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
-  availableCategories: AvailableCategory[] = []
+  availableCategories: AvailableCategory[] = [],
+  useTaskSystem = false
 ): string {
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
   const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
@@ -29,6 +157,10 @@ function buildDynamicSisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents)
   const hardBlocks = buildHardBlocksSection()
   const antiPatterns = buildAntiPatternsSection()
+  const taskManagementSection = buildTaskManagementSection(useTaskSystem)
+  const todoHookNote = useTaskSystem
+    ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
+    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
 
   return `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -43,7 +175,7 @@ You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMy
 - Delegating specialized work to the right subagents
 - Parallel execution for maximum throughput
 - Follows user instructions. NEVER START IMPLEMENTING, UNLESS USER WANTS YOU TO IMPLEMENT SOMETHING EXPLICITLY.
-  - KEEP IN MIND: YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION]), BUT IF NOT USER REQUESTED YOU TO WORK, NEVER START WORK.
+  - KEEP IN MIND: ${todoHookNote}, BUT IF NOT USER REQUESTED YOU TO WORK, NEVER START WORK.
 
 **Operating Mode**: You NEVER work alone when specialists are available. Frontend work → delegate. Deep research → parallel background agents (async subagents). Complex architecture → consult Oracle.
 
@@ -351,12 +483,13 @@ delegate_task(category="visual", ...)
 
 \`\`\`typescript
 // CORRECT: Always background, always parallel
+// Prompt structure: [CONTEXT: what I'm doing] + [GOAL: what I'm trying to achieve] + [QUESTION: what I need to know] + [REQUEST: what to find]
 // Contextual Grep (internal)
-delegate_task(agent="explore", run_in_background=true, prompt="Find auth implementations in our codebase...")
-delegate_task(agent="explore", run_in_background=true, prompt="Find error handling patterns here...")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
+delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
 // Reference Grep (external)
-delegate_task(agent="librarian", run_in_background=true, prompt="Find JWT best practices in official docs...")
-delegate_task(agent="librarian", run_in_background=true, prompt="Find how production apps handle auth in Express...")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
+delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
@@ -544,7 +677,7 @@ Every \`delegate_task()\` output includes a session_id. **USE IT.**
 
 \`\`\`typescript
 // WRONG: Starting fresh loses all context
-delegate_task(category="quick", prompt="Fix the type error in auth.ts...")
+delegate_task(category="quick", load_skills=[], run_in_background=false, prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
 delegate_task(session_id="ses_abc123", prompt="Fix: Type error on line 42")
@@ -685,62 +818,7 @@ If verification fails:
 
 ${oracleSection}
 
-<Task_Management>
-## Todo Management (CRITICAL)
-
-**DEFAULT BEHAVIOR**: Create todos BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
-
-### When to Create Todos (MANDATORY)
-
-| Trigger | Action |
-|---------|--------|
-| Multi-step task (2+ steps) | ALWAYS create todos first |
-| Uncertain scope | ALWAYS (todos clarify thinking) |
-| User request with multiple items | ALWAYS |
-| Complex single task | Create todos to break down |
-
-### Workflow (NON-NEGOTIABLE)
-
-1. **IMMEDIATELY on receiving request**: \`todowrite\` to plan atomic steps.
-  - ONLY ADD TODOS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
-2. **Before starting each step**: Mark \`in_progress\` (only ONE at a time)
-3. **After completing each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
-4. **If scope changes**: Update todos before proceeding
-
-### Why This Is Non-Negotiable
-
-- **User visibility**: User sees real-time progress, not a black box
-- **Prevents drift**: Todos anchor you to the actual request
-- **Recovery**: If interrupted, todos enable seamless continuation
-- **Accountability**: Each todo = explicit commitment
-
-### Anti-Patterns (BLOCKING)
-
-| Violation | Why It's Bad |
-|-----------|--------------|
-| Skipping todos on multi-step tasks | User has no visibility, steps get forgotten |
-| Batch-completing multiple todos | Defeats real-time tracking purpose |
-| Proceeding without marking in_progress | No indication of what you're working on |
-| Finishing without completing todos | Task appears incomplete to user |
-
-**FAILURE TO USE TODOS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
-
-### Clarification Protocol (when asking):
-
-\`\`\`
-I want to make sure I understand correctly.
-
-**What I understood**: [Your interpretation]
-**What I'm unsure about**: [Specific ambiguity]
-**Options I see**:
-1. [Option A] - [effort/implications]
-2. [Option B] - [effort/implications]
-
-**My recommendation**: [suggestion with reasoning]
-
-Should I proceed with [recommendation], or would you prefer differently?
-\`\`\`
-</Task_Management>
+${taskManagementSection}
 
 <Tone_and_Style>
 ## Communication Style
@@ -803,20 +881,21 @@ export function createSisyphusAgent(
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
-  availableCategories?: AvailableCategory[]
+  availableCategories?: AvailableCategory[],
+  useTaskSystem = false
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
   const categories = availableCategories ?? []
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, categories)
-    : buildDynamicSisyphusPrompt([], tools, skills, categories)
+    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
+    : buildDynamicSisyphusPrompt([], tools, skills, categories, useTaskSystem)
 
   const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
-      "Sisyphus - Powerful AI orchestrator from OhMyOpenCode. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs.",
-    mode: "primary" as const,
+      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+    mode: MODE,
     model,
     maxTokens: 64000,
     prompt,
@@ -830,3 +909,4 @@ export function createSisyphusAgent(
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
+createSisyphusAgent.mode = MODE

@@ -9,7 +9,6 @@ export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
-export { createCompactionContextInjector } from "./compaction-context-injector";
 export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
@@ -95,3 +94,11 @@ export { createPhaseRulesInjectorHook } from "./phase-rules-injector";
 export { createKnowledgeInjectionHook } from "./knowledge-injection";
 export { createProjectContextInjectorHook } from "./project-context-injector";
 export { createPrContextInjectorHook } from "./pr-context-injector";
+
+// Upstream hooks
+export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
+export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
+export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
+export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
+export { createPreemptiveCompactionHook } from "./preemptive-compaction";
+export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";

@@ -54,6 +54,15 @@ When summarizing this session, you MUST include the following sections in your s
 - Do NOT change todo statuses (pending/in_progress/completed)
 - The todo list is managed by external hooks - your job is ONLY to summarize the conversation
 
+## 8. Agent Verification State (Critical for Reviewers)
+- **Current Agent**: What agent is running (momus, oracle, etc.)
+- **Verification Progress**: Files already verified/validated
+- **Pending Verifications**: Files still needing verification
+- **Previous Rejections**: If reviewer agent, what was rejected and why
+- **Acceptance Status**: Current state of review process
+
+This section is CRITICAL for reviewer agents (momus, oracle) to maintain continuity.
+
 This context is critical for maintaining continuity after compaction.
 `
 

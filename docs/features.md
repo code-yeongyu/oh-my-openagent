@@ -4,25 +4,26 @@
 
 ## Agents: Your AI Team
 
-Oh-My-OpenCode provides 10 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
+Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
 
 ### Core Agents
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Sisyphus** | `anthropic/claude-opus-4-5` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). |
+| **Sisyphus** | `anthropic/claude-opus-4-5` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: kimi-k2.5 → glm-4.7 → gpt-5.2-codex → gemini-3-pro. |
+| **Hephaestus** | `openai/gpt-5.2-codex` | **The Legitimate Craftsman.** Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires gpt-5.2-codex (no fallback - only activates when this model is available). |
 | **oracle** | `openai/gpt-5.2` | Architecture decisions, code review, debugging. Read-only consultation - stellar logical reasoning and deep analysis. Inspired by AmpCode. |
-| **librarian** | `opencode/big-pickle` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Inspired by AmpCode. |
-| **explore** | `opencode/gpt-5-nano` | Fast codebase exploration and contextual grep. Uses Gemini 3 Flash when Antigravity auth is configured, Haiku when Claude max20 is available, otherwise Grok. Inspired by Claude Code. |
-| **multimodal-looker** | `google/gemini-3-flash` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Saves tokens by having another agent process media. |
+| **librarian** | `zai-coding-plan/glm-4.7` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: glm-4.7-free → claude-sonnet-4-5. |
+| **explore** | `anthropic/claude-haiku-4-5` | Fast codebase exploration and contextual grep. Fallback: gpt-5-mini → gpt-5-nano. |
+| **multimodal-looker** | `google/gemini-3-flash` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: gpt-5.2 → glm-4.6v → kimi-k2.5 → claude-haiku-4-5 → gpt-5-nano. |
 
 ### Planning Agents
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Prometheus** | `anthropic/claude-opus-4-5` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. |
-| **Metis** | `anthropic/claude-sonnet-4-5` | Plan consultant - pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. |
-| **Momus** | `anthropic/claude-sonnet-4-5` | Plan reviewer - validates plans against clarity, verifiability, and completeness standards. |
+| **Prometheus** | `anthropic/claude-opus-4-5` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: kimi-k2.5 → gpt-5.2 → gemini-3-pro. |
+| **Metis** | `anthropic/claude-opus-4-5` | Plan consultant - pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: kimi-k2.5 → gpt-5.2 → gemini-3-pro. |
+| **Momus** | `openai/gpt-5.2` | Plan reviewer - validates plans against clarity, verifiability, and completeness standards. Fallback: gpt-5.2 → claude-opus-4-5 → gemini-3-pro. |
 
 ### Invoking Agents
 
@@ -53,7 +54,7 @@ Run agents in the background and continue working:
 
 ```
 # Launch in background
-delegate_task(agent="explore", background=true, prompt="Find auth implementations")
+delegate_task(subagent_type="explore", load_skills=[], prompt="Find auth implementations", run_in_background=true)
 
 # Continue working...
 # System notifies on completion
@@ -320,7 +321,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **directory-agents-injector** | PostToolUse | Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files. |
+| **directory-agents-injector** | PostToolUse | Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files. **Deprecated for OpenCode 1.1.37+** - Auto-disabled when native AGENTS.md injection is available. |
 | **directory-readme-injector** | PostToolUse | Auto-injects README.md for directory context. |
 | **rules-injector** | PostToolUse | Injects rules from `.claude/rules/` when conditions match. Supports globs and alwaysApply. |
 | **compaction-context-injector** | Stop | Preserves critical context during session compaction. |
@@ -520,6 +521,37 @@ mcp:
 ```
 
 The `skill_mcp` tool invokes these operations with full schema discovery.
+
+#### OAuth-Enabled MCPs
+
+Skills can define OAuth-protected remote MCP servers. OAuth 2.1 with full RFC compliance (RFC 9728, 8414, 8707, 7591) is supported:
+
+```yaml
+---
+description: My API skill
+mcp:
+  my-api:
+    url: https://api.example.com/mcp
+    oauth:
+      clientId: ${CLIENT_ID}
+      scopes: ["read", "write"]
+---
+```
+
+When a skill MCP has `oauth` configured:
+- **Auto-discovery**: Fetches `/.well-known/oauth-protected-resource` (RFC 9728), falls back to `/.well-known/oauth-authorization-server` (RFC 8414)
+- **Dynamic Client Registration**: Auto-registers with servers supporting RFC 7591 (clientId becomes optional)
+- **PKCE**: Mandatory for all flows
+- **Resource Indicators**: Auto-generated from MCP URL per RFC 8707
+- **Token Storage**: Persisted in `~/.config/opencode/mcp-oauth.json` (chmod 0600)
+- **Auto-refresh**: Tokens refresh on 401; step-up authorization on 403 with `WWW-Authenticate`
+- **Dynamic Port**: OAuth callback server uses an auto-discovered available port
+
+Pre-authenticate via CLI:
+
+```bash
+bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+```
 
 ---
 

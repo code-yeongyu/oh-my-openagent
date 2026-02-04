@@ -1,28 +1,36 @@
 # HOOKS KNOWLEDGE BASE
 
 ## OVERVIEW
-38 lifecycle hooks intercepting/modifying agent behavior. Events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, onSummarize.
+
+34 lifecycle hooks intercepting/modifying agent behavior across 5 events.
+
+**Event Types**:
+- `UserPromptSubmit` (`chat.message`) - Can block
+- `PreToolUse` (`tool.execute.before`) - Can block
+- `PostToolUse` (`tool.execute.after`) - Cannot block
+- `Stop` (`event: session.stop`) - Cannot block
+- `onSummarize` (Compaction) - Cannot block
 
 ## STRUCTURE
 ```
 hooks/
-├── atlas/                      # Main orchestration (752 lines)
+├── atlas/                      # Main orchestration (757 lines)
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion (16k lines)
+├── todo-continuation-enforcer.ts # Force TODO completion
 ├── ralph-loop/                 # Self-referential dev loop
 ├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
 ├── comment-checker/            # Prevents AI slop
 ├── auto-slash-command/         # Detects /command patterns
-├── rules-injector/             # Conditional rules from .claude/rules/
-├── directory-agents-injector/  # Auto-injects AGENTS.md files
-├── directory-readme-injector/  # Auto-injects README.md files
-├── edit-error-recovery/        # Recovers from tool failures
-├── thinking-block-validator/   # Ensures valid <thinking> format
-├── context-window-monitor.ts   # Reminds agents of remaining headroom
+├── rules-injector/             # Conditional rules
+├── directory-agents-injector/  # Auto-injects AGENTS.md
+├── directory-readme-injector/  # Auto-injects README.md
+├── edit-error-recovery/        # Recovers from failures
+├── thinking-block-validator/   # Ensures valid <thinking>
+├── context-window-monitor.ts   # Reminds of headroom
 ├── session-recovery/           # Auto-recovers from crashes
 ├── think-mode/                 # Dynamic thinking budget
 ├── keyword-detector/           # ultrawork/search/analyze modes
-├── background-notification/    # OS notification on task completion
+├── background-notification/    # OS notification
 ├── prometheus-md-only/         # Planner read-only mode
 ├── agent-usage-reminder/       # Specialized agent hints
 ├── auto-update-checker/        # Plugin update check
@@ -37,16 +45,8 @@ hooks/
 ├── category-skill-reminder/    # Reminds of category skills
 ├── empty-task-response-detector.ts # Detects empty responses
 ├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
-├── planning-flow-guide/        # Guides planning workflow phases
-├── tdd-guard/                  # Enforces test-driven development (opt-in)
-├── subagent-verification/      # Verifies subagent task completion
-├── background-compaction/      # Compacts background agent sessions
-├── codebase-assessment/        # Assesses codebase patterns (opt-in)
-├── lsp-diagnostics-enforcer/   # Enforces LSP diagnostics checks (opt-in)
-├── phase-flow-enforcer/        # Enforces phase-based workflow (opt-in)
-├── plan-reorganizer/           # Moves completed phases to bottom of tasks.md
-├── plan-update-reminder/       # Reminds to update tasks.md after code changes
-├── plan-attention-refresher/   # Refreshes tasks.md into attention window
+├── stop-continuation-guard/    # Guards stop continuation
+├── subagent-question-blocker/  # Blocks subagent questions
 └── index.ts                    # Hook aggregation + registration
 ```
 
@@ -60,9 +60,9 @@ hooks/
 | onSummarize | Compaction | No | Preserve state, inject summary context |
 
 ## EXECUTION ORDER
-- **chat.message**: keywordDetector → agentSkillReminder → tddGuard → claudeCodeHooks → autoSlashCommand → startWork → ralphLoop
-- **tool.execute.before**: questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → tddGuard → codebaseAssessment → sisyphusJuniorNotepad → atlasHook
-- **tool.execute.after**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → categorySkillReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo → planUpdateReminder → tddGuard → planningFlowGuide → subagentVerification → lspDiagnosticsEnforcer → phaseFlowEnforcer
+- **UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
+- **PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → atlasHook
+- **PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo
 
 ## HOW TO ADD
 1. Create `src/hooks/name/` with `index.ts` exporting `createMyHook(ctx)`

@@ -1,78 +1,102 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test"
-import { createCompactionContextInjector } from "./index"
+import { describe, expect, it, mock, beforeEach } from "bun:test"
 
-// Mock the dependencies
+// Mock dependencies before importing
 const mockInjectHookMessage = mock(() => true)
-const mockMarkCompaction = mock(() => {})
+mock.module("../../features/hook-message-injector", () => ({
+  injectHookMessage: mockInjectHookMessage,
+}))
 
-// We need to test the function behavior
-describe("compaction-context-injector", () => {
+mock.module("../../shared/logger", () => ({
+  log: () => {},
+}))
+
+mock.module("../../shared/system-directive", () => ({
+  createSystemDirective: (type: string) => `[DIRECTIVE:${type}]`,
+  SystemDirectiveTypes: {
+    TODO_CONTINUATION: "TODO CONTINUATION",
+    RALPH_LOOP: "RALPH LOOP",
+    BOULDER_CONTINUATION: "BOULDER CONTINUATION",
+    DELEGATION_REQUIRED: "DELEGATION REQUIRED",
+    SINGLE_TASK_ONLY: "SINGLE TASK ONLY",
+    COMPACTION_CONTEXT: "COMPACTION CONTEXT",
+    CONTEXT_WINDOW_MONITOR: "CONTEXT WINDOW MONITOR",
+    PROMETHEUS_READ_ONLY: "PROMETHEUS READ-ONLY",
+  },
+}))
+
+import { createCompactionContextInjector } from "./index"
+import type { SummarizeContext } from "./index"
+
+describe("createCompactionContextInjector", () => {
   beforeEach(() => {
     mockInjectHookMessage.mockClear()
-    mockMarkCompaction.mockClear()
   })
 
-  describe("createCompactionContextInjector", () => {
-    it("#then should return a function", () => {
-      // #given
+  describe("Agent Verification State preservation", () => {
+    it("includes Agent Verification State section in compaction prompt", async () => {
+      // given
       const injector = createCompactionContextInjector()
-
-      // #then
-      expect(typeof injector).toBe("function")
-    })
-
-    it("#then should accept SummarizeContext parameters", async () => {
-      // #given
-      const injector = createCompactionContextInjector()
-      const ctx = {
-        sessionID: "test-session-1",
+      const context: SummarizeContext = {
+        sessionID: "test-session",
         providerID: "anthropic",
-        modelID: "claude-sonnet-4",
+        modelID: "claude-sonnet-4-5",
         usageRatio: 0.85,
-        directory: "/tmp/test",
+        directory: "/test/dir",
       }
 
-      // #when - should not throw
-      let error: Error | null = null
-      try {
-        await injector(ctx)
-      } catch (e) {
-        error = e as Error
-      }
+      // when
+      await injector(context)
 
-      // #then - function executes without throwing (may fail injection but that's ok)
-      expect(error).toBeNull()
+      // then
+      expect(mockInjectHookMessage).toHaveBeenCalledTimes(1)
+      const calls = mockInjectHookMessage.mock.calls as unknown as [string, string, unknown][]
+      const injectedPrompt = calls[0]?.[1] ?? ""
+      expect(injectedPrompt).toContain("Agent Verification State")
+      expect(injectedPrompt).toContain("Current Agent")
+      expect(injectedPrompt).toContain("Verification Progress")
     })
-  })
 
-  describe("SummarizeContext interface", () => {
-    it("#then should require all expected fields", () => {
-      // #given - a valid context object
-      const ctx = {
-        sessionID: "ses_123",
+    it("includes Momus-specific context for reviewer agents", async () => {
+      // given
+      const injector = createCompactionContextInjector()
+      const context: SummarizeContext = {
+        sessionID: "test-session",
         providerID: "anthropic",
-        modelID: "claude-sonnet-4",
+        modelID: "claude-sonnet-4-5",
         usageRatio: 0.9,
-        directory: "/project",
+        directory: "/test/dir",
       }
 
-      // #then - all fields should be defined
-      expect(ctx.sessionID).toBeDefined()
-      expect(ctx.providerID).toBeDefined()
-      expect(ctx.modelID).toBeDefined()
-      expect(ctx.usageRatio).toBeDefined()
-      expect(ctx.directory).toBeDefined()
+      // when
+      await injector(context)
+
+      // then
+      const calls = mockInjectHookMessage.mock.calls as unknown as [string, string, unknown][]
+      const injectedPrompt = calls[0]?.[1] ?? ""
+      expect(injectedPrompt).toContain("Previous Rejections")
+      expect(injectedPrompt).toContain("Acceptance Status")
+      expect(injectedPrompt).toContain("reviewer agents")
     })
 
-    it("#then usageRatio should be a number between 0 and 1", () => {
-      // #given
-      const validRatios = [0, 0.5, 0.85, 1]
-
-      // #then
-      for (const ratio of validRatios) {
-        expect(ratio).toBeGreaterThanOrEqual(0)
-        expect(ratio).toBeLessThanOrEqual(1)
+    it("preserves file verification progress in compaction prompt", async () => {
+      // given
+      const injector = createCompactionContextInjector()
+      const context: SummarizeContext = {
+        sessionID: "test-session",
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-5",
+        usageRatio: 0.95,
+        directory: "/test/dir",
       }
+
+      // when
+      await injector(context)
+
+      // then
+      const calls = mockInjectHookMessage.mock.calls as unknown as [string, string, unknown][]
+      const injectedPrompt = calls[0]?.[1] ?? ""
+      expect(injectedPrompt).toContain("Pending Verifications")
+      expect(injectedPrompt).toContain("Files already verified")
     })
   })
 })

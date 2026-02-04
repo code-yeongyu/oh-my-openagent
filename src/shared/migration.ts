@@ -64,7 +64,6 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
   "sisyphus-orchestrator": "atlas",
 
   // Removed hooks (v3.0.0) - will be filtered out and user warned
-  "preemptive-compaction": null,
   "empty-message-sanitizer": null,
 }
 
@@ -211,6 +210,13 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
     if (removed.length > 0) {
       log(`Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`)
+    }
+  }
+
+  if (rawConfig.experimental && typeof rawConfig.experimental === "object") {
+    const exp = rawConfig.experimental as Record<string, unknown>
+    if ("task_system" in exp && exp.task_system !== undefined) {
+      needsWrite = true
     }
   }
 

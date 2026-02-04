@@ -15,16 +15,16 @@ describe("getSystemMcpServerNames", () => {
   })
 
   it("returns empty set when no .mcp.json files exist", async () => {
-    // #given
+    // given
     const originalCwd = process.cwd()
     process.chdir(TEST_DIR)
 
     try {
-      // #when
+      // when
       const { getSystemMcpServerNames } = await import("./loader")
       const names = getSystemMcpServerNames()
 
-      // #then
+      // then
       expect(names).toBeInstanceOf(Set)
       // Note: May include servers from user's ~/.claude/.mcp.json if it exists
       // This test verifies the function returns a Set, not that it's empty
@@ -34,7 +34,7 @@ describe("getSystemMcpServerNames", () => {
   })
 
   it("returns server names from project .mcp.json", async () => {
-    // #given
+    // given
     const mcpConfig = {
       mcpServers: {
         playwright: {
@@ -53,11 +53,11 @@ describe("getSystemMcpServerNames", () => {
     process.chdir(TEST_DIR)
 
     try {
-      // #when
+      // when
       const { getSystemMcpServerNames } = await import("./loader")
       const names = getSystemMcpServerNames()
 
-      // #then
+      // then
       expect(names.has("playwright")).toBe(true)
       expect(names.has("sqlite")).toBe(true)
       // Note: size may be > 2 if user has ~/.claude/.mcp.json with additional servers
@@ -68,7 +68,7 @@ describe("getSystemMcpServerNames", () => {
   })
 
   it("returns server names from .claude/.mcp.json", async () => {
-    // #given
+    // given
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
     const mcpConfig = {
       mcpServers: {
@@ -84,11 +84,11 @@ describe("getSystemMcpServerNames", () => {
     process.chdir(TEST_DIR)
 
     try {
-      // #when
+      // when
       const { getSystemMcpServerNames } = await import("./loader")
       const names = getSystemMcpServerNames()
 
-      // #then
+      // then
       expect(names.has("memory")).toBe(true)
     } finally {
       process.chdir(originalCwd)
@@ -96,7 +96,7 @@ describe("getSystemMcpServerNames", () => {
   })
 
   it("excludes disabled MCP servers", async () => {
-    // #given
+    // given
     const mcpConfig = {
       mcpServers: {
         playwright: {
@@ -116,11 +116,11 @@ describe("getSystemMcpServerNames", () => {
     process.chdir(TEST_DIR)
 
     try {
-      // #when
+      // when
       const { getSystemMcpServerNames } = await import("./loader")
       const names = getSystemMcpServerNames()
 
-      // #then
+      // then
       expect(names.has("playwright")).toBe(false)
       expect(names.has("active")).toBe(true)
     } finally {
@@ -129,7 +129,7 @@ describe("getSystemMcpServerNames", () => {
   })
 
   it("merges server names from multiple .mcp.json files", async () => {
-    // #given
+    // given
     mkdirSync(join(TEST_DIR, ".claude"), { recursive: true })
     
     const projectMcp = {
@@ -150,11 +150,11 @@ describe("getSystemMcpServerNames", () => {
     process.chdir(TEST_DIR)
 
     try {
-      // #when
+      // when
       const { getSystemMcpServerNames } = await import("./loader")
       const names = getSystemMcpServerNames()
 
-      // #then
+      // then
       expect(names.has("playwright")).toBe(true)
       expect(names.has("memory")).toBe(true)
     } finally {

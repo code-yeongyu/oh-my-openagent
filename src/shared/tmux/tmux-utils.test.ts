@@ -10,77 +10,48 @@ import {
 
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
-    // #given
-    const originalEnv = process.env
-    const testEnv = { ...originalEnv, TMUX: "/tmp/tmux-1000/default" }
-    Object.defineProperty(process, "env", { value: testEnv, configurable: true })
+    // given
+    const originalTmux = process.env.TMUX
+    process.env.TMUX = "/tmp/tmux-1000/default"
 
-    try {
-      // #when
-      const result = isInsideTmux()
-
-      // #then
-      expect(result).toBe(true)
-    } finally {
-      Object.defineProperty(process, "env", { value: originalEnv, configurable: true })
-    }
-  })
-
-  // Skipped: flaky when running inside tmux (ambient TMUX env cannot be reliably isolated)
-  test.skip("returns false when TMUX env is not set", () => {
-    // #given
-    const originalEnv = process.env
-    const { TMUX: _, ...envWithoutTmux } = originalEnv
-    Object.defineProperty(process, "env", { value: envWithoutTmux, configurable: true })
-
-    try {
-      // #when
-      const result = isInsideTmux()
-
-      // #then
-      expect(result).toBe(false)
-    } finally {
-      Object.defineProperty(process, "env", { value: originalEnv, configurable: true })
-    }
-  })
-
-  // Skipped: flaky when running inside tmux (ambient TMUX env cannot be reliably isolated)
-  test.skip("returns false when TMUX env is empty string", () => {
-    // #given
-    const originalEnv = process.env
-    const testEnv = { ...originalEnv, TMUX: "" }
-    Object.defineProperty(process, "env", { value: testEnv, configurable: true })
-
-    try {
-      // #when
-      const result = isInsideTmux()
-
-      // #then
-      expect(result).toBe(false)
-    } finally {
-      Object.defineProperty(process, "env", { value: originalEnv, configurable: true })
-    }
-  })
-
-  test("uses process.env by default", () => {
-    // #given, #when
+    // when
     const result = isInsideTmux()
 
-    // #then - should not throw, returns boolean based on actual env
-    expect(typeof result).toBe("boolean")
+    // then
+    expect(result).toBe(true)
+
+    // cleanup
+    process.env.TMUX = originalTmux
   })
 
-  // Skipped: flaky when running inside tmux (ambient TMUX env cannot be reliably isolated)
-  test.skip("ignores inherited TMUX from prototype", () => {
-    // #given - env with TMUX on prototype, not own property
-    const proto = { TMUX: "/tmp/tmux-inherited" }
-    const env = Object.create(proto) as NodeJS.ProcessEnv
+  test("returns false when TMUX env is not set", () => {
+    // given
+    const originalTmux = process.env.TMUX
+    delete process.env.TMUX
 
-    // #when
-    const result = isInsideTmux(env)
+    // when
+    const result = isInsideTmux()
 
-    // #then - should ignore inherited property
+    // then
     expect(result).toBe(false)
+
+    // cleanup
+    process.env.TMUX = originalTmux
+  })
+
+  test("returns false when TMUX env is empty string", () => {
+    // given
+    const originalTmux = process.env.TMUX
+    process.env.TMUX = ""
+
+    // when
+    const result = isInsideTmux()
+
+    // then
+    expect(result).toBe(false)
+
+    // cleanup
+    process.env.TMUX = originalTmux
   })
 })
 
@@ -96,100 +67,100 @@ describe("isServerRunning", () => {
   })
 
   test("returns true when server responds OK", async () => {
-    // #given
+    // given
     globalThis.fetch = mock(async () => ({ ok: true })) as any
 
-    // #when
+    // when
     const result = await isServerRunning("http://localhost:4096")
 
-    // #then
+    // then
     expect(result).toBe(true)
   })
 
   test("returns false when server not reachable", async () => {
-    // #given
+    // given
     globalThis.fetch = mock(async () => {
       throw new Error("ECONNREFUSED")
     }) as any
 
-    // #when
+    // when
     const result = await isServerRunning("http://localhost:4096")
 
-    // #then
+    // then
     expect(result).toBe(false)
   })
 
   test("returns false when fetch returns not ok", async () => {
-    // #given
+    // given
     globalThis.fetch = mock(async () => ({ ok: false })) as any
 
-    // #when
+    // when
     const result = await isServerRunning("http://localhost:4096")
 
-    // #then
+    // then
     expect(result).toBe(false)
   })
 
   test("caches successful result", async () => {
-    // #given
+    // given
     const fetchMock = mock(async () => ({ ok: true })) as any
     globalThis.fetch = fetchMock
 
-    // #when
+    // when
     await isServerRunning("http://localhost:4096")
     await isServerRunning("http://localhost:4096")
 
-    // #then - should only call fetch once due to caching
+    // then - should only call fetch once due to caching
     expect(fetchMock.mock.calls.length).toBe(1)
   })
 
   test("does not cache failed result", async () => {
-    // #given
+    // given
     const fetchMock = mock(async () => {
       throw new Error("ECONNREFUSED")
     }) as any
     globalThis.fetch = fetchMock
 
-    // #when
+    // when
     await isServerRunning("http://localhost:4096")
     await isServerRunning("http://localhost:4096")
 
-    // #then - should call fetch 4 times (2 attempts per call, 2 calls)
+    // then - should call fetch 4 times (2 attempts per call, 2 calls)
     expect(fetchMock.mock.calls.length).toBe(4)
   })
 
   test("uses different cache for different URLs", async () => {
-    // #given
+    // given
     const fetchMock = mock(async () => ({ ok: true })) as any
     globalThis.fetch = fetchMock
 
-    // #when
+    // when
     await isServerRunning("http://localhost:4096")
     await isServerRunning("http://localhost:5000")
 
-    // #then - should call fetch twice for different URLs
+    // then - should call fetch twice for different URLs
     expect(fetchMock.mock.calls.length).toBe(2)
   })
 })
 
 describe("resetServerCheck", () => {
   test("clears cache without throwing", () => {
-    // #given, #when, #then
+    // given, #when, #then
     expect(() => resetServerCheck()).not.toThrow()
   })
 
   test("allows re-checking after reset", async () => {
-    // #given
+    // given
     const originalFetch = globalThis.fetch
     const fetchMock = mock(async () => ({ ok: true })) as any
     globalThis.fetch = fetchMock
 
-    // #when
+    // when
     await isServerRunning("http://localhost:4096")
     resetServerCheck()
     await isServerRunning("http://localhost:4096")
 
-    // #then - should call fetch twice after reset
+    // then - should call fetch twice after reset
     expect(fetchMock.mock.calls.length).toBe(2)
 
     // cleanup
@@ -199,26 +170,26 @@ describe("resetServerCheck", () => {
 
 describe("tmux pane functions", () => {
   test("spawnTmuxPane is exported as function", async () => {
-    // #given, #when
+    // given, #when
     const result = typeof spawnTmuxPane
 
-    // #then
+    // then
     expect(result).toBe("function")
   })
 
   test("closeTmuxPane is exported as function", async () => {
-    // #given, #when
+    // given, #when
     const result = typeof closeTmuxPane
 
-    // #then
+    // then
     expect(result).toBe("function")
   })
 
   test("applyLayout is exported as function", async () => {
-    // #given, #when
+    // given, #when
     const result = typeof applyLayout
 
-    // #then
+    // then
     expect(result).toBe("function")
   })
 })

@@ -16,6 +16,7 @@ import {
   saveInjectedRules,
 } from "./storage";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { getRuleInjectionFilePath } from "./output-path";
 
 interface ToolExecuteInput {
   tool: string;
@@ -31,11 +32,6 @@ interface ToolExecuteOutput {
 
 interface ToolExecuteBeforeOutput {
   args: unknown;
-}
-
-interface BatchToolCall {
-  tool: string;
-  parameters: Record<string, unknown>;
 }
 
 interface EventInput {
@@ -59,7 +55,6 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     string,
     { contentHashes: Set<string>; realPaths: Set<string> }
   >();
-  const pendingBatchFiles = new Map<string, string[]>();
   const truncator = createDynamicTruncator(ctx);
 
   function getSessionCache(sessionID: string): {
@@ -77,6 +72,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     if (path.startsWith("/")) return path;
     return resolve(ctx.directory, path);
   }
+
 
   async function processFilePathForInjection(
     filePath: string,
@@ -143,35 +139,6 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     saveInjectedRules(sessionID, cache);
   }
 
-  function extractFilePathFromToolCall(call: BatchToolCall): string | null {
-    const params = call.parameters;
-    return (params?.filePath ?? params?.file_path ?? params?.path) as string | null;
-  }
-
-  const toolExecuteBefore = async (
-    input: ToolExecuteInput,
-    output: ToolExecuteBeforeOutput
-  ) => {
-    if (input.tool.toLowerCase() !== "batch") return;
-
-    const args = output.args as { tool_calls?: BatchToolCall[] } | undefined;
-    if (!args?.tool_calls) return;
-
-    const filePaths: string[] = [];
-    for (const call of args.tool_calls) {
-      if (TRACKED_TOOLS.includes(call.tool.toLowerCase())) {
-        const filePath = extractFilePathFromToolCall(call);
-        if (filePath) {
-          filePaths.push(filePath);
-        }
-      }
-    }
-
-    if (filePaths.length > 0) {
-      pendingBatchFiles.set(input.callID, filePaths);
-    }
-  };
-
   const toolExecuteAfter = async (
     input: ToolExecuteInput,
     output: ToolExecuteOutput
@@ -179,19 +146,19 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     const toolName = input.tool.toLowerCase();
 
     if (TRACKED_TOOLS.includes(toolName)) {
-      await processFilePathForInjection(output.title, input.sessionID, output);
+      const filePath = getRuleInjectionFilePath(output);
+      if (!filePath) return;
+      await processFilePathForInjection(filePath, input.sessionID, output);
       return;
     }
+  };
 
-    if (toolName === "batch") {
-      const filePaths = pendingBatchFiles.get(input.callID);
-      if (filePaths) {
-        for (const filePath of filePaths) {
-          await processFilePathForInjection(filePath, input.sessionID, output);
-        }
-        pendingBatchFiles.delete(input.callID);
-      }
-    }
+  const toolExecuteBefore = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteBeforeOutput
+  ): Promise<void> => {
+    void input;
+    void output;
   };
 
   const eventHandler = async ({ event }: EventInput) => {

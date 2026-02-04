@@ -20,6 +20,7 @@ export * from "./opencode-version"
 export * from "./permission-compat"
 export * from "./external-plugin-detector"
 export * from "./zip-extractor"
+export * from "./binary-downloader"
 export * from "./agent-variant"
 export * from "./session-cursor"
 export * from "./shell-env"
@@ -27,9 +28,14 @@ export * from "./system-directive"
 export * from "./agent-tool-restrictions"
 export * from "./model-requirements"
 export * from "./model-resolver"
+export {
+  resolveModelPipeline,
+  type ModelResolutionRequest,
+  type ModelResolutionResult as ModelResolutionPipelineResult,
+  type ModelResolutionProvenance,
+} from "./model-resolution-pipeline"
 export * from "./model-availability"
 export * from "./connected-providers-cache"
-export * from "./case-insensitive"
 export * from "./session-utils"
 export * from "./tmux"
 export * from "./skill-reminder-generator"
@@ -41,3 +47,4 @@ export * from "./anti-pattern-tracker"
 export * from "./isolation-checker"
 export * from "./ast-coverage-checker"
 export * from "./part-factory"
+export * from "./model-suggestion-retry"
