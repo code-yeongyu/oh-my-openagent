@@ -398,7 +398,7 @@ export async function createBuiltinAgents(
       !hephaestusRequirement?.requiresModel ||
       hasHephaestusExplicitConfig ||
       isFirstRunNoCache ||
-      (availableModels.size > 0 && isModelAvailable(hephaestusRequirement.requiresModel, availableModels))
+      isAnyFallbackModelAvailable(hephaestusRequirement.fallbackChain, availableModels)
 
     if (hasRequiredModel) {
       let hephaestusResolution = applyModelResolution({
