@@ -98,6 +98,7 @@ import {
   getOpenCodeVersion,
   isOpenCodeVersionAtLeast,
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
+  injectServerAuthIntoClient,
 } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
@@ -107,6 +108,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   });
+  injectServerAuthIntoClient(ctx.client);
   // Start background tmux check immediately
   startTmuxCheck();
 
