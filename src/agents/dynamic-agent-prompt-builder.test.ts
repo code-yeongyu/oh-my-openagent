@@ -4,6 +4,7 @@ import { describe, it, expect } from "bun:test"
 import {
   buildCategorySkillsDelegationGuide,
   buildUltraworkSection,
+  formatCustomSkillsBlock,
   type AvailableSkill,
   type AvailableCategory,
   type AvailableAgent,
@@ -157,5 +158,48 @@ describe("buildUltraworkSection", () => {
     //#then: should have single section
     expect(result).toContain("Built-in Skills")
     expect(result).not.toContain("User-Installed Skills")
+  })
+})
+
+describe("formatCustomSkillsBlock", () => {
+  const customSkills: AvailableSkill[] = [
+    { name: "react-19", description: "React 19 patterns", location: "user" },
+    { name: "tailwind-4", description: "Tailwind v4", location: "project" },
+  ]
+
+  const customRows = customSkills.map((s) => {
+    const source = s.location === "project" ? "project" : "user"
+    return `| \`${s.name}\` | ${s.description} | ${source} |`
+  })
+
+  it("should produce consistent output used by both builders", () => {
+    //#given: custom skills and rows
+    //#when: formatting with default header level
+    const result = formatCustomSkillsBlock(customRows, customSkills)
+
+    //#then: contains all expected elements
+    expect(result).toContain("User-Installed Skills (HIGH PRIORITY)")
+    expect(result).toContain("CRITICAL")
+    expect(result).toContain('"react-19"')
+    expect(result).toContain('"tailwind-4"')
+    expect(result).toContain("| user |")
+    expect(result).toContain("| project |")
+  })
+
+  it("should use #### header by default", () => {
+    //#given: default header level
+    const result = formatCustomSkillsBlock(customRows, customSkills)
+
+    //#then: uses markdown h4
+    expect(result).toContain("#### User-Installed Skills")
+  })
+
+  it("should use bold header when specified", () => {
+    //#given: bold header level (used by Atlas)
+    const result = formatCustomSkillsBlock(customRows, customSkills, "**")
+
+    //#then: uses bold instead of h4
+    expect(result).toContain("**User-Installed Skills (HIGH PRIORITY):**")
+    expect(result).not.toContain("#### User-Installed Skills")
   })
 })

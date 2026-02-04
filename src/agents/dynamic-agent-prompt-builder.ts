@@ -166,6 +166,33 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   return rows.join("\n")
 }
 
+/**
+ * Renders the "User-Installed Skills (HIGH PRIORITY)" block used across multiple agent prompts.
+ * Extracted to avoid duplication between buildCategorySkillsDelegationGuide, buildSkillsSection, etc.
+ */
+export function formatCustomSkillsBlock(
+  customRows: string[],
+  customSkills: AvailableSkill[],
+  headerLevel: "####" | "**" = "####"
+): string {
+  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
+  const header = headerLevel === "####"
+    ? `#### User-Installed Skills (HIGH PRIORITY)`
+    : `**User-Installed Skills (HIGH PRIORITY):**`
+
+  return `${header}
+
+**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
+Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
+
+| Skill | Expertise Domain | Source |
+|-------|------------------|--------|
+${customRows.join("\n")}
+
+> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
+> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
+}
+
 export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) return ""
 
@@ -188,7 +215,7 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
     return `| \`${s.name}\` | ${desc} | ${source} |`
   })
 
-  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
+  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills)
 
   let skillsSection: string
 
@@ -199,29 +226,9 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
 |-------|------------------|
 ${builtinRows.join("\n")}
 
-#### User-Installed Skills (HIGH PRIORITY)
-
-**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
-Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
-
-| Skill | Expertise Domain | Source |
-|-------|------------------|--------|
-${customRows.join("\n")}
-
-> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
-> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
+${customSkillBlock}`
   } else if (customSkills.length > 0) {
-    skillsSection = `#### User-Installed Skills (HIGH PRIORITY)
-
-**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
-Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
-
-| Skill | Expertise Domain | Source |
-|-------|------------------|--------|
-${customRows.join("\n")}
-
-> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
-> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
+    skillsSection = customSkillBlock
   } else {
     skillsSection = `#### Available Skills (Domain Expertise Injection)
 
