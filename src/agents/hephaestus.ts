@@ -584,7 +584,7 @@ export function createHephaestusAgent(
     model,
     maxTokens: 32000,
     prompt,
-    color: "#708090", // Slate Gray - Iron/Steel, blacksmith's hammer theme
+    color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
     permission: { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"],
     reasoningEffort: "medium",
   }
