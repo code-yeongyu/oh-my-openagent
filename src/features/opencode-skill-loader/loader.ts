@@ -235,7 +235,8 @@ export interface DiscoverSkillsOptions {
 
 /**
  * Deduplicates skills by name, keeping the first occurrence (higher priority).
- * Priority order: opencode-project > project > opencode > user
+ * Priority order: opencode-project > opencode > project > user
+ * (OpenCode Global skills take precedence over legacy Claude project skills)
  */
 function deduplicateSkills(skills: LoadedSkill[]): LoadedSkill[] {
   const seen = new Set<string>()
@@ -257,8 +258,8 @@ export async function discoverAllSkills(): Promise<LoadedSkill[]> {
     discoverUserClaudeSkills(),
   ])
 
-  // Priority: opencode-project > project > opencode > user
-  return deduplicateSkills([...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills])
+  // Priority: opencode-project > opencode > project > user
+  return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills, ...projectSkills, ...userSkills])
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
@@ -279,8 +280,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverUserClaudeSkills(),
   ])
 
-  // Priority: opencode-project > project > opencode > user
-  return deduplicateSkills([...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills])
+  // Priority: opencode-project > opencode > project > user
+  return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills, ...projectSkills, ...userSkills])
 }
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {

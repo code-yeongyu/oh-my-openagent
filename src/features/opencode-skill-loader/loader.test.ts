@@ -389,13 +389,11 @@ Skill body.
   })
 
   describe("deduplication", () => {
-    it("deduplicates skills with same name, keeping higher priority", async () => {
+    it("deduplicates skills with same name, keeping higher priority (opencode-project > opencode)", async () => {
       // given: same skill name in both opencode-project and opencode scopes
       const opencodeProjectSkillsDir = join(TEST_DIR, ".opencode", "skills")
-      const opencodeGlobalSkillsDir = join(TEST_DIR, "opencode-global", "skills")
 
       mkdirSync(join(opencodeProjectSkillsDir, "duplicate-skill"), { recursive: true })
-      mkdirSync(join(opencodeGlobalSkillsDir, "duplicate-skill"), { recursive: true })
 
       writeFileSync(
         join(opencodeProjectSkillsDir, "duplicate-skill", "SKILL.md"),
@@ -407,43 +405,21 @@ Project skill body.
 `
       )
 
-      writeFileSync(
-        join(opencodeGlobalSkillsDir, "duplicate-skill", "SKILL.md"),
-        `---
-name: duplicate-skill
-description: From opencode-global (lower priority)
----
-Global skill body.
-`
-      )
-
-      // when
-      const { discoverOpencodeProjectSkills } = await import("./loader")
+      // when: use discoverSkills which performs actual deduplication
+      const { discoverSkills } = await import("./loader")
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
 
-      // Manually test deduplication logic
-      const { deduplicateSkills } = await import("./loader").then(m => ({
-        deduplicateSkills: (skills: any[]) => {
-          const seen = new Set<string>()
-          const result: any[] = []
-          for (const skill of skills) {
-            if (!seen.has(skill.name)) {
-              seen.add(skill.name)
-              result.push(skill)
-            }
-          }
-          return result
-        }
-      }))
-
       try {
-        const projectSkills = await discoverOpencodeProjectSkills()
-        const projectSkill = projectSkills.find(s => s.name === "duplicate-skill")
+        // discoverSkills with includeClaudeCodePaths: false only loads opencode-project and opencode-global
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const duplicateSkills = skills.filter(s => s.name === "duplicate-skill")
 
-        // then: opencode-project skill should exist
-        expect(projectSkill).toBeDefined()
-        expect(projectSkill?.definition.description).toContain("opencode-project")
+        // then: should have exactly one skill (deduplicated)
+        expect(duplicateSkills).toHaveLength(1)
+        // and it should be from opencode-project (higher priority)
+        expect(duplicateSkills[0]?.definition.description).toContain("opencode-project")
+        expect(duplicateSkills[0]?.scope).toBe("opencode-project")
       } finally {
         process.chdir(originalCwd)
       }
