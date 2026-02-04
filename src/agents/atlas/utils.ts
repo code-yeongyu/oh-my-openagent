@@ -56,21 +56,66 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
     return ""
   }
 
-  const skillRows = skills.map((s) => {
+  const builtinSkills = skills.filter((s) => s.location === "plugin")
+  const customSkills = skills.filter((s) => s.location !== "plugin")
+
+  const builtinRows = builtinSkills.map((s) => {
     const shortDesc = s.description.split(".")[0] || s.description
     return `| \`${s.name}\` | ${shortDesc} |`
   })
+
+  const customRows = customSkills.map((s) => {
+    const shortDesc = s.description.split(".")[0] || s.description
+    const source = s.location === "project" ? "project" : "user"
+    return `| \`${s.name}\` | ${shortDesc} | ${source} |`
+  })
+
+  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
+
+  let skillsTable: string
+
+  if (customSkills.length > 0 && builtinSkills.length > 0) {
+    skillsTable = `**Built-in Skills:**
+
+| Skill | When to Use |
+|-------|-------------|
+${builtinRows.join("\n")}
+
+**User-Installed Skills (HIGH PRIORITY):**
+
+The user installed these for their workflow. They MUST be evaluated for EVERY delegation.
+
+| Skill | When to Use | Source |
+|-------|-------------|--------|
+${customRows.join("\n")}
+
+> **CRITICAL**: The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.
+> When in doubt, INCLUDE a user-installed skill rather than omit it.`
+  } else if (customSkills.length > 0) {
+    skillsTable = `**User-Installed Skills (HIGH PRIORITY):**
+
+The user installed these for their workflow. They MUST be evaluated for EVERY delegation.
+
+| Skill | When to Use | Source |
+|-------|-------------|--------|
+${customRows.join("\n")}
+
+> **CRITICAL**: The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.
+> When in doubt, INCLUDE a user-installed skill rather than omit it.`
+  } else {
+    skillsTable = `| Skill | When to Use |
+|-------|-------------|
+${builtinRows.join("\n")}`
+  }
 
   return `
 #### 3.2.2: Skill Selection (PREPEND TO PROMPT)
 
 **Skills are specialized instructions that guide subagent behavior. Consider them alongside category selection.**
 
-| Skill | When to Use |
-|-------|-------------|
-${skillRows.join("\n")}
+${skillsTable}
 
-**MANDATORY: Evaluate ALL skills for relevance to your task.**
+**MANDATORY: Evaluate ALL skills (built-in AND user-installed) for relevance to your task.**
 
 Read each skill's description and ask: "Does this skill's domain overlap with my task?"
 - If YES: INCLUDE in load_skills=[...]
