@@ -1492,7 +1492,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - artistry category (gemini-3-pro with max variant)
+      // when - artistry category (gemini-3-pro with high variant)
       const result = await tool.execute(
         {
           description: "Test artistry forced background",
