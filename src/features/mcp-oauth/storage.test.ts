@@ -54,7 +54,10 @@ describe("mcp-oauth storage", () => {
     expect(success).toBe(true)
     expect(Object.keys(parsed)).toEqual(["example.com/mcp/v1"])
     expect(parsed["example.com/mcp/v1"].accessToken).toBe("access-1")
-    expect(mode).toBe(0o600)
+    // Windows doesn't support Unix file permissions, so skip permission check on Windows
+    if (process.platform !== "win32") {
+      expect(mode).toBe(0o600)
+    }
   })
 
   test("should load a saved token", () => {

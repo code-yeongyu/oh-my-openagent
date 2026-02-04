@@ -38,14 +38,18 @@ describe("opencode-config-dir", () => {
   describe("OPENCODE_CONFIG_DIR environment variable", () => {
     test("returns OPENCODE_CONFIG_DIR when env var is set", () => {
       // given OPENCODE_CONFIG_DIR is set to a custom path
-      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      // Use an absolute path that works on the current platform
+      const customPath = process.platform === "win32" 
+        ? "C:\\custom\\opencode\\path"
+        : "/custom/opencode/path"
+      process.env.OPENCODE_CONFIG_DIR = customPath
       Object.defineProperty(process, "platform", { value: "linux" })
 
       // when getOpenCodeConfigDir is called with binary="opencode"
       const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
       // then returns the custom path
-      expect(result).toBe("/custom/opencode/path")
+      expect(result).toBe(customPath)
     })
 
     test("falls back to default when env var is not set", () => {
@@ -101,7 +105,11 @@ describe("opencode-config-dir", () => {
 
     test("OPENCODE_CONFIG_DIR takes priority over XDG_CONFIG_HOME", () => {
       // given both OPENCODE_CONFIG_DIR and XDG_CONFIG_HOME are set
-      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      // Use an absolute path that works on the current platform
+      const customPath = process.platform === "win32"
+        ? "C:\\custom\\opencode\\path"
+        : "/custom/opencode/path"
+      process.env.OPENCODE_CONFIG_DIR = customPath
       process.env.XDG_CONFIG_HOME = "/xdg/config"
       Object.defineProperty(process, "platform", { value: "linux" })
 
@@ -109,7 +117,7 @@ describe("opencode-config-dir", () => {
       const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
       // then OPENCODE_CONFIG_DIR takes priority
-      expect(result).toBe("/custom/opencode/path")
+      expect(result).toBe(customPath)
     })
   })
 
@@ -156,14 +164,18 @@ describe("opencode-config-dir", () => {
       test("returns $XDG_CONFIG_HOME/opencode on Linux when XDG_CONFIG_HOME is set", () => {
         // given opencode CLI binary detected, platform is Linux with XDG_CONFIG_HOME set
         Object.defineProperty(process, "platform", { value: "linux" })
-        process.env.XDG_CONFIG_HOME = "/custom/config"
+        // Use an absolute path that works on the current platform
+        const customConfig = process.platform === "win32"
+          ? "C:\\custom\\config"
+          : "/custom/config"
+        process.env.XDG_CONFIG_HOME = customConfig
         delete process.env.OPENCODE_CONFIG_DIR
 
         // when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200" })
 
         // then returns $XDG_CONFIG_HOME/opencode
-        expect(result).toBe("/custom/config/opencode")
+        expect(result).toBe(join(customConfig, "opencode"))
       })
 
       test("returns ~/.config/opencode on macOS", () => {
