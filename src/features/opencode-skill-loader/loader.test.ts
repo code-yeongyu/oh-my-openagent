@@ -387,4 +387,134 @@ Skill body.
       }
     })
   })
+
+  describe("nested skill discovery", () => {
+    it("discovers skills in nested directories (superpowers pattern)", async () => {
+      // #given - simulate superpowers structure: skills/superpowers/brainstorming/SKILL.md
+      const nestedDir = join(SKILLS_DIR, "superpowers", "brainstorming")
+      mkdirSync(nestedDir, { recursive: true })
+      const skillContent = `---
+name: brainstorming
+description: A nested skill for brainstorming
+---
+This is a nested skill.
+`
+      writeFileSync(join(nestedDir, "SKILL.md"), skillContent)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "superpowers/brainstorming")
+
+        // #then
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("superpowers/brainstorming")
+        expect(skill?.definition.description).toContain("brainstorming")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("discovers multiple skills in nested directories", async () => {
+      // #given - multiple nested skills
+      const skills = ["brainstorming", "debugging", "testing"]
+      for (const skillName of skills) {
+        const nestedDir = join(SKILLS_DIR, "superpowers", skillName)
+        mkdirSync(nestedDir, { recursive: true })
+        writeFileSync(join(nestedDir, "SKILL.md"), `---
+name: ${skillName}
+description: ${skillName} skill
+---
+Content for ${skillName}.
+`)
+      }
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const discoveredSkills = await discoverSkills({ includeClaudeCodePaths: false })
+
+        // #then
+        for (const skillName of skills) {
+          const skill = discoveredSkills.find(s => s.name === `superpowers/${skillName}`)
+          expect(skill).toBeDefined()
+        }
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("respects max depth limit", async () => {
+      // #given - deeply nested skill (3 levels deep, beyond default maxDepth of 2)
+      const deepDir = join(SKILLS_DIR, "level1", "level2", "level3", "deep-skill")
+      mkdirSync(deepDir, { recursive: true })
+      writeFileSync(join(deepDir, "SKILL.md"), `---
+name: deep-skill
+description: A deeply nested skill
+---
+Too deep.
+`)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name.includes("deep-skill"))
+
+        // #then - should not find skill beyond maxDepth
+        expect(skill).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("flat skills still work alongside nested skills", async () => {
+      // #given - both flat and nested skills
+      const flatSkillDir = join(SKILLS_DIR, "flat-skill")
+      mkdirSync(flatSkillDir, { recursive: true })
+      writeFileSync(join(flatSkillDir, "SKILL.md"), `---
+name: flat-skill
+description: A flat skill
+---
+Flat content.
+`)
+
+      const nestedDir = join(SKILLS_DIR, "nested", "nested-skill")
+      mkdirSync(nestedDir, { recursive: true })
+      writeFileSync(join(nestedDir, "SKILL.md"), `---
+name: nested-skill
+description: A nested skill
+---
+Nested content.
+`)
+
+      // #when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+
+        // #then - both should be found
+        const flatSkill = skills.find(s => s.name === "flat-skill")
+        const nestedSkill = skills.find(s => s.name === "nested/nested-skill")
+
+        expect(flatSkill).toBeDefined()
+        expect(nestedSkill).toBeDefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
 })
