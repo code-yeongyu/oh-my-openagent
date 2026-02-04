@@ -20,6 +20,10 @@ export function createBoulderQuestionAutoAnswerHook(
         return
       }
 
+      if (state.session_id && state.session_id !== input.sessionID) {
+        return
+      }
+
       log(`[${HOOK_NAME}] Skipping question in Boulder mode`, {
         sessionID: input.sessionID,
         timeRemaining: state.deadline - Date.now(),
