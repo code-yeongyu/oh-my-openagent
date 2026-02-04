@@ -794,18 +794,22 @@ export async function resolveCategoryExecution(
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
   const overrideModel = sisyphusJuniorModel
+  const explicitCategoryModel = userCategories?.[args.category!]?.model
 
   if (!requirement) {
-    actualModel = overrideModel ?? resolved.model
+    // Precedence: explicit category model > sisyphus-junior default > category resolved model
+    // This keeps `sisyphus-junior.model` useful as a global default while allowing
+    // per-category overrides via `categories[category].model`.
+    actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
     if (actualModel) {
-      modelInfo = overrideModel
+      modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
     const resolution = resolveModelPipeline({
       intent: {
-        userModel: overrideModel ?? userCategories?.[args.category!]?.model,
+        userModel: explicitCategoryModel ?? overrideModel,
         categoryDefaultModel: resolved.model,
       },
       constraints: { availableModels },
