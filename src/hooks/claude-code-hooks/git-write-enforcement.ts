@@ -12,8 +12,11 @@ export function enforceGitWriteRestriction(
   config: OhMyOpenCodeConfig
 ): GitWriteEnforcementResult {
   const toolName = context.toolName
+  const toolLower = toolName.toLowerCase()
+  const isBashTool = toolLower === "bash" || toolLower === "mcp_bash"
+  const isInteractiveBash = toolLower === "interactive_bash"
 
-  if (toolName !== "Bash" && toolName !== "interactive_bash") {
+  if (!isBashTool && !isInteractiveBash) {
     return { blocked: false }
   }
 
@@ -42,12 +45,13 @@ export function enforceGitWriteRestriction(
 
 function extractCommand(context: PreToolUseContext): string {
   const toolInput = context.toolInput
+  const toolLower = context.toolName.toLowerCase()
 
-  if (context.toolName === "Bash") {
+  if (toolLower === "bash" || toolLower === "mcp_bash") {
     return (toolInput.command as string) ?? ""
   }
 
-  if (context.toolName === "interactive_bash") {
+  if (toolLower === "interactive_bash") {
     return (toolInput.tmux_command as string) ?? ""
   }
 

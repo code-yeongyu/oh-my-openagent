@@ -13,7 +13,7 @@ describe("Git Write Enforcement - Integration Tests", () => {
     return {
       sessionId: "test-session",
       toolName,
-      toolInput: toolName === "Bash" ? { command } : { tmux_command: command },
+      toolInput: toolName.toLowerCase() === "interactive_bash" ? { tmux_command: command } : { command },
       cwd: "/test/path",
       agent,
     }
@@ -23,9 +23,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
   const emptyConfig: OhMyOpenCodeConfig = {}
 
   describe("End-to-End Enforcement Flow", () => {
-    test("build agent + git push → blocked", () => {
-      //#given build agent attempting git push
-      const context = createContext("Bash", "git push origin main", "build")
+     test("build agent + git push → blocked", () => {
+       //#given build agent attempting git push
+       const context = createContext("bash", "git push origin main", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -36,9 +36,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.reason).toContain("git-owner")
     })
 
-    test("git-owner + git push → allowed", () => {
-      //#given git-owner agent attempting git push
-      const context = createContext("Bash", "git push origin main", "git-owner")
+     test("git-owner + git push → allowed", () => {
+       //#given git-owner agent attempting git push
+       const context = createContext("bash", "git push origin main", "git-owner")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -48,9 +48,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.reason).toBeUndefined()
     })
 
-    test("sisyphus + git commit → blocked", () => {
-      //#given sisyphus agent attempting git commit
-      const context = createContext("Bash", 'git commit -m "test"', "sisyphus")
+     test("sisyphus + git commit → blocked", () => {
+       //#given sisyphus agent attempting git commit
+       const context = createContext("bash", 'git commit -m "test"', "sisyphus")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -60,9 +60,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.reason).toContain("Git write blocked")
     })
 
-    test("any agent + git status → allowed (read operation)", () => {
-      //#given any agent attempting git status (read)
-      const context = createContext("Bash", "git status", "build")
+     test("any agent + git status → allowed (read operation)", () => {
+       //#given any agent attempting git status (read)
+       const context = createContext("bash", "git status", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -71,9 +71,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(false)
     })
 
-    test("any agent + ls -la → allowed (not git)", () => {
-      //#given any agent running non-git command
-      const context = createContext("Bash", "ls -la", "build")
+     test("any agent + ls -la → allowed (not git)", () => {
+       //#given any agent running non-git command
+       const context = createContext("bash", "ls -la", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -82,9 +82,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(false)
     })
 
-    test("undefined agent + git push → blocked (safe default)", () => {
-      //#given no agent specified for git push
-      const context = createContext("Bash", "git push origin main", undefined)
+     test("undefined agent + git push → blocked (safe default)", () => {
+       //#given no agent specified for git push
+       const context = createContext("bash", "git push origin main", undefined)
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -110,9 +110,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
   })
 
   describe("Tool Name Handling", () => {
-    test("Bash tool with git write → blocked for non-owner", () => {
-      //#given Bash tool with git commit
-      const context = createContext("Bash", "git commit -m 'test'", "sisyphus")
+     test("Bash tool with git write → blocked for non-owner", () => {
+       //#given Bash tool with git commit
+       const context = createContext("bash", "git commit -m 'test'", "sisyphus")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -139,14 +139,14 @@ describe("Git Write Enforcement - Integration Tests", () => {
     })
 
     test("non-Bash tool → always allowed", () => {
-      //#given non-Bash tool (even with git-like input)
-      const context: PreToolUseContext = {
-        sessionId: "test-session",
-        toolName: "Read",
-        toolInput: { filePath: "git-file.txt" },
-        cwd: "/test/path",
-        agent: "build",
-      }
+       //#given non-Bash tool (even with git-like input)
+       const context: PreToolUseContext = {
+         sessionId: "test-session",
+         toolName: "read",
+         toolInput: { filePath: "git-file.txt" },
+         cwd: "/test/path",
+         agent: "build",
+       }
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -157,13 +157,13 @@ describe("Git Write Enforcement - Integration Tests", () => {
   })
 
   describe("Complex Git Commands", () => {
-    test("chained commands with git write → blocked", () => {
-      //#given chained command with git commit
-      const context = createContext(
-        "Bash",
-        'git add . && git commit -m "test" && git push',
-        "build"
-      )
+     test("chained commands with git write → blocked", () => {
+       //#given chained command with git commit
+       const context = createContext(
+         "bash",
+         'git add . && git commit -m "test" && git push',
+         "build"
+       )
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -172,9 +172,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(true)
     })
 
-    test("git command with full path → blocked for non-owner", () => {
-      //#given git with full path
-      const context = createContext("Bash", "/usr/bin/git push origin main", "sisyphus")
+     test("git command with full path → blocked for non-owner", () => {
+       //#given git with full path
+       const context = createContext("bash", "/usr/bin/git push origin main", "sisyphus")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -183,9 +183,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(true)
     })
 
-    test("gh pr create → blocked for non-owner", () => {
-      //#given gh pr create command
-      const context = createContext("Bash", 'gh pr create --title "test"', "build")
+     test("gh pr create → blocked for non-owner", () => {
+       //#given gh pr create command
+       const context = createContext("bash", 'gh pr create --title "test"', "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -194,9 +194,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(true)
     })
 
-    test("gh pr list → allowed (read operation)", () => {
-      //#given gh pr list (read)
-      const context = createContext("Bash", "gh pr list", "build")
+     test("gh pr list → allowed (read operation)", () => {
+       //#given gh pr list (read)
+       const context = createContext("bash", "gh pr list", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -207,9 +207,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
   })
 
   describe("Edge Cases", () => {
-    test("empty command → allowed", () => {
-      //#given empty command
-      const context = createContext("Bash", "", "build")
+     test("empty command → allowed", () => {
+       //#given empty command
+       const context = createContext("bash", "", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -218,9 +218,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
       expect(result.blocked).toBe(false)
     })
 
-    test("whitespace-only command → allowed", () => {
-      //#given whitespace command
-      const context = createContext("Bash", "   ", "build")
+     test("whitespace-only command → allowed", () => {
+       //#given whitespace command
+       const context = createContext("bash", "   ", "build")
 
       //#when enforcement check runs
       const result = enforceGitWriteRestriction(context, emptyConfig)
@@ -240,9 +240,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
         "git remote -v",
       ]
 
-      for (const cmd of readCommands) {
-        const context = createContext("Bash", cmd, "build")
-        const result = enforceGitWriteRestriction(context, emptyConfig)
+       for (const cmd of readCommands) {
+         const context = createContext("bash", cmd, "build")
+         const result = enforceGitWriteRestriction(context, emptyConfig)
 
         //#then all read operations allowed
         expect(result.blocked).toBe(false)
@@ -260,9 +260,9 @@ describe("Git Write Enforcement - Integration Tests", () => {
         "gh pr create",
       ]
 
-      for (const cmd of writeCommands) {
-        const context = createContext("Bash", cmd, "git-owner")
-        const result = enforceGitWriteRestriction(context, emptyConfig)
+       for (const cmd of writeCommands) {
+         const context = createContext("bash", cmd, "git-owner")
+         const result = enforceGitWriteRestriction(context, emptyConfig)
 
         //#then all operations allowed for git-owner
         expect(result.blocked).toBe(false)
@@ -271,21 +271,21 @@ describe("Git Write Enforcement - Integration Tests", () => {
   })
 
   describe("Context Flow Integration", () => {
-    test("full context creation → classifier → enforcement → decision", () => {
-      //#given complete PreToolUseContext
-      const fullContext: PreToolUseContext = {
-        sessionId: "integration-test-session",
-        toolName: "Bash",
-        toolInput: {
-          command: "git push origin main",
-          description: "Push changes to remote",
-        },
-        cwd: "/Users/test/project",
-        transcriptPath: "/tmp/transcript.json",
-        toolUseId: "tool-123",
-        permissionMode: "default",
-        agent: "build",
-      }
+     test("full context creation → classifier → enforcement → decision", () => {
+       //#given complete PreToolUseContext
+       const fullContext: PreToolUseContext = {
+         sessionId: "integration-test-session",
+         toolName: "bash",
+         toolInput: {
+           command: "git push origin main",
+           description: "Push changes to remote",
+         },
+         cwd: "/Users/test/project",
+         transcriptPath: "/tmp/transcript.json",
+         toolUseId: "tool-123",
+         permissionMode: "default",
+         agent: "build",
+       }
 
       //#when enforcement runs with full context
       const result = enforceGitWriteRestriction(fullContext, emptyConfig)
