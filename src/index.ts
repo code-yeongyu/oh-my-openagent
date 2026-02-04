@@ -254,13 +254,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  const boulderLoop = isHookEnabled("boulder-loop")
-    ? createBoulderLoopHook(ctx, {
-        config: pluginConfig.boulder_loop,
-        checkSessionExists: async (sessionId) => sessionExists(sessionId),
-      })
-    : null;
-
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? createEditErrorRecoveryHook(ctx)
     : null;
@@ -328,6 +321,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
+    : null;
+
+  const boulderLoop = isHookEnabled("boulder-loop")
+    ? createBoulderLoopHook(ctx, {
+        config: pluginConfig.boulder_loop,
+        checkSessionExists: async (sessionId) => sessionExists(sessionId),
+        backgroundManager,
+      })
     : null;
 
   initTaskToastManager(ctx.client);

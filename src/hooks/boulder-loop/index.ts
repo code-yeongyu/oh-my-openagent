@@ -59,6 +59,7 @@ export function createBoulderLoopHook(
   const config = options?.config
   const stateDir = config?.state_dir
   const checkSessionExists = options?.checkSessionExists
+  const backgroundManager = options?.backgroundManager
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -153,6 +154,15 @@ export function createBoulderLoopHook(
             })
           }
         }
+        return
+      }
+
+      const hasRunningBgTasks = backgroundManager
+        ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
+        : false
+
+      if (hasRunningBgTasks) {
+        log(`[${HOOK_NAME}] Skipped: background tasks still running`, { sessionID })
         return
       }
 

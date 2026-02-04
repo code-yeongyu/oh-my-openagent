@@ -1,4 +1,5 @@
 import type { BoulderLoopConfig } from "../../config"
+import type { BackgroundManager } from "../../features/background-agent/manager"
 
 export interface BoulderLoopState {
   active: boolean
@@ -13,4 +14,5 @@ export interface BoulderLoopState {
 export interface BoulderLoopOptions {
   config?: BoulderLoopConfig
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  backgroundManager?: BackgroundManager
 }
