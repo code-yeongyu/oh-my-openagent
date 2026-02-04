@@ -1,4 +1,4 @@
-import { join, dirname, basename } from "path"
+import { join, dirname, basename, isAbsolute } from "path"
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync } from "fs"
 import { randomUUID } from "crypto"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
@@ -10,7 +10,7 @@ export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
   const storagePath = tasksConfig?.storage_path
 
   if (storagePath) {
-    return storagePath.startsWith("/") ? storagePath : join(process.cwd(), storagePath)
+    return isAbsolute(storagePath) ? storagePath : join(process.cwd(), storagePath)
   }
 
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
