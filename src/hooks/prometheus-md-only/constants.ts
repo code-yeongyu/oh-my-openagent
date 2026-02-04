@@ -7,7 +7,9 @@ export const PROMETHEUS_AGENTS = ["prometheus", "Prometheus (Planner)"]
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
-export const ALLOWED_PATH_PREFIXES = ["changes/", ".sisyphus/"]
+// Only changes/ is writable, .sisyphus/ is read-only
+// Note: No trailing slash - the regex in index.ts handles path separators
+export const ALLOWED_PATH_PREFIXES = ["changes"]
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 

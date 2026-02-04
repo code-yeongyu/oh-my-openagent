@@ -32,9 +32,12 @@ function isAllowedFile(filePath: string, workspaceRoot: string): boolean {
   }
 
   // 4. Check if path is in allowed directory (changes/)
+  // Normalize the relative path to use forward slashes for consistent matching
+  const normalizedRel = rel.replace(/\\/g, "/")
   const isInAllowedDir = ALLOWED_PATH_PREFIXES.some(prefix => {
-    const pattern = new RegExp(`^${prefix}[/\\\\]`, "i")
-    return pattern.test(rel)
+    // Match prefix followed by a forward slash (after normalization)
+    const pattern = new RegExp(`^${prefix}/`, "i")
+    return pattern.test(normalizedRel)
   })
   if (!isInAllowedDir) {
     return false
