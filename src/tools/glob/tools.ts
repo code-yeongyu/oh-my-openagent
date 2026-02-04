@@ -20,10 +20,12 @@ export const glob: ToolDefinition = tool({
           "simply omit it for the default behavior. Must be a valid directory path if provided."
       ),
   },
-  execute: async (args) => {
+  execute: async (args, ctx) => {
     try {
       const cli = await resolveGrepCliWithAutoInstall()
-      const paths = args.path ? [args.path] : undefined
+      // Use ctx.directory as the default search path when no path is provided
+      const searchPath = args.path ?? ctx.directory
+      const paths = [searchPath]
 
       const result = await runRgFiles(
         {

@@ -20,10 +20,12 @@ export const grep: ToolDefinition = tool({
       .optional()
       .describe("The directory to search in. Defaults to the current working directory."),
   },
-  execute: async (args) => {
+  execute: async (args, ctx) => {
     try {
       const globs = args.include ? [args.include] : undefined
-      const paths = args.path ? [args.path] : undefined
+      // Use ctx.directory as the default search path when no path is provided
+      const searchPath = args.path ?? ctx.directory
+      const paths = [searchPath]
 
       const result = await runRg({
         pattern: args.pattern,
