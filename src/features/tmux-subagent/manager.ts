@@ -122,6 +122,14 @@ export class TmuxSessionManager {
   }
 
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
+    const info = event.properties?.info
+    const sessionId = info?.id
+    
+    if (sessionId && (this.sessions.has(sessionId) || this.pendingSessions.has(sessionId))) {
+      log("[tmux-session-manager] session already tracked or pending, skipping duplicate call", { sessionId })
+      return
+    }
+
     const enabled = this.isEnabled()
     log("[tmux-session-manager] onSessionCreated called", {
       enabled,
@@ -135,30 +143,23 @@ export class TmuxSessionManager {
      if (!enabled) return
      if (event.type !== "session.created") return
 
-     const info = event.properties?.info
-     if (!info?.id || !info?.parentID) return
+     if (!sessionId || !info?.parentID) return
 
-     const sessionId = info.id
      const opcSessionId = info.parentID
      const title = info.title ?? "Subagent"
-
-     if (this.sessions.has(sessionId) || this.pendingSessions.has(sessionId)) {
-       log("[tmux-session-manager] session already tracked or pending", { sessionId })
-       return
-     }
 
      if (!this.sourcePaneId) {
        log("[tmux-session-manager] no source pane id")
        return
      }
 
+     this.pendingSessions.add(sessionId)
+     
      this.openCodeSessions.set(sessionId, opcSessionId)
      log("[tmux-session-manager] stored OpenCode session ID", {
        sessionId,
        opcSessionId,
      })
-
-     this.pendingSessions.add(sessionId)
 
      try {
        if (this.adapter.capabilities.manualLayout) {
