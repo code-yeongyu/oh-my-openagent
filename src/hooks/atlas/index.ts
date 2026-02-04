@@ -431,7 +431,7 @@ export function createAtlasHook(
     return state
   }
 
-  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number): Promise<void> {
+  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number, agent?: string): Promise<void> {
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -477,7 +477,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-            agent: "atlas",
+            agent: agent ?? "atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },
@@ -568,7 +568,7 @@ export function createAtlasHook(
 
         state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
-        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total)
+        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total, boulderState.agent)
         return
       }
 
