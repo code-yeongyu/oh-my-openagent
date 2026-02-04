@@ -378,6 +378,7 @@ export const CustomAgentConfigSchema = z.object({
   promptPath: z.string().optional(),
   constraintsPath: z.string().optional(),
   decisionsPath: z.string().optional(),
+  knowledgePaths: z.array(z.string()).optional(),
   metadata: CustomAgentMetadataSchema.optional(),
 })
 

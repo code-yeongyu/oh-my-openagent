@@ -57,6 +57,7 @@ function initializeDecisionsFile(filePath: string): void {
 function buildSystemPrompt(
   ownerContent: string | undefined,
   constraintsContent: string | undefined,
+  knowledgeContents: string[] = [],
 ): string {
   const parts: string[] = []
 
@@ -68,6 +69,10 @@ function buildSystemPrompt(
 
   if (constraintsContent) {
     parts.push(`\n\n## Constraints Reference (Machine-Readable)\n\n\`\`\`yaml\n${constraintsContent}\n\`\`\``)
+  }
+
+  for (const knowledgeContent of knowledgeContents) {
+    parts.push(`\n\n---\n## Company Conventions\n\n${knowledgeContent}`)
   }
 
   return parts.join("\n")
@@ -100,6 +105,7 @@ You are the exclusive authority for version control, commit management, branch o
 export function createGitOwnerAgent(model: string, config?: CustomAgentConfig): AgentConfig {
   let ownerContent: string | undefined
   let constraintsContent: string | undefined
+  const knowledgeContents: string[] = []
 
   if (config?.promptPath) {
     ownerContent = safeReadFile(config.promptPath)
@@ -113,7 +119,16 @@ export function createGitOwnerAgent(model: string, config?: CustomAgentConfig): 
     initializeDecisionsFile(config.decisionsPath)
   }
 
-  const systemPrompt = buildSystemPrompt(ownerContent, constraintsContent)
+  if (config?.knowledgePaths && config.knowledgePaths.length > 0) {
+    for (const knowledgePath of config.knowledgePaths) {
+      const content = safeReadFile(knowledgePath)
+      if (content) {
+        knowledgeContents.push(content)
+      }
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(ownerContent, constraintsContent, knowledgeContents)
 
   return {
     description:
