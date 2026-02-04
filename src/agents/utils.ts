@@ -57,7 +57,8 @@ export function buildAgent(
   model: string,
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
-  browserProvider?: BrowserAutomationProvider
+  browserProvider?: BrowserAutomationProvider,
+  disabledSkills?: Set<string>
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : source
   const categoryConfigs: Record<string, CategoryConfig> = categories
@@ -81,7 +82,7 @@ export function buildAgent(
   }
 
   if (agentWithCategory.skills?.length) {
-    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider })
+    const { resolved } = resolveMultipleSkills(agentWithCategory.skills, { gitMasterConfig, browserProvider, disabledSkills })
     if (resolved.size > 0) {
       const skillContent = Array.from(resolved.values()).join("\n\n")
       base.prompt = skillContent + (base.prompt ? "\n\n" + base.prompt : "")
@@ -234,7 +235,8 @@ export async function createBuiltinAgents(
   discoveredSkills: LoadedSkill[] = [],
   client?: any,
   browserProvider?: BrowserAutomationProvider,
-  uiSelectedModel?: string
+  uiSelectedModel?: string,
+  disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
@@ -258,7 +260,7 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const builtinSkills = createBuiltinSkills({ browserProvider })
+  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills })
   const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({
@@ -291,16 +293,16 @@ export async function createBuiltinAgents(
      const override = agentOverrides[agentName]
        ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
      const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
-     
+
      // Check if agent requires a specific model
      if (requirement?.requiresModel && availableModels) {
        if (!isModelAvailable(requirement.requiresModel, availableModels)) {
          continue
        }
      }
-     
+
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
-     
+
     const resolution = applyModelResolution({
       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
       userModel: override?.model,
@@ -311,7 +313,7 @@ export async function createBuiltinAgents(
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
     
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
@@ -375,7 +377,7 @@ export async function createBuiltinAgents(
         availableSkills,
         availableCategories
       )
-      
+
       if (sisyphusResolvedVariant) {
         sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
       }
@@ -420,7 +422,7 @@ export async function createBuiltinAgents(
           availableSkills,
           availableCategories
         )
-        
+
         hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
         const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
@@ -468,7 +470,7 @@ export async function createBuiltinAgents(
         availableSkills,
         userCategories: categories,
       })
-      
+
       if (atlasResolvedVariant) {
         orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
       }
