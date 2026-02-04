@@ -33,33 +33,37 @@ export function injectServerAuthIntoClient(client: unknown): void {
     return
   }
 
-  // Runtime type guard for SDK client structure
-  if (
-    typeof client !== "object" ||
-    client === null ||
-    !("_client" in client) ||
-    typeof (client as { _client: unknown })._client !== "object" ||
-    (client as { _client: unknown })._client === null
-  ) {
-    throw new Error(
-      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client structure is incompatible. " +
-        "This may indicate an OpenCode SDK version mismatch."
-    )
+  try {
+    if (
+      typeof client !== "object" ||
+      client === null ||
+      !("_client" in client) ||
+      typeof (client as { _client: unknown })._client !== "object" ||
+      (client as { _client: unknown })._client === null
+    ) {
+      throw new Error(
+        "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client structure is incompatible. " +
+          "This may indicate an OpenCode SDK version mismatch."
+      )
+    }
+
+    const internal = (client as { _client: { setConfig?: (config: { headers: Record<string, string> }) => void } })
+      ._client
+
+    if (typeof internal.setConfig !== "function") {
+      throw new Error(
+        "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client._client.setConfig is not a function. " +
+          "This may indicate an OpenCode SDK version mismatch."
+      )
+    }
+
+    internal.setConfig({
+      headers: {
+        Authorization: auth,
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[opencode-server-auth] Failed to inject server auth: ${message}`)
   }
-
-  const internal = (client as { _client: { setConfig?: (config: { headers: Record<string, string> }) => void } })
-    ._client
-
-  if (typeof internal.setConfig !== "function") {
-    throw new Error(
-      "[opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client._client.setConfig is not a function. " +
-        "This may indicate an OpenCode SDK version mismatch."
-    )
-  }
-
-  internal.setConfig({
-    headers: {
-      Authorization: auth,
-    },
-  })
 }
