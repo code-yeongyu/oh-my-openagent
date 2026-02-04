@@ -241,11 +241,12 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 })
 
 describe("createBuiltinAgents with requiresModel gating", () => {
-  test("hephaestus is not created when gpt-5.2-codex is unavailable", async () => {
+  test("hephaestus is not created when gpt-5.2-codex is unavailable and provider not connected", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-5"])
     )
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
 
     try {
       // #when
@@ -255,6 +256,7 @@ describe("createBuiltinAgents with requiresModel gating", () => {
       expect(agents.hephaestus).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
     }
   })
 
@@ -368,11 +370,12 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
     }
   })
 
-  test("sisyphus is not created when no fallback model is available (unrelated model only)", async () => {
+  test("sisyphus is not created when no fallback model is available and provider not connected", async () => {
     // #given - only openai/gpt-5.2 available, not in sisyphus fallback chain
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["openai/gpt-5.2"])
     )
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
 
     try {
       // #when
@@ -382,6 +385,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       expect(agents.sisyphus).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
     }
   })
 })
