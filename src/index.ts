@@ -314,51 +314,34 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
    const backgroundManager = new BackgroundManager(ctx, pluginConfig.background_task, {
      tmuxConfig: updatedTmuxConfig,
-    onSubagentSessionCreated: async (event) => {
-      log("[index] onSubagentSessionCreated callback received", {
-        sessionID: event.sessionID,
-        parentID: event.parentID,
-        title: event.title,
-      });
-      if (tmuxSessionManager) {
-        await tmuxSessionManager.onSessionCreated({
-          type: "session.created",
-          properties: {
-            info: {
-              id: event.sessionID,
-              parentID: event.parentID,
-              title: event.title,
-            },
-          },
-        });
-        if (tmuxSessionManager) {
-          await tmuxSessionManager.onSessionCreated({
-            type: "session.created",
-            properties: {
-              info: {
-                id: event.sessionID,
-                parentID: event.parentID,
-                title: event.title,
-              },
-            },
-          });
-        }
-        log("[index] onSubagentSessionCreated callback completed");
-      },
-      onShutdown: () => {
-        if (tmuxSessionManager) {
-          tmuxSessionManager.cleanup().catch((error) => {
-            log("[index] tmux cleanup error during shutdown:", error);
-          });
-        }
-      },
-    },
-    onShutdown: () => {
-      tmuxSessionManager?.cleanup().catch((error) => {
-        log("[index] tmux cleanup error during shutdown:", error)
-      })
-    },
-  });
+     onSubagentSessionCreated: async (event) => {
+       log("[index] onSubagentSessionCreated callback received", {
+         sessionID: event.sessionID,
+         parentID: event.parentID,
+         title: event.title,
+       });
+       if (tmuxSessionManager) {
+         await tmuxSessionManager.onSessionCreated({
+           type: "session.created",
+           properties: {
+             info: {
+               id: event.sessionID,
+               parentID: event.parentID,
+               title: event.title,
+             },
+           },
+         });
+       }
+       log("[index] onSubagentSessionCreated callback completed");
+     },
+     onShutdown: () => {
+       if (tmuxSessionManager) {
+         tmuxSessionManager.cleanup().catch((error) => {
+           log("[index] tmux cleanup error during shutdown:", error);
+         });
+       }
+     },
+   });
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
