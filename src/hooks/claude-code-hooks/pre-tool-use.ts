@@ -16,6 +16,7 @@ export interface PreToolUseContext {
   transcriptPath?: string
   toolUseId?: string
   permissionMode?: "default" | "plan" | "acceptEdits" | "bypassPermissions"
+  agent?: string
 }
 
 export interface PreToolUseResult {
@@ -68,6 +69,7 @@ export async function executePreToolUseHooks(
     tool_input: objectToSnakeCase(ctx.toolInput),
     tool_use_id: ctx.toolUseId,
     hook_source: "opencode-plugin",
+    agent: ctx.agent,
   }
 
   const startTime = Date.now()

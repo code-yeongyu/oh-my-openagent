@@ -38,6 +38,7 @@ export interface PreToolUseInput {
   tool_input: Record<string, unknown>
   tool_use_id?: string
   hook_source?: HookSource
+  agent?: string
 }
 
 export interface PostToolUseInput {

@@ -5,6 +5,7 @@ import {
   executePreToolUseHooks,
   type PreToolUseContext,
 } from "./pre-tool-use"
+import { getSessionAgent } from "../../features/claude-code-session-state/state"
 import {
   executePostToolUseHooks,
   type PostToolUseContext,
@@ -211,14 +212,15 @@ export function createClaudeCodeHooksHook(
 
       cacheToolInput(input.sessionID, input.tool, input.callID, output.args as Record<string, unknown>)
 
-      if (!isHookDisabled(config, "PreToolUse")) {
-        const preCtx: PreToolUseContext = {
-          sessionId: input.sessionID,
-          toolName: input.tool,
-          toolInput: output.args as Record<string, unknown>,
-          cwd: ctx.directory,
-          toolUseId: input.callID,
-        }
+       if (!isHookDisabled(config, "PreToolUse")) {
+         const preCtx: PreToolUseContext = {
+           sessionId: input.sessionID,
+           toolName: input.tool,
+           toolInput: output.args as Record<string, unknown>,
+           cwd: ctx.directory,
+           toolUseId: input.callID,
+           agent: getSessionAgent(input.sessionID),
+         }
 
         const result = await executePreToolUseHooks(preCtx, claudeConfig, extendedConfig)
 
