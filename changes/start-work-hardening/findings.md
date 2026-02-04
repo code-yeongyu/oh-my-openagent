@@ -1,0 +1,3 @@
+- Noted start-work hook at `src/hooks/start-work/index.ts` uses `generateExecutionModePrompt` with auto-activation for >5 tasks; design requires mandatory mode selection.
+- `src/features/boulder-state/worktree-manager.ts` already provides wave worktree helpers and reusable primitives like `findOrCreateWorktreeDir` and `listGitWorktrees` for plan-level integration.
+- Codex MCP tool was unavailable (timeout / not exposed), so design drafts were produced without Codex prototype input.

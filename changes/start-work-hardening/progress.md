@@ -1,0 +1,1 @@
+- Created design doc and Prometheus-style task plan for start-work hardening.
