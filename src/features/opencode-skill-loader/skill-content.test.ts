@@ -1,5 +1,33 @@
-import { describe, it, expect } from "bun:test"
+/// <reference types="bun-types" />
+
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { resolveSkillContent, resolveMultipleSkills, resolveSkillContentAsync, resolveMultipleSkillsAsync } from "./skill-content"
+
+let originalEnv: Record<string, string | undefined>
+let testConfigDir: string
+
+beforeEach(() => {
+	originalEnv = {
+		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+	}
+	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
+	testConfigDir = join(tmpdir(), unique)
+	process.env.CLAUDE_CONFIG_DIR = testConfigDir
+	process.env.OPENCODE_CONFIG_DIR = testConfigDir
+})
+
+afterEach(() => {
+	for (const [key, value] of Object.entries(originalEnv)) {
+		if (value !== undefined) {
+			process.env[key] = value
+		} else {
+			delete process.env[key]
+		}
+	}
+})
 
 describe("resolveSkillContent", () => {
 	it("should return template for existing skill", () => {
