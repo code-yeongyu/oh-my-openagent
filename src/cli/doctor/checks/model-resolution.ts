@@ -182,17 +182,44 @@ function formatModelWithVariant(model: string, variant?: string): string {
   return variant ? `${model} (${variant})` : model
 }
 
+function getAgentOverride(
+  agentName: string,
+  config: OmoConfig,
+): { variant?: string; category?: string } | undefined {
+  const agentOverrides = config.agents
+  if (!agentOverrides) return undefined
+
+  // Direct lookup first, then case-insensitive lookup (matches agent-variant.ts)
+  return (
+    agentOverrides[agentName] ??
+    Object.entries(agentOverrides).find(
+      ([key]) => key.toLowerCase() === agentName.toLowerCase()
+    )?.[1]
+  )
+}
+
 function getEffectiveVariant(
   name: string,
   requirement: ModelRequirement,
   config: OmoConfig,
 ): string | undefined {
-  // Check user config first
-  const userVariant = config.agents?.[name]?.variant
-  if (userVariant) {
-    return userVariant
+  const agentOverride = getAgentOverride(name, config)
+
+  // Priority 1: Agent's direct variant override
+  if (agentOverride?.variant) {
+    return agentOverride.variant
   }
-  // Fall back to requirement's fallback chain
+
+  // Priority 2: Agent's category -> category's variant (matches agent-variant.ts)
+  const categoryName = agentOverride?.category
+  if (categoryName) {
+    const categoryVariant = config.categories?.[categoryName]?.variant
+    if (categoryVariant) {
+      return categoryVariant
+    }
+  }
+
+  // Priority 3: Fall back to requirement's fallback chain
   const firstEntry = requirement.fallbackChain[0]
   return firstEntry?.variant ?? requirement.variant
 }
@@ -201,6 +228,19 @@ interface AvailableModelsInfo {
   providers: string[]
   modelCount: number
   cacheExists: boolean
+}
+
+function getCategoryEffectiveVariant(
+  categoryName: string,
+  requirement: ModelRequirement,
+  config: OmoConfig,
+): string | undefined {
+  const categoryVariant = config.categories?.[categoryName]?.variant
+  if (categoryVariant) {
+    return categoryVariant
+  }
+  const firstEntry = requirement.fallbackChain[0]
+  return firstEntry?.variant ?? requirement.variant
 }
 
 function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo, config: OmoConfig): string[] {
@@ -232,10 +272,9 @@ function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModels
   details.push("Categories:")
   for (const category of info.categories) {
     const marker = category.userOverride ? "●" : "○"
-    const categoryVariant = config.categories?.[category.name]?.variant
     const display = formatModelWithVariant(
       category.effectiveModel,
-      categoryVariant ?? getEffectiveVariant(category.name, category.requirement, config)
+      getCategoryEffectiveVariant(category.name, category.requirement, config)
     )
     details.push(`  ${marker} ${category.name}: ${display}`)
   }
