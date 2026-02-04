@@ -251,10 +251,10 @@ function deduplicateSkills(skills: LoadedSkill[]): LoadedSkill[] {
 }
 
 export async function discoverAllSkills(): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills] = await Promise.all([
     discoverOpencodeProjectSkills(),
-    discoverProjectClaudeSkills(),
     discoverOpencodeGlobalSkills(),
+    discoverProjectClaudeSkills(),
     discoverUserClaudeSkills(),
   ])
 
