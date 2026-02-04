@@ -55,7 +55,9 @@ export function getClaudeSettingsPaths(customPath?: string): string[] {
     paths.unshift(customPath)
   }
 
-  return paths
+  // Deduplicate paths to prevent loading the same file multiple times
+  // (e.g., when cwd is the home directory)
+  return [...new Set(paths)]
 }
 
 function mergeHooksConfig(
