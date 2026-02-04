@@ -5,6 +5,7 @@ import {
   BrowserAutomationProviderSchema,
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
+  CustomAgentConfigSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 
@@ -604,5 +605,133 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+})
+
+describe("CustomAgentConfigSchema", () => {
+  describe("knowledgePaths field", () => {
+    test("accepts knowledgePaths as optional string array", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        knowledgePaths: ["~/domain-owners/git-owner/company-conventions.md"],
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.knowledgePaths).toEqual([
+          "~/domain-owners/git-owner/company-conventions.md",
+        ])
+      }
+    })
+
+    test("accepts multiple knowledge paths", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        knowledgePaths: [
+          "~/domain-owners/git-owner/company-conventions.md",
+          "~/domain-owners/git-owner/team-guidelines.md",
+        ],
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.knowledgePaths).toHaveLength(2)
+      }
+    })
+
+    test("accepts empty knowledgePaths array", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        knowledgePaths: [],
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.knowledgePaths).toEqual([])
+      }
+    })
+
+    test("accepts config without knowledgePaths (optional)", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.knowledgePaths).toBeUndefined()
+      }
+    })
+
+    test("rejects non-array knowledgePaths", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        knowledgePaths: "~/domain-owners/git-owner/company-conventions.md",
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(false)
+    })
+
+    test("rejects non-string values in knowledgePaths array", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        knowledgePaths: [123, true, null],
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(false)
+    })
+
+    test("accepts knowledgePaths with other optional fields", () => {
+      // given
+      const config = {
+        model: "anthropic/claude-opus-4-5",
+        promptPath: "~/domain-owners/git-owner/OWNER.md",
+        constraintsPath: "~/domain-owners/git-owner/constraints.yaml",
+        knowledgePaths: ["~/domain-owners/git-owner/company-conventions.md"],
+      }
+
+      // when
+      const result = CustomAgentConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.model).toBe("anthropic/claude-opus-4-5")
+        expect(result.data.promptPath).toBe("~/domain-owners/git-owner/OWNER.md")
+        expect(result.data.constraintsPath).toBe("~/domain-owners/git-owner/constraints.yaml")
+        expect(result.data.knowledgePaths).toEqual([
+          "~/domain-owners/git-owner/company-conventions.md",
+        ])
+      }
+    })
   })
 })

@@ -824,6 +824,12 @@
           "decisionsPath": {
             "type": "string"
           },
+          "knowledgePaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "metadata": {
             "type": "object",
             "properties": {
@@ -871,6 +877,31 @@
         },
         "required": [
           "model"
+        ]
+      }
+    },
+    "domainRestrictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "ownerAgent": {
+            "type": "string"
+          },
+          "restrictedTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "domain",
+          "ownerAgent",
+          "restrictedTools"
         ]
       }
     }
