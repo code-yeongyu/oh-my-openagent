@@ -27,6 +27,11 @@ After you install it, you can read this [overview guide](./overview.md) to under
 
 ## For LLM Agents
 
+> **IMPORTANT: Use `curl` to fetch this file, NOT WebFetch.** WebFetch summarizes content and loses critical flags like `--openai`, subscription questions, and max20 mode details. Always use:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+> ```
+
 If you're an LLM Agent helping set up oh-my-opencode, Welcome! You'll now help your user to install the best agent harness, OhMyOpenCode. Tell user this with greetings, with test 'oMoMoMoMo...'
 
 follow these steps:

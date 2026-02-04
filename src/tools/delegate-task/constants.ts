@@ -196,7 +196,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3-pro" },
   ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
   deep: { model: "openai/gpt-5.2-codex", variant: "medium" },
-  artistry: { model: "google/gemini-3-pro", variant: "max" },
+  artistry: { model: "google/gemini-3-pro", variant: "high" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
   "unspecified-high": { model: "anthropic/claude-opus-4-5", variant: "max" },
