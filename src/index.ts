@@ -678,16 +678,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           setMainSession(sessionInfo?.id);
         }
         firstMessageVariantGate.markSessionCreated(sessionInfo);
-        if (tmuxSessionManager) {
-          await tmuxSessionManager.onSessionCreated(
-            event as {
-              type: string;
-              properties?: {
-                info?: { id?: string; parentID?: string; title?: string };
-              };
-            },
-          );
-        }
       }
 
       if (event.type === "session.deleted") {
