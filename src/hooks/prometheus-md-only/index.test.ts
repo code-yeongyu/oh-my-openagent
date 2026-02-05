@@ -352,6 +352,121 @@ describe("prometheus-md-only", () => {
     })
   })
 
+  describe("boulder state priority over message files (fixes #927)", () => {
+    const BOULDER_DIR = join(tmpdir(), `boulder-test-${randomUUID()}`)
+    const BOULDER_FILE = join(BOULDER_DIR, ".sisyphus", "boulder.json")
+
+    beforeEach(() => {
+      mkdirSync(join(BOULDER_DIR, ".sisyphus"), { recursive: true })
+    })
+
+    afterEach(() => {
+      rmSync(BOULDER_DIR, { recursive: true, force: true })
+    })
+
+    //#given session was started with prometheus (first message), but /start-work set boulder agent to atlas
+    //#when user types "continue" after interruption (memory cleared, falls back to message files)
+    //#then should use boulder state agent (atlas), not message file agent (prometheus)
+    test("should prioritize boulder agent over message file agent", async () => {
+      // given - prometheus in message files (from /plan)
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      
+      // given - atlas in boulder state (from /start-work)
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: [TEST_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "atlas"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should NOT block because boulder says atlas, not prometheus
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should use prometheus from boulder state when set", async () => {
+      // given - atlas in message files (from some other agent)
+      setupMessageStorage(TEST_SESSION_ID, "atlas")
+      
+      // given - prometheus in boulder state (edge case, but should honor it)
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: [TEST_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "prometheus"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should block because boulder says prometheus
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should fall back to message files when session not in boulder", async () => {
+      // given - prometheus in message files
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      
+      // given - boulder state exists but for different session
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: ["other-session-id"],
+        plan_name: "test-plan",
+        agent: "atlas"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should block because falls back to message files (prometheus)
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+  })
+
   describe("without message storage", () => {
     test("should handle missing session gracefully (no agent found)", async () => {
       // given

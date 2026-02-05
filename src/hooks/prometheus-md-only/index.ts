@@ -4,6 +4,7 @@ import { join, resolve, relative, isAbsolute } from "node:path"
 import { HOOK_NAME, PROMETHEUS_AGENT, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { readBoulderState } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
@@ -70,8 +71,31 @@ function getAgentFromMessageFiles(sessionID: string): string | undefined {
   return findFirstMessageWithAgent(messageDir) ?? findNearestMessageWithFields(messageDir)?.agent
 }
 
-function getAgentFromSession(sessionID: string): string | undefined {
-  return getSessionAgent(sessionID) ?? getAgentFromMessageFiles(sessionID)
+/**
+ * Get the effective agent for the session.
+ * Priority order:
+ * 1. In-memory session agent (most recent, set by /start-work)
+ * 2. Boulder state agent (persisted across restarts, fixes #927)
+ * 3. Message files (fallback for sessions without boulder state)
+ *
+ * This fixes issue #927 where after interruption:
+ * - In-memory map is cleared (process restart)
+ * - Message files return "prometheus" (oldest message from /plan)
+ * - But boulder.json has agent: "atlas" (set by /start-work)
+ */
+function getAgentFromSession(sessionID: string, directory: string): string | undefined {
+  // Check in-memory first (current session)
+  const memoryAgent = getSessionAgent(sessionID)
+  if (memoryAgent) return memoryAgent
+
+  // Check boulder state (persisted across restarts) - fixes #927
+  const boulderState = readBoulderState(directory)
+  if (boulderState?.session_ids.includes(sessionID) && boulderState.agent) {
+    return boulderState.agent
+  }
+
+  // Fallback to message files
+  return getAgentFromMessageFiles(sessionID)
 }
 
 export function createPrometheusMdOnlyHook(ctx: PluginInput) {
@@ -80,7 +104,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      const agentName = getAgentFromSession(input.sessionID)
+      const agentName = getAgentFromSession(input.sessionID, ctx.directory)
 
       if (agentName !== PROMETHEUS_AGENT) {
         return

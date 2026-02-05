@@ -38,4 +38,5 @@ export { createCompactionContextInjector, type SummarizeContext } from "./compac
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
+export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallbackOptions } from "./runtime-fallback";
