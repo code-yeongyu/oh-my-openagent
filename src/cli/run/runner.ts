@@ -5,6 +5,7 @@ import { checkCompletionConditions } from "./completion"
 import { createEventState, processEvents, serializeError } from "./events"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { loadPluginConfig } from "../../plugin-config"
+import { getAvailableServerPort, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
 
 const POLL_INTERVAL_MS = 500
 const DEFAULT_TIMEOUT_MS = 0
@@ -89,7 +90,7 @@ export async function run(options: RunOptions): Promise<number> {
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
 
-  console.log(pc.cyan("Starting opencode server..."))
+  console.log(pc.cyan("Starting opencode server (auto port selection enabled)..."))
 
   const abortController = new AbortController()
   let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -103,18 +104,24 @@ export async function run(options: RunOptions): Promise<number> {
   }
 
   try {
-    // Support custom OpenCode server port via environment variable
-    // This allows Open Agent and other orchestrators to run multiple
-    // concurrent missions without port conflicts
-    const serverPort = process.env.OPENCODE_SERVER_PORT
+    const envPort = process.env.OPENCODE_SERVER_PORT
       ? parseInt(process.env.OPENCODE_SERVER_PORT, 10)
       : undefined
-    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || undefined
+    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || "127.0.0.1"
+    const preferredPort = envPort && !isNaN(envPort) ? envPort : DEFAULT_SERVER_PORT
+
+    const { port: serverPort, wasAutoSelected } = await getAvailableServerPort(preferredPort, serverHostname)
+
+    if (wasAutoSelected) {
+      console.log(pc.yellow(`Port ${preferredPort} is busy, using port ${serverPort} instead`))
+    } else {
+      console.log(pc.dim(`Using port ${serverPort}`))
+    }
 
     const { client, server } = await createOpencode({
       signal: abortController.signal,
-      ...(serverPort && !isNaN(serverPort) ? { port: serverPort } : {}),
-      ...(serverHostname ? { hostname: serverHostname } : {}),
+      port: serverPort,
+      hostname: serverHostname,
     })
 
     const cleanup = () => {
