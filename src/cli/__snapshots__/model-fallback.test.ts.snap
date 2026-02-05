@@ -75,26 +75,26 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-sonnet-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "multimodal-looker": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -103,7 +103,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-high": {
@@ -113,7 +113,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "writing": {
@@ -137,26 +137,26 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-sonnet-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "multimodal-looker": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -165,18 +165,18 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-low": {
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "writing": {
@@ -458,7 +458,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -473,11 +473,11 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -531,7 +531,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -546,11 +546,11 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -571,7 +571,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-low": {
@@ -1009,7 +1009,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -1024,11 +1024,11 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1151,26 +1151,26 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "multimodal-looker": {
       "model": "zai-coding-plan/glm-4.6v",
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1179,7 +1179,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-high": {
@@ -1189,7 +1189,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "writing": {
@@ -1213,11 +1213,11 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-5",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "multimodal-looker": {
@@ -1228,11 +1228,11 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1355,7 +1355,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -1370,11 +1370,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1428,7 +1428,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -1443,11 +1443,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "high",
     },
     "prometheus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1468,7 +1468,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-low": {
