@@ -6,7 +6,7 @@
  */
 
 import type { CategoryConfig } from "../../config/schema"
-import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
+import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
 
 export const getCategoryDescription = (name: string, userCategories?: Record<string, CategoryConfig>) =>
@@ -70,7 +70,7 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
     return `| \`${s.name}\` | ${shortDesc} | ${source} |`
   })
 
-  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
+  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills, "**")
 
   let skillsTable: string
 
@@ -81,27 +81,9 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
 |-------|-------------|
 ${builtinRows.join("\n")}
 
-**User-Installed Skills (HIGH PRIORITY):**
-
-The user installed these for their workflow. They MUST be evaluated for EVERY delegation.
-
-| Skill | When to Use | Source |
-|-------|-------------|--------|
-${customRows.join("\n")}
-
-> **CRITICAL**: The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.
-> When in doubt, INCLUDE a user-installed skill rather than omit it.`
+${customSkillBlock}`
   } else if (customSkills.length > 0) {
-    skillsTable = `**User-Installed Skills (HIGH PRIORITY):**
-
-The user installed these for their workflow. They MUST be evaluated for EVERY delegation.
-
-| Skill | When to Use | Source |
-|-------|-------------|--------|
-${customRows.join("\n")}
-
-> **CRITICAL**: The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.
-> When in doubt, INCLUDE a user-installed skill rather than omit it.`
+    skillsTable = customSkillBlock
   } else {
     skillsTable = `| Skill | When to Use |
 |-------|-------------|
