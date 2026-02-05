@@ -451,8 +451,16 @@ claude project body.
         expect(duplicates[0]?.definition.description).toContain("opencode-project")
       } finally {
         process.chdir(originalCwd)
-        process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
-        process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
       }
     })
 
@@ -503,8 +511,16 @@ claude project body.
         expect(matches[0]?.definition.description).toContain("opencode-global")
       } finally {
         process.chdir(originalCwd)
-        process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
-        process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
       }
     })
 
@@ -536,7 +552,11 @@ Skill body.
         expect(names.length).toBe(uniqueNames.length)
       } finally {
         process.chdir(originalCwd)
-        process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
       }
     })
   })
