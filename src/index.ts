@@ -100,59 +100,27 @@ import {
   isOpenCodeVersionAtLeast,
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
   injectServerAuthIntoClient,
+  createDirectoryBoundClient,
 } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
-
-type DirectoryQuery = { query?: Record<string, unknown> };
-
-function withDirectoryArgs(
-  args: DirectoryQuery | undefined,
-  directory: string,
-) {
-  if (!args) return { query: { directory } };
-  const query =
-    typeof args.query === "object" && args.query ? args.query : undefined;
-  if (query && "directory" in query) return args;
-  return { ...args, query: { ...query, directory } };
-}
-
-function wrapSession<T extends object>(session: T, directory: string): T {
-  const handler: ProxyHandler<T> = {
-    get(target, prop) {
-      const value = target[prop as keyof T];
-      if (typeof value !== "function") return value;
-      return (args?: DirectoryQuery) => {
-        const next = withDirectoryArgs(args, directory);
-        const fn = value as (input: DirectoryQuery) => unknown;
-        return fn.call(target, next);
-      };
-    },
-  };
-  return new Proxy(session, handler);
-}
-
-function injectDirectoryClient<T extends { session?: object }>(
-  client: T,
-  directory: string,
-): T {
-  if (!client.session) return client;
-  const wrapped = wrapSession(client.session, directory);
-  client.session = wrapped as T["session"];
-  return client;
-}
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   });
   injectServerAuthIntoClient(ctx.client);
+
+  const ctxWithDirectory = {
+    ...ctx,
+    client: createDirectoryBoundClient(ctx.client, ctx.directory),
+  };
+
   // Start background tmux check immediately
-  injectDirectoryClient(ctx.client, ctx.directory);
   startTmuxCheck();
 
-  const pluginConfig = loadPluginConfig(ctx.directory, ctx);
+  const pluginConfig = loadPluginConfig(ctxWithDirectory.directory, ctxWithDirectory);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const firstMessageVariantGate = createFirstMessageVariantGate();
 
@@ -168,15 +136,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const modelCacheState = createModelCacheState();
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
-    ? createContextWindowMonitorHook(ctx)
+    ? createContextWindowMonitorHook(ctxWithDirectory)
     : null;
   const preemptiveCompaction =
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
-      ? createPreemptiveCompactionHook(ctx)
+      ? createPreemptiveCompactionHook(ctxWithDirectory)
       : null;
   const sessionRecovery = isHookEnabled("session-recovery")
-    ? createSessionRecoveryHook(ctx, {
+    ? createSessionRecoveryHook(ctxWithDirectory, {
         experimental: pluginConfig.experimental,
       })
     : null;
@@ -195,7 +163,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         allPlugins: externalNotifier.allPlugins,
       });
     } else {
-      sessionNotification = createSessionNotification(ctx);
+      sessionNotification = createSessionNotification(ctxWithDirectory);
     }
   }
 
@@ -203,7 +171,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createCommentCheckerHooks(pluginConfig.comment_checker)
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
-    ? createToolOutputTruncatorHook(ctx, {
+    ? createToolOutputTruncatorHook(ctxWithDirectory, {
         experimental: pluginConfig.experimental,
       })
     : null;
@@ -224,20 +192,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         },
       );
     } else {
-      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctxWithDirectory);
     }
   }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
-    ? createDirectoryReadmeInjectorHook(ctx)
+    ? createDirectoryReadmeInjectorHook(ctxWithDirectory)
     : null;
   const emptyTaskResponseDetector = isHookEnabled(
     "empty-task-response-detector",
   )
-    ? createEmptyTaskResponseDetectorHook(ctx)
+    ? createEmptyTaskResponseDetectorHook(ctxWithDirectory)
     : null;
   const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(
-    ctx,
+    ctxWithDirectory,
     {
       disabledHooks:
         (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
@@ -248,33 +216,33 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery",
   )
-    ? createAnthropicContextWindowLimitRecoveryHook(ctx, {
+    ? createAnthropicContextWindowLimitRecoveryHook(ctxWithDirectory, {
         experimental: pluginConfig.experimental,
       })
     : null;
   const rulesInjector = isHookEnabled("rules-injector")
-    ? createRulesInjectorHook(ctx)
+    ? createRulesInjectorHook(ctxWithDirectory)
     : null;
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
-    ? createAutoUpdateCheckerHook(ctx, {
+    ? createAutoUpdateCheckerHook(ctxWithDirectory, {
         showStartupToast: isHookEnabled("startup-toast"),
         isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
         autoUpdate: pluginConfig.auto_update ?? true,
       })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
-    ? createKeywordDetectorHook(ctx, contextCollector)
+    ? createKeywordDetectorHook(ctxWithDirectory, contextCollector)
     : null;
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
-    ? createAgentUsageReminderHook(ctx)
+    ? createAgentUsageReminderHook(ctxWithDirectory)
     : null;
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
-    ? createNonInteractiveEnvHook(ctx)
+    ? createNonInteractiveEnvHook(ctxWithDirectory)
     : null;
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
-    ? createInteractiveBashSessionHook(ctx)
+    ? createInteractiveBashSessionHook(ctxWithDirectory)
     : null;
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
@@ -282,34 +250,34 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const categorySkillReminder = isHookEnabled("category-skill-reminder")
-    ? createCategorySkillReminderHook(ctx)
+    ? createCategorySkillReminderHook(ctxWithDirectory)
     : null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
-    ? createRalphLoopHook(ctx, {
+    ? createRalphLoopHook(ctxWithDirectory, {
         config: pluginConfig.ralph_loop,
         checkSessionExists: async (sessionId) => sessionExists(sessionId),
       })
     : null;
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
-    ? createEditErrorRecoveryHook(ctx)
+    ? createEditErrorRecoveryHook(ctxWithDirectory)
     : null;
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
-    ? createDelegateTaskRetryHook(ctx)
+    ? createDelegateTaskRetryHook(ctxWithDirectory)
     : null;
 
   const startWork = isHookEnabled("start-work")
-    ? createStartWorkHook(ctx)
+    ? createStartWorkHook(ctxWithDirectory)
     : null;
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
-    ? createPrometheusMdOnlyHook(ctx)
+    ? createPrometheusMdOnlyHook(ctxWithDirectory)
     : null;
 
   const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
-    ? createSisyphusJuniorNotepadHook(ctx)
+    ? createSisyphusJuniorNotepadHook(ctxWithDirectory)
     : null;
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
@@ -321,15 +289,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
-    ? createWriteExistingFileGuardHook(ctx)
+    ? createWriteExistingFileGuardHook(ctxWithDirectory)
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
-  const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
+  const tmuxSessionManager = new TmuxSessionManager(ctxWithDirectory, tmuxConfig);
 
   const backgroundManager = new BackgroundManager(
-    ctx,
+    ctxWithDirectory,
     pluginConfig.background_task,
     {
       tmuxConfig,
@@ -360,13 +328,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   );
 
   const atlasHook = isHookEnabled("atlas")
-    ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
+    ? createAtlasHook(ctxWithDirectory, { directory: ctx.directory, backgroundManager })
     : null;
 
-  initTaskToastManager(ctx.client);
+  initTaskToastManager(ctxWithDirectory.client);
 
   const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
-    ? createStopContinuationGuardHook(ctx)
+    ? createStopContinuationGuardHook(ctxWithDirectory)
     : null;
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
@@ -374,7 +342,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? createTodoContinuationEnforcer(ctx, {
+    ? createTodoContinuationEnforcer(ctxWithDirectory, {
         backgroundManager,
         isContinuationStopped: stopContinuationGuard?.isStopped,
       })
@@ -387,7 +355,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           client: {
             session: {
               messages: async (args) => {
-                const result = await ctx.client.session.messages(args);
+                const result = await ctxWithDirectory.client.session.messages(args);
                 if (Array.isArray(result)) return result;
                 if (
                   typeof result === "object" &&
@@ -400,7 +368,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
                 return [];
               },
               prompt: async (args) => {
-                await ctx.client.session.prompt(args);
+                await ctxWithDirectory.client.session.prompt(args);
               },
             },
           },
@@ -422,19 +390,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
-  const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
+  const backgroundTools = createBackgroundTools(
+    backgroundManager,
+    ctxWithDirectory.client,
+  );
 
-  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
+  const callOmoAgent = createCallOmoAgent(ctxWithDirectory, backgroundManager);
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
   );
-  const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null;
+  const lookAt = isMultimodalLookerEnabled ? createLookAt(ctxWithDirectory) : null;
   const browserProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
   const delegateTask = createDelegateTask({
     manager: backgroundManager,
-    client: ctx.client,
+    client: ctxWithDirectory.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
@@ -511,7 +482,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const configHandler = createConfigHandler({
-    ctx: { directory: ctx.directory, client: ctx.client },
+    ctx: { directory: ctxWithDirectory.directory, client: ctxWithDirectory.client },
     pluginConfig,
     modelCacheState,
   });
@@ -519,10 +490,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false;
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
-        task_create: createTaskCreateTool(pluginConfig, ctx),
+        task_create: createTaskCreateTool(pluginConfig, ctxWithDirectory),
         task_get: createTaskGetTool(pluginConfig),
         task_list: createTaskList(pluginConfig),
-        task_update: createTaskUpdateTool(pluginConfig, ctx),
+        task_update: createTaskUpdateTool(pluginConfig, ctxWithDirectory),
       }
     : {};
 
@@ -577,7 +548,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await startWork?.["chat.message"]?.(input, output);
 
       if (!hasConnectedProvidersCache()) {
-        ctx.client.tui
+        ctxWithDirectory.client.tui
           .showToast({
             body: {
               title: "⚠️ Provider Cache Missing",
@@ -749,11 +720,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             sessionID === getMainSessionID() &&
             !stopContinuationGuard?.isStopped(sessionID)
           ) {
-            await ctx.client.session
+            await ctxWithDirectory.client.session
               .prompt({
                 path: { id: sessionID },
                 body: { parts: [{ type: "text", text: "continue" }] },
-                query: { directory: ctx.directory },
+                query: { directory: ctxWithDirectory.directory },
               })
               .catch(() => {});
           }
