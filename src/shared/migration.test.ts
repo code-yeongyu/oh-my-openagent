@@ -470,11 +470,12 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "google/gemini-3-flash" },
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
+      { model: "anthropic/claude-opus-4-5" },
       { model: "anthropic/claude-opus-4-6" },
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
-    const expectedCategories = ["visual-engineering", "writing", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]
+    const expectedCategories = ["visual-engineering", "writing", "ultrabrain", "quick", "unspecified-high", "unspecified-high", "unspecified-low"]
 
     // when: Migrate each config
     const results = configs.map(migrateAgentConfigToCategory)
@@ -485,6 +486,23 @@ describe("migrateAgentConfigToCategory", () => {
       expect(result.migrated.category).toBe(expectedCategories[index])
       expect(result.migrated.model).toBeUndefined()
     })
+  })
+
+  test("migrates legacy claude-opus-4-5 to unspecified-high category for backward compatibility", () => {
+    // given: Config with legacy claude-opus-4-5 model (used before upgrade to 4-6)
+    const config = {
+      model: "anthropic/claude-opus-4-5",
+      temperature: 0.1,
+    }
+
+    // when: Migrate agent config to category
+    const { migrated, changed } = migrateAgentConfigToCategory(config)
+
+    // then: Should migrate to unspecified-high category (same as opus-4-6)
+    expect(changed).toBe(true)
+    expect(migrated.category).toBe("unspecified-high")
+    expect(migrated.model).toBeUndefined()
+    expect(migrated.temperature).toBe(0.1)
   })
 
   test("preserves non-model fields during migration", () => {
