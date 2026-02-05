@@ -139,12 +139,14 @@ export function getPlanName(planPath: string): string {
  */
 export function createBoulderState(
   planPath: string,
-  sessionId: string
+  sessionId: string,
+  agent?: string
 ): BoulderState {
   return {
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
+    ...(agent !== undefined ? { agent } : {}),
   }
 }
