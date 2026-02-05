@@ -619,7 +619,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
-	function writeProviderModelsCache(data: { models: Record<string, string[]>; connected: string[] }) {
+	function writeProviderModelsCache(data: { models: Record<string, string[] | any[]>; connected: string[] }) {
 		const cacheDir = join(tempDir, "oh-my-opencode")
 		require("fs").mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "provider-models.json"), JSON.stringify({
@@ -722,6 +722,72 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		expect(result.has("opencode/glm-4.7-free")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-5")).toBe(false)
 		expect(result.has("google/gemini-3-pro")).toBe(false)
+	})
+
+	it("should handle object[] format with metadata (Ollama-style)", async () => {
+		writeProviderModelsCache({
+			models: {
+				ollama: [
+					{ id: "ministral-3:14b-32k-agent", provider: "ollama", context: 32768, output: 8192 },
+					{ id: "qwen3-coder:32k-agent", provider: "ollama", context: 32768, output: 8192 }
+				]
+			},
+			connected: ["ollama"]
+		})
+
+		const result = await fetchAvailableModels(undefined, {
+			connectedProviders: ["ollama"]
+		})
+
+		expect(result.size).toBe(2)
+		expect(result.has("ollama/ministral-3:14b-32k-agent")).toBe(true)
+		expect(result.has("ollama/qwen3-coder:32k-agent")).toBe(true)
+	})
+
+	it("should handle mixed string[] and object[] formats across providers", async () => {
+		writeProviderModelsCache({
+			models: {
+				anthropic: ["claude-opus-4-5", "claude-sonnet-4-5"],
+				ollama: [
+					{ id: "ministral-3:14b-32k-agent", provider: "ollama" },
+					{ id: "qwen3-coder:32k-agent", provider: "ollama" }
+				]
+			},
+			connected: ["anthropic", "ollama"]
+		})
+
+		const result = await fetchAvailableModels(undefined, {
+			connectedProviders: ["anthropic", "ollama"]
+		})
+
+		expect(result.size).toBe(4)
+		expect(result.has("anthropic/claude-opus-4-5")).toBe(true)
+		expect(result.has("anthropic/claude-sonnet-4-5")).toBe(true)
+		expect(result.has("ollama/ministral-3:14b-32k-agent")).toBe(true)
+		expect(result.has("ollama/qwen3-coder:32k-agent")).toBe(true)
+	})
+
+	it("should skip invalid entries in object[] format", async () => {
+		writeProviderModelsCache({
+			models: {
+				ollama: [
+					{ id: "valid-model", provider: "ollama" },
+					{ provider: "ollama" },
+					{ id: "", provider: "ollama" },
+					null,
+					"string-model"
+				]
+			},
+			connected: ["ollama"]
+		})
+
+		const result = await fetchAvailableModels(undefined, {
+			connectedProviders: ["ollama"]
+		})
+
+		expect(result.size).toBe(2)
+		expect(result.has("ollama/valid-model")).toBe(true)
+		expect(result.has("ollama/string-model")).toBe(true)
 	})
 })
 

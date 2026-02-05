@@ -11,8 +11,16 @@ interface ConnectedProvidersCache {
 	updatedAt: string
 }
 
+interface ModelMetadata {
+	id: string
+	provider?: string
+	context?: number
+	output?: number
+	name?: string
+}
+
 interface ProviderModelsCache {
-	models: Record<string, string[]>
+	models: Record<string, string[] | ModelMetadata[]>
 	connected: string[]
 	updatedAt: string
 }
