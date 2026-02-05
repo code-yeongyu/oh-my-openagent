@@ -875,6 +875,90 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
   })
 })
 
+describe("BackgroundManager.notifyParentSession - aborted parent", () => {
+  test("should skip notification when parent session is aborted", async () => {
+    //#given
+    let promptCalled = false
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalled = true
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => {
+          const error = new Error("User aborted")
+          error.name = "MessageAbortedError"
+          throw error
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-parent",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task aborted parent",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id, "task-remaining"]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should swallow aborted error from prompt", async () => {
+    //#given
+    let promptCalled = false
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalled = true
+          const error = new Error("User aborted")
+          error.name = "MessageAbortedError"
+          throw error
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-prompt",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task aborted prompt",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(true)
+
+    manager.shutdown()
+  })
+})
+
 function buildNotificationPromptBody(
   task: BackgroundTask,
   currentMessage: CurrentMessage | null
