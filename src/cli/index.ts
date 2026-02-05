@@ -5,6 +5,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { config } from "./config"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -153,6 +154,27 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("config")
+  .description("Interactive TUI configuration editor for oh-my-opencode")
+  .addHelpText("after", `
+Examples:
+  $ bunx oh-my-opencode config
+
+Interactive editor for:
+  - Agent configurations (model, category, fallback, permissions)
+  - Category settings (model, description)
+  - Root defaults (default_run_agent)
+  - Bulk operations (set values for all agents at once)
+  - Validation warnings
+
+The editor will create a backup of your config before saving.
+`)
+  .action(async () => {
+    const exitCode = await config()
     process.exit(exitCode)
   })
 
