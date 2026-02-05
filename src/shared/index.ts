@@ -34,6 +34,7 @@ export {
   type ModelResolutionResult as ModelResolutionPipelineResult,
   type ModelResolutionProvenance,
 } from "./model-resolution-pipeline"
+export { normalizeFallbackModels } from "./model-resolver"
 export * from "./model-availability"
 export * from "./connected-providers-cache"
 export * from "./session-utils"

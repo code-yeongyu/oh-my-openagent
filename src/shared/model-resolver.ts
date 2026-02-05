@@ -1,4 +1,3 @@
-import { log } from "./logger"
 import type { FallbackEntry } from "./model-requirements"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
 
@@ -6,6 +5,17 @@ export type ModelResolutionInput = {
 	userModel?: string
 	inheritedModel?: string
 	systemDefault?: string
+}
+
+/**
+ * Normalizes fallback_models to an array.
+ * Handles single string or array input, returns undefined for falsy values.
+ */
+export function normalizeFallbackModels(
+	fallbackModels: string | string[] | undefined | null
+): string[] | undefined {
+	if (!fallbackModels) return undefined
+	return Array.isArray(fallbackModels) ? fallbackModels : [fallbackModels]
 }
 
 export type ModelSource =

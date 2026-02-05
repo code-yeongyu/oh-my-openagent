@@ -90,6 +90,7 @@ export type AgentName = BuiltinAgentName
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string
   variant?: string
+  fallback_models?: string | string[]
 }
 
 export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>
