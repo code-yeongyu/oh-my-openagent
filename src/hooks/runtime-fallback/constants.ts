@@ -29,9 +29,9 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /overloaded/i,
   /temporarily.?unavailable/i,
   /try.?again/i,
-  /\b429\b/,
-  /\b503\b/,
-  /\b529\b/,
+  /(?:^|\s)429(?:\s|$)/,
+  /(?:^|\s)503(?:\s|$)/,
+  /(?:^|\s)529(?:\s|$)/,
 ]
 
 /**
