@@ -42,7 +42,7 @@ describe("model-resolution check", () => {
       // given: User has override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-5" },
+          oracle: { model: "anthropic/claude-opus-4-6" },
         },
       }
 
@@ -51,8 +51,8 @@ describe("model-resolution check", () => {
       // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-5")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-5")
+      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
+      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
     })
 
     it("shows user override for category when configured", async () => {

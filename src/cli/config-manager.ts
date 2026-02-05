@@ -544,8 +544,8 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
           max: { thinkingConfig: { thinkingBudget: 32768 } },
         },
       },
-      "antigravity-claude-opus-4-5-thinking": {
-        name: "Claude Opus 4.5 Thinking (Antigravity)",
+      "antigravity-claude-opus-4-6-thinking": {
+        name: "Claude Opus 4.6 Thinking (Antigravity)",
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {

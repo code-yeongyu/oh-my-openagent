@@ -38,14 +38,14 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
 
 /**
  * Normalizes model IDs to use consistent hyphen formatting.
- * GitHub Copilot may use dots (claude-opus-4.5) but our maps use hyphens (claude-opus-4-5).
+ * GitHub Copilot may use dots (claude-opus-4.6) but our maps use hyphens (claude-opus-4-6).
  * This ensures lookups work regardless of format.
  *
  * @example
- * normalizeModelID("claude-opus-4.5") // "claude-opus-4-5"
+ * normalizeModelID("claude-opus-4.6") // "claude-opus-4-6"
  * normalizeModelID("gemini-3.5-pro") // "gemini-3-5-pro"
  * normalizeModelID("gpt-5.2") // "gpt-5-2"
- * normalizeModelID("vertex_ai/claude-opus-4.5") // "vertex_ai/claude-opus-4-5"
+ * normalizeModelID("vertex_ai/claude-opus-4.6") // "vertex_ai/claude-opus-4-6"
  */
 function normalizeModelID(modelID: string): string {
   // Replace dots with hyphens when followed by a digit
@@ -59,10 +59,10 @@ function normalizeModelID(modelID: string): string {
  * model provider (Anthropic, Google, OpenAI).
  *
  * @example
- * resolveProvider("github-copilot", "claude-opus-4-5") // "anthropic"
+ * resolveProvider("github-copilot", "claude-opus-4-6") // "anthropic"
  * resolveProvider("github-copilot", "gemini-3-pro") // "google"
  * resolveProvider("github-copilot", "gpt-5.2") // "openai"
- * resolveProvider("anthropic", "claude-opus-4-5") // "anthropic" (unchanged)
+ * resolveProvider("anthropic", "claude-opus-4-6") // "anthropic" (unchanged)
  */
 function resolveProvider(providerID: string, modelID: string): string {
   // GitHub Copilot is a proxy - infer actual provider from model name
@@ -89,7 +89,6 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
   "claude-sonnet-4-5": "claude-sonnet-4-5-high",
   "claude-opus-4-6": "claude-opus-4-6-high",
-  "claude-opus-4-5": "claude-opus-4-5-high",
    // Gemini
    "gemini-3-pro": "gemini-3-pro-high",
    "gemini-3-pro-low": "gemini-3-pro-high",

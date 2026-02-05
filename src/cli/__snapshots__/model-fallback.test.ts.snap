@@ -605,7 +605,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -620,11 +620,11 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "high",
     },
     "prometheus": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -678,7 +678,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "momus": {
@@ -693,11 +693,11 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "high",
     },
     "prometheus": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -718,7 +718,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "opencode/claude-opus-4-5",
+      "model": "opencode/claude-opus-4-6",
       "variant": "max",
     },
     "unspecified-low": {
@@ -752,7 +752,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "metis": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -767,11 +767,11 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "variant": "high",
     },
     "prometheus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
   },
@@ -825,7 +825,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "metis": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -840,11 +840,11 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "high",
     },
     "prometheus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
   },
@@ -865,7 +865,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "unspecified-low": {
@@ -1082,7 +1082,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "metis": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -1097,11 +1097,11 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "high",
     },
     "prometheus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
   },
@@ -1282,7 +1282,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "momus": {
@@ -1297,11 +1297,11 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "high",
     },
     "prometheus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
     "sisyphus": {
-      "model": "github-copilot/claude-opus-4.5",
+      "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
     },
   },

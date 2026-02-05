@@ -182,7 +182,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
       "antigravity-gemini-3-flash",
       "antigravity-claude-sonnet-4-5",
       "antigravity-claude-sonnet-4-5-thinking",
-      "antigravity-claude-opus-4-5-thinking",
+      "antigravity-claude-opus-4-6-thinking",
     ]
 
     for (const key of required) {
@@ -228,7 +228,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 
     // #when checking Claude thinking variants
     const sonnetThinking = models["antigravity-claude-sonnet-4-5-thinking"]
-    const opusThinking = models["antigravity-claude-opus-4-5-thinking"]
+    const opusThinking = models["antigravity-claude-opus-4-6-thinking"]
 
     // #then both should have low and max variants
     for (const model of [sonnetThinking, opusThinking]) {
@@ -298,8 +298,8 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-5 providers)
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.5")
+    // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-6 providers)
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.6")
   })
 
   test("uses ultimate fallback when no providers configured", () => {

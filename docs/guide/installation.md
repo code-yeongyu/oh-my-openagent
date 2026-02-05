@@ -164,7 +164,7 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 - `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
 - `google/antigravity-claude-sonnet-4-5` — no variants
 - `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
-- `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-opus-4-6-thinking` — variants: `low`, `max`
 
 **Available models (Gemini CLI quota)**:
 - `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
@@ -196,7 +196,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.5` |
+| **Sisyphus**  | `github-copilot/claude-opus-4.6` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
 | **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
@@ -218,13 +218,13 @@ If Z.ai is the only provider available, all agents will use GLM models:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `opencode/claude-opus-4-5`       |
+| **Sisyphus**  | `opencode/claude-opus-4-6`       |
 | **Oracle**    | `opencode/gpt-5.2`               |
 | **Explore**   | `opencode/gpt-5-nano`             |
 | **Librarian** | `opencode/glm-4.7-free`          |
