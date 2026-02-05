@@ -14,6 +14,8 @@ export interface BoulderState {
   session_ids: string[]
   /** Plan name derived from filename */
   plan_name: string
+  /** Agent type to use when resuming (e.g., 'atlas') */
+  agent?: string
 }
 
 export interface PlanProgress {

@@ -858,8 +858,8 @@ describe("atlas hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-     test("should not inject when last agent is not Atlas", async () => {
-       // given - boulder state with incomplete plan, but last agent is NOT Atlas
+     test("should not inject when last agent does not match boulder agent", async () => {
+       // given - boulder state with incomplete plan, but last agent does NOT match
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -868,10 +868,11 @@ describe("atlas hook", () => {
          started_at: "2026-01-02T10:00:00Z",
          session_ids: [MAIN_SESSION_ID],
          plan_name: "test-plan",
+         agent: "atlas",
        }
        writeBoulderState(TEST_DIR, state)
 
-       // given - last agent is NOT Atlas
+       // given - last agent is NOT the boulder agent
        cleanupMessageStorage(MAIN_SESSION_ID)
        setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
 
@@ -886,8 +887,42 @@ describe("atlas hook", () => {
          },
        })
 
-       // then - should NOT call prompt because agent is not Atlas
+       // then - should NOT call prompt because agent does not match
        expect(mockInput._promptMock).not.toHaveBeenCalled()
+     })
+
+     test("should inject when last agent matches boulder agent even if non-Atlas", async () => {
+       // given - boulder state expects sisyphus and last agent is sisyphus
+       const planPath = join(TEST_DIR, "test-plan.md")
+       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+       const state: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-02T10:00:00Z",
+         session_ids: [MAIN_SESSION_ID],
+         plan_name: "test-plan",
+         agent: "sisyphus",
+       }
+       writeBoulderState(TEST_DIR, state)
+
+       cleanupMessageStorage(MAIN_SESSION_ID)
+       setupMessageStorage(MAIN_SESSION_ID, "sisyphus")
+
+       const mockInput = createMockPluginInput()
+       const hook = createAtlasHook(mockInput)
+
+       // when
+       await hook.handler({
+         event: {
+           type: "session.idle",
+           properties: { sessionID: MAIN_SESSION_ID },
+         },
+       })
+
+       // then - should call prompt for sisyphus
+       expect(mockInput._promptMock).toHaveBeenCalled()
+       const callArgs = mockInput._promptMock.mock.calls[0][0]
+       expect(callArgs.body.agent).toBe("sisyphus")
      })
 
     test("should debounce rapid continuation injections (prevent infinite loop)", async () => {
