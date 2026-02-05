@@ -88,6 +88,7 @@ function resolveProvider(providerID: string, modelID: string): string {
 const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
   "claude-sonnet-4-5": "claude-sonnet-4-5-high",
+  "claude-opus-4-6": "claude-opus-4-6-high",
   "claude-opus-4-5": "claude-opus-4-5-high",
    // Gemini
    "gemini-3-pro": "gemini-3-pro-high",

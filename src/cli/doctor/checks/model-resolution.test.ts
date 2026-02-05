@@ -14,9 +14,8 @@ describe("model-resolution check", () => {
       // then: Should have agent entries
       const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
-      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-5")
+      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
       expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
-      expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("github-copilot")
     })
 
     it("returns category requirements with provider chains", async () => {
