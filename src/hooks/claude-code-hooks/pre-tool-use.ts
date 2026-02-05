@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG } from "./plugin-config"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import { enforceGitWriteRestriction } from "./git-write-enforcement"
+import { validateGitCommit } from "./git-commit-validator"
 import { enforceKubectlWriteRestriction } from "./kubectl-write-enforcement"
 
 export interface PreToolUseContext {
@@ -55,19 +56,31 @@ export async function executePreToolUseHooks(
   const startTime = Date.now()
 
   const ohMyOpenCodeConfig = (extendedConfig as OhMyOpenCodeConfig | undefined) ?? ({} as OhMyOpenCodeConfig)
-  const gitEnforcement = enforceGitWriteRestriction(ctx, ohMyOpenCodeConfig)
-  if (gitEnforcement.blocked) {
-    return {
-      decision: "deny",
-      reason: gitEnforcement.reason,
-      elapsedMs: Date.now() - startTime,
-      hookName: "git-write-enforcement",
-      toolName: ctx.toolName,
-      inputLines: buildInputLines(ctx.toolInput),
-    }
-  }
+   const gitEnforcement = enforceGitWriteRestriction(ctx, ohMyOpenCodeConfig)
+   if (gitEnforcement.blocked) {
+     return {
+       decision: "deny",
+       reason: gitEnforcement.reason,
+       elapsedMs: Date.now() - startTime,
+       hookName: "git-write-enforcement",
+       toolName: ctx.toolName,
+       inputLines: buildInputLines(ctx.toolInput),
+     }
+   }
 
-  const kubectlEnforcement = enforceKubectlWriteRestriction(ctx, ohMyOpenCodeConfig)
+   const commitValidation = validateGitCommit(ctx, ohMyOpenCodeConfig)
+   if (commitValidation.blocked) {
+     return {
+       decision: "deny",
+       reason: commitValidation.reason,
+       elapsedMs: Date.now() - startTime,
+       hookName: "git-commit-validator",
+       toolName: ctx.toolName,
+       inputLines: buildInputLines(ctx.toolInput),
+     }
+   }
+
+   const kubectlEnforcement = enforceKubectlWriteRestriction(ctx, ohMyOpenCodeConfig)
   if (kubectlEnforcement.blocked) {
     return {
       decision: "deny",
