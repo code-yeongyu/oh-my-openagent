@@ -788,7 +788,7 @@ describe("agent override tools migration", () => {
     expect(permission["jetbrains_get_*"]).toBe("allow")
   })
 
-  test("tools config is removed after migration", async () => {
+  test("tools config is preserved for OpenCode native tool restriction", async () => {
     // #given
     const overrides = {
       explore: { tools: { "some_tool": false } } as any,
@@ -797,9 +797,9 @@ describe("agent override tools migration", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then
+    // #then - tools should be preserved (not deleted) for OpenCode to use
     expect(agents.explore).toBeDefined()
-    expect((agents.explore as any).tools).toBeUndefined()
+    expect((agents.explore as any).tools).toEqual({ "some_tool": false })
   })
 })
 

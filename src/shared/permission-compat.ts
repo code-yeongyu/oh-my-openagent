@@ -56,7 +56,12 @@ export function migrateToolsToPermission(
 
 /**
  * Migrates agent config from legacy tools format to permission format.
- * If config has `tools`, converts to `permission`.
+ * If config has `tools`, converts to `permission` BUT ALSO PRESERVES `tools`.
+ * 
+ * IMPORTANT: We preserve `tools` because:
+ * - `permission` only works for edit/bash/webfetch in OpenCode
+ * - `tools` (boolean format) is needed for native tool restriction of MCP tools
+ * - OpenCode uses `agent.tools` to enable/disable arbitrary tools like slack_*
  */
 export function migrateAgentConfig(
   config: Record<string, unknown>
@@ -70,7 +75,8 @@ export function migrateAgentConfig(
       result.tools as Record<string, boolean>
     )
     result.permission = { ...migratedPermission, ...existingPermission }
-    delete result.tools
+    // DO NOT delete result.tools - OpenCode needs it for native tool restriction
+    // The permission system only works for edit/bash/webfetch, not MCP tools
   }
 
   return result

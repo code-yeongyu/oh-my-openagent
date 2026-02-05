@@ -71,7 +71,7 @@ describe("permission-compat", () => {
   })
 
   describe("migrateAgentConfig", () => {
-    test("migrates tools to permission", () => {
+    test("migrates tools to permission and preserves tools", () => {
       // given config with tools
       const config = {
         model: "test",
@@ -81,8 +81,8 @@ describe("permission-compat", () => {
       // when migrating
       const result = migrateAgentConfig(config)
 
-      // then converts to permission
-      expect(result.tools).toBeUndefined()
+      // then converts to permission AND preserves tools for OpenCode
+      expect(result.tools).toEqual({ write: false, edit: false })
       expect(result.permission).toEqual({ write: "deny", edit: "deny" })
       expect(result.model).toBe("test")
     })
@@ -105,7 +105,7 @@ describe("permission-compat", () => {
       expect(result.prompt).toBe("hello")
     })
 
-    test("merges existing permission with migrated tools", () => {
+    test("merges existing permission with migrated tools and preserves tools", () => {
       // given config with both tools and permission
       const config = {
         tools: { write: false },
@@ -115,8 +115,8 @@ describe("permission-compat", () => {
       // when migrating
       const result = migrateAgentConfig(config)
 
-      // then merges permission (existing takes precedence)
-      expect(result.tools).toBeUndefined()
+      // then merges permission AND preserves tools for OpenCode native restriction
+      expect(result.tools).toEqual({ write: false })
       expect(result.permission).toEqual({ write: "deny", bash: "deny" })
     })
 
