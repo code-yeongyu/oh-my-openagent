@@ -26,6 +26,13 @@ function isSisyphusPath(filePath: string): boolean {
 
 const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
 
+function getLastAgentFromSession(sessionID: string): string | null {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir) return null
+  const nearest = findNearestMessageWithFields(messageDir)
+  return nearest?.agent?.toLowerCase() ?? null
+}
+
 const DIRECT_WORK_REMINDER = `
 
 ---
@@ -431,7 +438,7 @@ export function createAtlasHook(
     return state
   }
 
-  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number): Promise<void> {
+  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number, agent?: string): Promise<void> {
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -477,7 +484,7 @@ export function createAtlasHook(
        await ctx.client.session.prompt({
          path: { id: sessionID },
          body: {
-            agent: "atlas",
+            agent: agent ?? "atlas",
            ...(model !== undefined ? { model } : {}),
            parts: [{ type: "text", text: prompt }],
          },
@@ -549,8 +556,14 @@ export function createAtlasHook(
           return
         }
 
-        if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
+        const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
+        const lastAgent = getLastAgentFromSession(sessionID)
+        if (!lastAgent || lastAgent !== requiredAgent) {
+          log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
+            sessionID,
+            lastAgent: lastAgent ?? "unknown",
+            requiredAgent,
+          })
           return
         }
 
@@ -568,7 +581,7 @@ export function createAtlasHook(
 
         state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
-        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total)
+        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total, boulderState.agent)
         return
       }
 
