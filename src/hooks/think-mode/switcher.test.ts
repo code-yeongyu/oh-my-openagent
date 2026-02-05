@@ -141,6 +141,14 @@ describe("think-mode switcher", () => {
         expect(variant).toBe("claude-opus-4-5-high")
       })
 
+      it("should handle claude-opus-4-6 high variant", () => {
+        // given a Claude Opus 4.6 model ID
+        const variant = getHighVariant("claude-opus-4-6")
+
+        // then should return high variant
+        expect(variant).toBe("claude-opus-4-6-high")
+      })
+
       it("should handle dots in GPT version numbers", () => {
         // given a GPT model ID with dot format (gpt-5.2)
         const variant = getHighVariant("gpt-5.2")
