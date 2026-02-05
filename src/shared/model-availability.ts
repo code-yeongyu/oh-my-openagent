@@ -187,16 +187,23 @@ export async function fetchAvailableModels(
 		if (providerCount === 0) {
 			log("[fetchAvailableModels] provider-models cache empty, falling back to models.json")
 		} else {
-			log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
-			
-			for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
-				if (!connectedSet.has(providerId)) {
-					continue
-				}
-				for (const modelId of modelIds) {
+		log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
+		
+		for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
+			if (!connectedSet.has(providerId)) {
+				continue
+			}
+			for (const modelItem of modelIds) {
+				// Handle both string[] (legacy) and object[] (with metadata) formats
+				const modelId = typeof modelItem === 'string' 
+					? modelItem 
+					: (modelItem as any)?.id
+				
+				if (modelId) {
 					modelSet.add(`${providerId}/${modelId}`)
 				}
 			}
+		}
 
 			log("[fetchAvailableModels] parsed from provider-models cache", {
 				count: modelSet.size,
