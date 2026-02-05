@@ -1123,7 +1123,14 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           break
         }
       }
-    } catch {
+    } catch (error) {
+      if (this.isAbortedSessionError(error)) {
+        log("[background-agent] Parent session aborted, skipping notification:", {
+          taskId: task.id,
+          parentSessionID: task.parentSessionID,
+        })
+        return
+      }
       const messageDir = getMessageDir(task.parentSessionID)
       const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
       agent = currentMessage?.agent ?? task.parentAgent
@@ -1154,6 +1161,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         noReply: !allComplete,
       })
     } catch (error) {
+      if (this.isAbortedSessionError(error)) {
+        log("[background-agent] Parent session aborted, skipping notification:", {
+          taskId: task.id,
+          parentSessionID: task.parentSessionID,
+        })
+        return
+      }
       log("[background-agent] Failed to send notification:", error)
     }
 
@@ -1190,6 +1204,28 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       return `${minutes}m ${seconds % 60}s`
     }
     return `${seconds}s`
+  }
+
+  private isAbortedSessionError(error: unknown): boolean {
+    const message = this.getErrorText(error)
+    return message.toLowerCase().includes("aborted")
+  }
+
+  private getErrorText(error: unknown): string {
+    if (!error) return ""
+    if (typeof error === "string") return error
+    if (error instanceof Error) {
+      return `${error.name}: ${error.message}`
+    }
+    if (typeof error === "object" && error !== null) {
+      if ("message" in error && typeof error.message === "string") {
+        return error.message
+      }
+      if ("name" in error && typeof error.name === "string") {
+        return error.name
+      }
+    }
+    return ""
   }
 
   private hasRunningTasks(): boolean {
