@@ -259,7 +259,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #then Sisyphus uses Claude (OR logic - at least one provider available)
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
     expect(result.agents).toBeDefined()
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
   })
 
   test("generates native opus models when Claude max20 subscription", () => {
@@ -279,7 +279,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then Sisyphus uses Claude (OR logic - at least one provider available)
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
   })
 
   test("uses github-copilot sonnet fallback when only copilot available", () => {
@@ -342,7 +342,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #then librarian should use zai-coding-plan/glm-4.7
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
     // #then Sisyphus uses Claude (OR logic)
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-5")
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
   })
 
   test("uses native OpenAI models when only ChatGPT available", () => {
