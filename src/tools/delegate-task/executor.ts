@@ -12,7 +12,7 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry, normalizeFallbackModels } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -823,9 +823,7 @@ export async function resolveCategoryExecution(
     }
   } else {
     const categoryConfig = args.category ? userCategories?.[args.category] : undefined
-    const categoryFallbackModels = categoryConfig?.fallback_models 
-      ? (Array.isArray(categoryConfig.fallback_models) ? categoryConfig.fallback_models : [categoryConfig.fallback_models])
-      : undefined
+    const categoryFallbackModels = normalizeFallbackModels(categoryConfig?.fallback_models)
     
     const resolution = resolveModelPipeline({
       intent: {
