@@ -714,6 +714,54 @@ describe("git-command-classifier", () => {
       expect(result.isWrite).toBe(true)
     })
 
+    test("should detect git commit in compound command after cd", () => {
+      // #given
+      const command = "cd /path && git commit -m 'test'"
+
+      // #when
+      const result = classifyGitCommand(command)
+
+      // #then
+      expect(result.isGit).toBe(true)
+      expect(result.isWrite).toBe(true)
+    })
+
+    test("should detect git add in complex compound command", () => {
+      // #given
+      const command = "cd /path && echo test > file && git add file && git commit -m 'msg'"
+
+      // #when
+      const result = classifyGitCommand(command)
+
+      // #then
+      expect(result.isGit).toBe(true)
+      expect(result.isWrite).toBe(true)
+    })
+
+    test("should detect git push in || chain", () => {
+      // #given
+      const command = "git commit -m 'test' || git push"
+
+      // #when
+      const result = classifyGitCommand(command)
+
+      // #then
+      expect(result.isGit).toBe(true)
+      expect(result.isWrite).toBe(true)
+    })
+
+    test("should detect git after multiple non-git commands", () => {
+      // #given
+      const command = "mkdir -p test && cd test && echo hello > file.txt && git add file.txt"
+
+      // #when
+      const result = classifyGitCommand(command)
+
+      // #then
+      expect(result.isGit).toBe(true)
+      expect(result.isWrite).toBe(true)
+    })
+
     test("should handle chained commands with ;", () => {
       // #given
       const command = "git status; git log"

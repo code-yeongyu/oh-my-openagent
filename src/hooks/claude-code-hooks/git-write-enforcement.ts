@@ -13,27 +13,28 @@ export function enforceGitWriteRestriction(
 ): GitWriteEnforcementResult {
   const toolName = context.toolName
   const toolLower = toolName.toLowerCase()
-  const isBashTool = toolLower === "bash" || toolLower === "mcp_bash"
-  const isInteractiveBash = toolLower === "interactive_bash"
+   const isBashTool = toolLower === "bash" || toolLower === "mcp_bash"
+   const isInteractiveBash = toolLower === "interactive_bash"
 
-  if (!isBashTool && !isInteractiveBash) {
+   if (!isBashTool && !isInteractiveBash) {
     return { blocked: false }
   }
 
-  const command = extractCommand(context)
-  if (!command) {
+   const command = extractCommand(context)
+
+   if (!command) {
     return { blocked: false }
   }
 
-  const classification = classifyGitCommand(command)
+   const classification = classifyGitCommand(command)
 
-  if (!classification.isGit || !classification.isWrite) {
+   if (!classification.isGit || !classification.isWrite) {
     return { blocked: false }
   }
 
-  const agent = context.agent
+   const agent = context.agent
 
-  if (agent === "git-owner") {
+   if (agent === "git-owner") {
     return { blocked: false }
   }
 

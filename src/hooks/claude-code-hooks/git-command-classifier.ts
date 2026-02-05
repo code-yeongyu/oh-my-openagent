@@ -55,38 +55,41 @@ function extractGitCommand(command: string): GitMatch | null {
     workingCommand = envVarMatch[2]
   }
 
-  // Extract the executable part (before pipes, redirects, etc.)
-  const executablePart = workingCommand.split(/[|&><;]/, 1)[0].trim()
+  const parts = workingCommand.split(/\s*(?:&&|\|\||[;|])\s*/)
 
-  // Match git command with optional path and .exe extension
-  const gitPattern = /^(?:.*[/\\])?git(?:\.exe)?\s+(.*)$/i
-  const gitMatch = executablePart.match(gitPattern)
+  for (const part of parts) {
+    const trimmed = part.trim()
 
-  if (gitMatch) {
-    const args = gitMatch[1].trim()
-    const subcommandMatch = args.match(/^(\S+)/)
-    const subcommand = subcommandMatch ? subcommandMatch[1] : ""
+    const gitPattern = /^(?:.*[/\\])?git(?:\.exe)?\s+(.*)$/i
+    const gitMatch = trimmed.match(gitPattern)
 
-    return {
-      subcommand: subcommand.toLowerCase(),
-      fullCommand: args,
-      isGhCommand: false,
+    if (gitMatch) {
+      const rawArgs = gitMatch[1].trim()
+      const args = rawArgs.split(/[><&]/)[0].trim()
+      const subcommandMatch = args.match(/^(\S+)/)
+      const subcommand = subcommandMatch ? subcommandMatch[1] : ""
+
+      return {
+        subcommand: subcommand.toLowerCase(),
+        fullCommand: args,
+        isGhCommand: false,
+      }
     }
-  }
 
-  // Match gh command with optional path
-  const ghPattern = /^(?:.*[/\\])?gh\s+(.*)$/i
-  const ghMatch = executablePart.match(ghPattern)
+    const ghPattern = /^(?:.*[/\\])?gh\s+(.*)$/i
+    const ghMatch = trimmed.match(ghPattern)
 
-  if (ghMatch) {
-    const args = ghMatch[1].trim()
-    const subcommandMatch = args.match(/^(\S+)/)
-    const subcommand = subcommandMatch ? subcommandMatch[1] : ""
+    if (ghMatch) {
+      const rawArgs = ghMatch[1].trim()
+      const args = rawArgs.split(/[><&]/)[0].trim()
+      const subcommandMatch = args.match(/^(\S+)/)
+      const subcommand = subcommandMatch ? subcommandMatch[1] : ""
 
-    return {
-      subcommand: subcommand.toLowerCase(),
-      fullCommand: args,
-      isGhCommand: true,
+      return {
+        subcommand: subcommand.toLowerCase(),
+        fullCommand: args,
+        isGhCommand: true,
+      }
     }
   }
 

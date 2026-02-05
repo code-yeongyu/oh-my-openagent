@@ -210,19 +210,19 @@ export function createClaudeCodeHooksHook(
         tool_input: output.args as Record<string, unknown>,
       })
 
-      cacheToolInput(input.sessionID, input.tool, input.callID, output.args as Record<string, unknown>)
+       cacheToolInput(input.sessionID, input.tool, input.callID, output.args as Record<string, unknown>)
 
-       if (!isHookDisabled(config, "PreToolUse")) {
-         const preCtx: PreToolUseContext = {
-           sessionId: input.sessionID,
-           toolName: input.tool,
-           toolInput: output.args as Record<string, unknown>,
-           cwd: ctx.directory,
-           toolUseId: input.callID,
-           agent: getSessionAgent(input.sessionID),
-         }
+        if (!isHookDisabled(config, "PreToolUse")) {
+          const preCtx: PreToolUseContext = {
+            sessionId: input.sessionID,
+            toolName: input.tool,
+            toolInput: output.args as Record<string, unknown>,
+            cwd: ctx.directory,
+            toolUseId: input.callID,
+            agent: getSessionAgent(input.sessionID),
+           }
 
-        const result = await executePreToolUseHooks(preCtx, claudeConfig, extendedConfig)
+          const result = await executePreToolUseHooks(preCtx, claudeConfig, extendedConfig)
 
         if (result.decision === "deny") {
           ctx.client.tui
