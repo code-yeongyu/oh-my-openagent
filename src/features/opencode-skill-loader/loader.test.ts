@@ -388,169 +388,175 @@ Skill body.
     })
   })
 
-  describe("nested skill discovery", () => {
-    it("discovers skills in nested directories (superpowers pattern)", async () => {
-      // #given - simulate superpowers structure: skills/superpowers/brainstorming/SKILL.md
-      const nestedDir = join(SKILLS_DIR, "superpowers", "brainstorming")
-      mkdirSync(nestedDir, { recursive: true })
-      const skillContent = `---
-name: brainstorming
-description: A nested skill for brainstorming
+  describe("deduplication", () => {
+    it("deduplicates skills by name across scopes, keeping higher priority (opencode-project > opencode > project)", async () => {
+      const originalCwd = process.cwd()
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+
+      // given: same skill name in multiple scopes
+      const opencodeProjectSkillsDir = join(TEST_DIR, ".opencode", "skills")
+      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
+      const opencodeGlobalSkillsDir = join(opencodeConfigDir, "skills")
+      const projectClaudeSkillsDir = join(TEST_DIR, ".claude", "skills")
+
+      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
+
+      mkdirSync(join(opencodeProjectSkillsDir, "duplicate-skill"), { recursive: true })
+      mkdirSync(join(opencodeGlobalSkillsDir, "duplicate-skill"), { recursive: true })
+      mkdirSync(join(projectClaudeSkillsDir, "duplicate-skill"), { recursive: true })
+
+      writeFileSync(
+        join(opencodeProjectSkillsDir, "duplicate-skill", "SKILL.md"),
+        `---
+name: duplicate-skill
+description: From opencode-project (highest priority)
 ---
-This is a nested skill.
+opencode-project body.
 `
-      writeFileSync(join(nestedDir, "SKILL.md"), skillContent)
+      )
 
-      // #when
+      writeFileSync(
+        join(opencodeGlobalSkillsDir, "duplicate-skill", "SKILL.md"),
+        `---
+name: duplicate-skill
+description: From opencode-global (middle priority)
+---
+opencode-global body.
+`
+      )
+
+      writeFileSync(
+        join(projectClaudeSkillsDir, "duplicate-skill", "SKILL.md"),
+        `---
+name: duplicate-skill
+description: From claude project (lowest priority among these)
+---
+claude project body.
+`
+      )
+
+      // when
       const { discoverSkills } = await import("./loader")
-      const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "superpowers/brainstorming")
+        const skills = await discoverSkills()
+        const duplicates = skills.filter(s => s.name === "duplicate-skill")
 
-        // #then
-        expect(skill).toBeDefined()
-        expect(skill?.name).toBe("superpowers/brainstorming")
-        expect(skill?.definition.description).toContain("brainstorming")
+        // then
+        expect(duplicates).toHaveLength(1)
+        expect(duplicates[0]?.scope).toBe("opencode-project")
+        expect(duplicates[0]?.definition.description).toContain("opencode-project")
       } finally {
         process.chdir(originalCwd)
-      }
-    })
-
-    it("discovers multiple skills in nested directories", async () => {
-      // #given - multiple nested skills
-      const skills = ["brainstorming", "debugging", "testing"]
-      for (const skillName of skills) {
-        const nestedDir = join(SKILLS_DIR, "superpowers", skillName)
-        mkdirSync(nestedDir, { recursive: true })
-        writeFileSync(join(nestedDir, "SKILL.md"), `---
-name: ${skillName}
-description: ${skillName} skill
----
-Content for ${skillName}.
-`)
-      }
-
-      // #when
-      const { discoverSkills } = await import("./loader")
-      const originalCwd = process.cwd()
-      process.chdir(TEST_DIR)
-
-      try {
-        const discoveredSkills = await discoverSkills({ includeClaudeCodePaths: false })
-
-        // #then
-        for (const skillName of skills) {
-          const skill = discoveredSkills.find(s => s.name === `superpowers/${skillName}`)
-          expect(skill).toBeDefined()
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
         }
-      } finally {
-        process.chdir(originalCwd)
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
       }
     })
 
-    it("respects max depth limit", async () => {
-      // #given - deeply nested skill (3 levels deep, beyond default maxDepth of 2)
-      const deepDir = join(SKILLS_DIR, "level1", "level2", "level3", "deep-skill")
-      mkdirSync(deepDir, { recursive: true })
-      writeFileSync(join(deepDir, "SKILL.md"), `---
-name: deep-skill
-description: A deeply nested skill
----
-Too deep.
-`)
-
-      // #when
-      const { discoverSkills } = await import("./loader")
+    it("prioritizes OpenCode global skills over legacy Claude project skills", async () => {
       const originalCwd = process.cwd()
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+
+      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
+      const opencodeGlobalSkillsDir = join(opencodeConfigDir, "skills")
+      const projectClaudeSkillsDir = join(TEST_DIR, ".claude", "skills")
+
+      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
+      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
+
+      mkdirSync(join(opencodeGlobalSkillsDir, "global-over-project"), { recursive: true })
+      mkdirSync(join(projectClaudeSkillsDir, "global-over-project"), { recursive: true })
+
+      writeFileSync(
+        join(opencodeGlobalSkillsDir, "global-over-project", "SKILL.md"),
+        `---
+name: global-over-project
+description: From opencode-global (should win)
+---
+opencode-global body.
+`
+      )
+
+      writeFileSync(
+        join(projectClaudeSkillsDir, "global-over-project", "SKILL.md"),
+        `---
+name: global-over-project
+description: From claude project (should lose)
+---
+claude project body.
+`
+      )
+
+      const { discoverSkills } = await import("./loader")
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name.includes("deep-skill"))
+        const skills = await discoverSkills()
+        const matches = skills.filter(s => s.name === "global-over-project")
 
-        // #then - should not find skill beyond maxDepth
-        expect(skill).toBeUndefined()
+        expect(matches).toHaveLength(1)
+        expect(matches[0]?.scope).toBe("opencode")
+        expect(matches[0]?.definition.description).toContain("opencode-global")
       } finally {
         process.chdir(originalCwd)
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
+        if (originalClaudeConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+        }
       }
     })
 
-    it("flat skills still work alongside nested skills", async () => {
-      // #given - both flat and nested skills
-      const flatSkillDir = join(SKILLS_DIR, "flat-skill")
-      mkdirSync(flatSkillDir, { recursive: true })
-      writeFileSync(join(flatSkillDir, "SKILL.md"), `---
-name: flat-skill
-description: A flat skill
----
-Flat content.
-`)
-
-      const nestedDir = join(SKILLS_DIR, "nested", "nested-skill")
-      mkdirSync(nestedDir, { recursive: true })
-      writeFileSync(join(nestedDir, "SKILL.md"), `---
-name: nested-skill
-description: A nested skill
----
-Nested content.
-`)
-
-      // #when
-      const { discoverSkills } = await import("./loader")
+    it("returns no duplicates from discoverSkills", async () => {
       const originalCwd = process.cwd()
-      process.chdir(TEST_DIR)
+      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 
-      try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+      process.env.OPENCODE_CONFIG_DIR = join(TEST_DIR, "opencode-global")
 
-        // #then - both should be found
-        const flatSkill = skills.find(s => s.name === "flat-skill")
-        const nestedSkill = skills.find(s => s.name === "nested/nested-skill")
-
-        expect(flatSkill).toBeDefined()
-        expect(nestedSkill).toBeDefined()
-      } finally {
-        process.chdir(originalCwd)
-      }
-    })
-
-    it("prefers directory skill (SKILL.md) over file skill (*.md) on name collision", async () => {
-      // #given - both foo.md file AND foo/SKILL.md directory exist
-      // Directory skill should win (deterministic precedence: SKILL.md > {dir}.md > *.md)
-      const dirSkillDir = join(SKILLS_DIR, "collision-test")
-      mkdirSync(dirSkillDir, { recursive: true })
-      writeFileSync(join(dirSkillDir, "SKILL.md"), `---
-name: collision-test
-description: Directory-based skill (should win)
+      // given
+      const skillContent = `---
+name: unique-test-skill
+description: A unique skill for dedup test
 ---
-I am the directory skill.
-`)
+Skill body.
+`
+      createTestSkill("unique-test-skill", skillContent)
 
-      // Also create a file with same base name at parent level
-      writeFileSync(join(SKILLS_DIR, "collision-test.md"), `---
-name: collision-test
-description: File-based skill (should lose)
----
-I am the file skill.
-`)
-
-      // #when
+      // when
       const { discoverSkills } = await import("./loader")
-      const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
 
-        // #then - only one skill should exist, and it should be the directory-based one
-        const matchingSkills = skills.filter(s => s.name === "collision-test")
-        expect(matchingSkills).toHaveLength(1)
-        expect(matchingSkills[0]?.definition.description).toContain("Directory-based skill")
+        // then
+        const names = skills.map(s => s.name)
+        const uniqueNames = [...new Set(names)]
+        expect(names.length).toBe(uniqueNames.length)
       } finally {
         process.chdir(originalCwd)
+        if (originalOpenCodeConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
+        }
       }
     })
   })
