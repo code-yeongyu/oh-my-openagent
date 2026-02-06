@@ -1,7 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { generateDynamicTriggers, findMatchingTriggers } from "./trigger-generator"
-import { HOOK_NAME, type SkillTrigger } from "./types"
+import { HOOK_NAME, type SkillTrigger, type SkillTriggerCache } from "./types"
+import { loadCache, saveCache } from "./cache-storage"
+import { checkForUpdates, hashDescription } from "./cache-checker"
+import { buildExtractionPrompt, parseAIResponse, buildCachedTriggers, batchSkills } from "./trigger-extractor"
+import { getAllSkills } from "../../features/opencode-skill-loader/skill-content"
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 
 export * from "./types"
 export * from "./keyword-extractor"
@@ -27,6 +32,27 @@ function extractPromptText(parts: Array<{ type: string; text?: string }>): strin
 }
 
 /**
+ * Builds SkillTrigger array from cached data.
+ * Converts cached triggers to the format used by findMatchingTriggers.
+ */
+function buildTriggersFromCache(cache: SkillTriggerCache, skills: LoadedSkill[]): SkillTrigger[] {
+  const triggers: SkillTrigger[] = []
+  for (const skill of skills) {
+    const cached = cache.skills[skill.name]
+    if (!cached) continue
+    const pattern = cached.triggers.map(t => `\\b${t}\\b`).join('|')
+    triggers.push({
+      skillName: skill.name,
+      description: skill.definition?.description || '',
+      keywords: new RegExp(pattern, 'i'),
+      priority: cached.priority,
+      scope: cached.scope
+    })
+  }
+  return triggers.sort((a, b) => b.priority - a.priority)
+}
+
+/**
  * Creates the skill auto-trigger hook.
  * 
  * This hook dynamically detects keywords from user input and suggests
@@ -37,16 +63,46 @@ export function createSkillAutoTriggerHook(ctx: PluginInput) {
   let dynamicTriggers: SkillTrigger[] = []
   let initialized = false
 
-  // Initialize triggers asynchronously
-  const initPromise = generateDynamicTriggers()
-    .then((triggers) => {
-      dynamicTriggers = triggers
+  // Initialize triggers asynchronously with cache support
+  const initPromise = (async () => {
+    try {
+      // Load cache and get all skills
+      const cache = loadCache()
+      const allSkills = await getAllSkills()
+      
+      // Check for updates
+      const updateResult = checkForUpdates(cache, allSkills)
+      
+      if (updateResult.hasUpdates) {
+        // Log what needs updating (AI extraction is out of scope for now)
+        log(`[${HOOK_NAME}] Cache update needed: ${updateResult.newSkills.length} new, ${updateResult.changedSkills.length} changed, ${updateResult.deletedSkills.length} deleted`)
+        
+        // Fall back to regex-based triggers until AI extraction is implemented
+        dynamicTriggers = await generateDynamicTriggers()
+        log(`[${HOOK_NAME}] Using fallback: ${dynamicTriggers.length} dynamic skill triggers`)
+      } else if (Object.keys(cache.skills).length > 0) {
+        // Cache is valid and has skills - build triggers from cache
+        dynamicTriggers = buildTriggersFromCache(cache, allSkills)
+        log(`[${HOOK_NAME}] Loaded ${dynamicTriggers.length} cached skill triggers`)
+      } else {
+        // Empty cache, no updates detected - use fallback
+        dynamicTriggers = await generateDynamicTriggers()
+        log(`[${HOOK_NAME}] Using fallback: ${dynamicTriggers.length} dynamic skill triggers`)
+      }
+      
       initialized = true
-      log(`[${HOOK_NAME}] Loaded ${triggers.length} dynamic skill triggers`)
-    })
-    .catch((err) => {
+    } catch (err) {
       log(`[${HOOK_NAME}] Failed to load triggers`, { error: String(err) })
-    })
+      // Try fallback on error
+      try {
+        dynamicTriggers = await generateDynamicTriggers()
+        initialized = true
+        log(`[${HOOK_NAME}] Fallback loaded ${dynamicTriggers.length} triggers after error`)
+      } catch (fallbackErr) {
+        log(`[${HOOK_NAME}] Fallback also failed`, { error: String(fallbackErr) })
+      }
+    }
+  })()
 
   return {
     "chat.message": async (
