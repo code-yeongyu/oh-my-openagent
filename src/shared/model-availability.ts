@@ -317,6 +317,35 @@ export function isAnyFallbackModelAvailable(
 	return false
 }
 
+export function isAnyProviderConnected(
+	providers: string[],
+	availableModels: Set<string>,
+): boolean {
+	if (availableModels.size > 0) {
+		const providerSet = new Set(providers)
+		for (const model of availableModels) {
+			const [provider] = model.split("/")
+			if (providerSet.has(provider)) {
+				log("[isAnyProviderConnected] found model from required provider", { provider, model })
+				return true
+			}
+		}
+	}
+
+	const connectedProviders = readConnectedProvidersCache()
+	if (connectedProviders) {
+		const connectedSet = new Set(connectedProviders)
+		for (const provider of providers) {
+			if (connectedSet.has(provider)) {
+				log("[isAnyProviderConnected] provider connected via cache", { provider })
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 export function __resetModelCache(): void {}
 
 export function isModelCacheAvailable(): boolean {
