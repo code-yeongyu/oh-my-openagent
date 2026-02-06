@@ -20,6 +20,7 @@ export interface AvailableSkill {
 export interface AvailableCategory {
   name: string
   description: string
+  model?: string
 }
 
 export function categorizeTools(toolNames: string[]): AvailableTool[] {
