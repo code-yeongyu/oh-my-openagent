@@ -277,7 +277,7 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 ```typescript
 // OLD: Model name creates distributional bias
 delegate_task(agent="gpt-5.2", prompt="...")  // Model knows its limitations
-delegate_task(agent="claude-opus-4.5", prompt="...")  // Different self-perception
+delegate_task(agent="claude-opus-4.6", prompt="...")  // Different self-perception
 ```
 
 **The Solution: Semantic Categories:**

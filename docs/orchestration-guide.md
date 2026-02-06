@@ -275,7 +275,7 @@ flowchart TD
 
 ### 🔮 Prometheus (The Planner)
 
-- **Model**: `anthropic/claude-opus-4-5`
+- **Model**: `anthropic/claude-opus-4-6`
 - **Role**: Strategic planning, requirements interviews, work plan creation
 - **Constraint**: **READ-ONLY**. Can only create/modify markdown files within `.sisyphus/` directory.
 - **Characteristic**: Never writes code directly, focuses solely on "how to do it".

@@ -849,7 +849,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await compactionContextInjector({
         sessionID: input.sessionID,
         providerID: "anthropic",
-        modelID: "claude-opus-4-5",
+        modelID: "claude-opus-4-6",
         usageRatio: 0.8,
         directory: ctx.directory,
       });
