@@ -1712,6 +1712,64 @@ describe("sisyphus-task", () => {
       expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
 
+    test("category delegation ignores UI-selected (Kimi) system default model", async () => {
+      // given - OpenCode system default model is Kimi (selected from UI)
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-ui-model",
+            sessionID: "ses_ui_model_test",
+            description: "UI model inheritance test",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: "opencode/kimi-k2.5-free" } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using "quick" category which should use "anthropic/claude-haiku-4-5"
+      await tool.execute(
+        {
+          description: "UI model inheritance test",
+          prompt: "Do something quick",
+          category: "quick",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - category model must win (not Kimi)
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
+    })
+
     test("sisyphus-junior model override takes precedence over category model", async () => {
       // given - sisyphus-junior override model differs from category default
       const { createDelegateTask } = require("./tools")

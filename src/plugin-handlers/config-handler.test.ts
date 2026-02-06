@@ -23,12 +23,6 @@ beforeEach(() => {
     oracle: { name: "oracle", prompt: "test", mode: "subagent" },
   })
 
-  spyOn(sisyphusJunior, "createSisyphusJuniorAgentWithOverrides" as any).mockReturnValue({
-    name: "sisyphus-junior",
-    prompt: "test",
-    mode: "subagent",
-  })
-
   spyOn(commandLoader, "loadUserCommands" as any).mockResolvedValue({})
   spyOn(commandLoader, "loadProjectCommands" as any).mockResolvedValue({})
   spyOn(commandLoader, "loadOpencodeGlobalCommands" as any).mockResolvedValue({})
@@ -103,6 +97,66 @@ afterEach(() => {
   ;(configDir.getOpenCodeConfigPaths as any)?.mockRestore?.()
   ;(permissionCompat.migrateAgentConfig as any)?.mockRestore?.()
   ;(modelResolver.resolveModelWithFallback as any)?.mockRestore?.()
+})
+
+describe("Sisyphus-Junior model inheritance", () => {
+  test("does not inherit UI-selected model as system default", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "opencode/kimi-k2.5-free",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { model?: string }>
+    expect(agentConfig["sisyphus-junior"]?.model).toBe(
+      sisyphusJunior.SISYPHUS_JUNIOR_DEFAULTS.model
+    )
+  })
+
+  test("uses explicitly configured sisyphus-junior model", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      agents: {
+        "sisyphus-junior": {
+          model: "openai/gpt-5.3-codex",
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "opencode/kimi-k2.5-free",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { model?: string }>
+    expect(agentConfig["sisyphus-junior"]?.model).toBe(
+      "openai/gpt-5.3-codex"
+    )
+  })
 })
 
 describe("Plan agent demote behavior", () => {
