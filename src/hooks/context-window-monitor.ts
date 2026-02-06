@@ -1,12 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { resolveContextWindowLimit } from "../shared/context-window-limit-resolver"
+import type { ModelCacheState } from "../plugin-state"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
 const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
@@ -18,6 +15,8 @@ Complete your work thoroughly and methodically.`
 interface AssistantMessageInfo {
   role: "assistant"
   providerID: string
+  modelID?: string
+  contextWindowLimit?: number
   tokens: {
     input: number
     output: number
@@ -30,7 +29,10 @@ interface MessageWrapper {
   info: { role: string } & Partial<AssistantMessageInfo>
 }
 
-export function createContextWindowMonitorHook(ctx: PluginInput) {
+export function createContextWindowMonitorHook(
+  ctx: PluginInput,
+  modelCacheState?: ModelCacheState,
+) {
   const remindedSessions = new Set<string>()
 
   const toolExecuteAfter = async (
@@ -57,12 +59,19 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
       if (lastAssistant.providerID !== "anthropic") return
 
+      const effectiveLimit = resolveContextWindowLimit({
+        contextWindowLimit: lastAssistant.contextWindowLimit,
+        providerID: lastAssistant.providerID,
+        modelID: lastAssistant.modelID,
+        modelContextLimitsCache: modelCacheState?.modelContextLimitsCache,
+      })
+
       // Use only the last assistant message's input tokens
       // This reflects the ACTUAL current context window usage (post-compaction)
       const lastTokens = lastAssistant.tokens
       const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
-      const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
+      const actualUsagePercentage = totalInputTokens / effectiveLimit
 
       if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
