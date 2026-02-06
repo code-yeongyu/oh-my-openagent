@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync } from "node:fs"
 import { getConfigContext } from "../config-manager"
 import { parseJsonc } from "../../shared"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
@@ -9,8 +9,6 @@ import { editAgents } from "./agents"
 import { editCategories } from "./categories"
 import { runBulkOperations } from "./bulk"
 import { displayValidationWarnings, countWarnings } from "./validation"
-
-
 
 function getConfigPath(): string {
   const { paths } = getConfigContext()
@@ -31,13 +29,13 @@ function loadConfig(path: string): OhMyOpenCodeConfig | null {
   }
 }
 
-function createBackup(configPath: string): string | null {
+function createBackupWithCopy(configPath: string): string | null {
   try {
     if (!existsSync(configPath)) return null
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const backupPath = `${configPath}.backup.${timestamp}`
-    renameSync(configPath, backupPath)
+    copyFileSync(configPath, backupPath)
     return backupPath
   } catch {
     return null
@@ -117,7 +115,68 @@ async function showMainMenu(state: ConfigEditorState): Promise<"exit" | "continu
   }
 }
 
-export { runConfigEditor as config }
+async function runMenuLoop(state: ConfigEditorState): Promise<void> {
+  let running = true
+  while (running) {
+    const result = await showMainMenu(state)
+    if (result === "exit") {
+      running = false
+    }
+  }
+}
+
+async function promptSaveChanges(state: ConfigEditorState): Promise<number> {
+  if (!state.modified) {
+    p.log.info("No changes made.")
+    p.outro(color.green("Configuration unchanged."))
+    return 0
+  }
+
+  const confirmSave = await p.confirm({
+    message: `Save changes to config?`,
+    initialValue: true,
+  })
+
+  if (p.isCancel(confirmSave) || !confirmSave) {
+    const discard = await p.confirm({
+      message: "Discard changes?",
+      initialValue: false,
+    })
+
+    if (p.isCancel(discard) || !discard) {
+      p.log.info("Returning to menu...")
+      await runMenuLoop(state)
+      return promptSaveChanges(state)
+    }
+
+    p.log.info("Changes discarded.")
+    p.outro(color.yellow("Configuration not saved."))
+    return 0
+  }
+
+  const s = p.spinner()
+  s.start("Saving configuration...")
+
+  const backupPath = createBackupWithCopy(state.configPath)
+  const success = writeConfigAtomically(state.configPath, state.config)
+
+  if (!success) {
+    s.stop(`Failed to save config ${color.red("[X]")}`)
+    p.outro(color.red("Configuration failed to save."))
+    return 1
+  }
+
+  s.stop(`Config saved ${color.green("[OK]")}`)
+
+  if (backupPath) {
+    p.log.info(`Backup created: ${color.dim(backupPath)}`)
+  }
+
+  p.log.success(color.bold("Configuration saved successfully!"))
+  p.outro(color.green("oMoMoMoMo... Done!"))
+
+  return 0
+}
 
 async function runConfigEditor(): Promise<number> {
   p.intro(color.bgMagenta(color.white(" oh-my-opencode config ")))
@@ -139,61 +198,8 @@ async function runConfigEditor(): Promise<number> {
     configPath,
   }
 
-  let running = true
-  while (running) {
-    const result = await showMainMenu(state)
-    if (result === "exit") {
-      running = false
-    }
-  }
-
-  if (!state.modified) {
-    p.log.info("No changes made.")
-    p.outro(color.green("Configuration unchanged."))
-    return 0
-  }
-
-  const confirmSave = await p.confirm({
-    message: `Save changes to config?`,
-    initialValue: true,
-  })
-
-  if (p.isCancel(confirmSave) || !confirmSave) {
-    const discard = await p.confirm({
-      message: "Discard changes?",
-      initialValue: false,
-    })
-
-    if (p.isCancel(discard) || !discard) {
-      p.log.info("Returning to menu...")
-      return runConfigEditor()
-    }
-
-    p.log.info("Changes discarded.")
-    p.outro(color.yellow("Configuration not saved."))
-    return 0
-  }
-
-  const s = p.spinner()
-  s.start("Saving configuration...")
-
-  const backupPath = createBackup(configPath)
-  const success = writeConfigAtomically(configPath, state.config)
-
-  if (!success) {
-    s.stop(`Failed to save config ${color.red("[X]")}`)
-    p.outro(color.red("Configuration failed to save."))
-    return 1
-  }
-
-  s.stop(`Config saved ${color.green("[OK]")}`)
-
-  if (backupPath) {
-    p.log.info(`Backup created: ${color.dim(backupPath)}`)
-  }
-
-  p.log.success(color.bold("Configuration saved successfully!"))
-  p.outro(color.green("oMoMoMoMo... Done!"))
-
-  return 0
+  await runMenuLoop(state)
+  return promptSaveChanges(state)
 }
+
+export { runConfigEditor as config }

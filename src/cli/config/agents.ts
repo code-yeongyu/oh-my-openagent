@@ -243,12 +243,15 @@ async function editAgentField(
 
         p.log.success(`Set bash permission to "${value}"`)
       } else if (bashAction === "detailed") {
-        const currentPerms = agents[agentName]?.permission?.bash as Record<string, BashPermissionValue> | undefined
+        const existingBash = agents[agentName]?.permission?.bash
+        const isSimpleValue = typeof existingBash === "string"
+        const currentPerms = isSimpleValue ? undefined : existingBash as Record<string, BashPermissionValue> | undefined
+        const defaultValue: BashPermissionValue = isSimpleValue ? (existingBash as BashPermissionValue) : "ask"
 
         const newPerms: Record<string, BashPermissionValue> = {}
 
         for (const cmd of BASH_COMMANDS) {
-          const current = currentPerms?.[cmd] ?? "ask"
+          const current = currentPerms?.[cmd] ?? defaultValue
           const value = await p.select({
             message: `Permission for "${cmd}" command:`,
             options: [

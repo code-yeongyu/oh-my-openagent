@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import type { ConfigEditorState, ValidationWarning } from "./types"
+import type { ConfigEditorState, ValidationWarning, AgentConfigExtended } from "./types"
 import { AGENT_NAMES } from "./types"
 
 export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
@@ -28,7 +28,7 @@ export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
 
 export function checkFallbackWarnings(state: ConfigEditorState): ValidationWarning[] {
   const warnings: ValidationWarning[] = []
-  const agents = state.config.agents ?? {}
+  const agents = (state.config.agents ?? {}) as Record<string, AgentConfigExtended>
 
   for (const agentName of AGENT_NAMES) {
     const agent = agents[agentName]
@@ -36,12 +36,13 @@ export function checkFallbackWarnings(state: ConfigEditorState): ValidationWarni
 
     const hasModel = agent.model && agent.model.length > 0
     const hasCategory = agent.category && agent.category.length > 0
+    const hasFallback = agent.fallback_model && agent.fallback_model.length > 0
 
-    if ((hasModel || hasCategory) && !agent.model) {
+    if ((hasModel || hasCategory) && !hasFallback) {
       warnings.push({
         type: "missing-fallback",
         agent: agentName,
-        message: `Agent "${agentName}" has category but no fallback model configured`,
+        message: `Agent "${agentName}" has model/category but no fallback_model configured`,
       })
     }
   }
@@ -50,9 +51,11 @@ export function checkFallbackWarnings(state: ConfigEditorState): ValidationWarni
 }
 
 export function displayValidationWarnings(state: ConfigEditorState): void {
-  const warnings = validateConfig(state)
+  const modelWarnings = validateConfig(state)
+  const fallbackWarnings = checkFallbackWarnings(state)
+  const allWarnings = [...modelWarnings, ...fallbackWarnings]
 
-  if (warnings.length === 0) {
+  if (allWarnings.length === 0) {
     p.log.success(color.green("No validation warnings! Configuration looks good."))
     return
   }
@@ -61,7 +64,7 @@ export function displayValidationWarnings(state: ConfigEditorState): void {
   console.log(color.bgYellow(color.black(color.bold(" Validation Warnings "))))
   console.log()
 
-  for (const warning of warnings) {
+  for (const warning of allWarnings) {
     const icon = warning.type === "missing-fallback" ? color.yellow("[!]") : color.red("[X]")
     console.log(`  ${icon} ${color.yellow(warning.message)}`)
   }
