@@ -71,6 +71,7 @@ import {
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createTasksMdCreationGuardHook,
 } from "./hooks";
 import {
   contextCollector,
@@ -342,6 +343,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
     ? createWriteExistingFileGuardHook(ctx)
+    : null;
+
+  const tasksMdCreationGuard = isHookEnabled("tasks-md-creation-guard")
+    ? createTasksMdCreationGuardHook(ctx)
     : null;
 
   // TDD Guard hook - enforces Test-Driven Development
@@ -923,6 +928,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "tool.execute.before": async (input, output) => {
       await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
       await writeExistingFileGuard?.["tool.execute.before"]?.(input, output);
+      await tasksMdCreationGuard?.["tool.execute.before"]?.(input, output);
       await questionLabelTruncator["tool.execute.before"]?.(input, output);
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
@@ -1041,6 +1047,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         return;
       }
       await claudeCodeHooks["tool.execute.after"](input, output);
+      await tasksMdCreationGuard?.["tool.execute.after"]?.(input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await preemptiveCompaction?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);

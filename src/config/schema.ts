@@ -139,6 +139,7 @@ export const HookNameSchema = z.enum([
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
+  "tasks-md-creation-guard",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
