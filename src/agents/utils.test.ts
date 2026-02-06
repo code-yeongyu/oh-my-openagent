@@ -263,7 +263,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
   test("hephaestus is created when openai provider is connected", async () => {
     // #given - openai provider has models available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2-codex"])
+      new Set(["openai/gpt-5.3-codex"])
     )
 
     try {
@@ -280,7 +280,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
   test("hephaestus is created when github-copilot provider is connected", async () => {
     // #given - github-copilot provider has models available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["github-copilot/gpt-5.2-codex"])
+      new Set(["github-copilot/gpt-5.3-codex"])
     )
 
     try {
@@ -297,7 +297,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
   test("hephaestus is created when opencode provider is connected", async () => {
     // #given - opencode provider has models available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["opencode/gpt-5.2-codex"])
+      new Set(["opencode/gpt-5.3-codex"])
     )
 
     try {
@@ -322,7 +322,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.2-codex")
+      expect(agents.hephaestus.model).toBe("openai/gpt-5.3-codex")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -572,7 +572,7 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then - category's built-in model and skills are applied
-    expect(agent.model).toBe("openai/gpt-5.2-codex")
+    expect(agent.model).toBe("openai/gpt-5.3-codex")
     expect(agent.variant).toBe("xhigh")
     expect(agent.prompt).toContain("Role: Designer-Turned-Developer")
     expect(agent.prompt).toContain("Task description")
@@ -685,9 +685,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.3-codex, variant=xhigh
     expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.oracle.model).toBe("openai/gpt-5.3-codex")
     expect(agents.oracle.variant).toBe("xhigh")
   })
 
@@ -754,9 +754,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.3-codex, variant=xhigh
     expect(agents.sisyphus).toBeDefined()
-    expect(agents.sisyphus.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.sisyphus.model).toBe("openai/gpt-5.3-codex")
     expect(agents.sisyphus.variant).toBe("xhigh")
   })
 
@@ -769,9 +769,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.2-codex, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.3-codex, variant=xhigh
     expect(agents.atlas).toBeDefined()
-    expect(agents.atlas.model).toBe("openai/gpt-5.2-codex")
+    expect(agents.atlas.model).toBe("openai/gpt-5.3-codex")
     expect(agents.atlas.variant).toBe("xhigh")
   })
 
