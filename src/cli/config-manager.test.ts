@@ -298,8 +298,8 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-5 providers)
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.5")
+    // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-6 providers)
+    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.6")
   })
 
   test("uses ultimate fallback when no providers configured", () => {

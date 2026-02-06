@@ -34,7 +34,7 @@ describe("preemptive-compaction", () => {
             info: {
               role: "assistant",
               providerID: "anthropic",
-              modelID: "claude-opus-4-5",
+              modelID: "claude-opus-4-6",
               tokens: {
                 input: 180000,
                 output: 0,
@@ -69,7 +69,7 @@ describe("preemptive-compaction", () => {
             info: {
               role: "assistant",
               providerID: "anthropic",
-              modelID: "claude-opus-4-5",
+              modelID: "claude-opus-4-6",
               tokens: {
                 input: 100000,
                 output: 0,
