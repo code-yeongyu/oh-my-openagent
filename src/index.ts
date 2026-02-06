@@ -139,12 +139,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const modelCacheState = createModelCacheState();
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
-    ? createContextWindowMonitorHook(ctx)
+    ? createContextWindowMonitorHook(ctx, modelCacheState)
     : null;
   const preemptiveCompaction =
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
-      ? createPreemptiveCompactionHook(ctx)
+      ? createPreemptiveCompactionHook(ctx, modelCacheState)
       : null;
   const sessionRecovery = isHookEnabled("session-recovery")
     ? createSessionRecoveryHook(ctx, {
