@@ -129,4 +129,75 @@ describe("preemptive-compaction", () => {
     // #then
     expect(summarize).not.toHaveBeenCalled()
   })
+
+  test("uses model-specific cache limit instead of hardcoded default", async () => {
+    //#given
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-5",
+              tokens: {
+                input: 300000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const summarize = mock(() => Promise.resolve())
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const output = { title: "", output: "", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-3" },
+      output
+    )
+
+    //#then
+    // Future behavior: model cache limit = 500k, usage = 300k/500k = 0.6 (< 0.78)
+    expect(summarize).not.toHaveBeenCalled()
+  })
+
+  test("falls back to default 200k when no cache provided", async () => {
+    //#given
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "anthropic",
+              modelID: "claude-opus-4-6",
+              tokens: {
+                input: 160000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const summarize = mock(() => Promise.resolve())
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const output = { title: "", output: "", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-4" },
+      output
+    )
+
+    //#then
+    expect(summarize).toHaveBeenCalled()
+  })
 })
