@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 
@@ -34,33 +35,41 @@ const DELEGATION_TOOLS = new Set([
   "task",
 ])
 
-const REMINDER_MESSAGE = `
-[Category+Skill Reminder]
+function formatSkillNames(skills: AvailableSkill[], limit: number): string {
+  if (skills.length === 0) return "(none)"
+  const shown = skills.slice(0, limit).map((s) => s.name)
+  const remaining = skills.length - shown.length
+  const suffix = remaining > 0 ? ` (+${remaining} more)` : ""
+  return shown.join(", ") + suffix
+}
 
-You are an orchestrator agent. Consider whether this work should be delegated:
+function buildReminderMessage(availableSkills: AvailableSkill[]): string {
+  const builtinSkills = availableSkills.filter((s) => s.location === "plugin")
+  const customSkills = availableSkills.filter((s) => s.location !== "plugin")
 
-**DELEGATE when:**
-- UI/Frontend work → category: "visual-engineering", skills: ["frontend-ui-ux"]
-- Complex logic/architecture → category: "ultrabrain"
-- Quick/trivial tasks → category: "quick"
-- Git operations → skills: ["git-master"]
-- Browser automation → skills: ["playwright"] or ["agent-browser"]
+  const builtinText = formatSkillNames(builtinSkills, 8)
+  const customText = formatSkillNames(customSkills, 8)
 
-**DO IT YOURSELF when:**
-- Gathering context/exploring codebase
-- Simple edits that are part of a larger task you're coordinating
-- Tasks requiring your full context understanding
+  const exampleSkillName = customSkills[0]?.name ?? builtinSkills[0]?.name
+  const loadSkills = exampleSkillName ? `["${exampleSkillName}"]` : "[]"
 
-Example delegation:
-\`\`\`
-delegate_task(
-  category="visual-engineering",
-  load_skills=["frontend-ui-ux"],
-  description="Implement responsive navbar with animations",
-  run_in_background=true
-)
-\`\`\`
-`
+  const lines = [
+    "",
+    "[Category+Skill Reminder]",
+    "",
+    `**Built-in**: ${builtinText}`,
+    `**⚡ YOUR SKILLS (PRIORITY)**: ${customText}`,
+    "",
+    "> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.",
+    "",
+    "```typescript",
+    `delegate_task(category=\"visual-engineering\", load_skills=${loadSkills}, run_in_background=true)`,
+    "```",
+    "",
+  ]
+
+  return lines.join("\n")
+}
 
 interface ToolExecuteInput {
   tool: string
@@ -81,8 +90,12 @@ interface SessionState {
   toolCallCount: number
 }
 
-export function createCategorySkillReminderHook(_ctx: PluginInput) {
+export function createCategorySkillReminderHook(
+  _ctx: PluginInput,
+  availableSkills: AvailableSkill[] = []
+) {
   const sessionStates = new Map<string, SessionState>()
+  const reminderMessage = buildReminderMessage(availableSkills)
 
   function getOrCreateState(sessionID: string): SessionState {
     if (!sessionStates.has(sessionID)) {
@@ -130,7 +143,7 @@ export function createCategorySkillReminderHook(_ctx: PluginInput) {
     state.toolCallCount++
 
     if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown) {
-      output.output += REMINDER_MESSAGE
+      output.output += reminderMessage
       state.reminderShown = true
       log("[category-skill-reminder] Reminder injected", { 
         sessionID, 
