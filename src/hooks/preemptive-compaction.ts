@@ -7,6 +7,7 @@ interface AssistantMessageInfo {
   role: "assistant"
   providerID: string
   modelID?: string
+  contextWindowLimit?: number
   tokens: {
     input: number
     output: number
@@ -60,6 +61,7 @@ export function createPreemptiveCompactionHook(ctx: PluginInput, modelCacheState
       const lastTokens = lastAssistant.tokens
       const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
       const effectiveLimit = resolveContextWindowLimit({
+        contextWindowLimit: lastAssistant.contextWindowLimit,
         providerID: lastAssistant.providerID,
         modelID: lastAssistant.modelID,
         modelContextLimitsCache: modelCacheState?.modelContextLimitsCache,

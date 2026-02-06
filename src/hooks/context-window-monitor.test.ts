@@ -157,6 +157,77 @@ describe("context-window-monitor", () => {
     expect(messages).toHaveBeenCalledTimes(1)
   })
 
+  test("handles vertex-anthropic provider", async () => {
+    //#given
+    const sessionID = "context-window-monitor-vertex-anthropic-session"
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "vertex-anthropic",
+              modelID: "claude-opus-4-6",
+              tokens: {
+                input: 150000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const hook = createContextWindowMonitorHook(createMockCtx({ messages }))
+    const output = { title: "", output: "tool result", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-vertex" },
+      output
+    )
+
+    //#then
+    expect(output.output).toContain("[Context Status:")
+  })
+
+  test("displays model-appropriate limit in status text", async () => {
+    //#given
+    const sessionID = "context-window-monitor-display-limit"
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "anthropic",
+              modelID: "claude-opus-4-6",
+              tokens: {
+                input: 150000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const hook = createContextWindowMonitorHook(createMockCtx({ messages }))
+    const output = { title: "", output: "tool result", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-display" },
+      output
+    )
+
+    //#then
+    expect(output.output).toContain("200k context window")
+    expect(output.output).toContain("200,000")
+  })
+
   test("uses resolved model-aware context limit instead of hardcoded fallback", async () => {
     //#given
     const sessionID = "context-window-monitor-model-aware-limit"

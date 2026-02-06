@@ -8,6 +8,8 @@ import {
 function createMockCtx(messagesData: Array<{
   info: {
     role: string
+    providerID?: string
+    modelID?: string
     tokens?: {
       input: number
       output: number
@@ -104,6 +106,64 @@ describe("getContextWindowUsage", () => {
 
     //#then
     expect(usage).toBeNull()
+  })
+
+  test("extracts providerID/modelID from messages when not in limitOptions", async () => {
+    //#given
+    const mockCtx = createMockCtx([
+      {
+        info: {
+          role: "assistant",
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4-5",
+          tokens: {
+            input: 150000,
+            output: 5000,
+            reasoning: 0,
+            cache: { read: 10000, write: 0 },
+          },
+        },
+      },
+    ])
+    const limitOptions = {
+      modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 1_000_000]]),
+    }
+
+    //#when
+    const usage = await getContextWindowUsage(mockCtx, "session-extract", limitOptions)
+
+    //#then
+    expect(usage).not.toBeNull()
+    expect(usage!.usedTokens).toBe(165000)
+    expect(usage!.remainingTokens).toBe(835000)
+    expect(usage!.usagePercentage).toBeCloseTo(0.165, 6)
+  })
+
+  test("falls back to default when message has no providerID/modelID", async () => {
+    //#given
+    const mockCtx = createMockCtx([
+      {
+        info: {
+          role: "assistant",
+          tokens: {
+            input: 150000,
+            output: 5000,
+            reasoning: 0,
+            cache: { read: 10000, write: 0 },
+          },
+        },
+      },
+    ])
+    const limitOptions = {
+      modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 1_000_000]]),
+    }
+
+    //#when
+    const usage = await getContextWindowUsage(mockCtx, "session-no-provider", limitOptions)
+
+    //#then
+    expect(usage).not.toBeNull()
+    expect(usage!.remainingTokens).toBe(35000)
   })
 
   test("uses 200k denominator when env var is unset and model cache is not used", async () => {

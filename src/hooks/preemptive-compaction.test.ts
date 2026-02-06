@@ -154,7 +154,6 @@ describe("preemptive-compaction", () => {
     const summarize = mock(() => Promise.resolve())
     const modelCacheState = {
       modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 500_000]]),
-      anthropicContext1MEnabled: false,
     }
     const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }), modelCacheState)
     const output = { title: "", output: "", metadata: {} }
@@ -167,6 +166,77 @@ describe("preemptive-compaction", () => {
 
     //#then
     // model cache limit = 500k, usage = 300k/500k = 0.6 (< 0.78 threshold)
+    expect(summarize).not.toHaveBeenCalled()
+  })
+
+  test("handles vertex-anthropic provider", async () => {
+    //#given
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "vertex-anthropic",
+              modelID: "claude-opus-4-6",
+              tokens: {
+                input: 180000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const summarize = mock(() => Promise.resolve())
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const output = { title: "", output: "", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-vertex" },
+      output
+    )
+
+    //#then
+    expect(summarize).toHaveBeenCalled()
+  })
+
+  test("uses contextWindowLimit from message when available", async () => {
+    //#given
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "anthropic",
+              modelID: "claude-opus-4-6",
+              contextWindowLimit: 500_000,
+              tokens: {
+                input: 300000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const summarize = mock(() => Promise.resolve())
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const output = { title: "", output: "", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-cwl" },
+      output
+    )
+
+    //#then
     expect(summarize).not.toHaveBeenCalled()
   })
 

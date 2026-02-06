@@ -1,16 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
-import { resolveContextWindowLimit } from "../shared/context-window-limit-resolver"
+import { resolveContextWindowLimit, isAnthropicProvider } from "../shared/context-window-limit-resolver"
 import type { ModelCacheState } from "../plugin-state"
 
-const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
-const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
+function buildContextReminder(effectiveLimit: number): string {
+  const limitLabel = effectiveLimit >= 1_000_000 ? "1M" : `${Math.round(effectiveLimit / 1000)}k`
+  return `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
-You are using Anthropic Claude with 1M context window.
+You are using Anthropic Claude with ${limitLabel} context window.
 You have plenty of context remaining - do NOT rush or skip tasks.
 Complete your work thoroughly and methodically.`
+}
 
 interface AssistantMessageInfo {
   role: "assistant"
@@ -57,7 +59,7 @@ export function createContextWindowMonitorHook(
       if (assistantMessages.length === 0) return
 
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      if (lastAssistant.providerID !== "anthropic") return
+      if (!isAnthropicProvider(lastAssistant.providerID)) return
 
       const effectiveLimit = resolveContextWindowLimit({
         contextWindowLimit: lastAssistant.contextWindowLimit,
@@ -77,13 +79,13 @@ export function createContextWindowMonitorHook(
 
       remindedSessions.add(sessionID)
 
-      const displayUsagePercentage = totalInputTokens / ANTHROPIC_DISPLAY_LIMIT
-      const usedPct = (displayUsagePercentage * 100).toFixed(1)
-      const remainingPct = ((1 - displayUsagePercentage) * 100).toFixed(1)
+      const usagePercentage = totalInputTokens / effectiveLimit
+      const usedPct = (usagePercentage * 100).toFixed(1)
+      const remainingPct = ((1 - usagePercentage) * 100).toFixed(1)
       const usedTokens = totalInputTokens.toLocaleString()
-      const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
+      const limitTokens = effectiveLimit.toLocaleString()
 
-      output.output += `\n\n${CONTEXT_REMINDER}
+      output.output += `\n\n${buildContextReminder(effectiveLimit)}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
     } catch {
       // Graceful degradation - do not disrupt tool execution

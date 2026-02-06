@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { resolveContextWindowLimit } from "./context-window-limit-resolver"
+import { resolveContextWindowLimit, isAnthropicProvider } from "./context-window-limit-resolver"
 
 describe("resolveContextWindowLimit", () => {
   beforeEach(() => {
@@ -106,5 +106,45 @@ describe("resolveContextWindowLimit", () => {
 
     //#then
     expect(result).toBe(200_000)
+  })
+
+  test("env var takes precedence over model cache", () => {
+    //#given
+    process.env.ANTHROPIC_1M_CONTEXT = "true"
+    const modelContextLimitsCache = new Map<string, number>([
+      ["anthropic/claude-opus-4-6", 333_333],
+    ])
+
+    //#when
+    const result = resolveContextWindowLimit({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+      modelContextLimitsCache,
+    })
+
+    //#then
+    expect(result).toBe(1_000_000)
+  })
+})
+
+describe("isAnthropicProvider", () => {
+  test("returns true for 'anthropic'", () => {
+    expect(isAnthropicProvider("anthropic")).toBe(true)
+  })
+
+  test("returns true for 'vertex-anthropic'", () => {
+    expect(isAnthropicProvider("vertex-anthropic")).toBe(true)
+  })
+
+  test("returns false for 'openai'", () => {
+    expect(isAnthropicProvider("openai")).toBe(false)
+  })
+
+  test("returns false for undefined", () => {
+    expect(isAnthropicProvider(undefined)).toBe(false)
+  })
+
+  test("returns false for empty string", () => {
+    expect(isAnthropicProvider("")).toBe(false)
   })
 })

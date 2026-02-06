@@ -9,6 +9,8 @@ const DEFAULT_TARGET_MAX_TOKENS = 50_000;
 
 interface AssistantMessageInfo {
 	role: "assistant";
+	providerID?: string;
+	modelID?: string;
 	tokens: {
 		input: number;
 		output: number;
@@ -133,7 +135,11 @@ export async function getContextWindowUsage(
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const contextWindowLimit = resolveContextWindowLimit(limitOptions);
+		const contextWindowLimit = resolveContextWindowLimit({
+			...limitOptions,
+			providerID: limitOptions?.providerID ?? lastAssistant.providerID,
+			modelID: limitOptions?.modelID ?? lastAssistant.modelID,
+		});
 		const remainingTokens = contextWindowLimit - usedTokens;
 
 		return {

@@ -82,11 +82,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       | Record<string, ProviderConfig>
       | undefined;
 
-    const anthropicBeta =
-      providers?.anthropic?.options?.headers?.["anthropic-beta"];
-    modelCacheState.anthropicContext1MEnabled =
-      anthropicBeta?.includes("context-1m") ?? false;
-
     if (providers) {
       for (const [providerID, providerConfig] of Object.entries(providers)) {
         const models = providerConfig?.models;
