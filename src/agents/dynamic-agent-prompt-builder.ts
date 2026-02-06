@@ -300,7 +300,7 @@ delegate_task(
 delegate_task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
 \`\`\`
 
-**IMPORTANT**: load_skills parameter is REQUIRED for delegate_task. Pass [] if no skills are needed, but passing proper skills is HIGHLY RECOMMENDED for optimal results. Skills inject domain-specific expertise that dramatically improves task execution quality.`
+**IMPORTANT**: load_skills parameter is REQUIRED for delegate_task. Omitting this parameter will cause an error. Pass [] if no skills are needed, but passing proper skills is HIGHLY RECOMMENDED for optimal results. Skills inject domain-specific expertise that dramatically improves task execution quality.`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
