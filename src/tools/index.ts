@@ -24,6 +24,7 @@ import {
   session_read,
   session_search,
   session_info,
+  session_rename,
 } from "./session-manager"
 
 export { sessionExists } from "./session-manager/storage"
@@ -78,4 +79,5 @@ export const builtinTools: Record<string, ToolDefinition> = {
   session_read,
   session_search,
   session_info,
+  session_rename,
 }

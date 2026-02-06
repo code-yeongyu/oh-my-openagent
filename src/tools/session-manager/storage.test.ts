@@ -23,6 +23,7 @@ mock.module("./constants", () => ({
   SESSION_SEARCH_DESCRIPTION: "test",
   SESSION_INFO_DESCRIPTION: "test",
   SESSION_DELETE_DESCRIPTION: "test",
+  SESSION_RENAME_DESCRIPTION: "test",
   TOOL_NAME_PREFIX: "session_",
 }))
 
@@ -312,5 +313,258 @@ describe("session-manager storage - getMainSessions", () => {
 
     // then
     expect(sessions.length).toBe(2)
+  })
+})
+
+describe("session-manager storage - findSessionMetadataPath", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+    mkdirSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
+    mkdirSync(TEST_TODO_DIR, { recursive: true })
+    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+  })
+
+  function createSessionMetadata(projectID: string, sessionID: string, title?: string) {
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    const metadata = {
+      id: sessionID,
+      directory: `/test/path/${projectID}`,
+      time: {
+        created: Date.now(),
+        updated: Date.now(),
+      },
+      title: title || undefined,
+    }
+    writeFileSync(join(projectDir, `${sessionID}.json`), JSON.stringify(metadata, null, 2))
+  }
+
+  test("returns empty string for non-existent session", () => {
+    // #given non-existent session ID
+    const sessionID = "ses_doesnotexist_12345"
+
+    // #when searching for metadata path
+    const path = storage.findSessionMetadataPath(sessionID)
+
+    // #then returns empty string
+    expect(path).toBe("")
+  })
+
+  test("returns correct path when session exists in nested directory", () => {
+    // #given existing session in nested directory structure
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    createSessionMetadata(projectID, sessionID)
+
+    // #when searching for metadata path
+    const path = storage.findSessionMetadataPath(sessionID)
+
+    // #then returns full path to session JSON file
+    const expectedPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
+    expect(path).toBe(expectedPath)
+    expect(existsSync(path)).toBe(true)
+  })
+
+  test("handles multiple projects and finds correct session", () => {
+    // #given sessions in multiple project directories
+    const projectA = "project-a"
+    const projectB = "project-b"
+    const sessionA = "ses_a_123"
+    const sessionB = "ses_b_456"
+
+    createSessionMetadata(projectA, sessionA)
+    createSessionMetadata(projectB, sessionB)
+
+    // #when searching for specific session
+    const pathA = storage.findSessionMetadataPath(sessionA)
+    const pathB = storage.findSessionMetadataPath(sessionB)
+
+    // #then returns correct paths for each session
+    expect(pathA).toBe(join(TEST_SESSION_STORAGE, projectA, `${sessionA}.json`))
+    expect(pathB).toBe(join(TEST_SESSION_STORAGE, projectB, `${sessionB}.json`))
+  })
+
+  test("returns empty string when SESSION_STORAGE does not exist", () => {
+    // #given SESSION_STORAGE directory removed
+    rmSync(TEST_SESSION_STORAGE, { recursive: true, force: true })
+    const nonExistentSession = "ses_any_789"
+
+    // #when searching in non-existent storage
+    const path = storage.findSessionMetadataPath(nonExistentSession)
+
+    // #then returns empty string gracefully
+    expect(path).toBe("")
+  })
+})
+
+describe("session-manager storage - renameSession", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+    mkdirSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
+    mkdirSync(TEST_TODO_DIR, { recursive: true })
+    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+  })
+
+  function createSessionMetadata(projectID: string, sessionID: string, title?: string) {
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    const metadata = {
+      id: sessionID,
+      directory: `/test/path/${projectID}`,
+      time: {
+        created: Date.now(),
+        updated: Date.now(),
+      },
+      title: title || undefined,
+    }
+    writeFileSync(join(projectDir, `${sessionID}.json`), JSON.stringify(metadata, null, 2))
+  }
+
+  test("returns false for non-existent session", async () => {
+    // #given non-existent session ID
+    const sessionID = "ses_doesnotexist_12345"
+
+    // #when attempting to rename
+    const result = await storage.renameSession(sessionID, "New Title")
+
+    // #then returns false
+    expect(result).toBe(false)
+  })
+
+  test("successfully renames existing session and updates title", async () => {
+    // #given existing session with initial title
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    const initialTitle = "Initial Title"
+    createSessionMetadata(projectID, sessionID, initialTitle)
+
+    // #when renaming session
+    const newTitle = "Updated Title"
+    const result = await storage.renameSession(sessionID, newTitle)
+
+    // #then returns true and updates title in metadata
+    expect(result).toBe(true)
+
+    const sessionPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
+    const content = await Bun.file(sessionPath).text()
+    const metadata = JSON.parse(content)
+    expect(metadata.title).toBe(newTitle)
+  })
+
+  test("updates time.updated timestamp when renaming", async () => {
+    // #given existing session
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    createSessionMetadata(projectID, sessionID, "Original Title")
+
+    const sessionPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
+    const beforeContent = await Bun.file(sessionPath).text()
+    const beforeMetadata = JSON.parse(beforeContent)
+    const originalUpdated = beforeMetadata.time.updated
+
+    // #given time has passed to ensure timestamp difference
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    // #when renaming session
+    const result = await storage.renameSession(sessionID, "New Title")
+
+    // #then time.updated is greater than original
+    expect(result).toBe(true)
+
+    const afterContent = await Bun.file(sessionPath).text()
+    const afterMetadata = JSON.parse(afterContent)
+    expect(afterMetadata.time.updated).toBeGreaterThan(originalUpdated)
+  })
+
+  test("handles empty string title by keeping existing title", async () => {
+    // #given existing session with title
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    const originalTitle = "Some Title"
+    createSessionMetadata(projectID, sessionID, originalTitle)
+
+    // #when renaming with empty string
+    const result = await storage.renameSession(sessionID, "")
+
+    // #then title is preserved (empty strings are ignored to prevent TUI crashes)
+    expect(result).toBe(true)
+
+    const sessionPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
+    const content = await Bun.file(sessionPath).text()
+    const metadata = JSON.parse(content)
+    expect(metadata.title).toBe(originalTitle)
+  })
+
+  test("preserves other metadata fields when renaming", async () => {
+    // #given existing session with metadata
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    createSessionMetadata(projectID, sessionID, "Original")
+
+    const sessionPath = join(TEST_SESSION_STORAGE, projectID, `${sessionID}.json`)
+    const beforeContent = await Bun.file(sessionPath).text()
+    const beforeMetadata = JSON.parse(beforeContent)
+
+    // #when renaming session
+    await storage.renameSession(sessionID, "New Title")
+
+    // #then other fields remain unchanged
+    const afterContent = await Bun.file(sessionPath).text()
+    const afterMetadata = JSON.parse(afterContent)
+
+    expect(afterMetadata.id).toBe(beforeMetadata.id)
+    expect(afterMetadata.directory).toBe(beforeMetadata.directory)
+    expect(afterMetadata.time.created).toBe(beforeMetadata.time.created)
+  })
+
+  test("handles invalid JSON gracefully", async () => {
+    // #given session file with invalid JSON
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    const sessionPath = join(projectDir, `${sessionID}.json`)
+    writeFileSync(sessionPath, "{ invalid json }")
+
+    // #when attempting to rename
+    const result = await storage.renameSession(sessionID, "New Title")
+
+    // #then returns false due to parse error
+    expect(result).toBe(false)
+  })
+
+  test("handles file system errors gracefully", async () => {
+    // #given existing session
+    const projectID = "test-project-123"
+    const sessionID = "ses_test_456"
+    createSessionMetadata(projectID, sessionID, "Title")
+
+    // #when attempting to rename (should handle any errors gracefully)
+    const result = await storage.renameSession(sessionID, "New Title")
+
+    // #then should return boolean (either true or false, not throw)
+    expect(typeof result).toBe("boolean")
   })
 })

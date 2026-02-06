@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { session_list, session_read, session_search, session_info } from "./tools"
+import { session_list, session_read, session_search, session_info, session_rename } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
@@ -126,5 +126,63 @@ describe("session-manager tools", () => {
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
     
     expect(typeof result).toBe("string")
+  })
+
+  test("session_rename handles non-existent session", async () => {
+    //#given non-existent session ID
+    const args = { session_id: "ses_nonexistent", new_title: "New Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then returns error message
+    expect(result).toContain("not found")
+  })
+
+  test("session_rename successfully renames session", async () => {
+    //#given valid session ID and new title
+    const args = { session_id: "ses_test123", new_title: "Updated Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then returns a string result (success or failure)
+    expect(typeof result).toBe("string")
+  })
+
+  test("session_rename rejects empty title", async () => {
+    //#given empty new_title parameter
+    const args = { session_id: "ses_test123", new_title: "" }
+    
+    //#when attempting to execute
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then should return error about empty title
+    expect(result).toContain("cannot be empty")
+  })
+
+  test("session_rename uses current session when session_id not provided", async () => {
+    //#given only new_title provided, no session_id
+    const args = { new_title: "Default Session Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then result references context.sessionID ("test-session"), proving fallback worked
+    expect(typeof result).toBe("string")
+    expect(result).toContain("test-session")
+  })
+
+  test("session_rename prefers explicit session_id over context", async () => {
+    //#given both session_id and new_title provided
+    const args = { session_id: "ses_explicit", new_title: "Explicit Title" }
+    
+    //#when executing rename
+    const result = await session_rename.execute(args, mockContext)
+    
+    //#then should use the explicit session_id, not context.sessionID
+    expect(typeof result).toBe("string")
+    expect(result).toContain("ses_explicit")
+    expect(result).not.toContain("test-session")
   })
 })

@@ -4,8 +4,9 @@ import {
   SESSION_READ_DESCRIPTION,
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
+  SESSION_RENAME_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, renameSession, sessionExists } from "./storage"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -14,7 +15,7 @@ import {
   formatSearchResults,
   searchInSession,
 } from "./utils"
-import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
+import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SessionRenameArgs, SearchResult } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
 const MAX_SESSIONS_TO_SCAN = 50
@@ -139,6 +140,43 @@ export const session_info: ToolDefinition = tool({
       }
 
       return formatSessionInfo(info)
+    } catch (e) {
+      return `Error: ${e instanceof Error ? e.message : String(e)}`
+    }
+  },
+})
+
+export const session_rename: ToolDefinition = tool({
+  description: SESSION_RENAME_DESCRIPTION,
+  args: {
+    session_id: tool.schema.string().optional().describe("Session ID to rename (default: current session)"),
+    new_title: tool.schema.string().describe("New title for the session"),
+  },
+  execute: async (args: SessionRenameArgs, context) => {
+    try {
+      const toolCtx = context as { sessionID: string }
+      const sessionId = args.session_id || toolCtx.sessionID
+
+      if (!sessionId) {
+        return "Error: No session ID provided and could not determine current session"
+      }
+
+      if (!args.new_title || args.new_title.trim() === "") {
+        return "Error: Title cannot be empty. Please provide a descriptive title for the session."
+      }
+
+      if (!sessionExists(sessionId)) {
+        return `Session not found: ${sessionId}`
+      }
+
+      const success = await renameSession(sessionId, args.new_title.trim())
+
+      if (success) {
+        const titleDisplay = args.new_title ? `"${args.new_title}"` : "(cleared)"
+        return `Successfully renamed session ${sessionId} to ${titleDisplay}`
+      }
+
+      return `Failed to rename session ${sessionId}`
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }

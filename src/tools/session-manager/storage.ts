@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
 import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
@@ -204,6 +204,19 @@ export async function readSessionTranscript(sessionID: string): Promise<number> 
   }
 }
 
+async function getSessionTitle(sessionID: string): Promise<string | undefined> {
+  const metadataPath = findSessionMetadataPath(sessionID)
+  if (!metadataPath) return undefined
+
+  try {
+    const content = await readFile(metadataPath, "utf-8")
+    const meta = JSON.parse(content) as SessionMetadata
+    return meta.title
+  } catch {
+    return undefined
+  }
+}
+
 export async function getSessionInfo(sessionID: string): Promise<SessionInfo | null> {
   const messages = await readSessionMessages(sessionID)
   if (messages.length === 0) return null
@@ -224,6 +237,8 @@ export async function getSessionInfo(sessionID: string): Promise<SessionInfo | n
   const todos = await readSessionTodos(sessionID)
   const transcriptEntries = await readSessionTranscript(sessionID)
 
+  const title = await getSessionTitle(sessionID)
+
   return {
     id: sessionID,
     message_count: messages.length,
@@ -232,7 +247,49 @@ export async function getSessionInfo(sessionID: string): Promise<SessionInfo | n
     agents_used: Array.from(agentsUsed),
     has_todos: todos.length > 0,
     has_transcript: transcriptEntries > 0,
+    title,
     todos,
     transcript_entries: transcriptEntries,
+  }
+}
+
+export function findSessionMetadataPath(sessionID: string): string {
+  if (!existsSync(SESSION_STORAGE)) return ""
+
+  try {
+    const projectDirs = readdirSync(SESSION_STORAGE, { withFileTypes: true })
+    for (const projectDir of projectDirs) {
+      if (!projectDir.isDirectory()) continue
+
+      const projectPath = join(SESSION_STORAGE, projectDir.name)
+      const sessionFile = `${sessionID}.json`
+      const sessionPath = join(projectPath, sessionFile)
+
+      if (existsSync(sessionPath)) {
+        return sessionPath
+      }
+    }
+  } catch {
+    return ""
+  }
+
+  return ""
+}
+
+export async function renameSession(sessionID: string, newTitle: string): Promise<boolean> {
+  const sessionPath = findSessionMetadataPath(sessionID)
+  if (!sessionPath) return false
+
+  try {
+    const content = await readFile(sessionPath, "utf-8")
+    const metadata = JSON.parse(content) as SessionMetadata
+
+    metadata.title = newTitle && newTitle.trim() ? newTitle.trim() : metadata.title
+    metadata.time.updated = Date.now()
+
+    await writeFile(sessionPath, JSON.stringify(metadata, null, 2), "utf-8")
+    return true
+  } catch {
+    return false
   }
 }
