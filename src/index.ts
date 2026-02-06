@@ -374,12 +374,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       )
     : null;
 
-  if (sessionRecovery && todoContinuationEnforcer) {
-    sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
-    sessionRecovery.setOnRecoveryCompleteCallback(
-      todoContinuationEnforcer.markRecoveryComplete,
-    );
-  }
+  // sessionRecovery callbacks are setters; compose callbacks so both enforcers are notified.
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
@@ -487,11 +482,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
-  if (sessionRecovery && taskContinuationEnforcer) {
-    sessionRecovery.setOnAbortCallback(taskContinuationEnforcer.markRecovering);
-    sessionRecovery.setOnRecoveryCompleteCallback(
-      taskContinuationEnforcer.markRecoveryComplete,
-    );
+  if (sessionRecovery && (todoContinuationEnforcer || taskContinuationEnforcer)) {
+    sessionRecovery.setOnAbortCallback((sessionID) => {
+      todoContinuationEnforcer?.markRecovering(sessionID);
+      taskContinuationEnforcer?.markRecovering(sessionID);
+    });
+    sessionRecovery.setOnRecoveryCompleteCallback((sessionID) => {
+      todoContinuationEnforcer?.markRecoveryComplete(sessionID);
+      taskContinuationEnforcer?.markRecoveryComplete(sessionID);
+    });
   }
 
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
