@@ -18,6 +18,7 @@ import {
   buildDelegationTable,
   buildCategorySkillsDelegationGuide,
   buildOracleSection,
+  buildDevilsAdvocateSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
@@ -155,6 +156,7 @@ function buildDynamicSisyphusPrompt(
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
   const delegationTable = buildDelegationTable(availableAgents)
   const oracleSection = buildOracleSection(availableAgents)
+  const devilsAdvocateSection = buildDevilsAdvocateSection(availableAgents)
   const hardBlocks = buildHardBlocksSection()
   const antiPatterns = buildAntiPatternsSection()
   const taskManagementSection = buildTaskManagementSection(useTaskSystem)
@@ -435,6 +437,8 @@ If verification fails:
 </Behavior_Instructions>
 
 ${oracleSection}
+
+${devilsAdvocateSection}
 
 ${taskManagementSection}
 
