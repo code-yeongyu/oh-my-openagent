@@ -459,13 +459,13 @@ YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 
 1. **Wave 1**: Fire these tasks IN PARALLEL (no dependencies)
    \`\`\`
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
    \`\`\`
 
 2. **Wave 2**: After Wave 1 completes, fire next wave IN PARALLEL
    \`\`\`
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
    \`\`\`
 
 3. Continue until all waves complete
@@ -476,7 +476,7 @@ YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 WHY THIS FORMAT IS MANDATORY:
 - Caller can directly copy TODO items
 - Wave grouping enables parallel execution
-- Each task has clear delegate_task parameters
+- Each task has clear task parameters
 - QA criteria ensure verifiable completion
 </FINAL_OUTPUT_FOR_CALLER>
 

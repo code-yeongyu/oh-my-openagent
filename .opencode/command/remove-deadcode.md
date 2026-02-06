@@ -41,27 +41,27 @@ Fire ALL simultaneously:
 
 ```
 // Agent 1: Find all exported symbols
-delegate_task(subagent_type="explore", run_in_background=true,
+task(subagent_type="explore", run_in_background=true,
   prompt="Find ALL exported functions, classes, types, interfaces, and constants across src/.
   List each with: file path, line number, symbol name, export type (named/default).
   EXCLUDE: src/index.ts root exports, test files.
   Return as structured list.")
 
 // Agent 2: Find potentially unused files
-delegate_task(subagent_type="explore", run_in_background=true,
+task(subagent_type="explore", run_in_background=true,
   prompt="Find files in src/ that are NOT imported by any other file.
   Check import/require statements across the entire codebase.
   EXCLUDE: index.ts files, test files, entry points, config files, .md files.
   Return list of potentially orphaned files.")
 
 // Agent 3: Find unused imports within files
-delegate_task(subagent_type="explore", run_in_background=true,
+task(subagent_type="explore", run_in_background=true,
   prompt="Find unused imports across src/**/*.ts files.
   Look for import statements where the imported symbol is never referenced in the file body.
   Return: file path, line number, imported symbol name.")
 
 // Agent 4: Find functions/variables only used in their own declaration
-delegate_task(subagent_type="explore", run_in_background=true,
+task(subagent_type="explore", run_in_background=true,
   prompt="Find private/non-exported functions, variables, and types in src/**/*.ts that appear
   to have zero usage beyond their declaration. Return: file path, line number, symbol name.")
 ```

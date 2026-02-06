@@ -86,6 +86,13 @@ Prompts MUST be in English.`
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      if (args.category && !args.subagent_type) {
+        args.subagent_type = "sisyphus-junior"
+      }
+      await ctx.metadata?.({
+        title: args.description,
+      })
+
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
@@ -116,7 +123,7 @@ Prompts MUST be in English.`
         return executeSyncContinuation(args, ctx, options)
       }
 
-      if (args.category && args.subagent_type) {
+      if (args.category && args.subagent_type && args.subagent_type !== "sisyphus-junior") {
         return `Invalid arguments: Provide EITHER category OR subagent_type, not both.`
       }
 
@@ -157,7 +164,7 @@ Prompts MUST be in English.`
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
-        log("[delegate_task] unstable agent detection", {
+        log("[task] unstable agent detection", {
           category: args.category,
           actualModel,
           isUnstableAgent,

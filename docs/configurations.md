@@ -25,7 +25,7 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
     "explore": { "model": "opencode/gpt-5-nano" }        // Free model for grep
   },
   
-  // Override category models (used by delegate_task)
+  // Override category models (used by task)
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },         // Fast/cheap for trivial tasks
     "visual-engineering": { "model": "google/gemini-3-pro" } // Gemini for UI
@@ -252,7 +252,7 @@ Available agents: `sisyphus`, `prometheus`, `oracle`, `librarian`, `explore`, `m
 Oh My OpenCode includes built-in skills that provide additional capabilities:
 
 - **playwright** (default) / **agent-browser**: Browser automation for web scraping, testing, screenshots, and browser interactions. See [Browser Automation](#browser-automation) for switching between providers.
-- **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `delegate_task(category='quick', load_skills=['git-master'], ...)` to save context.
+- **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `task(category='quick', load_skills=['git-master'], ...)` to save context.
 
 Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
@@ -455,7 +455,7 @@ Run background subagents in separate tmux panes for **visual multi-agent executi
 ### How It Works
 
 When `tmux.enabled` is `true` and you're inside a tmux session:
-- Background agents (via `delegate_task(run_in_background=true)`) spawn in new tmux panes
+- Background agents (via `task(run_in_background=true)`) spawn in new tmux panes
 - Each pane shows the subagent's real-time output
 - Panes are automatically closed when the subagent completes
 - Layout is automatically adjusted based on your configuration
@@ -716,7 +716,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
 
 ## Categories
 
-Categories enable domain-specific task delegation via the `delegate_task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
+Categories enable domain-specific task delegation via the `task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
 
 ### Built-in Categories
 
@@ -797,12 +797,12 @@ All 7 categories come with optimal model defaults, but **you must configure them
 ### Usage
 
 ```javascript
-// Via delegate_task tool
-delegate_task(category="visual-engineering", prompt="Create a responsive dashboard component")
-delegate_task(category="ultrabrain", prompt="Design the payment processing flow")
+// Via task tool
+task(category="visual-engineering", prompt="Create a responsive dashboard component")
+task(category="ultrabrain", prompt="Design the payment processing flow")
 
 // Or target a specific agent directly (bypasses categories)
-delegate_task(agent="oracle", prompt="Review this architecture")
+task(agent="oracle", prompt="Review this architecture")
 ```
 
 ### Custom Categories
@@ -831,7 +831,7 @@ Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`
 
 | Option             | Type    | Default | Description                                                                                         |
 | ------------------ | ------- | ------- | --------------------------------------------------------------------------------------------------- |
-| `description`       | string  | -       | Human-readable description of the category's purpose. Shown in delegate_task prompt.                     |
+| `description`       | string  | -       | Human-readable description of the category's purpose. Shown in task prompt.                     |
 | `is_unstable_agent`| boolean | `false`  | Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. |
 
 ## Model Resolution System
