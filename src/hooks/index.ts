@@ -1,4 +1,5 @@
 export { createTodoContinuationEnforcer, type TodoContinuationEnforcer } from "./todo-continuation-enforcer";
+export { createTaskContinuationEnforcer, type TaskContinuationEnforcer } from "./task-continuation-enforcer";
 export { createContextWindowMonitorHook } from "./context-window-monitor";
 export { createSessionNotification } from "./session-notification";
 export { createSessionRecoveryHook, type SessionRecoveryHook, type SessionRecoveryOptions } from "./session-recovery";

@@ -1,6 +1,7 @@
 import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
 import {
   createTodoContinuationEnforcer,
+  createTaskContinuationEnforcer,
   createContextWindowMonitorHook,
   createSessionRecoveryHook,
   createSessionNotification,
@@ -478,6 +479,21 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false;
+
+  const taskContinuationEnforcer = isHookEnabled("task-continuation-enforcer") && taskSystemEnabled
+    ? createTaskContinuationEnforcer(ctx, pluginConfig, {
+        backgroundManager,
+        isContinuationStopped: stopContinuationGuard?.isStopped,
+      })
+    : null;
+
+  if (sessionRecovery && taskContinuationEnforcer) {
+    sessionRecovery.setOnAbortCallback(taskContinuationEnforcer.markRecovering);
+    sessionRecovery.setOnRecoveryCompleteCallback(
+      taskContinuationEnforcer.markRecoveryComplete,
+    );
+  }
+
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
@@ -627,6 +643,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await backgroundNotificationHook?.event(input);
       await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
+      await taskContinuationEnforcer?.handler(input);
       await unstableAgentBabysitter?.event(input);
       await contextWindowMonitor?.event(input);
       await directoryAgentsInjector?.event(input);
@@ -810,6 +827,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         if (command === "stop-continuation" && sessionID) {
           stopContinuationGuard?.stop(sessionID);
           todoContinuationEnforcer?.cancelAllCountdowns();
+          taskContinuationEnforcer?.cancelAllCountdowns();
           ralphLoop?.cancelLoop(sessionID);
           clearBoulderState(ctx.directory);
           log("[stop-continuation] All continuation mechanisms stopped", {
