@@ -5,6 +5,7 @@ import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-lo
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
+import { REVIEW_LOOP_TEMPLATE } from "./templates/review-loop"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -76,6 +77,17 @@ $ARGUMENTS
     template: `<command-instruction>
 ${STOP_CONTINUATION_TEMPLATE}
 </command-instruction>`,
+  },
+  "review-loop": {
+    description: "(builtin) Continuous PR review loop - iterates until no CRITICAL/HIGH issues remain (max 10 iterations)",
+    template: `<command-instruction>
+${REVIEW_LOOP_TEMPLATE}
+</command-instruction>
+
+<user-task>
+$ARGUMENTS
+</user-task>`,
+    argumentHint: "[target-branch]",
   },
 }
 
