@@ -419,30 +419,30 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult["atlas"]) {
       const agent = agentResult["atlas"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow", "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, task: "allow", call_omo_agent: "deny", "task_*": "allow", teammate: "allow" };
     }
     if (agentResult.sisyphus) {
       const agent = agentResult.sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
     }
     if (agentResult.hephaestus) {
       const agent = agentResult.hephaestus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission };
     }
     if (agentResult["prometheus"]) {
       const agent = agentResult["prometheus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
     }
     if (agentResult["sisyphus-junior"]) {
       const agent = agentResult["sisyphus-junior"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, delegate_task: "allow", "task_*": "allow", teammate: "allow" };
+      agent.permission = { ...agent.permission, task: "allow", "task_*": "allow", teammate: "allow" };
     }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
       webfetch: "allow",
       external_directory: "allow",
-      delegate_task: "deny",
+      task: "deny",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)

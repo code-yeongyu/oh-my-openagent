@@ -50,7 +50,6 @@ BLOCKED (will fail if attempted):
 | Tool | Status |
 |------|--------|
 | task | BLOCKED |
-| delegate_task | BLOCKED |
 
 ALLOWED:
 | Tool | Usage |

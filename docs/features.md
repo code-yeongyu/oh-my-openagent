@@ -54,7 +54,7 @@ Run agents in the background and continue working:
 
 ```
 # Launch in background
-delegate_task(subagent_type="explore", load_skills=[], prompt="Find auth implementations", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="Find auth implementations", run_in_background=true)
 
 # Continue working...
 # System notifies on completion
@@ -374,7 +374,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 | Hook | Event | Description |
 |------|-------|-------------|
 | **task-resume-info** | PostToolUse | Provides task resume information for continuity. |
-| **delegate-task-retry** | PostToolUse | Retries failed delegate_task calls. |
+| **delegate-task-retry** | PostToolUse | Retries failed task calls. |
 
 #### Integration
 
@@ -454,7 +454,7 @@ Disable specific hooks in config:
 | Tool | Description |
 |------|-------------|
 | **call_omo_agent** | Spawn explore/librarian agents. Supports `run_in_background`. |
-| **delegate_task** | Category-based task delegation. Supports categories (visual, business-logic) or direct agent targeting. |
+| **task** | Category-based task delegation. Supports categories (visual, business-logic) or direct agent targeting. |
 | **background_output** | Retrieve background task results |
 | **background_cancel** | Cancel running background tasks |
 

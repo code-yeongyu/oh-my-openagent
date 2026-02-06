@@ -274,7 +274,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan.prompt).toBe("original plan prompt")
   })
 
-  test("prometheus should have mode 'all' to be callable via delegate_task", async () => {
+  test("prometheus should have mode 'all' to be callable via task", async () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {
       sisyphus_agent: {
@@ -305,7 +305,7 @@ describe("Plan agent demote behavior", () => {
 })
 
 describe("Agent permission defaults", () => {
-  test("hephaestus should allow delegate_task", async () => {
+  test("hephaestus should allow task", async () => {
     // #given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -335,7 +335,7 @@ describe("Agent permission defaults", () => {
     // #then
     const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
     expect(agentConfig.hephaestus).toBeDefined()
-    expect(agentConfig.hephaestus.permission?.delegate_task).toBe("allow")
+    expect(agentConfig.hephaestus.permission?.task).toBe("allow")
   })
 })
 

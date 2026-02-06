@@ -56,7 +56,7 @@ features/
 
 ## ANTI-PATTERNS
 
-- **Sequential delegation**: Use `delegate_task` parallel
+- **Sequential delegation**: Use `task` parallel
 - **Trust self-reports**: ALWAYS verify
 - **Main thread blocks**: No heavy I/O in loader init
 - **Direct state mutation**: Use managers for boulder/session state
