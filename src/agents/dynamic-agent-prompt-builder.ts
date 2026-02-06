@@ -253,13 +253,13 @@ ${skillsSection}
 **STEP 1: Select Category**
 - Read each category's description
 - Match task requirements to category domain
-- Select the category whose domain BEST fits the task
+- Select category whose domain BEST fits the task
 
 **STEP 2: Evaluate ALL Skills (Built-in AND User-Installed)**
 For EVERY skill listed above, ask yourself:
 > "Does this skill's expertise domain overlap with my task?"
 
-- If YES → INCLUDE in \`load_skills=[...]\`
+- If YES → INCLUDE in load_skills=[...]
 - If NO → You MUST justify why (see below)
 ${customSkills.length > 0 ? `
 > **User-installed skills get PRIORITY.** The user explicitly installed them for their workflow.
@@ -298,7 +298,9 @@ delegate_task(
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
 delegate_task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
+\`\`\`
+
+**IMPORTANT**: load_skills parameter is REQUIRED for delegate_task. Pass [] if no skills are needed, but passing proper skills is HIGHLY RECOMMENDED for optimal results. Skills inject domain-specific expertise that dramatically improves task execution quality.`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
