@@ -240,13 +240,13 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
   })
 })
 
-describe("createBuiltinAgents with requiresModel gating", () => {
-  test("hephaestus is not created when gpt-5.2-codex is unavailable and provider not connected", async () => {
-    // #given
+describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => {
+  test("hephaestus is not created when no required provider is connected", async () => {
+    // #given - only anthropic models available, not in hephaestus requiresProvider
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-5"])
     )
-    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
 
     try {
       // #when
@@ -260,10 +260,44 @@ describe("createBuiltinAgents with requiresModel gating", () => {
     }
   })
 
-  test("hephaestus is created when gpt-5.2-codex is available", async () => {
-    // #given
+  test("hephaestus is created when openai provider is connected", async () => {
+    // #given - openai provider has models available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["openai/gpt-5.2-codex"])
+    )
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then
+      expect(agents.hephaestus).toBeDefined()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("hephaestus is created when github-copilot provider is connected", async () => {
+    // #given - github-copilot provider has models available
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["github-copilot/gpt-5.2-codex"])
+    )
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then
+      expect(agents.hephaestus).toBeDefined()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("hephaestus is created when opencode provider is connected", async () => {
+    // #given - opencode provider has models available
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["opencode/gpt-5.2-codex"])
     )
 
     try {
@@ -295,7 +329,7 @@ describe("createBuiltinAgents with requiresModel gating", () => {
     }
   })
 
-  test("hephaestus is created when explicit config provided even if model unavailable", async () => {
+  test("hephaestus is created when explicit config provided even if provider unavailable", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["anthropic/claude-opus-4-5"])

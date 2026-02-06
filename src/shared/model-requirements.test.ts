@@ -176,14 +176,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("kimi-for-coding")
   })
 
-  test("hephaestus requires gpt-5.2-codex", () => {
+  test("hephaestus requires openai/github-copilot/opencode provider", () => {
     // #given - hephaestus agent requirement
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
     // #when - accessing hephaestus requirement
-    // #then - requiresModel is set to gpt-5.2-codex
+    // #then - requiresProvider is set to openai, github-copilot, opencode (not requiresModel)
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresModel).toBe("gpt-5.2-codex")
+    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "opencode"])
+    expect(hephaestus.requiresModel).toBeUndefined()
   })
 
   test("all 10 builtin agents have valid fallbackChain arrays", () => {

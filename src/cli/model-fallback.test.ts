@@ -409,7 +409,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Hephaestus agent special cases", () => {
-    test("Hephaestus is created when OpenAI is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when OpenAI is available (openai provider connected)", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -421,7 +421,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is created when Copilot is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when Copilot is available (github-copilot provider connected)", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -433,7 +433,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is created when OpenCode Zen is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when OpenCode Zen is available (opencode provider connected)", () => {
       // #given
       const config = createConfig({ hasOpencodeZen: true })
 
@@ -445,7 +445,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is omitted when only Claude is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only Claude is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasClaude: true })
 
@@ -456,7 +456,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus).toBeUndefined()
     })
 
-    test("Hephaestus is omitted when only Gemini is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only Gemini is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasGemini: true })
 
@@ -467,7 +467,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus).toBeUndefined()
     })
 
-    test("Hephaestus is omitted when only ZAI is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only ZAI is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasZaiCodingPlan: true })
 

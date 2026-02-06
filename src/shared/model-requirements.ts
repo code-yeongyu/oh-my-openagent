@@ -9,6 +9,7 @@ export type ModelRequirement = {
   variant?: string // Default variant (used when entry doesn't specify one)
   requiresModel?: string // If set, only activates when this model is available (fuzzy match)
   requiresAnyModel?: boolean // If true, requires at least ONE model in fallbackChain to be available (or empty availability treated as unavailable)
+  requiresProvider?: string[] // If set, only activates when any of these providers is connected
 }
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
@@ -27,7 +28,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
     ],
-    requiresModel: "gpt-5.2-codex",
+    requiresProvider: ["openai", "github-copilot", "opencode"],
   },
   oracle: {
     fallbackChain: [
