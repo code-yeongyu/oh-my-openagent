@@ -4,8 +4,10 @@ import * as path from "path"
 import {
   AGENT_NAME_MAP,
   HOOK_NAME_MAP,
+  MODEL_VERSION_MAP,
   migrateAgentNames,
   migrateHookNames,
+  migrateModelVersions,
   migrateConfigFile,
   migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
@@ -369,29 +371,81 @@ describe("migrateConfigFile", () => {
     expect(needsWrite).toBe(false)
   })
 
-  test("handles migration of all legacy items together", () => {
-    // given: Config with all legacy items
-    const rawConfig: Record<string, unknown> = {
-      omo_agent: { disabled: false },
-      agents: {
-        omo: { model: "test" },
-        "OmO-Plan": { prompt: "custom" },
-      },
-      disabled_hooks: ["anthropic-auto-compact"],
-    }
+   test("handles migration of all legacy items together", () => {
+     // given: Config with all legacy items
+     const rawConfig: Record<string, unknown> = {
+       omo_agent: { disabled: false },
+       agents: {
+         omo: { model: "test" },
+         "OmO-Plan": { prompt: "custom" },
+       },
+       disabled_hooks: ["anthropic-auto-compact"],
+     }
 
-    // when: Migrate config file
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: All legacy items should be migrated
-    expect(needsWrite).toBe(true)
-    expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
-    expect(rawConfig.omo_agent).toBeUndefined()
-    const agents = rawConfig.agents as Record<string, unknown>
-    expect(agents["sisyphus"]).toBeDefined()
-    expect(agents["prometheus"]).toBeDefined()
-    expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
-  })
+     // then: All legacy items should be migrated
+     expect(needsWrite).toBe(true)
+     expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
+     expect(rawConfig.omo_agent).toBeUndefined()
+     const agents = rawConfig.agents as Record<string, unknown>
+     expect(agents["sisyphus"]).toBeDefined()
+     expect(agents["prometheus"]).toBeDefined()
+     expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
+   })
+
+   test("migrates model versions in agents", () => {
+     // given: Config with old model version in agents
+     const rawConfig: Record<string, unknown> = {
+       agents: {
+         sisyphus: { model: "openai/gpt-5.2-codex", temperature: 0.1 },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: Model version should be migrated
+     expect(needsWrite).toBe(true)
+     const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+     expect(agents["sisyphus"].model).toBe("openai/gpt-5.3-codex")
+   })
+
+   test("migrates model versions in categories", () => {
+     // given: Config with old model version in categories
+     const rawConfig: Record<string, unknown> = {
+       categories: {
+         "my-category": { model: "anthropic/claude-opus-4-5", temperature: 0.2 },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: Model version should be migrated
+     expect(needsWrite).toBe(true)
+     const categories = rawConfig.categories as Record<string, Record<string, unknown>>
+     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-6")
+   })
+
+   test("does not set needsWrite when no model versions need migration", () => {
+     // given: Config with current model versions
+     const rawConfig: Record<string, unknown> = {
+       agents: {
+         sisyphus: { model: "openai/gpt-5.3-codex" },
+       },
+       categories: {
+         "my-category": { model: "anthropic/claude-opus-4-6" },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: No write should be needed
+     expect(needsWrite).toBe(false)
+   })
 })
 
 describe("migration maps", () => {
@@ -410,6 +464,126 @@ describe("migration maps", () => {
     // given/#when: Check HOOK_NAME_MAP
     // then: Should contain be legacy hook name mapping
     expect(HOOK_NAME_MAP["anthropic-auto-compact"]).toBe("anthropic-context-window-limit-recovery")
+  })
+})
+
+describe("MODEL_VERSION_MAP", () => {
+  test("maps openai/gpt-5.2-codex to openai/gpt-5.3-codex", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: Should contain correct mapping
+    expect(MODEL_VERSION_MAP["openai/gpt-5.2-codex"]).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("maps anthropic/claude-opus-4-5 to anthropic/claude-opus-4-6", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: Should contain correct mapping
+    expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
+  })
+})
+
+describe("migrateModelVersions", () => {
+  test("replaces old model string in agent config", () => {
+    // given: Agent config with old model version
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex", temperature: 0.1 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Model should be updated, other fields preserved
+    expect(changed).toBe(true)
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.model).toBe("openai/gpt-5.3-codex")
+    expect(sisyphus.temperature).toBe(0.1)
+  })
+
+  test("replaces anthropic model version", () => {
+    // given: Agent config with old anthropic model
+    const agents = {
+      prometheus: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Model should be updated
+    expect(changed).toBe(true)
+    const prometheus = migrated["prometheus"] as Record<string, unknown>
+    expect(prometheus.model).toBe("anthropic/claude-opus-4-6")
+  })
+
+  test("leaves unknown model strings untouched", () => {
+    // given: Agent config with unknown model
+    const agents = {
+      oracle: { model: "openai/gpt-5.2", temperature: 0.5 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+    const oracle = migrated["oracle"] as Record<string, unknown>
+    expect(oracle.model).toBe("openai/gpt-5.2")
+  })
+
+  test("handles agent config with no model field", () => {
+    // given: Agent config without model field
+    const agents = {
+      sisyphus: { temperature: 0.1, prompt: "custom" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.temperature).toBe(0.1)
+  })
+
+  test("handles agent config with non-string model", () => {
+    // given: Agent config with non-string model
+    const agents = {
+      sisyphus: { model: 123, temperature: 0.1 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+  })
+
+  test("migrates multiple agents in one pass", () => {
+    // given: Multiple agents with old models
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+      prometheus: { model: "anthropic/claude-opus-4-5" },
+      oracle: { model: "openai/gpt-5.2" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Only mapped models should be updated
+    expect(changed).toBe(true)
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-6")
+    expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.2")
+  })
+
+  test("handles empty object", () => {
+    // given: Empty agents object
+    const agents = {}
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Should return empty with no change
+    expect(changed).toBe(false)
+    expect(Object.keys(migrated)).toHaveLength(0)
   })
 })
 
