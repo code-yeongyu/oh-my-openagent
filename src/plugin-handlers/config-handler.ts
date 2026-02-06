@@ -222,7 +222,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
         pluginConfig.agents?.["sisyphus-junior"],
-        config.model as string | undefined
+        undefined
       );
 
       if (builderEnabled) {
