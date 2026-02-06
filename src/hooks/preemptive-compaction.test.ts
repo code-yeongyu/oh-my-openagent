@@ -60,6 +60,41 @@ describe("preemptive-compaction", () => {
     expect(summarize).toHaveBeenCalled()
   })
 
+  test("triggers summarize for non-anthropic providers when usage exceeds threshold", async () => {
+    //#given
+    const messages = mock(() =>
+      Promise.resolve({
+        data: [
+          {
+            info: {
+              role: "assistant",
+              providerID: "openai",
+              modelID: "gpt-5.2",
+              tokens: {
+                input: 180000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+            },
+          },
+        ],
+      })
+    )
+    const summarize = mock(() => Promise.resolve())
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const output = { title: "", output: "", metadata: {} }
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "Read", sessionID, callID: "call-3" },
+      output
+    )
+
+    //#then
+    expect(summarize).toHaveBeenCalled()
+  })
+
   test("does not summarize when usage is below threshold", async () => {
     // #given
     const messages = mock(() =>
