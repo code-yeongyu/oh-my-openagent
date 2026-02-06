@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-20 feature modules: background agents, skill MCPs, builtin skills/commands, Claude Code compatibility layer.
+17 feature modules: background agents, skill MCPs, builtin skills/commands, Claude Code compatibility layer, task management.
 
 **Feature Types**: Task orchestration, Skill definitions, Command templates, Claude Code loaders, Supporting utilities
 
@@ -10,27 +10,25 @@
 
 ```
 features/
-├── background-agent/           # Task lifecycle (1418 lines)
+├── background-agent/           # Task lifecycle (1556 lines)
 │   ├── manager.ts              # Launch → poll → complete
 │   └── concurrency.ts          # Per-provider limits
-├── builtin-skills/             # Core skills (1729 lines)
-│   └── skills.ts               # playwright, agent-browser, frontend-ui-ux, git-master, dev-browser
+├── builtin-skills/             # Core skills
+│   └── skills/                 # playwright, agent-browser, frontend-ui-ux, git-master, dev-browser
 ├── builtin-commands/           # ralph-loop, refactor, ulw-loop, init-deep, start-work, cancel-ralph, stop-continuation
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
 ├── claude-code-mcp-loader/     # .mcp.json with ${VAR} expansion
-├── claude-code-plugin-loader/  # installed_plugins.json
+├── claude-code-plugin-loader/  # installed_plugins.json (486 lines)
 ├── claude-code-session-state/  # Session persistence
-├── opencode-skill-loader/      # Skills from 6 directories
+├── opencode-skill-loader/      # Skills from 6 directories (loader.ts 311 lines)
 ├── context-injector/           # AGENTS.md/README.md injection
 ├── boulder-state/              # Todo state persistence
 ├── hook-message-injector/      # Message injection
 ├── task-toast-manager/         # Background task notifications
-├── skill-mcp-manager/          # MCP client lifecycle (617 lines)
-├── tmux-subagent/              # Tmux session management
+├── skill-mcp-manager/          # MCP client lifecycle (640 lines)
+├── tmux-subagent/              # Tmux session management (472 lines)
 ├── mcp-oauth/                  # MCP OAuth handling
-├── sisyphus-swarm/             # Swarm coordination
-├── sisyphus-tasks/             # Task tracking
 └── claude-tasks/               # Task schema/storage - see AGENTS.md
 ```
 
