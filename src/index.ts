@@ -1,4 +1,5 @@
 import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
+import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -59,7 +60,6 @@ import {
 import type { SkillScope } from "./features/opencode-skill-loader/types";
 import { createBuiltinSkills } from "./features/builtin-skills";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
-import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder";
 import {
   setMainSession,
   getMainSessionID,
@@ -122,6 +122,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+
   const firstMessageVariantGate = createFirstMessageVariantGate();
 
   const tmuxConfig = {
@@ -249,9 +250,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createThinkingBlockValidatorHook()
     : null;
 
-  const categorySkillReminder = isHookEnabled("category-skill-reminder")
-    ? createCategorySkillReminderHook(ctx)
-    : null;
+  let categorySkillReminder: ReturnType<typeof createCategorySkillReminderHook> | null = null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
     ? createRalphLoopHook(ctx, {
@@ -483,6 +482,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       });
     },
   });
+
+  categorySkillReminder = isHookEnabled("category-skill-reminder")
+    ? createCategorySkillReminderHook(ctx, availableSkills)
+    : null;
+
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
   const skillTool = createSkillTool({
