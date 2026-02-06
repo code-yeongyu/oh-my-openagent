@@ -34,7 +34,7 @@ export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
-export { createCompactionContextInjector, type SummarizeContext } from "./compaction-context-injector";
+export { createCompactionContextInjector } from "./compaction-context-injector";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";

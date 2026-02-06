@@ -1,8 +1,10 @@
+const DEFAULT_ACTUAL_LIMIT = 200_000
+
 const ANTHROPIC_ACTUAL_LIMIT =
   process.env.ANTHROPIC_1M_CONTEXT === "true" ||
   process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
-    : 200_000
+    : DEFAULT_ACTUAL_LIMIT
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
@@ -59,11 +61,14 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
       if (assistantMessages.length === 0) return
 
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      if (lastAssistant.providerID !== "anthropic") return
+      const actualLimit =
+        lastAssistant.providerID === "anthropic"
+          ? ANTHROPIC_ACTUAL_LIMIT
+          : DEFAULT_ACTUAL_LIMIT
 
       const lastTokens = lastAssistant.tokens
       const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
-      const usageRatio = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
+      const usageRatio = totalInputTokens / actualLimit
 
       if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD) return
 
