@@ -122,6 +122,13 @@ function isRequiredModelAvailable(
   return matchingEntry.providers.some((provider) => isProviderAvailable(provider, avail))
 }
 
+function isRequiredProviderAvailable(
+  requiredProviders: string[],
+  avail: ProviderAvailability
+): boolean {
+  return requiredProviders.some((provider) => isProviderAvailable(provider, avail))
+}
+
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
   const hasAnyProvider =
@@ -185,6 +192,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
       continue
     }
+    if (req.requiresProvider && !isRequiredProviderAvailable(req.requiresProvider, avail)) {
+      continue
+    }
 
     const resolved = resolveModelFromChain(req.fallbackChain, avail)
     if (resolved) {
@@ -203,6 +213,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         : req.fallbackChain
 
     if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
+      continue
+    }
+    if (req.requiresProvider && !isRequiredProviderAvailable(req.requiresProvider, avail)) {
       continue
     }
 
