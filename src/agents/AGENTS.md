@@ -55,6 +55,7 @@ agents/
 | librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
 | explore | xai/grok-code-fast-1 | 0.1 | Fast contextual grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
+| devils-advocate | google/gemini-3-pro-preview | 0.1 | Adversarial validation |
 | Prometheus | anthropic/claude-opus-4-6 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 | Metis | anthropic/claude-opus-4-6 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
 | Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-6) |
