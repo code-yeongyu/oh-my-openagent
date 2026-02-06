@@ -6,6 +6,7 @@ import type { SkillTrigger } from "./types"
 import { checkForUpdates, hashDescription } from "./cache-checker"
 import { buildExtractionPrompt, parseAIResponse, buildCachedTriggers, batchSkills } from "./trigger-extractor"
 import { EMPTY_CACHE, type SkillTriggerCache, type CachedSkillTrigger } from "./types"
+import { triggerBackgroundExtraction } from "./ai-extractor"
 
 describe("extractKeywordsFromDescription", () => {
   test("returns null for empty description", () => {
@@ -461,5 +462,14 @@ describe("buildCachedTriggers", () => {
 
     //#then
     expect(result["test"].hash).toBe(hashDescription(description))
+  })
+})
+
+describe("ai-extractor", () => {
+  test("triggerBackgroundExtraction is exported", () => {
+    //#given
+    //#when
+    //#then
+    expect(typeof triggerBackgroundExtraction).toBe("function")
   })
 })
