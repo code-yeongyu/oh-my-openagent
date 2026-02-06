@@ -624,6 +624,11 @@ describe("atlas hook", () => {
   describe("session.idle handler (boulder continuation)", () => {
     const MAIN_SESSION_ID = "main-session-123"
 
+    async function flushMicrotasks(): Promise<void> {
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+
      beforeEach(() => {
        mock.module("../../features/claude-code-session-state", () => ({
          getMainSessionID: () => MAIN_SESSION_ID,
@@ -963,6 +968,135 @@ describe("atlas hook", () => {
 
       // then - should only call prompt ONCE due to debouncing
       expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+    })
+
+    test("should stop continuation after 2 consecutive prompt failures (issue #1355)", async () => {
+      //#given - boulder state with incomplete plan and prompt always fails
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - idle fires repeatedly, past cooldown each time
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        //#then - should attempt only twice, then disable continuation
+        expect(promptMock).toHaveBeenCalledTimes(2)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("should reset prompt failure counter on success and only stop after 2 consecutive failures", async () => {
+      //#given - boulder state with incomplete plan
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock(() => Promise.resolve())
+      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      promptMock.mockImplementationOnce(() => Promise.resolve())
+      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - fail, succeed (reset), then fail twice (disable), then attempt again
+        for (let i = 0; i < 5; i++) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
+
+        //#then - 4 prompt attempts; 5th idle is skipped after 2 consecutive failures
+        expect(promptMock).toHaveBeenCalledTimes(4)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("should reset continuation failure state on session.compacted event", async () => {
+      //#given - boulder state with incomplete plan and prompt always fails
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - two failures disables continuation, then compaction resets it
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        await hook.handler({ event: { type: "session.compacted", properties: { sessionID: MAIN_SESSION_ID } } })
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        //#then - 2 attempts + 1 after compaction (3 total)
+        expect(promptMock).toHaveBeenCalledTimes(3)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("should cleanup on session.deleted", async () => {
