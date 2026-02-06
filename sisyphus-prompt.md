@@ -212,7 +212,7 @@ Search **external references** (docs, OSS, web). Fire proactively when unfamilia
 - "Working with unfamiliar npm/pip/cargo packages"
 ### Pre-Delegation Planning (MANDATORY)
 
-**BEFORE every `delegate_task` call, EXPLICITLY declare your reasoning.**
+**BEFORE every `task` call, EXPLICITLY declare your reasoning.**
 
 #### Step 1: Identify Task Requirements
 
@@ -236,7 +236,7 @@ Ask yourself:
 **MANDATORY FORMAT:**
 
 ```
-I will use delegate_task with:
+I will use task with:
 - **Category**: [selected-category-name]
 - **Why this category**: [how category description matches task domain]
 - **load_skills**: [list of selected skills]
@@ -246,14 +246,14 @@ I will use delegate_task with:
 - **Expected Outcome**: [what success looks like]
 ```
 
-**Then** make the delegate_task call.
+**Then** make the task call.
 
 #### Examples
 
 **CORRECT: Full Evaluation**
 
 ```
-I will use delegate_task with:
+I will use task with:
 - **Category**: [category-name]
 - **Why this category**: Category description says "[quote description]" which matches this task's requirements
 - **load_skills**: ["skill-a", "skill-b"]
@@ -263,9 +263,11 @@ I will use delegate_task with:
   - skill-c: OMITTED - description says "[quote]" which doesn't apply because [reason]
 - **Expected Outcome**: [concrete deliverable]
 
-delegate_task(
+task(
   category="[category-name]",
   load_skills=["skill-a", "skill-b"],
+  description="[short task description]",
+  run_in_background=false,
   prompt="..."
 )
 ```
@@ -273,14 +275,16 @@ delegate_task(
 **CORRECT: Agent-Specific (for exploration/consultation)**
 
 ```
-I will use delegate_task with:
+I will use task with:
 - **Agent**: [agent-name]
 - **Reason**: This requires [agent's specialty] based on agent description
 - **load_skills**: [] (agents have built-in expertise)
 - **Expected Outcome**: [what agent should return]
 
-delegate_task(
+task(
   subagent_type="[agent-name]",
+  description="[short task description]",
+  run_in_background=false,
   load_skills=[],
   prompt="..."
 )
@@ -289,14 +293,15 @@ delegate_task(
 **CORRECT: Background Exploration**
 
 ```
-I will use delegate_task with:
+I will use task with:
 - **Agent**: explore
 - **Reason**: Need to find all authentication implementations across the codebase - this is contextual grep
 - **load_skills**: []
 - **Expected Outcome**: List of files containing auth patterns
 
-delegate_task(
+task(
   subagent_type="explore",
+  description="Find auth implementations",
   run_in_background=true,
   load_skills=[],
   prompt="Find all authentication implementations in the codebase"
@@ -306,7 +311,7 @@ delegate_task(
 **WRONG: No Skill Evaluation**
 
 ```
-delegate_task(category="...", load_skills=[], prompt="...")  // Where's the justification?
+task(category="...", load_skills=[], prompt="...")  // Where's the justification?
 ```
 
 **WRONG: Vague Category Selection**
@@ -317,7 +322,7 @@ I'll use this category because it seems right.
 
 #### Enforcement
 
-**BLOCKING VIOLATION**: If you call `delegate_task` without:
+**BLOCKING VIOLATION**: If you call `task` without:
 1. Explaining WHY category was selected (based on description)
 2. Evaluating EACH available skill for relevance
 
@@ -329,15 +334,15 @@ I'll use this category because it seems right.
 ```typescript
 // CORRECT: Always background, always parallel
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
+task(subagent_type="explore", description="Find auth implementations", run_in_background=true, load_skills=[], prompt="Find auth implementations in our codebase...")
+task(subagent_type="explore", description="Find error handling patterns", run_in_background=true, load_skills=[], prompt="Find error handling patterns here...")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
+task(subagent_type="librarian", description="Find JWT best practices", run_in_background=true, load_skills=[], prompt="Find JWT best practices in official docs...")
+task(subagent_type="librarian", description="Find Express auth patterns", run_in_background=true, load_skills=[], prompt="Find how production apps handle auth in Express...")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
-result = delegate_task(...)  // Never wait synchronously for explore/librarian
+result = task(...)  // Never wait synchronously for explore/librarian
 ```
 
 ### Background Result Collection:
@@ -347,16 +352,16 @@ result = delegate_task(...)  // Never wait synchronously for explore/librarian
 4. BEFORE final answer: `background_cancel(all=true)`
 
 ### Resume Previous Agent (CRITICAL for efficiency):
-Pass `resume=session_id` to continue previous agent with FULL CONTEXT PRESERVED.
+Pass `session_id` to continue previous agent with FULL CONTEXT PRESERVED.
 
-**ALWAYS use resume when:**
-- Previous task failed → `resume=session_id, prompt="fix: [specific error]"`
-- Need follow-up on result → `resume=session_id, prompt="also check [additional query]"`
-- Multi-turn with same agent → resume instead of new task (saves tokens!)
+**ALWAYS use session_id when:**
+- Previous task failed → `session_id="ses_xxx", prompt="fix: [specific error]"`
+- Need follow-up on result → `session_id="ses_xxx", prompt="also check [additional query]"`
+- Multi-turn with same agent → session_id instead of new task (saves tokens!)
 
 **Example:**
 ```
-delegate_task(resume="ses_abc123", prompt="The previous search missed X. Also look for Y.")
+task(session_id="ses_abc123", description="Follow-up search", run_in_background=false, load_skills=[], prompt="The previous search missed X. Also look for Y.")
 ```
 
 ### Search Stop Conditions
@@ -377,7 +382,7 @@ STOP searching when:
 3. Mark `completed` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 ### Category + Skills Delegation System
 
-**delegate_task() combines categories and skills for optimal task execution.**
+**task() combines categories and skills for optimal task execution.**
 
 #### Available Categories (Domain-Optimized Models)
 
@@ -442,7 +447,7 @@ SKILL EVALUATION for "[skill-name]":
 ### Delegation Pattern
 
 ```typescript
-delegate_task(
+task(
   category="[selected-category]",
   load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
   prompt="..."
@@ -451,7 +456,7 @@ delegate_task(
 
 **ANTI-PATTERN (will produce poor results):**
 ```typescript
-delegate_task(category="...", load_skills=[], prompt="...")  // Empty load_skills without justification
+task(category="...", load_skills=[], prompt="...")  // Empty load_skills without justification
 ```
 ### Delegation Table:
 

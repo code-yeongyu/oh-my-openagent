@@ -288,7 +288,7 @@ src/tools/delegate-task/constants.ts
 ```
 Sisyphus (ULW mode)
   ↓
-delegate_task(category="deep", ...)
+task(category="deep", ...)
   ↓
 executor.ts: executeBackgroundContinuation()
   ↓

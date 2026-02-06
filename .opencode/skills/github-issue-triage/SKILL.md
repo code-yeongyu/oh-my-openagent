@@ -21,7 +21,7 @@ You are a GitHub issue triage automation agent. Your job is to:
 
 | Aspect | Rule |
 |--------|------|
-| **Task Granularity** | 1 Issue = Exactly 1 `delegate_task()` call |
+| **Task Granularity** | 1 Issue = Exactly 1 `task()` call |
 | **Execution Mode** | `run_in_background=true` (Each issue runs independently) |
 | **Result Handling** | `background_output()` to collect results as they complete |
 | **Reporting** | IMMEDIATE streaming when each task finishes |
@@ -67,7 +67,7 @@ for (let i = 0; i < allIssues.length; i++) {
   const issue = allIssues[i]
   const category = getCategory(i)
   
-  const taskId = await delegate_task(
+  const taskId = await task(
     category=category,
     load_skills=[],
     run_in_background=true,  // ← CRITICAL: Each issue is independent background task
@@ -195,7 +195,7 @@ for (let i = 0; i < allIssues.length; i++) {
   
   console.log(`🚀 Launching background task for Issue #${issue.number} (${category})...`)
   
-  const taskId = await delegate_task(
+  const taskId = await task(
     category=category,
     load_skills=[],
     run_in_background=true,  // ← BACKGROUND TASK: Each issue runs independently
@@ -480,7 +480,7 @@ When invoked, immediately:
 4. Exhaustive pagination for issues
 5. Exhaustive pagination for PRs
 6. **LAUNCH**: For each issue:
-   - `delegate_task(run_in_background=true)` - 1 task per issue
+   - `task(run_in_background=true)` - 1 task per issue
    - Store taskId mapped to issue number
 7. **STREAM**: Poll `background_output()` for each task:
    - As each completes, immediately report result

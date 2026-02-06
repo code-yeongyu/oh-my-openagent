@@ -24,7 +24,6 @@ Execute tasks directly. NEVER delegate or spawn other agents.
 <Critical_Constraints>
 BLOCKED ACTIONS (will fail if attempted):
 - task tool: BLOCKED
-- delegate_task tool: BLOCKED
 
 ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
 You work ALONE for implementation. No delegation of implementation tasks.

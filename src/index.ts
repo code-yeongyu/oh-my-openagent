@@ -111,6 +111,7 @@ import { filterDisabledTools } from "./shared/disabled-tools";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
+import { consumeToolMetadata } from "./features/tool-metadata-store";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
@@ -533,7 +534,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
-    delegate_task: delegateTask,
+      task: delegateTask,
     skill: skillTool,
     skill_mcp: skillMcpTool,
     slashcommand: slashcommandTool,
@@ -787,16 +788,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
-        const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = ["explore", "librarian"].some(
-          (name) => name.toLowerCase() === (subagentType ?? "").toLowerCase(),
-        );
-
-        args.tools = {
-          ...(args.tools as Record<string, boolean> | undefined),
-          delegate_task: false,
-          ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
-        };
+        const category = typeof args.category === "string" ? args.category : undefined;
+        const subagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined;
+        if (category && !subagentType) {
+          args.subagent_type = "sisyphus-junior";
+        }
       }
 
       if (ralphLoop && input.tool === "slashcommand") {
@@ -872,6 +868,19 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (!output) {
         return;
       }
+
+      // Restore metadata that fromPlugin() overwrites with { truncated, outputPath }.
+      // This must run FIRST, before any hook reads output.metadata.
+      const stored = consumeToolMetadata(input.sessionID, input.callID)
+      if (stored) {
+        if (stored.title) {
+          output.title = stored.title
+        }
+        if (stored.metadata) {
+          output.metadata = { ...output.metadata, ...stored.metadata }
+        }
+      }
+
       await claudeCodeHooks["tool.execute.after"](input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await preemptiveCompaction?.["tool.execute.after"](input, output);

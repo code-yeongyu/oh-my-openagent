@@ -50,11 +50,11 @@ flowchart TB
     User -->|"/start-work"| Orchestrator
     Plan -->|"Read"| Orchestrator
     
-    Orchestrator -->|"delegate_task(category)"| Junior
-    Orchestrator -->|"delegate_task(agent)"| Oracle
-    Orchestrator -->|"delegate_task(agent)"| Explore
-    Orchestrator -->|"delegate_task(agent)"| Librarian
-    Orchestrator -->|"delegate_task(agent)"| Frontend
+    Orchestrator -->|"task(category)"| Junior
+    Orchestrator -->|"task(agent)"| Oracle
+    Orchestrator -->|"task(agent)"| Explore
+    Orchestrator -->|"task(agent)"| Librarian
+    Orchestrator -->|"task(agent)"| Frontend
     
     Junior -->|"Results + Learnings"| Orchestrator
     Oracle -->|"Advice"| Orchestrator
@@ -220,9 +220,9 @@ Independent tasks run in parallel:
 ```typescript
 // Orchestrator identifies parallelizable groups from plan
 // Group A: Tasks 2, 3, 4 (no file conflicts)
-delegate_task(category="ultrabrain", prompt="Task 2...")
-delegate_task(category="visual-engineering", prompt="Task 3...")
-delegate_task(category="general", prompt="Task 4...")
+task(category="ultrabrain", prompt="Task 2...")
+task(category="visual-engineering", prompt="Task 3...")
+task(category="general", prompt="Task 4...")
 // All run simultaneously
 ```
 
@@ -234,7 +234,7 @@ delegate_task(category="general", prompt="Task 4...")
 
 Junior is the **workhorse** that actually writes code. Key characteristics:
 
-- **Focused**: Cannot delegate (blocked from task/delegate_task tools)
+- **Focused**: Cannot delegate (blocked from task tool)
 - **Disciplined**: Obsessive todo tracking
 - **Verified**: Must pass lsp_diagnostics before completion
 - **Constrained**: Cannot modify plan files (READ-ONLY)
@@ -268,7 +268,7 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 
 ---
 
-## The delegate_task Tool: Category + Skill System
+## The task Tool: Category + Skill System
 
 ### Why Categories are Revolutionary
 
@@ -276,17 +276,17 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 
 ```typescript
 // OLD: Model name creates distributional bias
-delegate_task(agent="gpt-5.2", prompt="...")  // Model knows its limitations
-delegate_task(agent="claude-opus-4.6", prompt="...")  // Different self-perception
+task(agent="gpt-5.2", prompt="...")  // Model knows its limitations
+task(agent="claude-opus-4.6", prompt="...")  // Different self-perception
 ```
 
 **The Solution: Semantic Categories:**
 
 ```typescript
 // NEW: Category describes INTENT, not implementation
-delegate_task(category="ultrabrain", prompt="...")     // "Think strategically"
-delegate_task(category="visual-engineering", prompt="...")  // "Design beautifully"
-delegate_task(category="quick", prompt="...")          // "Just get it done fast"
+task(category="ultrabrain", prompt="...")     // "Think strategically"
+task(category="visual-engineering", prompt="...")  // "Design beautifully"
+task(category="quick", prompt="...")          // "Just get it done fast"
 ```
 
 ### Built-in Categories
@@ -324,13 +324,13 @@ Skills prepend specialized instructions to subagent prompts:
 
 ```typescript
 // Category + Skill combination
-delegate_task(
+task(
   category="visual-engineering", 
   load_skills=["frontend-ui-ux"],  // Adds UI/UX expertise
   prompt="..."
 )
 
-delegate_task(
+task(
   category="general",
   load_skills=["playwright"],  // Adds browser automation expertise
   prompt="..."
@@ -365,7 +365,7 @@ sequenceDiagram
         
         Note over Orchestrator: Prompt Structure:<br/>1. TASK (exact checkbox)<br/>2. EXPECTED OUTCOME<br/>3. REQUIRED SKILLS<br/>4. REQUIRED TOOLS<br/>5. MUST DO<br/>6. MUST NOT DO<br/>7. CONTEXT + Wisdom
         
-        Orchestrator->>Junior: delegate_task(category, load_skills, prompt)
+        Orchestrator->>Junior: task(category, load_skills, prompt)
         
         Junior->>Junior: Create todos, execute
         Junior->>Junior: Verify (lsp_diagnostics, tests)

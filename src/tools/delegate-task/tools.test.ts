@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
@@ -207,6 +208,66 @@ describe("sisyphus-task", () => {
   })
 
   describe("category delegation config validation", () => {
+    test("fills subagent_type as sisyphus-junior when category is provided without subagent_type", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-123",
+          status: "pending",
+          description: "Test task",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const args: {
+        description: string
+        prompt: string
+        category: string
+        run_in_background: boolean
+        load_skills: string[]
+        subagent_type?: string
+      } = {
+        description: "Quick category test",
+        prompt: "Do something",
+        category: "quick",
+        run_in_background: true,
+        load_skills: [],
+      }
+
+      // when
+      await tool.execute(args, toolContext)
+
+      // then
+      expect(args.subagent_type).toBe("sisyphus-junior")
+    }, { timeout: 10000 })
+
     test("proceeds without error when systemDefaultModel is undefined", async () => {
       // given a mock client with no model in config
       const { createDelegateTask } = require("./tools")
@@ -301,6 +362,71 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Model not configured")
       expect(result).toContain("custom-no-model")
       expect(result).toContain("Configure in one of")
+    })
+  })
+
+  describe("background metadata sessionId", () => {
+    test("should wait for background sessionId and set metadata for TUI toolcall counting", async () => {
+      //#given - manager.launch returns before sessionID is available
+      const { createDelegateTask } = require("./tools")
+
+      const tasks = new Map<string, { id: string; sessionID?: string; status: string; description: string; agent: string }>()
+      const mockManager = {
+        getTask: (id: string) => tasks.get(id),
+        launch: async () => {
+          const task = { id: "bg_1", status: "pending", description: "Test task", agent: "explore" }
+          tasks.set(task.id, task)
+          setTimeout(() => {
+            tasks.set(task.id, { ...task, status: "running", sessionID: "ses_child" })
+          }, 20)
+          return task
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const metadataCalls: Array<{ title?: string; metadata?: Record<string, unknown> }> = []
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+        metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => {
+          metadataCalls.push(input)
+        },
+      }
+
+      const args = {
+        description: "Explore task",
+        prompt: "Explore features directory deeply",
+        subagent_type: "explore",
+        run_in_background: true,
+        load_skills: [],
+      }
+
+      //#when
+      const result = await tool.execute(args, toolContext)
+
+      //#then - metadata should include sessionId (camelCase) once it's available
+      expect(String(result)).toContain("Background task launched")
+      const sessionIdCall = metadataCalls.find((c) => c.metadata?.sessionId === "ses_child")
+      expect(sessionIdCall).toBeDefined()
     })
   })
 
@@ -1894,7 +2020,7 @@ describe("sisyphus-task", () => {
 
   describe("browserProvider propagation", () => {
     test("should resolve agent-browser skill when browserProvider is passed", async () => {
-      // given - delegate_task configured with browserProvider: "agent-browser"
+      // given - task configured with browserProvider: "agent-browser"
       const { createDelegateTask } = require("./tools")
       let promptBody: any
 
@@ -1949,7 +2075,7 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
 
     test("should NOT resolve agent-browser skill when browserProvider is not set", async () => {
-      // given - delegate_task without browserProvider (defaults to playwright)
+      // given - task without browserProvider (defaults to playwright)
       const { createDelegateTask } = require("./tools")
 
       const mockManager = { launch: async () => ({}) }
@@ -2720,8 +2846,8 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
-  describe("prometheus subagent delegate_task permission", () => {
-    test("prometheus subagent should have delegate_task permission enabled", async () => {
+  describe("prometheus subagent task permission", () => {
+    test("prometheus subagent should have task permission enabled", async () => {
       // given - sisyphus delegates to prometheus
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -2759,7 +2885,7 @@ describe("sisyphus-task", () => {
       // when - sisyphus delegates to prometheus
       await tool.execute(
         {
-          description: "Test prometheus delegate_task permission",
+          description: "Test prometheus task permission",
           prompt: "Create a plan",
           subagent_type: "prometheus",
           run_in_background: false,
@@ -2768,11 +2894,11 @@ describe("sisyphus-task", () => {
         toolContext
       )
       
-      // then - prometheus should have delegate_task permission
-      expect(promptBody.tools.delegate_task).toBe(true)
+      // then - prometheus should have task permission
+      expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
-    test("non-prometheus subagent should NOT have delegate_task permission", async () => {
+    test("non-prometheus subagent should NOT have task permission", async () => {
       // given - sisyphus delegates to oracle (non-prometheus)
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -2810,7 +2936,7 @@ describe("sisyphus-task", () => {
       // when - sisyphus delegates to oracle
       await tool.execute(
         {
-          description: "Test oracle no delegate_task permission",
+          description: "Test oracle no task permission",
           prompt: "Consult on architecture",
           subagent_type: "oracle",
           run_in_background: false,
@@ -2819,8 +2945,8 @@ describe("sisyphus-task", () => {
         toolContext
       )
       
-      // then - oracle should NOT have delegate_task permission
-      expect(promptBody.tools.delegate_task).toBe(false)
+      // then - oracle should NOT have task permission
+      expect(promptBody.tools.task).toBe(false)
     }, { timeout: 20000 })
   })
 

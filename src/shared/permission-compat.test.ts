@@ -130,5 +130,49 @@ describe("permission-compat", () => {
       // then returns unchanged
       expect(result).toEqual(config)
     })
+
+    test("migrates delegate_task permission to task", () => {
+      //#given config with delegate_task permission
+      const config = {
+        model: "test",
+        permission: { delegate_task: "allow" as const, write: "deny" as const },
+      }
+
+      //#when migrating
+      const result = migrateAgentConfig(config)
+
+      //#then delegate_task is renamed to task
+      const perm = result.permission as Record<string, string>
+      expect(perm["task"]).toBe("allow")
+      expect(perm["delegate_task"]).toBeUndefined()
+      expect(perm["write"]).toBe("deny")
+    })
+
+    test("does not overwrite existing task permission with delegate_task", () => {
+      //#given config with both task and delegate_task permissions
+      const config = {
+        permission: { delegate_task: "allow" as const, task: "deny" as const },
+      }
+
+      //#when migrating
+      const result = migrateAgentConfig(config)
+
+      //#then existing task permission is preserved
+      const perm = result.permission as Record<string, string>
+      expect(perm["task"]).toBe("deny")
+      expect(perm["delegate_task"]).toBe("allow")
+    })
+
+    test("does not mutate the original config permission object", () => {
+      //#given config with delegate_task permission
+      const originalPerm = { delegate_task: "allow" as const }
+      const config = { permission: originalPerm }
+
+      //#when migrating
+      migrateAgentConfig(config)
+
+      //#then original permission object is not mutated
+      expect(originalPerm).toEqual({ delegate_task: "allow" })
+    })
   })
 })

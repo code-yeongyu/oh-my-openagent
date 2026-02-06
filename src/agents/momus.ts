@@ -193,7 +193,7 @@ export function createMomusAgent(model: string): AgentConfig {
     "write",
     "edit",
     "task",
-    "delegate_task",
+    "task",
   ])
 
   const base = {
