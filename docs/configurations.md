@@ -725,7 +725,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
 | Category             | Built-in Default Model             | Description                                                          |
 | -------------------- | ---------------------------------- | -------------------------------------------------------------------- |
 | `visual-engineering` | `google/gemini-3-pro-preview`      | Frontend, UI/UX, design, styling, animation                          |
-| `ultrabrain`         | `openai/gpt-5.2-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
+| `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
 | `artistry`           | `google/gemini-3-pro-preview` (max)| Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
 | `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
@@ -768,7 +768,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
       "model": "google/gemini-3-pro-preview"
     },
     "ultrabrain": { 
-      "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.3-codex",
       "variant": "xhigh"
     },
     "artistry": { 
@@ -911,8 +911,8 @@ Categories follow the same resolution logic:
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
 | **visual-engineering** | `gemini-3-pro` | google → anthropic → zai-coding-plan |
-| **ultrabrain** | `gpt-5.2-codex` | openai → google → anthropic |
-| **deep** | `gpt-5.2-codex` | openai → anthropic → google |
+| **ultrabrain** | `gpt-5.3-codex` | openai → google → anthropic |
+| **deep** | `gpt-5.3-codex` | openai → anthropic → google |
 | **artistry** | `gemini-3-pro` | google → anthropic → openai |
 | **quick** | `claude-haiku-4-5` | anthropic → google → opencode |
 | **unspecified-low** | `claude-sonnet-4-5` | anthropic → openai → google |

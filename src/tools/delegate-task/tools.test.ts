@@ -30,7 +30,7 @@ describe("sisyphus-task", () => {
       models: {
         anthropic: ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"],
         google: ["gemini-3-pro", "gemini-3-flash"],
-        openai: ["gpt-5.2", "gpt-5.2-codex"],
+        openai: ["gpt-5.2", "gpt-5.3-codex"],
       },
       connected: ["anthropic", "google", "openai"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -59,7 +59,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.2-codex")
+      expect(category.model).toBe("openai/gpt-5.3-codex")
       expect(category.variant).toBe("xhigh")
     })
 
@@ -69,7 +69,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.2-codex")
+      expect(category.model).toBe("openai/gpt-5.3-codex")
       expect(category.variant).toBe("medium")
     })
   })
@@ -216,7 +216,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) }, // No model configured
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.2-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -1754,7 +1754,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - using ultrabrain category (default model is openai/gpt-5.2-codex)
+      // when - using ultrabrain category (default model is openai/gpt-5.3-codex)
       await tool.execute(
         {
           description: "Override precedence test",
@@ -1805,7 +1805,7 @@ describe("sisyphus-task", () => {
         client: mockClient,
         sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
         userCategories: {
-          ultrabrain: { model: "openai/gpt-5.2-codex" },
+          ultrabrain: { model: "openai/gpt-5.3-codex" },
         },
       })
 
@@ -1830,7 +1830,7 @@ describe("sisyphus-task", () => {
 
       // then - explicit category model should win
       expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.2-codex")
+      expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
     })
   })
 
@@ -2083,7 +2083,7 @@ describe("sisyphus-task", () => {
       
       // then - catalog model is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("openai/gpt-5.2-codex")
+      expect(resolved!.config.model).toBe("openai/gpt-5.3-codex")
       expect(resolved!.config.variant).toBe("xhigh")
     })
 
@@ -2107,10 +2107,10 @@ describe("sisyphus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then - category's built-in model wins (ultrabrain uses gpt-5.2-codex)
+      // then - category's built-in model wins (ultrabrain uses gpt-5.3-codex)
       expect(resolved).not.toBeNull()
       const actualModel = resolved!.config.model
-      expect(actualModel).toBe("openai/gpt-5.2-codex")
+      expect(actualModel).toBe("openai/gpt-5.3-codex")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -2164,12 +2164,12 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-5"
       
-      // when category has a built-in model (gpt-5.2-codex for ultrabrain)
+      // when category has a built-in model (gpt-5.3-codex for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
       // then category's built-in model should be used, NOT inheritedModel
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("openai/gpt-5.2-codex")
+      expect(resolved!.model).toBe("openai/gpt-5.3-codex")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
