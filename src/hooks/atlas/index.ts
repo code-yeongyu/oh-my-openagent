@@ -391,6 +391,7 @@ interface ToolExecuteAfterOutput {
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  promptFailureCount: number
 }
 
 const CONTINUATION_COOLDOWN_MS = 5000
@@ -432,13 +433,14 @@ export function createAtlasHook(
   function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
     if (!state) {
-      state = {}
+      state = { promptFailureCount: 0 }
       sessions.set(sessionID, state)
     }
     return state
   }
 
   async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number, agent?: string): Promise<void> {
+    const state = getState(sessionID)
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -481,21 +483,28 @@ export function createAtlasHook(
           : undefined
       }
 
-       await ctx.client.session.prompt({
-         path: { id: sessionID },
-         body: {
-            agent: agent ?? "atlas",
-           ...(model !== undefined ? { model } : {}),
-           parts: [{ type: "text", text: prompt }],
-         },
-         query: { directory: ctx.directory },
-       })
+        await ctx.client.session.prompt({
+          path: { id: sessionID },
+          body: {
+             agent: agent ?? "atlas",
+            ...(model !== undefined ? { model } : {}),
+            parts: [{ type: "text", text: prompt }],
+          },
+          query: { directory: ctx.directory },
+        })
 
-      log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
-    } catch (err) {
-      log(`[${HOOK_NAME}] Boulder continuation failed`, { sessionID, error: String(err) })
-    }
-  }
+       state.promptFailureCount = 0
+
+       log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
+     } catch (err) {
+      state.promptFailureCount += 1
+      log(`[${HOOK_NAME}] Boulder continuation failed`, {
+        sessionID,
+        error: String(err),
+        promptFailureCount: state.promptFailureCount,
+      })
+     }
+   }
 
   return {
     handler: async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -538,6 +547,14 @@ export function createAtlasHook(
         if (state.lastEventWasAbortError) {
           state.lastEventWasAbortError = false
           log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
+          return
+        }
+
+        if (state.promptFailureCount >= 2) {
+          log(`[${HOOK_NAME}] Skipped: continuation disabled after repeated prompt failures`, {
+            sessionID,
+            promptFailureCount: state.promptFailureCount,
+          })
           return
         }
 
@@ -628,6 +645,17 @@ export function createAtlasHook(
         if (sessionInfo?.id) {
           sessions.delete(sessionInfo.id)
           log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
+        }
+        return
+      }
+
+      if (event.type === "session.compacted") {
+        const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as
+          | string
+          | undefined
+        if (sessionID) {
+          sessions.delete(sessionID)
+          log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
         }
         return
       }
