@@ -7,6 +7,7 @@ import { checkForUpdates, hashDescription } from "./cache-checker"
 import { buildExtractionPrompt, parseAIResponse, buildCachedTriggers, batchSkills } from "./trigger-extractor"
 import { getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { triggerBackgroundExtraction } from "./ai-extractor"
 
 export * from "./types"
 export * from "./keyword-extractor"
@@ -62,6 +63,10 @@ function buildTriggersFromCache(cache: SkillTriggerCache, skills: LoadedSkill[])
 export function createSkillAutoTriggerHook(ctx: PluginInput) {
   let dynamicTriggers: SkillTrigger[] = []
   let initialized = false
+  let needsCacheUpdate = false
+  let pendingSkills: LoadedSkill[] = []
+  let cacheUpdateTriggered = false
+  let currentCache: SkillTriggerCache = { version: "1.0", generatedAt: "", skills: {} }
 
   // Initialize triggers asynchronously with cache support
   const initPromise = (async () => {
@@ -74,10 +79,12 @@ export function createSkillAutoTriggerHook(ctx: PluginInput) {
       const updateResult = checkForUpdates(cache, allSkills)
       
       if (updateResult.hasUpdates) {
-        // Log what needs updating (AI extraction is out of scope for now)
+        // Log what needs updating
         log(`[${HOOK_NAME}] Cache update needed: ${updateResult.newSkills.length} new, ${updateResult.changedSkills.length} changed, ${updateResult.deletedSkills.length} deleted`)
-        
-        // Fall back to regex-based triggers until AI extraction is implemented
+        needsCacheUpdate = true
+        pendingSkills = [...updateResult.newSkills, ...updateResult.changedSkills]
+        currentCache = cache
+        // Fall back to regex-based triggers, but mark for background update
         dynamicTriggers = await generateDynamicTriggers()
         log(`[${HOOK_NAME}] Using fallback: ${dynamicTriggers.length} dynamic skill triggers`)
       } else if (Object.keys(cache.skills).length > 0) {
@@ -118,6 +125,23 @@ export function createSkillAutoTriggerHook(ctx: PluginInput) {
       // Wait for initialization if not ready
       if (!initialized) {
         await initPromise
+      }
+
+      // First message + needs update + not yet triggered → background extraction
+      if (needsCacheUpdate && !cacheUpdateTriggered && pendingSkills.length > 0) {
+        cacheUpdateTriggered = true
+        log(`[${HOOK_NAME}] Triggering background AI extraction for ${pendingSkills.length} skills`)
+        
+        // Run in background, don't block
+        triggerBackgroundExtraction(ctx, pendingSkills, currentCache)
+          .then((newTriggers) => {
+            dynamicTriggers = newTriggers
+            needsCacheUpdate = false
+            log(`[${HOOK_NAME}] Background extraction complete, updated ${newTriggers.length} triggers`)
+          })
+          .catch((err) => {
+            log(`[${HOOK_NAME}] Background extraction failed`, { error: String(err) })
+          })
       }
 
       if (dynamicTriggers.length === 0) {
