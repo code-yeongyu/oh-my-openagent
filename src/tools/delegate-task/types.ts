@@ -28,7 +28,12 @@ export interface ToolContextWithMetadata {
   messageID: string
   agent: string
   abort: AbortSignal
-  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
+  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void | Promise<void>
+  /**
+   * Tool call ID injected by OpenCode's internal context (not in plugin ToolContext type,
+   * but present at runtime via spread in fromPlugin()). Used for metadata store keying.
+   */
+  callID?: string
 }
 
 export interface SyncSessionCreatedEvent {

@@ -9,7 +9,7 @@ Instead of delegating everything to a single AI agent, it's far more efficient t
 - **Category**: "What kind of work is this?" (determines model, temperature, prompt mindset)
 - **Skill**: "What tools and knowledge are needed?" (injects specialized knowledge, MCP tools, workflows)
 
-By combining these two concepts, you can generate optimal agents through `delegate_task`.
+By combining these two concepts, you can generate optimal agents through `task`.
 
 ---
 
@@ -32,10 +32,10 @@ A Category is an agent configuration preset optimized for specific domains.
 
 ### Usage
 
-Specify the `category` parameter when invoking the `delegate_task` tool.
+Specify the `category` parameter when invoking the `task` tool.
 
 ```typescript
-delegate_task(
+task(
   category="visual-engineering",
   prompt="Add a responsive chart component to the dashboard page"
 )
@@ -74,7 +74,7 @@ A Skill is a mechanism that injects **specialized knowledge (Context)** and **to
 Add desired skill names to the `load_skills` array.
 
 ```typescript
-delegate_task(
+task(
   category="quick",
   load_skills=["git-master"],
   prompt="Commit current changes. Follow commit message style."
@@ -126,7 +126,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 ---
 
-## 5. delegate_task Prompt Guide
+## 5. task Prompt Guide
 
 When delegating, **clear and specific** prompts are essential. Include these 7 elements:
 
@@ -158,7 +158,7 @@ You can fine-tune categories in `oh-my-opencode.json`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `description` | string | Human-readable description of the category's purpose. Shown in delegate_task prompt. |
+| `description` | string | Human-readable description of the category's purpose. Shown in task prompt. |
 | `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-6`) |
 | `variant` | string | Model variant (e.g., `max`, `xhigh`) |
 | `temperature` | number | Creativity level (0.0 ~ 2.0). Lower is more deterministic. |

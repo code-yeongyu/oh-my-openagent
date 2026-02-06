@@ -387,7 +387,7 @@ You can control related features in `oh-my-opencode.json`.
 
 2. **Single Plan Principle**: No matter how large the task, contain all TODOs in one plan file (`.md`). This prevents context fragmentation.
 
-3. **Active Delegation**: During execution, delegate to specialized agents via `delegate_task` rather than modifying code directly.
+3. **Active Delegation**: During execution, delegate to specialized agents via `task` rather than modifying code directly.
 
 4. **Trust /start-work Continuity**: Don't worry about session interruptions. `/start-work` will always resume your work from boulder.json.
 
