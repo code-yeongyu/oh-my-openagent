@@ -39,6 +39,7 @@ export function createAnthropicEffortHook() {
       output: ChatParamsOutput
     ): Promise<void> => {
       const { model, message } = input
+      if (!model?.modelID || !model?.providerID) return
       if (message.variant !== "max") return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (!isOpus46(model.modelID)) return
