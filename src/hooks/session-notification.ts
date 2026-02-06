@@ -29,6 +29,8 @@ interface SessionNotificationConfig {
   skipIfIncompleteTodos?: boolean
   /** Maximum number of sessions to track before cleanup (default: 100) */
   maxTrackedSessions?: number
+  /** Callback to check if there are pending background tasks (default: undefined - no check) */
+  hasPendingBackgroundTasks?: () => boolean
 }
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
@@ -156,6 +158,7 @@ export function createSessionNotification(
     idleConfirmationDelay: 1500,
     skipIfIncompleteTodos: true,
     maxTrackedSessions: 100,
+    hasPendingBackgroundTasks: undefined as (() => boolean) | undefined,
     ...config,
   }
 
@@ -229,6 +232,10 @@ export function createSessionNotification(
 
     executingNotifications.add(sessionID)
     try {
+      if (mergedConfig.hasPendingBackgroundTasks?.()) {
+        return
+      }
+
       if (mergedConfig.skipIfIncompleteTodos) {
         const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
         if (notificationVersions.get(sessionID) !== version) {

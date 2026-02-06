@@ -153,6 +153,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   // Check for conflicting notification plugins before creating session-notification
+  // backgroundManagerRef is set later after BackgroundManager is created
+  let backgroundManagerRef: BackgroundManager | null = null;
   let sessionNotification = null;
   if (isHookEnabled("session-notification")) {
     const forceEnable = pluginConfig.notification?.force_enable ?? false;
@@ -166,7 +168,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         allPlugins: externalNotifier.allPlugins,
       });
     } else {
-      sessionNotification = createSessionNotification(ctx);
+      sessionNotification = createSessionNotification(ctx, {
+        hasPendingBackgroundTasks: () => {
+          if (!backgroundManagerRef) return false;
+          return backgroundManagerRef.getRunningTasks().length > 0;
+        },
+      });
     }
   }
 
@@ -331,6 +338,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       },
     },
   );
+
+  backgroundManagerRef = backgroundManager;
 
   const atlasHook = isHookEnabled("atlas")
     ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
