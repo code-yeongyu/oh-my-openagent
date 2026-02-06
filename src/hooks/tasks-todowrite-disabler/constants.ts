@@ -16,7 +16,7 @@ export const REPLACEMENT_MESSAGE = `TodoRead/TodoWrite are DISABLED because expe
 3. DO THE WORK
 4. TaskUpdate({ id: "T-xxx", status: "completed" })
 
-CRITICAL: 1 task = 1 delegate_task. Fire independent tasks concurrently.
+CRITICAL: 1 task = 1 task. Fire independent tasks concurrently.
 
 **STOP! DO NOT START WORKING DIRECTLY - NO MATTER HOW SMALL THE TASK!**
 Even if the task seems trivial (1 line fix, simple edit, quick change), you MUST:

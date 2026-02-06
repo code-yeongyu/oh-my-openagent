@@ -59,7 +59,7 @@ todoWrite([
 **BEFORE generating the plan**, summon Metis to catch what you might have missed:
 
 \`\`\`typescript
-delegate_task(
+task(
   subagent_type="metis",
   prompt=\`Review this planning session before I generate the work plan:
 

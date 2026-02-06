@@ -195,7 +195,7 @@ oh-my-opencode/
 | Type Safety | `as any`, `@ts-ignore`, `@ts-expect-error` |
 | Error Handling | Empty catch blocks |
 | Testing | Deleting failing tests, writing implementation before test |
-| Agent Calls | Sequential - use `delegate_task` parallel |
+| Agent Calls | Sequential - use `task` parallel |
 | Hook Logic | Heavy PreToolUse - slows every call |
 | Commits | Giant (3+ files), separate test from impl |
 | Temperature | >0.3 for code agents |

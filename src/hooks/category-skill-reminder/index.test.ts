@@ -50,7 +50,7 @@ describe("category-skill-reminder hook", () => {
 
       // then - reminder should be injected
       expect(output.output).toContain("[Category+Skill Reminder]")
-      expect(output.output).toContain("delegate_task")
+      expect(output.output).toContain("task")
 
       clearSessionAgent(sessionID)
     })
@@ -130,16 +130,16 @@ describe("category-skill-reminder hook", () => {
   })
 
   describe("delegation tool tracking", () => {
-    test("should NOT inject reminder if delegate_task is used", async () => {
-      // given - sisyphus agent that uses delegate_task
+    test("should NOT inject reminder if task is used", async () => {
+      // given - sisyphus agent that uses task
       const hook = createHook()
       const sessionID = "delegation-session"
       updateSessionAgent(sessionID, "Sisyphus")
 
       const output = { title: "", output: "result", metadata: {} }
 
-      // when - delegate_task is used, then more tool calls
-      await hook["tool.execute.after"]({ tool: "delegate_task", sessionID, callID: "1" }, output)
+      // when - task is used, then more tool calls
+      await hook["tool.execute.after"]({ tool: "task", sessionID, callID: "1" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
@@ -329,15 +329,15 @@ describe("category-skill-reminder hook", () => {
     })
 
     test("should handle delegation tool names case-insensitively", async () => {
-      // given - sisyphus agent using DELEGATE_TASK in uppercase
+      // given - sisyphus agent using TASK in uppercase
       const hook = createHook()
       const sessionID = "case-delegate-session"
       updateSessionAgent(sessionID, "Sisyphus")
 
       const output = { title: "", output: "result", metadata: {} }
 
-      // when - DELEGATE_TASK in uppercase is used
-      await hook["tool.execute.after"]({ tool: "DELEGATE_TASK", sessionID, callID: "1" }, output)
+      // when - TASK in uppercase is used
+      await hook["tool.execute.after"]({ tool: "TASK", sessionID, callID: "1" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
