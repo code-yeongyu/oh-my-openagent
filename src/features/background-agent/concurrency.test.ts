@@ -94,7 +94,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
 
     // when
     const modelLimit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
-    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-5")
+    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-6")
     const defaultLimit = manager.getConcurrencyLimit("google/gemini-3-pro")
 
     // then

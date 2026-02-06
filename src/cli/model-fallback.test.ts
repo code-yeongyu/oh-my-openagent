@@ -417,7 +417,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -429,7 +429,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("github-copilot/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("github-copilot/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -441,7 +441,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 

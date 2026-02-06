@@ -243,7 +243,7 @@ async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | nul
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
       { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-5, opencode/gpt-5.2, etc." },
+      { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.2, etc." },
     ],
     initialValue: initial.opencodeZen,
   })

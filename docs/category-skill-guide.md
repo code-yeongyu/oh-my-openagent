@@ -22,12 +22,12 @@ A Category is an agent configuration preset optimized for specific domains.
 | Category | Default Model | Use Cases |
 |----------|---------------|-----------|
 | `visual-engineering` | `google/gemini-3-pro` | Frontend, UI/UX, design, styling, animation |
-| `ultrabrain` | `openai/gpt-5.2-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
-| `deep` | `openai/gpt-5.2-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
+| `ultrabrain` | `openai/gpt-5.3-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
+| `deep` | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry` | `google/gemini-3-pro` (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
 | `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
-| `unspecified-high` | `anthropic/claude-opus-4-5` (max) | Tasks that don't fit other categories, high effort required |
+| `unspecified-high` | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required |
 | `writing` | `google/gemini-3-flash` | Documentation, prose, technical writing |
 
 ### Usage
@@ -159,7 +159,7 @@ You can fine-tune categories in `oh-my-opencode.json`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `description` | string | Human-readable description of the category's purpose. Shown in delegate_task prompt. |
-| `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-5`) |
+| `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-6`) |
 | `variant` | string | Model variant (e.g., `max`, `xhigh`) |
 | `temperature` | number | Creativity level (0.0 ~ 2.0). Lower is more deterministic. |
 | `top_p` | number | Nucleus sampling parameter (0.0 ~ 1.0) |
@@ -191,7 +191,7 @@ You can fine-tune categories in `oh-my-opencode.json`.
 
     // 3. Configure thinking model and restrict tools
     "deep-reasoning": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "thinking": {
         "type": "enabled",
         "budgetTokens": 32000

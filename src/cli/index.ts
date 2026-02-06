@@ -43,7 +43,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   OpenAI        Native openai/ models (GPT-5.2 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
-  OpenCode Zen  opencode/ models (opencode/claude-opus-4-5, etc.)
+  OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
   Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
 `)
