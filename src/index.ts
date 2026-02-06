@@ -115,6 +115,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+  const disabledTools = new Set(pluginConfig.disabled_tools ?? []);
   const firstMessageVariantGate = createFirstMessageVariantGate();
 
   const tmuxConfig = {
@@ -487,19 +488,31 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     : {};
 
+  const allTools: Record<string, ToolDefinition> = {
+    ...builtinTools,
+    ...backgroundTools,
+    call_omo_agent: callOmoAgent,
+    ...(lookAt ? { look_at: lookAt } : {}),
+    delegate_task: delegateTask,
+    skill: skillTool,
+    skill_mcp: skillMcpTool,
+    slashcommand: slashcommandTool,
+    interactive_bash,
+    ...taskToolsRecord,
+  };
+
+  const filteredTools: Record<string, ToolDefinition> =
+    disabledTools.size > 0 ? {} : allTools;
+  if (disabledTools.size > 0) {
+    for (const [toolName, toolDefinition] of Object.entries(allTools)) {
+      if (!disabledTools.has(toolName)) {
+        filteredTools[toolName] = toolDefinition;
+      }
+    }
+  }
+
   return {
-    tool: {
-      ...builtinTools,
-      ...backgroundTools,
-      call_omo_agent: callOmoAgent,
-      ...(lookAt ? { look_at: lookAt } : {}),
-      delegate_task: delegateTask,
-      skill: skillTool,
-      skill_mcp: skillMcpTool,
-      slashcommand: slashcommandTool,
-      interactive_bash,
-      ...taskToolsRecord,
-    },
+    tool: filteredTools,
 
     "chat.message": async (input, output) => {
       if (input.agent) {
