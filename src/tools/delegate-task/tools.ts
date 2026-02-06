@@ -55,7 +55,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
 MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
 
-- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+- load_skills: ALWAYS REQUIRED. Pass an array of skill names (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+  Empty array (load_skills=[]) is ONLY acceptable when you have evaluated ALL available skills and determined NONE are relevant - you MUST justify this decision. Otherwise, always include relevant skills.
 - category: Use predefined category → Spawns Sisyphus-Junior with category config
   Available categories:
 ${categoryList}
@@ -74,7 +75,7 @@ Prompts MUST be in English.`
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass an array of relevant skill names. Empty array ([]) is ONLY acceptable when you have evaluated ALL skills and determined NONE are relevant. Always include skills when possible - they inject domain-specific expertise that dramatically improves task execution quality."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
@@ -97,10 +98,10 @@ Prompts MUST be in English.`
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
       if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
+        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass an array of skill names (e.g., ["playwright"], ["git-master"]). Empty array [] is ONLY acceptable when you have evaluated ALL skills and determined NONE are relevant - you must justify this in your prompt.`)
       }
       if (args.load_skills === null) {
-        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
+        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass an array of skill names (e.g., ["playwright"], ["git-master"]). If no skills are relevant, pass [] and justify in your prompt.`)
       }
 
       const runInBackground = args.run_in_background === true

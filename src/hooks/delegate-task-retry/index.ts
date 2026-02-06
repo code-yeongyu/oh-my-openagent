@@ -119,18 +119,37 @@ task(
 }
 
 export function createDelegateTaskRetryHook(_ctx: PluginInput) {
-  return {
-    "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { title: string; output: string; metadata: unknown }
-    ) => {
-      if (input.tool.toLowerCase() !== "task") return
+  const isDelegationTool = (tool: string): boolean => {
+    const normalized = tool.toLowerCase()
+    return normalized === "task" || normalized === "delegate_task"
+  }
 
-      const errorInfo = detectDelegateTaskError(output.output)
-      if (errorInfo) {
-        const guidance = buildRetryGuidance(errorInfo)
-        output.output += `\n${guidance}`
-      }
-    },
+  const toolExecuteBefore = async (
+    input: { tool: string; sessionID: string; callID: string },
+    output: { args: Record<string, unknown>; message?: string }
+  ) => {
+    if (!isDelegationTool(input.tool)) return
+
+    if (output.args.load_skills === undefined || output.args.load_skills === null) {
+      output.args.load_skills = []
+    }
+  }
+
+  const toolExecuteAfter = async (
+    input: { tool: string; sessionID: string; callID: string },
+    output: { title: string; output: string; metadata: unknown }
+  ) => {
+    if (!isDelegationTool(input.tool)) return
+
+    const errorInfo = detectDelegateTaskError(output.output)
+    if (errorInfo) {
+      const guidance = buildRetryGuidance(errorInfo)
+      output.output += `\n${guidance}`
+    }
+  }
+
+  return {
+    "tool.execute.before": toolExecuteBefore,
+    "tool.execute.after": toolExecuteAfter,
   }
 }

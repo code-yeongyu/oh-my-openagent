@@ -3,6 +3,7 @@ import {
   DELEGATE_TASK_ERROR_PATTERNS,
   detectDelegateTaskError,
   buildRetryGuidance,
+  createDelegateTaskRetryHook,
 } from "./index"
 
 describe("sisyphus-task-retry", () => {
@@ -114,6 +115,44 @@ describe("sisyphus-task-retry", () => {
       
       expect(guidance).toContain("explore")
       expect(guidance).toContain("oracle")
+    })
+  })
+
+  describe("createDelegateTaskRetryHook", () => {
+    it("injects load_skills=[] before delegate_task execution when missing", async () => {
+      const hook = createDelegateTaskRetryHook({} as never)
+      const input = { tool: "delegate_task", sessionID: "ses_1", callID: "call_1" }
+      const output = { args: { subagent_type: "explore", run_in_background: true } as Record<string, unknown> }
+
+      await hook["tool.execute.before"]?.(input, output)
+
+      expect(output.args.load_skills).toEqual([])
+    })
+
+    it("does not override provided load_skills", async () => {
+      const hook = createDelegateTaskRetryHook({} as never)
+      const input = { tool: "delegate_task", sessionID: "ses_1", callID: "call_1" }
+      const output = {
+        args: {
+          subagent_type: "explore",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        } as Record<string, unknown>,
+      }
+
+      await hook["tool.execute.before"]?.(input, output)
+
+      expect(output.args.load_skills).toEqual(["git-master"])
+    })
+
+    it("does not modify non-delegate tools", async () => {
+      const hook = createDelegateTaskRetryHook({} as never)
+      const input = { tool: "bash", sessionID: "ses_1", callID: "call_1" }
+      const output = { args: { command: "git status" } as Record<string, unknown> }
+
+      await hook["tool.execute.before"]?.(input, output)
+
+      expect(output.args).toEqual({ command: "git status" })
     })
   })
 })

@@ -42,7 +42,7 @@ task(
   subagent_type="[agent-name]",
   load_skills=[],
   run_in_background=false,
-  prompt="..."
+  prompt="... SKILL EVALUATION: [Explain why skills don't apply]"
 )
 \`\`\`
 

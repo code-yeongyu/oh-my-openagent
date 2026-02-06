@@ -303,12 +303,12 @@ task(
 )
 \`\`\`
 
+**CRITICAL**: load_skills parameter is REQUIRED and MUST be an array. An empty array (\`load_skills=[]\`) is ONLY acceptable when you have explicitly evaluated ALL skills and determined that NONE are relevant - and you MUST provide justification (see STEP 3 above).
+
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
 task(category="...", load_skills=[], run_in_background=false, prompt="...")  // NEVER do this without justification
 \`\`\`
-
-**CRITICAL**: load_skills parameter is REQUIRED and MUST be an array. Omitting this parameter will cause an error. An empty array (\`load_skills=[]\`) is ONLY acceptable when you have explicitly evaluated ALL skills and determined that NONE are relevant - and you MUST provide justification (see STEP 3 above).
 
 **Passing proper skills is HIGHLY RECOMMENDED** for optimal results. Skills inject domain-specific expertise that dramatically improves task execution quality.`
 }

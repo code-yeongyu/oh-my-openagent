@@ -78,7 +78,7 @@ Use \`task()\` with EITHER category OR agent (mutually exclusive):
 task(category="[name]", load_skills=["skill-1"], run_in_background=false, prompt="...")
 
 // Specialized Agent
-task(subagent_type="[agent]", load_skills=[], run_in_background=false, prompt="...")
+task(subagent_type="[agent]", load_skills=[], run_in_background=false, prompt="... SKILL EVALUATION: [Explain why skills don't apply]")
 \`\`\`
 
 {CATEGORY_SECTION}
@@ -241,8 +241,8 @@ task(category="...", run_in_background=false, ...)
 
 **Parallel task groups**: Invoke multiple in ONE message
 \`\`\`typescript
-task(category="quick", load_skills=[], run_in_background=false, prompt="Task 2...")
-task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3...")
+task(category="quick", load_skills=[], run_in_background=false, prompt="Task 2... SKILL EVALUATION: Simple change, no skills needed.")
+task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3... SKILL EVALUATION: Typo fix, skills not applicable.")
 \`\`\`
 
 **Background management**:

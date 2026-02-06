@@ -84,7 +84,13 @@ export function formatDetailedError(error: unknown, ctx: ErrorContext): string {
     lines.push(`- category: ${ctx.args.category ?? "(none)"}`)
     lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
     lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
-    lines.push(`- load_skills: [${ctx.args.load_skills?.join(", ") ?? ""}]`)
+    if (ctx.args.load_skills === undefined) {
+      lines.push(`- load_skills: (not provided - CAUSES VALIDATION ERROR)`)
+    } else if (ctx.args.load_skills.length === 0) {
+      lines.push(`- load_skills: [] (empty array - requires justification)`)
+    } else {
+      lines.push(`- load_skills: [${ctx.args.load_skills.join(", ")}]`)
+    }
     if (ctx.args.session_id) {
       lines.push(`- session_id: ${ctx.args.session_id}`)
     }
